@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v3 (2026-10-28) |
+| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v4 (2026-10-28) |
 | Date | 2026-10-28 |
 | Scope | Everything needed to go from an empty repository to a deployed, smoke-tested v1 |
 
@@ -172,11 +172,13 @@ Behaviour
 2. Verify with `aws-jwt-verify`:
    - cloud: `CognitoJwtVerifier.create({ userPoolId, clientId, tokenUse: 'access' })`;
    - local (when `JWKS_URI` is set): `JwtRsaVerifier.create({ issuer: COGNITO_ISSUER, jwksUri: JWKS_URI, audience: null, customJwtCheck })` where `customJwtCheck` enforces `client_id === CLIENT_ID` and `token_use === 'access'`.
+   - Local key download: the library's default fetcher only accepts `https://` addresses, and cognito-local serves its JWKS over plain HTTP. The local verifier therefore gets its own `SimpleJwksCache` whose fetcher uses Node's built-in `fetch` with a 3-second timeout (`AbortSignal.timeout`). Only the download changes; every check stays in the library. The cloud verifier keeps the default HTTPS-only fetcher, because `JWKS_URI` is empty there.
    - The verifier instance is created once at module load so the JWKS cache lives across invocations.
 3. On success return the simple response `{ isAuthorized: true, context: { sub, username, groups: JSON.stringify(groups ?? []) } }`.
-4. On any failure return `{ isAuthorized: false }` and log the reason at `warn` level without the token.
+4. When the token is missing, malformed or fails any check, return `{ isAuthorized: false }` and log the reason at `warn` level without the token.
+5. When the signing keys cannot be downloaded (the library's `FetchError`; the local fetcher throws the same error), log at `error` level and rethrow: the client gets 500 and the authorizer `Errors` alarm fires (architecture v4, section 4).
 
-Tests (`tests/unit/handlers/authorizer.test.ts`): generate an RSA key pair in the test, serve a fake JWKS through the verifier's `cacheJwks()` hook, sign tokens with `jose` (dev dependency) and cover: valid token, expired, wrong issuer, wrong client id, id token instead of access token, missing header, malformed header, groups absent.
+Tests (`tests/unit/handlers/authorizer.test.ts`): generate an RSA key pair in the test, serve a fake JWKS through the verifier's `cacheJwks()` hook, sign tokens with `node:crypto` (no extra dependency) and cover, for both the cloud and the local verifier: valid token, expired, wrong issuer, wrong client id, id token instead of access token, missing header, malformed header, groups absent. For the local verifier also cover the key download with a stubbed global `fetch`: success over `http://`; an error status, a timeout and a connection error all crash; an unknown key id with the server reachable still denies. For the cloud verifier, a `FetchError` from `verify` crashes.
 
 **Acceptance:** unit tests green; with the local stack up, `curl -H "Authorization: Bearer <alice token>" -X POST localhost:3000/hello` reaches the (still empty) hello handler instead of returning 403, a garbage token returns 403, and a request without `Authorization` header returns 401.
 

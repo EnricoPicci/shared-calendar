@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft v3 — base for the implementation plan |
+| Status | Draft v4 — base for the implementation plan |
 | Date | 2026-10-28 |
 | Stack | TypeScript · AWS Lambda · API Gateway (HTTP API) · Amazon Cognito · DynamoDB · AWS SAM |
 
@@ -13,6 +13,7 @@
 | v1 | 2026-10-26 | First draft |
 | v2 | 2026-10-27 | **Simplified passwords:** no forced password change at first sign-in; accounts are created with a permanent password returned once to the Administrator; self-service password change/reset deferred to a later version with a documented, minimal upgrade path (section 7.4). **Administrator can call Hello World:** the message depends on the caller's role (section 4). The admin bootstrap no longer needs e-mail. |
 | v3 | 2026-10-28 | Findings from implementation steps 2–3. **Token errors:** an invalid or expired token is answered with 403, not 401: it is the HTTP API's fixed answer when a Lambda authorizer denies; 401 remains for a missing `Authorization` header (section 4 contract and conventions, section 6 diagrams). **Error alarms** specified (section 11): one on the API's 5xx responses, covering every route including handled 500s, and one on authorizer crashes, both e-mailed to `AlertEmail`. |
+| v4 | 2026-10-28 | Finding from implementation step 5. **Key server unreachable:** when the authorizer cannot download Cognito's signing keys (connection error, time-out, error status) it fails instead of denying, so the client gets 500 rather than a misleading 403 and the authorizer `Errors` alarm fires (section 4 conventions, section 6 diagrams, section 11). Any problem with the token itself is still a 403. |
 
 ---
 
@@ -169,6 +170,7 @@ Conventions
 - `password` in the `POST /users` response is **permanent** and shown **only in this response**. It is generated server-side (16 random characters satisfying the pool policy), never logged, and the Administrator hands it to the user out of band.
 - Error body: `{ "error": "<short code>", "message": "<human text>" }`. Never leaks stack traces or AWS error details.
 - Token errors are answered by API Gateway before any handler runs: **401** when the `Authorization` header is missing, **403** when the token is invalid or expired (the HTTP API's fixed answer when the Lambda authorizer denies). Their body is API Gateway's own `{ "message": "…" }`, not the shape above. Handlers answer 403 for a valid token with the wrong role.
+- One exception is not the caller's fault: if the authorizer cannot download Cognito's signing keys (network error, time-out, error status), it fails instead of denying. API Gateway then answers **500** with its own `{ "message": "Internal Server Error" }`, and the authorizer `Errors` alarm fires (section 11). A 403 here would hide an outage behind what looks like a bad token.
 - `POST /hello` is a POST (not GET) because it **creates** a record.
 
 ---
@@ -261,6 +263,7 @@ sequenceDiagram
     AUTH->>COG: GET jwks.json (cached in memory)
     AUTH->>AUTH: verify signature, exp, issuer, client_id, token_use=access
     Note over GW: no Authorization header: 401 Unauthorized, authorizer not called
+    Note over AUTH: signing keys cannot be downloaded: authorizer fails, 500 Internal Server Error
     alt token invalid or expired
         AUTH-->>GW: isAuthorized=false
         GW-->>A: 403 Forbidden
@@ -329,6 +332,7 @@ sequenceDiagram
     C->>GW: POST /hello  Bearer JWT
     GW->>AUTH: authorize(request)
     Note over GW: no Authorization header: 401 Unauthorized, authorizer not called
+    Note over AUTH: signing keys cannot be downloaded: authorizer fails, 500 Internal Server Error
     alt token invalid or expired
         AUTH-->>GW: isAuthorized=false
         GW-->>C: 403 Forbidden
@@ -488,7 +492,7 @@ Guard-rails: budget alarm at 1 USD; API throttling; no on-demand DynamoDB (provi
 
 - Structured JSON logs (`requestId`, `route`, `username`, `role`, `outcome`, `durationMs`) via a 20-line logger (or AWS Lambda Powertools Logger if preferred).
 - CloudWatch default metrics (errors, duration, throttles) per function.
-- Two alarms, notification by e-mail to `AlertEmail` (SNS, free): the API's `5xx` responses > 0 in 5 min (every route, including handled 500s), and the `authorizer` Lambda's `Errors` > 0 in 5 min.
+- Two alarms, notification by e-mail to `AlertEmail` (SNS, free): the API's `5xx` responses > 0 in 5 min (every route, including handled 500s), and the `authorizer` Lambda's `Errors` > 0 in 5 min. The authorizer fails, rather than denying, only when it cannot download Cognito's signing keys (section 4), so this alarm means an outage, never a bad token.
 - No tracing (X-Ray) to stay in the free tier and keep the template short; it is a one-line switch if ever needed.
 
 ---
