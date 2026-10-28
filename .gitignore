@@ -1,2 +1,9 @@
 docs/ARCHITECTURE.pdf
 .DS_Store
+node_modules/
+.aws-sam/
+dist/
+coverage/
+.env*
+*.local.json
+!env.local.json
