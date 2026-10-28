@@ -79,6 +79,10 @@ Node 22 is pinned in `.nvmrc`; run `nvm use` first (the machine default may be n
   `DOCKER_HOST=unix://$HOME/.docker/run/docker.sock` and dummy `AWS_ACCESS_KEY_ID` /
   `AWS_SECRET_ACCESS_KEY` (otherwise SAM tries the real, possibly expired, AWS login).
   `scripts/local-api.sh` does both.
+- After `npm run build`, restart `npm run local:api`: it is not certain that the warm
+  containers pick up the rebuilt code on their own.
+- Under `sam local`, every event carries the same fake `requestContext.requestId`, so
+  identical request ids in local logs are expected. In the cloud they are unique.
 - The shell is zsh: `set -- $var` does not word-split. Pass arguments explicitly.
 
 More scripts arrive in step 10; update this list when they do.
