@@ -27,6 +27,8 @@ cached = true
 parallel = true
 
 [local.local_start_api.parameters]
+# AlertEmail has no default; only the alarms and the budget use it, and they do not run locally.
+parameter_overrides = "AlertEmail=local@example.invalid"
 env_vars = "env.local.json"
 docker_network = "hello-local"
 warm_containers = "EAGER"

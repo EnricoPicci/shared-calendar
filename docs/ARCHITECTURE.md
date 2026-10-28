@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | Draft v2 — base for the implementation plan |
-| Date | 2026-10-27 |
+| Status | Draft v3 — base for the implementation plan |
+| Date | 2026-10-28 |
 | Stack | TypeScript · AWS Lambda · API Gateway (HTTP API) · Amazon Cognito · DynamoDB · AWS SAM |
 
 ### Change log
@@ -12,6 +12,7 @@
 |---|---|---|
 | v1 | 2026-10-26 | First draft |
 | v2 | 2026-10-27 | **Simplified passwords:** no forced password change at first sign-in; accounts are created with a permanent password returned once to the Administrator; self-service password change/reset deferred to a later version with a documented, minimal upgrade path (section 7.4). **Administrator can call Hello World:** the message depends on the caller's role (section 4). The admin bootstrap no longer needs e-mail. |
+| v3 | 2026-10-28 | Findings from implementation steps 2–3. **Token errors:** an invalid or expired token is answered with 403, not 401: it is the HTTP API's fixed answer when a Lambda authorizer denies; 401 remains for a missing `Authorization` header (section 4 contract and conventions, section 6 diagrams). **Error alarms** specified (section 11): one on the API's 5xx responses, covering every route including handled 500s, and one on authorizer crashes, both e-mailed to `AlertEmail`. |
 
 ---
 
@@ -151,9 +152,9 @@ Base URL: `https://<api-id>.execute-api.<region>.amazonaws.com` (cloud) or `http
 
 | Method & path | Role | Request body | Success | Errors |
 |---|---|---|---|---|
-| `POST /hello` | admin **or** user | *(none)* | `201` `{ "messageId", "role", "message", "createdAt" }` | 401 no/invalid token · 403 in neither group |
-| `POST /users` | admin | `{ "username": "alice" }` | `201` `{ "username", "password" }` | 400 invalid username · 403 not admin · 409 already exists |
-| `DELETE /users/{username}` | admin | *(none)* | `204` | 403 not admin **or** target is an admin · 404 unknown user |
+| `POST /hello` | admin **or** user | *(none)* | `201` `{ "messageId", "role", "message", "createdAt" }` | 401 missing token · 403 invalid token or in neither group |
+| `POST /users` | admin | `{ "username": "alice" }` | `201` `{ "username", "password" }` | 400 invalid username · 401 missing token · 403 invalid token or not admin · 409 already exists |
+| `DELETE /users/{username}` | admin | *(none)* | `204` | 401 missing token · 403 invalid token, not admin **or** target is an admin · 404 unknown user |
 
 `POST /hello` response examples
 
@@ -167,6 +168,7 @@ Conventions
 - `username`: `^[a-z0-9][a-z0-9._-]{2,31}$` (3–32 chars, lowercase). Validated with `zod` before anything else runs.
 - `password` in the `POST /users` response is **permanent** and shown **only in this response**. It is generated server-side (16 random characters satisfying the pool policy), never logged, and the Administrator hands it to the user out of band.
 - Error body: `{ "error": "<short code>", "message": "<human text>" }`. Never leaks stack traces or AWS error details.
+- Token errors are answered by API Gateway before any handler runs: **401** when the `Authorization` header is missing, **403** when the token is invalid or expired (the HTTP API's fixed answer when the Lambda authorizer denies). Their body is API Gateway's own `{ "message": "…" }`, not the shape above. Handlers answer 403 for a valid token with the wrong role.
 - `POST /hello` is a POST (not GET) because it **creates** a record.
 
 ---
@@ -258,9 +260,10 @@ sequenceDiagram
     GW->>AUTH: authorize(request)  [result cached 5 min per token]
     AUTH->>COG: GET jwks.json (cached in memory)
     AUTH->>AUTH: verify signature, exp, issuer, client_id, token_use=access
+    Note over GW: no Authorization header: 401 Unauthorized, authorizer not called
     alt token invalid or expired
         AUTH-->>GW: isAuthorized=false
-        GW-->>A: 401 Unauthorized
+        GW-->>A: 403 Forbidden
     else token valid
         AUTH-->>GW: isAuthorized=true, context {sub, username, groups}
         GW->>CU: invoke (event + authorizer context)
@@ -325,9 +328,10 @@ sequenceDiagram
 
     C->>GW: POST /hello  Bearer JWT
     GW->>AUTH: authorize(request)
-    alt token invalid
+    Note over GW: no Authorization header: 401 Unauthorized, authorizer not called
+    alt token invalid or expired
         AUTH-->>GW: isAuthorized=false
-        GW-->>C: 401 Unauthorized
+        GW-->>C: 403 Forbidden
     else token valid
         AUTH-->>GW: isAuthorized=true, context {sub, username, groups}
         GW->>HW: invoke

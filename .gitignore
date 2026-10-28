@@ -4,6 +4,7 @@ node_modules/
 .aws-sam/
 dist/
 coverage/
+.cognito/
 .env*
+# Includes env.local.json: local-seed.sh generates it with machine-specific pool/client ids.
 *.local.json
-!env.local.json

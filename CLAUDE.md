@@ -67,11 +67,20 @@ Node 22 is pinned in `.nvmrc`; run `nvm use` first (the machine default may be n
 - `npm run build`: `sam build`. Always go through npm: SAM needs the project's `esbuild`
   on the PATH, which a bare `sam build` does not have.
 - `sam validate --lint`: checks `template.yaml`.
-- `sam local …` with Docker Desktop needs
+- `npm run local:up`: starts DynamoDB Local, dynamodb-admin (http://localhost:8001) and
+  cognito-local, then seeds them (table, pool, client, groups, users `admin` /
+  `Admin-Local-Pass-1!` and `alice` / `Alice-Local-Pass-1!`) and writes `env.local.json`.
+  Idempotent. Set `DYNAMODB_PORT=8002` when another project holds port 8000.
+- `npm run local:api`: builds and serves the API on http://127.0.0.1:3000 (foreground).
+- `npm run local:down`: stops the stack. The table is in memory and is lost; Cognito
+  data survives in `.cognito/`.
+- Raw `sam local …` with Docker Desktop needs
   `DOCKER_HOST=unix://$HOME/.docker/run/docker.sock` and dummy `AWS_ACCESS_KEY_ID` /
   `AWS_SECRET_ACCESS_KEY` (otherwise SAM tries the real, possibly expired, AWS login).
+  `scripts/local-api.sh` does both.
+- The shell is zsh: `set -- $var` does not word-split. Pass arguments explicitly.
 
-More scripts arrive in steps 3 and 10; update this list when they do.
+More scripts arrive in step 10; update this list when they do.
 
 ## Folder map
 
@@ -79,6 +88,9 @@ More scripts arrive in steps 3 and 10; update this list when they do.
 - `src/lib/`: shared modules; the only place that touches the AWS SDK (step 4).
 - `tests/unit/`: vitest unit tests, mirroring `src/` (e.g. `tests/unit/lib/http.test.ts`).
 - `tests/integration/`: end-to-end tests against the local Docker stack (step 9).
+- `scripts/`: shell scripts behind the npm scripts (`local-seed.sh`, `local-api.sh`).
+- `docker/`: files for the local stack (`cognito-local-config.json`).
+- Generated, git-ignored: `env.local.json`, `.cognito/`, `.aws-sam/`.
 - `docs/`, `prompts/`: see "Where the truth lives".
 
 ## Test conventions

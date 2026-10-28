@@ -10,7 +10,10 @@
     "build": "sam build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test:unit": "vitest run --project unit"
+    "test:unit": "vitest run --project unit",
+    "local:up": "mkdir -p .cognito && cp docker/cognito-local-config.json .cognito/config.json && docker compose up -d && bash scripts/local-seed.sh",
+    "local:down": "docker compose down",
+    "local:api": "bash scripts/local-api.sh"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1158.0",

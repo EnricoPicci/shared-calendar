@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27) |
+| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v3 (2026-10-28) |
 | Date | 2026-10-28 |
 | Scope | Everything needed to go from an empty repository to a deployed, smoke-tested v1 |
 
@@ -65,7 +65,7 @@ Files
 - `tsconfig.json`: `target ES2022`, `module ESNext`, `moduleResolution Bundler`, `strict true`, `noUncheckedIndexedAccess true`, `types: ["node", "vitest/globals"]`.
 - `eslint.config.js` (flat config, `typescript-eslint` recommended).
 - `vitest.config.ts` with two projects: `unit` (`tests/unit/**`) and `integration` (`tests/integration/**`, run only when `RUN_INTEGRATION=1`).
-- `.gitignore` extended with `node_modules/`, `.aws-sam/`, `dist/`, `.env*`, `*.local.json` except `env.local.json` (which holds no secrets).
+- `.gitignore` extended with `node_modules/`, `.aws-sam/`, `dist/`, `.env*`, `*.local.json` (this includes `env.local.json`, which step 3's seed script generates with machine-specific ids).
 - `.editorconfig`, `.nvmrc` (`22`).
 - `src/` and `tests/` folders with a placeholder test.
 
@@ -122,9 +122,10 @@ Also create `samconfig.toml` with a `[default.deploy.parameters]` section (stack
 Files
 
 - `docker-compose.yml` with three services on a named network `hello-local`:
-  - `dynamodb` → `amazon/dynamodb-local`, port `8000`, command `-jar DynamoDBLocal.jar -sharedDb -inMemory`.
+  - `dynamodb` → `amazon/dynamodb-local`, host port `${DYNAMODB_PORT:-8000}` (override when another project already uses 8000), command `-jar DynamoDBLocal.jar -sharedDb -inMemory`.
   - `dynamodb-admin` → `aaronshaf/dynamodb-admin`, port `8001`, env `DYNAMO_ENDPOINT=http://dynamodb:8000`.
-  - `cognito` → `jagregory/cognito-local`, port `9229`, volume `./.cognito:/app/.cognito` (gitignored).
+  - `cognito` → `jagregory/cognito-local`, port `9229`, volume `./.cognito:/app/.cognito` (gitignored). `local:up` first copies `docker/cognito-local-config.json` to `.cognito/config.json`: it allows plain (non-e-mail) usernames and fixes the token issuer to `http://localhost:9229/<poolId>`, two emulator defaults that differ from what we need.
+  - Images are pinned to exact versions; all ports are bound to `127.0.0.1` only.
 - `scripts/local-seed.sh` (idempotent, uses the AWS CLI with dummy credentials and `--endpoint-url`):
   1. create table `hello-messages` on DynamoDB Local with the same key schema as the template;
   2. create user pool `local_pool` and an app client on cognito-local, enable `USER_PASSWORD_AUTH`;
@@ -132,10 +133,10 @@ Files
   4. create user `admin` in group `admin` with a permanent password `Admin-Local-Pass-1!`;
   5. create user `alice` in group `user` with a permanent password `Alice-Local-Pass-1!`;
   6. write the generated pool id and client id into `env.local.json`.
-- `env.local.json`: per-function env for `sam local`, pointing `DYNAMODB_ENDPOINT` to `http://dynamodb:8000`, `COGNITO_ENDPOINT` to `http://cognito:9229`, `JWKS_URI` to `http://cognito:9229/<poolId>/.well-known/jwks.json`, `COGNITO_ISSUER` to `http://cognito:9229/<poolId>`, plus dummy `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` so the SDK does not look for real credentials.
-- npm scripts: `local:up` (`docker compose up -d` + seed), `local:down`, `local:api` (`sam build && sam local start-api --docker-network hello-local --env-vars env.local.json --warm-containers EAGER`).
+- `env.local.json`: per-function env for `sam local`, pointing `DYNAMODB_ENDPOINT` to `http://dynamodb:8000`, `COGNITO_ENDPOINT` to `http://cognito:9229`, `JWKS_URI` to `http://cognito:9229/<poolId>/.well-known/jwks.json`, `COGNITO_ISSUER` to `http://localhost:9229/<poolId>` (the `iss` claim names the address the token was *requested* from, i.e. the host, not the address the Lambda uses to fetch the keys), plus dummy `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` so the SDK does not look for real credentials.
+- npm scripts: `local:up` (copy the emulator config, `docker compose up -d`, seed), `local:down`, `local:api` (`scripts/local-api.sh`: finds the Docker socket, sets dummy AWS credentials, then `sam build` and `sam local start-api` with the `[local]` settings of `samconfig.toml`: `--docker-network hello-local --env-vars env.local.json --warm-containers EAGER`).
 
-Note on hostnames: handlers run inside SAM's containers and reach the emulators by service name on the Docker network; tests run on the host and reach them on `localhost`. The seed script and the tests therefore use `localhost:8000/9229`, while `env.local.json` uses the service names.
+Note on hostnames: handlers run inside SAM's containers and reach the emulators by service name on the Docker network; tests run on the host and reach them on `localhost`. The seed script and the tests therefore use `localhost:${DYNAMODB_PORT:-8000}` and `localhost:9229`, while `env.local.json` uses the service names.
 
 **Acceptance:** after `npm run local:up`, `http://localhost:8001` shows an empty `hello-messages` table; `aws cognito-idp initiate-auth --endpoint-url http://localhost:9229 …` for `alice` returns tokens; `npm run local:api` prints the three mounted routes.
 
@@ -177,7 +178,7 @@ Behaviour
 
 Tests (`tests/unit/handlers/authorizer.test.ts`): generate an RSA key pair in the test, serve a fake JWKS through the verifier's `cacheJwks()` hook, sign tokens with `jose` (dev dependency) and cover: valid token, expired, wrong issuer, wrong client id, id token instead of access token, missing header, malformed header, groups absent.
 
-**Acceptance:** unit tests green; with the local stack up, `curl -H "Authorization: Bearer <alice token>" -X POST localhost:3000/hello` reaches the (still empty) hello handler instead of returning 401, and a garbage token returns 401.
+**Acceptance:** unit tests green; with the local stack up, `curl -H "Authorization: Bearer <alice token>" -X POST localhost:3000/hello` reaches the (still empty) hello handler instead of returning 403, a garbage token returns 403, and a request without `Authorization` header returns 401.
 
 ---
 
@@ -246,7 +247,7 @@ Test cases (`tests/integration/journeys.test.ts`), in order:
 | # | Journey | Expectation |
 |---|---|---|
 | 1 | Sign in as `alice` and `admin` | tokens returned, no challenge |
-| 2 | `/hello` without token / with garbage token | 401 |
+| 2 | `/hello` without token / with garbage token | 401 / 403 |
 | 3 | `/hello` as `alice` | 201, `role: user`, message `Hello World, I am alice`, row in table |
 | 4 | `/hello` as `admin` | 201, `role: admin`, Administrator message, row in table |
 | 5 | `POST /users` as `alice` | 403 |

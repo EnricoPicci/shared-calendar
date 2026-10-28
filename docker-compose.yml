@@ -1,0 +1,52 @@
+# Local emulators for development and integration tests (architecture section 8).
+# Start with `npm run local:up`, stop with `npm run local:down`.
+#
+# Ports are bound to 127.0.0.1 only, so nothing is reachable from the local network.
+# DYNAMODB_PORT changes the host port of DynamoDB Local (default 8000) when another
+# project already uses 8000; inside Docker it is always dynamodb:8000.
+
+name: hello-world-api
+
+services:
+  # DynamoDB emulator. In memory: the table and its rows disappear on `local:down`.
+  dynamodb:
+    image: amazon/dynamodb-local:3.3.1
+    command: -jar DynamoDBLocal.jar -sharedDb -inMemory
+    ports:
+      - 127.0.0.1:${DYNAMODB_PORT:-8000}:8000
+    networks:
+      - hello-local
+
+  # Web UI to browse the tables: http://localhost:8001
+  dynamodb-admin:
+    image: aaronshaf/dynamodb-admin:5.3.4
+    environment:
+      DYNAMO_ENDPOINT: http://dynamodb:8000
+    ports:
+      - 127.0.0.1:8001:8001
+    depends_on:
+      - dynamodb
+    networks:
+      - hello-local
+
+  # Cognito emulator. Users, groups and pools are kept in ./.cognito across restarts.
+  # `npm run local:up` first copies docker/cognito-local-config.json to .cognito/config.json
+  # (copied, not mounted: the emulator rewrites the file). It changes two emulator defaults:
+  # - usernames may be plain names; the emulator otherwise demands e-mail addresses, which
+  #   real Cognito does not and our pool does not use;
+  # - token issuer fixed to http://localhost:9229/<poolId>, the value env.local.json expects
+  #   (the emulator otherwise writes http://0.0.0.0:9229/<poolId>).
+  cognito:
+    image: jagregory/cognito-local:5.3.0
+    ports:
+      - 127.0.0.1:9229:9229
+    volumes:
+      - ./.cognito:/app/.cognito
+    networks:
+      - hello-local
+
+# Fixed name (not prefixed by the project) so `sam local start-api --docker-network hello-local`
+# can attach the Lambda containers to it and reach the services above by name.
+networks:
+  hello-local:
+    name: hello-local
