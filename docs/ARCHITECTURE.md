@@ -483,7 +483,8 @@ Guard-rails: budget alarm at 1 USD; API throttling; no on-demand DynamoDB (provi
 ## 11. Observability
 
 - Structured JSON logs (`requestId`, `route`, `username`, `role`, `outcome`, `durationMs`) via a 20-line logger (or AWS Lambda Powertools Logger if preferred).
-- CloudWatch default metrics (errors, duration, throttles) per function; one alarm on `authorizer` or `hello` 5xx > 0 in 5 min, notification by e-mail (SNS, free).
+- CloudWatch default metrics (errors, duration, throttles) per function.
+- Two alarms, notification by e-mail to `AlertEmail` (SNS, free): the API's `5xx` responses > 0 in 5 min (every route, including handled 500s), and the `authorizer` Lambda's `Errors` > 0 in 5 min.
 - No tracing (X-Ray) to stay in the free tier and keep the template short; it is a one-line switch if ever needed.
 
 ---

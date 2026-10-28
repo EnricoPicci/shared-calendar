@@ -101,6 +101,9 @@ Resources to declare (names are the logical IDs to use):
 | `DeleteUserFunction` | `AWS::Serverless::Function` | route `DELETE /users/{username}`; policy `cognito-idp:AdminListGroupsForUser`, `AdminUserGlobalSignOut`, `AdminDeleteUser` on the pool ARN |
 | `*LogGroup` (one per function) | `AWS::Logs::LogGroup` | `RetentionInDays: 14` |
 | `Budget` | `AWS::Budgets::Budget` | 1 USD monthly, e-mail notification to parameter `AlertEmail` |
+| `AlarmTopic` | `AWS::SNS::Topic` | e-mail subscription to `AlertEmail` (architecture section 11) |
+| `Api5xxAlarm` | `AWS::CloudWatch::Alarm` | `AWS/ApiGateway` metric `5xx` for the `HttpApi` > 0 over 5 min, `TreatMissingData: notBreaching`, action → `AlarmTopic` |
+| `AuthorizerErrorsAlarm` | `AWS::CloudWatch::Alarm` | `AWS/Lambda` metric `Errors` for `AuthorizerFunction` > 0 over 5 min, `TreatMissingData: notBreaching`, action → `AlarmTopic` |
 
 Global function settings (`Globals.Function`): `Runtime: nodejs22.x`, `Architectures: [arm64]`, `MemorySize: 256`, `Timeout: 10`, `Tracing: Disabled`. Each function carries `Metadata.BuildMethod: esbuild` with `BuildProperties: { Minify: true, Target: es2022, Format: esm, Sourcemap: true, EntryPoints: [<handler file>] }`.
 
@@ -290,7 +293,7 @@ Test cases (`tests/integration/journeys.test.ts`), in order:
 2. `sam deploy --guided` once: stack `hello-world-api`, region of choice, parameters `AdminUsername`, `AlertEmail`; accept the IAM capability prompt; save to `samconfig.toml`.
 3. `npm run bootstrap-admin hello-world-api` and choose the admin password.
 4. `npm run smoke hello-world-api`.
-5. Confirm the budget subscription e-mail from AWS Budgets.
+5. Confirm the SNS subscription e-mail ("AWS Notification - Subscription Confirmation") sent to `AlertEmail`; until then the error alarms send nothing. Then, in the AWS console, open Billing → Budgets and check that `hello-world-api-monthly` exists with a 1 USD limit and `AlertEmail` as recipient (budget alerts need no confirmation).
 6. In the AWS console, open DynamoDB → `hello-messages` → Explore items: the two smoke-test rows are visible (N4 in the cloud).
 7. Record `ApiUrl`, `UserPoolId`, `UserPoolClientId` in the README (they are not secrets).
 
@@ -354,5 +357,5 @@ Suggested checkpoints to commit and, if wanted, push: after step 3 (local stack 
 
 - All twelve steps' acceptance checks pass.
 - `npm run verify` is green on a clean clone.
-- The stack is deployed, the smoke test passes, the budget alarm is confirmed.
+- The stack is deployed, the smoke test passes, the alarm e-mail subscription is confirmed and the budget is visible in the Budgets console.
 - `docs/ARCHITECTURE.md` reflects what was built; commit tagged `v1.0.0`.

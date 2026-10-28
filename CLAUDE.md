@@ -64,7 +64,12 @@ Node 22 is pinned in `.nvmrc`; run `nvm use` first (the machine default may be n
 - `npm run typecheck`: `tsc --noEmit` over `src/`, `tests/` and the config files.
 - `npm run lint`: ESLint flat config with `typescript-eslint` recommended rules.
 - `npm run test:unit`: vitest project `unit`, no Docker needed.
-- `npm run build`: `sam build` (needs `template.yaml`, added in plan step 2).
+- `npm run build`: `sam build`. Always go through npm: SAM needs the project's `esbuild`
+  on the PATH, which a bare `sam build` does not have.
+- `sam validate --lint`: checks `template.yaml`.
+- `sam local …` with Docker Desktop needs
+  `DOCKER_HOST=unix://$HOME/.docker/run/docker.sock` and dummy `AWS_ACCESS_KEY_ID` /
+  `AWS_SECRET_ACCESS_KEY` (otherwise SAM tries the real, possibly expired, AWS login).
 
 More scripts arrive in steps 3 and 10; update this list when they do.
 

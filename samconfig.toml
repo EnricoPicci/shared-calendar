@@ -1,0 +1,32 @@
+# SAM CLI settings. Each [env.command.parameters] section holds the flags that would
+# otherwise be typed on the command line; pick an environment with --config-env <env>.
+version = 0.1
+
+[default.global.parameters]
+stack_name = "hello-world-api"
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.validate.parameters]
+lint = true
+
+# Cloud deployment. The region is a placeholder until step 11: sam deploy --guided asks
+# for it (and for AdminUsername / AlertEmail) and saves the answers here.
+[default.deploy.parameters]
+stack_name = "hello-world-api"
+region = "eu-west-1"
+capabilities = "CAPABILITY_IAM"
+resolve_s3 = true
+confirm_changeset = true
+
+# Laptop: sam local start-api against the Docker emulators (plan step 3).
+[local.build.parameters]
+cached = true
+parallel = true
+
+[local.local_start_api.parameters]
+env_vars = "env.local.json"
+docker_network = "hello-local"
+warm_containers = "EAGER"

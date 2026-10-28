@@ -1,0 +1,565 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Hello World API (docs/ARCHITECTURE.md). Cognito user pool for identities and roles,
+  HTTP API with a Lambda authorizer, three business Lambdas, one DynamoDB table.
+
+# Values asked for at deploy time (sam deploy --guided stores them in samconfig.toml).
+Parameters:
+  AdminUsername:
+    Type: String
+    Default: admin
+    AllowedPattern: '^[a-z0-9][a-z0-9._-]{2,31}$'
+    Description: >
+      Username of the Administrator created by the deployment. Never change it after the
+      first deploy: CloudFormation would replace (delete and recreate) the user.
+  AlertEmail:
+    Type: String
+    AllowedPattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+    Description: E-mail address that receives the monthly budget alert and the error alarms.
+
+# Settings shared by every function below, so each function only lists what differs.
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures:
+      - arm64
+    MemorySize: 256
+    Timeout: 10
+    Tracing: Disabled
+    Environment:
+      Variables:
+        # Makes stack traces in the logs point at the TypeScript lines (esbuild emits source maps).
+        NODE_OPTIONS: --enable-source-maps
+
+Resources:
+  # ---------------------------------------------------------------------------
+  # Identity: Cognito user pool, its app client, the two role groups, the admin
+  # ---------------------------------------------------------------------------
+
+  # The user directory. Stores usernames and password hashes, issues the JWTs.
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolTier: ESSENTIALS
+      DeletionProtection: ACTIVE
+      # No self sign-up: only AdminCreateUser (our createUser Lambda, or this template) creates accounts.
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      # v1 has no forgot-password flow (architecture 7.4): only an administrator can recover an account.
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: admin_only
+            Priority: 1
+      # Optional e-mail attribute, unused in v1, kept so the forgot-password upgrade needs no pool change.
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: false
+          Mutable: true
+
+  # The "app" that clients sign in through. Defines which sign-in flows and token lifetimes are allowed.
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      AccessTokenValidity: 15
+      IdTokenValidity: 15
+      RefreshTokenValidity: 7
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      # Sign-in errors do not reveal whether a username exists.
+      PreventUserExistenceErrors: ENABLED
+      # Lets deleteUser revoke refresh tokens through AdminUserGlobalSignOut.
+      EnableTokenRevocation: true
+
+  # Roles are group memberships; they arrive in the token as the cognito:groups claim.
+  AdminGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref UserPool
+      GroupName: admin
+      Description: Administrators may create and delete users and call Hello World.
+
+  UserGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref UserPool
+      GroupName: user
+      Description: Users may call Hello World.
+
+  # The Administrator account. Created without a password and without any e-mail;
+  # scripts/bootstrap-admin.sh sets a permanent password once after the first deploy.
+  AdminUser:
+    Type: AWS::Cognito::UserPoolUser
+    Properties:
+      UserPoolId: !Ref UserPool
+      Username: !Ref AdminUsername
+      MessageAction: SUPPRESS
+
+  AdminUserToGroup:
+    Type: AWS::Cognito::UserPoolUserToGroupAttachment
+    Properties:
+      UserPoolId: !Ref UserPool
+      GroupName: !Ref AdminGroup
+      Username: !Ref AdminUser
+
+  # ---------------------------------------------------------------------------
+  # Data: the messages table
+  # ---------------------------------------------------------------------------
+
+  # One row per Hello World call. Fixed capacity of 1 read / 1 write per second stays inside
+  # the always-free tier and cannot scale into cost. Encrypted at rest with an AWS-owned key
+  # (the default, free). Deletion protection blocks deleting the table, even by sam delete.
+  MessagesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: hello-messages
+      BillingMode: PROVISIONED
+      AttributeDefinitions:
+        - AttributeName: messageId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: messageId
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+      DeletionProtectionEnabled: true
+
+  # ---------------------------------------------------------------------------
+  # API: the public HTTPS entry point
+  # ---------------------------------------------------------------------------
+
+  # Every route requires a valid token: API Gateway calls the authorizer Lambda first and only
+  # forwards the request if it answers isAuthorized=true. The answer is cached per Authorization
+  # header for 300 s. Throttling (5 req/s, bursts of 10) blocks brute force and bill surprises.
+  # No stage name: the default stage serves the routes at the root of the URL (architecture 4).
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Auth:
+        DefaultAuthorizer: JwtLambdaAuthorizer
+        Authorizers:
+          JwtLambdaAuthorizer:
+            FunctionArn: !GetAtt AuthorizerFunction.Arn
+            AuthorizerPayloadFormatVersion: '2.0'
+            EnableSimpleResponses: true
+            Identity:
+              Headers:
+                - Authorization
+              ReauthorizeEvery: 300
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 10
+        ThrottlingRateLimit: 5
+      # One JSON line per request. No headers are logged, so tokens never reach the logs.
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiAccessLogGroup.Arn
+        Format: '{"requestId":"$context.requestId","ip":"$context.identity.sourceIp","requestTime":"$context.requestTime","method":"$context.httpMethod","path":"$context.path","status":"$context.status","latencyMs":"$context.responseLatency","authorizerError":"$context.authorizer.error","integrationError":"$context.integrationErrorMessage"}'
+
+  ApiAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/apigateway/${AWS::StackName}-access
+      RetentionInDays: 14
+
+  # ---------------------------------------------------------------------------
+  # Functions. Each one has its own log group (14-day retention) and its own IAM role.
+  #
+  # Environment variables set to '' are only used locally: env.local.json fills them
+  # for sam local, and the code treats an empty value as "not set" (use AWS defaults).
+  # sam local can only override variables that are declared here, hence the ''.
+  #
+  # Each role only lets the function write its own logs and call the exact AWS
+  # actions it needs, on the one pool or table it works with. The log permission
+  # ends in "log-stream:*" because Lambda names a new log stream per container at
+  # run time; it cannot reach any other log group.
+  # ---------------------------------------------------------------------------
+
+  # Verifies the Cognito access token. Needs no AWS permission besides logging:
+  # the signing keys are public and fetched over HTTPS.
+  AuthorizerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: authorizer.handler
+      Role: !GetAtt AuthorizerRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref AuthorizerLogGroup
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref UserPool
+          CLIENT_ID: !Ref UserPoolClient
+          JWKS_URI: ''
+          COGNITO_ISSUER: ''
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/authorizer.ts
+
+  # Lets API Gateway call the authorizer. SAM creates this permission for route functions,
+  # but not for an HTTP API's Lambda authorizer; without it every request fails with 500
+  # in the cloud (sam local does not notice). Limited to the authorizers of this one API.
+  AuthorizerInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref AuthorizerFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/authorizers/*
+
+  AuthorizerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-authorizer
+      RetentionInDays: 14
+
+  AuthorizerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${AuthorizerLogGroup}:log-stream:*
+
+  # POST /hello: builds the role-dependent message and stores it.
+  HelloFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: hello.handler
+      Role: !GetAtt HelloRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref HelloLogGroup
+      Environment:
+        Variables:
+          MESSAGES_TABLE: !Ref MessagesTable
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        Hello:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /hello
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/hello.ts
+
+  HelloLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-hello
+      RetentionInDays: 14
+
+  HelloRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${HelloLogGroup}:log-stream:*
+        - PolicyName: put-message
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: !GetAtt MessagesTable.Arn
+
+  # POST /users: creates a user with a permanent password in the "user" group.
+  # AdminDeleteUser is only used to roll back a half-created user.
+  CreateUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: createUser.handler
+      Role: !GetAtt CreateUserRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref CreateUserLogGroup
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref UserPool
+          COGNITO_ENDPOINT: ''
+      Events:
+        CreateUser:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /users
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/createUser.ts
+
+  CreateUserLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-createUser
+      RetentionInDays: 14
+
+  CreateUserRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CreateUserLogGroup}:log-stream:*
+        - PolicyName: create-user
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminSetUserPassword
+                  - cognito-idp:AdminAddUserToGroup
+                  - cognito-idp:AdminDeleteUser
+                Resource: !GetAtt UserPool.Arn
+
+  # DELETE /users/{username}: refuses administrators, signs the user out everywhere, deletes them.
+  DeleteUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: deleteUser.handler
+      Role: !GetAtt DeleteUserRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref DeleteUserLogGroup
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref UserPool
+          COGNITO_ENDPOINT: ''
+      Events:
+        DeleteUser:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: DELETE
+            Path: /users/{username}
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/deleteUser.ts
+
+  DeleteUserLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-deleteUser
+      RetentionInDays: 14
+
+  DeleteUserRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeleteUserLogGroup}:log-stream:*
+        - PolicyName: delete-user
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminListGroupsForUser
+                  - cognito-idp:AdminUserGlobalSignOut
+                  - cognito-idp:AdminDeleteUser
+                Resource: !GetAtt UserPool.Arn
+
+  # ---------------------------------------------------------------------------
+  # Error alarms (architecture section 11)
+  # ---------------------------------------------------------------------------
+
+  # A notification channel that forwards alarm messages to AlertEmail. After the first
+  # deploy AWS sends a confirmation e-mail; no alarm e-mail arrives until it is confirmed.
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlertEmail
+
+  # Fires when the authorizer crashes at least once in 5 minutes (callers then get a 500).
+  AuthorizerErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: The authorizer Lambda failed at least once in 5 minutes.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref AuthorizerFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      # No invocations means no data, which is normal here, not an alarm.
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopic
+
+  # Fires when the API answers any request with a 5xx status at least once in 5 minutes.
+  # Covers every route, including handlers that catch a failure and return 500 themselves
+  # (those do not count as Lambda errors, so a per-function alarm would miss them).
+  Api5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: The API returned at least one 5xx response in 5 minutes.
+      Namespace: AWS/ApiGateway
+      MetricName: 5xx
+      Dimensions:
+        - Name: ApiId
+          Value: !Ref HttpApi
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopic
+
+  # ---------------------------------------------------------------------------
+  # Cost guard-rail
+  # ---------------------------------------------------------------------------
+
+  # E-mails AlertEmail when this month's actual or forecast spend for the account exceeds 1 USD.
+  Budget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub ${AWS::StackName}-monthly
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: 1
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref AlertEmail
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref AlertEmail
+
+# Values printed after deployment; scripts read them with sam list stack-outputs. None is a secret.
+Outputs:
+  ApiUrl:
+    Description: Base URL of the API
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}
+  UserPoolId:
+    Description: Cognito user pool id
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Description: Cognito app client id used to sign in
+    Value: !Ref UserPoolClient
+  MessagesTableName:
+    Description: DynamoDB table holding the messages
+    Value: !Ref MessagesTable
