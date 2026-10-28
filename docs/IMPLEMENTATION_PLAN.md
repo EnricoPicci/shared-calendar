@@ -182,6 +182,10 @@ Tests (`tests/unit/handlers/authorizer.test.ts`): generate an RSA key pair in th
 
 **Goal:** `src/handlers/hello.ts` implementing architecture section 6.5.
 
+**Why `hello` comes before the user-management handlers.** This is a deliberate choice: Hello World is the simplest end-to-end slice, so proving it first validates the authorizer, the local stack and the DynamoDB wiring before the more involved `createUser` and `deleteUser` handlers arrive.
+
+**Which users are used, given that `createUser` does not exist yet.** None are needed by the unit tests: the handler reads its identity from the authorizer context, which the tests build by hand (`groups: ["user"]`, `["admin"]`, both, none) with DynamoDB mocked. The local end-to-end checks use the two accounts that step 3's seed script creates directly in the Cognito emulator with the AWS CLI, bypassing our API: `admin` (group `admin`) and `alice` (group `user`). These two remain fixed fixtures that no test deletes; the `createUser` Lambda is first exercised in step 7 with a separate account.
+
 1. `getClaims` → 401 if absent.
 2. `resolveRole(groups)` → 403 `{ error: "forbidden" }` if `null`.
 3. Build the message: `admin` → `Hello World, the Administrator is speaking`; `user` → `Hello World, I am ${username}`.
