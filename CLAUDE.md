@@ -57,7 +57,29 @@ Read both documents before changing anything.
 - Prefer the simplest design that meets the architecture. Do not add libraries,
   abstractions or AWS services the architecture does not call for.
 
-## To be extended
+## Everyday commands
 
-After plan step 1 creates the scaffold, add here: the everyday commands, the folder map
-and the test conventions, so this file describes what exists rather than intentions.
+Node 22 is pinned in `.nvmrc`; run `nvm use` first (the machine default may be newer).
+
+- `npm run typecheck`: `tsc --noEmit` over `src/`, `tests/` and the config files.
+- `npm run lint`: ESLint flat config with `typescript-eslint` recommended rules.
+- `npm run test:unit`: vitest project `unit`, no Docker needed.
+- `npm run build`: `sam build` (needs `template.yaml`, added in plan step 2).
+
+More scripts arrive in steps 3 and 10; update this list when they do.
+
+## Folder map
+
+- `src/handlers/`: one Lambda entry point per file (filled from step 5).
+- `src/lib/`: shared modules; the only place that touches the AWS SDK (step 4).
+- `tests/unit/`: vitest unit tests, mirroring `src/` (e.g. `tests/unit/lib/http.test.ts`).
+- `tests/integration/`: end-to-end tests against the local Docker stack (step 9).
+- `docs/`, `prompts/`: see "Where the truth lives".
+
+## Test conventions
+
+- vitest with globals enabled (`describe`, `it`, `expect` need no import).
+- Two projects in `vitest.config.ts`: `unit` (`tests/unit/**/*.test.ts`) and
+  `integration` (`tests/integration/**/*.test.ts`). The integration project only
+  selects files when `RUN_INTEGRATION=1`; otherwise it runs nothing and exits 0.
+- Unit tests mock AWS with `aws-sdk-client-mock`, never real endpoints.

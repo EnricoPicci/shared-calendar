@@ -1,0 +1,1 @@
+Read docs/ARCHITECTURE.md and docs/IMPLEMENTATION_PLAN.md. Implement the plan step by step, starting at step 0. After each step, run its acceptance check, report the result, and stop so I can review before the next step.
