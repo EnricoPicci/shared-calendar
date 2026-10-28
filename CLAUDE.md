@@ -1,0 +1,63 @@
+# CLAUDE.md
+
+Guidance for Claude Code when working in this repository.
+
+## What this project is
+
+A small serverless back end on AWS: a "Hello World" API for registered users and an
+administrative API to create and delete users. TypeScript, AWS Lambda, API Gateway
+(HTTP API), Amazon Cognito, DynamoDB, deployed with AWS SAM.
+
+## Where the truth lives
+
+- `docs/ARCHITECTURE.md` defines the behaviour, the API contract, the data model and
+  the security rules. On any conflict, the architecture wins.
+- `docs/IMPLEMENTATION_PLAN.md` defines the order of work, step by step, with an
+  acceptance check per step.
+- `prompts/` holds the numbered briefs that produced those documents. Keep new briefs
+  numbered in sequence.
+
+Read both documents before changing anything.
+
+## Working rhythm
+
+- Implement one plan step at a time. Run the step's acceptance check, report the
+  result honestly (including failures), then stop for review before the next step.
+- Commit only when asked. The plan suggests checkpoints after steps 3, 6, 9 and 11.
+- When the implementation proves the architecture wrong, say so and propose the
+  document change rather than silently diverging.
+
+## Hard rules from the design
+
+- Handlers never import the AWS SDK directly. All AWS access goes through the modules
+  under `src/lib` (`cognito.ts`, `db.ts`). This keeps later features cheap.
+- Logs never contain tokens, passwords or the body of the create-user response.
+- IAM policies never use a wildcard action or resource. One role per function, scoped
+  to the one user pool or table it needs.
+- Every password is set as permanent. There is no forced password change and no
+  e-mail sending in v1.
+- The API can never create an administrator, delete one, or set its password.
+- Role resolution: `admin` wins over `user`; a token in neither group gets 403.
+
+## Cloud safety
+
+- Never run `sam deploy`, `sam delete`, or any `aws` command that creates, changes or
+  deletes resources unless explicitly instructed in the current request.
+- `npm run verify` (all local tests) must be green before any deployment. The deploy
+  script enforces this; do not bypass it.
+- Local development uses the Docker stack (DynamoDB Local, dynamodb-admin, cognito-local)
+  and `sam local start-api`. No AWS account is needed until plan step 11.
+
+## Tooling and style
+
+- Node.js 22, TypeScript strict, esbuild bundling via SAM, vitest for tests,
+  `aws-sdk-client-mock` for unit tests, `zod` for input validation.
+- Infrastructure is one `template.yaml`. Explain infrastructure changes in plain terms:
+  the reader is not an Infrastructure-as-Code expert.
+- Prefer the simplest design that meets the architecture. Do not add libraries,
+  abstractions or AWS services the architecture does not call for.
+
+## To be extended
+
+After plan step 1 creates the scaffold, add here: the everyday commands, the folder map
+and the test conventions, so this file describes what exists rather than intentions.
