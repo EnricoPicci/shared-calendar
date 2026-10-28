@@ -63,7 +63,8 @@ Node 22 is pinned in `.nvmrc`; run `nvm use` first (the machine default may be n
 
 - `npm run typecheck`: `tsc --noEmit` over `src/`, `tests/` and the config files.
 - `npm run lint`: ESLint flat config with `typescript-eslint` recommended rules.
-- `npm run test:unit`: vitest project `unit`, no Docker needed.
+- `npm run test:unit`: vitest project `unit`, no Docker needed. Runs with v8 coverage and
+  fails below 100 % line coverage on `src/lib` (HTML report in `coverage/`, git-ignored).
 - `npm run build`: `sam build`. Always go through npm: SAM needs the project's `esbuild`
   on the PATH, which a bare `sam build` does not have.
 - `sam validate --lint`: checks `template.yaml`.

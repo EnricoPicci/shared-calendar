@@ -8,6 +8,13 @@ export default defineConfig({
   test: {
     // Without RUN_INTEGRATION the integration project selects no files; that is not a failure.
     passWithNoTests: !runIntegration,
+    // Plan step 4: the shared libraries must stay at 100 % line coverage.
+    coverage: {
+      provider: 'v8',
+      include: ['src/lib/**/*.ts'],
+      reporter: ['text', 'html'],
+      thresholds: { lines: 100 },
+    },
     projects: [
       {
         test: {
