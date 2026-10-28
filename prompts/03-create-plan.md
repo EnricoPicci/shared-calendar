@@ -1,0 +1,1 @@
+create the implementation plan from docs/ARCHITECTURE.md and save it as docs/IMPLEMENTATION_PLAN.md
