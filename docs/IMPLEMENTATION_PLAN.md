@@ -105,7 +105,7 @@ Resources to declare (names are the logical IDs to use):
 | `Api5xxAlarm` | `AWS::CloudWatch::Alarm` | `AWS/ApiGateway` metric `5xx` for the `HttpApi` > 0 over 5 min, `TreatMissingData: notBreaching`, action → `AlarmTopic` |
 | `AuthorizerErrorsAlarm` | `AWS::CloudWatch::Alarm` | `AWS/Lambda` metric `Errors` for `AuthorizerFunction` > 0 over 5 min, `TreatMissingData: notBreaching`, action → `AlarmTopic` |
 
-Global function settings (`Globals.Function`): `Runtime: nodejs22.x`, `Architectures: [arm64]`, `MemorySize: 256`, `Timeout: 10`, `Tracing: Disabled`. Each function carries `Metadata.BuildMethod: esbuild` with `BuildProperties: { Minify: true, Target: es2022, Format: esm, Sourcemap: true, EntryPoints: [<handler file>] }`.
+Global function settings (`Globals.Function`): `Runtime: nodejs22.x`, `Architectures: [arm64]`, `MemorySize: 256`, `Timeout: 10`, `Tracing: Disabled`. Each function carries `Metadata.BuildMethod: esbuild` with `BuildProperties: { Minify: true, Target: es2022, Format: esm, OutExtension: [.js=.mjs], Sourcemap: true, EntryPoints: [<handler file>] }`. The functions that bundle the AWS SDK (`hello`, `createUser`, `deleteUser`) also get `Banner: [js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);]`: the SDK is CommonJS and calls `require()`, which an ES module bundle does not have, so without the banner the function crashes when it loads (found in step 6; unit tests cannot catch it because they run the TypeScript source, not the bundle). The authorizer bundles only ESM code and does not need it.
 
 Parameters: `AdminUsername` (default `admin`), `AlertEmail`, `Stage` (default `prod`). Outputs: `ApiUrl`, `UserPoolId`, `UserPoolClientId`, `MessagesTableName`.
 
@@ -127,6 +127,7 @@ Files
   - `cognito` → `jagregory/cognito-local`, port `9229`, volume `./.cognito:/app/.cognito` (gitignored). `local:up` first copies `docker/cognito-local-config.json` to `.cognito/config.json`: it allows plain (non-e-mail) usernames and fixes the token issuer to `http://localhost:9229/<poolId>`, two emulator defaults that differ from what we need.
   - Images are pinned to exact versions; all ports are bound to `127.0.0.1` only.
 - `scripts/local-seed.sh` (idempotent, uses the AWS CLI with dummy credentials and `--endpoint-url`):
+  0. check that `localhost:${DYNAMODB_PORT:-8000}` and `localhost:9229` are published by *this* project's `dynamodb` and `cognito` containers and that both are attached to `hello-local`; otherwise stop with an error naming the fix. When another project already holds the port, Docker can leave our container running with no port and no network, and the seed would silently fill the other project's emulator (found in step 6);
   1. create table `hello-messages` on DynamoDB Local with the same key schema as the template;
   2. create user pool `local_pool` and an app client on cognito-local, enable `USER_PASSWORD_AUTH`;
   3. create groups `admin` and `user`;

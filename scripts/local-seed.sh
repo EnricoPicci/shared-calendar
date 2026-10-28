@@ -39,6 +39,35 @@ wait_for() {
   exit 1
 }
 
+# Makes sure localhost:<port> really is this project's container, attached to hello-local.
+# When another project already holds the port, Docker can leave our container running with
+# no port and no network: the seed would then fill the other project's emulator, and the
+# Lambda containers could not reach ours by name.
+check_service() {
+  local service=$1 container_port=$2 host_port=$3 id published networks
+  id=$(docker compose ps -q "$service" 2>/dev/null || true)
+  if [[ -z "$id" ]]; then
+    echo "ERROR: the $service container of this project is not running (docker compose ps)." >&2
+    exit 1
+  fi
+  published=$(docker compose port "$service" "$container_port" 2>/dev/null || true)
+  networks=$(docker inspect "$id" --format '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}')
+  if [[ "$published" != "127.0.0.1:$host_port" || " $networks" != *" hello-local "* ]]; then
+    echo "ERROR: localhost:$host_port is not this project's $service container" >&2
+    networks=${networks% }
+    echo "       (published: '${published:-none}', networks: '${networks:-none}')." >&2
+    echo "       Another container probably holds port $host_port (docker ps). Run npm run local:down," >&2
+    if [[ "$service" == dynamodb ]]; then
+      echo "       then DYNAMODB_PORT=8002 npm run local:up (or another free port)." >&2
+    else
+      echo "       free port $host_port, then npm run local:up." >&2
+    fi
+    exit 1
+  fi
+}
+check_service dynamodb 8000 "${DYNAMODB_PORT:-8000}"
+check_service cognito 9229 9229
+
 wait_for "DynamoDB Local ($DYNAMODB_URL)" ddb list-tables
 wait_for "cognito-local ($COGNITO_URL)" idp list-user-pools --max-results 1
 

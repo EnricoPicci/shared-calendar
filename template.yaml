@@ -284,6 +284,9 @@ Resources:
         OutExtension:
           - .js=.mjs
         Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
         EntryPoints:
           - src/handlers/hello.ts
 
@@ -352,6 +355,9 @@ Resources:
         OutExtension:
           - .js=.mjs
         Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
         EntryPoints:
           - src/handlers/createUser.ts
 
@@ -422,6 +428,9 @@ Resources:
         OutExtension:
           - .js=.mjs
         Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
         EntryPoints:
           - src/handlers/deleteUser.ts
 
