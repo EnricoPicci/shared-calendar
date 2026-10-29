@@ -24,11 +24,22 @@ describe('CreateUserBody', () => {
     });
   });
 
-  it('rejects unknown fields', () => {
-    const result = validate(CreateUserBody, { username: 'bob', group: 'admin' });
+  it('rejects unknown fields, naming each one but not its value', () => {
+    const result = validate(CreateUserBody, { username: 'bob', group: 'admin', role: 'admin' });
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.response.statusCode).toBe(400);
+    expect(JSON.parse(result.response.body as string)).toEqual({
+      error: 'invalid_request',
+      message: 'Invalid input: group, role',
+    });
+  });
+
+  it('names an unknown field together with an invalid one', () => {
+    const result = validate(CreateUserBody, { username: 'Bob', group: 'admin' });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(JSON.parse(result.response.body as string).message).toBe('Invalid input: username, group');
   });
 
   it('rejects a missing username', () => {

@@ -15,8 +15,13 @@ export function validate<T>(schema: z.ZodType<T>, value: unknown): Outcome<T> {
   if (result.success) {
     return { ok: true, value: result.data };
   }
-  // Only the field paths go back to the caller, never the rejected values.
-  const fields = result.error.issues.map((issue) => issue.path.join('.') || '(root)');
+  // Only the field paths go back to the caller, never the rejected values. An unknown field
+  // is reported against its parent object, so name the field itself instead.
+  const fields = result.error.issues.flatMap((issue) =>
+    issue.code === 'unrecognized_keys'
+      ? issue.keys.map((key) => [...issue.path, key].join('.'))
+      : [issue.path.join('.') || '(root)'],
+  );
   return {
     ok: false,
     response: error(400, 'invalid_request', `Invalid input: ${[...new Set(fields)].join(', ')}`),
