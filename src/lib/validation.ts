@@ -8,7 +8,10 @@ const USERNAME = z.string().regex(/^[a-z0-9][a-z0-9._-]{2,31}$/, 'invalid userna
 export const CreateUserBody = z.object({ username: USERNAME }).strict();
 export type CreateUserBody = z.infer<typeof CreateUserBody>;
 
-export const UsernameParam = USERNAME;
+// An object rather than the bare string, so that a rejection names the field
+// ("Invalid input: username") instead of "(root)".
+export const UsernameParam = z.object({ username: USERNAME });
+export type UsernameParam = z.infer<typeof UsernameParam>;
 
 export function validate<T>(schema: z.ZodType<T>, value: unknown): Outcome<T> {
   const result = schema.safeParse(value);

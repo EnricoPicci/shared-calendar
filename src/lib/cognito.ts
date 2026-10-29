@@ -80,7 +80,15 @@ export async function listGroups(username: string): Promise<string[]> {
 }
 
 // Revokes the user's refresh tokens.
+//
+// SKIP_GLOBAL_SIGN_OUT exists only because the local Cognito emulator (cognito-local 5.3.0)
+// does not implement AdminUserGlobalSignOut: it answers "Unsupported", the handler turns that
+// into a 500, and no user could ever be deleted locally. scripts/local-seed.sh sets it to
+// 'true' in env.local.json for sam local only. template.yaml leaves it empty, so in the cloud
+// the sign-out always runs and the post-deploy smoke test exercises it against real Cognito.
+// Never set it in the cloud: deleted users' refresh tokens would not be revoked.
 export async function globalSignOut(username: string): Promise<void> {
+  if (process.env.SKIP_GLOBAL_SIGN_OUT === 'true') return;
   await cognitoClient
     .send(new AdminUserGlobalSignOutCommand({ UserPoolId: userPoolId(), Username: username }))
     .catch((err: unknown) => mapError(err, username));

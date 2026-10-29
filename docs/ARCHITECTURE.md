@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | Draft v4 — base for the implementation plan |
-| Date | 2026-10-28 |
+| Status | Draft v5 — base for the implementation plan |
+| Date | 2026-10-29 |
 | Stack | TypeScript · AWS Lambda · API Gateway (HTTP API) · Amazon Cognito · DynamoDB · AWS SAM |
 
 ### Change log
@@ -14,6 +14,7 @@
 | v2 | 2026-10-27 | **Simplified passwords:** no forced password change at first sign-in; accounts are created with a permanent password returned once to the Administrator; self-service password change/reset deferred to a later version with a documented, minimal upgrade path (section 7.4). **Administrator can call Hello World:** the message depends on the caller's role (section 4). The admin bootstrap no longer needs e-mail. |
 | v3 | 2026-10-28 | Findings from implementation steps 2–3. **Token errors:** an invalid or expired token is answered with 403, not 401: it is the HTTP API's fixed answer when a Lambda authorizer denies; 401 remains for a missing `Authorization` header (section 4 contract and conventions, section 6 diagrams). **Error alarms** specified (section 11): one on the API's 5xx responses, covering every route including handled 500s, and one on authorizer crashes, both e-mailed to `AlertEmail`. |
 | v4 | 2026-10-28 | Finding from implementation step 5. **Key server unreachable:** when the authorizer cannot download Cognito's signing keys (connection error, time-out, error status) it fails instead of denying, so the client gets 500 rather than a misleading 403 and the authorizer `Errors` alarm fires (section 4 conventions, section 6 diagrams, section 11). Any problem with the token itself is still a 403. |
+| v5 | 2026-10-29 | Finding from implementation step 8. **404 error code:** `DELETE /users/{username}` answers an unknown user with `{ "error": "user_not_found" }`, named like `user_exists`. **400 listed:** the same route now lists 400 for an invalid username, which section 6.4 already specified (section 4 contract). **Global sign-out skipped locally:** cognito-local lacks `AdminUserGlobalSignOut`, so a local-only `SKIP_GLOBAL_SIGN_OUT` setting skips it; the cloud always signs out (section 8 note on Cognito emulation). |
 
 ---
 
@@ -155,7 +156,7 @@ Base URL: `https://<api-id>.execute-api.<region>.amazonaws.com` (cloud) or `http
 |---|---|---|---|---|
 | `POST /hello` | admin **or** user | *(none)* | `201` `{ "messageId", "role", "message", "createdAt" }` | 401 missing token · 403 invalid token or in neither group |
 | `POST /users` | admin | `{ "username": "alice" }` | `201` `{ "username", "password" }` | 400 invalid username · 401 missing token · 403 invalid token or not admin · 409 already exists |
-| `DELETE /users/{username}` | admin | *(none)* | `204` | 401 missing token · 403 invalid token, not admin **or** target is an admin · 404 unknown user |
+| `DELETE /users/{username}` | admin | *(none)* | `204` | 400 invalid username · 401 missing token · 403 invalid token, not admin **or** target is an admin · 404 unknown user (`{ "error": "user_not_found" }`) |
 
 `POST /hello` response examples
 
@@ -429,10 +430,12 @@ flowchart LR
 | API Gateway + Lambdas | `sam local start-api` | Runs the real handler code in Lambda-like Docker containers. Since SAM CLI 1.80 it also invokes the Lambda authorizer locally. |
 | DynamoDB | `amazon/dynamodb-local` (Docker) | Same API as the cloud service; table created by a seed script from the same definition as `template.yaml` |
 | **DB inspection UI** | `aaronshaf/dynamodb-admin` (Docker) | Browser table viewer/editor at `localhost:8001` — satisfies N4 locally. In the cloud, the DynamoDB console "Explore items" page gives the same view. |
-| Cognito | `jagregory/cognito-local` (Docker) | Community emulator: sign-in (`USER_PASSWORD_AUTH`), the admin APIs we use, groups, and a JWKS endpoint so the authorizer verifies tokens exactly as in the cloud. Dropping the first-login password challenge (v2) removed the emulator's least faithful area from our flows. |
+| Cognito | `jagregory/cognito-local` (Docker) | Community emulator: sign-in (`USER_PASSWORD_AUTH`), the admin APIs we use except `AdminUserGlobalSignOut` (see the note below), groups, and a JWKS endpoint so the authorizer verifies tokens exactly as in the cloud. Dropping the first-login password challenge (v2) removed the emulator's least faithful area from our flows. |
 | Wiring | `docker-compose.yml` + `env.local.json` | Lambdas receive `DYNAMODB_ENDPOINT`, `COGNITO_ENDPOINT`, `JWKS_URI` via environment; in the cloud these are simply absent and the SDK defaults apply |
 
 **Note on Cognito emulation.** Our Lambdas only call admin APIs (`AdminCreateUser`, `AdminSetUserPassword`, `AdminAddUserToGroup`, `AdminListGroupsForUser`, `AdminUserGlobalSignOut`, `AdminDeleteUser`) and verify JWTs. The Cognito access is isolated behind one small adapter (`src/lib/cognito.ts`) that unit tests mock. The emulator is used for integration tests; a 2-minute post-deploy smoke test (section 9.3) is the final proof against real Cognito.
+
+**`AdminUserGlobalSignOut` is skipped locally.** cognito-local does not implement it and answers "Unsupported", which would make every local delete fail with 500. `env.local.json` therefore sets `SKIP_GLOBAL_SIGN_OUT=true` for `deleteUser`, and the adapter skips that one call. `template.yaml` declares the variable empty, so in the cloud the sign-out always runs; the smoke test, which deletes its throw-away user, covers it against real Cognito. Locally, a deleted user's refresh token is therefore not revoked.
 
 ### 8.1 Test pyramid and the "deploy gate"
 

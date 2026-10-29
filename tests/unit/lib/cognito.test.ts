@@ -131,6 +131,20 @@ describe('globalSignOut', () => {
     cognito.on(AdminUserGlobalSignOutCommand).rejects(notFound());
     await expect(globalSignOut('ghost')).rejects.toBeInstanceOf(UserNotFoundError);
   });
+
+  // Local-only switch for cognito-local, which lacks AdminUserGlobalSignOut.
+  it('sends nothing when SKIP_GLOBAL_SIGN_OUT is true', async () => {
+    vi.stubEnv('SKIP_GLOBAL_SIGN_OUT', 'true');
+    await globalSignOut('bob');
+    expect(cognito.calls()).toHaveLength(0);
+  });
+
+  it.each([[''], ['false'], ['1']])('still signs out when SKIP_GLOBAL_SIGN_OUT is %j', async (value) => {
+    vi.stubEnv('SKIP_GLOBAL_SIGN_OUT', value);
+    cognito.on(AdminUserGlobalSignOutCommand).resolves({});
+    await globalSignOut('bob');
+    expect(cognito.commandCalls(AdminUserGlobalSignOutCommand)).toHaveLength(1);
+  });
 });
 
 describe('deleteUser', () => {

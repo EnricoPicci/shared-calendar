@@ -133,6 +133,10 @@ ensure_user alice "$ALICE_PASSWORD" user
 
 # 5. Environment for sam local. Lambda containers use service names; the token issuer is the
 # address the tokens were requested from (the host), hence localhost in COGNITO_ISSUER.
+# SKIP_GLOBAL_SIGN_OUT: cognito-local does not implement AdminUserGlobalSignOut and answers
+# "Unsupported", which would make every local DELETE /users/{username} fail with 500. The
+# deleteUser function skips that one call locally; in the cloud the variable stays empty and
+# the sign-out runs (see globalSignOut in src/lib/cognito.ts).
 cat > env.local.json <<EOF
 {
   "AuthorizerFunction": {
@@ -158,6 +162,7 @@ cat > env.local.json <<EOF
   "DeleteUserFunction": {
     "USER_POOL_ID": "$POOL_ID",
     "COGNITO_ENDPOINT": "http://cognito:9229",
+    "SKIP_GLOBAL_SIGN_OUT": "true",
     "AWS_ACCESS_KEY_ID": "local",
     "AWS_SECRET_ACCESS_KEY": "local"
   }

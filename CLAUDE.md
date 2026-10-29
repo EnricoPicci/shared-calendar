@@ -83,6 +83,9 @@ Node 22 is pinned in `.nvmrc`; run `nvm use` first (the machine default may be n
   containers pick up the rebuilt code on their own.
 - Under `sam local`, every event carries the same fake `requestContext.requestId`, so
   identical request ids in local logs are expected. In the cloud they are unique.
+- cognito-local does not implement `AdminUserGlobalSignOut`. `env.local.json` sets
+  `SKIP_GLOBAL_SIGN_OUT=true` for `DeleteUserFunction` so local deletes work; the cloud never
+  sets it (architecture section 8, note on Cognito emulation).
 - The shell is zsh: `set -- $var` does not word-split. Pass arguments explicitly.
 
 More scripts arrive in step 10; update this list when they do.

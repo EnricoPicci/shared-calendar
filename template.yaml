@@ -412,6 +412,12 @@ Resources:
         Variables:
           USER_POOL_ID: !Ref UserPool
           COGNITO_ENDPOINT: ''
+          # Local development only, never set in the cloud. The local Cognito emulator
+          # (cognito-local) does not support AdminUserGlobalSignOut, so env.local.json sets
+          # this to 'true' to skip that one call and let local deletes work. It is declared
+          # here, empty, because sam local only passes variables the template declares.
+          # Left empty, the sign-out runs and revokes the deleted user's refresh tokens.
+          SKIP_GLOBAL_SIGN_OUT: ''
       Events:
         DeleteUser:
           Type: HttpApi

@@ -63,10 +63,13 @@ describe('CreateUserBody', () => {
 
 describe('UsernameParam', () => {
   it('accepts a valid name', () => {
-    expect(validate(UsernameParam, 'carol')).toEqual({ ok: true, value: 'carol' });
+    expect(validate(UsernameParam, { username: 'carol' })).toEqual({ ok: true, value: { username: 'carol' } });
   });
 
-  it.each([['Carol'], ['ca'], [undefined]])('rejects %s', (value) => {
-    expect(validate(UsernameParam, value).ok).toBe(false);
+  it.each([['Carol'], ['ca'], [undefined]])('rejects %s and names the field', (value) => {
+    const result = validate(UsernameParam, { username: value });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(JSON.parse(result.response.body ?? '')).toEqual({ error: 'invalid_request', message: 'Invalid input: username' });
   });
 });
