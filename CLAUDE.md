@@ -65,6 +65,10 @@ Node 22 is pinned in `.nvmrc`; run `nvm use` first (the machine default may be n
 - `npm run lint`: ESLint flat config with `typescript-eslint` recommended rules.
 - `npm run test:unit`: vitest project `unit`, no Docker needed. Runs with v8 coverage and
   fails below 100 % line coverage on `src/lib` (HTML report in `coverage/`, git-ignored).
+- `RUN_INTEGRATION=1 npm run test:integration`: the journeys of plan step 9 against the
+  running `local:up` + `local:api` stack. Pass the same `DYNAMODB_PORT` as `local:up`
+  (here `DYNAMODB_PORT=8002`). Without `RUN_INTEGRATION=1` it runs nothing and exits 0.
+  Removes a leftover `carol` before starting, so it can be rerun after a failed run.
 - `npm run build`: `sam build`. Always go through npm: SAM needs the project's `esbuild`
   on the PATH, which a bare `sam build` does not have.
 - `sam validate --lint`: checks `template.yaml`.

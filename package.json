@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test:unit": "vitest run --project unit --coverage",
+    "test:integration": "vitest run --project integration",
     "local:up": "mkdir -p .cognito && cp docker/cognito-local-config.json .cognito/config.json && docker compose up -d && bash scripts/local-seed.sh",
     "local:down": "docker compose down",
     "local:api": "bash scripts/local-api.sh"

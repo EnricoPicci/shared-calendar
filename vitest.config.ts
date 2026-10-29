@@ -30,6 +30,11 @@ export default defineConfig({
           globals: true,
           environment: 'node',
           include: runIntegration ? ['tests/integration/**/*.test.ts'] : [],
+          // Checks that the local stack is up before any journey runs.
+          globalSetup: runIntegration ? ['tests/integration/setup.ts'] : [],
+          // sam local starts a Lambda container on the first call of each function.
+          testTimeout: 60_000,
+          hookTimeout: 60_000,
         },
       },
     ],
