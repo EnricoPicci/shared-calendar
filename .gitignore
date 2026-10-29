@@ -8,3 +8,5 @@ coverage/
 .env*
 # Includes env.local.json: local-seed.sh generates it with machine-specific pool/client ids.
 *.local.json
+# Written by npm run verify, checked by npm run deploy.
+.verify-ok

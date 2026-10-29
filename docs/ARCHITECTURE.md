@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft v5 — base for the implementation plan |
+| Status | Draft v6 — base for the implementation plan |
 | Date | 2026-10-29 |
 | Stack | TypeScript · AWS Lambda · API Gateway (HTTP API) · Amazon Cognito · DynamoDB · AWS SAM |
 
@@ -15,6 +15,7 @@
 | v3 | 2026-10-28 | Findings from implementation steps 2–3. **Token errors:** an invalid or expired token is answered with 403, not 401: it is the HTTP API's fixed answer when a Lambda authorizer denies; 401 remains for a missing `Authorization` header (section 4 contract and conventions, section 6 diagrams). **Error alarms** specified (section 11): one on the API's 5xx responses, covering every route including handled 500s, and one on authorizer crashes, both e-mailed to `AlertEmail`. |
 | v4 | 2026-10-28 | Finding from implementation step 5. **Key server unreachable:** when the authorizer cannot download Cognito's signing keys (connection error, time-out, error status) it fails instead of denying, so the client gets 500 rather than a misleading 403 and the authorizer `Errors` alarm fires (section 4 conventions, section 6 diagrams, section 11). Any problem with the token itself is still a 403. |
 | v5 | 2026-10-29 | Finding from implementation step 8. **404 error code:** `DELETE /users/{username}` answers an unknown user with `{ "error": "user_not_found" }`, named like `user_exists`. **400 listed:** the same route now lists 400 for an invalid username, which section 6.4 already specified (section 4 contract). **Global sign-out skipped locally:** cognito-local lacks `AdminUserGlobalSignOut`, so a local-only `SKIP_GLOBAL_SIGN_OUT` setting skips it; the cloud always signs out (section 8 note on Cognito emulation). |
+| v6 | 2026-10-29 | Finding from implementation step 10. **Deploy gate:** `npm run deploy` no longer runs `verify` itself (verify needs the local Docker stack, which a deploy should not have to start); it checks the stamp `.verify-ok` that a passing `verify` writes: same commit, younger than 30 minutes, clean working tree both at verify time and at deploy time (section 8.1). **Environments:** `npm run deploy` uses the one deploy environment in `samconfig.toml` (section 9.2). **Smoke test** also runs against the local stack (section 9.3). |
 
 ---
 
@@ -445,7 +446,7 @@ flowchart LR
 | Integration | The journeys of section 6 end-to-end through `sam local start-api` against DynamoDB Local and cognito-local: create user, sign in, hello as user, hello as admin, delete user, plus the negative cases (401/403/404/409) | `vitest` + `fetch` | yes |
 | Static | `tsc --noEmit`, `eslint`, `npm audit`, `sam validate --lint` | — | no |
 
-`npm run verify` runs all three levels. **`npm run deploy` refuses to run unless `verify` has just passed** (the deploy script calls `verify` first). That is the mechanical enforcement of N5.
+`npm run verify` runs all three levels and, only if all pass, writes the stamp `.verify-ok` (commit hash, time, and whether the working tree was clean). **`npm run deploy` refuses to run unless `verify` has just passed**: the stamp must exist, be younger than 30 minutes, name the current commit, and have been written on a clean tree, and the tree must still be clean (the build packages the files on disk, so uncommitted changes would ship untested). Deploy does not run `verify` itself because the integration tests need the local Docker stack. That is the mechanical enforcement of N5.
 
 ---
 
@@ -466,13 +467,13 @@ sam deploy --guided              # first time: asks for region, stack name, admi
 
 ### 9.2 Environments
 
-One AWS account, one stack per environment (`hello-dev`, `hello-prod`) selected by `--config-env`. Given the load, a single `prod` stack is enough to start; the local stack is the "dev" environment.
+One AWS account, one stack per environment (`hello-dev`, `hello-prod`) selected by `--config-env`. Given the load, a single `prod` stack is enough to start; the local stack is the "dev" environment. v1 therefore has one deploy environment, the `default` section of `samconfig.toml`, and `npm run deploy` takes no environment argument (extra arguments go to `sam deploy`, e.g. `npm run deploy -- --guided` for the first deployment).
 
 Runtime choices: Node.js 22, `arm64` (cheaper, faster cold start), 256 MB, 10 s timeout, bundled with `esbuild` through SAM's `Metadata.BuildMethod: esbuild`.
 
 ### 9.3 Post-deploy smoke test
 
-A script `scripts/smoke.sh <stack>` that signs in as admin, calls `/hello` as admin (expects the Administrator message), creates a throw-away user, calls `/hello` as that user (expects `I am <name>`), verifies both rows in DynamoDB, deletes the user. Run after every deploy; it is the only test that touches real Cognito.
+A script `scripts/smoke.sh <stack>` that signs in as admin, calls `/hello` as admin (expects the Administrator message), creates a throw-away user, calls `/hello` as that user (expects `I am <name>`), verifies both rows in DynamoDB, deletes the user, and checks that the user can no longer sign in. Run after every deploy; it is the only test that touches real Cognito. `scripts/smoke.sh local` runs the same checks against the local stack, which tests the script itself; there the global sign-out is skipped (section 8), so only the cloud run exercises refresh-token revocation.
 
 ---
 
@@ -529,7 +530,10 @@ Guard-rails: budget alarm at 1 USD; API throttling; no on-demand DynamoDB (provi
 │   ├── local-seed.sh              # create table, pool, client, groups, admin + sample user locally
 │   ├── bootstrap-admin.sh         # set/rotate the admin password (cloud or local)
 │   ├── smoke.sh                   # post-deploy end-to-end check
-│   └── deploy.sh                  # runs verify, then sam deploy
+│   ├── target.sh                  # shared by the two above: stack or local ids and endpoints
+│   ├── cognito.mjs                # sign-in / set-password with the password on stdin (AWS SDK)
+│   ├── verify.sh                  # all checks; writes .verify-ok on success
+│   └── deploy.sh                  # checks .verify-ok, then sam build + sam deploy
 └── docs/
     └── ARCHITECTURE.md
 ```

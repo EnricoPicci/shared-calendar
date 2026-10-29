@@ -91,8 +91,34 @@ Node 22 is pinned in `.nvmrc`; run `nvm use` first (the machine default may be n
   `SKIP_GLOBAL_SIGN_OUT=true` for `DeleteUserFunction` so local deletes work; the cloud never
   sets it (architecture section 8, note on Cognito emulation).
 - The shell is zsh: `set -- $var` does not word-split. Pass arguments explicitly.
-
-More scripts arrive in step 10; update this list when they do.
+- `npm run audit`: `npm audit --audit-level=high`.
+- `DYNAMODB_PORT=8002 npm run verify`: typecheck, lint, audit, `sam validate --lint`, unit
+  and integration tests (sets `RUN_INTEGRATION=1` itself), stopping at the first failure.
+  Needs `local:up` + `local:api` running; never starts them. On success writes
+  `.verify-ok` (`<commit> <epoch> <clean|dirty>`, git-ignored); removes it at the start.
+- `npm run deploy`: refuses (exit 1, names the reason) unless `.verify-ok` is younger than
+  30 minutes, names HEAD and says `clean`, and the tree is still clean; then `npm run build`
+  and `sam deploy` with the default config env. Extra arguments go to `sam deploy`
+  (`npm run deploy -- --guided`). Real cloud action: only when explicitly asked.
+- `npm run bootstrap-admin <stack|local>`: sets the admin password (hidden prompt, twice,
+  pool policy checked first). Only sets the password. Reads stdin, so
+  `printf '%s\n%s\n' "$pw" "$pw" | npm run bootstrap-admin local` works in tests.
+- `DYNAMODB_PORT=8002 npm run smoke <stack|local>`: journeys 3, 4, 6, 11 with a throw-away
+  `smoke-<epoch>` user, PASS/FAIL per check, deletes the user on every exit. Prompts for the
+  admin password (stdin). Leaves its message rows in the table (history).
+- Stack targets read ids from the CloudFormation outputs (read-only `describe-stacks`) in
+  `samconfig.toml`'s region unless `AWS_REGION` is set. `local` uses `env.local.json` and
+  dummy credentials. After `bootstrap-admin local`, rerun `local:up` to restore
+  `Admin-Local-Pass-1!`, or the integration tests fail.
+- Passwords and tokens in these scripts never go into a command-line argument (visible in
+  `ps`) or a file: the two Cognito calls carrying a password go through
+  `scripts/cognito.mjs` (AWS SDK, password on stdin), API calls pass the token to curl with
+  `-H @-`, and JSON answers are parsed by `json_field` (node, stdin). The AWS CLI cannot
+  read a request from a pipe, and its errors echo the input. Avoid bash here-strings
+  (`<<<`) for secrets: bash 3.2 writes them to a temp file.
+- The scripts run on macOS (bash 3.2, BSD tools) and Linux (bash 5, GNU tools) and need
+  only node, the AWS CLI, curl and git: no jq. JSON is read with node or `--query`. Keep it
+  that way: no `sed -i`, `stat`, `date -d`/`-v`, or other flags that differ between the two.
 
 ## Folder map
 
@@ -100,9 +126,11 @@ More scripts arrive in step 10; update this list when they do.
 - `src/lib/`: shared modules; the only place that touches the AWS SDK (step 4).
 - `tests/unit/`: vitest unit tests, mirroring `src/` (e.g. `tests/unit/lib/http.test.ts`).
 - `tests/integration/`: end-to-end tests against the local Docker stack (step 9).
-- `scripts/`: shell scripts behind the npm scripts (`local-seed.sh`, `local-api.sh`).
+- `scripts/`: shell scripts behind the npm scripts (`local-seed.sh`, `local-api.sh`,
+  `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`; `target.sh` is sourced by
+  the last two, which call `cognito.mjs`).
 - `docker/`: files for the local stack (`cognito-local-config.json`).
-- Generated, git-ignored: `env.local.json`, `.cognito/`, `.aws-sam/`.
+- Generated, git-ignored: `env.local.json`, `.cognito/`, `.aws-sam/`, `.verify-ok`.
 - `docs/`, `prompts/`: see "Where the truth lives".
 
 ## Test conventions

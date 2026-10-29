@@ -38,13 +38,15 @@ Conventions used throughout:
 
 ## 2. Prerequisites (step 0)
 
-Install and verify once, before step 1.
+Install and verify once, before step 1. Everything runs on macOS and Linux; the scripts need nothing beyond this table and a POSIX base system (bash, sed, date).
 
 | Tool | Version | Check |
 |---|---|---|
 | Node.js | 22 LTS | `node -v` |
 | npm | bundled with Node | `npm -v` |
-| Docker Desktop | current | `docker info` |
+| git | any | `git --version` |
+| curl | ≥ 7.55 (any current distribution) | `curl --version` |
+| Docker Desktop (macOS) or Docker Engine with the Compose v2 plugin (Linux) | current | `docker info`, `docker compose version` |
 | AWS SAM CLI | ≥ 1.80 (Lambda authorizer support in `sam local`) | `sam --version` |
 | AWS CLI v2 | current | `aws --version` |
 | An AWS account + a named CLI profile with permission to create CloudFormation stacks, Lambda, API Gateway, Cognito, DynamoDB, IAM roles, CloudWatch, Budgets | | `aws sts get-caller-identity --profile <profile>` |
@@ -278,14 +280,14 @@ Test cases (`tests/integration/journeys.test.ts`), in order:
 | `typecheck` / `lint` / `audit` | `tsc --noEmit` / `eslint .` / `npm audit --audit-level=high` |
 | `test:unit` / `test:integration` | vitest projects |
 | `local:up` / `local:down` / `local:api` | step 3 |
-| `verify` | `typecheck && lint && audit && sam validate --lint && test:unit && test:integration` — writes `.verify-ok` with a timestamp on success |
-| `deploy` | `scripts/deploy.sh`: refuses unless `.verify-ok` exists, is younger than 30 minutes and matches the current `git rev-parse HEAD`; then `sam build && sam deploy --config-env <env>` |
+| `verify` | `scripts/verify.sh`: `typecheck && lint && audit && sam validate --lint && test:unit && test:integration` (with `RUN_INTEGRATION=1`) — writes `.verify-ok` (`<commit> <epoch seconds> <clean|dirty>`) on success |
+| `deploy` | `scripts/deploy.sh`: refuses unless `.verify-ok` exists, is younger than 30 minutes, matches the current `git rev-parse HEAD`, says `clean`, and the tree is still clean; then `npm run build && sam deploy` (the `default` config env; extra arguments go to `sam deploy`) |
 | `bootstrap-admin` | `scripts/bootstrap-admin.sh <stack|local>` |
-| `smoke` | `scripts/smoke.sh <stack>` |
+| `smoke` | `scripts/smoke.sh <stack|local>` |
 
-`scripts/bootstrap-admin.sh`: reads `UserPoolId` from the stack outputs (or from `env.local.json` with `local`), prompts for the password with `read -s`, confirms it twice, runs `aws cognito-idp admin-set-user-password --permanent`. Never echoes the password, never writes it to disk.
+`scripts/bootstrap-admin.sh`: reads `UserPoolId` from the stack outputs (or from `env.local.json` with `local`), prompts for the password with `read -s`, confirms it twice, checks the pool policy, then calls `AdminSetUserPassword` with `Permanent: true`. Never echoes the password, never writes it to disk, never passes it as a command-line argument: the call goes through `scripts/cognito.mjs` (the project's AWS SDK) with the password on a pipe, because the AWS CLI accepts a request only as arguments or as a regular file.
 
-`scripts/smoke.sh`: reads outputs, prompts for the admin password, signs in, runs journeys 3, 4, 6, 11 of step 9 against the real API with a throw-away username `smoke-<timestamp>`, prints PASS/FAIL per check, exits non-zero on any failure.
+`scripts/smoke.sh`: reads outputs, prompts for the admin password, signs in, runs journeys 3, 4, 6, 11 of step 9 against the real API (or, with `local`, the local stack) with a throw-away username `smoke-<timestamp>`, prints PASS/FAIL per check, exits non-zero on any failure, and deletes the throw-away user on every exit.
 
 **Acceptance:** `npm run verify` passes; `npm run deploy` without a prior `verify` prints the refusal and exits 1; `bootstrap-admin local` followed by sign-in works against the emulator.
 
@@ -293,8 +295,8 @@ Test cases (`tests/integration/journeys.test.ts`), in order:
 
 ### Step 11 — First cloud deployment (≈ 2 h, needs the AWS account)
 
-1. `npm run verify` (must be green).
-2. `sam deploy --guided` once: stack `hello-world-api`, region of choice, parameters `AdminUsername`, `AlertEmail`; accept the IAM capability prompt; save to `samconfig.toml`.
+1. `npm run verify` on a clean, committed tree (must be green and say "clean tree").
+2. `npm run deploy -- --guided` once (the gate applies to the first deployment too): stack `hello-world-api`, region of choice, parameters `AdminUsername`, `AlertEmail`; accept the IAM capability prompt; save to `samconfig.toml`.
 3. `npm run bootstrap-admin hello-world-api` and choose the admin password.
 4. `npm run smoke hello-world-api`.
 5. Confirm the SNS subscription e-mail ("AWS Notification - Subscription Confirmation") sent to `AlertEmail`; until then the error alarms send nothing. Then, in the AWS console, open Billing → Budgets and check that `hello-world-api-monthly` exists with a 1 USD limit and `AlertEmail` as recipient (budget alerts need no confirmation).
