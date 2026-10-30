@@ -77,6 +77,11 @@ Node 22 is pinned in `.nvmrc`; run `nvm use` first (the machine default may be n
   `Admin-Local-Pass-1!` and `alice` / `Alice-Local-Pass-1!`) and writes `env.local.json`.
   Idempotent. Set `DYNAMODB_PORT=8002` when another project holds port 8000.
 - `npm run local:api`: builds and serves the API on http://127.0.0.1:3000 (foreground).
+- The local functions run on the machine's CPU type: `local-api.sh` passes
+  `FunctionArchitecture=x86_64` on x86 machines (the cloud stays `arm64`, the template default).
+- GitHub Codespaces: the legacy iptables `FORWARD` chain drops traffic between containers on
+  `hello-local` (the authorizer then times out fetching `http://cognito:9229/…/jwks.json`). After
+  each Codespace start, before `local:api`: `sudo iptables-legacy -I FORWARD -i br-+ -o br-+ -j ACCEPT`.
 - `npm run local:down`: stops the stack. The table is in memory and is lost; Cognito
   data survives in `.cognito/`.
 - Raw `sam local …` with Docker Desktop needs

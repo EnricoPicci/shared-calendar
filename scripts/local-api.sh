@@ -24,5 +24,12 @@ unset AWS_PROFILE AWS_SESSION_TOKEN
 # sam build needs the project's esbuild on the PATH.
 export PATH="$PWD/node_modules/.bin:$PATH"
 
+# The functions run on the machine's own CPU type: on an x86 machine Docker would have to emulate
+# arm64, and cold starts then exceed the 10 s timeout. The code is plain JavaScript, so it behaves
+# the same on both. --parameter-overrides replaces the one in samconfig.toml, hence AlertEmail again.
+arch=arm64
+[[ "$(uname -m)" == x86_64 ]] && arch=x86_64
+
 sam build --config-env local
-sam local start-api --config-env local
+sam local start-api --config-env local \
+  --parameter-overrides "AlertEmail=local@example.invalid FunctionArchitecture=$arch"

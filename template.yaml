@@ -17,13 +17,20 @@ Parameters:
     Type: String
     AllowedPattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
     Description: E-mail address that receives the monthly budget alert and the error alarms.
+  FunctionArchitecture:
+    Type: String
+    Default: arm64
+    AllowedValues: [arm64, x86_64]
+    Description: >
+      CPU type of the functions. Keep arm64 in the cloud (cheaper). Local runs on an x86 machine
+      set x86_64 (scripts/local-api.sh): emulating arm64 there is too slow for the 10 s timeout.
 
 # Settings shared by every function below, so each function only lists what differs.
 Globals:
   Function:
     Runtime: nodejs22.x
     Architectures:
-      - arm64
+      - !Ref FunctionArchitecture
     MemorySize: 256
     Timeout: 10
     Tracing: Disabled
