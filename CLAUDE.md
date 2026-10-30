@@ -110,6 +110,11 @@ Node 22 is pinned in `.nvmrc`; run `nvm use` first (the machine default may be n
   `samconfig.toml`'s region unless `AWS_REGION` is set. `local` uses `env.local.json` and
   dummy credentials. After `bootstrap-admin local`, rerun `local:up` to restore
   `Admin-Local-Pass-1!`, or the integration tests fail.
+- Cloud: stack `hello-world-api` in `eu-north-1` (the organization's policy blocks regional
+  services in every other region). The operator signs in with IAM Identity Center:
+  `export AWS_PROFILE=hello-admin`, and when the session expires
+  `aws sso login --profile hello-admin --use-device-code` (device code: the Codespace has no
+  local browser callback).
 - Passwords and tokens in these scripts never go into a command-line argument (visible in
   `ps`) or a file: the two Cognito calls carrying a password go through
   `scripts/cognito.mjs` (AWS SDK, password on stdin), API calls pass the token to curl with

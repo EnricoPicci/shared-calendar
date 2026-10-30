@@ -12,11 +12,11 @@ parallel = true
 [default.validate.parameters]
 lint = true
 
-# Cloud deployment. The region is a placeholder until step 11: sam deploy --guided asks
-# for it (and for AdminUsername / AlertEmail) and saves the answers here.
+# Cloud deployment. sam deploy --guided asks for AdminUsername / AlertEmail and saves the
+# answers here. eu-north-1: the account's organization allows regional services only there.
 [default.deploy.parameters]
 stack_name = "hello-world-api"
-region = "eu-west-1"
+region = "eu-north-1"
 capabilities = "CAPABILITY_IAM"
 resolve_s3 = true
 confirm_changeset = true

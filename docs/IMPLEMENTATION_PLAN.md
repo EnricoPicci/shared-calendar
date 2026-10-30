@@ -295,6 +295,7 @@ Test cases (`tests/integration/journeys.test.ts`), in order:
 
 ### Step 11 — First cloud deployment (≈ 2 h, needs the AWS account)
 
+0. Pick the region before the deploy and check it read-only: `aws cloudformation describe-stacks --stack-name hello-world-api --region <region>` must answer "does not exist", not `AccessDenied … explicit deny in a service control policy`. An account created by the console's multi-account setup sits in an AWS Organization whose policy allows regional services in one region only (here `eu-north-1`). Put that region in `samconfig.toml` and in the CLI profile, and commit before step 1.
 1. `npm run verify` on a clean, committed tree (must be green and say "clean tree").
 2. `npm run deploy -- --guided` once (the gate applies to the first deployment too): stack `hello-world-api`, region of choice, parameters `AdminUsername`, `AlertEmail`; accept the IAM capability prompt; save to `samconfig.toml`.
 3. `npm run bootstrap-admin hello-world-api` and choose the admin password.
