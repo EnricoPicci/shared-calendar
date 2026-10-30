@@ -4,6 +4,7 @@ version = 0.1
 
 [default.global.parameters]
 stack_name = "hello-world-api"
+region = "eu-north-1"
 
 [default.build.parameters]
 cached = true
@@ -12,14 +13,18 @@ parallel = true
 [default.validate.parameters]
 lint = true
 
-# Cloud deployment. sam deploy --guided asks for AdminUsername / AlertEmail and saves the
-# answers here. eu-north-1: the account's organization allows regional services only there.
+# Cloud deployment. eu-north-1: the account's organization allows regional services only there.
+# AlertEmail is deliberately not here (the repository is public): the first deploy of a stack
+# passes it once, npm run deploy -- --parameter-overrides AlertEmail=you@example.com, and
+# CloudFormation keeps it; later deploys leave it out and SAM reuses the stack's stored value.
 [default.deploy.parameters]
-stack_name = "hello-world-api"
 region = "eu-north-1"
 capabilities = "CAPABILITY_IAM"
 resolve_s3 = true
 confirm_changeset = true
+s3_prefix = "hello-world-api"
+parameter_overrides = "AdminUsername=\"admin\" FunctionArchitecture=\"arm64\""
+image_repositories = []
 
 # Laptop: sam local start-api against the Docker emulators (plan step 3).
 [local.build.parameters]
@@ -27,7 +32,7 @@ cached = true
 parallel = true
 
 [local.local_start_api.parameters]
-# AlertEmail has no default; only the alarms and the budget use it, and they do not run locally.
+# AlertEmail has no default; only the alarms use it, and they do not run locally.
 parameter_overrides = "AlertEmail=local@example.invalid"
 env_vars = "env.local.json"
 docker_network = "hello-local"

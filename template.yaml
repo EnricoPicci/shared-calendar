@@ -16,7 +16,9 @@ Parameters:
   AlertEmail:
     Type: String
     AllowedPattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
-    Description: E-mail address that receives the monthly budget alert and the error alarms.
+    Description: >
+      E-mail address that receives the error alarms, and the monthly budget alert created by
+      npm run budget (not in this template: CloudFormation lacks budgets in some regions).
   FunctionArchitecture:
     Type: String
     Default: arm64
@@ -537,39 +539,6 @@ Resources:
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmTopic
-
-  # ---------------------------------------------------------------------------
-  # Cost guard-rail
-  # ---------------------------------------------------------------------------
-
-  # E-mails AlertEmail when this month's actual or forecast spend for the account exceeds 1 USD.
-  Budget:
-    Type: AWS::Budgets::Budget
-    Properties:
-      Budget:
-        BudgetName: !Sub ${AWS::StackName}-monthly
-        BudgetType: COST
-        TimeUnit: MONTHLY
-        BudgetLimit:
-          Amount: 1
-          Unit: USD
-      NotificationsWithSubscribers:
-        - Notification:
-            NotificationType: ACTUAL
-            ComparisonOperator: GREATER_THAN
-            Threshold: 100
-            ThresholdType: PERCENTAGE
-          Subscribers:
-            - SubscriptionType: EMAIL
-              Address: !Ref AlertEmail
-        - Notification:
-            NotificationType: FORECASTED
-            ComparisonOperator: GREATER_THAN
-            Threshold: 100
-            ThresholdType: PERCENTAGE
-          Subscribers:
-            - SubscriptionType: EMAIL
-              Address: !Ref AlertEmail
 
 # Values printed after deployment; scripts read them with sam list stack-outputs. None is a secret.
 Outputs:

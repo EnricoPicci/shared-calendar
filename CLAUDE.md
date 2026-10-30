@@ -111,6 +111,9 @@ Node 22 is pinned in `.nvmrc`; run `nvm use` first (the machine default may be n
 - `DYNAMODB_PORT=8002 npm run smoke <stack|local>`: journeys 3, 4, 6, 11 with a throw-away
   `smoke-<epoch>` user, PASS/FAIL per check, deletes the user on every exit. Prompts for the
   admin password (stdin). Leaves its message rows in the table (history).
+- `npm run budget <stack> [-- --dry-run]`: creates the 1 USD monthly budget `<stack>-monthly`
+  (e-mail to the stack's `AlertEmail`) through the Budgets API. Not in `template.yaml`: no
+  `AWS::Budgets::Budget` in CloudFormation in `eu-north-1`. Idempotent; no local target.
 - Stack targets read ids from the CloudFormation outputs (read-only `describe-stacks`) in
   `samconfig.toml`'s region unless `AWS_REGION` is set. `local` uses `env.local.json` and
   dummy credentials. After `bootstrap-admin local`, rerun `local:up` to restore
@@ -137,8 +140,8 @@ Node 22 is pinned in `.nvmrc`; run `nvm use` first (the machine default may be n
 - `tests/unit/`: vitest unit tests, mirroring `src/` (e.g. `tests/unit/lib/http.test.ts`).
 - `tests/integration/`: end-to-end tests against the local Docker stack (step 9).
 - `scripts/`: shell scripts behind the npm scripts (`local-seed.sh`, `local-api.sh`,
-  `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`; `target.sh` is sourced by
-  the last two, which call `cognito.mjs`).
+  `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`, `budget.sh`; `target.sh` is
+  sourced by the last three; the first two of those call `cognito.mjs`).
 - `docker/`: files for the local stack (`cognito-local-config.json`).
 - Generated, git-ignored: `env.local.json`, `.cognito/`, `.aws-sam/`, `.verify-ok`.
 - `docs/`, `prompts/`: see "Where the truth lives".

@@ -19,7 +19,8 @@
     "verify": "bash scripts/verify.sh",
     "deploy": "bash scripts/deploy.sh",
     "bootstrap-admin": "bash scripts/bootstrap-admin.sh",
-    "smoke": "bash scripts/smoke.sh"
+    "smoke": "bash scripts/smoke.sh",
+    "budget": "bash scripts/budget.sh"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.1158.0",
