@@ -8,7 +8,8 @@
 # commit, was written on a clean tree, and the tree is still clean (sam build packages the files
 # on disk, not the commit, so uncommitted changes would ship untested).
 #
-# Extra arguments go to sam deploy, e.g. the first deployment: npm run deploy -- --guided
+# Extra arguments go to sam deploy, e.g. the first deployment of a stack, which needs the alert
+# address (kept out of samconfig.toml): npm run deploy -- --parameter-overrides AlertEmail=you@example.com
 # Uses your real AWS credentials.
 set -euo pipefail
 cd "$(dirname "$0")/.."

@@ -461,7 +461,7 @@ flowchart LR
 ```
 sam build                        # bundles each TypeScript handler with esbuild
 sam local start-api              # runs the API on the laptop
-sam deploy --guided              # first time: asks for region, stack name, admin username; then one command
+npm run deploy                   # verify gate, then sam deploy; the first time with the alert e-mail
 ./scripts/bootstrap-admin.sh     # once after the first deploy: sets the admin password
 ```
 
@@ -469,7 +469,7 @@ sam deploy --guided              # first time: asks for region, stack name, admi
 
 ### 9.2 Environments
 
-One AWS account, one stack per environment (`hello-dev`, `hello-prod`) selected by `--config-env`. Given the load, a single `prod` stack is enough to start; the local stack is the "dev" environment. v1 therefore has one deploy environment, the `default` section of `samconfig.toml`, and `npm run deploy` takes no environment argument (extra arguments go to `sam deploy`, e.g. `npm run deploy -- --guided` for the first deployment).
+One AWS account, one stack per environment (`hello-dev`, `hello-prod`) selected by `--config-env`. Given the load, a single `prod` stack is enough to start; the local stack is the "dev" environment. v1 therefore has one deploy environment, the `default` section of `samconfig.toml`, and `npm run deploy` takes no environment argument (extra arguments go to `sam deploy`). `samconfig.toml` is in the public repository, so it holds no e-mail address: the first deploy of a stack passes `--parameter-overrides AlertEmail=…`, CloudFormation stores the value with the stack, and later deploys reuse it.
 
 Runtime choices: Node.js 22, `arm64` (cheaper, faster cold start), 256 MB, 10 s timeout, bundled with `esbuild` through SAM's `Metadata.BuildMethod: esbuild`. The CPU type is the template parameter `FunctionArchitecture` (default `arm64`, the cloud value); the local stack sets it to the machine's own type, because emulating arm64 on an x86 machine makes cold starts exceed the timeout.
 

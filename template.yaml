@@ -4,7 +4,8 @@ Description: >
   Hello World API (docs/ARCHITECTURE.md). Cognito user pool for identities and roles,
   HTTP API with a Lambda authorizer, three business Lambdas, one DynamoDB table.
 
-# Values asked for at deploy time (sam deploy --guided stores them in samconfig.toml).
+# Values given at deploy time: samconfig.toml holds all but AlertEmail, which the first deploy
+# passes on the command line (public repository) and CloudFormation then keeps.
 Parameters:
   AdminUsername:
     Type: String
@@ -492,6 +493,8 @@ Resources:
 
   # A notification channel that forwards alarm messages to AlertEmail. After the first
   # deploy AWS sends a confirmation e-mail; no alarm e-mail arrives until it is confirmed.
+  # Unconfirmed, AWS deletes the subscription after about two days and a redeploy does not
+  # recreate it: subscribe again by hand (docs/RUNBOOK.md, section 3).
   AlarmTopic:
     Type: AWS::SNS::Topic
     Properties:

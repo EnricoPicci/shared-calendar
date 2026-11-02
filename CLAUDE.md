@@ -104,7 +104,9 @@ Node 22 is pinned in `.nvmrc`; run `nvm use` first (the machine default may be n
 - `npm run deploy`: refuses (exit 1, names the reason) unless `.verify-ok` is younger than
   30 minutes, names HEAD and says `clean`, and the tree is still clean; then `npm run build`
   and `sam deploy` with the default config env. Extra arguments go to `sam deploy`
-  (`npm run deploy -- --guided`). Real cloud action: only when explicitly asked.
+  (first deploy of a stack: `npm run deploy -- --parameter-overrides AlertEmail=<address>`; later
+  deploys reuse the stored value). Never put an e-mail address in `samconfig.toml`: the repo is
+  public. Real cloud action: only when explicitly asked.
 - `npm run bootstrap-admin <stack|local>`: sets the admin password (hidden prompt, twice,
   pool policy checked first). Only sets the password. Reads stdin, so
   `printf '%s\n%s\n' "$pw" "$pw" | npm run bootstrap-admin local` works in tests.

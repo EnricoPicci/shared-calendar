@@ -296,13 +296,13 @@ Test cases (`tests/integration/journeys.test.ts`), in order:
 
 0. Pick the region before the deploy and check it read-only: `aws cloudformation describe-stacks --stack-name hello-world-api --region <region>` must answer "does not exist", not `AccessDenied … explicit deny in a service control policy`. An account created by the console's multi-account setup sits in an AWS Organization whose policy allows regional services in one region only (here `eu-north-1`). Put that region in `samconfig.toml` and in the CLI profile, and commit before step 1.
 1. `npm run verify` on a clean, committed tree (must be green and say "clean tree").
-2. `npm run deploy -- --guided` once (the gate applies to the first deployment too): stack `hello-world-api`, region of choice, parameters `AdminUsername`, `AlertEmail`, `FunctionArchitecture` (Enter: keep `arm64`); accept the IAM capability prompt; save to `samconfig.toml`.
+2. `npm run deploy -- --parameter-overrides AlertEmail=<alert address>` (the gate applies to the first deployment too). `samconfig.toml` holds the other settings (stack `hello-world-api`, region, IAM capability, `AdminUsername` `admin`, `FunctionArchitecture` `arm64`) but not the address, because the repository is public: CloudFormation stores it with the stack and later deploys reuse it. In step 11 the first deploy was `--guided`, which wrote the address into `samconfig.toml`; it was removed before pushing. If `--guided` is ever used, do not save its answers with the address in them.
 3. `npm run bootstrap-admin hello-world-api` and choose the admin password.
 4. `npm run smoke hello-world-api`.
 5. `npm run budget hello-world-api -- --dry-run`, then `npm run budget hello-world-api`: creates the 1 USD monthly budget `hello-world-api-monthly` that e-mails `AlertEmail` (architecture 9.2). Not in `template.yaml`, because CloudFormation does not offer `AWS::Budgets::Budget` in every region (`Unrecognized resource types` in `eu-north-1`). Idempotent.
-6. Confirm the SNS subscription e-mail ("AWS Notification - Subscription Confirmation") sent to `AlertEmail`; until then the error alarms send nothing. Then, in the AWS console, open Billing → Budgets and check that `hello-world-api-monthly` exists with a 1 USD limit and `AlertEmail` as recipient (budget alerts need no confirmation).
+6. Confirm the SNS subscription e-mail ("AWS Notification - Subscription Confirmation") sent to `AlertEmail`; until then the error alarms send nothing. Do it the same day: AWS deletes an unconfirmed e-mail subscription after about two days (in step 11 it was gone within 65 h of the deploy), and a later deploy does not recreate it, because CloudFormation sees no change to the topic. Check with `aws sns list-subscriptions-by-topic` (a confirmed one shows an ARN, not `PendingConfirmation`); if the list is empty, subscribe again by hand: `aws sns subscribe --topic-arn <AlarmTopic ARN> --protocol email --notification-endpoint <AlertEmail>`, then confirm. Then, in the AWS console, open Billing → Budgets and check that `hello-world-api-monthly` exists with a 1 USD limit and `AlertEmail` as recipient (budget alerts need no confirmation).
 7. In the AWS console, open DynamoDB → `hello-messages` → Explore items: the two smoke-test rows are visible (N4 in the cloud).
-8. Record `ApiUrl`, `UserPoolId`, `UserPoolClientId` in the README (they are not secrets).
+8. `ApiUrl`, `UserPoolId`, `UserPoolClientId` go into the README, which step 12 writes (they are not secrets). Until then `sam list stack-outputs --stack-name hello-world-api` shows them.
 
 **Acceptance:** smoke test PASS; `sam list stack-outputs` shows the four outputs; AWS Cost Explorer forecast for the month is 0 USD apart from the API Gateway fraction of a cent.
 
@@ -310,7 +310,7 @@ Test cases (`tests/integration/journeys.test.ts`), in order:
 
 ### Step 12 — Documentation and hand-over (≈ 2 h)
 
-- `README.md`: purpose, prerequisites, the five everyday commands (`local:up`, `local:api`, `verify`, `deploy`, `smoke`), how to sign in with curl and call each endpoint, how the admin creates and deletes users, where to look at the data (dynamodb-admin locally, console in the cloud), how to rotate the admin password.
+- `README.md`: purpose, prerequisites, the deployed stack's `ApiUrl`, `UserPoolId` and `UserPoolClientId` (from step 11), the five everyday commands (`local:up`, `local:api`, `verify`, `deploy`, `smoke`), how to sign in with curl and call each endpoint, how the admin creates and deletes users, where to look at the data (dynamodb-admin locally, console in the cloud), how to rotate the admin password.
 - `docs/ARCHITECTURE.md`: update the status line to "implemented, v1" and fix anything the implementation proved different.
 - Tag the commit `v1.0.0`.
 
