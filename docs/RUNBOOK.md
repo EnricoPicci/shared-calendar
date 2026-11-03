@@ -2,7 +2,8 @@
 
 What to do, in order, to work on the deployed stack: the daily start, updating the stack,
 deploying from scratch, and the one-time setup done during plan step 11 that is easy to
-forget. The why behind each rule is in `docs/ARCHITECTURE.md` (v8) and `CLAUDE.md`.
+forget. The why behind each rule is in `docs/ARCHITECTURE.md` (v8) and `CLAUDE.md`. Which AWS
+identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AWS_ACCOUNTS.md`.
 
 | | |
 |---|---|
