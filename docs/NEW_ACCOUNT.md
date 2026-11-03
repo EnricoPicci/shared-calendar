@@ -32,6 +32,25 @@ an access portal and a Builder ID that cannot be deleted. Everything below uses 
   bound to an e-mail address, and an address with one makes the sign-in page ask "Builder ID or
   root?" every time. A new plus-address (`you+aws-hello-root@gmail.com`) works.
 
+**Can a Gmail plus-address be the root e-mail?** Yes. Two separate things decide what you get,
+and the e-mail address is not one of them:
+
+- Whether a Builder ID is created depends on the sign-up **flow**, not on the address. The
+  advanced flow creates a root user and no Builder ID whatever e-mail you type; the new flow
+  always creates one. A brand-new domain would get a Builder ID too if used with the wrong URL.
+- Whether the sign-in page asks "Builder ID or root?" depends on whether **that exact address**
+  already has a Builder ID. AWS compares addresses as plain strings: `you+something@gmail.com`
+  and `you@gmail.com` are two different identities to AWS, even though Gmail delivers both to
+  one inbox. The first account proves plus-addresses are accepted: its Identity Center user is
+  one.
+
+So a plus-address is a good choice, on two conditions: pick a tag never used with AWS before
+(no Builder Center, Q Developer, re:Post or Skill Builder sign-up with it), and use the advanced
+URL. The address protects against the sign-in-page question; only the URL protects against the
+Builder ID itself. One practical point: all mail for the new account (verification codes, the
+SNS subscription confirmation for `AlertEmail`, budget alerts, root password resets) lands in
+the same inbox as the old account's mail. A Gmail filter on the tag keeps the two apart.
+
 What you need before starting: that fresh e-mail address, a phone that can receive an SMS, a
 credit card (the advanced flow refuses to continue without a payment method; a 1 USD hold is
 placed and released), a password manager, and an authenticator app for MFA.
