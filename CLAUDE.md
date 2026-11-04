@@ -10,6 +10,8 @@ administrative API to create and delete users. TypeScript, AWS Lambda, API Gatew
 
 ## Where the truth lives
 
+- `README.md` is the entry point for a newcomer (what it is, prerequisites, the deployed
+  stack's ids, everyday commands, curl examples). It summarises; it is not a source of truth.
 - `docs/ARCHITECTURE.md` defines the behaviour, the API contract, the data model and
   the security rules. On any conflict, the architecture wins.
 - `docs/IMPLEMENTATION_PLAN.md` defines the order of work, step by step, with an

@@ -170,6 +170,11 @@ Done on 2026-11-02: admin password set (`CONFIRMED`), smoke test 10/10 PASS, bud
 one had expired unconfirmed), smoke rows in `hello-messages`, logs checked. The alert address
 was taken out of `samconfig.toml` (public repository); the stack keeps it.
 
+- [x] Commit at the end of step 11 (`7e52743`).
+- [x] Step 12 (2026-11-04): `README.md` written, architecture marked "v1 implemented" (v9), tag
+      `v1.0.0`.
 - [ ] Cost Explorer forecast for the month (console; can lag a day). The budget's own forecast
       also shows "None" until AWS has a few days of cost data.
-- [ ] Commit at the end of step 11
+- [ ] First deploy since `AlertEmail` left `samconfig.toml`: the change set must show **no**
+      change to `AlarmTopic` (SAM should reuse the value stored with the stack; untested).
+      If it shows Modify or Replace, answer N and pass `--parameter-overrides AlertEmail=<address>`.

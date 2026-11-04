@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | Draft v8 — base for the implementation plan |
-| Date | 2026-10-30 |
+| Status | v1 implemented (plan step 12, tag `v1.0.0`); v9 |
+| Date | 2026-11-04 |
 | Stack | TypeScript · AWS Lambda · API Gateway (HTTP API) · Amazon Cognito · DynamoDB · AWS SAM |
 
 ### Change log
@@ -17,6 +17,7 @@
 | v5 | 2026-10-29 | Finding from implementation step 8. **404 error code:** `DELETE /users/{username}` answers an unknown user with `{ "error": "user_not_found" }`, named like `user_exists`. **400 listed:** the same route now lists 400 for an invalid username, which section 6.4 already specified (section 4 contract). **Global sign-out skipped locally:** cognito-local lacks `AdminUserGlobalSignOut`, so a local-only `SKIP_GLOBAL_SIGN_OUT` setting skips it; the cloud always signs out (section 8 note on Cognito emulation). |
 | v6 | 2026-10-29 | Finding from implementation step 10. **Deploy gate:** `npm run deploy` no longer runs `verify` itself (verify needs the local Docker stack, which a deploy should not have to start); it checks the stamp `.verify-ok` that a passing `verify` writes: same commit, younger than 30 minutes, clean working tree both at verify time and at deploy time (section 8.1). **Environments:** `npm run deploy` uses the one deploy environment in `samconfig.toml` (section 9.2). **Smoke test** also runs against the local stack (section 9.3). |
 | v7 | 2026-10-30 | Finding from implementation step 11. **Local CPU type:** the functions stay `arm64` in the cloud, but the local stack runs them on the machine's own CPU type (template parameter `FunctionArchitecture`, set by `scripts/local-api.sh`): on an x86 machine Docker must emulate arm64, and the emulated cold starts exceed the 10 s timeout. The code is plain JavaScript, so behaviour does not depend on the CPU (section 9.2). |
+| v9 | 2026-11-04 | **v1 implemented.** Plan step 12: the stack is deployed and smoke-tested, the README exists, the status line says so. Wording aligned with what was built: region `eu-north-1` in the overview (section 2), `npm run` commands and the real template size in 6.1 and 9.1, the logger of section 11, sections 1 and 15 in the past tense. A browser front end is now planned (section 14, assumption 6); section 12 points to the target monorepo layout (`docs/FOLDER_STRUCTURE.md`), which a later step applies. |
 | v8 | 2026-10-30 | Finding from implementation step 11. **Budget outside the stack:** CloudFormation does not offer `AWS::Budgets::Budget` in every region (not in `eu-north-1`), so the 1 USD monthly budget is created after the deploy by `npm run budget <stack>` (`scripts/budget.sh`, idempotent, Budgets API) instead of by `template.yaml`. Same budget, same `AlertEmail` recipient (section 9.2, security table). |
 
 ---
@@ -25,7 +26,7 @@
 
 This document describes the architecture of a small back-end application exposing a "Hello World" API to registered users and to the Administrator, plus an administrative API to create and delete users. It is written for a reader who knows TypeScript and basic AWS concepts but is **not** an expert in Infrastructure as Code: every infrastructure choice is explained in plain terms.
 
-The document is the input for the implementation plan (next step). It fixes the **what** and the **why**; the plan will fix the **in which order**.
+The document was the input for `docs/IMPLEMENTATION_PLAN.md`. It fixes the **what** and the **why**; the plan fixes the **in which order**.
 
 ### 1.1 Requirements recap
 
@@ -69,7 +70,7 @@ flowchart LR
         U[User<br/>curl / script]
     end
 
-    subgraph AWS["AWS (eu-west-1 or any region)"]
+    subgraph AWS["AWS (eu-north-1)"]
         COG[(Amazon Cognito<br/>User Pool<br/>groups: admin, user)]
         GW[API Gateway<br/>HTTP API]
         AUTH[Lambda<br/>authorizer<br/>verifies JWT]
@@ -220,14 +221,14 @@ sequenceDiagram
     participant SAM as sam deploy
     participant CFN as CloudFormation
     participant COG as Cognito
-    participant BS as scripts/bootstrap-admin.sh
+    participant BS as npm run bootstrap-admin
 
-    Op->>SAM: sam deploy --parameter-overrides AdminUsername=admin
+    Op->>SAM: npm run deploy (first deploy: -- --parameter-overrides AlertEmail=…; AdminUsername comes from samconfig.toml)
     SAM->>CFN: create/update stack (API, Lambdas, table, user pool, groups)
     CFN->>COG: create user pool + groups admin, user
     CFN->>COG: AdminCreateUser(admin, MessageAction=SUPPRESS) + add to group admin
     CFN-->>Op: stack outputs (ApiUrl, UserPoolId, ClientId)
-    Op->>BS: ./scripts/bootstrap-admin.sh STACK_NAME (prompts for the admin password, hidden input)
+    Op->>BS: npm run bootstrap-admin hello-world-api (prompts for the admin password, hidden input)
     BS->>COG: AdminSetUserPassword(admin, password, Permanent=true)
     Note over Op,COG: Runs with the AWS credentials of the operator. Run once, or again to rotate the admin password.
     Op->>COG: InitiateAuth(admin, password)
@@ -456,13 +457,13 @@ flowchart LR
 
 ### 9.1 What SAM does, in plain words
 
-`template.yaml` is a single YAML file (≈ 150 lines) that lists the resources of section 2 and their settings. Four commands cover the whole life cycle:
+`template.yaml` is a single YAML file (≈ 560 lines, comments included) that lists the resources of section 2 and their settings. Four commands cover the whole life cycle:
 
 ```
-sam build                        # bundles each TypeScript handler with esbuild
-sam local start-api              # runs the API on the laptop
+npm run build                    # sam build: bundles each TypeScript handler with esbuild
+npm run local:api                # sam local start-api: runs the API on the laptop
 npm run deploy                   # verify gate, then sam deploy; the first time with the alert e-mail
-./scripts/bootstrap-admin.sh     # once after the first deploy: sets the admin password
+npm run bootstrap-admin <stack>  # once after the first deploy: sets the admin password
 ```
 
 `sam deploy` hands the template to CloudFormation, which creates or updates every resource and rolls back automatically on failure. Deleting the whole application is `sam delete`. There is no state file to manage and no extra tool to install besides the SAM CLI and Docker.
@@ -498,14 +499,16 @@ Guard-rails: budget alarm at 1 USD; API throttling; no on-demand DynamoDB (provi
 
 ## 11. Observability
 
-- Structured JSON logs (`requestId`, `route`, `username`, `role`, `outcome`, `durationMs`) via a 20-line logger (or AWS Lambda Powertools Logger if preferred).
+- Structured JSON logs (`requestId`, `route`, `username`, `role`, `outcome`, `durationMs`) via the 20-line logger `src/lib/logger.ts`.
 - CloudWatch default metrics (errors, duration, throttles) per function.
 - Two alarms, notification by e-mail to `AlertEmail` (SNS, free): the API's `5xx` responses > 0 in 5 min (every route, including handled 500s), and the `authorizer` Lambda's `Errors` > 0 in 5 min. The authorizer fails, rather than denying, only when it cannot download Cognito's signing keys (section 4), so this alarm means an outage, never a bad token.
 - No tracing (X-Ray) to stay in the free tier and keep the template short; it is a one-line switch if ever needed.
 
 ---
 
-## 12. Proposed repository layout
+## 12. Repository layout
+
+The layout of v1, as built. The next structural step moves the back end into `backend/` beside a `frontend/` and a `shared/` folder: `docs/FOLDER_STRUCTURE.md` describes that target layout; until it is applied, the tree below is the truth.
 
 ```
 .
@@ -569,14 +572,16 @@ Assumptions made (change them in the implementation plan if wrong):
 3. An account in both groups behaves as Administrator (section 3, role resolution).
 4. Messages are never deleted and never listed by the API (inspection happens through the DB UI).
 5. One region, one production stack; local Docker stack is the development environment.
-6. Clients are scripts/curl/Postman; no front end is in scope.
+6. Clients of v1 are scripts, curl or Postman. A browser front end is planned (`docs/FOLDER_STRUCTURE.md`); it will use the same API and the same sign-in flow.
 7. The Administrator keeps the generated user passwords confidential and delivers them out of band; the system offers no in-band delivery (no e-mail) in v1.
 
 Nothing is blocking: the implementation plan can start from this document.
 
 ---
 
-## 15. Next step — implementation plan outline
+## 15. Implementation plan outline (historical)
+
+This outline became `docs/IMPLEMENTATION_PLAN.md` and is kept as it was written.
 
 1. Repository scaffold, TypeScript/esbuild/vitest config, lint.
 2. `template.yaml`: table, user pool + groups + app client, HTTP API, authorizer, three functions, IAM policies, admin user, outputs.

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v4 (2026-10-28) |
+| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v4 (2026-10-28). **Steps 1–12 done** (step 12 on 2026-11-04, tag `v1.0.0`); step 13 planned |
 | Date | 2026-10-28 |
 | Scope | Everything needed to go from an empty repository to a deployed, smoke-tested v1 |
 
@@ -318,6 +318,18 @@ Test cases (`tests/integration/journeys.test.ts`), in order:
 
 ---
 
+### Step 13 — Monorepo move (planned, not started)
+
+**Goal:** the repository shows its three components at a glance: `backend/` (everything built in steps 1–12), `frontend/` (reserved for the browser app), `shared/` (the API contract and the username rule, extracted from `src/lib`). npm workspaces, one lock file, `docs/` and `prompts/` stay at the root.
+
+- Target layout and the rules for it: `docs/FOLDER_STRUCTURE.md` (decided 2026-11-04, brief 20).
+- File-by-file map, edits and order of work: `docs/FOLDER_MOVE_MAP.md` (throw-away; deleted when the move is committed).
+- The detailed brief for this step comes later, as the next numbered prompt.
+
+**Acceptance:** `npm install` at the root, then `DYNAMODB_PORT=8002 npm run verify -w backend` green against the local stack, and `npm run build -w backend` producing bundles that contain the shared code. Then the architecture gets a change-log line, `CLAUDE.md` and `docs/RUNBOOK.md` switch to the workspace command form, and this plan's path convention (section 1) is updated.
+
+---
+
 ## 4. Order of work and checkpoints
 
 ```
@@ -330,6 +342,7 @@ Test cases (`tests/integration/journeys.test.ts`), in order:
                                             10 scripts + gate
                                             11 first deployment     (checkpoint: smoke PASS)
                                             12 docs + tag v1.0.0
+                                            13 monorepo move        (planned)
 ```
 
 Suggested checkpoints to commit and, if wanted, push: after step 3 (local stack runs), after step 6 (first end-to-end call works locally), after step 9 (all tests green), after step 11 (deployed).
