@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v4 (2026-10-28). **Steps 1–12 done** (step 12 on 2026-11-04, tag `v1.0.0`); step 13 planned |
+| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v4 (2026-10-28). **Steps 1–12 done** (step 12 on 2026-11-04, tag `v1.0.0`); step 20, monorepo move, done 2026-11-04 |
 | Date | 2026-10-28 |
 | Scope | Everything needed to go from an empty repository to a deployed, smoke-tested v1 |
 
@@ -14,7 +14,7 @@ The plan is a sequence of **steps**. Each step lists what to build, the files it
 
 Conventions used throughout:
 
-- Paths are relative to the repository root. The layout is the one in architecture section 12.
+- Paths are relative to `backend/` since the monorepo move of 2026-11-04 (step 20, `docs/FOLDER_STRUCTURE.md`); the plan was written when the back end was the whole repository. Commands run in the back-end workspace: `npm run <script> -w backend` from the root, or the plain form from inside `backend/`.
 - "Unit" tests run with `vitest` and no Docker. "Integration" tests need the local Docker stack (architecture section 8).
 - Effort figures are indicative, for a developer who knows TypeScript but is new to SAM. Total: roughly 3 working days.
 - The architecture document is the source of truth for behaviour. Where this plan quotes a value (token lifetime, password policy, IAM action), the architecture wins if they ever differ.
@@ -318,13 +318,13 @@ Test cases (`tests/integration/journeys.test.ts`), in order:
 
 ---
 
-### Step 13 — Monorepo move (planned, not started)
+### Step 20 — Monorepo move (done 2026-11-04)
 
 **Goal:** the repository shows its three components at a glance: `backend/` (everything built in steps 1–12), `frontend/` (reserved for the browser app), `shared/` (the API contract and the username rule, extracted from `src/lib`). npm workspaces, one lock file, `docs/` and `prompts/` stay at the root.
 
-- Target layout and the rules for it: `docs/FOLDER_STRUCTURE.md` (decided 2026-11-04, brief 20).
-- File-by-file map, edits and order of work: `docs/FOLDER_MOVE_MAP.md` (throw-away; deleted when the move is committed).
-- The detailed brief for this step comes later, as the next numbered prompt.
+- Layout and the rules for it: `docs/FOLDER_STRUCTURE.md` (decided 2026-11-04, brief 20; applied by brief 21, `prompts/21-step-20-implementation.md`).
+- Numbered 20, not 13, to leave 13–19 for back-end follow-ups (section 6).
+- What the implementation found: `sam build --build-in-source` alone runs an `npm update --omit dev` per function, which in a workspace strips the root's development tools. The build therefore uses SAM's beta npm-workspace support (`SAM_CLI_BETA_NODEJS_MONOREPO=1`, `cached = false`; `docs/FOLDER_STRUCTURE.md` 4.3). The lock file was carried over, not regenerated, so every resolved dependency version is unchanged.
 
 **Acceptance:** `npm install` at the root, then `DYNAMODB_PORT=8002 npm run verify -w backend` green against the local stack, and `npm run build -w backend` producing bundles that contain the shared code. Then the architecture gets a change-log line, `CLAUDE.md` and `docs/RUNBOOK.md` switch to the workspace command form, and this plan's path convention (section 1) is updated.
 
@@ -342,7 +342,7 @@ Test cases (`tests/integration/journeys.test.ts`), in order:
                                             10 scripts + gate
                                             11 first deployment     (checkpoint: smoke PASS)
                                             12 docs + tag v1.0.0
-                                            13 monorepo move        (planned)
+                                            20 monorepo move        (done; backend/, shared/)
 ```
 
 Suggested checkpoints to commit and, if wanted, push: after step 3 (local stack runs), after step 6 (first end-to-end call works locally), after step 9 (all tests green), after step 11 (deployed).

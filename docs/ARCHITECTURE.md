@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v1 implemented (plan step 12, tag `v1.0.0`); v9 |
+| Status | v1 implemented (plan step 12, tag `v1.0.0`); monorepo layout (plan step 20); v10 |
 | Date | 2026-11-04 |
 | Stack | TypeScript · AWS Lambda · API Gateway (HTTP API) · Amazon Cognito · DynamoDB · AWS SAM |
 
@@ -17,8 +17,9 @@
 | v5 | 2026-10-29 | Finding from implementation step 8. **404 error code:** `DELETE /users/{username}` answers an unknown user with `{ "error": "user_not_found" }`, named like `user_exists`. **400 listed:** the same route now lists 400 for an invalid username, which section 6.4 already specified (section 4 contract). **Global sign-out skipped locally:** cognito-local lacks `AdminUserGlobalSignOut`, so a local-only `SKIP_GLOBAL_SIGN_OUT` setting skips it; the cloud always signs out (section 8 note on Cognito emulation). |
 | v6 | 2026-10-29 | Finding from implementation step 10. **Deploy gate:** `npm run deploy` no longer runs `verify` itself (verify needs the local Docker stack, which a deploy should not have to start); it checks the stamp `.verify-ok` that a passing `verify` writes: same commit, younger than 30 minutes, clean working tree both at verify time and at deploy time (section 8.1). **Environments:** `npm run deploy` uses the one deploy environment in `samconfig.toml` (section 9.2). **Smoke test** also runs against the local stack (section 9.3). |
 | v7 | 2026-10-30 | Finding from implementation step 11. **Local CPU type:** the functions stay `arm64` in the cloud, but the local stack runs them on the machine's own CPU type (template parameter `FunctionArchitecture`, set by `scripts/local-api.sh`): on an x86 machine Docker must emulate arm64, and the emulated cold starts exceed the 10 s timeout. The code is plain JavaScript, so behaviour does not depend on the CPU (section 9.2). |
-| v9 | 2026-11-04 | **v1 implemented.** Plan step 12: the stack is deployed and smoke-tested, the README exists, the status line says so. Wording aligned with what was built: region `eu-north-1` in the overview (section 2), `npm run` commands and the real template size in 6.1 and 9.1, the logger of section 11, sections 1 and 15 in the past tense. A browser front end is now planned (section 14, assumption 6); section 12 points to the target monorepo layout (`docs/FOLDER_STRUCTURE.md`), which a later step applies. |
 | v8 | 2026-10-30 | Finding from implementation step 11. **Budget outside the stack:** CloudFormation does not offer `AWS::Budgets::Budget` in every region (not in `eu-north-1`), so the 1 USD monthly budget is created after the deploy by `npm run budget <stack>` (`scripts/budget.sh`, idempotent, Budgets API) instead of by `template.yaml`. Same budget, same `AlertEmail` recipient (section 9.2, security table). |
+| v9 | 2026-11-04 | **v1 implemented.** Plan step 12: the stack is deployed and smoke-tested, the README exists, the status line says so. Wording aligned with what was built: region `eu-north-1` in the overview (section 2), `npm run` commands and the real template size in 6.1 and 9.1, the logger of section 11, sections 1 and 15 in the past tense. A browser front end is now planned (section 14, assumption 6); section 12 points to the target monorepo layout (`docs/FOLDER_STRUCTURE.md`), which a later step applies. |
+| v10 | 2026-11-04 | **Monorepo layout** (plan step 20). The back end moves to `backend/`; the API contract (response and error body types, error codes, `Role` and `resolveRole`) and the username rule move to `shared/`, which the back end imports and bundles; `frontend/` is reserved. Section 12 is replaced by a pointer to `docs/FOLDER_STRUCTURE.md`; paths in this document are relative to `backend/`. No change to behaviour, contract, resources or IAM. The build runs esbuild inside `backend/` with SAM's beta support for npm workspaces (section 9.1). |
 
 ---
 
@@ -449,7 +450,7 @@ flowchart LR
 | Integration | The journeys of section 6 end-to-end through `sam local start-api` against DynamoDB Local and cognito-local: create user, sign in, hello as user, hello as admin, delete user, plus the negative cases (401/403/404/409) | `vitest` + `fetch` | yes |
 | Static | `tsc --noEmit`, `eslint`, `npm audit`, `sam validate --lint` | — | no |
 
-`npm run verify` runs all three levels and, only if all pass, writes the stamp `.verify-ok` (commit hash, time, and whether the working tree was clean). **`npm run deploy` refuses to run unless `verify` has just passed**: the stamp must exist, be younger than 30 minutes, name the current commit, and have been written on a clean tree, and the tree must still be clean (the build packages the files on disk, so uncommitted changes would ship untested). Deploy does not run `verify` itself because the integration tests need the local Docker stack. That is the mechanical enforcement of N5.
+`npm run verify` runs all three levels, for the back end and for the shared package it bundles (`shared/`, section 12), and, only if all pass, writes the stamp `.verify-ok` (commit hash, time, and whether the working tree was clean). **`npm run deploy` refuses to run unless `verify` has just passed**: the stamp must exist, be younger than 30 minutes, name the current commit, and have been written on a clean tree, and the tree must still be clean (the build packages the files on disk, so uncommitted changes would ship untested). Deploy does not run `verify` itself because the integration tests need the local Docker stack. That is the mechanical enforcement of N5.
 
 ---
 
@@ -460,11 +461,13 @@ flowchart LR
 `template.yaml` is a single YAML file (≈ 560 lines, comments included) that lists the resources of section 2 and their settings. Four commands cover the whole life cycle:
 
 ```
-npm run build                    # sam build: bundles each TypeScript handler with esbuild
-npm run local:api                # sam local start-api: runs the API on the laptop
-npm run deploy                   # verify gate, then sam deploy; the first time with the alert e-mail
-npm run bootstrap-admin <stack>  # once after the first deploy: sets the admin password
+npm run build -w backend                       # sam build: bundles each TypeScript handler with esbuild
+npm run local:api -w backend                   # sam local start-api: runs the API on the laptop
+npm run deploy -w backend                      # verify gate, then sam deploy; the first time with the alert e-mail
+npm run bootstrap-admin -w backend -- <stack>  # once after the first deploy: sets the admin password
 ```
+
+The handlers import the shared contract (`@shared-calendar/shared`, section 12) through an npm workspace link. To reach it, esbuild runs inside `backend/` (`build_in_source` in `samconfig.toml`), and SAM's beta support for npm workspaces (`SAM_CLI_BETA_NODEJS_MONOREPO=1`, set by the build script and `scripts/local-api.sh`) installs the dependencies once at the repository root from the lock file. Without it SAM runs an `npm update` per function that strips the repository's development tools. The shared code ends up inside each function's bundle, as `src/lib` always did.
 
 `sam deploy` hands the template to CloudFormation, which creates or updates every resource and rolls back automatically on failure. Deleting the whole application is `sam delete`. There is no state file to manage and no extra tool to install besides the SAM CLI and Docker.
 
@@ -508,44 +511,9 @@ Guard-rails: budget alarm at 1 USD; API throttling; no on-demand DynamoDB (provi
 
 ## 12. Repository layout
 
-The layout of v1, as built. The next structural step moves the back end into `backend/` beside a `frontend/` and a `shared/` folder: `docs/FOLDER_STRUCTURE.md` describes that target layout; until it is applied, the tree below is the truth.
+The repository is a monorepo: the back end described here lives in `backend/`, the code it shares with the future browser front end (the API contract types, `Role` and `resolveRole`, the username schemas) in `shared/`, and `frontend/` is reserved. The tree, the rules for placing a file and the build mechanics are in `docs/FOLDER_STRUCTURE.md`. Paths elsewhere in this document (`template.yaml`, `samconfig.toml`, `src/lib/cognito.ts`, `scripts/…`, `.verify-ok`, `env.local.json`) are relative to `backend/`, and its commands run in that workspace (`npm run <script> -w backend`, or from inside `backend/`).
 
-```
-.
-├── template.yaml                  # all infrastructure (SAM)
-├── samconfig.toml                 # deploy parameters per environment
-├── docker-compose.yml             # dynamodb-local, dynamodb-admin, cognito-local
-├── env.local.json                 # Lambda env vars for sam local
-├── package.json                   # scripts: build, local:up, local:api, test, verify, deploy, smoke
-├── src/
-│   ├── handlers/
-│   │   ├── authorizer.ts
-│   │   ├── hello.ts               # role resolution + message per role
-│   │   ├── createUser.ts
-│   │   └── deleteUser.ts
-│   └── lib/
-│       ├── auth.ts                # claims typing, resolveRole(), requireGroup()
-│       ├── cognito.ts             # thin adapter: createUser, setPermanentPassword, addToGroup, listGroups, globalSignOut, deleteUser
-│       ├── db.ts                  # DynamoDB DocumentClient + putMessage()
-│       ├── http.ts                # ok()/error() response helpers
-│       ├── password.ts            # password generator (used by createUser now, by reset later)
-│       └── validation.ts          # zod schemas
-├── tests/
-│   ├── unit/
-│   └── integration/
-├── scripts/
-│   ├── local-seed.sh              # create table, pool, client, groups, admin + sample user locally
-│   ├── bootstrap-admin.sh         # set/rotate the admin password (cloud or local)
-│   ├── smoke.sh                   # post-deploy end-to-end check
-│   ├── target.sh                  # shared by the two above: stack or local ids and endpoints
-│   ├── cognito.mjs                # sign-in / set-password with the password on stdin (AWS SDK)
-│   ├── verify.sh                  # all checks; writes .verify-ok on success
-│   └── deploy.sh                  # checks .verify-ok, then sam build + sam deploy
-└── docs/
-    └── ARCHITECTURE.md
-```
-
-Dependencies (runtime): `@aws-sdk/client-cognito-identity-provider`, `@aws-sdk/client-dynamodb`, `@aws-sdk/lib-dynamodb`, `aws-jwt-verify`, `zod`, `ulid`. Dev: `typescript`, `esbuild`, `vitest`, `aws-sdk-client-mock`, `eslint`, `@types/aws-lambda`.
+Dependencies (runtime, `backend/`): `@shared-calendar/shared`, `@aws-sdk/client-cognito-identity-provider`, `@aws-sdk/client-dynamodb`, `@aws-sdk/lib-dynamodb`, `aws-jwt-verify`, `zod`, `ulid`; `shared/` depends on `zod` only. Dev, at the repository root: `typescript`, `esbuild`, `vitest`, `@vitest/coverage-v8`, `eslint`, `typescript-eslint`, `@types/node`; in `backend/`: `aws-sdk-client-mock`, `@types/aws-lambda`.
 
 ---
 

@@ -1,6 +1,6 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand } from '@aws-sdk/lib-dynamodb';
-import type { Role } from './auth';
+import type { Role } from '@shared-calendar/shared';
 
 // One row of the hello-messages table (architecture section 5.2).
 export type MessageItem = {

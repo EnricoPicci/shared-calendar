@@ -6,9 +6,16 @@ version = 0.1
 stack_name = "hello-world-api"
 region = "eu-north-1"
 
+# Monorepo build (docs/FOLDER_STRUCTURE.md 4.3). esbuild runs inside backend/
+# (build_in_source), where node_modules/@shared-calendar/shared, the workspace link to ../shared,
+# resolves. Together with SAM_CLI_BETA_NODEJS_MONOREPO=1 (set by npm run build and
+# scripts/local-api.sh) SAM installs once at the repository root from the lock file, keeping the
+# dev tools, instead of an npm update per function that would strip them. The beta skips cached
+# builds, hence cached = false.
 [default.build.parameters]
-cached = true
+cached = false
 parallel = true
+build_in_source = true
 
 [default.validate.parameters]
 lint = true
@@ -28,8 +35,9 @@ image_repositories = []
 
 # Laptop: sam local start-api against the Docker emulators (plan step 3).
 [local.build.parameters]
-cached = true
+cached = false
 parallel = true
+build_in_source = true
 
 [local.local_start_api.parameters]
 # AlertEmail has no default; only the alarms use it, and they do not run locally.

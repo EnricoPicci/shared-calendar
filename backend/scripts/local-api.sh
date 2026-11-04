@@ -21,8 +21,10 @@ fi
 export AWS_ACCESS_KEY_ID=local AWS_SECRET_ACCESS_KEY=local AWS_REGION=eu-west-1
 unset AWS_PROFILE AWS_SESSION_TOKEN
 
-# sam build needs the project's esbuild on the PATH.
-export PATH="$PWD/node_modules/.bin:$PATH"
+# sam build needs the repository's esbuild on the PATH (npm workspaces hoist it to the root).
+export PATH="$PWD/../node_modules/.bin:$PWD/node_modules/.bin:$PATH"
+# The monorepo build of samconfig.toml: one install at the repository root, then esbuild in place.
+export SAM_CLI_BETA_NODEJS_MONOREPO=1
 
 # The functions run on the machine's own CPU type: on an x86 machine Docker would have to emulate
 # arm64, and cold starts then exceed the 10 s timeout. The code is plain JavaScript, so it behaves

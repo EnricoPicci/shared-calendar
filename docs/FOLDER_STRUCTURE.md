@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Status | v1 — target layout, not yet applied (see "How to get there") |
+| Status | v1 — applied on 2026-11-04 (plan step 20) |
 | Date | 2026-11-04 |
 | Supersedes | `docs/ARCHITECTURE.md` section 12 ("Proposed repository layout") |
-| Brief | `prompts/20-org-folders-for-client-and-server.md` |
+| Brief | `prompts/20-org-folders-for-client-and-server.md` (decision), `prompts/21-step-20-implementation.md` (move) |
 
 This repository holds every part of the application: the back end that exists today (the
 Hello World API, `docs/ARCHITECTURE.md`), the browser front end that will follow, and the
@@ -146,15 +146,32 @@ browser, vitest for the tests), so the shared code is bundled from source and th
 every consumer must be a bundler; a plain `node shared/src/x.ts` would not run, and that is
 fine, because `shared/` is never executed on its own.
 
-### 4.3 SAM builds in place
+### 4.3 SAM builds in place, with its workspace support
 
-Today `sam build` copies the function sources to a scratch folder and runs esbuild there.
-From that folder the root `node_modules/` and the `shared/` link are out of reach. The build
-setting `build_in_source = true` in `backend/samconfig.toml` (the `sam build
---build-in-source` option) makes SAM run esbuild inside `backend/` itself, where the link
-resolves, and esbuild follows it to `shared/src` and bundles the code into each function as
-before. Nothing changes in `template.yaml` apart from this: `CodeUri: ./` and the
-`EntryPoints` stay relative to `backend/`, where the template lives.
+By default `sam build` copies the function sources to a scratch folder, installs the
+dependencies there and runs esbuild. From that folder the root `node_modules/` and the
+`shared/` link are out of reach, and npm would even look for `@shared-calendar/shared` on the
+public registry. Three settings in `backend/` make the build work in the monorepo:
+
+- `build_in_source = true` in `samconfig.toml`: SAM runs esbuild inside `backend/` itself,
+  where the link resolves; esbuild follows it to `shared/src` and bundles the code into each
+  function, as it always did with `src/lib`.
+- `SAM_CLI_BETA_NODEJS_MONOREPO=1`, set by the `build` script of `backend/package.json` and by
+  `scripts/local-api.sh`: SAM's beta support for npm workspaces. It runs one `npm install` at the
+  repository root from the lock file (keeping the development tools) and then bundles each
+  function without an install of its own. Without it, building in source runs `npm update
+  --omit dev` once per function, in parallel: in a workspace that strips the root's development
+  tools (esbuild, TypeScript, vitest) and re-resolves versions. Found while applying this
+  layout.
+- `cached = false` in `samconfig.toml`: the beta does not apply to cached builds. The build
+  only bundles, so caching saved little.
+
+`template.yaml` does not change: `CodeUri: ./` and the `EntryPoints` stay relative to
+`backend/`, where the template lives. The beta is a SAM feature under AWS's beta terms and may
+change with a SAM upgrade. If it breaks, `npm run build -w backend` fails, and `verify` with it,
+before anything is deployed. The alternatives considered were pointing `CodeUri` at the
+repository root (SAM copies the whole repository per function) and a `makefile` build that runs
+esbuild directly; the second is the fallback if the beta goes away.
 
 ### 4.4 One lock file, one audit, one Node version
 
@@ -171,7 +188,7 @@ committed state of the repository", and a monorepo has one commit history.
 
 ---
 
-## 5. Everyday commands after the move
+## 5. Everyday commands
 
 From the repository root, once, after cloning or after a dependency change:
 
@@ -202,8 +219,8 @@ npm run smoke -w backend -- hello-world-api
 npm run budget -w backend -- hello-world-api
 ```
 
-`cd backend && npm run <script> …` is the same thing. `CLAUDE.md` and `docs/RUNBOOK.md` are
-updated to these forms when the move is executed.
+`cd backend && npm run <script> …` is the same thing (drop `-w backend` and the `--` before the
+arguments). `CLAUDE.md`, `README.md` and `docs/RUNBOOK.md` use these forms.
 
 ---
 
@@ -292,13 +309,9 @@ depth and need no change. After the move the generated files appear here:
 
 ---
 
-## 10. How to get there
+## 10. How it was applied
 
-The move itself is a separate, one-off step with its own brief. The throw-away file
-`docs/FOLDER_MOVE_MAP.md` lists every existing file with its destination and the edits it
-needs; delete that file once the move is committed. Acceptance for the move: `npm install` at
-the root, then `DYNAMODB_PORT=8002 npm run verify -w backend` green against the local stack,
-and `npm run build -w backend` producing bundles that contain the shared code. Until then,
-`docs/ARCHITECTURE.md` section 12 describes the current, flat layout; the move adds a change
-log line (v9) to the architecture that points here and updates `CLAUDE.md`, `docs/RUNBOOK.md`
-and the path conventions of `docs/IMPLEMENTATION_PLAN.md`.
+Applied on 2026-11-04 as plan step 20 (brief `prompts/21-step-20-implementation.md`): every
+file moved with `git mv`, so `git log --follow` shows its history from before the move. The
+lock file was carried over rather than regenerated, so no dependency version changed.
+`docs/ARCHITECTURE.md` v10 records the move and points here for the layout.

@@ -2,7 +2,7 @@
 
 What to do, in order, to work on the deployed stack: the daily start, updating the stack,
 deploying from scratch, and the one-time setup done during plan step 11 that is easy to
-forget. The why behind each rule is in `docs/ARCHITECTURE.md` (v8) and `CLAUDE.md`. Which AWS
+forget. The why behind each rule is in `docs/ARCHITECTURE.md` and `CLAUDE.md`. Which AWS
 identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AWS_ACCOUNTS.md`.
 
 | | |
@@ -24,7 +24,9 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
    sudo iptables-legacy -I FORWARD -i br-+ -o br-+ -j ACCEPT
    ```
 
-2. `nvm use` (Node 22 from `.nvmrc`).
+2. `nvm use` (Node 22 from `.nvmrc`). Commands below run from the repository root; the back
+   end's scripts run in its workspace (`-w backend`, or `cd backend` and drop the flag). After a
+   fresh clone or a dependency change: `npm ci` at the root.
 3. In every terminal that talks to AWS:
 
    ```bash
@@ -35,7 +37,7 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
 
    The device code is needed in the Codespace: the normal login waits for a browser callback
    on `localhost`, which is the laptop, not the Codespace. Do not set `AWS_REGION`: the scripts
-   and SAM take the region from `samconfig.toml`.
+   and SAM take the region from `backend/samconfig.toml`.
 
 ---
 
@@ -45,27 +47,28 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
 2. Start the local stack (two terminals, leave them running):
 
    ```bash
-   DYNAMODB_PORT=8002 npm run local:up
-   npm run local:api                    # wait for "Running on http://127.0.0.1:3000"
+   DYNAMODB_PORT=8002 npm run local:up -w backend
+   npm run local:api -w backend         # wait for "Running on http://127.0.0.1:3000"
    ```
 
-3. `DYNAMODB_PORT=8002 npm run verify`: must end with `verify PASSED … (clean tree)`.
+3. `DYNAMODB_PORT=8002 npm run verify -w backend`: must end with `verify PASSED … (clean tree)`.
    From now on there are **30 minutes** to deploy, and no tracked file may change.
-4. `npm run deploy` (no `--guided`, no `AlertEmail`: the other answers are in `samconfig.toml`,
+4. `npm run deploy -w backend` (no `--guided`, no `AlertEmail`: the other answers are in
+   `backend/samconfig.toml`,
    and SAM reuses the alert address the stack already has).
    Read the change set before answering `y`. **Remove** or **Replace** on `UserPool`,
    `MessagesTable` or `AdminUser` means data loss: answer N and investigate.
-5. `npm run smoke hello-world-api` (asks for the admin password): every line must say PASS.
+5. `npm run smoke -w backend -- hello-world-api` (asks for the admin password): every line must say PASS.
 
 Rules:
 
 - Never change `AdminUsername` after the first deploy: CloudFormation would delete and recreate
   the administrator.
-- If a deploy rewrites `samconfig.toml`, commit it before the next deploy (and verify again).
+- If a deploy rewrites `backend/samconfig.toml`, commit it before the next deploy (and verify again).
   Never commit an e-mail address into it: the repository is public.
-- To change the alert address: `npm run deploy -- --parameter-overrides AlertEmail=<new>`,
+- To change the alert address: `npm run deploy -w backend -- --parameter-overrides AlertEmail=<new>`,
   confirm the new subscription e-mail the same day, and change the budget's recipient in the
-  console (Billing → Budgets; `npm run budget` does not touch an existing budget).
+  console (Billing → Budgets; `npm run budget -w backend` does not touch an existing budget).
 - `FunctionArchitecture` stays `arm64` in the cloud; the `x86_64` value is only for the local
   stack on x86 machines (`local-api.sh` sets it).
 
@@ -78,19 +81,20 @@ Plan step 11 has the full list; in short:
 0. Region check, read-only: `aws cloudformation describe-stacks --stack-name hello-world-api
    --region eu-north-1` must answer "does not exist", not `AccessDenied … explicit deny in a
    service control policy`. In another account, check its organization's allowed region first and
-   put it in `samconfig.toml` (both `region` lines) and the profile.
+   put it in `backend/samconfig.toml` (both `region` lines) and the profile.
 1. Steps 1 to 3 of section 2 (commit, local stack, verify).
-2. `npm run deploy -- --parameter-overrides AlertEmail=<alert address>`. `samconfig.toml`
-   already holds everything else (stack, region, capabilities, `AdminUsername` `admin`,
+2. `npm run deploy -w backend -- --parameter-overrides AlertEmail=<alert address>`.
+   `backend/samconfig.toml` already holds everything else (stack, region, capabilities, `AdminUsername` `admin`,
    `FunctionArchitecture` `arm64`); the address is the one value it leaves out, because the
    repository is public. CloudFormation stores it with the stack, so later deploys omit it.
    Without the flag the deploy stops before creating anything: `AlertEmail` must have a value.
    Avoid `--guided`; if you use it, answer N to "Save arguments to configuration file", or SAM
-   writes the address into `samconfig.toml`.
-3. `npm run bootstrap-admin hello-world-api`: sets the admin password. Until then the admin
+   writes the address into `backend/samconfig.toml`.
+3. `npm run bootstrap-admin -w backend -- hello-world-api`: sets the admin password. Until then the admin
    status is `FORCE_CHANGE_PASSWORD` and the smoke test cannot sign in.
-4. `npm run smoke hello-world-api`.
-5. `npm run budget hello-world-api -- --dry-run`, then `npm run budget hello-world-api`. The
+4. `npm run smoke -w backend -- hello-world-api`.
+5. `npm run budget -w backend -- hello-world-api --dry-run`, then
+   `npm run budget -w backend -- hello-world-api`. The
    budget is **not** in the template (CloudFormation has no `AWS::Budgets::Budget` in
    `eu-north-1`), so a new stack has no budget until this runs.
 6. Click the link in the "AWS Notification - Subscription Confirmation" e-mail sent to
@@ -168,13 +172,19 @@ where the stack lives) are different on purpose.
 Done on 2026-11-02: admin password set (`CONFIRMED`), smoke test 10/10 PASS, budget
 `hello-world-api-monthly` created, SNS subscription confirmed (re-subscribed by hand: the first
 one had expired unconfirmed), smoke rows in `hello-messages`, logs checked. The alert address
-was taken out of `samconfig.toml` (public repository); the stack keeps it.
+was taken out of `backend/samconfig.toml` (public repository); the stack keeps it.
 
 - [x] Commit at the end of step 11 (`7e52743`).
 - [x] Step 12 (2026-11-04): `README.md` written, architecture marked "v1 implemented" (v9), tag
       `v1.0.0`.
 - [ ] Cost Explorer forecast for the month (console; can lag a day). The budget's own forecast
       also shows "None" until AWS has a few days of cost data.
-- [ ] First deploy since `AlertEmail` left `samconfig.toml`: the change set must show **no**
+- [ ] First deploy since `AlertEmail` left `backend/samconfig.toml`: the change set must show **no**
       change to `AlarmTopic` (SAM should reuse the value stored with the stack; untested).
       If it shows Modify or Replace, answer N and pass `--parameter-overrides AlertEmail=<address>`.
+- [x] Plan step 20 (2026-11-04): monorepo move, the back end now lives in `backend/`
+      (`docs/FOLDER_STRUCTURE.md`). Commands take `-w backend`.
+- [ ] First deploy after the move: the change set must show the four functions' code and
+      nothing else (new bundles that now include `shared/`; no resource, role or parameter
+      change). The build uses SAM's beta monorepo support (`backend/samconfig.toml`); if a SAM
+      upgrade breaks it, `npm run build -w backend` fails before anything is deployed.

@@ -1,3 +1,4 @@
+import type { ApiErrorBody, ApiErrorCode } from '@shared-calendar/shared';
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 
 export type HttpResponse = APIGatewayProxyStructuredResultV2;
@@ -16,8 +17,9 @@ export function noContent(): HttpResponse {
 }
 
 // Error body shape of architecture section 4: { error, message }. Never pass AWS error details here.
-export function error(status: number, code: string, message: string): HttpResponse {
-  return ok(status, { error: code, message });
+// The codes are the contract's (ApiErrorCode); a new one starts in @shared-calendar/shared.
+export function error(status: number, code: ApiErrorCode, message: string): HttpResponse {
+  return ok(status, { error: code, message } satisfies ApiErrorBody);
 }
 
 export function parseJsonBody(event: Pick<APIGatewayProxyEventV2, 'body' | 'isBase64Encoded'>): Outcome<unknown> {

@@ -3,6 +3,9 @@
 #
 #   typecheck, lint, audit, sam validate --lint, unit tests, integration tests
 #
+# The shared package (../shared, @shared-calendar/shared) is bundled into every function, so its
+# typecheck, lint and unit tests (100 % line coverage) are part of the gate too.
+#
 # The integration tests need the local stack (npm run local:up, npm run local:api); pass the same
 # DYNAMODB_PORT as local:up. This script never starts the stack.
 #
@@ -30,10 +33,13 @@ step() {
   "$@"
 }
 step npm run typecheck
+step npm run typecheck -w @shared-calendar/shared
 step npm run lint
+step npm run lint -w @shared-calendar/shared
 step npm run audit
 step sam validate --lint
 step npm run test:unit
+step npm run test:unit -w @shared-calendar/shared
 # Without RUN_INTEGRATION=1 the integration project selects no files and passes vacuously.
 step env RUN_INTEGRATION=1 npm run test:integration
 

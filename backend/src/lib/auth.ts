@@ -1,8 +1,7 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
+import type { Role } from '@shared-calendar/shared';
 import { z } from 'zod';
 import { error, type HttpResponse, type Outcome } from './http';
-
-export type Role = 'admin' | 'user';
 
 export type Claims = {
   sub: string;
@@ -44,12 +43,7 @@ export function getClaims(event: EventWithAuthorizer): Outcome<Claims> {
   return { ok: true, value: { sub: context.data.sub, username: context.data.username, groups: parsedGroups.data } };
 }
 
-// Architecture section 3: admin wins over user; in neither group means no role.
-export function resolveRole(groups: readonly string[]): Role | null {
-  if (groups.includes('admin')) return 'admin';
-  if (groups.includes('user')) return 'user';
-  return null;
-}
+// Role and resolveRole (architecture section 3) live in @shared-calendar/shared.
 
 // Returns the 403 response to send, or undefined when the caller is in the group.
 export function requireGroup(claims: Claims, group: Role): HttpResponse | undefined {

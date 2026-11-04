@@ -1,10 +1,11 @@
+import { CreateUserBody, resolveRole, type CreateUserResponse } from '@shared-calendar/shared';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { getClaims, requireGroup, resolveRole } from '../lib/auth';
+import { getClaims, requireGroup } from '../lib/auth';
 import { addToGroup, createUser, deleteUser, setPermanentPassword, UserExistsError } from '../lib/cognito';
 import { error, ok, parseJsonBody, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 import { generatePassword } from '../lib/password';
-import { CreateUserBody, validate } from '../lib/validation';
+import { validate } from '../lib/validation';
 
 // Architecture section 6.3, including the rollback. One log line per request (section 11):
 // "username" is the caller, "target" the account being created. The response body carries
@@ -60,5 +61,5 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
     });
   }
 
-  return done('created', ok(201, { username: target, password }), { ...caller, target });
+  return done('created', ok(201, { username: target, password } satisfies CreateUserResponse), { ...caller, target });
 };

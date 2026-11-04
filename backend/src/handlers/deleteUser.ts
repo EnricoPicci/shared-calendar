@@ -1,9 +1,10 @@
+import { resolveRole, UsernameParam } from '@shared-calendar/shared';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { getClaims, requireGroup, resolveRole } from '../lib/auth';
+import { getClaims, requireGroup } from '../lib/auth';
 import { deleteUser, globalSignOut, listGroups, UserNotFoundError } from '../lib/cognito';
 import { error, noContent, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
-import { UsernameParam, validate } from '../lib/validation';
+import { validate } from '../lib/validation';
 
 // Architecture section 6.4. One log line per request (section 11): "username" is the caller,
 // "target" the account being deleted, logged only once the path parameter is valid.

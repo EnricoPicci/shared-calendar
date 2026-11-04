@@ -1,5 +1,5 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
-import { getClaims, requireGroup, resolveRole, type Claims } from '../../../src/lib/auth';
+import { getClaims, requireGroup, type Claims } from '../../../src/lib/auth';
 
 // Only requestContext matters to getClaims; the rest of the event is irrelevant here.
 function eventWith(lambda: unknown): Parameters<typeof getClaims>[0] {
@@ -36,19 +36,7 @@ describe('getClaims', () => {
   });
 });
 
-// Architecture section 3, the four group combinations.
-describe('resolveRole', () => {
-  it.each([
-    [['admin'], 'admin'],
-    [['user'], 'user'],
-    [['admin', 'user'], 'admin'],
-    [['user', 'admin'], 'admin'],
-    [[], null],
-    [['other'], null],
-  ])('groups %j resolve to %s', (groups, role) => {
-    expect(resolveRole(groups)).toBe(role);
-  });
-});
+// resolveRole moved to shared/tests/roles.test.ts.
 
 describe('requireGroup admin', () => {
   it.each([[['admin']], [['admin', 'user']]])('allows %j', (groups) => {

@@ -87,7 +87,7 @@ Sign in at `https://console.aws.amazon.com/` → **Root user** → the root e-ma
    secret in the password manager.
 2. **Let IAM users see billing.** Account name → **Account** → **IAM user and role access to
    Billing information** → **Edit** → **Activate**. Without this, the `admin` user cannot
-   open Billing → Budgets, and `npm run budget` fails with an access-denied error.
+   open Billing → Budgets, and `npm run budget -w backend` fails with an access-denied error.
 3. **Note the account id** (12 digits, account name menu, top right). It goes into the
    password manager, next to the root entry. The admin user signs in with it.
 4. Optional: **Account alias**. IAM → Dashboard → **Account Alias** → **Create**, for example
@@ -125,7 +125,7 @@ Why one `AdministratorAccess` user and not something narrower: SAM creates and d
 roles, Lambda functions, API Gateway, Cognito, DynamoDB, CloudWatch alarms and SNS topics, and
 the operator scripts read CloudFormation outputs and write Budgets. A narrower policy would
 need maintenance at every plan step for no gain while a single person operates the account.
-The architecture's "no wildcard" rule applies to the function roles in `template.yaml`, not to
+The architecture's "no wildcard" rule applies to the function roles in `backend/template.yaml`, not to
 the human operator.
 
 ---
@@ -171,14 +171,15 @@ When a later command fails with an expired-credentials error, run step 2 again. 
 
 ## 5. Deploy the stack
 
-From here the runbook applies unchanged, section 3 "Deploying from scratch": `local:up` +
-`local:api`, `npm run verify`, `npm run deploy -- --parameter-overrides AlertEmail=<address>`,
-confirm the SNS subscription e-mail, `npm run bootstrap-admin hello-world-api`,
-`npm run budget hello-world-api`, `npm run smoke hello-world-api`.
+From here the runbook applies unchanged, section 3 "Deploying from scratch" (every command in
+the back-end workspace, `-w backend`): `local:up` + `local:api`, `npm run verify -w backend`,
+`npm run deploy -w backend -- --parameter-overrides AlertEmail=<address>`, confirm the SNS
+subscription e-mail, `npm run bootstrap-admin -w backend -- hello-world-api`,
+`npm run budget -w backend -- hello-world-api`, `npm run smoke -w backend -- hello-world-api`.
 
 Two things are simpler than in the first account:
 
-- **Region:** `eu-north-1` stays (it is in `samconfig.toml`), but only out of habit. This
+- **Region:** `eu-north-1` stays (it is in `backend/samconfig.toml`), but only out of habit. This
   account has no organization policy restricting regions.
 - **Billing → Budgets** in the console works for `admin` as soon as root did step 2.2.
 
@@ -195,7 +196,7 @@ Propose and review before editing; none of these are urgent.
   `admin` with `AdministratorAccess` and MFA" instead of the Identity Center paragraphs.
 - `docs/AWS_ACCOUNTS.md`: rewrite around two identities (root, `admin`) and one account, or
   retire it into this file.
-- `samconfig.toml`: the comment on `eu-north-1` no longer needs to mention an organization.
+- `backend/samconfig.toml`: the comment on `eu-north-1` no longer needs to mention an organization.
 - Memory note for Claude: the hand-off memory says `aws sso login`; update it.
 
 ---

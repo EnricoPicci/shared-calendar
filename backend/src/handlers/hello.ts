@@ -1,6 +1,7 @@
+import { resolveRole, type HelloResponse, type Role } from '@shared-calendar/shared';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { ulid } from 'ulid';
-import { getClaims, resolveRole, type Role } from '../lib/auth';
+import { getClaims } from '../lib/auth';
 import { putMessage } from '../lib/db';
 import { error, ok, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
@@ -38,5 +39,5 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
     return done('error', error(500, 'internal_error', 'Could not store the message'), { username, role, reason: err });
   }
 
-  return done('created', ok(201, { messageId, role, message, createdAt }), { username, role });
+  return done('created', ok(201, { messageId, role, message, createdAt } satisfies HelloResponse), { username, role });
 };
