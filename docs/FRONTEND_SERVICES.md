@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Status | v1 implemented (2026-11-05): `frontend/src/services/` (brief `prompts/31-implement-login-service.md`); design brief `prompts/30-design-first-service-class.md` |
+| Status | v3 — `LoginService` implemented (2026-11-05, brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`); `SessionStore` designed, not implemented (section 9) |
 | Date | 2026-11-05 |
-| Scope | The rules of the front end's services layer, the pattern every service follows, and the full design of `LoginService` |
-| Depends on | `docs/ARCHITECTURE.md` v10 (sections 3.1, 4, 6.2), `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/` |
+| Scope | The rules of the front end's services layer, the pattern every service follows, the full design of `LoginService`, and the `SessionStore` that keeps the signed-in session |
+| Depends on | `docs/ARCHITECTURE.md` v11 (sections 3.1, 4, 6.2, 8), `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/` |
 
 ### Change log
 
@@ -13,6 +13,7 @@
 |---|---|---|
 | v1 | 2026-11-05 | First design: services-layer rules, the service pattern, `LoginService` with `loginResult$` (ReplaySubject) and `loginState$` (BehaviorSubject). |
 | v2 | 2026-11-05 | Implemented (brief 31). Details the implementation fixed: an access token that cannot be decoded, or lacks `username` or `exp`, and a 200 without `IdToken` or `RefreshToken`, are `failure unexpected` (section 4.5); a JSON body that is not an object is read as `{}`; `decodeClaims` decodes the payload as UTF-8 (`atob` + `TextDecoder`). Found against cognito-local: it answers a wrong password with `InvalidPasswordException` (real Cognito: `NotAuthorizedException`), now also mapped to `invalid_credentials`; it issues 24-hour access tokens without `ExpiresIn`, so the 15-minute expiry is checked only in the cloud (section 7). `frontend/` exists ahead of the front-end architecture, for the services layer only (decision 8 revised; `docs/FOLDER_STRUCTURE.md` section 7). Section 5: the integration test and the tooling as built, including an ESLint guard against Node imports and globals in `frontend/src`. Section 7: the acceptance as run. |
+| v3 | 2026-11-05 | Design of `SessionStore` (section 9): the one in-memory holder of the signed-in `Session`, written by `LoginService` on success, read by the API services, cleared at `expiresAt`, on logout and on an API 401. `LoginService` gains the store as a second constructor argument (section 9.4). Sections 4.6 and 4.8 point at it; decisions 9 to 13. Added as section 9 rather than inserted, so that the section numbers cited by the code and by briefs 30 and 31 stay valid. |
 
 ---
 
@@ -367,8 +368,8 @@ login.loginState$.subscribe((state) => {
   if (state.status === 'failure') errorBox.textContent = state.message;
 });
 login.loginResult$.pipe(filter((r) => r.status === 'success')).subscribe((r) => {
-  app.start(r.session); // hands the session to the services that call the API
-});
+  app.start(r.session); // v3: the session is also in the SessionStore (section 9); the app may
+});                     // react to session$ instead
 
 // 2. then trigger
 form.onsubmit = () => login.login(usernameInput.value, passwordInput.value);
@@ -399,10 +400,10 @@ may use the schema for an early hint if it wishes.
 | `RefreshService` | `InitiateAuth` with `REFRESH_TOKEN_AUTH` (`ALLOW_REFRESH_TOKEN_AUTH` is enabled) | `Session.refreshToken`; emits a new `Session` before `expiresAt` |
 | `HelloService` | `POST /hello` | `Session.accessToken`; result typed with `HelloResponse` from `shared/` |
 | `UsersService` | `POST /users`, `DELETE /users/{username}` | `Session.accessToken`; `CreateUserResponse`, `ApiErrorBody` from `shared/` |
-| logout | `RevokeToken` (optional), then `reset()` on the services | returns `loginState$` to `idle` |
+| logout | `RevokeToken` (optional), then `SessionStore.clear()` and `reset()` on the services | `session$` emits `null` (section 9); returns `loginState$` to `idle` |
 
-The API services will share one small helper around `fromFetch` that adds the bearer header
-and maps API Gateway's own 401/403/500 bodies and the handlers' `ApiErrorBody` to a typed result,
+The API services will share one small helper around `fromFetch` that reads the access token
+from the `SessionStore` (section 9.5), adds the bearer header and maps API Gateway's own 401/403/500 bodies and the handlers' `ApiErrorBody` to a typed result,
 following section 3 exactly.
 
 ---
@@ -507,3 +508,184 @@ unexpected`).
 | 6 | A new `login` cancels the pending one | Simplest defined behaviour; avoids a stale answer landing after a newer one. Alternative (ignore the new call while pending) can be chosen by the view by disabling the button on `pending`. |
 | 7 | Document name `docs/FRONTEND_SERVICES.md` | Assumed, the recommended option: one document for the services layer, later services added as sections; name follows `docs/FOLDER_STRUCTURE.md` section 8. |
 | 8 | ~~No code until `docs/FRONTEND_ARCHITECTURE.md` exists~~ Revised in v2: the services layer is created before it; everything else in `frontend/` still waits | Brief 31, decision 1: the services layer depends on nothing the architecture will choose. Recorded in `docs/FOLDER_STRUCTURE.md` section 7. |
+| 9 | One `SessionStore` holds the signed-in `Session`; nobody else keeps a copy of a token | Section 9.1. One place to refresh, expire or clear; every consumer sees the change. No state library: a `BehaviorSubject` is enough. |
+| 10 | `LoginService` writes to the store itself (store injected), before it emits the outcome | Section 9.4. The view does not have to wire login to the store, and a view reacting to `success` already finds the session there. |
+| 11 | Memory only; no `sessionStorage` or `localStorage` in v3 | Rule 7. A reload means signing in again. `sessionStorage` is the candidate if that becomes annoying, decided by the front-end architecture with the hosting and its CSP; `localStorage` is excluded (tokens outlive the tab). |
+| 12 | The store clears itself at `expiresAt` | Section 9.3. The view learns of the expiry on time instead of from a 401. `RefreshService` will replace the session before then, which re-arms the timer. |
+| 13 | `session$` is `Session \| null`, without a reason for `null` | Assumed, the simplest option. If the view needs to say "your session expired" rather than show the bare form, the value becomes a small union (`signed_in` / `signed_out` with `reason: 'logout' \| 'expired' \| 'rejected'`) without changing who writes or reads it. |
+
+---
+
+## 9. `SessionStore`: the signed-in session
+
+### 9.1 Purpose
+
+`LoginService` produces a `Session` (section 4.3), but only as the value of one outcome. The rest
+of the front end needs a lasting answer to "who is signed in, and with which token": the view to
+choose between the login form and the application, the API services to put the access token in
+the `Authorization: Bearer` header of every call.
+
+`SessionStore` is that answer: **one** small object holding the current `Session`, or `null`
+when nobody is signed in. Every service that needs the token reads it from the store at the
+moment of the call; nobody keeps a copy. Refreshing the token, logging out or expiring then
+happens in one place, and every consumer sees it.
+
+It is not a service in the sense of section 3: it makes no remote call. It follows the same
+rules otherwise: plain TypeScript, a private subject, a public observable, created by the view
+layer (the application's start-up code) and passed to the services through their constructors
+(rule 1: no global singleton).
+
+Two kinds of state stay separate:
+
+| Stream | Answers | Lives |
+|---|---|---|
+| `LoginService.loginState$` | How did the last *login attempt* go? (idle, pending, success, failure) | Per attempt |
+| `SessionStore.session$` | *Is someone signed in*, and as whom, with which token? | From a successful login until expiry, logout or a 401 |
+
+After an expiry `loginState$` still shows the last attempt's `success`: the view decides "signed in
+or not" from `session$` only.
+
+### 9.2 The class
+
+```ts
+import { BehaviorSubject, Observable, Subscription, timer } from 'rxjs';
+import type { Session } from './login.types';
+
+export class SessionStore {
+  private readonly sessionSubject = new BehaviorSubject<Session | null>(null);
+  readonly session$: Observable<Session | null> = this.sessionSubject.asObservable();
+
+  // Clears the session at its expiry; re-armed by every set(), cancelled by clear().
+  private expiry?: Subscription;
+
+  set(session: Session): void {
+    this.expiry?.unsubscribe();
+    if (session.expiresAt.getTime() <= Date.now()) {
+      this.clear(); // never publish a session that is already dead
+      return;
+    }
+    this.sessionSubject.next(session);
+    this.expiry = timer(session.expiresAt).subscribe(() => this.clear());
+  }
+
+  clear(): void {
+    this.expiry?.unsubscribe();
+    this.expiry = undefined;
+    if (this.sessionSubject.getValue() !== null) this.sessionSubject.next(null);
+  }
+}
+```
+
+- `BehaviorSubject`, not `ReplaySubject`: "nobody is signed in" is a real, current value, and a
+  view must be able to render at once (section 3.3).
+- Only `session$` is public. The subject's synchronous `.value` stays private, as for
+  `loginState$` (section 3.3): consumers read the token reactively (section 9.5).
+- `clear()` emits only on a real change, so logout after an expiry does not emit `null` twice.
+- Like every subject of the layer, `sessionSubject` never receives `error` or `complete`.
+
+### 9.3 Expiry
+
+`set()` arms an RxJS `timer` for `expiresAt` (the access token's `exp` claim, section 4.5); when it
+fires, the store clears itself and `session$` emits `null`. The view then shows the login form at
+the moment the token stops working, instead of discovering it from a failed API call.
+
+- Every `set()` re-arms the timer, so the later `RefreshService` (section 4.8) only has to call
+  `set()` with the new session before `expiresAt`.
+- The expiry compares with the browser's clock. A wrong clock clears too early or too late; the
+  API's 401 (section 9.5) is the backstop, and the server's check is the only one that matters
+  for security.
+- `setTimeout`, under `timer`, holds at most about 24.8 days. Cloud tokens live 15 minutes and
+  cognito-local's 24 hours (`docs/ARCHITECTURE.md` section 8), far below.
+
+### 9.4 Who writes
+
+| Writer | Call | When |
+|---|---|---|
+| `LoginService` | `set(session)` | A login succeeds |
+| the store itself | `clear()` | `expiresAt` is reached |
+| `RefreshService` (later) | `set(newSession)` | Before `expiresAt` |
+| logout (later) | `clear()` | The user signs out |
+| the API helper (later) | `clear()` | The API answers **401**: the token is expired or invalid (e.g. the browser's clock ran late). Not on 403: the token is valid, the role is not enough. |
+
+`LoginService` changes in one place: it receives the store as a second constructor argument,
+`new LoginService(config, store)`, and its pipeline writes the session before it emits:
+
+```ts
+tap((result) => {
+  if (result.status === 'success') this.store.set(result.session); // first: the store
+  this.stateSubject.next(result);                                    // then the two streams
+}),
+```
+
+A view reacting to `success` on `loginResult$` or `loginState$` therefore already finds the
+session in `session$`. A failed attempt does not touch the store: a session already present
+stays until expiry or logout.
+
+### 9.5 Who reads
+
+- **The view** subscribes to `session$`: `null` → the login form; a session → the application,
+  with `username` and `role` for the header and for which actions to offer (admin or user).
+- **The API services** (`HelloService`, `UsersService`, later) read the token when the call is
+  made, not when the service is built, through the shared helper of section 4.8:
+
+  ```ts
+  this.store.session$.pipe(
+    take(1), // the current session, at the moment of the call
+    switchMap((session) =>
+      session
+        ? fromFetch(url, { method, headers: { Authorization: `Bearer ${session.accessToken}` } })
+        : of(notSignedIn), // a failure value, never an error (rule 4)
+    ),
+  )
+  ```
+
+### 9.6 Storage: memory only
+
+The session lives in the `BehaviorSubject`, in memory. A page reload or a new tab means signing in
+again. This is rule 7 and the safest choice: nothing is left in the browser for an injected script
+to read later.
+
+If reloads become a nuisance, `sessionStorage` is the candidate (survives a reload, dies with
+the tab): the store would read it in its constructor and write it in `set()` and `clear()`; nobody
+else would change. That decision belongs to the front-end architecture document, together with
+the hosting and its Content-Security-Policy. `localStorage` is not a candidate: the tokens would
+outlive the tab by up to the refresh token's 7 days.
+
+### 9.7 Security notes
+
+- The store holds tokens; it logs nothing and is never attached to `window` or to a global.
+- It never holds a password: it receives a `Session`, which has none (section 4.7).
+- A deleted user's access token keeps working until its `exp`: the authorizer checks signature
+  and expiry, not revocation (architecture section 7.3). The store's expiry then signs the front
+  end out, and the later `RefreshService` fails because the delete revoked the refresh token. So a
+  deleted user is out at the latest 15 minutes after the delete, as the architecture accepts.
+
+### 9.8 Placement and unit tests
+
+```
+frontend/src/services/session.store.ts              # SessionStore
+frontend/tests/unit/services/session.store.test.ts
+```
+
+`login.service.ts` and its tests change for the second constructor argument. The tests use
+`vi.useFakeTimers()` for the expiry (RxJS's `timer` uses `setTimeout`); 100 % line coverage stays.
+
+| Test | Expect |
+|---|---|
+| initial | `session$` gives `null` at once |
+| set | `session$` gives the session; a late subscriber gets it too |
+| expiry | at `expiresAt` (fake clock) `session$` gives `null`; one millisecond before, still the session |
+| re-arm | `set(a)`, then `set(b)` with a later expiry: nothing at `a`'s expiry, `null` at `b`'s |
+| already expired | `set()` with `expiresAt` in the past: `null`, never the dead session |
+| clear | `session$` gives `null`; the timer is cancelled (advancing past `expiresAt` emits nothing) |
+| clear twice | one `null` only |
+| login writes | `LoginService` success: the store holds the session, and it is there when `loginResult$` emits |
+| login failure | a failure leaves an existing session in place |
+
+### 9.9 Acceptance check (for the implementation step)
+
+1. `npm run verify -w frontend` green, 100 % line coverage on `frontend/src`.
+2. With `RUN_INTEGRATION=1` (local stack running), the integration test of section 7 also checks
+   that after alice's login the store's `session$` gives her session, and the `POST /hello` call
+   uses the token read from the store.
+3. No new dependency; the ESLint guard of section 5 still passes.
