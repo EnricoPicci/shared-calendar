@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v1 — design only; no code in `frontend/` yet (brief `prompts/30-design-first-service-class.md`) |
+| Status | v1 implemented (2026-11-05): `frontend/src/services/` (brief `prompts/31-implement-login-service.md`); design brief `prompts/30-design-first-service-class.md` |
 | Date | 2026-11-05 |
 | Scope | The rules of the front end's services layer, the pattern every service follows, and the full design of `LoginService` |
 | Depends on | `docs/ARCHITECTURE.md` v10 (sections 3.1, 4, 6.2), `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/` |
@@ -12,6 +12,7 @@
 | Version | Date | Change |
 |---|---|---|
 | v1 | 2026-11-05 | First design: services-layer rules, the service pattern, `LoginService` with `loginResult$` (ReplaySubject) and `loginState$` (BehaviorSubject). |
+| v2 | 2026-11-05 | Implemented (brief 31). Details the implementation fixed: an access token that cannot be decoded, or lacks `username` or `exp`, and a 200 without `IdToken` or `RefreshToken`, are `failure unexpected` (section 4.5); a JSON body that is not an object is read as `{}`; `decodeClaims` decodes the payload as UTF-8 (`atob` + `TextDecoder`). Found against cognito-local: it answers a wrong password with `InvalidPasswordException` (real Cognito: `NotAuthorizedException`), now also mapped to `invalid_credentials`; it issues 24-hour access tokens without `ExpiresIn`, so the 15-minute expiry is checked only in the cloud (section 7). `frontend/` exists ahead of the front-end architecture, for the services layer only (decision 8 revised; `docs/FOLDER_STRUCTURE.md` section 7). Section 5: the integration test and the tooling as built. Section 7: the acceptance as run. |
 
 ---
 
@@ -29,9 +30,11 @@ This document fixes the rules of the services layer, the pattern every service f
 designs the first service, **login**. Later services (Hello World, create user, delete user,
 token refresh) will be added as sections of this document, following the same pattern.
 
-It is a design: nothing is created in `frontend/` until the front-end architecture document
-exists (`docs/FOLDER_STRUCTURE.md` section 7). This document is written so that it can become the
-"services layer" chapter of that architecture unchanged.
+The services layer is implemented in `frontend/src/services/` (v2). It was created ahead of the
+front-end architecture document, as the one exception of `docs/FOLDER_STRUCTURE.md` section 7:
+it is plain TypeScript with `rxjs` and `shared/`, and depends on nothing that document will
+choose. This document is written so that it can become the "services layer" chapter of that
+architecture unchanged.
 
 ### 1.1 What "login" is in this system
 
@@ -203,7 +206,7 @@ export type Session = {
 };
 
 export type LoginFailureReason =
-  | 'invalid_credentials'      // NotAuthorizedException, UserNotFoundException
+  | 'invalid_credentials'      // NotAuthorizedException, UserNotFoundException (InvalidPasswordException locally)
   | 'too_many_attempts'        // TooManyRequestsException, LimitExceededException
   | 'password_reset_required'  // PasswordResetRequiredException (cannot happen in v1; mapped anyway)
   | 'challenge'                // 200 without AuthenticationResult (cannot happen in v1)
@@ -316,6 +319,7 @@ function describe(err: unknown): string {
 const REASON_BY_TYPE: Record<string, LoginFailureReason> = {
   NotAuthorizedException: 'invalid_credentials',
   UserNotFoundException: 'invalid_credentials',
+  InvalidPasswordException: 'invalid_credentials', // cognito-local's wrong password; never from real InitiateAuth
   TooManyRequestsException: 'too_many_attempts',
   LimitExceededException: 'too_many_attempts',
   PasswordResetRequiredException: 'password_reset_required',
@@ -337,7 +341,11 @@ function toLoginResult(status: number, text: string): LoginResult {
 ```
 
 `toSession` decodes the access token's payload (the middle base64url part of the JWT, with
-`atob` and `JSON.parse`) and reads `username`, `cognito:groups` and `exp`. It does **not**
+`atob`, `TextDecoder` for UTF-8 and `JSON.parse`) and reads `username`, `cognito:groups` and `exp`.
+A token that cannot be decoded, or has no `username` or `exp`, and a 200 without `IdToken` or
+`RefreshToken`, give `failure('unexpected')`: inside `map`, never a thrown error, which
+`catchError` would misreport as `network`. A JSON body that is not an object (`null`) is read
+as `{}`. It does **not**
 verify the signature: the browser only displays these claims, and the API verifies the token
 on every call (architecture section 7). If `resolveRole(groups)` returns `null`, the outcome is
 `failure('no_role')`: the account is authenticated but can do nothing, and the view should say
@@ -410,9 +418,12 @@ frontend/
 │   ├── login.service.ts     # LoginService, LoginConfig
 │   ├── login.types.ts       # Session, LoginFailureReason, LoginResult, LoginState
 │   └── jwt.ts               # decodeClaims(jwt): the base64url payload decoder
-└── tests/unit/services/
-    ├── login.service.test.ts
-    └── jwt.test.ts
+└── tests/
+    ├── unit/services/
+    │   ├── login.service.test.ts
+    │   └── jwt.test.ts
+    └── integration/
+        └── login.service.test.ts   # against the local stack, RUN_INTEGRATION=1 only
 ```
 
 - Runtime dependency: `rxjs` (7.8 or later; `fromFetch` is in `rxjs/fetch`). Plus
@@ -421,10 +432,16 @@ frontend/
   services use `fetch`, `Response`, `atob`); no Node types.
 - Unit tests run with vitest in the `node` environment: Node 22 provides `fetch`, `Response`
   and `atob`, so no browser emulation (jsdom) is needed for the services layer.
-- Coverage threshold: 100 % lines on `frontend/src/services`.
+- Coverage threshold: 100 % lines on `frontend/src` (today: the services).
+- `frontend/vitest.config.ts` has two projects like the back end: `unit` and `integration`, the
+  second selecting files only when `RUN_INTEGRATION=1`. `npm run test:unit -w frontend` runs both.
+- The compiler does not fully enforce "no Node types": vitest's own type declarations reference
+  `@types/node`, so `node:fs` and `process` type-check in `frontend/` even with
+  `types: ["vitest/globals"]`. "No Node module in `frontend/src`" is a review rule (the
+  integration test uses `node:fs` to read `backend/env.local.json`, which is allowed in tests).
 
-The folder is created only together with `docs/FRONTEND_ARCHITECTURE.md` (framework, hosting,
-sign-in flow); this document then becomes, or is referenced as, its services chapter.
+When `docs/FRONTEND_ARCHITECTURE.md` (framework, hosting, sign-in flow) is written, this document
+becomes, or is referenced as, its services chapter.
 
 ---
 
@@ -461,14 +478,17 @@ unexpected`).
 
 1. `npm run typecheck -w frontend`, `npm run lint -w frontend`, `npm run test:unit -w frontend`
    green, 100 % line coverage on `src/services`.
-2. Manual, against the local stack (`npm run local:up -w backend` running): a scratch page or a
-   vitest file run with `RUN_INTEGRATION=1` calls `new LoginService({ cognitoUrl:
+2. Against the local stack (`DYNAMODB_PORT=8002 npm run local:up -w backend` and
+   `npm run local:api -w backend` running), `RUN_INTEGRATION=1 npm run test:unit -w frontend`
+   runs `tests/integration/login.service.test.ts`, which calls `new LoginService({ cognitoUrl:
    'http://localhost:9229/', clientId: <CLIENT_ID of env.local.json> }).login('alice',
    'Alice-Local-Pass-1!')` and receives `success` with `role: 'user'`; `admin` /
    `Admin-Local-Pass-1!` receives `role: 'admin'`; a wrong password receives
-   `invalid_credentials`.
+   `invalid_credentials`, and so does an unknown user. `expiresAt` equals the access token's
+   `exp`; cognito-local issues 24-hour tokens, so the 15-minute validity of architecture
+   section 3.1 is a cloud property, not checked locally.
 3. The access token of the success is accepted by `POST /hello` on `http://127.0.0.1:3000`
-   (curl is enough), proving the front end's session and the back end's authorizer agree.
+   (same test file), proving the front end's session and the back end's authorizer agree.
 
 ---
 
@@ -483,4 +503,4 @@ unexpected`).
 | 5 | In neither group → `failure no_role` | A session that cannot call anything is more useful as an explained failure than as a success the API then rejects with 403. |
 | 6 | A new `login` cancels the pending one | Simplest defined behaviour; avoids a stale answer landing after a newer one. Alternative (ignore the new call while pending) can be chosen by the view by disabling the button on `pending`. |
 | 7 | Document name `docs/FRONTEND_SERVICES.md` | Assumed, the recommended option: one document for the services layer, later services added as sections; name follows `docs/FOLDER_STRUCTURE.md` section 8. |
-| 8 | No code until `docs/FRONTEND_ARCHITECTURE.md` exists | `docs/FOLDER_STRUCTURE.md` section 7. The brief asks for a design. |
+| 8 | ~~No code until `docs/FRONTEND_ARCHITECTURE.md` exists~~ Revised in v2: the services layer is created before it; everything else in `frontend/` still waits | Brief 31, decision 1: the services layer depends on nothing the architecture will choose. Recorded in `docs/FOLDER_STRUCTURE.md` section 7. |

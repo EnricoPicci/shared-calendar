@@ -10,8 +10,9 @@ administrative API to create and delete users. TypeScript, AWS Lambda, API Gatew
 
 The repository is an npm-workspaces monorepo: the back end in `backend/`, the code it shares
 with the browser front end (the API contract types, `Role`/`resolveRole`, the username schemas)
-in `shared/` (package `@shared-calendar/shared`), `frontend/` reserved (not created until its
-architecture exists). Layout and placement rules: `docs/FOLDER_STRUCTURE.md`.
+in `shared/` (package `@shared-calendar/shared`), and in `frontend/` only the browser's services
+layer (`docs/FRONTEND_SERVICES.md`; the rest of the front end waits for its architecture
+document). Layout and placement rules: `docs/FOLDER_STRUCTURE.md`.
 
 ## Where the truth lives
 
@@ -77,14 +78,20 @@ Commands run from the repository root. Back-end scripts take `-w backend`, with 
 their own arguments (`npm run smoke -w backend -- local`); from inside `backend/` the plain
 form works the same. Paths below without a folder are relative to `backend/`.
 
-- `npm run typecheck`, `npm run lint`, `npm run test:unit` at the root: every package (`shared`
-  and `backend`), each with its own coverage threshold.
+- `npm run typecheck`, `npm run lint`, `npm run test:unit` at the root: every package (`shared`,
+  `backend` and `frontend`), each with its own coverage threshold.
 - `npm run typecheck -w backend`: `tsc --noEmit` over `src/`, `tests/` and the config files
   (`-w @shared-calendar/shared` for the shared package, which has no Node types).
 - `npm run lint -w backend`: ESLint with the root flat config (`typescript-eslint` recommended).
 - `npm run test:unit -w backend`: vitest project `unit`, no Docker needed. Runs with v8 coverage and
   fails below 100 % line coverage on `src/lib` (HTML report in `coverage/`, git-ignored).
   `shared/` has the same 100 % threshold on `shared/src`.
+- `npm run typecheck -w frontend`, `npm run lint -w frontend`, `npm run test:unit -w frontend`
+  (100 % line coverage on `frontend/src`), `npm run verify -w frontend` (the three in order, stops
+  at the first failure; no Docker). The root `npm run verify` runs the back end's, then this.
+- `RUN_INTEGRATION=1 npm run test:unit -w frontend`: also runs `frontend/tests/integration`
+  (`LoginService` against cognito-local on 9229, its token against `POST /hello` on 3000). Needs
+  `local:up` + `local:api` running and the Codespaces iptables rule below.
 - `RUN_INTEGRATION=1 npm run test:integration -w backend`: the journeys of plan step 9 against the
   running `local:up` + `local:api` stack. Pass the same `DYNAMODB_PORT` as `local:up`
   (here `DYNAMODB_PORT=8002`). Without `RUN_INTEGRATION=1` it runs nothing and exits 0.
@@ -163,7 +170,7 @@ form works the same. Paths below without a folder are relative to `backend/`.
 
 Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
 
-- Root: `package.json` (workspaces `shared`, `backend`; delegating scripts; shared dev tools),
+- Root: `package.json` (workspaces `shared`, `backend`, `frontend`; delegating scripts; shared dev tools),
   the one `package-lock.json`, `tsconfig.base.json` (strictness every package extends),
   `eslint.config.js`, `.nvmrc`, `docs/`, `prompts/`.
 - `backend/`: the API. `package.json` (name `backend`, scripts), `template.yaml`,
@@ -176,13 +183,19 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`, `budget.sh`; `target.sh` is
     sourced by the last three; the first two of those call `cognito.mjs`).
   - `docker/`: files for the local stack (`cognito-local-config.json`).
+- `frontend/`: package `frontend`, the services layer only (exception in `docs/FOLDER_STRUCTURE.md`
+  section 7). `package.json` (deps `rxjs`, `@shared-calendar/shared`; scripts `typecheck`, `lint`,
+  `test:unit`, `verify`; no `dev`/`build`/`deploy` yet), `tsconfig.json` (ES2022 + DOM, no node
+  types), `vitest.config.ts`, `src/services/` (`login.service.ts`, `login.types.ts`, `jwt.ts`),
+  `tests/unit/` mirroring `src/`, `tests/integration/`. `src/` imports only `rxjs`, `rxjs/fetch`,
+  `rxjs/operators` and `@shared-calendar/shared`; configuration comes through the constructor.
+  No framework, Vite, `index.html`, `template.yaml` or `dist/` until `docs/FRONTEND_ARCHITECTURE.md`.
 - `shared/`: package `@shared-calendar/shared`, no build step (`exports` points at
   `src/index.ts`; each consumer bundles it). `src/api.ts` (response and error body types,
   `ApiErrorCode`), `src/roles.ts` (`Role`, `resolveRole`), `src/username.ts` (the username
   pattern and zod schemas), `src/index.ts` (re-exports); `tests/` mirrors `src/`.
-- `frontend/`: reserved; does not exist yet (`docs/FOLDER_STRUCTURE.md` section 7).
 - Generated, git-ignored: root `node_modules/`; in `backend/`: `env.local.json`, `.cognito/`,
-  `.aws-sam/`, `.verify-ok`, `coverage/`; `shared/coverage/`.
+  `.aws-sam/`, `.verify-ok`, `coverage/`; `shared/coverage/`; `frontend/coverage/`.
 
 ## Test conventions
 
@@ -194,3 +207,8 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   Tests of the contract itself (what a schema accepts, `resolveRole`) live there; the back end
   tests what it does with it (the 400 answer, the handlers).
 - Unit tests mock AWS with `aws-sdk-client-mock`, never real endpoints.
+- `frontend/vitest.config.ts`: projects `unit` and `integration` like the back end (integration
+  selects files only with `RUN_INTEGRATION=1`); `test:unit` runs both; 100 % line coverage on `src/`.
+  Unit tests stub `fetch` with `vi.stubGlobal` and real `Response` objects, no network, and use a
+  service as a consumer would: subscribe first, then call. vitest's types pull in `@types/node`,
+  so the compiler does not stop a Node import in `frontend/src`: that rule is checked in review.

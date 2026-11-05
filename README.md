@@ -20,6 +20,7 @@ Where the full story is:
 | `docs/RUNBOOK.md` | What the operator does: daily start, updating the stack, deploying from scratch |
 | `docs/AWS_ACCOUNTS.md` | Which AWS identity to sign in with, and why |
 | `docs/FOLDER_STRUCTURE.md` | The monorepo layout (back end, front end, shared): which folder holds what, and how the pieces are built |
+| `docs/FRONTEND_SERVICES.md` | The front end's services layer and its first service, `LoginService` (implemented in `frontend/src/services/`) |
 | `CLAUDE.md` | Working rules and the complete list of commands |
 
 ## Prerequisites

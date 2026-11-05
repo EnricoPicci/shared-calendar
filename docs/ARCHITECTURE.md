@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v1 implemented (plan step 12, tag `v1.0.0`); monorepo layout (plan step 20); v10 |
-| Date | 2026-11-04 |
+| Status | v1 implemented (plan step 12, tag `v1.0.0`); monorepo layout (plan step 20); v11 |
+| Date | 2026-11-05 |
 | Stack | TypeScript · AWS Lambda · API Gateway (HTTP API) · Amazon Cognito · DynamoDB · AWS SAM |
 
 ### Change log
@@ -20,6 +20,7 @@
 | v8 | 2026-10-30 | Finding from implementation step 11. **Budget outside the stack:** CloudFormation does not offer `AWS::Budgets::Budget` in every region (not in `eu-north-1`), so the 1 USD monthly budget is created after the deploy by `npm run budget <stack>` (`scripts/budget.sh`, idempotent, Budgets API) instead of by `template.yaml`. Same budget, same `AlertEmail` recipient (section 9.2, security table). |
 | v9 | 2026-11-04 | **v1 implemented.** Plan step 12: the stack is deployed and smoke-tested, the README exists, the status line says so. Wording aligned with what was built: region `eu-north-1` in the overview (section 2), `npm run` commands and the real template size in 6.1 and 9.1, the logger of section 11, sections 1 and 15 in the past tense. A browser front end is now planned (section 14, assumption 6); section 12 points to the target monorepo layout (`docs/FOLDER_STRUCTURE.md`), which a later step applies. |
 | v10 | 2026-11-04 | **Monorepo layout** (plan step 20). The back end moves to `backend/`; the API contract (response and error body types, error codes, `Role` and `resolveRole`) and the username rule move to `shared/`, which the back end imports and bundles; `frontend/` is reserved. Section 12 is replaced by a pointer to `docs/FOLDER_STRUCTURE.md`; paths in this document are relative to `backend/`. No change to behaviour, contract, resources or IAM. The build runs esbuild inside `backend/` with SAM's beta support for npm workspaces (section 9.1). |
+| v11 | 2026-11-05 | Section 8, note on Cognito emulation: two sign-in differences of cognito-local found by the front end's `LoginService` integration test (`InvalidPasswordException` for a wrong password; 24-hour access tokens without `ExpiresIn`). Documentation only; the back end is unchanged. |
 
 ---
 
@@ -441,6 +442,13 @@ flowchart LR
 **Note on Cognito emulation.** Our Lambdas only call admin APIs (`AdminCreateUser`, `AdminSetUserPassword`, `AdminAddUserToGroup`, `AdminListGroupsForUser`, `AdminUserGlobalSignOut`, `AdminDeleteUser`) and verify JWTs. The Cognito access is isolated behind one small adapter (`src/lib/cognito.ts`) that unit tests mock. The emulator is used for integration tests; a 2-minute post-deploy smoke test (section 9.3) is the final proof against real Cognito.
 
 **`AdminUserGlobalSignOut` is skipped locally.** cognito-local does not implement it and answers "Unsupported", which would make every local delete fail with 500. `env.local.json` therefore sets `SKIP_GLOBAL_SIGN_OUT=true` for `deleteUser`, and the adapter skips that one call. `template.yaml` declares the variable empty, so in the cloud the sign-out always runs; the smoke test, which deletes its throw-away user, covers it against real Cognito. Locally, a deleted user's refresh token is therefore not revoked.
+
+**Sign-in differs in two details** (found by the front end's `LoginService` integration test,
+`docs/FRONTEND_SERVICES.md` v2). cognito-local answers a wrong password with
+`InvalidPasswordException`, while real Cognito answers `NotAuthorizedException`, the same as for
+an unknown user (`PreventUserExistenceErrors`); the front end maps both to one failure. And it
+issues access tokens valid for 24 hours, without `ExpiresIn`, ignoring the pool's 15 minutes
+(section 3.1); the short validity can only be observed against real Cognito.
 
 ### 8.1 Test pyramid and the "deploy gate"
 

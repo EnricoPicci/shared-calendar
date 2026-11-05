@@ -66,15 +66,16 @@ stays at the root.
 │   ├── scripts/                 # operator scripts (local stack, verify, deploy, smoke, budget…)
 │   └── (generated, git-ignored) env.local.json  .cognito/  .aws-sam/  .verify-ok  coverage/
 │
-├── frontend/                    # ── the browser app (reserved; shape in section 7) ───────
-│   ├── package.json             # name "frontend"; UI framework, Vite, its own test runner
-│   ├── index.html  vite.config.ts  tsconfig.json  vitest.config.ts
-│   ├── src/                     # the application
-│   ├── public/                  # static files copied as they are
+├── frontend/                    # ── the browser app (services layer only; section 7) ────
+│   ├── package.json             # name "frontend"; deps rxjs, shared; typecheck/lint/test:unit/verify
+│   ├── tsconfig.json            # extends ../tsconfig.base.json; lib ES2022 + DOM, no node types
+│   ├── vitest.config.ts         # projects unit + integration; 100 % line coverage on src/
+│   ├── src/services/            # the services layer (docs/FRONTEND_SERVICES.md): login
 │   ├── tests/
-│   ├── template.yaml            # its own static hosting (S3 + CloudFront), its own stack
-│   ├── scripts/                 # build, deploy, read the back end's outputs
-│   └── (generated, git-ignored) dist/  coverage/
+│   │   ├── unit/                # mirrors src/
+│   │   └── integration/         # LoginService against the back end's local stack
+│   ├── (reserved, not yet) index.html  vite.config.ts  public/  template.yaml  scripts/
+│   └── (generated, git-ignored) coverage/   (later dist/)
 │
 └── shared/                      # ── what both import ─────────────────────────────────────
     ├── package.json             # name "@shared-calendar/shared"; exports ./src/index.ts
@@ -201,10 +202,10 @@ Repository-wide (root scripts that run the same-named script in every package th
 
 | Command | Does |
 |---|---|
-| `npm run typecheck` | `tsc --noEmit` in every package |
+| `npm run typecheck` | `tsc --noEmit` in every package (`shared`, `backend`, `frontend`) |
 | `npm run lint` | `eslint .` from the root, one rule set, every package |
 | `npm run test:unit` | unit tests of every package, each with its own coverage threshold |
-| `npm run verify` | `backend`'s verify (and the front end's, when it exists) |
+| `npm run verify` | `backend`'s verify, then `frontend`'s (typecheck, lint, unit tests) |
 
 Back-end operator commands keep their names and arguments; they are run in the back-end
 workspace:
@@ -270,8 +271,15 @@ like so that it fits the repository on day one:
 - It validates input with the same `shared/` schemas the API uses, so a username the UI
   accepts is one the API accepts.
 
-Nothing is created in `frontend/` until its architecture document exists; the folder is named
-here so that no one puts browser code anywhere else in the meantime.
+Nothing else is created in `frontend/` until its architecture document exists; the folder is
+named here so that no one puts browser code anywhere else in the meantime. **The one exception:
+the services layer exists since 2026-11-05** (brief `prompts/31-implement-login-service.md`,
+design `docs/FRONTEND_SERVICES.md`): plain TypeScript with `rxjs` and `shared/`, which depends on
+nothing the architecture will choose. Hence a minimal package (`package.json`, `tsconfig.json`,
+`vitest.config.ts`, `src/services/`, `tests/`) with `typecheck`, `lint`, `test:unit` and `verify`.
+Everything else still waits for the architecture document: no framework, no Vite, no
+`index.html`, no `template.yaml`, no `dist/`, and no `dev`, `build` or `deploy` script (the root
+scripts use `--if-present`, so their absence is not an error).
 
 ---
 
@@ -305,7 +313,7 @@ depth and need no change. After the move the generated files appear here:
 | `backend/.aws-sam/` | backend | `sam build` |
 | `backend/.verify-ok` | backend | `verify.sh` |
 | `backend/coverage/`, `shared/coverage/`, `frontend/coverage/` | each package | vitest |
-| `frontend/dist/` | frontend | Vite |
+| `frontend/dist/` (not yet: no build until the front-end architecture) | frontend | Vite |
 
 ---
 
