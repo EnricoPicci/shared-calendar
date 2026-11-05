@@ -9,7 +9,9 @@ template and fully testable on a laptop before anything reaches the cloud.
 
 This is v1 of the back end of a larger application. The repository is a monorepo: the back end
 in `backend/`, the code it shares with the browser front end that will follow (the API contract
-and the username rule) in `shared/`, and `frontend/` reserved for that front end.
+and the username rule) in `shared/`, and in `frontend/` the front end's services layer
+(`LoginService`, `docs/FRONTEND_SERVICES.md`); the rest of the front end waits for its
+architecture document.
 
 Where the full story is:
 

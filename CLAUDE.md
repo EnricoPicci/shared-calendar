@@ -211,4 +211,6 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   selects files only with `RUN_INTEGRATION=1`); `test:unit` runs both; 100 % line coverage on `src/`.
   Unit tests stub `fetch` with `vi.stubGlobal` and real `Response` objects, no network, and use a
   service as a consumer would: subscribe first, then call. vitest's types pull in `@types/node`,
-  so the compiler does not stop a Node import in `frontend/src`: that rule is checked in review.
+  so the compiler does not stop a Node import in `frontend/src`; ESLint does (root
+  `eslint.config.js`: only `rxjs`, `rxjs/fetch`, `rxjs/operators`, `@shared-calendar/shared` and
+  relative imports, no Node globals). A new allowed import there is a design change.

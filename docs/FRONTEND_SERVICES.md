@@ -12,7 +12,7 @@
 | Version | Date | Change |
 |---|---|---|
 | v1 | 2026-11-05 | First design: services-layer rules, the service pattern, `LoginService` with `loginResult$` (ReplaySubject) and `loginState$` (BehaviorSubject). |
-| v2 | 2026-11-05 | Implemented (brief 31). Details the implementation fixed: an access token that cannot be decoded, or lacks `username` or `exp`, and a 200 without `IdToken` or `RefreshToken`, are `failure unexpected` (section 4.5); a JSON body that is not an object is read as `{}`; `decodeClaims` decodes the payload as UTF-8 (`atob` + `TextDecoder`). Found against cognito-local: it answers a wrong password with `InvalidPasswordException` (real Cognito: `NotAuthorizedException`), now also mapped to `invalid_credentials`; it issues 24-hour access tokens without `ExpiresIn`, so the 15-minute expiry is checked only in the cloud (section 7). `frontend/` exists ahead of the front-end architecture, for the services layer only (decision 8 revised; `docs/FOLDER_STRUCTURE.md` section 7). Section 5: the integration test and the tooling as built. Section 7: the acceptance as run. |
+| v2 | 2026-11-05 | Implemented (brief 31). Details the implementation fixed: an access token that cannot be decoded, or lacks `username` or `exp`, and a 200 without `IdToken` or `RefreshToken`, are `failure unexpected` (section 4.5); a JSON body that is not an object is read as `{}`; `decodeClaims` decodes the payload as UTF-8 (`atob` + `TextDecoder`). Found against cognito-local: it answers a wrong password with `InvalidPasswordException` (real Cognito: `NotAuthorizedException`), now also mapped to `invalid_credentials`; it issues 24-hour access tokens without `ExpiresIn`, so the 15-minute expiry is checked only in the cloud (section 7). `frontend/` exists ahead of the front-end architecture, for the services layer only (decision 8 revised; `docs/FOLDER_STRUCTURE.md` section 7). Section 5: the integration test and the tooling as built, including an ESLint guard against Node imports and globals in `frontend/src`. Section 7: the acceptance as run. |
 
 ---
 
@@ -437,8 +437,11 @@ frontend/
   second selecting files only when `RUN_INTEGRATION=1`. `npm run test:unit -w frontend` runs both.
 - The compiler does not fully enforce "no Node types": vitest's own type declarations reference
   `@types/node`, so `node:fs` and `process` type-check in `frontend/` even with
-  `types: ["vitest/globals"]`. "No Node module in `frontend/src`" is a review rule (the
-  integration test uses `node:fs` to read `backend/env.local.json`, which is allowed in tests).
+  `types: ["vitest/globals"]`. ESLint enforces the rule instead: for `frontend/src/**`,
+  `no-restricted-imports` allows only `rxjs`, `rxjs/fetch`, `rxjs/operators`,
+  `@shared-calendar/shared` and relative paths, and `no-restricted-globals` rejects `process`,
+  `Buffer`, `global`, `require`, `__dirname`, `__filename` (root `eslint.config.js`). Tests are not
+  covered: the integration test uses `node:fs` to read `backend/env.local.json`.
 
 When `docs/FRONTEND_ARCHITECTURE.md` (framework, hosting, sign-in flow) is written, this document
 becomes, or is referenced as, its services chapter.
