@@ -1,12 +1,15 @@
 import { LoginService, type LoginConfig } from '../../../src/services/login.service';
-import type { LoginResult, LoginState } from '../../../src/services/login.types';
+import type { LoginResult, LoginState, Session } from '../../../src/services/login.types';
+import { SessionStore } from '../../../src/services/session.store';
 
-// docs/FRONTEND_SERVICES.md section 6. The global fetch is a stub answering with real Response
+// docs/FRONTEND_SERVICES.md sections 6 and 9.8 (v4: the session goes to the store; the outcome
+// carries no token). The global fetch is a stub answering with real Response
 // objects, so fromFetch runs unchanged. Every test subscribes first, then calls login.
 
 const CONFIG: LoginConfig = { cognitoUrl: 'http://cognito.test/', clientId: 'client-123' };
 const PASSWORD = 'Secret-Pass-1!';
-const EXP = 1_900_000_000; // seconds since the epoch
+// 15 minutes ahead, in seconds since the epoch: the store arms its expiry timer on it (section 9.3).
+const EXP = Math.floor(Date.now() / 1000) + 900;
 
 function b64url(text: string): string {
   const bytes = new TextEncoder().encode(text);
@@ -46,12 +49,15 @@ afterEach(() => {
 
 // A service with both streams recorded, as a consumer would subscribe before calling login.
 function subscribed() {
-  const service = new LoginService(CONFIG);
+  const store = new SessionStore();
+  const service = new LoginService(CONFIG, store);
   const results: LoginResult[] = [];
   const states: LoginState[] = [];
+  const sessions: (Session | null)[] = [];
   service.loginResult$.subscribe((r) => results.push(r));
   service.loginState$.subscribe((s) => states.push(s));
-  return { service, results, states };
+  store.session$.subscribe((s) => sessions.push(s));
+  return { service, store, results, states, sessions };
 }
 
 async function loginOnce(answer: Response | (() => Promise<Response>), username = 'alice') {
@@ -63,21 +69,44 @@ async function loginOnce(answer: Response | (() => Promise<Response>), username 
 }
 
 describe('LoginService', () => {
-  it('success: emits a session with username, role and expiry; state idle → pending → success', async () => {
+  it('success: emits username, role and expiry, no token; state idle → pending → success', async () => {
     const { result, states } = await loginOnce(tokens(ALICE));
-    expect(result).toEqual({
-      status: 'success',
-      session: {
-        username: 'alice',
-        role: 'user',
-        accessToken: jwt(ALICE),
-        idToken: 'id-token',
-        refreshToken: 'refresh-token',
-        expiresAt: new Date(EXP * 1000),
-      },
-    });
+    expect(result).toEqual({ status: 'success', username: 'alice', role: 'user', expiresAt: new Date(EXP * 1000) });
     expect(states).toEqual([{ status: 'idle' }, { status: 'pending', username: 'alice' }, result]);
     expect(states[2]).toBe(result); // the same object in both streams
+  });
+
+  it('login writes: the store holds the session with the three tokens before the outcome is emitted', async () => {
+    fetchMock.mockResolvedValueOnce(tokens(ALICE));
+    const { service, store, sessions } = subscribed();
+    let inStoreAtEmit: Session | null | undefined;
+    service.loginResult$.subscribe(() => (inStoreAtEmit = sessions.at(-1)));
+    service.login('alice', PASSWORD);
+    await vi.waitFor(() => expect(inStoreAtEmit).toBeDefined());
+    const expected: Session = {
+      username: 'alice',
+      role: 'user',
+      accessToken: jwt(ALICE),
+      idToken: 'id-token',
+      refreshToken: 'refresh-token',
+      expiresAt: new Date(EXP * 1000),
+    };
+    expect(inStoreAtEmit).toEqual(expected);
+    expect(sessions).toEqual([null, expected]);
+    store.clear(); // stops the expiry timer
+  });
+
+  it('login failure: an existing session stays in the store', async () => {
+    fetchMock.mockResolvedValueOnce(tokens(ALICE)).mockResolvedValueOnce(cognitoError('NotAuthorizedException', 'no'));
+    const { service, store, results, sessions } = subscribed();
+    service.login('alice', PASSWORD);
+    await vi.waitFor(() => expect(results).toHaveLength(1));
+    service.login('alice', 'wrong');
+    await vi.waitFor(() => expect(results).toHaveLength(2));
+    expect(results[1]?.status).toBe('failure');
+    expect(sessions).toHaveLength(2);
+    expect(sessions[1]?.username).toBe('alice');
+    store.clear();
   });
 
   it('request shape: one POST to the configured URL with the InitiateAuth headers and body', async () => {
@@ -99,7 +128,7 @@ describe('LoginService', () => {
 
   it('admin wins: groups user and admin give role admin', async () => {
     const { result } = await loginOnce(tokens({ ...ALICE, 'cognito:groups': ['user', 'admin'] }));
-    expect(result.status === 'success' && result.session.role).toBe('admin');
+    expect(result.status === 'success' && result.role).toBe('admin');
   });
 
   it('no group: failure no_role, and the state ends in that failure', async () => {
@@ -223,13 +252,13 @@ describe('LoginService', () => {
     await new Promise((r) => setTimeout(r, 10));
 
     expect(results).toHaveLength(1);
-    expect(results[0]).toMatchObject({ status: 'success', session: { username: 'alice' } });
+    expect(results[0]).toMatchObject({ status: 'success', username: 'alice' });
     expect(states.map((s) => s.status)).toEqual(['idle', 'pending', 'pending', 'success']);
   });
 
   it('late subscriber: the result is replayed and the state is the current success', async () => {
     fetchMock.mockResolvedValueOnce(tokens(ALICE));
-    const service = new LoginService(CONFIG);
+    const service = new LoginService(CONFIG, new SessionStore());
     const early: LoginResult[] = [];
     service.loginResult$.subscribe((r) => early.push(r));
     service.login('alice', PASSWORD);
@@ -249,7 +278,7 @@ describe('LoginService', () => {
     expect(states).toEqual([{ status: 'idle' }]);
   });
 
-  it('no leak: no state or result value contains the password', async () => {
+  it('no leak: no state or result value contains the password or a token', async () => {
     fetchMock
       .mockResolvedValueOnce(tokens(ALICE))
       .mockResolvedValueOnce(cognitoError('NotAuthorizedException', 'Incorrect username or password.'))
@@ -259,8 +288,10 @@ describe('LoginService', () => {
       service.login('alice', PASSWORD);
       await vi.waitFor(() => expect(results).toHaveLength(i));
     }
-    expect(JSON.stringify(results)).not.toContain(PASSWORD);
-    expect(JSON.stringify(states)).not.toContain(PASSWORD);
+    for (const secret of [PASSWORD, jwt(ALICE), 'id-token', 'refresh-token']) {
+      expect(JSON.stringify(results)).not.toContain(secret);
+      expect(JSON.stringify(states)).not.toContain(secret);
+    }
     expect(JSON.stringify(Object.entries(service).filter(([k]) => k === 'config'))).not.toContain(PASSWORD);
   });
 });

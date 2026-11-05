@@ -70,10 +70,11 @@ stays at the root.
 │   ├── package.json             # name "frontend"; deps rxjs, shared; typecheck/lint/test:unit/verify
 │   ├── tsconfig.json            # extends ../tsconfig.base.json; lib ES2022 + DOM, no node types
 │   ├── vitest.config.ts         # projects unit + integration; 100 % line coverage on src/
-│   ├── src/services/            # the services layer (docs/FRONTEND_SERVICES.md): login
+│   ├── src/services/            # the services layer (docs/FRONTEND_SERVICES.md): session store,
+│   │                            # login, refresh, hello, users; shared cognito.ts and api.ts
 │   ├── tests/
-│   │   ├── unit/                # mirrors src/
-│   │   └── integration/         # LoginService against the back end's local stack
+│   │   ├── unit/                # mirrors src/ (plus fixtures.ts)
+│   │   └── integration/         # login and the services' journeys against the local stack
 │   ├── (reserved, not yet) index.html  vite.config.ts  public/  template.yaml  scripts/
 │   └── (generated, git-ignored) coverage/   (later dist/)
 │

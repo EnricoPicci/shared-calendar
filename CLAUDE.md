@@ -90,8 +90,10 @@ form works the same. Paths below without a folder are relative to `backend/`.
   (100 % line coverage on `frontend/src`), `npm run verify -w frontend` (the three in order, stops
   at the first failure; no Docker). The root `npm run verify` runs the back end's, then this.
 - `RUN_INTEGRATION=1 npm run test:unit -w frontend`: also runs `frontend/tests/integration`
-  (`LoginService` against cognito-local on 9229, its token against `POST /hello` on 3000). Needs
-  `local:up` + `local:api` running and the Codespaces iptables rule below.
+  (`login.service.test.ts`, and `journeys.test.ts`: the services against cognito-local on 9229
+  and the API on 3000, `docs/FRONTEND_SERVICES.md` section 14). Needs `local:up` + `local:api`
+  running and the Codespaces iptables rule below. Creates and removes the throw-away user
+  `fe-journey` (removed first too, so it can be rerun after a failed run).
 - `RUN_INTEGRATION=1 npm run test:integration -w backend`: the journeys of plan step 9 against the
   running `local:up` + `local:api` stack. Pass the same `DYNAMODB_PORT` as `local:up`
   (here `DYNAMODB_PORT=8002`). Without `RUN_INTEGRATION=1` it runs nothing and exits 0.
@@ -186,9 +188,13 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
 - `frontend/`: package `frontend`, the services layer only (exception in `docs/FOLDER_STRUCTURE.md`
   section 7). `package.json` (deps `rxjs`, `@shared-calendar/shared`; scripts `typecheck`, `lint`,
   `test:unit`, `verify`; no `dev`/`build`/`deploy` yet), `tsconfig.json` (ES2022 + DOM, no node
-  types), `vitest.config.ts`, `src/services/` (`login.service.ts`, `login.types.ts`, `jwt.ts`),
-  `tests/unit/` mirroring `src/`, `tests/integration/`. `src/` imports only `rxjs`, `rxjs/fetch`,
-  `rxjs/operators` and `@shared-calendar/shared`; configuration comes through the constructor.
+  types), `vitest.config.ts`, `src/services/` (`session.store.ts`; `cognito.ts` and `api.ts`, the
+  building blocks the services share; `login`, `refresh`, `hello`, `users` as `<name>.service.ts`
+  + `<name>.types.ts`; `jwt.ts`), `tests/unit/services/` mirroring `src/` (plus `fixtures.ts`),
+  `tests/integration/` (`local.ts` helper, `login.service.test.ts`, `journeys.test.ts`). `src/`
+  imports only `rxjs`, `rxjs/fetch`, `rxjs/operators` and `@shared-calendar/shared`; configuration
+  comes through the constructor, the `SessionStore` as the second argument. Tokens live only in
+  the `SessionStore` (rule 9): no result, state or service field holds one.
   No framework, Vite, `index.html`, `template.yaml` or `dist/` until `docs/FRONTEND_ARCHITECTURE.md`.
 - `shared/`: package `@shared-calendar/shared`, no build step (`exports` points at
   `src/index.ts`; each consumer bundles it). `src/api.ts` (response and error body types,
@@ -210,7 +216,9 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
 - `frontend/vitest.config.ts`: projects `unit` and `integration` like the back end (integration
   selects files only with `RUN_INTEGRATION=1`); `test:unit` runs both; 100 % line coverage on `src/`.
   Unit tests stub `fetch` with `vi.stubGlobal` and real `Response` objects, no network, and use a
-  service as a consumer would: subscribe first, then call. vitest's types pull in `@types/node`,
+  service as a consumer would: subscribe first, then call. Tests that fake timers must fake
+  `setInterval` too (RxJS's `timer` uses it), and keep test sessions within 24.8 days of the clock
+  (the store's expiry `setTimeout` overflows beyond). vitest's types pull in `@types/node`,
   so the compiler does not stop a Node import in `frontend/src`; ESLint does (root
   `eslint.config.js`: only `rxjs`, `rxjs/fetch`, `rxjs/operators`, `@shared-calendar/shared` and
   relative imports, no Node globals). A new allowed import there is a design change.

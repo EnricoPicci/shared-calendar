@@ -10,7 +10,8 @@ template and fully testable on a laptop before anything reaches the cloud.
 This is v1 of the back end of a larger application. The repository is a monorepo: the back end
 in `backend/`, the code it shares with the browser front end that will follow (the API contract
 and the username rule) in `shared/`, and in `frontend/` the front end's services layer
-(`LoginService`, `docs/FRONTEND_SERVICES.md`); the rest of the front end waits for its
+(session store, login, token refresh, Hello World, user administration;
+`docs/FRONTEND_SERVICES.md`); the rest of the front end waits for its
 architecture document.
 
 Where the full story is:
@@ -22,7 +23,7 @@ Where the full story is:
 | `docs/RUNBOOK.md` | What the operator does: daily start, updating the stack, deploying from scratch |
 | `docs/AWS_ACCOUNTS.md` | Which AWS identity to sign in with, and why |
 | `docs/FOLDER_STRUCTURE.md` | The monorepo layout (back end, front end, shared): which folder holds what, and how the pieces are built |
-| `docs/FRONTEND_SERVICES.md` | The front end's services layer and its first service, `LoginService` (implemented in `frontend/src/services/`) |
+| `docs/FRONTEND_SERVICES.md` | The front end's services layer: `SessionStore`, `LoginService`, `RefreshService`, `HelloService`, `UsersService` (implemented in `frontend/src/services/`) |
 | `CLAUDE.md` | Working rules and the complete list of commands |
 
 ## Prerequisites

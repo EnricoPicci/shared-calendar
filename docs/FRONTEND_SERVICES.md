@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v4 — `LoginService` implemented (2026-11-05, brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`). Designed, not implemented (brief `prompts/32-implement-session-and-api-services.md`, part A): `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13) |
+| Status | v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). Logout is not designed yet |
 | Date | 2026-11-05 |
 | Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration |
 | Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/` |
@@ -15,6 +15,7 @@
 | v2 | 2026-11-05 | Implemented (brief 31). Details the implementation fixed: an access token that cannot be decoded, or lacks `username` or `exp`, and a 200 without `IdToken` or `RefreshToken`, are `failure unexpected` (section 4.5); a JSON body that is not an object is read as `{}`; `decodeClaims` decodes the payload as UTF-8 (`atob` + `TextDecoder`). Found against cognito-local: it answers a wrong password with `InvalidPasswordException` (real Cognito: `NotAuthorizedException`), now also mapped to `invalid_credentials`; it issues 24-hour access tokens without `ExpiresIn`, so the 15-minute expiry is checked only in the cloud (section 7). `frontend/` exists ahead of the front-end architecture, for the services layer only (decision 8 revised; `docs/FOLDER_STRUCTURE.md` section 7). Section 5: the integration test and the tooling as built, including an ESLint guard against Node imports and globals in `frontend/src`. Section 7: the acceptance as run. |
 | v3 | 2026-11-05 | Design of `SessionStore` (section 9): the one in-memory holder of the signed-in `Session`, written by `LoginService` on success, read by the API services, cleared at `expiresAt`, on logout and on an API 401. `LoginService` gains the store as a second constructor argument (section 9.4). Sections 4.6 and 4.8 point at it; decisions 9 to 13. Added as section 9 rather than inserted, so that the section numbers cited by the code and by briefs 30 and 31 stay valid. |
 | v4 | 2026-11-05 | Design of the remaining services (brief 32, part A). **Correction:** an expired or invalid token is answered by API Gateway with **403** and its own body `{ "message" }`, not 401 (architecture section 4); 401 means the header is missing. The store is cleared on 401 and on a 403 without an `error` field, and left alone on a handler's 403 (`forbidden`, `cannot_delete_admin`) and on API Gateway's 500 (authorizer outage): sections 9.1, 9.3, 9.4, 9.7, decision 12. The store gains `replace(previous, next)` and `clear(only?)`, so that a late answer cannot overwrite or clear a newer session (section 9.2). Rule 6 gains its one exception: the password `POST /users` generates. New sections, appended so that cited numbers stay valid: 10, the shared building blocks (`cognito.ts`, used by `LoginService` and `RefreshService`; `api.ts`, used by `HelloService` and `UsersService`), with the **known gap** that the API has no CORS configuration (10.3); 11, `RefreshService` (cognito-local implements `REFRESH_TOKEN_AUTH`, checked 2026-11-05); 12, `HelloService`; 13, `UsersService`; 14, the integration journeys. Section 4.8 becomes pointers; decisions 14 to 27. **Tokens live only in the `SessionStore`** (rule 9, decision 28): a login success no longer carries the `Session` but `{ username, role, expiresAt }`, like a refresh success; `LoginService` writes the session to the store and emits the token-free outcome (sections 4.3, 4.6, 4.7, 6, 9.4, 9.7, 10.1; decision 4 revised). This changes `LoginService`'s public result, so its success tests change with it. |
+| v5 | 2026-11-05 | Implemented (brief 32, part B); acceptance in section 14.3. What the code fixed that the sketches left open: `api.ts` has two failure builders, `apiFailure(code, …)` for a route's code (and `UsersService`'s check before any request) and `transportFailure(reason, …)` for the five transport reasons, typed `ApiFailure<never>` so that it fits every route (the sketches' `failure<C>`); `toApiAnswer` reads an empty non-2xx body as `{}`, so a 403 without body is also `session_rejected`; `RefreshService` maps Cognito's reasons with a complete `Record<AuthFailureReason, RefreshFailureReason>` (section 11.5 as a table in code). Tests: the store rows "login writes" and "login failure" of section 9.8 live in `login.service.test.ts`, with the service they exercise; the unit tests share `tests/unit/services/fixtures.ts` (unsigned JWTs, `Response` builders, a session factory); RxJS's `timer` schedules with `setInterval`, so tests that fake timers must fake it (the schedule tests fake `setTimeout`, `setInterval` and `Date` only, and flush fetch promises with the real `setImmediate`); a test session must expire within 24.8 days of the clock, or the store's `setTimeout` overflows and fires at once. Section 5 points at section 14.1 for the tree. No design change. |
 
 ---
 
@@ -434,24 +435,12 @@ may use the schema for an early hint if it wishes.
 ## 5. Placement and tooling
 
 Per `docs/FOLDER_STRUCTURE.md` section 7 (what the folder must look like) and section 8 (this
-document's name carries the component):
-
-```
-frontend/
-├── src/services/
-│   ├── login.service.ts     # LoginService, LoginConfig
-│   ├── login.types.ts       # Session, LoginFailureReason, LoginResult, LoginState
-│   └── jwt.ts               # decodeClaims(jwt): the base64url payload decoder
-└── tests/
-    ├── unit/services/
-    │   ├── login.service.test.ts
-    │   └── jwt.test.ts
-    └── integration/
-        └── login.service.test.ts   # against the local stack, RUN_INTEGRATION=1 only
-```
+document's name carries the component). The files as built since v5 are listed in section 14.1;
+v2 had `login.service.ts`, `login.types.ts`, `jwt.ts` and their tests.
 
 - Runtime dependency: `rxjs` (7.8 or later; `fromFetch` is in `rxjs/fetch`). Plus
-  `@shared-calendar/shared`.
+  `@shared-calendar/shared`, which brings `zod` with its `Username` schema (section 13): the
+  front end uses `zod` only through the shared package.
 - `frontend/tsconfig.json` extends `tsconfig.base.json` with `lib: ["ES2022", "DOM"]` (the
   services use `fetch`, `Response`, `atob`); no Node types.
 - Unit tests run with vitest in the `node` environment: Node 22 provides `fetch`, `Response`
@@ -1611,7 +1600,8 @@ frontend/src/services/
 
 frontend/tests/
 ├── unit/services/        # one file per source file: session.store, cognito, api, jwt,
-│                         # login.service, refresh.service, hello.service, users.service
+│                         # login.service, refresh.service, hello.service, users.service;
+│                         # plus fixtures.ts (v5): JWT, Response and session builders
 └── integration/
     ├── local.ts           # the local stack's URLs and client id (reads backend/env.local.json)
     ├── login.service.test.ts  # the same journeys; tokens read from the store (section 9.9)
@@ -1648,7 +1638,7 @@ removed in `beforeAll` and `afterAll` through `UsersService` as admin, accepting
 
 Journey 13 needs the `REFRESH_TOKEN_AUTH` of cognito-local, checked in section 11.1.
 
-### 14.3 Acceptance check (for the implementation step)
+### 14.3 Acceptance check
 
 1. From the root, `npm run typecheck`, `npm run lint` and `npm run test:unit` green for the three
    packages; `frontend` at 100 % line coverage on `src/`; `npm run verify -w frontend` green;
@@ -1657,3 +1647,16 @@ Journey 13 needs the `REFRESH_TOKEN_AUTH` of cognito-local, checked in section 1
    -w backend` and `npm run local:api -w backend`: the login file (section 9.9) and the 14
    journeys green.
 3. `DYNAMODB_PORT=8002 npm run verify -w backend` still green, no diff in `backend/` or `shared/`.
+
+**As run (2026-11-05, v5):**
+
+1. Root `npm run typecheck`, `npm run lint`, `npm run test:unit`: green for `shared` (26 tests),
+   `backend` (180) and `frontend` (129 unit tests in 8 files); `frontend` at 100 % lines
+   (178/178; branches 131/132: the `?? ''` after `split('#').pop()`, which cannot be reached).
+   `npm run verify -w frontend` green. `npm run audit -w backend`: 0 vulnerabilities. The lock
+   file is unchanged; no dependency added.
+2. `RUN_INTEGRATION=1 npm run test:unit -w frontend` against the local stack: 148 tests, of which
+   the login file's 5 and the 14 journeys; run twice in a row, green both times (the removal of
+   `fe-journey` at both ends makes it rerunnable).
+3. `DYNAMODB_PORT=8002 npm run verify -w backend`: PASSED, with the back end's 13 journeys after
+   the front end's; `git status` shows no change in `backend/` or `shared/`.
