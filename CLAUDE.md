@@ -22,6 +22,9 @@ document). Layout and placement rules: `docs/FOLDER_STRUCTURE.md`.
   the security rules. On any conflict, the architecture wins.
 - `docs/IMPLEMENTATION_PLAN.md` defines the order of work, step by step, with an
   acceptance check per step.
+- `docs/SHARED_CALENDAR_SPEC.md` specifies the shared calendar (agreed with the Product Owner,
+  brief 40, not yet implemented). It is the input for the calendar's plan steps; once merged into
+  `ARCHITECTURE.md` (spec section 19), the architecture wins as usual.
 - `prompts/` holds the numbered briefs that produced those documents. Keep new briefs
   numbered in sequence.
 
