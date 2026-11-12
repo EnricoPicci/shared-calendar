@@ -2,7 +2,7 @@
 # Prepares the local emulators started by docker-compose.yml. Safe to run any number of times:
 # every step first checks whether its object already exists.
 #
-#   1. table hello-messages on DynamoDB Local (same key schema as template.yaml)
+#   1. tables hello-messages and calendar on DynamoDB Local (same key schemas as template.yaml)
 #   2. user pool local_pool and app client local_client on cognito-local
 #   3. groups admin and user
 #   4. user admin (group admin) and user alice (group user), permanent passwords
@@ -16,6 +16,7 @@ cd "$(dirname "$0")/.."
 DYNAMODB_URL="http://localhost:${DYNAMODB_PORT:-8000}"
 COGNITO_URL="http://localhost:9229"
 TABLE_NAME="hello-messages"
+CALENDAR_TABLE="calendar"
 POOL_NAME="local_pool"
 CLIENT_NAME="local_client"
 ADMIN_PASSWORD="Admin-Local-Pass-1!"
@@ -71,7 +72,8 @@ check_service cognito 9229 9229
 wait_for "DynamoDB Local ($DYNAMODB_URL)" ddb list-tables
 wait_for "cognito-local ($COGNITO_URL)" idp list-user-pools --max-results 1
 
-# 1. Table
+# 1. Tables. The calendar table starts empty: until the Administrator saves settings, the
+# defaults apply (spec R-SET-01). The calendar journeys empty it at their start.
 if ddb describe-table --table-name "$TABLE_NAME" >/dev/null 2>&1; then
   echo "table $TABLE_NAME: exists"
 else
@@ -81,6 +83,17 @@ else
     --key-schema AttributeName=messageId,KeyType=HASH \
     --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 >/dev/null
   echo "table $TABLE_NAME: created"
+fi
+
+if ddb describe-table --table-name "$CALENDAR_TABLE" >/dev/null 2>&1; then
+  echo "table $CALENDAR_TABLE: exists"
+else
+  ddb create-table \
+    --table-name "$CALENDAR_TABLE" \
+    --attribute-definitions AttributeName=PK,AttributeType=S AttributeName=SK,AttributeType=S \
+    --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE \
+    --provisioned-throughput ReadCapacityUnits=10,WriteCapacityUnits=10 >/dev/null
+  echo "table $CALENDAR_TABLE: created"
 fi
 
 # 2. User pool and app client
@@ -137,8 +150,16 @@ ensure_user alice "$ALICE_PASSWORD" user
 # "Unsupported", which would make every local DELETE /users/{username} fail with 500. The
 # deleteUser function skips that one call locally; in the cloud the variable stays empty and
 # the sign-out runs (see globalSignOut in src/lib/cognito.ts).
+# "Parameters" applies to every function that declares the variable in template.yaml, so each new
+# calendar function needs no section of its own. CALENDAR_TIME_ZONE is deliberately absent: a value
+# here would win over the template, and the CalendarTimeZone parameter (default Europe/Rome, or
+# --parameter-overrides) must stay its one source.
 cat > env.local.json <<EOF
 {
+  "Parameters": {
+    "CALENDAR_TABLE": "$CALENDAR_TABLE",
+    "DYNAMODB_ENDPOINT": "http://dynamodb:8000"
+  },
   "AuthorizerFunction": {
     "USER_POOL_ID": "$POOL_ID",
     "CLIENT_ID": "$CLIENT_ID",

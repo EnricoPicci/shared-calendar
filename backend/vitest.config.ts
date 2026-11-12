@@ -32,6 +32,8 @@ export default defineConfig({
           include: runIntegration ? ['tests/integration/**/*.test.ts'] : [],
           // Checks that the local stack is up before any journey runs.
           globalSetup: runIntegration ? ['tests/integration/setup.ts'] : [],
+          // One file at a time: every file shares one sam local, one DynamoDB Local and one cognito-local.
+          fileParallelism: false,
           // sam local starts a Lambda container on the first call of each function.
           testTimeout: 60_000,
           hookTimeout: 60_000,

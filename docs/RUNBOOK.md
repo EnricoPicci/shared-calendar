@@ -57,7 +57,9 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
    `backend/samconfig.toml`,
    and SAM reuses the alert address the stack already has).
    Read the change set before answering `y`. **Remove** or **Replace** on `UserPool`,
-   `MessagesTable` or `AdminUser` means data loss: answer N and investigate.
+   `MessagesTable`, `CalendarTable` or `AdminUser` means data loss: answer N and investigate.
+   The first deploy with the shared calendar (plan step 55) shows `CalendarTable`, its policies
+   and functions as **Add**; that is expected.
 5. `npm run smoke -w backend -- hello-world-api` (asks for the admin password): every line must say PASS.
 
 Rules:
@@ -69,6 +71,9 @@ Rules:
 - To change the alert address: `npm run deploy -w backend -- --parameter-overrides AlertEmail=<new>`,
   confirm the new subscription e-mail the same day, and change the budget's recipient in the
   console (Billing → Budgets; `npm run budget -w backend` does not touch an existing budget).
+- Never change `CalendarTimeZone` once the calendar holds data (default `Europe/Rome`): the stored
+  dates and instants were computed in that zone and would no longer agree with the new one. An
+  invalid value makes every calendar request answer 500 (and fires the 5xx alarm).
 - `FunctionArchitecture` stays `arm64` in the cloud; the `x86_64` value is only for the local
   stack on x86 machines (`local-api.sh` sets it).
 
@@ -111,13 +116,15 @@ Plan step 11 has the full list; in short:
 7. Console checks: Billing → Budgets shows `hello-world-api-monthly` (1 USD); DynamoDB →
    `hello-messages` → Explore items shows the smoke rows.
 
-If the first create fails: CloudFormation rolls back, but cannot delete the two protected
-resources (the table `hello-messages` and the user pool), so the stack may end in
+If the first create fails: CloudFormation rolls back, but cannot delete the three protected
+resources (the tables `hello-messages` and `calendar`, and the user pool), so the stack may end in
 `ROLLBACK_FAILED` or `ROLLBACK_COMPLETE`. Read the first `CREATE_FAILED` in
 `aws cloudformation describe-stack-events --stack-name hello-world-api` before changing
 anything. Cleaning up means deleting the stack while keeping those resources
-(`--retain-resources MessagesTable UserPool`), then switching off their deletion protection and
-deleting them by hand; the fixed table name would otherwise block the next deploy.
+(`--retain-resources MessagesTable CalendarTable UserPool`), then switching off their deletion
+protection and deleting them by hand; the fixed table names would otherwise block the next deploy.
+The same holds for removing the stack on purpose: the calendar's appointments and history are lost
+with the `calendar` table, so export what must be kept first.
 
 A failed change set (for example an unknown resource type) creates nothing: the stack stays in
 `REVIEW_IN_PROGRESS` with 0 resources, and the next deploy simply reuses it.

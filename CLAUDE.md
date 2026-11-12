@@ -46,8 +46,10 @@ Read both documents before changing anything.
   The API contract and the username rule live there and the back end imports them; a new error
   code or response field starts in `shared/src/api.ts`.
 - Logs never contain tokens, passwords or the body of the create-user response.
-- IAM policies never use a wildcard action or resource. One role per function, scoped
-  to the one user pool or table it needs.
+- IAM policies never use a wildcard action or resource. One role per function, granting only
+  what its route needs, scoped to the user pool and/or table it uses. The calendar's DynamoDB
+  permissions are shared managed policies on the `calendar` table, attached per role
+  (architecture 7.1).
 - Every password is set as permanent. There is no forced password change and no
   e-mail sending in v1.
 - The API can never create an administrator, delete one, or set its password.
@@ -97,19 +99,34 @@ form works the same. Paths below without a folder are relative to `backend/`.
   and the API on 3000, `docs/FRONTEND_SERVICES.md` section 14). Needs `local:up` + `local:api`
   running and the Codespaces iptables rule below. Creates and removes the throw-away user
   `fe-journey` (removed first too, so it can be rerun after a failed run).
-- `RUN_INTEGRATION=1 npm run test:integration -w backend`: the journeys of plan step 9 against the
-  running `local:up` + `local:api` stack. Pass the same `DYNAMODB_PORT` as `local:up`
-  (here `DYNAMODB_PORT=8002`). Without `RUN_INTEGRATION=1` it runs nothing and exits 0.
-  Removes a leftover `carol` before starting, so it can be rerun after a failed run.
+- `RUN_INTEGRATION=1 npm run test:integration -w backend`: the journeys of plan step 9
+  (`journeys.test.ts`) and the calendar's (`calendar.test.ts`) against the running `local:up` +
+  `local:api` stack. Pass the same `DYNAMODB_PORT` as `local:up` (here `DYNAMODB_PORT=8002`).
+  Without `RUN_INTEGRATION=1` it runs nothing and exits 0. Removes a leftover `carol` before
+  starting, so it can be rerun after a failed run. **The calendar journeys empty the local
+  `calendar` table first** (helper `resetCalendarTable()`, which refuses any endpoint but
+  `localhost`/`127.0.0.1`): calendar data made by hand is lost when they run.
+- Integration files run one at a time, in both packages (`fileParallelism: false` on the
+  `integration` projects): they share one `sam local`, one DynamoDB Local and one cognito-local.
+  Their order is not fixed, so every file prepares its own state. Never run the back end's and the
+  front end's integration tests at the same time by hand (two terminals): nothing prevents it.
 - `npm run build -w backend`: `sam build`. Always go through npm: SAM needs the repository's
   `esbuild` on the PATH and `SAM_CLI_BETA_NODEJS_MONOREPO=1`, which the script sets. Without the
   beta, building in source runs `npm update --omit dev` per function, which strips the root's dev
   tools (`docs/FOLDER_STRUCTURE.md` 4.3; repair with `npm ci` at the root).
 - `sam validate --lint` (inside `backend/`): checks `template.yaml`.
 - `npm run local:up -w backend`: starts DynamoDB Local, dynamodb-admin (http://localhost:8001) and
-  cognito-local, then seeds them (table, pool, client, groups, users `admin` /
-  `Admin-Local-Pass-1!` and `alice` / `Alice-Local-Pass-1!`) and writes `env.local.json`.
-  Idempotent. Set `DYNAMODB_PORT=8002` when another project holds port 8000.
+  cognito-local, then seeds them (tables `hello-messages` and `calendar`, the latter empty; pool,
+  client, groups, users `admin` / `Admin-Local-Pass-1!` and `alice` / `Alice-Local-Pass-1!`) and
+  writes `env.local.json`. Idempotent; rerun it after a change to `local-seed.sh`. Set
+  `DYNAMODB_PORT=8002` when another project holds port 8000.
+- Calendar variables: every calendar function declares `CALENDAR_TABLE`, `CALENDAR_TIME_ZONE` and
+  `DYNAMODB_ENDPOINT` in `template.yaml`. `env.local.json` sets `CALENDAR_TABLE` and
+  `DYNAMODB_ENDPOINT` once, in its `Parameters` section, which `sam local` applies to every
+  function declaring the variable: a new calendar function needs no seed line. `CALENDAR_TIME_ZONE`
+  is deliberately not in the file (a value there would win over the template): it comes from the
+  parameter `CalendarTimeZone` (default `Europe/Rome`). An invalid zone makes every calendar
+  request answer 500.
 - `npm run local:api -w backend`: builds and serves the API on http://127.0.0.1:3000 (foreground).
 - The local functions run on the machine's CPU type: `local-api.sh` passes
   `FunctionArchitecture=x86_64` on x86 machines (the cloud stays `arm64`, the template default).
@@ -181,9 +198,16 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
 - `backend/`: the API. `package.json` (name `backend`, scripts), `template.yaml`,
   `samconfig.toml`, `docker-compose.yml`, `tsconfig.json`, `vitest.config.ts`, and:
   - `src/handlers/`: one Lambda entry point per file.
-  - `src/lib/`: back-end modules; the only place that touches the AWS SDK.
+  - `src/lib/`: back-end modules; the only place that touches the AWS SDK. `calendarDb.ts` is the
+    only module that knows the `calendar` table's item layout and the calendar lock
+    (`withCalendarLock`); its configuration (`calendarConfig()`) is read once per container.
+  - `src/handlers/`, calendar: `getCalendarSettings.ts`, `updateCalendarSettings.ts` (the pattern
+    the other calendar handlers copy: claims → configuration check → role → validate →
+    `calendarDb` → one log line).
   - `tests/unit/`: vitest unit tests, mirroring `src/` (e.g. `tests/unit/lib/http.test.ts`).
-  - `tests/integration/`: end-to-end tests against the local Docker stack (step 9).
+  - `tests/integration/`: end-to-end tests against the local Docker stack: `setup.ts` (helpers,
+    including `resetCalendarTable()`, `putCalendarItem()`, `getCalendarItem()`), `journeys.test.ts`
+    (step 9), `calendar.test.ts` (the calendar's journeys, growing per plan step).
   - `scripts/`: shell scripts behind the npm scripts (`local-seed.sh`, `local-api.sh`,
     `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`, `budget.sh`; `target.sh` is
     sourced by the last three; the first two of those call `cognito.mjs`).

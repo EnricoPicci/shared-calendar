@@ -30,6 +30,8 @@ export default defineConfig({
           globals: true,
           environment: 'node',
           include: runIntegration ? ['tests/integration/**/*.test.ts'] : [],
+          // One file at a time: every file shares one sam local, one DynamoDB Local and one cognito-local.
+          fileParallelism: false,
           // sam local starts a Lambda container on the first call of each function.
           testTimeout: 60_000,
         },

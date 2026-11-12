@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v3 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
-| Date | 2026-11-10; v3 2026-11-12 |
+| Status | v4 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
+| Date | 2026-11-10; v3 and v4 2026-11-12 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
@@ -15,6 +15,7 @@
 | v1 | 2026-11-10 | First version, written after the Product Owner interview (section 3). |
 | v2 | 2026-11-10 | Brief 41 (planning). Assumptions A1–A8 confirmed by the PO. Approved changes: how the acceptance scenarios with a fixed "now" are proven (18.3); throw-away Users `dave` and `erin` and a reset of the local `calendar` table in the back-end journeys (18.2); AC-34 wording; `docs/RUNBOOK.md` added to section 19. |
 | v3 | 2026-11-12 | Brief 42 (plan step 41). Text lengths are counted in UTF-16 code units (11.4; referenced from 6.1 and R-BOOK-11). |
+| v4 | 2026-11-12 | Brief 44 (plan step 43). `env.local.json` sets the calendar variables once, in its `Parameters` section, and never `CALENDAR_TIME_ZONE`, which comes from the `CalendarTimeZone` parameter only: `sam local` lets the file override the template, so a value there would make `--parameter-overrides` ineffective (14.4). |
 
 ---
 
@@ -1037,8 +1038,10 @@ response + one log line. Coverage stays at 100 % lines on `src/lib`.
 
 - `scripts/local-seed.sh` creates the `calendar` table from the same definition (idempotent, like
   `hello-messages`). It seeds no calendar data: the defaults apply (R-SET-01).
-- `env.local.json` gains `CALENDAR_TABLE` and `CALENDAR_TIME_ZONE` for every calendar function and
-  for `DeleteUserFunction`.
+- `env.local.json` sets `CALENDAR_TABLE` and `DYNAMODB_ENDPOINT` once, in its `Parameters`
+  section, which `sam local` applies to every function declaring the variable (every calendar
+  function, and `DeleteUserFunction` once it declares `CALENDAR_TABLE`). `CALENDAR_TIME_ZONE` comes
+  from the `CalendarTimeZone` parameter only, since a value in the file would override it.
 - dynamodb-admin shows the new table automatically (N4).
 - cognito-local (`jagregory/cognito-local:5.3.0`) implements both new Cognito calls, checked in its
   bundled server on 2026-11-10. `AdminGetUser` returns the `sub` attribute, which the emulator sets

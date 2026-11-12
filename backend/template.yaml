@@ -2,7 +2,9 @@ AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
   Hello World API (docs/ARCHITECTURE.md). Cognito user pool for identities and roles,
-  HTTP API with a Lambda authorizer, three business Lambdas, one DynamoDB table.
+  HTTP API with a Lambda authorizer, three business Lambdas, one DynamoDB table; and the shared
+  calendar (docs/SHARED_CALENDAR_SPEC.md, being built in plan steps 41-56): its table, its
+  shared permission sets and, so far, the two settings functions.
 
 # Values given at deploy time: samconfig.toml holds all but AlertEmail, which the first deploy
 # passes on the command line (public repository) and CloudFormation then keeps.
@@ -27,10 +29,20 @@ Parameters:
     Description: >
       CPU type of the functions. Keep arm64 in the cloud (cheaper). Local runs on an x86 machine
       set x86_64 (scripts/local-api.sh): emulating arm64 there is too slow for the 10 s timeout.
+  CalendarTimeZone:
+    Type: String
+    Default: Europe/Rome
+    Description: >
+      IANA time zone of the shared calendar (spec R-TIME-01), passed to every calendar function as
+      CALENDAR_TIME_ZONE. Never change it once the calendar holds data: stored local dates and
+      instants would no longer agree. The functions check it on first use; an invalid value makes
+      every calendar request answer 500, which fires the 5xx alarm.
 
 # Settings shared by every function below, so each function only lists what differs.
 Globals:
   Function:
+    # Every function is built from this folder; each one's Metadata names its own entry file.
+    CodeUri: ./
     Runtime: nodejs22.x
     Architectures:
       - !Ref FunctionArchitecture
@@ -150,6 +162,66 @@ Resources:
         WriteCapacityUnits: 1
       DeletionProtectionEnabled: true
 
+  # The shared calendar (spec 13.1). One table holds every kind of calendar item (settings, the
+  # lock, types, patterns, appointments...), told apart by a generic two-part key: PK groups the
+  # items of one kind, SK orders them. No secondary index: every read is a strongly consistent
+  # read of these keys, which the calendar lock relies on (spec 13.4). Fixed capacity of 10 reads /
+  # 10 writes per second (11/11 with the messages table, inside the always-free 25/25). Same
+  # encryption and deletion protection as the messages table; no TTL (history is kept) and no
+  # stream (planned for notifications, spec 15).
+  CalendarTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: calendar
+      BillingMode: PROVISIONED
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 10
+        WriteCapacityUnits: 10
+      DeletionProtectionEnabled: true
+
+  # Shared permission sets on the calendar table (spec 14.3). A managed policy is a named,
+  # reusable list of permissions, not an identity: each calendar function still has its own role,
+  # which lists the sets its route needs under ManagedPolicyArns. Written once here instead of
+  # repeated in every role. Resource: the calendar table only. Writes go through
+  # TransactWriteItems, which DynamoDB authorizes by the actions of its parts (Put, Update...).
+  # Two more sets come with the routes that need them: CalendarDeletePolicy (step 44) and
+  # CalendarBookPolicy (step 48).
+  CalendarReadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Read the calendar table (strongly consistent GetItem and Query).
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:Query
+            Resource: !GetAtt CalendarTable.Arn
+
+  CalendarWritePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Write calendar items and move the calendar lock on (PutItem, UpdateItem).
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+            Resource: !GetAtt CalendarTable.Arn
+
   # ---------------------------------------------------------------------------
   # API: the public HTTPS entry point
   # ---------------------------------------------------------------------------
@@ -194,7 +266,9 @@ Resources:
   # sam local can only override variables that are declared here, hence the ''.
   #
   # Each role only lets the function write its own logs and call the exact AWS
-  # actions it needs, on the one pool or table it works with. The log permission
+  # actions it needs, on the one pool or table it works with (calendar roles: the shared
+  # permission sets of their route, which may include one read action the route does not
+  # call; see CalendarReadPolicy). The log permission
   # ends in "log-stream:*" because Lambda names a new log stream per container at
   # run time; it cannot reach any other log group.
   # ---------------------------------------------------------------------------
@@ -204,7 +278,6 @@ Resources:
   AuthorizerFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./
       Handler: authorizer.handler
       Role: !GetAtt AuthorizerRole.Arn
       LoggingConfig:
@@ -269,7 +342,6 @@ Resources:
   HelloFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./
       Handler: hello.handler
       Role: !GetAtt HelloRole.Arn
       LoggingConfig:
@@ -340,7 +412,6 @@ Resources:
   CreateUserFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./
       Handler: createUser.handler
       Role: !GetAtt CreateUserRole.Arn
       LoggingConfig:
@@ -413,7 +484,6 @@ Resources:
   DeleteUserFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: ./
       Handler: deleteUser.handler
       Role: !GetAtt DeleteUserRole.Arn
       LoggingConfig:
@@ -488,6 +558,141 @@ Resources:
                 Resource: !GetAtt UserPool.Arn
 
   # ---------------------------------------------------------------------------
+  # Calendar functions (spec 14.1), one per route, written like HelloFunction. Each one gets
+  # the calendar table and time zone in its environment, its own log group, and its own role:
+  # the inline write-own-logs statement plus the shared permission sets its route needs.
+  # ---------------------------------------------------------------------------
+
+  # GET /calendar/settings (route 1): the settings, or the defaults until the first save.
+  GetCalendarSettingsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: getCalendarSettings.handler
+      Role: !GetAtt GetCalendarSettingsRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref GetCalendarSettingsLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        GetCalendarSettings:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /calendar/settings
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/getCalendarSettings.ts
+
+  GetCalendarSettingsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-getCalendarSettings
+      RetentionInDays: 14
+
+  GetCalendarSettingsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${GetCalendarSettingsLogGroup}:log-stream:*
+
+  # PUT /calendar/settings (route 2, Administrator only): replaces the settings under the lock.
+  UpdateCalendarSettingsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: updateCalendarSettings.handler
+      Role: !GetAtt UpdateCalendarSettingsRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref UpdateCalendarSettingsLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        UpdateCalendarSettings:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: PUT
+            Path: /calendar/settings
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/updateCalendarSettings.ts
+
+  UpdateCalendarSettingsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-updateCalendarSettings
+      RetentionInDays: 14
+
+  UpdateCalendarSettingsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+        - !Ref CalendarWritePolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${UpdateCalendarSettingsLogGroup}:log-stream:*
+
+  # ---------------------------------------------------------------------------
   # Error alarms (architecture section 11)
   # ---------------------------------------------------------------------------
 
@@ -557,3 +762,6 @@ Outputs:
   MessagesTableName:
     Description: DynamoDB table holding the messages
     Value: !Ref MessagesTable
+  CalendarTableName:
+    Description: DynamoDB table holding the shared calendar
+    Value: !Ref CalendarTable

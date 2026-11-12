@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v4 (2026-10-28). **Steps 1–12 done** (step 12 on 2026-11-04, tag `v1.0.0`); step 20, monorepo move, done 2026-11-04. **Shared calendar: steps 41–56 planned** (2026-11-10, brief 41, from `docs/SHARED_CALENDAR_SPEC.md` v2); step 41 done 2026-11-12 (brief 42); step 42 done 2026-11-12 (brief 43) |
+| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v4 (2026-10-28). **Steps 1–12 done** (step 12 on 2026-11-04, tag `v1.0.0`); step 20, monorepo move, done 2026-11-04. **Shared calendar: steps 41–56 planned** (2026-11-10, brief 41, from `docs/SHARED_CALENDAR_SPEC.md` v2); step 41 done 2026-11-12 (brief 42); step 42 done 2026-11-12 (brief 43); step 43 done 2026-11-12 (brief 44) |
 | Date | 2026-10-28; calendar steps added 2026-11-10 |
 | Scope | Everything needed to go from an empty repository to a deployed, smoke-tested v1; then the shared calendar (steps 41–56), from its specification to a deployed, smoke-tested feature |
 
@@ -613,9 +613,10 @@ Files
   - `GetCalendarSettingsFunction` and `UpdateCalendarSettingsFunction`, each with its log group and
     its role (inline `write-own-logs` only), using `Globals` as far as SAM allows (14.3).
 - `backend/scripts/local-seed.sh`: creates `calendar` idempotently. `env.local.json` gains
-  `CALENDAR_TABLE`, `CALENDAR_TIME_ZONE` and `DYNAMODB_ENDPOINT` for the calendar functions,
-  preferably once, in the env-vars file's `Parameters` section, which `sam local` applies to
-  every function declaring the variable. Later steps then add no seed lines.
+  `CALENDAR_TABLE` and `DYNAMODB_ENDPOINT` once, in the env-vars file's `Parameters` section,
+  which `sam local` applies to every function declaring the variable. Later steps then add no seed
+  lines. `CALENDAR_TIME_ZONE` comes from the `CalendarTimeZone` parameter only: a value in the file
+  would override it (spec 14.4, v4).
 - `backend/src/lib/calendarDb.ts`:
   - configuration read once per container: `CALENDAR_TABLE`, plus `CALENDAR_TIME_ZONE` checked with
     `isValidTimeZone` (an invalid zone makes every request answer 500, R-TIME-01);

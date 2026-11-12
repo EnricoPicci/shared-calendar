@@ -21,7 +21,7 @@
 | v9 | 2026-11-04 | **v1 implemented.** Plan step 12: the stack is deployed and smoke-tested, the README exists, the status line says so. Wording aligned with what was built: region `eu-north-1` in the overview (section 2), `npm run` commands and the real template size in 6.1 and 9.1, the logger of section 11, sections 1 and 15 in the past tense. A browser front end is now planned (section 14, assumption 6); section 12 points to the target monorepo layout (`docs/FOLDER_STRUCTURE.md`), which a later step applies. |
 | v10 | 2026-11-04 | **Monorepo layout** (plan step 20). The back end moves to `backend/`; the API contract (response and error body types, error codes, `Role` and `resolveRole`) and the username rule move to `shared/`, which the back end imports and bundles; `frontend/` is reserved. Section 12 is replaced by a pointer to `docs/FOLDER_STRUCTURE.md`; paths in this document are relative to `backend/`. No change to behaviour, contract, resources or IAM. The build runs esbuild inside `backend/` with SAM's beta support for npm workspaces (section 9.1). |
 | v11 | 2026-11-05 | Section 8, note on Cognito emulation: two sign-in differences of cognito-local found by the front end's `LoginService` integration test (`InvalidPasswordException` for a wrong password; 24-hour access tokens without `ExpiresIn`). Documentation only; the back end is unchanged. |
-| v12 | 2026-11-12 (open) | **Shared calendar (F5), in progress.** The shared calendar (F5) is being implemented in plan steps 41–56; a calendar matter that the architecture does not yet describe is governed by `docs/SHARED_CALENDAR_SPEC.md`; whatever the architecture already describes, including everything Hello World does, is governed by the architecture. Each plan step merges the part of spec section 19 it implements and adds its sentence here; step 56 closes v12. **Step 41:** the calendar's time model in `shared/src/calendar/` (time helpers with `Intl` only, primitive schemas, default settings and limits; `docs/FOLDER_STRUCTURE.md`); no route, resource or behaviour of the API changes. **Step 42:** the calendar's shared contract and rules: in `shared/src/api.ts` the 20 calendar error codes of spec 11.3, the optional `conflicts` field of the error body, `UserSummary` and `ListUsersResponse`; in `shared/src/calendar/` the response types (`types.ts`), the request bodies and path and query parameters (`schemas.ts`) and the pure rules (`rules.ts`: defined and effective windows, slots, overlap, the local-time grids, `cancellableUntil`); no route, resource or behaviour of the API changes, and no handler answers the new error codes yet (section 4 lists each route's codes in the step that adds the route). |
+| v12 | 2026-11-12 (open) | **Shared calendar (F5), in progress.** The shared calendar (F5) is being implemented in plan steps 41–56; a calendar matter that the architecture does not yet describe is governed by `docs/SHARED_CALENDAR_SPEC.md`; whatever the architecture already describes, including everything Hello World does, is governed by the architecture. Each plan step merges the part of spec section 19 it implements and adds its sentence here; step 56 closes v12. **Step 41:** the calendar's time model in `shared/src/calendar/` (time helpers with `Intl` only, primitive schemas, default settings and limits; `docs/FOLDER_STRUCTURE.md`); no route, resource or behaviour of the API changes. **Step 42:** the calendar's shared contract and rules: in `shared/src/api.ts` the 20 calendar error codes of spec 11.3, the optional `conflicts` field of the error body, `UserSummary` and `ListUsersResponse`; in `shared/src/calendar/` the response types (`types.ts`), the request bodies and path and query parameters (`schemas.ts`) and the pure rules (`rules.ts`: defined and effective windows, slots, overlap, the local-time grids, `cancellableUntil`); no route, resource or behaviour of the API changes, and no handler answers the new error codes yet (section 4 lists each route's codes in the step that adds the route). **Step 43:** the first calendar slice: the DynamoDB table `calendar` (section 5.3) with the calendar lock, the parameter `CalendarTimeZone`, and the routes `GET` and `PUT /calendar/settings` (sections 3 and 4) with their two functions (section 2); the calendar's DynamoDB permissions are written once as shared managed policies attached to each calendar function's own role (section 7.1); capacity 11/11 in total (section 10). |
 
 ---
 
@@ -81,7 +81,9 @@ flowchart LR
         CU[Lambda<br/>createUser]
         DU[Lambda<br/>deleteUser]
         HW[Lambda<br/>hello]
+        CAL[Lambdas<br/>calendar settings<br/>get, update]
         DB[(DynamoDB<br/>Messages table)]
+        CDB[(DynamoDB<br/>calendar table)]
         CW[CloudWatch Logs]
     end
 
@@ -90,18 +92,19 @@ flowchart LR
     COG -- "2. JWT access token" --> A
     COG -- "2. JWT access token" --> U
 
-    A -- "3. POST/DELETE /users, POST /hello  (Bearer JWT)" --> GW
-    U -- "3. POST /hello  (Bearer JWT)" --> GW
+    A -- "3. POST/DELETE /users, POST /hello, GET/PUT /calendar/settings  (Bearer JWT)" --> GW
+    U -- "3. POST /hello, GET /calendar/settings  (Bearer JWT)" --> GW
     GW -- "verify token" --> AUTH
     AUTH -- "fetch signing keys (cached)" --> COG
-    GW --> CU & DU & HW
+    GW --> CU & DU & HW & CAL
     CU -- "AdminCreateUser + AdminSetUserPassword" --> COG
     DU -- AdminDeleteUser --> COG
     HW -- PutItem --> DB
-    CU & DU & HW & AUTH -.logs.-> CW
+    CAL -- "GetItem, TransactWriteItems" --> CDB
+    CU & DU & HW & CAL & AUTH -.logs.-> CW
 ```
 
-**How to read it.** Clients never talk to our Lambdas without a token. They first sign in against Cognito (step 1–2) and get a short-lived JWT. Every API call carries that JWT; API Gateway asks the authorizer Lambda to verify it before any business Lambda runs. Users live in Cognito, messages live in DynamoDB. Nothing else exists: no servers, no VPC, no NAT, no load balancer, no e-mail.
+**How to read it.** Clients never talk to our Lambdas without a token. They first sign in against Cognito (step 1–2) and get a short-lived JWT. Every API call carries that JWT; API Gateway asks the authorizer Lambda to verify it before any business Lambda runs. Users live in Cognito; messages and the shared calendar live in DynamoDB, one table each. The calendar (F5) is being built route by route (plan steps 43–51); the diagram shows the functions that exist so far. Nothing else exists: no servers, no VPC, no NAT, no load balancer, no e-mail.
 
 ### 2.1 Why these pieces
 
@@ -109,9 +112,9 @@ flowchart LR
 |---|---|---|
 | **API Gateway HTTP API** | Public HTTPS entry point, routing, throttling, TLS | HTTP API (not REST API) is ~70 % cheaper and simpler; supports Lambda authorizers |
 | **Lambda authorizer** | Verifies the Cognito JWT signature/expiry and injects identity into the request | API Gateway also has a built-in JWT authorizer with zero code, **but it cannot run locally**. A tiny Lambda authorizer behaves identically on the laptop and in the cloud (N5). |
-| **Lambda functions** (`hello`, `createUser`, `deleteUser`) | Business logic, one function per route | One route = one function = one least-privilege IAM role. Easy to read, easy to secure. |
+| **Lambda functions** (`hello`, `createUser`, `deleteUser`; calendar: `getCalendarSettings`, `updateCalendarSettings`) | Business logic, one function per route | One route = one function = one least-privilege IAM role. Easy to read, easy to secure. |
 | **Cognito user pool** | User directory, passwords, sign-in, groups (= roles), token issuing | We never store or hash a password ourselves. Roles are group memberships that only an administrator (or the deployment) can change. Password change/reset exist in Cognito already, ready for a later version. |
-| **DynamoDB** | Stores Hello World messages | Serverless, zero idle cost, always-free tier, browsable in the AWS console and locally with a web UI |
+| **DynamoDB** | Stores Hello World messages (`hello-messages`) and the shared calendar (`calendar`, section 5.3) | Serverless, zero idle cost, always-free tier, browsable in the AWS console and locally with a web UI |
 | **CloudWatch Logs** | Structured logs per function | Free tier 5 GB/month; retention set to 14 days to keep it free |
 | **AWS SAM** | Describes all of the above in one `template.yaml`; builds, runs locally, deploys | See section 9 |
 
@@ -123,15 +126,16 @@ Roles are **Cognito groups**. A user's roles arrive inside the JWT as the claim 
 
 | Role | Cognito group | Can call | Hello World message |
 |---|---|---|---|
-| Administrator | `admin` | `POST /users`, `DELETE /users/{username}`, `POST /hello` | `Hello World, the Administrator is speaking` |
-| User | `user` | `POST /hello` | `Hello World, I am <UserName>` |
+| Administrator | `admin` | `POST /users`, `DELETE /users/{username}`, `POST /hello`, `GET` and `PUT /calendar/settings` | `Hello World, the Administrator is speaking` |
+| User | `user` | `POST /hello`, `GET /calendar/settings` | `Hello World, I am <UserName>` |
 
 Rules
 
 - Self sign-up is **disabled** in the user pool. Only `AdminCreateUser` (from the `createUser` Lambda or from the deployment) creates accounts.
 - The one Administrator account is created by the deployment (section 6.1). The API cannot create additional administrators and cannot delete members of the `admin` group — this keeps the admin role out of reach of the API surface.
 - **Role resolution.** Cognito groups are not mutually exclusive: an account can belong to `admin`, to `user`, to both, or to neither, and the token lists every membership in the `cognito:groups` array. The code must therefore define the outcome for all four combinations, not only the two normal ones. Two checks use the groups:
-  - *Admin endpoints* (`POST /users`, `DELETE /users/{username}`) ask a yes/no question: is `admin` in the list? Membership of `user` is irrelevant.
+  - *Admin endpoints* (`POST /users`, `DELETE /users/{username}`, `PUT /calendar/settings`) ask a yes/no question: is `admin` in the list? Membership of `user` is irrelevant.
+  - *Routes open to both roles* (`GET /calendar/settings`) accept `admin` or `user` and answer 403 to a token in neither group.
   - *Hello World* must choose exactly one message, so it applies a precedence rule, **admin wins**: if `admin` is present the Administrator message is produced, even if `user` is also present; if only `user` is present the User message is produced; if neither is present the call is rejected with 403.
 
   | Groups in the token | Admin endpoints | `POST /hello` message | Deletable via API |
@@ -165,6 +169,10 @@ Base URL: `https://<api-id>.execute-api.<region>.amazonaws.com` (cloud) or `http
 | `POST /hello` | admin **or** user | *(none)* | `201` `{ "messageId", "role", "message", "createdAt" }` | 401 missing token · 403 invalid token or in neither group |
 | `POST /users` | admin | `{ "username": "alice" }` | `201` `{ "username", "password" }` | 400 invalid username · 401 missing token · 403 invalid token or not admin · 409 already exists |
 | `DELETE /users/{username}` | admin | *(none)* | `204` | 400 invalid username · 401 missing token · 403 invalid token, not admin **or** target is an admin · 404 unknown user (`{ "error": "user_not_found" }`) |
+| `GET /calendar/settings` | admin **or** user | *(none)* | `200` `CalendarSettings` | 401 missing token · 403 invalid token or in neither group (`forbidden`) · 500 `internal_error` |
+| `PUT /calendar/settings` | admin | `UpdateSettingsBody`: all four of `cancellationNoticeHours` (0–720), `minBookingNoticeHours` (0–720), `bookingHorizonDays` (1–365), `maxFutureAppointmentsPerUser` (1–100 or `null`), integers, no other field | `200` `CalendarSettings` | 400 `invalid_json` / `invalid_request` · 401 missing token · 403 invalid token or not admin (`forbidden`) · 409 `concurrent_update` · 500 `internal_error` |
+
+`CalendarSettings` (types in `shared/src/calendar/types.ts`): `{ timeZone, cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser, updatedAt, updatedBy }`. `timeZone` is the deployment parameter `CalendarTimeZone`, read-only. Until the Administrator first saves, `GET` answers the defaults (24, 0, 56, `null`) with `updatedAt: null` and `updatedBy: null`; a save sets `updatedAt` to the time of the request and `updatedBy` to `{ username, role }` of the caller. `409 concurrent_update` means the calendar lock (section 5.3) was busy three times in a row; the client may retry. An invalid `CalendarTimeZone` makes every calendar request answer `500 internal_error`, whatever the caller's role.
 
 `POST /hello` response examples
 
@@ -211,6 +219,36 @@ Password policy: min 12 chars, upper + lower + digit + symbol. Users are created
 | `createdAt` | S | | ISO-8601 UTC | ISO-8601 UTC |
 
 `role` is stored so that the DB UI shows at a glance who produced each message. Settings: **provisioned capacity 1 RCU / 1 WCU** (inside the always-free 25/25), deletion protection on, encryption at rest (AWS-owned key, free), no TTL (messages are kept). A global secondary index `byUser (userName, createdAt)` can be added later if listing a user's messages becomes a requirement; it is not needed now.
+
+### 5.3 DynamoDB table `calendar`
+
+The shared calendar (F5) keeps every kind of calendar item in one table (single-table design), told apart by a generic two-part key: the partition key `PK` groups the items of one kind, the sort key `SK` orders them. The single `messageId` key of `hello-messages` cannot do that, hence a second table.
+
+| Setting | Value | Why |
+|---|---|---|
+| Keys | `PK` (S, partition), `SK` (S, sort) | one key shape for every item kind |
+| Secondary indexes | none | every read is a strongly consistent `GetItem` or `Query` on the keys; indexes are only eventually consistent, and the lock below relies on consistent reads |
+| Capacity | provisioned 10 RCU / 10 WCU | a transaction costs 2 WCU per item; with `hello-messages` (1/1) the total stays inside the always-free 25/25 and cannot scale into cost |
+| Deletion protection, encryption | on; AWS-owned key | as `hello-messages` |
+| TTL, stream | none | history is kept; a stream is planned for notifications (spec section 15) |
+
+Items so far (the other kinds of `docs/SHARED_CALENDAR_SPEC.md` 13.2 arrive with their routes):
+
+| Item | `PK` | `SK` | Other attributes |
+|---|---|---|---|
+| Calendar lock | `LOCK` | `LOCK` | `version` (N) |
+| Settings | `SETTINGS` | `SETTINGS` | `cancellationNoticeHours`, `minBookingNoticeHours`, `bookingHorizonDays`, `maxFutureAppointmentsPerUser`, `updatedAt`, `updatedBy` (`{ username, role }`) |
+
+No item is seeded: until the first save, the settings are the defaults of `shared/src/calendar/defaults.ts`. The time zone is not stored; it is the parameter `CalendarTimeZone`, which must not change once the table holds data.
+
+**The calendar lock.** Several calendar rules compare a write with the rest of the calendar (no double booking, no overlap), so two writes at the same moment must not both pass their checks against a state the other is changing. Every calendar write therefore takes one optimistic lock for the whole calendar:
+
+1. read `LOCK` (consistent; version 0 if the item does not exist yet);
+2. read what the rules need and check them; on failure answer 4xx and write nothing;
+3. `TransactWriteItems`: first the lock update, `version = v + 1` only if `version = v` (on first use: only if the item does not exist), then the operation's own writes. All succeed or none does;
+4. if the transaction was cancelled because of the lock's condition (the first entry of the cancellation reasons), another write came first: wait a random 50–150 ms and start again from 1, at most 3 attempts in total, then answer `409 concurrent_update`. Any other failure is not retried.
+
+All calendar writes take turns, which costs nothing at ≤ 10 users (N6) and makes the calendar serializable. The code is `backend/src/lib/calendarDb.ts` (`withCalendarLock`), the only module that knows the item layout.
 
 ---
 
@@ -376,7 +414,7 @@ sequenceDiagram
 | Authorization | Role check against `cognito:groups` **inside each handler** (defence in depth: the authorizer proves *who*, the handler decides *what*) | `hello`, `createUser`, `deleteUser` |
 | Account hygiene | Self sign-up disabled; password policy 12+ chars with symbols; passwords generated server-side with `crypto.randomInt`, returned exactly once, never logged; Cognito built-in lockout after repeated failed sign-ins | user pool, `createUser` |
 | Privilege boundary | API can never create an admin, delete an admin, or set an admin's password | `createUser` always assigns `user`; `deleteUser` refuses admins; admin password only via bootstrap script |
-| Least privilege IAM | Each Lambda has its own role with only the actions it needs, scoped to the one pool/table: `hello` → `dynamodb:PutItem`; `createUser` → `AdminCreateUser`, `AdminSetUserPassword`, `AdminAddUserToGroup`, `AdminDeleteUser` (rollback only); `deleteUser` → `AdminListGroupsForUser`, `AdminUserGlobalSignOut`, `AdminDeleteUser`; authorizer → none | `template.yaml` |
+| Least privilege IAM | Each Lambda has its own role with only the actions it needs, scoped to the one pool/table: `hello` → `dynamodb:PutItem`; `createUser` → `AdminCreateUser`, `AdminSetUserPassword`, `AdminAddUserToGroup`, `AdminDeleteUser` (rollback only); `deleteUser` → `AdminListGroupsForUser`, `AdminUserGlobalSignOut`, `AdminDeleteUser`; authorizer → none. **Calendar functions:** the DynamoDB permissions on `calendar` are written once, as shared customer-managed policies (`AWS::IAM::ManagedPolicy`, resource: the `calendar` table's ARN only, no wildcard): `CalendarReadPolicy` (`GetItem`, `Query`) and `CalendarWritePolicy` (`PutItem`, `UpdateItem`; transactions are authorized by the actions of their parts). Each calendar role lists the policies its route needs: `getCalendarSettings` → read; `updateCalendarSettings` → read + write. A managed policy is a reusable list of permissions, not an identity: every function keeps its own role, with its inline `write-own-logs` statement naming its own log group. The price: a read route may get one read action it does not call (`getCalendarSettings` never queries), which exposes nothing a `GetItem` on the table does not already allow. | `template.yaml` |
 | No secrets | There is no secret anywhere: Lambdas use IAM roles, JWT verification uses public keys. Nothing to rotate or leak | — |
 | Input validation | `zod` schemas on body and path; unknown fields rejected; errors never echo AWS internals | handlers |
 | Abuse / cost protection | API stage throttling 5 req/s, burst 10 (plenty for 10 users, blocks brute force and bill surprises); AWS Budget alarm at 1 USD | `template.yaml`; budget by `scripts/budget.sh` |
@@ -395,7 +433,7 @@ sequenceDiagram
 | Enumeration of usernames via `POST /users` 409 | Accepted: endpoint is admin-only |
 | Brute-force sign-in | Cognito lockout + API throttling |
 | Injection | DynamoDB SDK uses typed parameters (no query strings); input validated |
-| Runaway cost | Throttling, provisioned 1/1 capacity, budget alarm |
+| Runaway cost | Throttling, provisioned capacity (1/1 messages, 10/10 calendar), budget alarm |
 
 ### 7.3 Residual risks (accepted, documented)
 
@@ -501,12 +539,12 @@ A script `scripts/smoke.sh <stack>` that signs in as admin, calls `/hello` as ad
 |---|---|---|---|
 | Lambda | 1 M requests + 400 000 GB-s, always free | ~2 000 invocations | 0 € |
 | API Gateway HTTP API | 1 M requests free for 12 months, then 1 USD per million | ~1 000 | 0 € (≈ 0.001 USD after year 1) |
-| DynamoDB | 25 GB + 25 RCU/WCU provisioned, always free | 1 RCU / 1 WCU, < 1 MB | 0 € |
+| DynamoDB | 25 GB + 25 RCU/WCU provisioned, always free | 11 RCU / 11 WCU (messages 1/1, calendar 10/10), < 1 MB | 0 € |
 | Cognito (Essentials plan) | 10 000 MAU free | 11 MAU | 0 € |
 | CloudWatch Logs | 5 GB ingest free | < 10 MB | 0 € |
 | **Total** | | | **≈ 0 €** |
 
-Guard-rails: budget alarm at 1 USD; API throttling; no on-demand DynamoDB (provisioned 1/1 cannot scale into cost). No e-mail is sent in v1, so no SES/SNS cost.
+Guard-rails: budget alarm at 1 USD; API throttling; no on-demand DynamoDB (provisioned 11/11 in total cannot scale into cost). No e-mail is sent in v1, so no SES/SNS cost.
 
 ---
 

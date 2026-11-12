@@ -59,7 +59,8 @@ stays at the root.
 │   ├── vitest.config.ts         # projects unit + integration; 100 % line coverage on src/lib
 │   ├── src/
 │   │   ├── handlers/            # one Lambda entry point per file
-│   │   └── lib/                 # the only place that touches the AWS SDK
+│   │   └── lib/                 # the only place that touches the AWS SDK (calendarDb.ts:
+│   │                            # the calendar table's item layout and lock)
 │   ├── tests/
 │   │   ├── unit/                # mirrors src/
 │   │   └── integration/         # journeys against the local Docker stack

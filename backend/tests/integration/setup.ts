@@ -4,7 +4,14 @@ import {
   InitiateAuthCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { DescribeTableCommand, DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import {
+  BatchWriteCommand,
+  DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+  ScanCommand,
+  type BatchWriteCommandInput,
+} from '@aws-sdk/lib-dynamodb';
 import { existsSync, readFileSync } from 'node:fs';
 import { connect } from 'node:net';
 
@@ -17,6 +24,7 @@ const COGNITO_URL = 'http://localhost:9229';
 const DYNAMODB_PORT = process.env.DYNAMODB_PORT ?? '8000';
 const DYNAMODB_URL = `http://localhost:${DYNAMODB_PORT}`;
 const TABLE_NAME = 'hello-messages';
+const CALENDAR_TABLE = 'calendar';
 const ENV_FILE = 'env.local.json';
 
 // Dummy credentials: the emulators accept anything, and this keeps the SDK away from the real
@@ -52,9 +60,9 @@ function portOpen(port: number): Promise<boolean> {
   });
 }
 
-async function tableExists(): Promise<boolean> {
+async function tableExists(name: string): Promise<boolean> {
   try {
-    await dynamoClient.send(new DescribeTableCommand({ TableName: TABLE_NAME }));
+    await dynamoClient.send(new DescribeTableCommand({ TableName: name }));
     return true;
   } catch {
     return false;
@@ -67,9 +75,12 @@ export async function setup(): Promise<void> {
   if (!existsSync(ENV_FILE)) missing.push(`${ENV_FILE} is missing (npm run local:up)`);
   if (!(await portOpen(Number(DYNAMODB_PORT)))) {
     missing.push(`DynamoDB Local is not listening on port ${DYNAMODB_PORT} (npm run local:up; set DYNAMODB_PORT if it uses another port)`);
-  } else if (!(await tableExists())) {
+  } else if (!(await tableExists(TABLE_NAME))) {
     // Typically another project's DynamoDB Local holds the port (DYNAMODB_PORT not set).
     missing.push(`no table ${TABLE_NAME} on port ${DYNAMODB_PORT}: wrong DYNAMODB_PORT, or run npm run local:up`);
+  } else if (!(await tableExists(CALENDAR_TABLE))) {
+    // A stack started before plan step 43: local:up creates the table (it is idempotent).
+    missing.push(`no table ${CALENDAR_TABLE} on port ${DYNAMODB_PORT}: run npm run local:up again`);
   }
   if (!(await portOpen(9229))) missing.push('cognito-local is not listening on port 9229 (npm run local:up)');
   if (!(await portOpen(3000))) missing.push('the API is not listening on port 3000 (npm run local:api)');
@@ -138,4 +149,52 @@ export async function removeUserIfPresent(username: string): Promise<void> {
   } catch (err) {
     if ((err as { name?: unknown }).name !== 'UserNotFoundException') throw err;
   }
+}
+
+// ── The calendar table (docs/SHARED_CALENDAR_SPEC.md 18.2) ────────────────────────────────────
+// The calendar is global, so the calendar journeys own the local table: they empty it first.
+
+export type CalendarItem = { PK: string; SK: string } & Record<string, unknown>;
+
+// These helpers write straight into the table, so they refuse anything but the local emulator.
+async function localCalendar(): Promise<DynamoDBDocumentClient> {
+  const endpoint = await dynamoClient.config.endpoint?.();
+  const host = endpoint?.hostname;
+  if (host !== 'localhost' && host !== '127.0.0.1') {
+    throw new Error(`Refusing to touch the calendar table on ${host ?? 'the default AWS endpoint'}: only DynamoDB Local`);
+  }
+  return dynamo;
+}
+
+// Deletes every item of the local calendar table, including what an earlier failed run left.
+export async function resetCalendarTable(): Promise<void> {
+  const client = await localCalendar();
+  let startKey: Record<string, unknown> | undefined;
+  do {
+    const page = await client.send(
+      new ScanCommand({ TableName: CALENDAR_TABLE, ProjectionExpression: 'PK, SK', ExclusiveStartKey: startKey }),
+    );
+    const keys = (page.Items ?? []) as { PK: string; SK: string }[];
+    for (let i = 0; i < keys.length; i += 25) {
+      const requests = keys.slice(i, i + 25).map((Key) => ({ DeleteRequest: { Key } }));
+      let unprocessed: BatchWriteCommandInput['RequestItems'] = { [CALENDAR_TABLE]: requests };
+      while (unprocessed && Object.keys(unprocessed).length > 0) {
+        unprocessed = (await client.send(new BatchWriteCommand({ RequestItems: unprocessed }))).UnprocessedItems;
+      }
+    }
+    startKey = page.LastEvaluatedKey;
+  } while (startKey);
+}
+
+// Writes an item directly, for states the API cannot produce (e.g. an appointment in the past).
+export async function putCalendarItem(item: CalendarItem): Promise<void> {
+  const client = await localCalendar();
+  await client.send(new PutCommand({ TableName: CALENDAR_TABLE, Item: item }));
+}
+
+// One item read directly (consistent), or undefined.
+export async function getCalendarItem(PK: string, SK: string): Promise<CalendarItem | undefined> {
+  const client = await localCalendar();
+  const { Item } = await client.send(new GetCommand({ TableName: CALENDAR_TABLE, Key: { PK, SK }, ConsistentRead: true }));
+  return Item as CalendarItem | undefined;
 }
