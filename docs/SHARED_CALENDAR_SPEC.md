@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| Status | v1 — specification, agreed with the Product Owner (2026-11-10); not implemented |
+| Status | v2 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
 | Date | 2026-11-10 |
-| Brief | `prompts/40-paln-basic-shared-calendar.md` |
+| Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
 
@@ -13,6 +13,7 @@
 | Version | Date | Change |
 |---|---|---|
 | v1 | 2026-11-10 | First version, written after the Product Owner interview (section 3). |
+| v2 | 2026-11-10 | Brief 41 (planning). Assumptions A1–A8 confirmed by the PO. Approved changes: how the acceptance scenarios with a fixed "now" are proven (18.3); throw-away Users `dave` and `erin` and a reset of the local `calendar` table in the back-end journeys (18.2); AC-34 wording; `docs/RUNBOOK.md` added to section 19. |
 
 ---
 
@@ -1231,13 +1232,28 @@ call any route until the front-end architecture solves it.
 
 ### 18.2 Integration journeys (back end, `tests/integration/calendar.test.ts`, `RUN_INTEGRATION=1`)
 
-Like the existing journeys, the file starts by removing what an earlier failed run may have left
-behind: it cancels the appointments of the throw-away User `dave` and deletes the test types,
-patterns, overrides and windows whose names or dates belong to the test.
+The calendar is global (one set of settings, one availability), so the journeys own the local
+`calendar` table: the file starts by **emptying it** (every item, through DynamoDB Local on
+`localhost`; the helper refuses any other endpoint), which also removes whatever an earlier failed
+run left behind. The local table lives in memory and is lost at `local:down` anyway; data made by
+hand for exploration is lost when the journeys run.
+
+The seeded `alice` and `admin` are fixtures that no test deletes (Hello World plan, step 6). The
+scenarios' `alice` and `bob` are therefore played by two throw-away Users, **`dave`** (alice) and
+**`erin`** (bob), created through `POST /users` at the start and deleted at the end (and removed
+first, so a failed run can be repeated). AC-29 deletes `dave`.
 
 ### 18.3 Acceptance scenarios
 
 Time zone `Europe/Rome`. "Now" is set by the scenario. Defaults apply unless stated.
+
+**How a fixed "now" is proven.** `sam local` runs on the real clock, so every scenario is proven
+twice: (1) in the handler's unit tests, with a fake clock and the exact dates of the table; (2) in
+the integration journeys (18.2), with the same shape on dates counted from the real today (e.g.
+"the next Monday at least 8 days ahead") and settings chosen to make the timing rule decidable
+(e.g. a notice of 720 h to prove `cancellation_too_late`). An appointment that has already ended
+cannot be booked through the API (R-BOOK-03), so the journeys of AC-29 and AC-31 write it directly
+into DynamoDB Local, as the existing journeys already read the table directly.
 
 | Id | Given | When | Then |
 |---|---|---|---|
@@ -1274,7 +1290,7 @@ Time zone `Europe/Rome`. "Now" is set by the scenario. Defaults apply unless sta
 | AC-31 | an ended appointment | admin cancels | 409 `appointment_not_active` |
 | AC-32 | — | admin `GET /users` | alice, bob; not admin |
 | AC-33 | — | `GET /calendar?from=2026-11-01&to=2026-12-15` | 400 `invalid_request` (span > 31 days) |
-| AC-34 | Two bookings of the same slot sent at the same moment (unit test with a mocked transaction conflict; integration with `Promise.all`) | — | exactly one 201; the other 409 `slot_taken` (after a retry) |
+| AC-34 | Two bookings of the same slot sent at the same moment (unit test with a mocked transaction conflict; integration with `Promise.all`) | — | exactly one 201; the other 409 `slot_taken`. The retry on the lock is proven by the unit test: `sam local` may serve the two requests one after the other, and then no retry happens |
 | AC-35 | Pattern Sun 01:00–04:00 local valid on 2027-03-28 (clocks go forward) | admin views 2027-03-28 | slots 01:00 and 03:00 local, each 60 real minutes |
 | AC-36 | Any write above | inspect CloudWatch/local logs | no note text, no request body |
 
@@ -1296,6 +1312,7 @@ messages do.
 | `docs/IMPLEMENTATION_PLAN.md` | New steps (section 21 outline) with acceptance checks |
 | `docs/FRONTEND_SERVICES.md` | `api.ts` changes (16.1); new sections for the five services and `listUsers` |
 | `docs/FOLDER_STRUCTURE.md` | `shared/src/calendar/` folder |
+| `docs/RUNBOOK.md` | The deploy's change-set check names `CalendarTable` next to `MessagesTable` ("replace/delete means data loss: answer N"); the stack-removal procedure retains `CalendarTable` too; `CalendarTimeZone` must not change once data exists (1.3); the smoke test's calendar journey |
 | `README.md`, `CLAUDE.md` | New routes in the curl examples; `CALENDAR_TABLE` in the local notes; this document in "Where the truth lives" |
 | `shared/src/api.ts` | 11.3 |
 | `backend/src/handlers/deleteUser.ts` | 10.2 |
@@ -1349,8 +1366,8 @@ cancels the affected appointments through the normal path.
 
 ## 22. Assumptions and open points
 
-Assumptions (the PO accepted defaults that left these details to the analyst; change them before
-the plan if wrong):
+Assumptions (the PO accepted defaults that left these details to the analyst). **All eight were
+confirmed by the PO on 2026-11-10 (brief 41).**
 
 | # | Assumption |
 |---|---|
