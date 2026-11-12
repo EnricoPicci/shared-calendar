@@ -1,0 +1,110 @@
+import type { Role } from '../roles';
+import type { OneOffWindowBody, PatternBody, WindowBody } from './schemas';
+
+// The calendar's response types (docs/SHARED_CALENDAR_SPEC.md 11.5, 11.6) and its event types
+// (section 15). Types only: the bodies they extend are inferred from the schemas in schemas.ts.
+// Dates are local `YYYY-MM-DD`; every other time is an instant in the toISOString form.
+
+/** Who did something: the caller's username and role at that moment. */
+export type Actor = { username: string; role: Role };
+
+// ── Settings and availability ───────────────────────────────────────────────────────────────
+
+/** 200 of GET and PUT /calendar/settings. Until the first save: the defaults, `updatedAt: null` (R-SET-01). */
+export type CalendarSettings = {
+  timeZone: string; // the deployment parameter CalendarTimeZone, read-only
+  cancellationNoticeHours: number;
+  minBookingNoticeHours: number;
+  bookingHorizonDays: number;
+  maxFutureAppointmentsPerUser: number | null;
+  updatedAt: string | null;
+  updatedBy: Actor | null;
+};
+
+export type AvailabilityType = { typeId: string; name: string; createdAt: string; updatedAt: string };
+/** 200 of GET /calendar/types, sorted by name. */
+export type ListTypesResponse = { types: AvailabilityType[] };
+
+export type WeeklyPattern = PatternBody & { patternId: string; createdAt: string; updatedAt: string };
+/** 200 of GET /calendar/patterns, sorted by weekday, then start. */
+export type ListPatternsResponse = { patterns: WeeklyPattern[] };
+
+export type DateOverride = { date: string; windows: WindowBody[]; updatedAt: string };
+
+export type OneOffWindow = OneOffWindowBody & { windowId: string; createdAt: string };
+
+// ── Appointments ────────────────────────────────────────────────────────────────────────────
+
+export type AppointmentStatus = 'booked' | 'cancelled';
+/** Why an appointment was cancelled: an explicit cancel, replaced by a change, or its User deleted (D19). */
+export type CancelReason = 'cancelled' | 'changed' | 'user_deleted';
+
+export type Appointment = {
+  appointmentId: string;
+  username: string;
+  start: string;
+  end: string;
+  date: string; // the local date of `start`
+  typeId: string;
+  typeName: string; // the type's current name, or the snapshot taken at booking if it was deleted
+  note: string | null;
+  status: AppointmentStatus;
+  createdAt: string;
+  createdBy: Actor;
+  updatedAt: string;
+  updatedBy: Actor;
+  cancelledAt: string | null;
+  cancelledBy: Actor | null;
+  cancelReason: CancelReason | null;
+  replaces: string | null;
+  replacedBy: string | null;
+  cancellableUntil: string | null; // User callers only (rules.ts cancellableUntil); null for the Administrator
+};
+
+/** 200 of GET /calendar/appointments, sorted by start. */
+export type ListAppointmentsResponse = { appointments: Appointment[] };
+/** 201 of POST /calendar/appointments/{appointmentId}/change. */
+export type ChangeAppointmentResponse = { cancelled: Appointment; booked: Appointment };
+
+// ── The calendar view (GET /calendar, 11.6) ─────────────────────────────────────────────────
+
+/** Where a defined window comes from. `sourceId` is the patternId, the override's date, or the windowId. */
+export type WindowSource = 'pattern' | 'override' | 'one_off';
+
+export type CalendarWindow = {
+  start: string;
+  end: string;
+  typeId: string;
+  typeName: string;
+  source?: WindowSource; // admin only
+  sourceId?: string; // admin only
+};
+export type Slot = { start: string; end: string; typeId: string };
+export type Interval = { start: string; end: string };
+
+export type CalendarDay = {
+  date: string;
+  weekday: number;
+  windows: CalendarWindow[]; // the defined windows (6.5), as instants, sorted; not merged
+  slots: Slot[]; // free slots bookable by the caller (R-SLOT-03 / R-SLOT-04)
+  busy: Interval[]; // users only: other people's active appointments, no names; [] for the Administrator
+  hasOverride?: boolean; // admin only
+};
+
+export type CalendarView = {
+  timeZone: string;
+  from: string;
+  to: string;
+  generatedAt: string; // the "now" of the request: the slots are valid as of this instant
+  days: CalendarDay[]; // one per date from..to, in order
+  appointments: Appointment[]; // active appointments starting in the range: all (admin) or own (user)
+};
+
+// ── Events (section 15) ─────────────────────────────────────────────────────────────────────
+
+/** The `type` of an event item, written in the same transaction as the change it records. */
+export type CalendarEventType =
+  | 'appointment.booked'
+  | 'appointment.cancelled'
+  | 'appointment.changed'
+  | 'appointment.note_updated';

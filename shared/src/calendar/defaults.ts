@@ -20,3 +20,12 @@ export const CALENDAR_LIMITS = {
   typeNameLength: 40,
   noteLength: 500,
 } as const;
+
+// Spec section 9: the range of each editable setting, inclusive; all are integers.
+// `maxFutureAppointmentsPerUser` may also be null (unlimited). UpdateSettingsBody reads these.
+export const SETTINGS_RANGES = {
+  cancellationNoticeHours: { min: 0, max: 720 },
+  minBookingNoticeHours: { min: 0, max: 720 },
+  bookingHorizonDays: { min: 1, max: 365 },
+  maxFutureAppointmentsPerUser: { min: 1, max: 100 },
+} as const;

@@ -88,8 +88,9 @@ stays at the root.
     │   ├── roles.ts             # Role, resolveRole (architecture section 3, "admin wins")
     │   ├── username.ts          # the username rule and the zod schemas built on it
     │   └── calendar/            # the shared calendar's contract (docs/SHARED_CALENDAR_SPEC.md 12):
-    │                            # time.ts (time-zone helpers, Intl only), schemas.ts, defaults.ts;
-    │                            # rules.ts and types.ts follow in plan step 42
+    │                            # time.ts (time-zone helpers, Intl only), schemas.ts (primitives,
+    │                            # bodies, parameters), types.ts (responses, events), rules.ts (pure
+    │                            # availability and slot rules), defaults.ts (defaults, limits, ranges)
     └── tests/                   # mirrors src/ (tests/calendar/ too)
 ```
 
@@ -251,6 +252,11 @@ Since then, plan step 41 (2026-11-12) added `shared/src/calendar/` for the share
 calendar time zone, with the built-in `Intl` API only, decision T6), `schemas.ts` (the primitive
 zod schemas: dates, times, weekday, instant, ULID, note, type name) and `defaults.ts` (default
 settings and count limits). It imports only `zod` and its own files, like the rest of `shared/`.
+Plan step 42 (2026-11-12) completed the contract: `api.ts` gained the calendar's error codes, the
+`conflicts` field of the error body and `UserSummary`; `calendar/schemas.ts` the request bodies and
+the path and query parameters; `calendar/types.ts` (new, types only) the response and event types;
+`calendar/rules.ts` (new) the pure functions both sides use (defined and effective windows, slots,
+overlap, the local-time grids, `cancellableUntil`); `calendar/defaults.ts` the settings ranges.
 
 What stays out of `shared/`: the DynamoDB item shape (`MessageItem`), the authorizer context,
 the logger, the password generator (server-side secret handling), and everything that imports
