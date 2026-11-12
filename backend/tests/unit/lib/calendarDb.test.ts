@@ -1,5 +1,6 @@
 import { TransactionCanceledException } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { localDateOf } from '@shared-calendar/shared';
 import { mockClient } from 'aws-sdk-client-mock';
 
 // The module reads its configuration once per container, so every test imports a fresh copy
@@ -38,6 +39,7 @@ const transactions = () => ddb.commandCalls(TransactWriteCommand).map((call) => 
 beforeEach(async () => {
   ddb.reset();
   ddb.on(GetCommand).resolves({});
+  ddb.on(QueryCommand).resolves({ Items: [] });
   ddb.on(TransactWriteCommand).resolves({});
   db = await load();
 });
@@ -92,6 +94,11 @@ describe('calendarConfig', () => {
     const broken = await load({ CALENDAR_TIME_ZONE: 'Not/AZone' });
     await expect(broken.getSettings()).rejects.toThrow(broken.CalendarConfigError);
     await expect(broken.putSettings(VALUES, ADMIN, NOW)).rejects.toThrow(broken.CalendarConfigError);
+    await expect(broken.listTypes()).rejects.toThrow(broken.CalendarConfigError);
+    const pass = () => null;
+    await expect(broken.createType({ typeId: 'T', name: 'n', nameKey: 'n' }, NOW, pass)).rejects.toThrow(broken.CalendarConfigError);
+    await expect(broken.renameType('T', { name: 'n', nameKey: 'n' }, NOW, pass)).rejects.toThrow(broken.CalendarConfigError);
+    await expect(broken.deleteType('T', '2026-11-12', NOW, pass)).rejects.toThrow(broken.CalendarConfigError);
     expect(ddb.calls()).toHaveLength(0);
   });
 });
@@ -317,5 +324,307 @@ describe('putSettings', () => {
     const failed = expect(locked).rejects.toBeInstanceOf(db.ConcurrentUpdateError);
     await vi.runAllTimersAsync();
     await failed;
+  });
+});
+
+// ── Availability types ─────────────────────────────────────────────────────────────────────────
+
+const STUDIO = '01JC0000000000000000000001';
+const POOL = '01JC0000000000000000000002';
+const NEW_ID = '01JC0000000000000000000009';
+const EARLIER = '2026-11-01T08:00:00.000Z';
+
+const typeItem = (typeId: string, name: string, at = EARLIER) => ({
+  PK: 'TYPE',
+  SK: typeId,
+  name,
+  nameKey: name.toLowerCase(),
+  createdAt: at,
+  updatedAt: at,
+});
+const queries = () => ddb.commandCalls(QueryCommand).map((call) => call.args[0].input);
+const partitionQuery = (pk: string) => ({
+  TableName: TABLE,
+  KeyConditionExpression: 'PK = :pk',
+  ExpressionAttributeValues: { ':pk': pk },
+  ConsistentRead: true,
+  ExclusiveStartKey: undefined,
+});
+const rangeQuery = (pk: string, from: string) => ({
+  TableName: TABLE,
+  KeyConditionExpression: 'PK = :pk AND SK >= :from',
+  ExpressionAttributeValues: { ':pk': pk, ':from': from },
+  ConsistentRead: true,
+  ExclusiveStartKey: undefined,
+});
+const onTypes = (...items: object[]) =>
+  ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'TYPE' } }).resolves({ Items: items });
+
+describe('listTypes', () => {
+  it('reads the TYPE partition with one consistent query', async () => {
+    await db.listTypes();
+    expect(queries()).toEqual([partitionQuery('TYPE')]);
+  });
+
+  it('answers the types sorted by nameKey, without PK, SK or nameKey', async () => {
+    onTypes(typeItem(STUDIO, 'Studio'), typeItem(POOL, 'alpha'), typeItem(NEW_ID, 'Beta'));
+    expect(await db.listTypes()).toEqual([
+      { typeId: POOL, name: 'alpha', createdAt: EARLIER, updatedAt: EARLIER },
+      { typeId: NEW_ID, name: 'Beta', createdAt: EARLIER, updatedAt: EARLIER },
+      { typeId: STUDIO, name: 'Studio', createdAt: EARLIER, updatedAt: EARLIER },
+    ]);
+  });
+
+  it('answers an empty list when there is no type (no Items in the answer)', async () => {
+    ddb.on(QueryCommand).resolves({});
+    expect(await db.listTypes()).toEqual([]);
+  });
+
+  it('follows LastEvaluatedKey to the last page', async () => {
+    ddb
+      .on(QueryCommand)
+      .resolvesOnce({ Items: [typeItem(STUDIO, 'Studio')], LastEvaluatedKey: { PK: 'TYPE', SK: STUDIO } })
+      .resolvesOnce({ Items: [typeItem(POOL, 'Pool')], LastEvaluatedKey: { PK: 'TYPE', SK: POOL } })
+      .resolvesOnce({ Items: [] });
+    expect((await db.listTypes()).map((t) => t.name)).toEqual(['Pool', 'Studio']);
+    expect(queries().map((q) => q.ExclusiveStartKey)).toEqual([undefined, { PK: 'TYPE', SK: STUDIO }, { PK: 'TYPE', SK: POOL }]);
+    expect(queries().every((q) => q.ConsistentRead === true)).toBe(true);
+  });
+
+  it('propagates a DynamoDB failure', async () => {
+    ddb.on(QueryCommand).rejects(new Error('network down'));
+    await expect(db.listTypes()).rejects.toThrow('network down');
+  });
+});
+
+describe('createType', () => {
+  const studio = { typeId: NEW_ID, name: 'Studio', nameKey: 'studio' };
+
+  it('reads the types after the lock, then writes the lock update and the whole TYPE item', async () => {
+    const check = vi.fn(() => null);
+    const locked = await db.createType(studio, NOW, check);
+    expect(locked).toEqual({
+      result: { ok: true, value: { typeId: NEW_ID, name: 'Studio', createdAt: NOW, updatedAt: NOW } },
+      attempts: 1,
+    });
+    // Lock first, then the types (inside the attempt).
+    expect(ddb.calls().map((call) => call.args[0].constructor.name)).toEqual(['GetCommand', 'QueryCommand', 'TransactWriteCommand']);
+    expect(queries()).toEqual([partitionQuery('TYPE')]);
+    const items = transactions()[0]!.TransactItems!;
+    expect(items).toHaveLength(2);
+    expect(items[0]!.Update!.Key).toEqual({ PK: 'LOCK', SK: 'LOCK' });
+    expect(items[1]).toEqual({
+      Put: {
+        TableName: TABLE,
+        Item: { PK: 'TYPE', SK: NEW_ID, name: 'Studio', nameKey: 'studio', createdAt: NOW, updatedAt: NOW },
+      },
+    });
+  });
+
+  it('gives the check every type read inside the attempt, with its nameKey', async () => {
+    onTypes(typeItem(POOL, 'Pool'));
+    const check = vi.fn(() => null);
+    await db.createType(studio, NOW, check);
+    expect(check).toHaveBeenCalledWith([{ typeId: POOL, name: 'Pool', nameKey: 'pool', createdAt: EARLIER, updatedAt: EARLIER }]);
+  });
+
+  it('writes nothing when the check refuses', async () => {
+    const locked = await db.createType(studio, NOW, () => ({ error: 'limit_reached' as const }));
+    expect(locked).toEqual({ result: { ok: false, error: 'limit_reached' }, attempts: 1 });
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('re-reads the types on a retry: a name taken in between is refused, not duplicated', async () => {
+    vi.useFakeTimers();
+    ddb
+      .on(QueryCommand)
+      .resolvesOnce({ Items: [] })
+      .resolves({ Items: [typeItem(POOL, 'STUDIO')] });
+    ddb.on(TransactWriteCommand).rejectsOnce(lockBusy()).resolves({});
+    // The real rule, as the handler passes it.
+    const { checkTypeName } = await import('../../../src/lib/calendarRules');
+    const check = vi.fn((types: { typeId: string; nameKey: string }[]) => checkTypeName('Studio', types));
+
+    const pending = db.createType(studio, NOW, check);
+    await vi.runAllTimersAsync();
+
+    expect(await pending).toEqual({ result: { ok: false, error: 'type_name_exists' }, attempts: 2 });
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(queries()).toHaveLength(2);
+    // The first transaction lost the lock; no second one was sent.
+    expect(transactions()).toHaveLength(1);
+  });
+
+  it('writes the same typeId on every attempt', async () => {
+    vi.useFakeTimers();
+    ddb.on(TransactWriteCommand).rejectsOnce(lockBusy()).resolves({});
+    const pending = db.createType(studio, NOW, () => null);
+    await vi.runAllTimersAsync();
+    await pending;
+    expect(transactions().map((t) => t.TransactItems![1]!.Put!.Item!.SK)).toEqual([NEW_ID, NEW_ID]);
+  });
+});
+
+describe('renameType', () => {
+  const rename = { name: 'Gym', nameKey: 'gym' };
+
+  it('writes the whole item again with the new name, keeping createdAt', async () => {
+    onTypes(typeItem(STUDIO, 'Studio'), typeItem(POOL, 'Pool'));
+    const check = vi.fn(() => null);
+    const locked = await db.renameType(STUDIO, rename, NOW, check);
+    expect(locked).toEqual({
+      result: { ok: true, value: { typeId: STUDIO, name: 'Gym', createdAt: EARLIER, updatedAt: NOW } },
+      attempts: 1,
+    });
+    expect(queries()).toEqual([partitionQuery('TYPE')]);
+    expect(check).toHaveBeenCalledWith([
+      { typeId: STUDIO, name: 'Studio', nameKey: 'studio', createdAt: EARLIER, updatedAt: EARLIER },
+      { typeId: POOL, name: 'Pool', nameKey: 'pool', createdAt: EARLIER, updatedAt: EARLIER },
+    ]);
+    const items = transactions()[0]!.TransactItems!;
+    expect(items).toHaveLength(2);
+    expect(items[1]).toEqual({
+      Put: { TableName: TABLE, Item: { PK: 'TYPE', SK: STUDIO, name: 'Gym', nameKey: 'gym', createdAt: EARLIER, updatedAt: NOW } },
+    });
+  });
+
+  it('answers type_not_found, without calling the check or writing, when the type is not there', async () => {
+    onTypes(typeItem(POOL, 'Pool'));
+    const check = vi.fn(() => null);
+    expect(await db.renameType(STUDIO, rename, NOW, check)).toEqual({ result: { ok: false, error: 'type_not_found' }, attempts: 1 });
+    expect(check).not.toHaveBeenCalled();
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('writes nothing when the check refuses', async () => {
+    onTypes(typeItem(STUDIO, 'Studio'), typeItem(POOL, 'Pool'));
+    const locked = await db.renameType(STUDIO, { name: 'pool', nameKey: 'pool' }, NOW, () => ({ error: 'type_name_exists' as const }));
+    expect(locked).toEqual({ result: { ok: false, error: 'type_name_exists' }, attempts: 1 });
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('answers type_not_found on a retry if the type was deleted in between', async () => {
+    vi.useFakeTimers();
+    ddb
+      .on(QueryCommand)
+      .resolvesOnce({ Items: [typeItem(STUDIO, 'Studio')] })
+      .resolves({ Items: [] });
+    ddb.on(TransactWriteCommand).rejectsOnce(lockBusy()).resolves({});
+    const pending = db.renameType(STUDIO, rename, NOW, () => null);
+    await vi.runAllTimersAsync();
+    expect(await pending).toEqual({ result: { ok: false, error: 'type_not_found' }, attempts: 2 });
+    expect(transactions()).toHaveLength(1);
+  });
+});
+
+describe('deleteType', () => {
+  // 23:30 UTC is already the next day in Europe/Rome (UTC+1 in November): "today" is the local date.
+  const LATE = '2026-11-16T23:30:00.000Z';
+  const TODAY = localDateOf(LATE, 'Europe/Rome');
+  const noRefs = { patterns: [], overrides: [], windows: [], appointments: [] };
+
+  beforeEach(() => {
+    ddb.on(GetCommand, { Key: { PK: 'TYPE', SK: STUDIO } }).resolves({ Item: typeItem(STUDIO, 'Studio') });
+  });
+
+  it('computes today in the calendar zone across midnight UTC', () => {
+    expect(TODAY).toBe('2026-11-17');
+  });
+
+  it('reads the type, then what refers to it from today and from now − 24 h, then deletes it', async () => {
+    const check = vi.fn(() => null);
+    const locked = await db.deleteType(STUDIO, TODAY, LATE, check);
+    expect(locked).toEqual({ result: { ok: true, value: null }, attempts: 1 });
+    expect(ddb.commandCalls(GetCommand).map((call) => call.args[0].input)).toEqual([
+      { TableName: TABLE, Key: { PK: 'LOCK', SK: 'LOCK' }, ConsistentRead: true },
+      { TableName: TABLE, Key: { PK: 'TYPE', SK: STUDIO }, ConsistentRead: true },
+    ]);
+    expect(queries()).toEqual([
+      partitionQuery('PATTERN'),
+      rangeQuery('OVERRIDE', '2026-11-17'),
+      // A window's SK is <date>#<windowId>: every one dated today or later sorts at or after today.
+      rangeQuery('WINDOW', '2026-11-17'),
+      rangeQuery('APPT', '2026-11-15T23:30:00.000Z'),
+    ]);
+    expect(check).toHaveBeenCalledWith(noRefs);
+    const items = transactions()[0]!.TransactItems!;
+    expect(items).toHaveLength(2);
+    expect(items[0]!.Update!.Key).toEqual({ PK: 'LOCK', SK: 'LOCK' });
+    // No condition: the lock already serializes every calendar write.
+    expect(items[1]).toEqual({ Delete: { TableName: TABLE, Key: { PK: 'TYPE', SK: STUDIO } } });
+  });
+
+  it('gives the check only the fields it reads, with the override date from its SK', async () => {
+    ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'PATTERN' } }).resolves({
+      Items: [{ PK: 'PATTERN', SK: 'P1', weekday: 1, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-01-01', validUntil: '2026-02-01' }],
+    });
+    ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'OVERRIDE' } }).resolves({
+      Items: [
+        { PK: 'OVERRIDE', SK: '2026-11-20', windows: [{ start: '09:00', end: '10:00', typeId: POOL }], updatedAt: EARLIER },
+        { PK: 'OVERRIDE', SK: '2026-11-21', updatedAt: EARLIER },
+      ],
+    });
+    ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'WINDOW' } }).resolves({
+      Items: [{ PK: 'WINDOW', SK: '2026-11-18#W1', date: '2026-11-18', start: '09:00', end: '10:00', typeId: STUDIO }],
+    });
+    ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'APPT' } }).resolves({
+      Items: [{ PK: 'APPT', SK: '2026-11-18T08:00:00.000Z#A1', typeId: STUDIO, status: 'booked', end: '2026-11-18T09:00:00.000Z', note: 'private' }],
+    });
+    const check = vi.fn(() => null);
+    await db.deleteType(STUDIO, TODAY, LATE, check);
+    expect(check).toHaveBeenCalledWith({
+      patterns: [{ typeId: STUDIO }],
+      overrides: [
+        { date: '2026-11-20', windows: [{ typeId: POOL }] },
+        { date: '2026-11-21', windows: [] },
+      ],
+      windows: [{ date: '2026-11-18', typeId: STUDIO }],
+      appointments: [{ typeId: STUDIO, status: 'booked', end: '2026-11-18T09:00:00.000Z' }],
+    });
+  });
+
+  it('follows LastEvaluatedKey on every reference query', async () => {
+    ddb
+      .on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'APPT' } })
+      .resolvesOnce({ Items: [{ PK: 'APPT', SK: 'a#1', typeId: POOL, status: 'booked', end: LATE }], LastEvaluatedKey: { PK: 'APPT', SK: 'a#1' } })
+      .resolvesOnce({ Items: [{ PK: 'APPT', SK: 'b#2', typeId: STUDIO, status: 'booked', end: LATE }] });
+    const check = vi.fn(() => null);
+    await db.deleteType(STUDIO, TODAY, LATE, check);
+    expect(check).toHaveBeenCalledWith(expect.objectContaining({ appointments: [expect.objectContaining({ typeId: POOL }), expect.objectContaining({ typeId: STUDIO })] }));
+    expect(queries().filter((q) => q.ExpressionAttributeValues![':pk'] === 'APPT').map((q) => q.ExclusiveStartKey)).toEqual([
+      undefined,
+      { PK: 'APPT', SK: 'a#1' },
+    ]);
+  });
+
+  it('answers type_not_found, reading nothing else and writing nothing, when the type is not there', async () => {
+    const check = vi.fn(() => null);
+    expect(await db.deleteType(POOL, TODAY, LATE, check)).toEqual({ result: { ok: false, error: 'type_not_found' }, attempts: 1 });
+    expect(check).not.toHaveBeenCalled();
+    expect(queries()).toHaveLength(0);
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('writes nothing when the check refuses', async () => {
+    const locked = await db.deleteType(STUDIO, TODAY, LATE, () => ({ error: 'type_in_use' as const }));
+    expect(locked).toEqual({ result: { ok: false, error: 'type_in_use' }, attempts: 1 });
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('re-reads the references on a retry', async () => {
+    vi.useFakeTimers();
+    ddb.on(TransactWriteCommand).rejectsOnce(lockBusy()).resolves({});
+    ddb
+      .on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'PATTERN' } })
+      .resolvesOnce({ Items: [] })
+      .resolves({ Items: [{ PK: 'PATTERN', SK: 'P1', typeId: STUDIO }] });
+    const check = vi.fn((refs: { patterns: readonly { typeId: string }[] }) =>
+      refs.patterns.length > 0 ? { error: 'type_in_use' as const } : null,
+    );
+    const pending = db.deleteType(STUDIO, TODAY, LATE, check);
+    await vi.runAllTimersAsync();
+    expect(await pending).toEqual({ result: { ok: false, error: 'type_in_use' }, attempts: 2 });
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(transactions()).toHaveLength(1);
   });
 });

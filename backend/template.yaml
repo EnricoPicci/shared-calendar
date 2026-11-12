@@ -4,7 +4,7 @@ Description: >
   Hello World API (docs/ARCHITECTURE.md). Cognito user pool for identities and roles,
   HTTP API with a Lambda authorizer, three business Lambdas, one DynamoDB table; and the shared
   calendar (docs/SHARED_CALENDAR_SPEC.md, being built in plan steps 41-56): its table, its
-  shared permission sets and, so far, the two settings functions.
+  shared permission sets and, so far, the settings and availability-type functions.
 
 # Values given at deploy time: samconfig.toml holds all but AlertEmail, which the first deploy
 # passes on the command line (public repository) and CloudFormation then keeps.
@@ -194,8 +194,7 @@ Resources:
   # which lists the sets its route needs under ManagedPolicyArns. Written once here instead of
   # repeated in every role. Resource: the calendar table only. Writes go through
   # TransactWriteItems, which DynamoDB authorizes by the actions of its parts (Put, Update...).
-  # Two more sets come with the routes that need them: CalendarDeletePolicy (step 44) and
-  # CalendarBookPolicy (step 48).
+  # One more set comes with the routes that need it: CalendarBookPolicy (step 48).
   CalendarReadPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -219,6 +218,23 @@ Resources:
           - Effect: Allow
             Action:
               - dynamodb:PutItem
+              - dynamodb:UpdateItem
+            Resource: !GetAtt CalendarTable.Arn
+
+  # Delete calendar items (DeleteItem) and move the calendar lock on (UpdateItem), for the routes
+  # that delete something: a type, a pattern, an override, a one-off window. UpdateItem is here
+  # too because every delete is a transaction that also updates the lock; such a route needs no
+  # PutItem, so it does not get the write set.
+  CalendarDeletePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Delete calendar items and move the calendar lock on (DeleteItem, UpdateItem).
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:DeleteItem
               - dynamodb:UpdateItem
             Resource: !GetAtt CalendarTable.Arn
 
@@ -691,6 +707,266 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${UpdateCalendarSettingsLogGroup}:log-stream:*
+
+  # GET /calendar/types (route 3): every availability type, sorted by name.
+  ListAvailabilityTypesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: listAvailabilityTypes.handler
+      Role: !GetAtt ListAvailabilityTypesRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref ListAvailabilityTypesLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        ListAvailabilityTypes:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /calendar/types
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/listAvailabilityTypes.ts
+
+  ListAvailabilityTypesLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-listAvailabilityTypes
+      RetentionInDays: 14
+
+  ListAvailabilityTypesRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ListAvailabilityTypesLogGroup}:log-stream:*
+
+  # POST /calendar/types (route 4, Administrator only): creates a type under the lock.
+  CreateAvailabilityTypeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: createAvailabilityType.handler
+      Role: !GetAtt CreateAvailabilityTypeRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref CreateAvailabilityTypeLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        CreateAvailabilityType:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /calendar/types
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/createAvailabilityType.ts
+
+  CreateAvailabilityTypeLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-createAvailabilityType
+      RetentionInDays: 14
+
+  CreateAvailabilityTypeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+        - !Ref CalendarWritePolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CreateAvailabilityTypeLogGroup}:log-stream:*
+
+  # PUT /calendar/types/{typeId} (route 5, Administrator only): renames a type under the lock.
+  RenameAvailabilityTypeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: renameAvailabilityType.handler
+      Role: !GetAtt RenameAvailabilityTypeRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref RenameAvailabilityTypeLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        RenameAvailabilityType:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: PUT
+            Path: /calendar/types/{typeId}
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/renameAvailabilityType.ts
+
+  RenameAvailabilityTypeLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-renameAvailabilityType
+      RetentionInDays: 14
+
+  RenameAvailabilityTypeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+        - !Ref CalendarWritePolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${RenameAvailabilityTypeLogGroup}:log-stream:*
+
+  # DELETE /calendar/types/{typeId} (route 6, Administrator only): deletes a type nothing current
+  # refers to, under the lock.
+  DeleteAvailabilityTypeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: deleteAvailabilityType.handler
+      Role: !GetAtt DeleteAvailabilityTypeRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref DeleteAvailabilityTypeLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        DeleteAvailabilityType:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: DELETE
+            Path: /calendar/types/{typeId}
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/deleteAvailabilityType.ts
+
+  DeleteAvailabilityTypeLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-deleteAvailabilityType
+      RetentionInDays: 14
+
+  DeleteAvailabilityTypeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+        - !Ref CalendarDeletePolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeleteAvailabilityTypeLogGroup}:log-stream:*
 
   # ---------------------------------------------------------------------------
   # Error alarms (architecture section 11)

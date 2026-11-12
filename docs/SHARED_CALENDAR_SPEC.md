@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v4 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
-| Date | 2026-11-10; v3 and v4 2026-11-12 |
+| Status | v5 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
+| Date | 2026-11-10; v3 to v5 2026-11-12 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
@@ -16,6 +16,7 @@
 | v2 | 2026-11-10 | Brief 41 (planning). Assumptions A1–A8 confirmed by the PO. Approved changes: how the acceptance scenarios with a fixed "now" are proven (18.3); throw-away Users `dave` and `erin` and a reset of the local `calendar` table in the back-end journeys (18.2); AC-34 wording; `docs/RUNBOOK.md` added to section 19. |
 | v3 | 2026-11-12 | Brief 42 (plan step 41). Text lengths are counted in UTF-16 code units (11.4; referenced from 6.1 and R-BOOK-11). |
 | v4 | 2026-11-12 | Brief 44 (plan step 43). `env.local.json` sets the calendar variables once, in its `Parameters` section, and never `CALENDAR_TIME_ZONE`, which comes from the `CalendarTimeZone` parameter only: `sam local` lets the file override the template, so a value there would make `--parameter-overrides` ineffective (14.4). |
+| v5 | 2026-11-12 | Brief 45 (plan step 44). Open point O2 closed: the template stays reviewable and the local stack light; the PO confirmed T2 (section 22). |
 
 ---
 
@@ -1393,4 +1394,4 @@ Open points to check during implementation (not decisions for the PO):
 | # | Point |
 |---|---|
 | O1 | ~~cognito-local's support for `ListUsersInGroup` and `AdminGetUser`~~ Checked: both are implemented (14.4). |
-| O2 | The template's growth (≈ +1 450 lines with the shared policies of 14.3 and `Globals`): confirm during implementation that it stays reviewable; otherwise revisit T2 with the PO. |
+| O2 | ~~The template's growth (≈ +1 450 lines with the shared policies of 14.3 and `Globals`): confirm during implementation that it stays reviewable; otherwise revisit T2 with the PO.~~ Checked at plan step 44 (2026-11-12), with 6 of the 21 calendar functions: one function block (function, `Metadata`, log group, role, comment) is 64 lines, of which only the name, handler, method, path and permission sets differ; the template is estimated at about 2 060 lines when complete, about +1 500 against this estimate of +1 450. The local stack with 10 functions used about 0.75 GB and was ready in about 14 s; extrapolated to 25 functions, about 1.4 GB and about 30 s, so neither fallback (`LAZY` warm containers, a bigger machine) is needed. **The PO confirmed T2 (one Lambda per route) on 2026-11-12.** |

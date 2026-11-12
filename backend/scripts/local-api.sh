@@ -32,6 +32,22 @@ export SAM_CLI_BETA_NODEJS_MONOREPO=1
 arch=arm64
 [[ "$(uname -m)" == x86_64 ]] && arch=x86_64
 
+# On exit (Ctrl-C included), remove the Lambda containers sam local leaves running. It cleans up
+# its EAGER containers but not the extra ones it starts on a first request; they pile up with every
+# restart (step 44: 14 of 18 still running after Ctrl-C). Only containers SAM labels as Lambda
+# containers on this project's network: the emulators and other projects' containers are untouched.
+remove_lambda_containers() {
+  local ids
+  ids=$(docker ps -aq --filter label=sam.cli.container.type=lambda --filter network=hello-local) || return 0
+  if [[ -n "$ids" ]]; then
+    echo "Removing $(echo "$ids" | wc -l | tr -d ' ') Lambda container(s) left by sam local"
+    # One id per line; unquoted on purpose so that each becomes an argument (no xargs -r on macOS).
+    # shellcheck disable=SC2086
+    docker rm -f $ids > /dev/null || true
+  fi
+}
+trap remove_lambda_containers EXIT
+
 sam build --config-env local
 sam local start-api --config-env local \
   --parameter-overrides "AlertEmail=local@example.invalid FunctionArchitecture=$arch"

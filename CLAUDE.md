@@ -141,6 +141,12 @@ form works the same. Paths below without a folder are relative to `backend/`.
   `scripts/local-api.sh` does both.
 - After `npm run build -w backend`, restart `npm run local:api -w backend`: it is not certain that the warm
   containers pick up the rebuilt code on their own.
+- `sam local` (`warm_containers = "EAGER"`) starts extra Lambda containers besides its warm ones
+  and leaves them running when it stops. `local-api.sh` removes every container labelled
+  `sam.cli.container.type=lambda` on the `hello-local` network when it exits (Ctrl-C included); the
+  emulators are untouched. After a `kill -9` or a closed terminal, remove them by hand:
+  `docker rm -f $(docker ps -aq --filter label=sam.cli.container.type=lambda --filter network=hello-local)`.
+  Local weight with 10 functions (step 44): about 0.75 GB for the whole stack, ready in about 14 s.
 - Under `sam local`, every event carries the same fake `requestContext.requestId`, so
   identical request ids in local logs are expected. In the cloud they are unique.
 - cognito-local does not implement `AdminUserGlobalSignOut`. `env.local.json` sets
@@ -200,10 +206,16 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   - `src/handlers/`: one Lambda entry point per file.
   - `src/lib/`: back-end modules; the only place that touches the AWS SDK. `calendarDb.ts` is the
     only module that knows the `calendar` table's item layout and the calendar lock
-    (`withCalendarLock`); its configuration (`calendarConfig()`) is read once per container.
+    (`withCalendarLock`); its configuration (`calendarConfig()`) is read once per container. Its
+    locked writes take the rule check as a callback (`check`), run on the data read inside the
+    locked attempt. `calendarRules.ts`: the calendar's checks (`checkTypeName`, `checkTypeDelete`,
+    `typeNameKey`), pure, no AWS, "today" and "now" passed in; a failed check is `{ error }` with
+    a code of `ApiErrorCode`.
   - `src/handlers/`, calendar: `getCalendarSettings.ts`, `updateCalendarSettings.ts` (the pattern
-    the other calendar handlers copy: claims → configuration check → role → validate →
-    `calendarDb` → one log line).
+    the other calendar handlers copy: claims → configuration check → role → path → body →
+    `calendarDb` with the `calendarRules` check → one log line); availability types:
+    `listAvailabilityTypes.ts`, `createAvailabilityType.ts`, `renameAvailabilityType.ts`,
+    `deleteAvailabilityType.ts`.
   - `tests/unit/`: vitest unit tests, mirroring `src/` (e.g. `tests/unit/lib/http.test.ts`).
   - `tests/integration/`: end-to-end tests against the local Docker stack: `setup.ts` (helpers,
     including `resetCalendarTable()`, `putCalendarItem()`, `getCalendarItem()`), `journeys.test.ts`

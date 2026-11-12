@@ -60,7 +60,8 @@ stays at the root.
 │   ├── src/
 │   │   ├── handlers/            # one Lambda entry point per file
 │   │   └── lib/                 # the only place that touches the AWS SDK (calendarDb.ts:
-│   │                            # the calendar table's item layout and lock)
+│   │                            # the calendar table's item layout and lock; calendarRules.ts:
+│   │                            # the calendar's checks, pure, no AWS)
 │   ├── tests/
 │   │   ├── unit/                # mirrors src/
 │   │   └── integration/         # journeys against the local Docker stack
