@@ -49,10 +49,8 @@ beforeEach(async () => {
   vi.setSystemTime(new Date(NOW));
   ddb.reset();
   ddb.on(GetCommand).resolves({});
-  ddb.on(GetCommand, { Key: { PK: 'TYPE', SK: STUDIO } }).resolves({
-    Item: { PK: 'TYPE', SK: STUDIO, name: 'Studio', nameKey: 'studio', createdAt: NOW, updatedAt: NOW },
-  });
   ddb.on(QueryCommand).resolves({ Items: [] });
+  onPartition('TYPE', [{ PK: 'TYPE', SK: STUDIO, name: 'Studio', nameKey: 'studio', createdAt: NOW, updatedAt: NOW }]);
   ddb.on(TransactWriteCommand).resolves({});
   output = [];
   vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {

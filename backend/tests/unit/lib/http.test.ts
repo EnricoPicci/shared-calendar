@@ -23,6 +23,17 @@ describe('error', () => {
     expect(response.headers).toEqual({ 'content-type': 'application/json' });
     expect(JSON.parse(response.body as string)).toEqual({ error: 'user_exists', message: 'User already exists' });
   });
+
+  it('adds conflicts when given (availability_conflict), and only then', () => {
+    const conflicts = [{ appointmentId: '01JC0000000000000000000001', username: 'alice', start: '2026-11-16T08:00:00.000Z', end: '2026-11-16T09:00:00.000Z' }];
+    const response = error(409, 'availability_conflict', '1 appointment would fall outside the availability', conflicts);
+    expect(JSON.parse(response.body as string)).toEqual({
+      error: 'availability_conflict',
+      message: '1 appointment would fall outside the availability',
+      conflicts,
+    });
+    expect(JSON.parse(error(409, 'availability_overlap', 'x').body as string)).not.toHaveProperty('conflicts');
+  });
 });
 
 describe('parseJsonBody', () => {

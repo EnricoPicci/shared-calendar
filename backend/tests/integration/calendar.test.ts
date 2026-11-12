@@ -1,5 +1,5 @@
 import { ulid } from 'ulid';
-import { api, getCalendarItem, putCalendarItem, resetCalendarTable, signIn } from './setup';
+import { api, getCalendarItem, resetCalendarTable, signIn } from './setup';
 
 // The shared calendar's journeys (docs/SHARED_CALENDAR_SPEC.md 18.2), end to end through sam
 // local. Each route step adds its own. The calendar is global, so this file owns the local
@@ -93,9 +93,10 @@ describe('calendar settings (routes 1 and 2)', () => {
   });
 });
 
+// The ids the API gave each type, filled by the type journeys and used by the pattern journeys.
+const ids: Record<string, string> = {};
+
 describe('availability types (routes 3–6)', () => {
-  // Filled as the journeys go: the ids the API gave each type.
-  const ids: Record<string, string> = {};
   const listNames = async (token: string) => {
     const res = await api('GET', '/calendar/types', token);
     expect(res.status).toBe(200);
@@ -191,14 +192,116 @@ describe('availability types (routes 3–6)', () => {
     expect(await getCalendarItem('TYPE', typeId)).toBeUndefined();
     expect((await api('DELETE', `/calendar/types/${typeId}`, adminToken)).status).toBe(404);
   });
+});
 
-  it('AC-28: a type used by a weekly pattern is 409 type_in_use, and stays', async () => {
-    // Patterns have no route before plan step 45: the item is written directly, with only the
-    // attributes of spec 13.2 that the delete check reads.
-    await putCalendarItem({ PK: 'PATTERN', SK: ulid(), typeId: ids.Studio });
-    const res = await api('DELETE', `/calendar/types/${ids.Studio}`, adminToken);
+describe('weekly patterns (routes 7–10)', () => {
+  // The scenario's pattern (AC-04): Monday 08:00–12:00 at Studio from 2026-11-01, no end. A pattern
+  // may start in the past (A4), and no appointment exists before step 48, so fixed dates work.
+  const ac04 = () => ({ weekday: 1, start: '08:00', end: '12:00', typeId: ids.Studio, validFrom: '2026-11-01', validUntil: null });
+  const created: Record<string, string> = {};
+  const listed = async () => {
+    const res = await api('GET', '/calendar/patterns', adminToken);
+    expect(res.status).toBe(200);
+    return res.body?.patterns as { patternId: string; weekday: number; start: string; end: string }[];
+  };
+
+  it('starts with no pattern; a User can neither list nor create (403)', async () => {
+    expect(await listed()).toEqual([]);
+    expect((await api('GET', '/calendar/patterns', aliceToken)).status).toBe(403);
+    const post = await api('POST', '/calendar/patterns', aliceToken, ac04());
+    expect(post.status).toBe(403);
+    expect(post.body).toMatchObject({ error: 'forbidden' });
+  });
+
+  it('creates the AC-04 pattern (201), stored with every field of 13.2', async () => {
+    const res = await api('POST', '/calendar/patterns', adminToken, ac04());
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ patternId: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/), ...ac04(), createdAt: expect.any(String), updatedAt: expect.any(String) });
+    created.ac04 = res.body?.patternId as string;
+    expect(await getCalendarItem('PATTERN', created.ac04)).toEqual({
+      PK: 'PATTERN',
+      SK: created.ac04,
+      ...ac04(),
+      createdAt: res.body?.createdAt,
+      updatedAt: res.body?.updatedAt,
+    });
+  });
+
+  it('AC-05: Mon 11:00–13:00 at the other type, same validity, is 409 availability_overlap', async () => {
+    const res = await api('POST', '/calendar/patterns', adminToken, { ...ac04(), start: '11:00', end: '13:00', typeId: ids.pool });
     expect(res.status).toBe(409);
-    expect(res.body).toMatchObject({ error: 'type_in_use' });
-    expect(await getCalendarItem('TYPE', ids.Studio!)).toMatchObject({ name: 'Studio' });
+    expect(res.body).toEqual({
+      error: 'availability_overlap',
+      message: 'On 2026-11-02 the window 11:00–13:00 would overlap the window 08:00–12:00',
+    });
+    expect(await listed()).toHaveLength(1);
+  });
+
+  it('allows a touching window, and lists by weekday, then start', async () => {
+    for (const [name, body] of [
+      ['touching', { ...ac04(), start: '12:00', end: '13:00', typeId: ids.pool }],
+      ['tuesday', { ...ac04(), weekday: 2, start: '09:00', end: '10:00' }],
+      ['early', { ...ac04(), start: '07:00', end: '08:00', typeId: ids.pool }],
+    ] as const) {
+      const res = await api('POST', '/calendar/patterns', adminToken, body);
+      expect(res.status).toBe(201);
+      created[name] = res.body?.patternId as string;
+    }
+    expect((await listed()).map((p) => p.patternId)).toEqual([created.early, created.ac04, created.touching, created.tuesday]);
+  });
+
+  it('an unknown typeId in the body is 409 type_not_found', async () => {
+    const res = await api('POST', '/calendar/patterns', adminToken, { ...ac04(), weekday: 3, typeId: ulid() });
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ error: 'type_not_found' });
+  });
+
+  it('updates as a full replacement (200, createdAt kept); a field left out is 400; an overlap is 409', async () => {
+    const before = await getCalendarItem('PATTERN', created.touching!);
+    const res = await api('PUT', `/calendar/patterns/${created.touching}`, adminToken, { ...ac04(), start: '12:00', end: '14:00', validUntil: '2026-12-31' });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ patternId: created.touching, start: '12:00', end: '14:00', typeId: ids.Studio, validUntil: '2026-12-31' });
+    expect(res.body?.createdAt).toBe(before?.createdAt);
+
+    // Every field is required: one left out is refused, never "kept" from the stored pattern.
+    const missing: Record<string, unknown> = { ...ac04(), start: '12:00', end: '14:00' };
+    delete missing.validUntil;
+    const partial = await api('PUT', `/calendar/patterns/${created.touching}`, adminToken, missing);
+    expect(partial.status).toBe(400);
+    expect(partial.body).toMatchObject({ error: 'invalid_request' });
+
+    const clash = await api('PUT', `/calendar/patterns/${created.touching}`, adminToken, { ...ac04(), start: '11:30', end: '14:00' });
+    expect(clash.status).toBe(409);
+    expect(clash.body).toMatchObject({ error: 'availability_overlap' });
+    expect(await getCalendarItem('PATTERN', created.touching!)).toMatchObject({ start: '12:00', end: '14:00', validUntil: '2026-12-31' });
+  });
+
+  it('an unknown pattern id is 404 pattern_not_found; a malformed one is 400', async () => {
+    const unknown = ulid();
+    for (const res of [
+      await api('PUT', `/calendar/patterns/${unknown}`, adminToken, ac04()),
+      await api('DELETE', `/calendar/patterns/${unknown}`, adminToken),
+    ]) {
+      expect(res.status).toBe(404);
+      expect(res.body).toMatchObject({ error: 'pattern_not_found' });
+    }
+    expect((await api('DELETE', '/calendar/patterns/not-a-ulid', adminToken)).status).toBe(400);
+  });
+
+  it('AC-28: a type used by patterns is 409 type_in_use; once they are deleted (204) the type deletes (204)', async () => {
+    const inUse = await api('DELETE', `/calendar/types/${ids.Studio}`, adminToken);
+    expect(inUse.status).toBe(409);
+    expect(inUse.body).toMatchObject({ error: 'type_in_use' });
+
+    for (const name of ['ac04', 'touching', 'tuesday']) {
+      const res = await api('DELETE', `/calendar/patterns/${created[name]}`, adminToken);
+      expect(res.status).toBe(204);
+      expect(res.body).toBeUndefined();
+    }
+    expect((await listed()).map((p) => p.patternId)).toEqual([created.early]);
+
+    const gone = await api('DELETE', `/calendar/types/${ids.Studio}`, adminToken);
+    expect(gone.status).toBe(204);
+    expect(await getCalendarItem('TYPE', ids.Studio!)).toBeUndefined();
   });
 });

@@ -21,7 +21,7 @@
 | v9 | 2026-11-04 | **v1 implemented.** Plan step 12: the stack is deployed and smoke-tested, the README exists, the status line says so. Wording aligned with what was built: region `eu-north-1` in the overview (section 2), `npm run` commands and the real template size in 6.1 and 9.1, the logger of section 11, sections 1 and 15 in the past tense. A browser front end is now planned (section 14, assumption 6); section 12 points to the target monorepo layout (`docs/FOLDER_STRUCTURE.md`), which a later step applies. |
 | v10 | 2026-11-04 | **Monorepo layout** (plan step 20). The back end moves to `backend/`; the API contract (response and error body types, error codes, `Role` and `resolveRole`) and the username rule move to `shared/`, which the back end imports and bundles; `frontend/` is reserved. Section 12 is replaced by a pointer to `docs/FOLDER_STRUCTURE.md`; paths in this document are relative to `backend/`. No change to behaviour, contract, resources or IAM. The build runs esbuild inside `backend/` with SAM's beta support for npm workspaces (section 9.1). |
 | v11 | 2026-11-05 | Section 8, note on Cognito emulation: two sign-in differences of cognito-local found by the front end's `LoginService` integration test (`InvalidPasswordException` for a wrong password; 24-hour access tokens without `ExpiresIn`). Documentation only; the back end is unchanged. |
-| v12 | 2026-11-12 (open) | **Shared calendar (F5), in progress.** The shared calendar (F5) is being implemented in plan steps 41–56; a calendar matter that the architecture does not yet describe is governed by `docs/SHARED_CALENDAR_SPEC.md`; whatever the architecture already describes, including everything Hello World does, is governed by the architecture. Each plan step merges the part of spec section 19 it implements and adds its sentence here; step 56 closes v12. **Step 41:** the calendar's time model in `shared/src/calendar/` (time helpers with `Intl` only, primitive schemas, default settings and limits; `docs/FOLDER_STRUCTURE.md`); no route, resource or behaviour of the API changes. **Step 42:** the calendar's shared contract and rules: in `shared/src/api.ts` the 20 calendar error codes of spec 11.3, the optional `conflicts` field of the error body, `UserSummary` and `ListUsersResponse`; in `shared/src/calendar/` the response types (`types.ts`), the request bodies and path and query parameters (`schemas.ts`) and the pure rules (`rules.ts`: defined and effective windows, slots, overlap, the local-time grids, `cancellableUntil`); no route, resource or behaviour of the API changes, and no handler answers the new error codes yet (section 4 lists each route's codes in the step that adds the route). **Step 43:** the first calendar slice: the DynamoDB table `calendar` (section 5.3) with the calendar lock, the parameter `CalendarTimeZone`, and the routes `GET` and `PUT /calendar/settings` (sections 3 and 4) with their two functions (section 2); the calendar's DynamoDB permissions are written once as shared managed policies attached to each calendar function's own role (section 7.1); capacity 11/11 in total (section 10). **Step 44:** availability types, routes `GET` and `POST /calendar/types`, `PUT` and `DELETE /calendar/types/{typeId}` (sections 3 and 4, with the `AvailabilityType` shape, case-insensitive uniqueness by `nameKey` and the order of the list), with their four functions (section 2); the `TYPE` item and the reads the delete check needs (section 5.3); the third shared policy, `CalendarDeletePolicy` (section 7.1). Open point O2 (template size, spec section 22) checked: one function block is 64 lines, the template is estimated at about 2 060 lines when complete (about +1 500, the spec estimated +1 450), and the local stack is light (about 1.4 GB and 30 s at 25 functions, extrapolated from 10); the PO confirmed T2, one function per route (section 2.1), on 2026-11-12. |
+| v12 | 2026-11-12 (open) | **Shared calendar (F5), in progress.** The shared calendar (F5) is being implemented in plan steps 41–56; a calendar matter that the architecture does not yet describe is governed by `docs/SHARED_CALENDAR_SPEC.md`; whatever the architecture already describes, including everything Hello World does, is governed by the architecture. Each plan step merges the part of spec section 19 it implements and adds its sentence here; step 56 closes v12. **Step 41:** the calendar's time model in `shared/src/calendar/` (time helpers with `Intl` only, primitive schemas, default settings and limits; `docs/FOLDER_STRUCTURE.md`); no route, resource or behaviour of the API changes. **Step 42:** the calendar's shared contract and rules: in `shared/src/api.ts` the 20 calendar error codes of spec 11.3, the optional `conflicts` field of the error body, `UserSummary` and `ListUsersResponse`; in `shared/src/calendar/` the response types (`types.ts`), the request bodies and path and query parameters (`schemas.ts`) and the pure rules (`rules.ts`: defined and effective windows, slots, overlap, the local-time grids, `cancellableUntil`); no route, resource or behaviour of the API changes, and no handler answers the new error codes yet (section 4 lists each route's codes in the step that adds the route). **Step 43:** the first calendar slice: the DynamoDB table `calendar` (section 5.3) with the calendar lock, the parameter `CalendarTimeZone`, and the routes `GET` and `PUT /calendar/settings` (sections 3 and 4) with their two functions (section 2); the calendar's DynamoDB permissions are written once as shared managed policies attached to each calendar function's own role (section 7.1); capacity 11/11 in total (section 10). **Step 44:** availability types, routes `GET` and `POST /calendar/types`, `PUT` and `DELETE /calendar/types/{typeId}` (sections 3 and 4, with the `AvailabilityType` shape, case-insensitive uniqueness by `nameKey` and the order of the list), with their four functions (section 2); the `TYPE` item and the reads the delete check needs (section 5.3); the third shared policy, `CalendarDeletePolicy` (section 7.1). Open point O2 (template size, spec section 22) checked: one function block is 64 lines, the template is estimated at about 2 060 lines when complete (about +1 500, the spec estimated +1 450), and the local stack is light (about 1.4 GB and 30 s at 25 functions, extrapolated from 10); the PO confirmed T2, one function per route (section 2.1), on 2026-11-12. **Step 45:** weekly patterns, routes `GET` and `POST /calendar/patterns`, `PUT` and `DELETE /calendar/patterns/{patternId}`, all admin only (sections 3 and 4, with the `WeeklyPattern` shape, the order of the list, the checks of every availability write and the `conflicts` field of the error body), with their four functions (section 2); the `PATTERN` item and the availability state that every such check reads under the lock (section 5.3); the diagram "edit availability when appointments exist" (section 6.6); the roles of the four functions (section 7.1). Overlaps are compared as local times, and two patterns overlap only if they share a date (spec v6, R-AV-01). |
 
 ---
 
@@ -81,7 +81,7 @@ flowchart LR
         CU[Lambda<br/>createUser]
         DU[Lambda<br/>deleteUser]
         HW[Lambda<br/>hello]
-        CAL[Lambdas<br/>calendar settings: get, update<br/>availability types: list,<br/>create, rename, delete]
+        CAL[Lambdas<br/>calendar settings: get, update<br/>availability types: list,<br/>create, rename, delete<br/>weekly patterns: list,<br/>create, update, delete]
         DB[(DynamoDB<br/>Messages table)]
         CDB[(DynamoDB<br/>calendar table)]
         CW[CloudWatch Logs]
@@ -92,7 +92,7 @@ flowchart LR
     COG -- "2. JWT access token" --> A
     COG -- "2. JWT access token" --> U
 
-    A -- "3. POST/DELETE /users, POST /hello, GET/PUT /calendar/settings, GET/POST/PUT/DELETE /calendar/types  (Bearer JWT)" --> GW
+    A -- "3. POST/DELETE /users, POST /hello, GET/PUT /calendar/settings, GET/POST/PUT/DELETE /calendar/types, GET/POST/PUT/DELETE /calendar/patterns  (Bearer JWT)" --> GW
     U -- "3. POST /hello, GET /calendar/settings, GET /calendar/types  (Bearer JWT)" --> GW
     GW -- "verify token" --> AUTH
     AUTH -- "fetch signing keys (cached)" --> COG
@@ -112,7 +112,7 @@ flowchart LR
 |---|---|---|
 | **API Gateway HTTP API** | Public HTTPS entry point, routing, throttling, TLS | HTTP API (not REST API) is ~70 % cheaper and simpler; supports Lambda authorizers |
 | **Lambda authorizer** | Verifies the Cognito JWT signature/expiry and injects identity into the request | API Gateway also has a built-in JWT authorizer with zero code, **but it cannot run locally**. A tiny Lambda authorizer behaves identically on the laptop and in the cloud (N5). |
-| **Lambda functions** (`hello`, `createUser`, `deleteUser`; calendar: `getCalendarSettings`, `updateCalendarSettings`, `listAvailabilityTypes`, `createAvailabilityType`, `renameAvailabilityType`, `deleteAvailabilityType`) | Business logic, one function per route | One route = one function = one least-privilege IAM role. Easy to read, easy to secure. |
+| **Lambda functions** (`hello`, `createUser`, `deleteUser`; calendar: `getCalendarSettings`, `updateCalendarSettings`, `listAvailabilityTypes`, `createAvailabilityType`, `renameAvailabilityType`, `deleteAvailabilityType`, `listPatterns`, `createPattern`, `updatePattern`, `deletePattern`) | Business logic, one function per route | One route = one function = one least-privilege IAM role. Easy to read, easy to secure. |
 | **Cognito user pool** | User directory, passwords, sign-in, groups (= roles), token issuing | We never store or hash a password ourselves. Roles are group memberships that only an administrator (or the deployment) can change. Password change/reset exist in Cognito already, ready for a later version. |
 | **DynamoDB** | Stores Hello World messages (`hello-messages`) and the shared calendar (`calendar`, section 5.3) | Serverless, zero idle cost, always-free tier, browsable in the AWS console and locally with a web UI |
 | **CloudWatch Logs** | Structured logs per function | Free tier 5 GB/month; retention set to 14 days to keep it free |
@@ -126,7 +126,7 @@ Roles are **Cognito groups**. A user's roles arrive inside the JWT as the claim 
 
 | Role | Cognito group | Can call | Hello World message |
 |---|---|---|---|
-| Administrator | `admin` | `POST /users`, `DELETE /users/{username}`, `POST /hello`, `GET` and `PUT /calendar/settings`, `GET` and `POST /calendar/types`, `PUT` and `DELETE /calendar/types/{typeId}` | `Hello World, the Administrator is speaking` |
+| Administrator | `admin` | `POST /users`, `DELETE /users/{username}`, `POST /hello`, `GET` and `PUT /calendar/settings`, `GET` and `POST /calendar/types`, `PUT` and `DELETE /calendar/types/{typeId}`, `GET` and `POST /calendar/patterns`, `PUT` and `DELETE /calendar/patterns/{patternId}` | `Hello World, the Administrator is speaking` |
 | User | `user` | `POST /hello`, `GET /calendar/settings`, `GET /calendar/types` | `Hello World, I am <UserName>` |
 
 Rules
@@ -134,7 +134,7 @@ Rules
 - Self sign-up is **disabled** in the user pool. Only `AdminCreateUser` (from the `createUser` Lambda or from the deployment) creates accounts.
 - The one Administrator account is created by the deployment (section 6.1). The API cannot create additional administrators and cannot delete members of the `admin` group — this keeps the admin role out of reach of the API surface.
 - **Role resolution.** Cognito groups are not mutually exclusive: an account can belong to `admin`, to `user`, to both, or to neither, and the token lists every membership in the `cognito:groups` array. The code must therefore define the outcome for all four combinations, not only the two normal ones. Two checks use the groups:
-  - *Admin endpoints* (`POST /users`, `DELETE /users/{username}`, `PUT /calendar/settings`, `POST /calendar/types`, `PUT` and `DELETE /calendar/types/{typeId}`) ask a yes/no question: is `admin` in the list? Membership of `user` is irrelevant.
+  - *Admin endpoints* (`POST /users`, `DELETE /users/{username}`, `PUT /calendar/settings`, `POST /calendar/types`, `PUT` and `DELETE /calendar/types/{typeId}`, all four `/calendar/patterns` routes) ask a yes/no question: is `admin` in the list? Membership of `user` is irrelevant.
   - *Routes open to both roles* (`GET /calendar/settings`, `GET /calendar/types`) accept `admin` or `user` and answer 403 to a token in neither group.
   - *Hello World* must choose exactly one message, so it applies a precedence rule, **admin wins**: if `admin` is present the Administrator message is produced, even if `user` is also present; if only `user` is present the User message is produced; if neither is present the call is rejected with 403.
 
@@ -175,10 +175,21 @@ Base URL: `https://<api-id>.execute-api.<region>.amazonaws.com` (cloud) or `http
 | `POST /calendar/types` | admin | `TypeBody`: `{ "name" }`, 1–40 characters after trimming (UTF-16 code units), no control characters, no other field | `201` `AvailabilityType` | 400 `invalid_json` / `invalid_request` · 401 missing token · 403 invalid token or not admin (`forbidden`) · 409 `type_name_exists` (the name exists, compared case-insensitively), `limit_reached` (20 types exist), `concurrent_update` · 500 `internal_error` |
 | `PUT /calendar/types/{typeId}` | admin | `TypeBody` as above | `200` `AvailabilityType` | 400 `invalid_json` / `invalid_request` (also a `typeId` that is not a ULID) · 401 missing token · 403 invalid token or not admin (`forbidden`) · 404 `type_not_found` · 409 `type_name_exists` (another type's name), `concurrent_update` · 500 `internal_error` |
 | `DELETE /calendar/types/{typeId}` | admin | *(none)* | `204` | 400 `invalid_request` (a `typeId` that is not a ULID) · 401 missing token · 403 invalid token or not admin (`forbidden`) · 404 `type_not_found` · 409 `type_in_use`, `concurrent_update` · 500 `internal_error` |
+| `GET /calendar/patterns` | admin | *(none)* | `200` `{ "patterns": WeeklyPattern[] }`, by weekday, then start | 401 missing token · 403 invalid token or not admin (`forbidden`) · 500 `internal_error` |
+| `POST /calendar/patterns` | admin | `PatternBody`: `{ weekday, start, end, typeId, validFrom, validUntil }`, all required (`validUntil` may be `null`), no other field; `weekday` 1 (Monday)–7, `start`/`end` local `HH:mm` on the 15-minute grid with `start < end` (`end` may be `24:00`), `validFrom`/`validUntil` local dates with `validFrom ≤ validUntil` | `201` `WeeklyPattern` | 400 `invalid_json` / `invalid_request` · 401 missing token · 403 invalid token or not admin (`forbidden`) · 409 `type_not_found` (the body's `typeId`), `limit_reached` (50 patterns exist), `availability_overlap`, `availability_conflict` (with `conflicts`), `concurrent_update` · 500 `internal_error` |
+| `PUT /calendar/patterns/{patternId}` | admin | `PatternBody` as above: a full replacement, nothing is kept from the stored pattern but its id and `createdAt` | `200` `WeeklyPattern` | 400 `invalid_json` / `invalid_request` (also a `patternId` that is not a ULID) · 401 missing token · 403 invalid token or not admin (`forbidden`) · 404 `pattern_not_found` · 409 `type_not_found`, `availability_overlap`, `availability_conflict` (with `conflicts`), `concurrent_update` · 500 `internal_error` |
+| `DELETE /calendar/patterns/{patternId}` | admin | *(none)* | `204` | 400 `invalid_request` (a `patternId` that is not a ULID) · 401 missing token · 403 invalid token or not admin (`forbidden`) · 404 `pattern_not_found` · 409 `availability_conflict` (with `conflicts`), `concurrent_update` · 500 `internal_error` |
 
 `CalendarSettings` (types in `shared/src/calendar/types.ts`): `{ timeZone, cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser, updatedAt, updatedBy }`. `timeZone` is the deployment parameter `CalendarTimeZone`, read-only. Until the Administrator first saves, `GET` answers the defaults (24, 0, 56, `null`) with `updatedAt: null` and `updatedBy: null`; a save sets `updatedAt` to the time of the request and `updatedBy` to `{ username, role }` of the caller. `409 concurrent_update` means the calendar lock (section 5.3) was busy three times in a row; the client may retry. An invalid `CalendarTimeZone` makes every calendar request answer `500 internal_error`, whatever the caller's role.
 
 `AvailabilityType` (spec 6.1): `{ typeId, name, createdAt, updatedAt }`. `typeId` is a ULID generated by the server; `name` is stored trimmed. Names are unique **case-insensitively**: they are compared by `nameKey`, the trimmed name lower-cased with JavaScript's `toLowerCase()` (no locale and no further Unicode case folding, so `Straße` and `STRASSE` count as different names). A rename may keep the type's own name or change only its case. `GET /calendar/types` sorts by the same `nameKey`, comparing UTF-16 code units, so `alpha` comes before `Beta`. At most 20 types exist at the same time. A rename shows everywhere at once. `DELETE` answers `409 type_in_use` while the type is referred to by any weekly pattern (whatever its validity), by an override or one-off window dated today or later in the calendar's time zone, or by a booked appointment that has not ended (spec R-TYPE-03); past references do not block. A `typeId` in the path that does not exist is `404 type_not_found`; as a reference inside a request body (later routes) it is `409 type_not_found`.
+
+`WeeklyPattern` (spec 6.2): `{ patternId, weekday, start, end, typeId, validFrom, validUntil, createdAt, updatedAt }`. A pattern gives one window on every date with its weekday from `validFrom` to `validUntil` inclusive (`null`: no end), except on a date with an override (plan step 47). `validFrom` may lie in the past. At most 50 patterns exist at the same time. Every write of availability is checked under the calendar lock (section 5.3) against the calendar **as it would be after the write**, in this order:
+
+1. `409 type_not_found` if the body names a type that does not exist;
+2. `409 limit_reached` for a 51st pattern;
+3. `409 availability_overlap` if two windows of one date would overlap (spec R-AV-01, R-AV-02). Windows are compared as the **local times** the Administrator typed, so the check does not depend on daylight saving. A pattern is compared with every other pattern of the same weekday that shares at least one date with it, past dates included, and with the one-off windows dated today or later on the dates it applies to. Touching windows (`12:00` end, `12:00` start) do not overlap. The `message` names the first date of the overlap and both windows, e.g. `On 2026-11-02 the window 11:00–13:00 would overlap the window 08:00–12:00`;
+4. `409 availability_conflict` if a booked appointment that has not ended (one in progress included) would no longer lie entirely inside one window **of its own type** on the dates the write changes (spec R-AV-03, R-AV-04). Adjacent windows of one type count as one. Extending a window never conflicts; changing its type, shrinking it under an appointment, moving it or deleting it does. The body lists the appointments, by start, in `conflicts`: `[{ appointmentId, username, start, end }]`. The `message` only counts them (`2 appointments would fall outside the availability`). Only the Administrator can write availability, so only the Administrator ever receives `conflicts`; it is never logged.
 
 `POST /hello` response examples
 
@@ -191,7 +202,7 @@ Conventions
 
 - `username`: `^[a-z0-9][a-z0-9._-]{2,31}$` (3–32 chars, lowercase). Validated with `zod` before anything else runs.
 - `password` in the `POST /users` response is **permanent** and shown **only in this response**. It is generated server-side (16 random characters satisfying the pool policy), never logged, and the Administrator hands it to the user out of band.
-- Error body: `{ "error": "<short code>", "message": "<human text>" }`. Never leaks stack traces or AWS error details.
+- Error body: `{ "error": "<short code>", "message": "<human text>" }`. Never leaks stack traces or AWS error details. With `availability_conflict` only, it also carries `conflicts` (see `WeeklyPattern` above).
 - Token errors are answered by API Gateway before any handler runs: **401** when the `Authorization` header is missing, **403** when the token is invalid or expired (the HTTP API's fixed answer when the Lambda authorizer denies). Their body is API Gateway's own `{ "message": "…" }`, not the shape above. Handlers answer 403 for a valid token with the wrong role.
 - One exception is not the caller's fault: if the authorizer cannot download Cognito's signing keys (network error, time-out, error status), it fails instead of denying. API Gateway then answers **500** with its own `{ "message": "Internal Server Error" }`, and the authorizer `Errors` alarm fires (section 11). A 403 here would hide an outage behind what looks like a bad token.
 - `POST /hello` is a POST (not GET) because it **creates** a record.
@@ -244,9 +255,10 @@ Items so far (the other kinds of `docs/SHARED_CALENDAR_SPEC.md` 13.2 arrive with
 |---|---|---|---|
 | Calendar lock | `LOCK` | `LOCK` | `version` (N) |
 | Settings | `SETTINGS` | `SETTINGS` | `cancellationNoticeHours`, `minBookingNoticeHours`, `bookingHorizonDays`, `maxFutureAppointmentsPerUser`, `updatedAt`, `updatedBy` (`{ username, role }`) |
+| Weekly pattern | `PATTERN` | `<patternId>` | `weekday`, `start`, `end`, `typeId`, `validFrom`, `validUntil` (`null`: no end), `createdAt`, `updatedAt`. The id is the `SK` only. Create and update write the whole item (`Put`); delete removes it. |
 | Availability type | `TYPE` | `<typeId>` | `name`, `nameKey` (the name lower-cased, for uniqueness and order), `createdAt`, `updatedAt`. The id is the `SK` only. Create and rename write the whole item (`Put`); delete removes it. |
 
-Reads so far, every one strongly consistent and following `LastEvaluatedKey` to the last page: `GetItem` of the lock, the settings and one type; `Query PK = TYPE` (all types). Deleting a type also reads what may refer to it (spec 13.2 access patterns): `Query PK = PATTERN` (every pattern), `PK = OVERRIDE` and `PK = WINDOW` with `SK ≥ today` (a window's `SK` is `<date>#<windowId>`), and `PK = APPT` with `SK ≥ now − 24 h` (an appointment lasts at most a day), keeping in code the booked ones with `end > now`. Those partitions stay empty until their routes exist (plan steps 45–48), but the delete check is complete from the start.
+Reads so far, every one strongly consistent and following `LastEvaluatedKey` to the last page: `GetItem` of the lock and the settings; `Query PK = TYPE` (all types, for the list and for create and rename) and `PK = PATTERN` (all patterns, for the list). Every write that compares itself with the rest of the calendar (deleting a type; creating, updating or deleting a pattern) reads the **availability state** inside the locked attempt, five queries (spec 13.2 access patterns): `PK = TYPE` and `PK = PATTERN` whole; `PK = OVERRIDE` and `PK = WINDOW` with `SK ≥ today` (a window's `SK` is `<date>#<windowId>`); `PK = APPT` with `SK ≥ now − 24 h` (an appointment lasts at most a day, inside one date, so every one that has not ended is found), keeping in code the booked ones with `end > now`. The override, window and appointment partitions stay empty until their routes exist (plan steps 47–48), but the checks are complete from the start.
 
 No item is seeded: until the first save, the settings are the defaults of `shared/src/calendar/defaults.ts`. The time zone is not stored; it is the parameter `CalendarTimeZone`, which must not change once the table holds data.
 
@@ -410,6 +422,43 @@ sequenceDiagram
     end
 ```
 
+### 6.6 Edit availability when appointments exist (calendar, plan step 45)
+
+Every availability write (here: changing a weekly pattern; overrides and one-off windows follow the same path from plan step 47) is checked against the whole calendar, under the calendar lock, as it would be after the write.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor A as Administrator
+    participant GW as API Gateway + authorizer
+    participant L as Lambda updatePattern
+    participant DB as DynamoDB calendar
+
+    A->>GW: PUT /calendar/patterns/{patternId} {weekday, start, end, typeId, validFrom, validUntil}
+    GW->>L: request + {sub, username, groups}
+    L->>L: admin? body valid (PatternBody)? now, today (calendar zone)
+    loop at most 3 attempts (calendar lock, section 5.3)
+        L->>DB: GetItem LOCK (consistent) → version v
+        L->>DB: Query TYPE, PATTERN, OVERRIDE ≥ today, WINDOW ≥ today, APPT ≥ now − 24 h (consistent)
+        L->>L: pattern exists? type exists? calendar after the write: overlap (local times)? every booked appointment not yet ended still inside a window of its type?
+        alt pattern missing
+            L-->>A: 404 pattern_not_found (nothing written)
+        else overlap
+            L-->>A: 409 availability_overlap "On <date> the window … would overlap the window …"
+        else appointments left outside
+            L-->>A: 409 availability_conflict {conflicts: [{appointmentId, username, start, end}]}
+        else all checks pass
+            L->>DB: TransactWriteItems [Update LOCK v→v+1 if version = v, Put PATTERN]
+            alt lock taken by another write
+                L->>L: wait 50–150 ms, start again (after 3 attempts: 409 concurrent_update)
+            else written
+                L-->>A: 200 WeeklyPattern
+            end
+        end
+    end
+    Note over L: one log line: patternId, lockAttempts, outcome, conflictCount; never the body or the conflicts
+```
+
 ---
 
 ## 7. Security design
@@ -423,7 +472,7 @@ sequenceDiagram
 | Authorization | Role check against `cognito:groups` **inside each handler** (defence in depth: the authorizer proves *who*, the handler decides *what*) | `hello`, `createUser`, `deleteUser` |
 | Account hygiene | Self sign-up disabled; password policy 12+ chars with symbols; passwords generated server-side with `crypto.randomInt`, returned exactly once, never logged; Cognito built-in lockout after repeated failed sign-ins | user pool, `createUser` |
 | Privilege boundary | API can never create an admin, delete an admin, or set an admin's password | `createUser` always assigns `user`; `deleteUser` refuses admins; admin password only via bootstrap script |
-| Least privilege IAM | Each Lambda has its own role with only the actions it needs, scoped to the one pool/table: `hello` → `dynamodb:PutItem`; `createUser` → `AdminCreateUser`, `AdminSetUserPassword`, `AdminAddUserToGroup`, `AdminDeleteUser` (rollback only); `deleteUser` → `AdminListGroupsForUser`, `AdminUserGlobalSignOut`, `AdminDeleteUser`; authorizer → none. **Calendar functions:** the DynamoDB permissions on `calendar` are written once, as shared customer-managed policies (`AWS::IAM::ManagedPolicy`, resource: the `calendar` table's ARN only, no wildcard): `CalendarReadPolicy` (`GetItem`, `Query`), `CalendarWritePolicy` (`PutItem`, `UpdateItem`; transactions are authorized by the actions of their parts) and `CalendarDeletePolicy` (`DeleteItem`, `UpdateItem`: a delete is a transaction that also moves the lock on). Each calendar role lists the policies its route needs: `getCalendarSettings`, `listAvailabilityTypes` → read; `updateCalendarSettings`, `createAvailabilityType`, `renameAvailabilityType` → read + write; `deleteAvailabilityType` → read + delete. A managed policy is a reusable list of permissions, not an identity: every function keeps its own role, with its inline `write-own-logs` statement naming its own log group. The price: a read route may get one read action it does not call (`getCalendarSettings` never queries, `listAvailabilityTypes` never uses `GetItem`), which exposes nothing a `GetItem` on the table does not already allow. | `template.yaml` |
+| Least privilege IAM | Each Lambda has its own role with only the actions it needs, scoped to the one pool/table: `hello` → `dynamodb:PutItem`; `createUser` → `AdminCreateUser`, `AdminSetUserPassword`, `AdminAddUserToGroup`, `AdminDeleteUser` (rollback only); `deleteUser` → `AdminListGroupsForUser`, `AdminUserGlobalSignOut`, `AdminDeleteUser`; authorizer → none. **Calendar functions:** the DynamoDB permissions on `calendar` are written once, as shared customer-managed policies (`AWS::IAM::ManagedPolicy`, resource: the `calendar` table's ARN only, no wildcard): `CalendarReadPolicy` (`GetItem`, `Query`), `CalendarWritePolicy` (`PutItem`, `UpdateItem`; transactions are authorized by the actions of their parts) and `CalendarDeletePolicy` (`DeleteItem`, `UpdateItem`: a delete is a transaction that also moves the lock on). Each calendar role lists the policies its route needs: `getCalendarSettings`, `listAvailabilityTypes`, `listPatterns` → read; `updateCalendarSettings`, `createAvailabilityType`, `renameAvailabilityType`, `createPattern`, `updatePattern` → read + write; `deleteAvailabilityType`, `deletePattern` → read + delete. A managed policy is a reusable list of permissions, not an identity: every function keeps its own role, with its inline `write-own-logs` statement naming its own log group. The price: a read route may get one read action it does not call (`getCalendarSettings` never queries, `listAvailabilityTypes` and `listPatterns` never use `GetItem`), which exposes nothing a `GetItem` on the table does not already allow. | `template.yaml` |
 | No secrets | There is no secret anywhere: Lambdas use IAM roles, JWT verification uses public keys. Nothing to rotate or leak | — |
 | Input validation | `zod` schemas on body and path; unknown fields rejected; errors never echo AWS internals | handlers |
 | Abuse / cost protection | API stage throttling 5 req/s, burst 10 (plenty for 10 users, blocks brute force and bill surprises); AWS Budget alarm at 1 USD | `template.yaml`; budget by `scripts/budget.sh` |

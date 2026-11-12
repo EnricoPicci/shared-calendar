@@ -99,6 +99,11 @@ describe('calendarConfig', () => {
     await expect(broken.createType({ typeId: 'T', name: 'n', nameKey: 'n' }, NOW, pass)).rejects.toThrow(broken.CalendarConfigError);
     await expect(broken.renameType('T', { name: 'n', nameKey: 'n' }, NOW, pass)).rejects.toThrow(broken.CalendarConfigError);
     await expect(broken.deleteType('T', '2026-11-12', NOW, pass)).rejects.toThrow(broken.CalendarConfigError);
+    await expect(broken.listPatterns()).rejects.toThrow(broken.CalendarConfigError);
+    const p = { patternId: 'P', weekday: 1, start: '08:00', end: '09:00', typeId: 'T', validFrom: '2026-11-01', validUntil: null };
+    await expect(broken.createPattern(p, '2026-11-12', NOW, pass)).rejects.toThrow(broken.CalendarConfigError);
+    await expect(broken.updatePattern(p, '2026-11-12', NOW, pass)).rejects.toThrow(broken.CalendarConfigError);
+    await expect(broken.deletePattern('P', '2026-11-12', NOW, pass)).rejects.toThrow(broken.CalendarConfigError);
     expect(ddb.calls()).toHaveLength(0);
   });
 });
@@ -517,46 +522,41 @@ describe('renameType', () => {
   });
 });
 
-describe('deleteType', () => {
+// The availability state every check of a locked attempt reads (deleteType, the pattern writes).
+describe('the state read inside a locked attempt', () => {
   // 23:30 UTC is already the next day in Europe/Rome (UTC+1 in November): "today" is the local date.
   const LATE = '2026-11-16T23:30:00.000Z';
   const TODAY = localDateOf(LATE, 'Europe/Rome');
-  const noRefs = { patterns: [], overrides: [], windows: [], appointments: [] };
 
   beforeEach(() => {
-    ddb.on(GetCommand, { Key: { PK: 'TYPE', SK: STUDIO } }).resolves({ Item: typeItem(STUDIO, 'Studio') });
+    onTypes(typeItem(STUDIO, 'Studio'));
   });
 
   it('computes today in the calendar zone across midnight UTC', () => {
     expect(TODAY).toBe('2026-11-17');
   });
 
-  it('reads the type, then what refers to it from today and from now − 24 h, then deletes it', async () => {
-    const check = vi.fn(() => null);
-    const locked = await db.deleteType(STUDIO, TODAY, LATE, check);
-    expect(locked).toEqual({ result: { ok: true, value: null }, attempts: 1 });
+  it('runs five consistent queries: types and patterns whole, overrides and windows from today, appointments from now − 24 h', async () => {
+    await db.deleteType(STUDIO, TODAY, LATE, () => null);
     expect(ddb.commandCalls(GetCommand).map((call) => call.args[0].input)).toEqual([
       { TableName: TABLE, Key: { PK: 'LOCK', SK: 'LOCK' }, ConsistentRead: true },
-      { TableName: TABLE, Key: { PK: 'TYPE', SK: STUDIO }, ConsistentRead: true },
     ]);
     expect(queries()).toEqual([
+      partitionQuery('TYPE'),
       partitionQuery('PATTERN'),
       rangeQuery('OVERRIDE', '2026-11-17'),
       // A window's SK is <date>#<windowId>: every one dated today or later sorts at or after today.
       rangeQuery('WINDOW', '2026-11-17'),
       rangeQuery('APPT', '2026-11-15T23:30:00.000Z'),
     ]);
-    expect(check).toHaveBeenCalledWith(noRefs);
-    const items = transactions()[0]!.TransactItems!;
-    expect(items).toHaveLength(2);
-    expect(items[0]!.Update!.Key).toEqual({ PK: 'LOCK', SK: 'LOCK' });
-    // No condition: the lock already serializes every calendar write.
-    expect(items[1]).toEqual({ Delete: { TableName: TABLE, Key: { PK: 'TYPE', SK: STUDIO } } });
   });
 
-  it('gives the check only the fields it reads, with the override date from its SK', async () => {
+  it('maps only the fields the rules read: ids from the SK, an override’s date from its SK', async () => {
     ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'PATTERN' } }).resolves({
-      Items: [{ PK: 'PATTERN', SK: 'P1', weekday: 1, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-01-01', validUntil: '2026-02-01' }],
+      Items: [
+        { PK: 'PATTERN', SK: 'P1', weekday: 1, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-01-01', validUntil: '2026-02-01', createdAt: EARLIER, updatedAt: EARLIER },
+        { PK: 'PATTERN', SK: 'P2', weekday: 2, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-01-01', validUntil: null, createdAt: EARLIER, updatedAt: EARLIER },
+      ],
     });
     ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'OVERRIDE' } }).resolves({
       Items: [
@@ -565,53 +565,108 @@ describe('deleteType', () => {
       ],
     });
     ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'WINDOW' } }).resolves({
-      Items: [{ PK: 'WINDOW', SK: '2026-11-18#W1', date: '2026-11-18', start: '09:00', end: '10:00', typeId: STUDIO }],
+      Items: [{ PK: 'WINDOW', SK: '2026-11-18#W1', date: '2026-11-18', start: '09:00', end: '10:00', typeId: STUDIO, createdAt: EARLIER }],
     });
     ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'APPT' } }).resolves({
-      Items: [{ PK: 'APPT', SK: '2026-11-18T08:00:00.000Z#A1', typeId: STUDIO, status: 'booked', end: '2026-11-18T09:00:00.000Z', note: 'private' }],
+      Items: [
+        {
+          PK: 'APPT',
+          SK: '2026-11-18T08:00:00.000Z#A1',
+          username: 'alice',
+          start: '2026-11-18T08:00:00.000Z',
+          end: '2026-11-18T09:00:00.000Z',
+          date: '2026-11-18',
+          typeId: STUDIO,
+          status: 'booked',
+          note: 'private',
+        },
+      ],
     });
     const check = vi.fn(() => null);
     await db.deleteType(STUDIO, TODAY, LATE, check);
     expect(check).toHaveBeenCalledWith({
-      patterns: [{ typeId: STUDIO }],
+      types: [{ typeId: STUDIO, name: 'Studio', nameKey: 'studio', createdAt: EARLIER, updatedAt: EARLIER }],
+      patterns: [
+        { patternId: 'P1', weekday: 1, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-01-01', validUntil: '2026-02-01', createdAt: EARLIER, updatedAt: EARLIER },
+        { patternId: 'P2', weekday: 2, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-01-01', validUntil: null, createdAt: EARLIER, updatedAt: EARLIER },
+      ],
       overrides: [
-        { date: '2026-11-20', windows: [{ typeId: POOL }] },
+        { date: '2026-11-20', windows: [{ start: '09:00', end: '10:00', typeId: POOL }] },
         { date: '2026-11-21', windows: [] },
       ],
-      windows: [{ date: '2026-11-18', typeId: STUDIO }],
-      appointments: [{ typeId: STUDIO, status: 'booked', end: '2026-11-18T09:00:00.000Z' }],
+      oneOffs: [{ windowId: 'W1', date: '2026-11-18', start: '09:00', end: '10:00', typeId: STUDIO }],
+      // No note: the rules never read it.
+      appointments: [
+        {
+          appointmentId: 'A1',
+          username: 'alice',
+          start: '2026-11-18T08:00:00.000Z',
+          end: '2026-11-18T09:00:00.000Z',
+          date: '2026-11-18',
+          typeId: STUDIO,
+          status: 'booked',
+        },
+      ],
     });
   });
 
-  it('follows LastEvaluatedKey on every reference query', async () => {
+  it('reads a pattern stored without validUntil as open-ended', async () => {
+    ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'PATTERN' } }).resolves({
+      Items: [{ PK: 'PATTERN', SK: 'P1', weekday: 1, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-01-01' }],
+    });
+    const check = vi.fn(() => null);
+    await db.deleteType(STUDIO, TODAY, LATE, check);
+    expect(check).toHaveBeenCalledWith(expect.objectContaining({ patterns: [expect.objectContaining({ validUntil: null })] }));
+  });
+
+  it('follows LastEvaluatedKey on every query', async () => {
     ddb
       .on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'APPT' } })
       .resolvesOnce({ Items: [{ PK: 'APPT', SK: 'a#1', typeId: POOL, status: 'booked', end: LATE }], LastEvaluatedKey: { PK: 'APPT', SK: 'a#1' } })
       .resolvesOnce({ Items: [{ PK: 'APPT', SK: 'b#2', typeId: STUDIO, status: 'booked', end: LATE }] });
     const check = vi.fn(() => null);
     await db.deleteType(STUDIO, TODAY, LATE, check);
-    expect(check).toHaveBeenCalledWith(expect.objectContaining({ appointments: [expect.objectContaining({ typeId: POOL }), expect.objectContaining({ typeId: STUDIO })] }));
+    expect(check).toHaveBeenCalledWith(
+      expect.objectContaining({ appointments: [expect.objectContaining({ appointmentId: '1' }), expect.objectContaining({ appointmentId: '2' })] }),
+    );
     expect(queries().filter((q) => q.ExpressionAttributeValues![':pk'] === 'APPT').map((q) => q.ExclusiveStartKey)).toEqual([
       undefined,
       { PK: 'APPT', SK: 'a#1' },
     ]);
   });
+});
 
-  it('answers type_not_found, reading nothing else and writing nothing, when the type is not there', async () => {
+describe('deleteType', () => {
+  const TODAY = '2026-11-16';
+
+  beforeEach(() => {
+    onTypes(typeItem(STUDIO, 'Studio'));
+  });
+
+  it('deletes the TYPE item after the lock, with no condition', async () => {
+    const locked = await db.deleteType(STUDIO, TODAY, NOW, () => null);
+    expect(locked).toEqual({ result: { ok: true, value: null }, attempts: 1 });
+    const items = transactions()[0]!.TransactItems!;
+    expect(items).toHaveLength(2);
+    expect(items[0]!.Update!.Key).toEqual({ PK: 'LOCK', SK: 'LOCK' });
+    // No condition: the lock already serializes every calendar write.
+    expect(items[1]).toEqual({ Delete: { TableName: TABLE, Key: { PK: 'TYPE', SK: STUDIO } } });
+  });
+
+  it('answers type_not_found, without calling the check or writing, when the type is not there', async () => {
     const check = vi.fn(() => null);
-    expect(await db.deleteType(POOL, TODAY, LATE, check)).toEqual({ result: { ok: false, error: 'type_not_found' }, attempts: 1 });
+    expect(await db.deleteType(POOL, TODAY, NOW, check)).toEqual({ result: { ok: false, error: 'type_not_found' }, attempts: 1 });
     expect(check).not.toHaveBeenCalled();
-    expect(queries()).toHaveLength(0);
     expect(transactions()).toHaveLength(0);
   });
 
   it('writes nothing when the check refuses', async () => {
-    const locked = await db.deleteType(STUDIO, TODAY, LATE, () => ({ error: 'type_in_use' as const }));
+    const locked = await db.deleteType(STUDIO, TODAY, NOW, () => ({ error: 'type_in_use' as const }));
     expect(locked).toEqual({ result: { ok: false, error: 'type_in_use' }, attempts: 1 });
     expect(transactions()).toHaveLength(0);
   });
 
-  it('re-reads the references on a retry', async () => {
+  it('re-reads the state on a retry', async () => {
     vi.useFakeTimers();
     ddb.on(TransactWriteCommand).rejectsOnce(lockBusy()).resolves({});
     ddb
@@ -621,10 +676,160 @@ describe('deleteType', () => {
     const check = vi.fn((refs: { patterns: readonly { typeId: string }[] }) =>
       refs.patterns.length > 0 ? { error: 'type_in_use' as const } : null,
     );
-    const pending = db.deleteType(STUDIO, TODAY, LATE, check);
+    const pending = db.deleteType(STUDIO, TODAY, NOW, check);
     await vi.runAllTimersAsync();
     expect(await pending).toEqual({ result: { ok: false, error: 'type_in_use' }, attempts: 2 });
     expect(check).toHaveBeenCalledTimes(2);
     expect(transactions()).toHaveLength(1);
+  });
+});
+
+// ── Weekly patterns ────────────────────────────────────────────────────────────────────────────
+
+const P1 = '01JC00000000000000000000P1';
+const P2 = '01JC00000000000000000000P2';
+const P3 = '01JC00000000000000000000P3';
+const fields = { weekday: 1, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-11-01', validUntil: null };
+const patternItem = (patternId: string, more: Record<string, unknown> = {}) => ({
+  PK: 'PATTERN',
+  SK: patternId,
+  ...fields,
+  createdAt: EARLIER,
+  updatedAt: EARLIER,
+  ...more,
+});
+const onPatterns = (...items: object[]) =>
+  ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'PATTERN' } }).resolves({ Items: items });
+
+describe('listPatterns', () => {
+  it('reads the PATTERN partition with one consistent query', async () => {
+    await db.listPatterns();
+    expect(queries()).toEqual([partitionQuery('PATTERN')]);
+  });
+
+  it('answers the patterns by weekday, then start, then validity and id, without PK and SK', async () => {
+    onPatterns(
+      patternItem(P3, { weekday: 2, start: '07:00', end: '08:00' }),
+      patternItem(P2, { start: '12:00', end: '13:00' }),
+      patternItem('01JC00000000000000000000P5', { start: '07:00', end: '08:00', validFrom: '2027-01-01' }),
+      patternItem('01JC00000000000000000000P4', { start: '07:00', end: '08:00', validFrom: '2026-01-01', validUntil: '2026-06-30' }),
+      patternItem('01JC00000000000000000000P6', { start: '07:00', end: '08:00', validFrom: '2026-01-01', validUntil: '2026-06-30' }),
+    );
+    const listed = await db.listPatterns();
+    expect(listed.map((p) => p.patternId)).toEqual([
+      '01JC00000000000000000000P4',
+      '01JC00000000000000000000P6',
+      '01JC00000000000000000000P5',
+      P2,
+      P3,
+    ]);
+    expect(listed[3]).toEqual({ patternId: P2, ...fields, start: '12:00', end: '13:00', createdAt: EARLIER, updatedAt: EARLIER });
+  });
+});
+
+describe('createPattern', () => {
+  const TODAY = '2026-11-12';
+
+  it('reads the state after the lock, then writes the lock update and the whole PATTERN item', async () => {
+    const check = vi.fn(() => null);
+    const locked = await db.createPattern({ patternId: P1, ...fields }, TODAY, NOW, check);
+    expect(locked).toEqual({ result: { ok: true, value: { patternId: P1, ...fields, createdAt: NOW, updatedAt: NOW } }, attempts: 1 });
+    expect(check).toHaveBeenCalledTimes(1);
+    expect(queries().map((q) => q.ExpressionAttributeValues![':pk'])).toEqual(['TYPE', 'PATTERN', 'OVERRIDE', 'WINDOW', 'APPT']);
+    const items = transactions()[0]!.TransactItems!;
+    expect(items).toHaveLength(2);
+    expect(items[0]!.Update!.Key).toEqual({ PK: 'LOCK', SK: 'LOCK' });
+    // validUntil null is stored as null: the item always has every field of 13.2.
+    expect(items[1]).toEqual({
+      Put: { TableName: TABLE, Item: { PK: 'PATTERN', SK: P1, ...fields, createdAt: NOW, updatedAt: NOW } },
+    });
+  });
+
+  it('writes nothing and passes the check’s message and conflicts on when it refuses', async () => {
+    const conflicts = [{ appointmentId: 'A1', username: 'alice', start: NOW, end: NOW }];
+    const refusal = { error: 'availability_conflict' as const, message: '1 appointment would fall outside the availability', conflicts };
+    const locked = await db.createPattern({ patternId: P1, ...fields }, TODAY, NOW, () => refusal);
+    expect(locked).toEqual({ result: { ok: false, ...refusal }, attempts: 1 });
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('re-reads the state on a retry: a clash made in between is refused, and the same id is written otherwise', async () => {
+    vi.useFakeTimers();
+    ddb.on(TransactWriteCommand).rejectsOnce(lockBusy()).resolves({});
+    const check = vi.fn((state: { patterns: readonly unknown[] }) => (state.patterns.length > 0 ? { error: 'availability_overlap' as const } : null));
+    ddb
+      .on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'PATTERN' } })
+      .resolvesOnce({ Items: [] })
+      .resolves({ Items: [patternItem(P2)] });
+    const pending = db.createPattern({ patternId: P1, ...fields }, TODAY, NOW, check);
+    await vi.runAllTimersAsync();
+    expect(await pending).toEqual({ result: { ok: false, error: 'availability_overlap' }, attempts: 2 });
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(transactions()).toHaveLength(1);
+  });
+});
+
+describe('updatePattern', () => {
+  const TODAY = '2026-11-12';
+  const changed = { ...fields, start: '07:00', typeId: POOL, validUntil: '2026-12-31' };
+
+  it('writes the whole item again, keeping createdAt', async () => {
+    onPatterns(patternItem(P1), patternItem(P2, { weekday: 2 }));
+    const check = vi.fn(() => null);
+    const locked = await db.updatePattern({ patternId: P1, ...changed }, TODAY, NOW, check);
+    expect(locked).toEqual({
+      result: { ok: true, value: { patternId: P1, ...changed, createdAt: EARLIER, updatedAt: NOW } },
+      attempts: 1,
+    });
+    expect(transactions()[0]!.TransactItems![1]).toEqual({
+      Put: { TableName: TABLE, Item: { PK: 'PATTERN', SK: P1, ...changed, createdAt: EARLIER, updatedAt: NOW } },
+    });
+  });
+
+  it('answers pattern_not_found, without calling the check or writing, when the pattern is not there', async () => {
+    onPatterns(patternItem(P2));
+    const check = vi.fn(() => null);
+    expect(await db.updatePattern({ patternId: P1, ...changed }, TODAY, NOW, check)).toEqual({
+      result: { ok: false, error: 'pattern_not_found' },
+      attempts: 1,
+    });
+    expect(check).not.toHaveBeenCalled();
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('writes nothing when the check refuses', async () => {
+    onPatterns(patternItem(P1));
+    const refusal = { error: 'availability_overlap' as const, message: 'On 2026-11-16 …' };
+    expect(await db.updatePattern({ patternId: P1, ...changed }, TODAY, NOW, () => refusal)).toEqual({
+      result: { ok: false, ...refusal },
+      attempts: 1,
+    });
+    expect(transactions()).toHaveLength(0);
+  });
+});
+
+describe('deletePattern', () => {
+  const TODAY = '2026-11-12';
+
+  it('deletes the PATTERN item after the lock, with no condition', async () => {
+    onPatterns(patternItem(P1));
+    expect(await db.deletePattern(P1, TODAY, NOW, () => null)).toEqual({ result: { ok: true, value: null }, attempts: 1 });
+    const items = transactions()[0]!.TransactItems!;
+    expect(items).toHaveLength(2);
+    expect(items[1]).toEqual({ Delete: { TableName: TABLE, Key: { PK: 'PATTERN', SK: P1 } } });
+  });
+
+  it('answers pattern_not_found when the pattern is not there', async () => {
+    const check = vi.fn(() => null);
+    expect(await db.deletePattern(P1, TODAY, NOW, check)).toEqual({ result: { ok: false, error: 'pattern_not_found' }, attempts: 1 });
+    expect(check).not.toHaveBeenCalled();
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('writes nothing when the check refuses', async () => {
+    onPatterns(patternItem(P1));
+    const refusal = { error: 'availability_conflict' as const, message: '1 appointment would fall outside the availability', conflicts: [] };
+    expect(await db.deletePattern(P1, TODAY, NOW, () => refusal)).toEqual({ result: { ok: false, ...refusal }, attempts: 1 });
+    expect(transactions()).toHaveLength(0);
   });
 });

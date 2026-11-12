@@ -208,14 +208,18 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     only module that knows the `calendar` table's item layout and the calendar lock
     (`withCalendarLock`); its configuration (`calendarConfig()`) is read once per container. Its
     locked writes take the rule check as a callback (`check`), run on the data read inside the
-    locked attempt. `calendarRules.ts`: the calendar's checks (`checkTypeName`, `checkTypeDelete`,
-    `typeNameKey`), pure, no AWS, "today" and "now" passed in; a failed check is `{ error }` with
-    a code of `ApiErrorCode`.
+    locked attempt; the writes that compare themselves with the rest of the calendar get the
+    availability state (`CalendarState`: types, patterns, overrides and one-off windows from today,
+    appointments from now − 24 h). `calendarRules.ts`: the calendar's checks (`checkTypeName`,
+    `checkTypeDelete`, `typeNameKey`, and `checkAvailabilityWrite` for every availability write:
+    patterns, overrides, one-off windows), pure, no AWS, "today", "now" and the zone passed in; a
+    failed check is `Refusal` (`{ error, message?, conflicts? }`, code from `ApiErrorCode`).
   - `src/handlers/`, calendar: `getCalendarSettings.ts`, `updateCalendarSettings.ts` (the pattern
     the other calendar handlers copy: claims → configuration check → role → path → body →
     `calendarDb` with the `calendarRules` check → one log line); availability types:
     `listAvailabilityTypes.ts`, `createAvailabilityType.ts`, `renameAvailabilityType.ts`,
-    `deleteAvailabilityType.ts`.
+    `deleteAvailabilityType.ts`; weekly patterns: `listPatterns.ts`, `createPattern.ts`,
+    `updatePattern.ts`, `deletePattern.ts`.
   - `tests/unit/`: vitest unit tests, mirroring `src/` (e.g. `tests/unit/lib/http.test.ts`).
   - `tests/integration/`: end-to-end tests against the local Docker stack: `setup.ts` (helpers,
     including `resetCalendarTable()`, `putCalendarItem()`, `getCalendarItem()`), `journeys.test.ts`

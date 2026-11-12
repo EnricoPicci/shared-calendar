@@ -11,11 +11,15 @@ import {
   type Actor,
   type ApiErrorCode,
   type AppointmentStatus,
+  type OneOffInput,
+  type OverrideInput,
+  type PatternInput,
+  type WeeklyPattern,
   type AvailabilityType,
   type CalendarSettings,
   type UpdateSettingsBody,
 } from '@shared-calendar/shared';
-import type { Refusal, TypeReferences } from './calendarRules';
+import type { CalendarState, Refusal, StateAppointment } from './calendarRules';
 import { documentClient } from './db';
 
 // The calendar table (docs/SHARED_CALENDAR_SPEC.md 13). This is the only module that knows its
@@ -206,7 +210,9 @@ async function queryPartition(table: string, pk: string, fromSk?: string): Promi
 // (nothing written). `T` is the stored object; `C` the error codes the operation can answer.
 export type Checked<T, C extends ApiErrorCode> = { ok: true; value: T } | ({ ok: false } & Refusal<C>);
 
-const refused = <C extends ApiErrorCode>(error: C) => ({ ok: false, error }) as const;
+// A refusal as the caller gets it: the check's code, and its message and conflicts if it gave any.
+const refused = <C extends ApiErrorCode>(refusal: Refusal<C>) => ({ ok: false as const, ...refusal });
+const notFound = <C extends ApiErrorCode>(error: C) => refused({ error });
 
 // ── Availability types (spec 6.1; item TYPE / <typeId> of 13.2) ────────────────────────────────
 
@@ -268,7 +274,7 @@ export async function createType<C extends ApiErrorCode>(
   const created: TypeRecord = { ...type, createdAt: now, updatedAt: now };
   return withCalendarLock<Checked<AvailabilityType, C>>(async () => {
     const refusal = check(await readTypes(table));
-    if (refusal) return { write: null, result: refused(refusal.error) };
+    if (refusal) return { write: null, result: refused(refusal) };
     return { write: [putType(table, created)], result: { ok: true, value: toAvailabilityType(created) } };
   });
 }
@@ -288,9 +294,9 @@ export async function renameType<C extends ApiErrorCode>(
   return withCalendarLock<Checked<AvailabilityType, C | 'type_not_found'>>(async () => {
     const types = await readTypes(table);
     const current = types.find((t) => t.typeId === typeId);
-    if (!current) return { write: null, result: refused('type_not_found') };
+    if (!current) return { write: null, result: notFound('type_not_found') };
     const refusal = check(types);
-    if (refusal) return { write: null, result: refused(refusal.error) };
+    if (refusal) return { write: null, result: refused(refusal) };
     const renamed: TypeRecord = { ...current, ...rename, updatedAt: now };
     return { write: [putType(table, renamed)], result: { ok: true, value: toAvailabilityType(renamed) } };
   });
@@ -299,56 +305,192 @@ export async function renameType<C extends ApiErrorCode>(
 // One day in milliseconds: an appointment lasts at most this long (13.2).
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+const PATTERN_PK = 'PATTERN';
+
+function toPattern(item: Item): WeeklyPattern {
+  return {
+    patternId: item.SK as string,
+    weekday: item.weekday as number,
+    start: item.start as string,
+    end: item.end as string,
+    typeId: item.typeId as string,
+    validFrom: item.validFrom as string,
+    validUntil: (item.validUntil as string | null | undefined) ?? null,
+    createdAt: item.createdAt as string,
+    updatedAt: item.updatedAt as string,
+  };
+}
+
+// The id after the first '#' of an SK `<date or instant>#<id>`.
+const idOf = (sk: string) => sk.slice(sk.indexOf('#') + 1);
+
 /**
- * What can refer to a type and is not in the past (13.2 access patterns): every pattern, the
- * overrides and one-off windows dated `today` or later (a window's SK is `<date>#<windowId>`), and
- * the appointments that started at most 24 h before `now` (none lasts longer), so every one not
- * yet ended. The filter on status and end is checkTypeDelete's.
+ * The availability state of a locked attempt (13.2 access patterns, all consistent): every type
+ * and every pattern; the overrides and one-off windows dated `today` or later (a window's SK is
+ * `<date>#<windowId>`, so it sorts at or after `today`); the appointments that started at most
+ * 24 h before `now` (none lasts longer), so every one not yet ended. Filtering on status and end is
+ * the rules'. Only the fields the rules read are mapped.
  */
-async function readTypeReferences(table: string, today: string, now: string): Promise<TypeReferences> {
+type ReadState = Omit<CalendarState, 'types' | 'patterns'> & { types: TypeRecord[]; patterns: WeeklyPattern[] };
+
+async function readState(table: string, today: string, now: string): Promise<ReadState> {
   const since = new Date(Date.parse(now) - DAY_MS).toISOString();
-  const [patterns, overrides, windows, appointments] = await Promise.all([
-    queryPartition(table, 'PATTERN'),
+  const [types, patterns, overrides, oneOffs, appointments] = await Promise.all([
+    queryPartition(table, TYPE_PK),
+    queryPartition(table, PATTERN_PK),
     queryPartition(table, 'OVERRIDE', today),
     queryPartition(table, 'WINDOW', today),
     queryPartition(table, 'APPT', since),
   ]);
   return {
-    patterns: patterns.map((p) => ({ typeId: p.typeId as string })),
-    overrides: overrides.map((o) => ({
-      date: o.SK as string,
-      windows: ((o.windows as Item[] | undefined) ?? []).map((w) => ({ typeId: w.typeId as string })),
-    })),
-    windows: windows.map((w) => ({ date: w.date as string, typeId: w.typeId as string })),
-    appointments: appointments.map((a) => ({
-      typeId: a.typeId as string,
-      status: a.status as AppointmentStatus,
-      end: a.end as string,
-    })),
+    types: types.map(toTypeRecord),
+    patterns: patterns.map(toPattern),
+    overrides: overrides.map(
+      (o): OverrideInput => ({
+        date: o.SK as string,
+        windows: ((o.windows as Item[] | undefined) ?? []).map((w) => ({
+          start: w.start as string,
+          end: w.end as string,
+          typeId: w.typeId as string,
+        })),
+      }),
+    ),
+    oneOffs: oneOffs.map(
+      (w): OneOffInput => ({
+        windowId: idOf(w.SK as string),
+        date: w.date as string,
+        start: w.start as string,
+        end: w.end as string,
+        typeId: w.typeId as string,
+      }),
+    ),
+    appointments: appointments.map(
+      (a): StateAppointment => ({
+        appointmentId: idOf(a.SK as string),
+        username: a.username as string,
+        start: a.start as string,
+        end: a.end as string,
+        date: a.date as string,
+        typeId: a.typeId as string,
+        status: a.status as AppointmentStatus,
+      }),
+    ),
   };
 }
 
-// The check of a delete: given what still refers to types, read inside the locked attempt.
-export type TypeDeleteCheck = (refs: TypeReferences) => Refusal<'type_in_use'> | null;
+/** The check of a write that compares it with the rest of the calendar, read inside the locked attempt. */
+export type StateCheck<C extends ApiErrorCode> = (state: CalendarState) => Refusal<C> | null;
 
 /**
  * Deletes a type under the lock (R-TYPE-03): `type_not_found` if it is not there at the time of
- * the attempt, otherwise `check` decides on the references read inside the attempt. The lock
+ * the attempt, otherwise `check` decides on the state read inside the attempt. The lock
  * serializes every calendar write, so the delete needs no condition of its own.
  */
-export async function deleteType(
+export async function deleteType<C extends ApiErrorCode>(
   typeId: string,
   today: string,
   now: string,
-  check: TypeDeleteCheck,
-): Promise<Locked<Checked<null, 'type_not_found' | 'type_in_use'>>> {
+  check: StateCheck<C>,
+): Promise<Locked<Checked<null, C | 'type_not_found'>>> {
   const { table } = calendarConfig();
-  const key = { PK: TYPE_PK, SK: typeId };
-  return withCalendarLock<Checked<null, 'type_not_found' | 'type_in_use'>>(async () => {
-    const { Item } = await documentClient.send(new GetCommand({ TableName: table, Key: key, ConsistentRead: true }));
-    if (!Item) return { write: null, result: refused('type_not_found') };
-    const refusal = check(await readTypeReferences(table, today, now));
-    if (refusal) return { write: null, result: refused(refusal.error) };
-    return { write: [{ Delete: { TableName: table, Key: key } }], result: { ok: true, value: null } };
+  return withCalendarLock<Checked<null, C | 'type_not_found'>>(async () => {
+    const state = await readState(table, today, now);
+    if (!state.types.some((t) => t.typeId === typeId)) return { write: null, result: notFound('type_not_found') };
+    const refusal = check(state);
+    if (refusal) return { write: null, result: refused(refusal) };
+    return { write: [{ Delete: { TableName: table, Key: { PK: TYPE_PK, SK: typeId } } }], result: { ok: true, value: null } };
+  });
+}
+
+// ── Weekly patterns (spec 6.2; item PATTERN / <patternId> of 13.2) ─────────────────────────────
+
+const byWeekdayThenStart = (a: WeeklyPattern, b: WeeklyPattern) =>
+  a.weekday - b.weekday || cmp(a.start, b.start) || cmp(a.validFrom, b.validFrom) || cmp(a.patternId, b.patternId);
+function cmp(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/** Every pattern, by weekday, then start (11.1); then validity and id, so the order is stable. */
+export async function listPatterns(): Promise<WeeklyPattern[]> {
+  const { table } = calendarConfig();
+  return (await queryPartition(table, PATTERN_PK)).map(toPattern).sort(byWeekdayThenStart);
+}
+
+// The whole item, for create and update alike: the id is the SK and is not repeated.
+function putPattern(table: string, p: WeeklyPattern): TransactItem {
+  return {
+    Put: {
+      TableName: table,
+      Item: {
+        PK: PATTERN_PK,
+        SK: p.patternId,
+        weekday: p.weekday,
+        start: p.start,
+        end: p.end,
+        typeId: p.typeId,
+        validFrom: p.validFrom,
+        validUntil: p.validUntil,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      },
+    },
+  };
+}
+
+/**
+ * Creates a pattern under the lock (R-PAT-03/04, R-AV-01..05). `check` sees the state read inside
+ * the attempt, before the write. `pattern.patternId` is generated by the caller once per request.
+ */
+export async function createPattern<C extends ApiErrorCode>(
+  pattern: PatternInput,
+  today: string,
+  now: string,
+  check: StateCheck<C>,
+): Promise<Locked<Checked<WeeklyPattern, C>>> {
+  const { table } = calendarConfig();
+  const created: WeeklyPattern = { ...pattern, createdAt: now, updatedAt: now };
+  return withCalendarLock<Checked<WeeklyPattern, C>>(async () => {
+    const refusal = check(await readState(table, today, now));
+    if (refusal) return { write: null, result: refused(refusal) };
+    return { write: [putPattern(table, created)], result: { ok: true, value: created } };
+  });
+}
+
+/**
+ * Replaces a pattern (full replacement, R-PAT-03) under the lock: `pattern_not_found` if it is not
+ * there at the time of the attempt, otherwise `check` decides. `createdAt` is kept.
+ */
+export async function updatePattern<C extends ApiErrorCode>(
+  pattern: PatternInput,
+  today: string,
+  now: string,
+  check: StateCheck<C>,
+): Promise<Locked<Checked<WeeklyPattern, C | 'pattern_not_found'>>> {
+  const { table } = calendarConfig();
+  return withCalendarLock<Checked<WeeklyPattern, C | 'pattern_not_found'>>(async () => {
+    const state = await readState(table, today, now);
+    const current = state.patterns.find((p) => p.patternId === pattern.patternId);
+    if (!current) return { write: null, result: notFound('pattern_not_found') };
+    const refusal = check(state);
+    if (refusal) return { write: null, result: refused(refusal) };
+    const updated: WeeklyPattern = { ...pattern, createdAt: current.createdAt, updatedAt: now };
+    return { write: [putPattern(table, updated)], result: { ok: true, value: updated } };
+  });
+}
+
+/** Deletes a pattern under the lock: `pattern_not_found` if it is not there, otherwise `check` decides (R-AV-03). */
+export async function deletePattern<C extends ApiErrorCode>(
+  patternId: string,
+  today: string,
+  now: string,
+  check: StateCheck<C>,
+): Promise<Locked<Checked<null, C | 'pattern_not_found'>>> {
+  const { table } = calendarConfig();
+  return withCalendarLock<Checked<null, C | 'pattern_not_found'>>(async () => {
+    const state = await readState(table, today, now);
+    if (!state.patterns.some((p) => p.patternId === patternId)) return { write: null, result: notFound('pattern_not_found') };
+    const refusal = check(state);
+    if (refusal) return { write: null, result: refused(refusal) };
+    return { write: [{ Delete: { TableName: table, Key: { PK: PATTERN_PK, SK: patternId } } }], result: { ok: true, value: null } };
   });
 }

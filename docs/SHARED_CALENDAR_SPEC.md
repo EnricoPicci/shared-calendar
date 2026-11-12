@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v5 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
-| Date | 2026-11-10; v3 to v5 2026-11-12 |
+| Status | v6 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
+| Date | 2026-11-10; v3 to v6 2026-11-12 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
@@ -17,6 +17,7 @@
 | v3 | 2026-11-12 | Brief 42 (plan step 41). Text lengths are counted in UTF-16 code units (11.4; referenced from 6.1 and R-BOOK-11). |
 | v4 | 2026-11-12 | Brief 44 (plan step 43). `env.local.json` sets the calendar variables once, in its `Parameters` section, and never `CALENDAR_TIME_ZONE`, which comes from the `CalendarTimeZone` parameter only: `sam local` lets the file override the template, so a value there would make `--parameter-overrides` ineffective (14.4). |
 | v5 | 2026-11-12 | Brief 45 (plan step 44). Open point O2 closed: the template stays reviewable and the local stack light; the PO confirmed T2 (section 22). |
+| v6 | 2026-11-12 | Brief 46 (plan step 45). R-AV-01: windows are compared as local times, not instants (the spring-forward night), and two patterns overlap only if they share at least one date (6.5, text and table). |
 
 ---
 
@@ -290,13 +291,17 @@ defined(D) = base(D) ∪ oneOffWindows(D)
 
 **R-AV-01 — No overlap (D6).** The defined windows of a date never overlap: for any two windows
 `[s1, e1)` and `[s2, e2)`, either `e1 ≤ s2` or `e2 ≤ s1`. Touching windows (`12:00` end, `12:00`
-start) are allowed, also with different types. Every write that could create an overlap is
+start) are allowed, also with different types. Windows are compared as the local times that define
+them (`HH:mm` of one date), not as instants: on the night clocks go forward, `02:00–02:30` and
+`03:00–04:00` do not overlap, although both start at the same instant. Two patterns overlap only if
+their windows overlap and they share at least one date: the same weekday, inside both validity
+periods. Every write that could create an overlap is
 rejected with `409 availability_overlap`, and the response's `message` names the date and both
 windows. The writes and their checks:
 
 | Write | Checked against |
 |---|---|
-| Create / update a pattern | Every other pattern with the same weekday and an intersecting validity period (an overlap on any date is an overlap). And, for every date from today on within the pattern's validity that has **no override**, the one-off windows of that date. |
+| Create / update a pattern | Every other pattern with the same weekday and an intersecting validity period that contains at least one date of that weekday (an overlap on any date, past dates included, is an overlap). And, for every date from today on within the pattern's validity that has **no override**, the one-off windows of that date. |
 | Set an override on D | Its own windows among themselves, and the one-off windows of D. |
 | Create a one-off window on D | The current `base(D)` and the other one-off windows of D. |
 | Delete an override on D | The pattern windows that apply again on D, against the one-off windows of D. |

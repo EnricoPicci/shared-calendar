@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApiErrorCode } from '@shared-calendar/shared';
+import type { ApiErrorBody, ApiErrorCode, AppointmentConflict } from '@shared-calendar/shared';
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 
 export type HttpResponse = APIGatewayProxyStructuredResultV2;
@@ -18,8 +18,9 @@ export function noContent(): HttpResponse {
 
 // Error body shape of architecture section 4: { error, message }. Never pass AWS error details here.
 // The codes are the contract's (ApiErrorCode); a new one starts in @shared-calendar/shared.
-export function error(status: number, code: ApiErrorCode, message: string): HttpResponse {
-  return ok(status, { error: code, message } satisfies ApiErrorBody);
+// `conflicts` only with availability_conflict (spec 11.3); it goes to the body, never to a log line.
+export function error(status: number, code: ApiErrorCode, message: string, conflicts?: AppointmentConflict[]): HttpResponse {
+  return ok(status, (conflicts ? { error: code, message, conflicts } : { error: code, message }) satisfies ApiErrorBody);
 }
 
 export function parseJsonBody(event: Pick<APIGatewayProxyEventV2, 'body' | 'isBase64Encoded'>): Outcome<unknown> {
