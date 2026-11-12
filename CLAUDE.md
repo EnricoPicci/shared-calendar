@@ -202,7 +202,10 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
 - `shared/`: package `@shared-calendar/shared`, no build step (`exports` points at
   `src/index.ts`; each consumer bundles it). `src/api.ts` (response and error body types,
   `ApiErrorCode`), `src/roles.ts` (`Role`, `resolveRole`), `src/username.ts` (the username
-  pattern and zod schemas), `src/index.ts` (re-exports); `tests/` mirrors `src/`.
+  pattern and zod schemas), `src/calendar/` (the shared calendar, plan steps 41–42: `time.ts`, the
+  time-zone helpers with `Intl` only, never the machine's zone; `schemas.ts`, the primitive zod
+  schemas; `defaults.ts`, default settings and limits), `src/index.ts` (re-exports); `tests/`
+  mirrors `src/`.
 - Generated, git-ignored: root `node_modules/`; in `backend/`: `env.local.json`, `.cognito/`,
   `.aws-sam/`, `.verify-ok`, `coverage/`; `shared/coverage/`; `frontend/coverage/`.
 

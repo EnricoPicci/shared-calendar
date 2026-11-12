@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v4 (2026-10-28). **Steps 1–12 done** (step 12 on 2026-11-04, tag `v1.0.0`); step 20, monorepo move, done 2026-11-04. **Shared calendar: steps 41–56 planned** (2026-11-10, brief 41, from `docs/SHARED_CALENDAR_SPEC.md` v2); not started |
+| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v4 (2026-10-28). **Steps 1–12 done** (step 12 on 2026-11-04, tag `v1.0.0`); step 20, monorepo move, done 2026-11-04. **Shared calendar: steps 41–56 planned** (2026-11-10, brief 41, from `docs/SHARED_CALENDAR_SPEC.md` v2); step 41 done 2026-11-12 (brief 42) |
 | Date | 2026-10-28; calendar steps added 2026-11-10 |
 | Scope | Everything needed to go from an empty repository to a deployed, smoke-tested v1; then the shared calendar (steps 41–56), from its specification to a deployed, smoke-tested feature |
 
@@ -473,7 +473,7 @@ close the merge.
 
 **What governs in the meantime.** Step 41 opens version v12 of the architecture's change log with
 this rule: *the shared calendar (F5) is being implemented in plan steps 41–56; a calendar matter
-that the architecture does not yet describe is governed by `docs/SHARED_CALENDAR_SPEC.md` v2;
+that the architecture does not yet describe is governed by `docs/SHARED_CALENDAR_SPEC.md`;
 whatever the architecture already describes, including everything Hello World does, is governed by
 the architecture.* A step that changes existing behaviour (43: IAM pattern and cost; 51:
 `deleteUser`) merges that change in the same step, so the code never contradicts the architecture.

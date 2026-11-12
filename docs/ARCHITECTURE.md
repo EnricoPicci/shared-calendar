@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v1 implemented (plan step 12, tag `v1.0.0`); monorepo layout (plan step 20); v11 |
-| Date | 2026-11-05 |
+| Status | v1 implemented (plan step 12, tag `v1.0.0`); monorepo layout (plan step 20); v12 open: shared calendar (F5) in progress, plan steps 41–56 |
+| Date | 2026-11-12 |
 | Stack | TypeScript · AWS Lambda · API Gateway (HTTP API) · Amazon Cognito · DynamoDB · AWS SAM |
 
 ### Change log
@@ -21,6 +21,7 @@
 | v9 | 2026-11-04 | **v1 implemented.** Plan step 12: the stack is deployed and smoke-tested, the README exists, the status line says so. Wording aligned with what was built: region `eu-north-1` in the overview (section 2), `npm run` commands and the real template size in 6.1 and 9.1, the logger of section 11, sections 1 and 15 in the past tense. A browser front end is now planned (section 14, assumption 6); section 12 points to the target monorepo layout (`docs/FOLDER_STRUCTURE.md`), which a later step applies. |
 | v10 | 2026-11-04 | **Monorepo layout** (plan step 20). The back end moves to `backend/`; the API contract (response and error body types, error codes, `Role` and `resolveRole`) and the username rule move to `shared/`, which the back end imports and bundles; `frontend/` is reserved. Section 12 is replaced by a pointer to `docs/FOLDER_STRUCTURE.md`; paths in this document are relative to `backend/`. No change to behaviour, contract, resources or IAM. The build runs esbuild inside `backend/` with SAM's beta support for npm workspaces (section 9.1). |
 | v11 | 2026-11-05 | Section 8, note on Cognito emulation: two sign-in differences of cognito-local found by the front end's `LoginService` integration test (`InvalidPasswordException` for a wrong password; 24-hour access tokens without `ExpiresIn`). Documentation only; the back end is unchanged. |
+| v12 | 2026-11-12 (open) | **Shared calendar (F5), in progress.** The shared calendar (F5) is being implemented in plan steps 41–56; a calendar matter that the architecture does not yet describe is governed by `docs/SHARED_CALENDAR_SPEC.md`; whatever the architecture already describes, including everything Hello World does, is governed by the architecture. Each plan step merges the part of spec section 19 it implements and adds its sentence here; step 56 closes v12. **Step 41:** the calendar's time model in `shared/src/calendar/` (time helpers with `Intl` only, primitive schemas, default settings and limits; `docs/FOLDER_STRUCTURE.md`); no route, resource or behaviour of the API changes. |
 
 ---
 
@@ -40,6 +41,7 @@ Functional
 - **F2 — User management.** An Administrator can create and delete Users.
 - **F3 — Roles.** Two roles: `User` (may call Hello World) and `Administrator` (may create/delete Users **and** call Hello World).
 - **F4 — Passwords (v1).** Accounts are created with a permanent password chosen by the system and returned once to the Administrator. No password change or reset flow in v1; adding it later must require minimal effort.
+- **F5 — Shared calendar.** *In progress* (plan steps 41–56): the Administrator publishes availability, Users book, cancel and change one-hour appointments. Specified in `docs/SHARED_CALENDAR_SPEC.md`, which governs every calendar matter this document does not yet describe (change log v12).
 
 Non-functional
 

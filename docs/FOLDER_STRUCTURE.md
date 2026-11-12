@@ -86,8 +86,11 @@ stays at the root.
     │   ├── index.ts             # the public surface: re-exports the files below
     │   ├── api.ts               # response bodies, error body, error codes (architecture section 4)
     │   ├── roles.ts             # Role, resolveRole (architecture section 3, "admin wins")
-    │   └── username.ts          # the username rule and the zod schemas built on it
-    └── tests/                   # mirrors src/
+    │   ├── username.ts          # the username rule and the zod schemas built on it
+    │   └── calendar/            # the shared calendar's contract (docs/SHARED_CALENDAR_SPEC.md 12):
+    │                            # time.ts (time-zone helpers, Intl only), schemas.ts, defaults.ts;
+    │                            # rules.ts and types.ts follow in plan step 42
+    └── tests/                   # mirrors src/ (tests/calendar/ too)
 ```
 
 Names are plain words, as in the brief, rather than the `apps/` + `packages/` convention: with
@@ -242,6 +245,12 @@ The back end then uses the contract rather than restating it: `error()` in `http
 `ApiErrorCode` instead of any string, and the two `201` bodies are typed with `HelloResponse`
 and `CreateUserResponse`. A new error code or response field therefore starts life in
 `shared/`, where the front end sees it.
+
+Since then, plan step 41 (2026-11-12) added `shared/src/calendar/` for the shared calendar
+(`docs/SHARED_CALENDAR_SPEC.md` section 12): `time.ts` (local date and time ↔ instant in the
+calendar time zone, with the built-in `Intl` API only, decision T6), `schemas.ts` (the primitive
+zod schemas: dates, times, weekday, instant, ULID, note, type name) and `defaults.ts` (default
+settings and count limits). It imports only `zod` and its own files, like the rest of `shared/`.
 
 What stays out of `shared/`: the DynamoDB item shape (`MessageItem`), the authorizer context,
 the logger, the password generator (server-side secret handling), and everything that imports
