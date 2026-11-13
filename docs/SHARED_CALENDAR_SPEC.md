@@ -1394,7 +1394,7 @@ A suggested order. The plan fixes the steps and their acceptance checks. Step nu
 | 47 | `GET /users`, `deleteUser` changes | AC-29, AC-32 |
 | 48 | Back-end integration journeys + smoke addition; `verify` green | `npm run verify` |
 | 49 | Front-end `api.ts` changes and the five services + `listUsers` | `npm run verify -w frontend`, 100 % |
-| 50 | Front-end integration journeys | `RUN_INTEGRATION=1 npm run test:unit -w frontend` |
+| 50 | Front-end integration journeys | `RUN_INTEGRATION=1 npm run test:integration -w frontend` |
 | 51 | Documents of section 19; deployment when instructed | the docs merged; smoke PASS in the cloud |
 
 Follow-ups, not in this feature: e-mail notifications (section 15.3); date-range closures;

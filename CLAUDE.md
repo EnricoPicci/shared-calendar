@@ -94,11 +94,12 @@ form works the same. Paths below without a folder are relative to `backend/`.
 - `npm run typecheck -w frontend`, `npm run lint -w frontend`, `npm run test:unit -w frontend`
   (100 % line coverage on `frontend/src`), `npm run verify -w frontend` (the three in order, stops
   at the first failure; no Docker). The root `npm run verify` runs the back end's, then this.
-- `RUN_INTEGRATION=1 npm run test:unit -w frontend`: also runs `frontend/tests/integration`
+- `RUN_INTEGRATION=1 npm run test:integration -w frontend`: runs `frontend/tests/integration`
   (`login.service.test.ts`, and `journeys.test.ts`: the services against cognito-local on 9229
   and the API on 3000, `docs/FRONTEND_SERVICES.md` section 14). Needs `local:up` + `local:api`
   running and the Codespaces iptables rule below. Creates and removes the throw-away user
-  `fe-journey` (removed first too, so it can be rerun after a failed run).
+  `fe-journey` (removed first too, so it can be rerun after a failed run). Without
+  `RUN_INTEGRATION=1` it runs nothing and exits 0, like the back end's.
 - `RUN_INTEGRATION=1 npm run test:integration -w backend`: the journeys of plan step 9
   (`journeys.test.ts`) and the calendar's (`calendar.test.ts`) against the running `local:up` +
   `local:api` stack. Pass the same `DYNAMODB_PORT` as `local:up` (here `DYNAMODB_PORT=8002`).
@@ -265,7 +266,8 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   tests what it does with it (the 400 answer, the handlers).
 - Unit tests mock AWS with `aws-sdk-client-mock`, never real endpoints.
 - `frontend/vitest.config.ts`: projects `unit` and `integration` like the back end (integration
-  selects files only with `RUN_INTEGRATION=1`); `test:unit` runs both; 100 % line coverage on `src/`.
+  selects files only with `RUN_INTEGRATION=1`); `test:unit` runs `unit` with 100 % line coverage on
+  `src/`, `test:integration` runs `integration`, as in the back end.
   Unit tests stub `fetch` with `vi.stubGlobal` and real `Response` objects, no network, and use a
   service as a consumer would: subscribe first, then call. Tests that fake timers must fake
   `setInterval` too (RxJS's `timer` uses it), and keep test sessions within 24.8 days of the clock

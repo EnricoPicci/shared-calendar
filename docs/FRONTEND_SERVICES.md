@@ -447,7 +447,8 @@ v2 had `login.service.ts`, `login.types.ts`, `jwt.ts` and their tests.
   and `atob`, so no browser emulation (jsdom) is needed for the services layer.
 - Coverage threshold: 100 % lines on `frontend/src` (today: the services).
 - `frontend/vitest.config.ts` has two projects like the back end: `unit` and `integration`, the
-  second selecting files only when `RUN_INTEGRATION=1`. `npm run test:unit -w frontend` runs both.
+  second selecting files only when `RUN_INTEGRATION=1`. `npm run test:unit -w frontend` runs `unit`, with
+  coverage; `npm run test:integration -w frontend` runs `integration`, as in the back end.
 - The compiler does not fully enforce "no Node types": vitest's own type declarations reference
   `@types/node`, so `node:fs` and `process` type-check in `frontend/` even with
   `types: ["vitest/globals"]`. ESLint enforces the rule instead: for `frontend/src/**`,

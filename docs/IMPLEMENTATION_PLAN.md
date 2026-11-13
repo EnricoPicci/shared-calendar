@@ -957,7 +957,7 @@ Tests (16.6): success; request shape (method, path, query, body); every route er
 then success; cancel of a pending call; late subscriber.
 
 **Acceptance:** `npm run verify -w frontend` green with 100 % on `frontend/src`;
-`RUN_INTEGRATION=1 npm run test:unit -w frontend` green; root `verify` green.
+`RUN_INTEGRATION=1 npm run test:integration -w frontend` green; root `verify` green.
 
 ---
 
