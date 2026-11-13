@@ -222,6 +222,27 @@ describe('calendarView: windows', () => {
     ]);
   });
 
+  it('applies an override to its own date only: the next Monday keeps the pattern (R-OVR-01, AC-06)', () => {
+    const v = admin({
+      from: '2026-11-16',
+      to: '2026-11-23',
+      patterns: [PATTERNS[0]!],
+      overrides: [{ date: '2026-11-16', windows: [{ start: '09:00', end: '12:00', typeId: STUDIO }] }],
+      appointments: [],
+    });
+    expect([v.days[0], v.days[7]].map((d) => [d!.date, d!.hasOverride, d!.windows.map((w) => [w.source, localTimeOf(w.start, ZONE)])])).toEqual([
+      ['2026-11-16', true, [['override', '09:00']]],
+      ['2026-11-23', false, [['pattern', '08:00']]],
+    ]);
+  });
+
+  it('adds a one-off window on a date with an empty override (R-ONE-01, R-OVR-03)', () => {
+    const oneOff = { windowId: '01M6DN0000000000000000W003', date: '2026-11-16', start: '09:00', end: '10:00', typeId: POOL };
+    const v = admin({ patterns: [PATTERNS[0]!], overrides: [{ date: '2026-11-16', windows: [] }], oneOffs: [oneOff], appointments: [] });
+    expect(v.days[0]!.windows.map((w) => [w.source, w.sourceId])).toEqual([['one_off', oneOff.windowId]]);
+    expect(localSlots(v)).toEqual(['09:00']);
+  });
+
   it('leaves out a past window whose type was deleted (R-VIEW-03, v7); the override still counts for hasOverride', () => {
     const GONE = '01M6DN0000000000000000GONE';
     const more = {

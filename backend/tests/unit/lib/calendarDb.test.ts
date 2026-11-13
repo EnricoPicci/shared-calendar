@@ -834,6 +834,236 @@ describe('deletePattern', () => {
   });
 });
 
+// ── Date overrides and one-off windows ─────────────────────────────────────────────────────────
+
+const W1 = '01JC00000000000000000000W1';
+const W2 = '01JC00000000000000000000W2';
+const windowItem = (windowId: string, date: string, more: Record<string, unknown> = {}) => ({
+  PK: 'WINDOW',
+  SK: `${date}#${windowId}`,
+  date,
+  start: '12:00',
+  end: '13:00',
+  typeId: STUDIO,
+  createdAt: EARLIER,
+  createdBy: ADMIN,
+  ...more,
+});
+const onPartition = (pk: string, ...items: object[]) =>
+  ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': pk } }).resolves({ Items: items });
+
+describe('setOverride', () => {
+  const TODAY = '2026-11-12';
+  const DATE = '2026-11-16';
+  const studio = { start: '09:00', end: '12:00', typeId: STUDIO };
+  const pool = { start: '14:00', end: '18:00', typeId: POOL };
+
+  it('reads the state after the lock, then puts the whole OVERRIDE item with updatedBy, windows sorted by start', async () => {
+    const check = vi.fn(() => null);
+    const locked = await db.setOverride(DATE, [pool, studio], ADMIN, TODAY, NOW, check);
+    // The answer has no updatedBy (11.5).
+    expect(locked).toEqual({ result: { ok: true, value: { date: DATE, windows: [studio, pool], updatedAt: NOW } }, attempts: 1 });
+    expect(check).toHaveBeenCalledTimes(1);
+    expect(queries().map((q) => q.ExpressionAttributeValues![':pk'])).toEqual(['TYPE', 'PATTERN', 'OVERRIDE', 'WINDOW', 'APPT']);
+    const items = transactions()[0]!.TransactItems!;
+    expect(items).toHaveLength(2);
+    expect(items[0]!.Update!.Key).toEqual({ PK: 'LOCK', SK: 'LOCK' });
+    expect(items[1]).toEqual({
+      Put: { TableName: TABLE, Item: { PK: 'OVERRIDE', SK: DATE, windows: [studio, pool], updatedAt: NOW, updatedBy: ADMIN } },
+    });
+  });
+
+  it('stores an empty list for a closed day, and picks only the actor’s and the windows’ own fields', async () => {
+    await db.setOverride(DATE, [], { ...ADMIN, extra: 'x' } as unknown as typeof ADMIN, TODAY, NOW, () => null);
+    expect(transactions()[0]!.TransactItems![1]!.Put!.Item).toEqual({ PK: 'OVERRIDE', SK: DATE, windows: [], updatedAt: NOW, updatedBy: ADMIN });
+    await db.setOverride(DATE, [{ ...studio, extra: 'x' } as unknown as typeof studio], ADMIN, TODAY, NOW, () => null);
+    expect(transactions()[1]!.TransactItems![1]!.Put!.Item!.windows).toEqual([studio]);
+  });
+
+  it('replaces an existing override with the same Put (R-OVR-02)', async () => {
+    onPartition('OVERRIDE', { PK: 'OVERRIDE', SK: DATE, windows: [pool], updatedAt: EARLIER, updatedBy: ADMIN });
+    const check = vi.fn(() => null);
+    await db.setOverride(DATE, [studio], ADMIN, TODAY, NOW, check);
+    expect(check).toHaveBeenCalledWith(expect.objectContaining({ overrides: [{ date: DATE, windows: [pool] }] }));
+    expect(transactions()[0]!.TransactItems![1]!.Put!.Item).toEqual({ PK: 'OVERRIDE', SK: DATE, windows: [studio], updatedAt: NOW, updatedBy: ADMIN });
+  });
+
+  it('writes nothing and passes the check’s refusal on', async () => {
+    const conflicts = [{ appointmentId: 'A1', username: 'alice', start: NOW, end: NOW }];
+    const refusal = { error: 'availability_conflict' as const, message: '1 appointment would fall outside the availability', conflicts };
+    expect(await db.setOverride(DATE, [], ADMIN, TODAY, NOW, () => refusal)).toEqual({ result: { ok: false, ...refusal }, attempts: 1 });
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('re-reads and re-checks on a retry: a one-off window created in between is seen', async () => {
+    vi.useFakeTimers();
+    ddb.on(TransactWriteCommand).rejectsOnce(lockBusy()).resolves({});
+    ddb
+      .on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'WINDOW' } })
+      .resolvesOnce({ Items: [] })
+      .resolves({ Items: [windowItem(W1, DATE, { start: '10:00', end: '11:00' })] });
+    const check = vi.fn((state: { oneOffs: readonly unknown[] }) => (state.oneOffs.length > 0 ? { error: 'availability_overlap' as const } : null));
+    const pending = db.setOverride(DATE, [studio], ADMIN, TODAY, NOW, check);
+    await vi.runAllTimersAsync();
+    expect(await pending).toEqual({ result: { ok: false, error: 'availability_overlap' }, attempts: 2 });
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(transactions()).toHaveLength(1);
+  });
+});
+
+describe('deleteOverride', () => {
+  const TODAY = '2026-11-12';
+  const DATE = '2026-11-16';
+
+  it('deletes the OVERRIDE item after the lock, with no condition', async () => {
+    onPartition('OVERRIDE', { PK: 'OVERRIDE', SK: DATE, windows: [], updatedAt: EARLIER, updatedBy: ADMIN });
+    const check = vi.fn(() => null);
+    expect(await db.deleteOverride(DATE, TODAY, NOW, check)).toEqual({ result: { ok: true, value: null }, attempts: 1 });
+    expect(check).toHaveBeenCalledTimes(1);
+    const items = transactions()[0]!.TransactItems!;
+    expect(items).toHaveLength(2);
+    expect(items[0]!.Update!.Key).toEqual({ PK: 'LOCK', SK: 'LOCK' });
+    expect(items[1]).toEqual({ Delete: { TableName: TABLE, Key: { PK: 'OVERRIDE', SK: DATE } } });
+  });
+
+  it('answers override_not_found, without calling the check or writing, when the date has none', async () => {
+    onPartition('OVERRIDE', { PK: 'OVERRIDE', SK: '2026-11-23', windows: [], updatedAt: EARLIER });
+    const check = vi.fn(() => null);
+    expect(await db.deleteOverride(DATE, TODAY, NOW, check)).toEqual({ result: { ok: false, error: 'override_not_found' }, attempts: 1 });
+    expect(check).not.toHaveBeenCalled();
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('writes nothing when the check refuses', async () => {
+    onPartition('OVERRIDE', { PK: 'OVERRIDE', SK: DATE, windows: [], updatedAt: EARLIER });
+    const refusal = { error: 'availability_overlap' as const, message: 'On 2026-11-16 …' };
+    expect(await db.deleteOverride(DATE, TODAY, NOW, () => refusal)).toEqual({ result: { ok: false, ...refusal }, attempts: 1 });
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('re-reads on a retry: an override deleted in between answers override_not_found', async () => {
+    vi.useFakeTimers();
+    ddb.on(TransactWriteCommand).rejectsOnce(lockBusy()).resolves({});
+    ddb
+      .on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'OVERRIDE' } })
+      .resolvesOnce({ Items: [{ PK: 'OVERRIDE', SK: DATE, windows: [], updatedAt: EARLIER }] })
+      .resolves({ Items: [] });
+    const pending = db.deleteOverride(DATE, TODAY, NOW, () => null);
+    await vi.runAllTimersAsync();
+    expect(await pending).toEqual({ result: { ok: false, error: 'override_not_found' }, attempts: 2 });
+    expect(transactions()).toHaveLength(1);
+  });
+});
+
+describe('createOneOffWindow', () => {
+  const TODAY = '2026-11-12';
+  const window = { windowId: W1, date: '2026-11-16', start: '12:00', end: '13:00', typeId: STUDIO };
+
+  it('reads the state after the lock, then puts the WINDOW item <date>#<windowId> with createdBy', async () => {
+    const check = vi.fn(() => null);
+    const locked = await db.createOneOffWindow(window, ADMIN, TODAY, NOW, check);
+    // The answer has no createdBy (11.5).
+    expect(locked).toEqual({ result: { ok: true, value: { ...window, createdAt: NOW } }, attempts: 1 });
+    expect(check).toHaveBeenCalledTimes(1);
+    expect(queries().map((q) => q.ExpressionAttributeValues![':pk'])).toEqual(['TYPE', 'PATTERN', 'OVERRIDE', 'WINDOW', 'APPT']);
+    const items = transactions()[0]!.TransactItems!;
+    expect(items).toHaveLength(2);
+    expect(items[0]!.Update!.Key).toEqual({ PK: 'LOCK', SK: 'LOCK' });
+    expect(items[1]).toEqual({
+      Put: {
+        TableName: TABLE,
+        Item: { PK: 'WINDOW', SK: `2026-11-16#${W1}`, date: '2026-11-16', start: '12:00', end: '13:00', typeId: STUDIO, createdAt: NOW, createdBy: ADMIN },
+      },
+    });
+  });
+
+  it('writes nothing when the check refuses', async () => {
+    expect(await db.createOneOffWindow(window, ADMIN, TODAY, NOW, () => ({ error: 'limit_reached' as const }))).toEqual({
+      result: { ok: false, error: 'limit_reached' },
+      attempts: 1,
+    });
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('re-reads on a retry and writes the same id', async () => {
+    vi.useFakeTimers();
+    ddb.on(TransactWriteCommand).rejectsOnce(lockBusy()).resolves({});
+    const check = vi.fn(() => null);
+    const pending = db.createOneOffWindow(window, ADMIN, TODAY, NOW, check);
+    await vi.runAllTimersAsync();
+    expect((await pending).attempts).toBe(2);
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(transactions().map((t) => t.TransactItems![1]!.Put!.Item!.SK)).toEqual([`2026-11-16#${W1}`, `2026-11-16#${W1}`]);
+  });
+});
+
+describe('deleteOneOffWindow', () => {
+  const TODAY = '2026-11-12';
+
+  it('finds the window among those from today on and deletes its item, with one read of the state', async () => {
+    onPartition('WINDOW', windowItem(W2, '2026-11-12'), windowItem(W1, '2026-11-16'));
+    const check = vi.fn(() => null);
+    expect(await db.deleteOneOffWindow(W1, TODAY, NOW, check)).toEqual({ result: { ok: true, value: null }, attempts: 1 });
+    expect(check).toHaveBeenCalledTimes(1);
+    expect(queries().filter((q) => q.ExpressionAttributeValues![':pk'] === 'WINDOW')).toEqual([rangeQuery('WINDOW', TODAY)]);
+    const items = transactions()[0]!.TransactItems!;
+    expect(items).toHaveLength(2);
+    expect(items[0]!.Update!.Key).toEqual({ PK: 'LOCK', SK: 'LOCK' });
+    expect(items[1]).toEqual({ Delete: { TableName: TABLE, Key: { PK: 'WINDOW', SK: `2026-11-16#${W1}` } } });
+  });
+
+  it('accepts a window dated today', async () => {
+    onPartition('WINDOW', windowItem(W1, TODAY));
+    expect((await db.deleteOneOffWindow(W1, TODAY, NOW, () => null)).result).toEqual({ ok: true, value: null });
+  });
+
+  it('answers date_in_past for a window dated before today, found in the whole partition (spec v8)', async () => {
+    ddb
+      .on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'WINDOW', ':from': TODAY } })
+      .resolves({ Items: [windowItem(W2, '2026-11-16')] });
+    ddb.on(QueryCommand, { KeyConditionExpression: 'PK = :pk', ExpressionAttributeValues: { ':pk': 'WINDOW' } }).resolves({
+      Items: [windowItem(W1, '2026-11-11'), windowItem(W2, '2026-11-16')],
+    });
+    const check = vi.fn(() => null);
+    expect(await db.deleteOneOffWindow(W1, TODAY, NOW, check)).toEqual({ result: { ok: false, error: 'date_in_past' }, attempts: 1 });
+    expect(queries().filter((q) => q.ExpressionAttributeValues![':pk'] === 'WINDOW')).toEqual([rangeQuery('WINDOW', TODAY), partitionQuery('WINDOW')]);
+    expect(check).not.toHaveBeenCalled();
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('answers window_not_found for an id that is nowhere', async () => {
+    onPartition('WINDOW', windowItem(W2, '2026-11-16'));
+    const check = vi.fn(() => null);
+    expect(await db.deleteOneOffWindow(W1, TODAY, NOW, check)).toEqual({ result: { ok: false, error: 'window_not_found' }, attempts: 1 });
+    expect(check).not.toHaveBeenCalled();
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('writes nothing when the check refuses', async () => {
+    onPartition('WINDOW', windowItem(W1, '2026-11-16'));
+    const refusal = { error: 'availability_conflict' as const, message: '1 appointment would fall outside the availability', conflicts: [] };
+    expect(await db.deleteOneOffWindow(W1, TODAY, NOW, () => refusal)).toEqual({ result: { ok: false, ...refusal }, attempts: 1 });
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('re-reads and re-checks on a retry', async () => {
+    vi.useFakeTimers();
+    onPartition('WINDOW', windowItem(W1, '2026-11-16'));
+    ddb.on(TransactWriteCommand).rejectsOnce(lockBusy()).resolves({});
+    ddb
+      .on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'APPT' } })
+      .resolvesOnce({ Items: [] })
+      .resolves({ Items: [{ PK: 'APPT', SK: 'x#A1', status: 'booked' }] });
+    const check = vi.fn((state: { appointments: readonly unknown[] }) =>
+      state.appointments.length > 0 ? { error: 'availability_conflict' as const, conflicts: [] } : null,
+    );
+    const pending = db.deleteOneOffWindow(W1, TODAY, NOW, check);
+    await vi.runAllTimersAsync();
+    expect(await pending).toEqual({ result: { ok: false, error: 'availability_conflict', conflicts: [] }, attempts: 2 });
+    expect(check).toHaveBeenCalledTimes(2);
+  });
+});
+
 // ── The calendar view's reads ──────────────────────────────────────────────────────────────────
 
 describe('readCalendarRange', () => {

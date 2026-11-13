@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v7 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
-| Date | 2026-11-10; v3 to v6 2026-11-12; v7 2026-11-13 |
+| Status | v8 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
+| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
@@ -19,6 +19,7 @@
 | v5 | 2026-11-12 | Brief 45 (plan step 44). Open point O2 closed: the template stays reviewable and the local stack light; the PO confirmed T2 (section 22). |
 | v6 | 2026-11-12 | Brief 46 (plan step 45). R-AV-01: windows are compared as local times, not instants (the spring-forward night), and two patterns overlap only if they share at least one date (6.5, text and table). |
 | v7 | 2026-11-13 | Brief 47 (plan step 46). The 11.6 example corrected: the four Swimming Pool slots added, alice's appointment written out in full, real ULIDs. The night clocks go back gives two slots at the same local time (R-SLOT-01, 16.8). A window whose type has been deleted is not shown (R-VIEW-03). The view's appointment range is `SK BETWEEN <rangeStart> AND <rangeEnd>`, `rangeEnd` exclusive (13.2). |
+| v8 | 2026-11-13 | Brief 48 (plan step 47). A one-off window dated before today cannot be deleted: `409 date_in_past`, as for an override (R-ONE-02, route 14). An override's windows are stored and returned sorted by start; two of its own windows that overlap are `409 availability_overlap` (6.3). |
 
 ---
 
@@ -253,7 +254,7 @@ fall-back day, and a zone with a non-whole-hour offset.
 | Field | Rule |
 |---|---|
 | `date` | local date, today or later (`409 date_in_past` otherwise); the key of the override |
-| `windows` | 0–10 windows `{ start, end, typeId }`, local times as for patterns |
+| `windows` | 0–10 windows `{ start, end, typeId }`, local times as for patterns; stored and returned sorted by start. Two windows of one override that overlap are `409 availability_overlap` (6.5), not `400` |
 | `updatedAt` | instant |
 
 - **R-OVR-01** When a date has an override, **none** of the pattern windows apply on that date; the
@@ -277,6 +278,8 @@ fall-back day, and a zone with a non-whole-hour offset.
 - **R-ONE-01** A one-off window adds availability on its date, whether or not the date has an override.
 - **R-ONE-02** One-off windows are created and deleted, not edited. To change one, delete it and
   create a new one (this keeps the route count down; the view can offer "edit" as these two calls).
+  A one-off window dated before today cannot be deleted (`409 date_in_past`, as for an override):
+  past availability is not edited (R-AV-02).
 - **R-ONE-03** At most 10 one-off windows per date.
 - Example from the brief: "15:00–17:00 on Monday 9 November 2026" is a one-off window.
 
@@ -309,7 +312,7 @@ windows. The writes and their checks:
 
 **R-AV-02 — The rule cannot be broken from the past.** A pattern's overlap check against one-off
 windows considers dates from today on only. One-off windows and overrides cannot be dated in the
-past.
+past, nor set or deleted once their date is past (`409 date_in_past`).
 
 ### 6.6 Effective windows
 
@@ -602,7 +605,7 @@ are validated the same way.
 | 11 | `PUT /calendar/overrides/{date}` | admin | `{ windows: WindowBody[] }` | `200` `DateOverride` | 400 · 409 `date_in_past`, `type_not_found`, `availability_overlap`, `availability_conflict`, `concurrent_update` |
 | 12 | `DELETE /calendar/overrides/{date}` | admin | — | `204` | 400 · 404 `override_not_found` · 409 `date_in_past`, `availability_overlap`, `availability_conflict`, `concurrent_update` |
 | 13 | `POST /calendar/windows` | admin | `{ date, start, end, typeId }` | `201` `OneOffWindow` | 400 · 409 `date_in_past`, `type_not_found`, `availability_overlap`, `limit_reached`, `concurrent_update` |
-| 14 | `DELETE /calendar/windows/{windowId}` | admin | — | `204` | 400 · 404 `window_not_found` · 409 `availability_conflict`, `concurrent_update` |
+| 14 | `DELETE /calendar/windows/{windowId}` | admin | — | `204` | 400 · 404 `window_not_found` · 409 `date_in_past`, `availability_conflict`, `concurrent_update` |
 | 15 | `GET /calendar` | admin, user | `?from=YYYY-MM-DD&to=YYYY-MM-DD` (inclusive, `from ≤ to`, at most 31 days) | `200` `CalendarView` | 400 `invalid_request` |
 | 16 | `GET /calendar/appointments` | admin, user | `?from&to` (at most 92 days) **or** `?upcoming=true`; optional `username` (admin only), `status` = `booked` (default) \| `cancelled` \| `all` | `200` `{ appointments: Appointment[] }` (by start) | 400 · 403 `forbidden` (a User passing another `username`) |
 | 17 | `POST /calendar/appointments` | admin, user | `BookBody` | `201` `Appointment` | 400 · 403 `forbidden` · 404 `user_not_found` · 409 `target_not_user`, `booking_too_soon`, `booking_too_far`, `outside_availability`, `slot_taken`, `appointment_limit_reached`, `concurrent_update` |

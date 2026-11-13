@@ -1295,6 +1295,270 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${GetCalendarLogGroup}:log-stream:*
 
+  # PUT /calendar/overrides/{date} (route 11, Administrator only): sets or replaces the override of a
+  # date under the lock, checked for overlaps and for appointments it would leave outside the availability.
+  SetOverrideFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: setOverride.handler
+      Role: !GetAtt SetOverrideRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref SetOverrideLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        SetOverride:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: PUT
+            Path: /calendar/overrides/{date}
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/setOverride.ts
+
+  SetOverrideLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-setOverride
+      RetentionInDays: 14
+
+  SetOverrideRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+        - !Ref CalendarWritePolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${SetOverrideLogGroup}:log-stream:*
+
+  # DELETE /calendar/overrides/{date} (route 12, Administrator only): removes the override of a date
+  # under the lock, so the weekly patterns apply again, with the same checks.
+  DeleteOverrideFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: deleteOverride.handler
+      Role: !GetAtt DeleteOverrideRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref DeleteOverrideLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        DeleteOverride:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: DELETE
+            Path: /calendar/overrides/{date}
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/deleteOverride.ts
+
+  DeleteOverrideLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-deleteOverride
+      RetentionInDays: 14
+
+  DeleteOverrideRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+        - !Ref CalendarDeletePolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeleteOverrideLogGroup}:log-stream:*
+
+  # POST /calendar/windows (route 13, Administrator only): adds a one-off window on a date under the
+  # lock, checked for overlaps and the limit of 10 per date.
+  CreateOneOffWindowFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: createOneOffWindow.handler
+      Role: !GetAtt CreateOneOffWindowRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref CreateOneOffWindowLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        CreateOneOffWindow:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /calendar/windows
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/createOneOffWindow.ts
+
+  CreateOneOffWindowLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-createOneOffWindow
+      RetentionInDays: 14
+
+  CreateOneOffWindowRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+        - !Ref CalendarWritePolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CreateOneOffWindowLogGroup}:log-stream:*
+
+  # DELETE /calendar/windows/{windowId} (route 14, Administrator only): removes a one-off window under
+  # the lock, unless an appointment would fall outside the availability.
+  DeleteOneOffWindowFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: deleteOneOffWindow.handler
+      Role: !GetAtt DeleteOneOffWindowRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref DeleteOneOffWindowLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        DeleteOneOffWindow:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: DELETE
+            Path: /calendar/windows/{windowId}
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/deleteOneOffWindow.ts
+
+  DeleteOneOffWindowLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-deleteOneOffWindow
+      RetentionInDays: 14
+
+  DeleteOneOffWindowRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+        - !Ref CalendarDeletePolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeleteOneOffWindowLogGroup}:log-stream:*
+
   # ---------------------------------------------------------------------------
   # Error alarms (architecture section 11)
   # ---------------------------------------------------------------------------

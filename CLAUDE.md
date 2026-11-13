@@ -147,7 +147,8 @@ form works the same. Paths below without a folder are relative to `backend/`.
   `sam.cli.container.type=lambda` on the `hello-local` network when it exits (Ctrl-C included); the
   emulators are untouched. After a `kill -9` or a closed terminal, remove them by hand:
   `docker rm -f $(docker ps -aq --filter label=sam.cli.container.type=lambda --filter network=hello-local)`.
-  Local weight with 10 functions (step 44): about 0.75 GB for the whole stack, ready in about 14 s.
+  Local weight with 10 functions (step 44): about 0.75 GB for the whole stack, ready in about 14 s;
+  with 15 calendar functions (step 47): about 1.1 GB (26 containers after the journeys; start-up not timed).
 - Under `sam local`, every event carries the same fake `requestContext.requestId`, so
   identical request ids in local logs are expected. In the cloud they are unique.
 - cognito-local does not implement `AdminUserGlobalSignOut`. `env.local.json` sets
@@ -211,7 +212,9 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     locked writes take the rule check as a callback (`check`), run on the data read inside the
     locked attempt; the writes that compare themselves with the rest of the calendar get the
     availability state (`CalendarState`: types, patterns, overrides and one-off windows from today,
-    appointments from now − 24 h). `calendarRules.ts`: the calendar's checks (`checkTypeName`,
+    appointments from now − 24 h). Its availability writes: patterns, `setOverride`, `deleteOverride`,
+    `createOneOffWindow`, `deleteOneOffWindow` (a window by id: the state first, the whole `WINDOW`
+    partition only on a miss, to tell a past window, `date_in_past`, from an unknown one). `calendarRules.ts`: the calendar's checks (`checkTypeName`,
     `checkTypeDelete`, `typeNameKey`, and `checkAvailabilityWrite` for every availability write:
     patterns, overrides, one-off windows; and `calendarView`, the calendar view built for one
     caller's role from what `calendarDb.readCalendarRange` reads), pure, no AWS, "today", "now" and
@@ -223,7 +226,9 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     `calendarDb` with the `calendarRules` check → one log line); availability types:
     `listAvailabilityTypes.ts`, `createAvailabilityType.ts`, `renameAvailabilityType.ts`,
     `deleteAvailabilityType.ts`; weekly patterns: `listPatterns.ts`, `createPattern.ts`,
-    `updatePattern.ts`, `deletePattern.ts`; the view: `getCalendar.ts` (`GET /calendar`, both roles).
+    `updatePattern.ts`, `deletePattern.ts`; date overrides: `setOverride.ts`, `deleteOverride.ts`; one-off
+    windows: `createOneOffWindow.ts`, `deleteOneOffWindow.ts` (all admin only; `date_in_past` from the
+    path or body before the lock, except the window delete); the view: `getCalendar.ts` (`GET /calendar`, both roles).
   - `tests/unit/`: vitest unit tests, mirroring `src/` (e.g. `tests/unit/lib/http.test.ts`).
   - `tests/integration/`: end-to-end tests against the local Docker stack: `setup.ts` (helpers,
     including `resetCalendarTable()`, `putCalendarItem()`, `getCalendarItem()`), `journeys.test.ts`
