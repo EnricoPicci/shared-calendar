@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v6 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
-| Date | 2026-11-10; v3 to v6 2026-11-12 |
+| Status | v7 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
+| Date | 2026-11-10; v3 to v6 2026-11-12; v7 2026-11-13 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
@@ -18,6 +18,7 @@
 | v4 | 2026-11-12 | Brief 44 (plan step 43). `env.local.json` sets the calendar variables once, in its `Parameters` section, and never `CALENDAR_TIME_ZONE`, which comes from the `CalendarTimeZone` parameter only: `sam local` lets the file override the template, so a value there would make `--parameter-overrides` ineffective (14.4). |
 | v5 | 2026-11-12 | Brief 45 (plan step 44). Open point O2 closed: the template stays reviewable and the local stack light; the PO confirmed T2 (section 22). |
 | v6 | 2026-11-12 | Brief 46 (plan step 45). R-AV-01: windows are compared as local times, not instants (the spring-forward night), and two patterns overlap only if they share at least one date (6.5, text and table). |
+| v7 | 2026-11-13 | Brief 47 (plan step 46). The 11.6 example corrected: the four Swimming Pool slots added, alice's appointment written out in full, real ULIDs. The night clocks go back gives two slots at the same local time (R-SLOT-01, 16.8). A window whose type has been deleted is not shown (R-VIEW-03). The view's appointment range is `SK BETWEEN <rangeStart> AND <rangeEnd>`, `rangeEnd` exclusive (13.2). |
 
 ---
 
@@ -359,6 +360,12 @@ feet.
 
 A window 08:30–12:00 yields the slots 09:00, 10:00 and 11:00. A window 08:00–08:45 yields none.
 
+On the night clocks go back, the repeated local hour gives two slots with the same local start, one
+real hour apart, one per UTC offset. In `Europe/Rome` on 2026-10-25, a window 01:00–04:00 holds four
+real hours and gives four slots: 01:00 (+02:00), 02:00 (+02:00), 02:00 (+01:00) and 03:00 (+01:00).
+Each lasts 60 real minutes, and all of them are free and bookable like any other slot. An instant
+names each slot without ambiguity.
+
 **R-SLOT-02 — Free.** A slot is free when it overlaps no active appointment. Overlap is computed
 on real instants (`[a, b)` and `[c, d)` overlap when `a < d` and `c < b`). There is no break
 between appointments (D8).
@@ -494,7 +501,8 @@ appointment_not_found`, `409 appointment_not_active`, `400 invalid_request`. Eve
   view.
 - **R-VIEW-02** The Administrator sees every appointment, in every status.
 - **R-VIEW-03** Past dates can be viewed. Their windows are shown as the *current* rules define
-  them, which may differ from what applied at the time (assumption A3); their slots are empty.
+  them, which may differ from what applied at the time (assumption A3); their slots are empty. A
+  window of a type that has since been deleted is not shown (it can only lie in the past, R-TYPE-03).
 
 ---
 
@@ -762,7 +770,9 @@ type Slot = { start: string; end: string; typeId: string };
 type Interval = { start: string; end: string };
 ```
 
-Example (User `alice`, one day, `Europe/Rome`, now = 2026-11-10T09:00Z):
+Example (User `alice`, one day, `Europe/Rome`, now = 2026-11-10T09:00Z, default settings). The
+unit test of the view reproduces it byte for byte (`JSON.stringify` of the response body equals
+this JSON once compacted):
 
 ```json
 {
@@ -771,22 +781,37 @@ Example (User `alice`, one day, `Europe/Rome`, now = 2026-11-10T09:00Z):
   "days": [{
     "date": "2026-11-16", "weekday": 1,
     "windows": [
-      { "start": "2026-11-16T07:00:00.000Z", "end": "2026-11-16T11:00:00.000Z", "typeId": "01JC0STUDIO…", "typeName": "Studio" },
-      { "start": "2026-11-16T13:00:00.000Z", "end": "2026-11-16T17:00:00.000Z", "typeId": "01JC0POOL…", "typeName": "Swimming Pool" }
+      { "start": "2026-11-16T07:00:00.000Z", "end": "2026-11-16T11:00:00.000Z", "typeId": "01M6DMBE008N3QKX5R2D7W9VT4", "typeName": "Studio" },
+      { "start": "2026-11-16T13:00:00.000Z", "end": "2026-11-16T17:00:00.000Z", "typeId": "01M6DMMJZ04FZ6M1H8QJ0C3BNA", "typeName": "Swimming Pool" }
     ],
     "slots": [
-      { "start": "2026-11-16T07:00:00.000Z", "end": "2026-11-16T08:00:00.000Z", "typeId": "01JC0STUDIO…" },
-      { "start": "2026-11-16T09:00:00.000Z", "end": "2026-11-16T10:00:00.000Z", "typeId": "01JC0STUDIO…" }
+      { "start": "2026-11-16T07:00:00.000Z", "end": "2026-11-16T08:00:00.000Z", "typeId": "01M6DMBE008N3QKX5R2D7W9VT4" },
+      { "start": "2026-11-16T09:00:00.000Z", "end": "2026-11-16T10:00:00.000Z", "typeId": "01M6DMBE008N3QKX5R2D7W9VT4" },
+      { "start": "2026-11-16T13:00:00.000Z", "end": "2026-11-16T14:00:00.000Z", "typeId": "01M6DMMJZ04FZ6M1H8QJ0C3BNA" },
+      { "start": "2026-11-16T14:00:00.000Z", "end": "2026-11-16T15:00:00.000Z", "typeId": "01M6DMMJZ04FZ6M1H8QJ0C3BNA" },
+      { "start": "2026-11-16T15:00:00.000Z", "end": "2026-11-16T16:00:00.000Z", "typeId": "01M6DMMJZ04FZ6M1H8QJ0C3BNA" },
+      { "start": "2026-11-16T16:00:00.000Z", "end": "2026-11-16T17:00:00.000Z", "typeId": "01M6DMMJZ04FZ6M1H8QJ0C3BNA" }
     ],
     "busy": [ { "start": "2026-11-16T08:00:00.000Z", "end": "2026-11-16T09:00:00.000Z" } ]
   }],
-  "appointments": [ { "appointmentId": "01JC…", "username": "alice", "start": "2026-11-16T10:00:00.000Z", "…": "…" } ]
+  "appointments": [{
+    "appointmentId": "01M70NR5E0Q7R2C9T5XH3KD8MV", "username": "alice",
+    "start": "2026-11-16T10:00:00.000Z", "end": "2026-11-16T11:00:00.000Z", "date": "2026-11-16",
+    "typeId": "01M6DMBE008N3QKX5R2D7W9VT4", "typeName": "Studio",
+    "note": "First lesson", "status": "booked",
+    "createdAt": "2026-11-09T17:30:00.000Z", "createdBy": { "username": "alice", "role": "user" },
+    "updatedAt": "2026-11-09T17:30:00.000Z", "updatedBy": { "username": "alice", "role": "user" },
+    "cancelledAt": null, "cancelledBy": null, "cancelReason": null,
+    "replaces": null, "replacedBy": null,
+    "cancellableUntil": "2026-11-15T10:00:00.000Z"
+  }]
 }
 ```
 
 Local times are UTC + 1 in November: the Studio window is 08:00–12:00 local, 09:00–10:00 local is
 someone else's appointment (busy), 11:00–12:00 local is alice's own, so the free slots are 08:00 and
-10:00 local.
+10:00 local at the Studio and 14:00, 15:00, 16:00 and 17:00 local at the Swimming Pool. alice may
+cancel or change her appointment until 2026-11-15 11:00 local (`cancellableUntil`, 24 h of notice).
 
 ### 11.7 Examples
 
@@ -881,7 +906,7 @@ Access patterns, every one a `GetItem` or a `Query` on the base table with `Cons
 | All types / all patterns | `Query PK = TYPE` / `PK = PATTERN` |
 | Overrides in a date range | `Query PK = OVERRIDE, SK BETWEEN from AND to` |
 | One-off windows in a date range | `Query PK = WINDOW, SK BETWEEN from AND to#~` |
-| Appointments in a time range (view, overlap check) | `Query PK = APPT, SK BETWEEN <rangeStart> AND <rangeEnd>~`; filter `status` in code |
+| Appointments in a time range (view, overlap check) | `Query PK = APPT, SK BETWEEN <rangeStart> AND <rangeEnd>`; filter `status` in code. `rangeEnd` is exclusive (for the view, the local midnight after `to`): an `SK` is `<start>#<appointmentId>` and instants have one length, so an appointment starting exactly at `rangeEnd` has an `SK` that sorts after `<rangeEnd>` and is not taken. |
 | Active appointments not yet ended (conflict check R-AV-03, `upcoming`, limit R-BOOK-09) | `Query PK = APPT, SK ≥ <now − longest window>`, filter `status = booked` and `end > now`. An appointment lasts at most one day, so `SK ≥ (now − 24 h)` is enough. |
 | Appointment by id | `GetItem APPTID#<id>` → `GetItem APPT / sk` |
 | A User's appointments | the range queries above, filtered on `userId` (ranges are bounded to 92 days, or "upcoming") |
@@ -1202,7 +1227,7 @@ A new journeys file, `frontend/tests/integration/calendar.test.ts`, against the 
 
 | View | Who | Needs |
 |---|---|---|
-| Week calendar | both | Seven days from `GET /calendar`: windows coloured by type, free slots clickable, own appointments (User) or all appointments with names (Administrator), busy blocks (User). Navigation by week. Times shown in the calendar time zone, labelled with it, whatever the browser's zone. |
+| Week calendar | both | Seven days from `GET /calendar`: windows coloured by type, free slots clickable, own appointments (User) or all appointments with names (Administrator), busy blocks (User). Navigation by week. Times shown in the calendar time zone, labelled with it, whatever the browser's zone. On the night clocks go back, two slots or appointments can show the same local time an hour apart: the view must tell them apart, for example by showing the UTC offset ("02:00 +02:00", "02:00 +01:00"). |
 | Book dialog | both | Slot or (Administrator) custom start/end on a 15-minute grid, User picker (`GET /users`, Administrator), note. |
 | Appointment detail | both | Fields of 11.5; actions cancel, change, edit note, enabled according to the rules (`cancellableUntil`, status, end); the reason of a failure in plain words. |
 | My appointments | User | `GET /calendar/appointments?upcoming=true`; history with `status=all` and a range. |

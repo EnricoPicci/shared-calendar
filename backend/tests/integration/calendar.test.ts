@@ -1,3 +1,4 @@
+import { addDays, localDateOf, toInstant, weekdayOf } from '@shared-calendar/shared';
 import { ulid } from 'ulid';
 import { api, getCalendarItem, resetCalendarTable, signIn } from './setup';
 
@@ -303,5 +304,140 @@ describe('weekly patterns (routes 7–10)', () => {
     const gone = await api('DELETE', `/calendar/types/${ids.Studio}`, adminToken);
     expect(gone.status).toBe(204);
     expect(await getCalendarItem('TYPE', ids.Studio!)).toBeUndefined();
+  });
+});
+
+describe('calendar view (route 15)', () => {
+  // Dates come from the real today in the calendar zone, computed with the shared helpers, never
+  // with fixed offsets. The settings journeys left minBookingNoticeHours 2 and bookingHorizonDays 30;
+  // the type journeys left GYM (ids.pool) with the pattern Monday 07:00–08:00 from 2026-11-01.
+  const ZONE = 'Europe/Rome';
+  const HOUR_MS = 60 * 60 * 1000;
+  const today = () => localDateOf(new Date().toISOString(), ZONE);
+  const firstOnOrAfter = (date: string, weekday: number) => {
+    let d = date;
+    while (weekdayOf(d) !== weekday) d = addDays(d, 1);
+    return d;
+  };
+  const at = (date: string, time: string) => toInstant(date, time, ZONE);
+  const view = async (token: string, from: string, to: string) => {
+    const res = await api('GET', `/calendar?from=${from}&to=${to}`, token);
+    expect(res.status).toBe(200);
+    return res.body as { timeZone: string; from: string; to: string; generatedAt: string; days: Record<string, unknown>[]; appointments: unknown[] };
+  };
+  type Window = { start: string; end: string; typeId: string; typeName: string; source?: string; sourceId?: string };
+  type Slot = { start: string; end: string; typeId: string };
+  const patternIds: Record<string, string> = {};
+
+  it('prepares a fresh Studio type and the AC-04 pattern, from a past Monday, no end', async () => {
+    const type = await api('POST', '/calendar/types', adminToken, { name: 'Studio' });
+    expect(type.status).toBe(201);
+    ids.viewStudio = type.body?.typeId as string;
+
+    const pastMonday = addDays(firstOnOrAfter(today(), 1), -14);
+    const res = await api('POST', '/calendar/patterns', adminToken, {
+      weekday: 1, start: '08:00', end: '12:00', typeId: ids.viewStudio, validFrom: pastMonday, validUntil: null,
+    });
+    expect(res.status).toBe(201);
+    patternIds.ac04 = res.body?.patternId as string;
+
+    const patterns = await api('GET', '/calendar/patterns', adminToken);
+    const gym = (patterns.body?.patterns as { patternId: string; typeId: string }[]).find((p) => p.typeId === ids.pool);
+    expect(gym).toBeDefined();
+    patternIds.gym = gym!.patternId;
+  });
+
+  it('AC-04: alice sees the next Monday at least 8 days ahead: the window 08:00–12:00 and slots at 08, 09, 10, 11; no admin-only field', async () => {
+    const D = firstOnOrAfter(addDays(today(), 8), 1);
+    const before = Date.now();
+    const body = await view(aliceToken, D, D);
+    expect(body).toMatchObject({ timeZone: ZONE, from: D, to: D, appointments: [] });
+    expect(Date.parse(body.generatedAt)).toBeGreaterThanOrEqual(before - 5_000);
+    expect(body.days).toHaveLength(1);
+
+    const day = body.days[0]!;
+    expect(day).toEqual({
+      date: D,
+      weekday: 1,
+      // The leftover GYM window touches the Studio window and stays apart: another type.
+      windows: [
+        { start: at(D, '07:00'), end: at(D, '08:00'), typeId: ids.pool, typeName: 'GYM' },
+        { start: at(D, '08:00'), end: at(D, '12:00'), typeId: ids.viewStudio, typeName: 'Studio' },
+      ],
+      slots: [
+        { start: at(D, '07:00'), end: at(D, '08:00'), typeId: ids.pool },
+        ...['08:00', '09:00', '10:00', '11:00'].map((t, i) => ({
+          start: at(D, t),
+          end: at(D, ['09:00', '10:00', '11:00', '12:00'][i]!),
+          typeId: ids.viewStudio,
+        })),
+      ],
+      busy: [],
+    });
+    // Absent for a User, not null or false.
+    expect('hasOverride' in day).toBe(false);
+    for (const w of day.windows as Window[]) {
+      expect('source' in w).toBe(false);
+      expect('sourceId' in w).toBe(false);
+    }
+  });
+
+  it('AC-04: the Administrator’s view of the same day carries source, sourceId and hasOverride', async () => {
+    const D = firstOnOrAfter(addDays(today(), 8), 1);
+    const day = (await view(adminToken, D, D)).days[0]!;
+    expect(day.hasOverride).toBe(false);
+    expect(day.busy).toEqual([]);
+    expect(day.windows).toEqual([
+      { start: at(D, '07:00'), end: at(D, '08:00'), typeId: ids.pool, typeName: 'GYM', source: 'pattern', sourceId: patternIds.gym },
+      { start: at(D, '08:00'), end: at(D, '12:00'), typeId: ids.viewStudio, typeName: 'Studio', source: 'pattern', sourceId: patternIds.ac04 },
+    ]);
+    expect((day.slots as Slot[]).map((s) => s.start)).toEqual(['07:00', '08:00', '09:00', '10:00', '11:00'].map((t) => at(D, t)));
+  });
+
+  it('AC-33: a range of more than 31 days, from after to, a missing to and an unknown parameter are 400 invalid_request, for both roles', async () => {
+    for (const token of [aliceToken, adminToken]) {
+      for (const query of [
+        'from=2026-11-01&to=2026-12-15',
+        'from=2026-11-17&to=2026-11-16',
+        'from=2026-11-16',
+        'from=2026-11-16&to=2026-11-16&username=bob',
+        'from=2026-02-30&to=2026-03-01',
+      ]) {
+        const res = await api('GET', `/calendar?${query}`, token);
+        expect(res.status, query).toBe(400);
+        expect(res.body).toMatchObject({ error: 'invalid_request' });
+      }
+      // 31 days is allowed, to both roles.
+      const from = today();
+      expect((await view(token, from, addDays(from, 30))).days).toHaveLength(31);
+    }
+  });
+
+  it('AC-35: on the next spring-forward Sunday, 01:00–04:00 gives the Administrator slots at 01:00 and 03:00 local, each 60 real minutes', async () => {
+    // The next Sunday on which local 01:00 and 03:00 are one real hour apart.
+    let S = firstOnOrAfter(today(), 7);
+    for (let i = 0; i < 60 && Date.parse(at(S, '03:00')) - Date.parse(at(S, '01:00')) !== HOUR_MS; i++) S = addDays(S, 7);
+    expect(Date.parse(at(S, '03:00')) - Date.parse(at(S, '01:00'))).toBe(HOUR_MS);
+
+    const res = await api('POST', '/calendar/patterns', adminToken, {
+      weekday: 7, start: '01:00', end: '04:00', typeId: ids.viewStudio, validFrom: S, validUntil: S,
+    });
+    expect(res.status).toBe(201);
+
+    const admin = (await view(adminToken, S, S)).days[0]!;
+    expect(admin.windows).toEqual([
+      { start: at(S, '01:00'), end: at(S, '04:00'), typeId: ids.viewStudio, typeName: 'Studio', source: 'pattern', sourceId: res.body?.patternId },
+    ]);
+    const slots = admin.slots as Slot[];
+    expect(slots).toEqual([
+      { start: at(S, '01:00'), end: at(S, '03:00'), typeId: ids.viewStudio },
+      { start: at(S, '03:00'), end: at(S, '04:00'), typeId: ids.viewStudio },
+    ]);
+    for (const s of slots) expect(Date.parse(s.end) - Date.parse(s.start)).toBe(HOUR_MS);
+
+    // alice: the same window; slots only if S lies within the 30-day horizon (R-SLOT-03).
+    const alice = (await view(aliceToken, S, S)).days[0]!;
+    expect(alice.windows).toEqual([{ start: at(S, '01:00'), end: at(S, '04:00'), typeId: ids.viewStudio, typeName: 'Studio' }]);
+    expect(alice.slots).toEqual(S > addDays(today(), 30) ? [] : slots);
   });
 });

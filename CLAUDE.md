@@ -212,14 +212,17 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     availability state (`CalendarState`: types, patterns, overrides and one-off windows from today,
     appointments from now − 24 h). `calendarRules.ts`: the calendar's checks (`checkTypeName`,
     `checkTypeDelete`, `typeNameKey`, and `checkAvailabilityWrite` for every availability write:
-    patterns, overrides, one-off windows), pure, no AWS, "today", "now" and the zone passed in; a
-    failed check is `Refusal` (`{ error, message?, conflicts? }`, code from `ApiErrorCode`).
+    patterns, overrides, one-off windows; and `calendarView`, the calendar view built for one
+    caller's role from what `calendarDb.readCalendarRange` reads), pure, no AWS, "today", "now" and
+    the zone passed in; a failed check is `Refusal` (`{ error, message?, conflicts? }`, code from
+    `ApiErrorCode`). `http.ts`: `parseJsonBody` for bodies, `parseQuery` for query strings (the
+    object a `.strict()` query schema checks).
   - `src/handlers/`, calendar: `getCalendarSettings.ts`, `updateCalendarSettings.ts` (the pattern
     the other calendar handlers copy: claims → configuration check → role → path → body →
     `calendarDb` with the `calendarRules` check → one log line); availability types:
     `listAvailabilityTypes.ts`, `createAvailabilityType.ts`, `renameAvailabilityType.ts`,
     `deleteAvailabilityType.ts`; weekly patterns: `listPatterns.ts`, `createPattern.ts`,
-    `updatePattern.ts`, `deletePattern.ts`.
+    `updatePattern.ts`, `deletePattern.ts`; the view: `getCalendar.ts` (`GET /calendar`, both roles).
   - `tests/unit/`: vitest unit tests, mirroring `src/` (e.g. `tests/unit/lib/http.test.ts`).
   - `tests/integration/`: end-to-end tests against the local Docker stack: `setup.ts` (helpers,
     including `resetCalendarTable()`, `putCalendarItem()`, `getCalendarItem()`), `journeys.test.ts`

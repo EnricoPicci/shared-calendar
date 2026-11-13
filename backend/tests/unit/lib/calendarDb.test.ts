@@ -833,3 +833,185 @@ describe('deletePattern', () => {
     expect(transactions()).toHaveLength(0);
   });
 });
+
+// ── The calendar view's reads ──────────────────────────────────────────────────────────────────
+
+describe('readCalendarRange', () => {
+  const between = (pk: string, from: string, to: string) => ({
+    TableName: TABLE,
+    KeyConditionExpression: 'PK = :pk AND SK BETWEEN :from AND :to',
+    ExpressionAttributeValues: { ':pk': pk, ':from': from, ':to': to },
+    ConsistentRead: true,
+    ExclusiveStartKey: undefined,
+  });
+  const ALICE = { username: 'alice', role: 'user' } as const;
+  /** Every attribute of the appointment item (architecture 5.3), as step 48 writes it. */
+  const apptItem = (more: Record<string, unknown> = {}) => ({
+    PK: 'APPT',
+    SK: '2026-11-16T08:00:00.000Z#01M70NR5E0Q7R2C9T5XH3KD8MV',
+    userId: 'sub-alice',
+    username: 'alice',
+    start: '2026-11-16T08:00:00.000Z',
+    end: '2026-11-16T09:00:00.000Z',
+    date: '2026-11-16',
+    typeId: STUDIO,
+    typeNameAtBooking: 'Old studio name',
+    note: 'my note',
+    status: 'booked',
+    createdAt: EARLIER,
+    createdBy: ALICE,
+    updatedAt: EARLIER,
+    updatedBy: ALICE,
+    cancelledAt: null,
+    cancelledBy: null,
+    cancelReason: null,
+    replaces: null,
+    replacedBy: null,
+    version: 1,
+    ...more,
+  });
+  const onAppts = (...items: object[]) => ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'APPT' } }).resolves({ Items: items });
+
+  it('reads the settings and five consistent queries, the range bounded exactly (November, UTC+1)', async () => {
+    await db.readCalendarRange('2026-11-16', '2026-11-22');
+    expect(ddb.commandCalls(GetCommand).map((call) => call.args[0].input)).toEqual([
+      { TableName: TABLE, Key: { PK: 'SETTINGS', SK: 'SETTINGS' }, ConsistentRead: true },
+    ]);
+    expect(queries()).toEqual([
+      partitionQuery('TYPE'),
+      partitionQuery('PATTERN'),
+      between('OVERRIDE', '2026-11-16', '2026-11-22'),
+      // A window's SK is <date>#<windowId>; '~' sorts after every id character.
+      between('WINDOW', '2026-11-16', '2026-11-22#~'),
+      // Local midnight of from, and the local midnight after to: exclusive, since every SK is
+      // `<start>#<id>` and so sorts after the bare instant.
+      between('APPT', '2026-11-15T23:00:00.000Z', '2026-11-22T23:00:00.000Z'),
+    ]);
+    expect(ddb.commandCalls(TransactWriteCommand)).toHaveLength(0);
+  });
+
+  it('bounds a range across the spring-forward night by its local midnights (UTC+1 at the start, UTC+2 at the end)', async () => {
+    await db.readCalendarRange('2027-03-22', '2027-03-28');
+    expect(queries().at(-1)).toEqual(between('APPT', '2027-03-21T23:00:00.000Z', '2027-03-28T22:00:00.000Z'));
+  });
+
+  it('answers the settings (defaults until saved), the types and patterns, overrides and one-off windows as the rules read them', async () => {
+    onTypes(typeItem(STUDIO, 'Studio'));
+    ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'PATTERN' } }).resolves({
+      Items: [{ PK: 'PATTERN', SK: 'P1', weekday: 1, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-11-01', validUntil: null, createdAt: EARLIER, updatedAt: EARLIER }],
+    });
+    ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'OVERRIDE' } }).resolves({
+      Items: [{ PK: 'OVERRIDE', SK: '2026-11-17', windows: [], updatedAt: EARLIER }],
+    });
+    ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'WINDOW' } }).resolves({
+      Items: [{ PK: 'WINDOW', SK: '2026-11-18#W1', date: '2026-11-18', start: '12:00', end: '13:00', typeId: STUDIO, createdAt: EARLIER }],
+    });
+    const range = await db.readCalendarRange('2026-11-16', '2026-11-22');
+    expect(range).toEqual({
+      settings: {
+        timeZone: 'Europe/Rome',
+        cancellationNoticeHours: 24,
+        minBookingNoticeHours: 0,
+        bookingHorizonDays: 56,
+        maxFutureAppointmentsPerUser: null,
+        updatedAt: null,
+        updatedBy: null,
+      },
+      types: [{ typeId: STUDIO, name: 'Studio', createdAt: EARLIER, updatedAt: EARLIER }],
+      patterns: [{ patternId: 'P1', weekday: 1, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-11-01', validUntil: null, createdAt: EARLIER, updatedAt: EARLIER }],
+      overrides: [{ date: '2026-11-17', windows: [] }],
+      oneOffs: [{ windowId: 'W1', date: '2026-11-18', start: '12:00', end: '13:00', typeId: STUDIO }],
+      appointments: [],
+    });
+  });
+
+  it('maps every field of the appointment (8.1): the type’s current name, the owner’s sub apart, nothing internal', async () => {
+    onTypes(typeItem(STUDIO, 'Studio'));
+    onAppts(apptItem());
+    const { appointments } = await db.readCalendarRange('2026-11-16', '2026-11-16');
+    expect(appointments).toEqual([
+      {
+        userId: 'sub-alice',
+        appointment: {
+          appointmentId: '01M70NR5E0Q7R2C9T5XH3KD8MV',
+          username: 'alice',
+          start: '2026-11-16T08:00:00.000Z',
+          end: '2026-11-16T09:00:00.000Z',
+          date: '2026-11-16',
+          typeId: STUDIO,
+          typeName: 'Studio',
+          note: 'my note',
+          status: 'booked',
+          createdAt: EARLIER,
+          createdBy: ALICE,
+          updatedAt: EARLIER,
+          updatedBy: ALICE,
+          cancelledAt: null,
+          cancelledBy: null,
+          cancelReason: null,
+          replaces: null,
+          replacedBy: null,
+        },
+      },
+    ]);
+    // No userId, snapshot, version, PK or SK in what becomes the response.
+    for (const key of ['userId', 'typeNameAtBooking', 'version', 'PK', 'SK']) expect(appointments[0]!.appointment).not.toHaveProperty(key);
+  });
+
+  it('takes the snapshot name once the type is gone, and maps a cancelled appointment’s fields', async () => {
+    const cancelledBy = { username: 'admin', role: 'admin', extra: 'dropped' };
+    onAppts(
+      apptItem({
+        status: 'cancelled',
+        cancelledAt: NOW,
+        cancelledBy,
+        cancelReason: 'changed',
+        replaces: '01M70NR5E0Q7R2C9T5XH3KD8M0',
+        replacedBy: '01M70NR5E0Q7R2C9T5XH3KD8M1',
+        updatedBy: cancelledBy,
+      }),
+    );
+    const { appointment } = (await db.readCalendarRange('2026-11-16', '2026-11-16')).appointments[0]!;
+    expect(appointment).toEqual(
+      expect.objectContaining({
+        typeName: 'Old studio name',
+        status: 'cancelled',
+        cancelledAt: NOW,
+        cancelledBy: ADMIN,
+        updatedBy: ADMIN,
+        cancelReason: 'changed',
+        replaces: '01M70NR5E0Q7R2C9T5XH3KD8M0',
+        replacedBy: '01M70NR5E0Q7R2C9T5XH3KD8M1',
+      }),
+    );
+  });
+
+  it('reads a missing optional attribute as null', async () => {
+    const item: Record<string, unknown> = apptItem();
+    for (const key of ['note', 'cancelledAt', 'cancelledBy', 'cancelReason', 'replaces', 'replacedBy']) delete item[key];
+    onAppts(item);
+    const { appointment } = (await db.readCalendarRange('2026-11-16', '2026-11-16')).appointments[0]!;
+    expect(appointment).toEqual(
+      expect.objectContaining({ note: null, cancelledAt: null, cancelledBy: null, cancelReason: null, replaces: null, replacedBy: null }),
+    );
+  });
+
+  it('follows LastEvaluatedKey on the bounded query', async () => {
+    ddb
+      .on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'APPT' } })
+      .resolvesOnce({ Items: [apptItem({ SK: 'a#1' })], LastEvaluatedKey: { PK: 'APPT', SK: 'a#1' } })
+      .resolvesOnce({ Items: [apptItem({ SK: 'b#2' })] });
+    const { appointments } = await db.readCalendarRange('2026-11-16', '2026-11-16');
+    expect(appointments.map((a) => a.appointment.appointmentId)).toEqual(['1', '2']);
+    const appt = queries().filter((q) => q.ExpressionAttributeValues![':pk'] === 'APPT');
+    expect(appt.map((q) => q.ExclusiveStartKey)).toEqual([undefined, { PK: 'APPT', SK: 'a#1' }]);
+    expect(appt.every((q) => q.KeyConditionExpression === 'PK = :pk AND SK BETWEEN :from AND :to' && q.ConsistentRead)).toBe(true);
+  });
+
+  it('propagates a DynamoDB failure and throws CalendarConfigError when the zone is broken', async () => {
+    ddb.on(QueryCommand).rejects(new Error('network down'));
+    await expect(db.readCalendarRange('2026-11-16', '2026-11-16')).rejects.toThrow('network down');
+    const broken = await load({ CALENDAR_TIME_ZONE: 'Not/AZone' });
+    await expect(broken.readCalendarRange('2026-11-16', '2026-11-16')).rejects.toThrow(broken.CalendarConfigError);
+  });
+});

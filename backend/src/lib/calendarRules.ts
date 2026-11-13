@@ -1,13 +1,23 @@
 import {
   CALENDAR_LIMITS,
   addDays,
+  cancellableUntil,
   definedWindows,
   effectiveWindows,
+  localDateOf,
   overlaps,
+  slotsOf,
   toInstantWindows,
   weekdayOf,
   type ApiErrorCode,
   type Appointment,
+  type CalendarDay,
+  type CalendarSettings,
+  type CalendarView,
+  type CalendarWindow,
+  type Interval,
+  type Role,
+  type Slot,
   type AppointmentConflict,
   type AppointmentStatus,
   type OneOffInput,
@@ -283,4 +293,135 @@ export function checkAvailabilityWrite(
 
   const after = applyWrite(state, write);
   return checkOverlap(write, after, today) ?? checkConflicts(write, state, after, now, zone);
+}
+
+// ── The calendar view (spec 11.6, 7, 8.6, 17) ────────────────────────────────────────────────
+
+/**
+ * An appointment as calendarDb reads it for the view: the response fields (typeName already the
+ * current name or the snapshot) and, apart, the owner's Cognito `sub`. Ownership is decided on
+ * `userId`, never on `username` (a deleted username can be given to a new User), and `userId` is
+ * never part of a response: it sits beside the appointment, not in it.
+ */
+export type ViewAppointment = { userId: string; appointment: Omit<Appointment, 'cancellableUntil'> };
+
+export type CalendarViewInput = {
+  from: string;
+  to: string;
+  now: string;
+  zone: string;
+  role: Role;
+  /** The caller's Cognito `sub`: a User's own appointments are those with this `userId`. */
+  callerSub: string;
+  settings: Pick<CalendarSettings, 'cancellationNoticeHours' | 'minBookingNoticeHours' | 'bookingHorizonDays'>;
+  types: readonly { typeId: string; name: string }[];
+  patterns: readonly PatternInput[];
+  /** The overrides dated in the range; one of another date is ignored. */
+  overrides: readonly OverrideInput[];
+  /** The one-off windows dated in the range. */
+  oneOffs: readonly OneOffInput[];
+  /** The appointments starting in the range, every status; one dated outside the range is ignored. */
+  appointments: readonly ViewAppointment[];
+};
+
+const HOUR_MS = 60 * 60 * 1000;
+
+// The appointment as a response (11.5), field by field in the contract's order, so nothing stored
+// beside it can reach the body. `cancellableUntil` for a User; null for the Administrator.
+function toResponse(a: Omit<Appointment, 'cancellableUntil'>, until: string | null): Appointment {
+  return {
+    appointmentId: a.appointmentId,
+    username: a.username,
+    start: a.start,
+    end: a.end,
+    date: a.date,
+    typeId: a.typeId,
+    typeName: a.typeName,
+    note: a.note,
+    status: a.status,
+    createdAt: a.createdAt,
+    createdBy: a.createdBy,
+    updatedAt: a.updatedAt,
+    updatedBy: a.updatedBy,
+    cancelledAt: a.cancelledAt,
+    cancelledBy: a.cancelledBy,
+    cancelReason: a.cancelReason,
+    replaces: a.replaces,
+    replacedBy: a.replacedBy,
+    cancellableUntil: until,
+  };
+}
+
+const byStartThenId = (a: ViewAppointment, b: ViewAppointment) =>
+  byInstant(a.appointment.start, b.appointment.start) || byInstant(a.appointment.appointmentId, b.appointment.appointmentId);
+function byInstant(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * The calendar view of `from`..`to` for one caller (11.6), pure: "now" and the zone passed in,
+ * "today" = localDateOf(now, zone) (R-TIME-04). Per date:
+ * - `windows`: the defined windows (6.5) as instants, sorted, not merged (T11); `source`,
+ *   `sourceId` for the Administrator only. A window whose type no longer exists is left out (it can
+ *   only lie in the past, R-TYPE-03; R-VIEW-03, spec v7), and so is one that holds no real time
+ *   (it starts in the hour skipped when clocks go forward and ends at or just after it);
+ * - `slots`: the slots (R-SLOT-01) of the effective windows (6.6), minus every slot that overlaps
+ *   a booked appointment, the caller's own included (R-SLOT-02). A User gets those that pass
+ *   R-SLOT-03 (`start > now`, the minimum notice, the horizon); the Administrator those with
+ *   `start > now` (R-SLOT-04). A past date has windows and no slots (R-VIEW-03);
+ * - `busy`: for a User, the other Users' booked appointments of that date as bare intervals,
+ *   sorted (section 17); `[]` for the Administrator;
+ * - `hasOverride`: for the Administrator only, also for an override with no windows.
+ * A field that is "admin only" is absent for a User. `appointments`: the booked ones (active, an
+ * ended one included) starting in the range, by start: all for the Administrator with
+ * `cancellableUntil: null`, the caller's own (by `userId`) for a User with `cancellableUntil`.
+ */
+export function calendarView(input: CalendarViewInput): CalendarView {
+  const { from, to, now, zone, role, callerSub, settings } = input;
+  const admin = role === 'admin';
+  const today = localDateOf(now, zone);
+  const lastBookable = addDays(today, settings.bookingHorizonDays);
+  const nowMs = Date.parse(now);
+  const typeNames = new Map(input.types.map((t) => [t.typeId, t.name]));
+  // Active = booked, an ended one included. Only those dated in the range: calendarDb reads exactly
+  // these, and the view does not rely on it.
+  const booked = input.appointments
+    .filter((a) => a.appointment.status === 'booked' && from <= a.appointment.date && a.appointment.date <= to)
+    .sort(byStartThenId);
+
+  // R-SLOT-03 for a User, R-SLOT-04 for the Administrator; R-SLOT-02 for both.
+  const offered = (slot: Slot): boolean => {
+    const ahead = Date.parse(slot.start) - nowMs;
+    if (ahead <= 0) return false;
+    if (!admin && (ahead < settings.minBookingNoticeHours * HOUR_MS || localDateOf(slot.start, zone) > lastBookable)) return false;
+    return !booked.some((a) => overlaps(slot, a.appointment));
+  };
+
+  const days: CalendarDay[] = [];
+  for (let date = from; date <= to; date = addDays(date, 1)) {
+    const override = input.overrides.find((o) => o.date === date) ?? null;
+    const defined = definedWindows(date, input.patterns, override, input.oneOffs).filter((w) => typeNames.has(w.typeId));
+    const instants = toInstantWindows(date, defined, zone).filter((w) => w.start < w.end);
+    const windows = instants.map(
+      (w): CalendarWindow => ({
+        start: w.start,
+        end: w.end,
+        typeId: w.typeId,
+        typeName: typeNames.get(w.typeId)!,
+        ...(admin && { source: w.source, sourceId: w.sourceId }),
+      }),
+    );
+    const slots = effectiveWindows(instants).flatMap((w) => slotsOf(w, zone)).filter(offered);
+    const busy: Interval[] = admin
+      ? []
+      : booked
+          .filter((a) => a.userId !== callerSub && a.appointment.date === date)
+          .map((a) => ({ start: a.appointment.start, end: a.appointment.end }));
+    days.push({ date, weekday: weekdayOf(date), windows, slots, busy, ...(admin && { hasOverride: override !== null }) });
+  }
+
+  const appointments = booked
+    .filter((a) => admin || a.userId === callerSub)
+    .map((a) => toResponse(a.appointment, admin ? null : cancellableUntil(a.appointment, settings)));
+  return { timeZone: zone, from, to, generatedAt: now, days, appointments };
 }

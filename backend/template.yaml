@@ -1230,6 +1230,71 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeletePatternLogGroup}:log-stream:*
 
+  # GET /calendar (route 15, Administrator and Users): the calendar view of a date range (at most
+  # 31 days): windows, free slots, busy intervals and appointments. A read: no lock, no write.
+  GetCalendarFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: getCalendar.handler
+      Role: !GetAtt GetCalendarRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref GetCalendarLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        GetCalendar:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /calendar
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/getCalendar.ts
+
+  GetCalendarLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-getCalendar
+      RetentionInDays: 14
+
+  GetCalendarRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${GetCalendarLogGroup}:log-stream:*
+
   # ---------------------------------------------------------------------------
   # Error alarms (architecture section 11)
   # ---------------------------------------------------------------------------

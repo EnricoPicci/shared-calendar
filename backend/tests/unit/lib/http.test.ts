@@ -1,4 +1,6 @@
-import { error, noContent, ok, parseJsonBody } from '../../../src/lib/http';
+import { CalendarQuery } from '@shared-calendar/shared';
+import { error, noContent, ok, parseJsonBody, parseQuery } from '../../../src/lib/http';
+import { validate } from '../../../src/lib/validation';
 
 describe('ok', () => {
   it('returns the status, a JSON content type and the serialised body', () => {
@@ -61,6 +63,40 @@ describe('parseJsonBody', () => {
     expect(JSON.parse(result.response.body as string)).toEqual({
       error: 'invalid_json',
       message: 'Request body must be a JSON document',
+    });
+  });
+});
+
+describe('parseQuery', () => {
+  const view = (queryStringParameters?: Record<string, string | undefined>) => validate(CalendarQuery, parseQuery({ queryStringParameters }));
+  const message = (outcome: ReturnType<typeof view>) => (outcome.ok ? null : JSON.parse(outcome.response.body as string));
+
+  it('gives the parameters as one string each', () => {
+    expect(parseQuery({ queryStringParameters: { from: '2026-11-16', to: '2026-11-22' } })).toEqual({ from: '2026-11-16', to: '2026-11-22' });
+    expect(view({ from: '2026-11-16', to: '2026-11-22' })).toEqual({ ok: true, value: { from: '2026-11-16', to: '2026-11-22' } });
+  });
+
+  it('gives {} without a query string, so the schema answers 400 for the missing fields', () => {
+    expect(parseQuery({})).toEqual({});
+    expect(parseQuery({ queryStringParameters: undefined })).toEqual({});
+    expect(message(view(undefined))).toEqual({ error: 'invalid_request', message: 'Invalid input: from, to' });
+  });
+
+  it('drops a parameter API Gateway gives as undefined', () => {
+    expect(parseQuery({ queryStringParameters: { from: '2026-11-16', to: undefined } })).toEqual({ from: '2026-11-16' });
+  });
+
+  it('keeps an unknown parameter, which the strict schema refuses', () => {
+    expect(message(view({ from: '2026-11-16', to: '2026-11-16', upcoming: 'true' }))).toEqual({
+      error: 'invalid_request',
+      message: 'Invalid input: upcoming',
+    });
+  });
+
+  it('a repeated parameter (joined with a comma by API Gateway) fails the date format', () => {
+    expect(message(view({ from: '2026-11-16,2026-11-17', to: '2026-11-17' }))).toEqual({
+      error: 'invalid_request',
+      message: 'Invalid input: from',
     });
   });
 });

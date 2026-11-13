@@ -34,3 +34,15 @@ export function parseJsonBody(event: Pick<APIGatewayProxyEventV2, 'body' | 'isBa
     return { ok: false, response: error(400, 'invalid_json', 'Request body must be a JSON document') };
   }
 }
+
+// The query string as the object a `.strict()` query schema checks (spec 11.2): one string per
+// parameter. A request without a query string gives `{}`, so the schema answers 400 for the
+// missing fields. API Gateway (payload 2.0) joins a repeated parameter with commas (`a,b`), so it
+// arrives as one value and fails the schema's format. Nothing here can fail; the schema decides.
+export function parseQuery(event: Pick<APIGatewayProxyEventV2, 'queryStringParameters'>): Record<string, string> {
+  const params: Record<string, string> = {};
+  for (const [key, value] of Object.entries(event.queryStringParameters ?? {})) {
+    if (value !== undefined) params[key] = value;
+  }
+  return params;
+}

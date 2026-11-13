@@ -3,14 +3,18 @@ import {
   GetCommand,
   QueryCommand,
   TransactWriteCommand,
+  type QueryCommandInput,
   type TransactWriteCommandInput,
 } from '@aws-sdk/lib-dynamodb';
 import {
   DEFAULT_SETTINGS,
+  addDays,
   isValidTimeZone,
+  toInstant,
   type Actor,
   type ApiErrorCode,
   type AppointmentStatus,
+  type CancelReason,
   type OneOffInput,
   type OverrideInput,
   type PatternInput,
@@ -19,7 +23,7 @@ import {
   type CalendarSettings,
   type UpdateSettingsBody,
 } from '@shared-calendar/shared';
-import type { CalendarState, Refusal, StateAppointment } from './calendarRules';
+import type { CalendarState, Refusal, StateAppointment, ViewAppointment } from './calendarRules';
 import { documentClient } from './db';
 
 // The calendar table (docs/SHARED_CALENDAR_SPEC.md 13). This is the only module that knows its
@@ -162,12 +166,16 @@ function pickValues(values: SettingsValues): SettingsValues {
   };
 }
 
-// The saved settings, or the defaults until the first save (R-SET-01).
-export async function getSettings(): Promise<CalendarSettings> {
-  const { table, timeZone } = calendarConfig();
+async function readSettings(table: string, timeZone: string): Promise<CalendarSettings> {
   const { Item } = await documentClient.send(new GetCommand({ TableName: table, Key: SETTINGS_KEY, ConsistentRead: true }));
   const values = (Item as SettingsValues | undefined) ?? { ...DEFAULT_SETTINGS, updatedAt: null, updatedBy: null };
   return { timeZone, ...pickValues(values) };
+}
+
+// The saved settings, or the defaults until the first save (R-SET-01).
+export async function getSettings(): Promise<CalendarSettings> {
+  const { table, timeZone } = calendarConfig();
+  return readSettings(table, timeZone);
 }
 
 // Replaces the four editable values together (R-SET-02), under the lock. The time zone is a
@@ -185,17 +193,28 @@ export async function putSettings(values: UpdateSettingsBody, by: Actor, now: st
 
 type Item = Record<string, unknown>;
 
-// Every item of one partition, or of its part from `fromSk` on (SK ≥ fromSk), in SK order:
-// a consistent Query that follows LastEvaluatedKey to the end. Every query of this module uses it.
-async function queryPartition(table: string, pk: string, fromSk?: string): Promise<Item[]> {
+// The key condition of queryPartition: the whole partition, SK ≥ from, or SK BETWEEN from AND to
+// (both inclusive, as DynamoDB defines BETWEEN).
+function keyCondition(pk: string, fromSk?: string, toSk?: string): Pick<QueryCommandInput, 'KeyConditionExpression' | 'ExpressionAttributeValues'> {
+  if (fromSk === undefined) return { KeyConditionExpression: 'PK = :pk', ExpressionAttributeValues: { ':pk': pk } };
+  if (toSk === undefined) return { KeyConditionExpression: 'PK = :pk AND SK >= :from', ExpressionAttributeValues: { ':pk': pk, ':from': fromSk } };
+  return {
+    KeyConditionExpression: 'PK = :pk AND SK BETWEEN :from AND :to',
+    ExpressionAttributeValues: { ':pk': pk, ':from': fromSk, ':to': toSk },
+  };
+}
+
+// Every item of one partition, or of its part from `fromSk` on (SK ≥ fromSk), or between `fromSk`
+// and `toSk` (both inclusive), in SK order: a consistent Query that follows LastEvaluatedKey to the
+// end. Every query of this module uses it.
+async function queryPartition(table: string, pk: string, fromSk?: string, toSk?: string): Promise<Item[]> {
   const items: Item[] = [];
   let startKey: Item | undefined;
   do {
     const page = await documentClient.send(
       new QueryCommand({
         TableName: table,
-        KeyConditionExpression: fromSk === undefined ? 'PK = :pk' : 'PK = :pk AND SK >= :from',
-        ExpressionAttributeValues: fromSk === undefined ? { ':pk': pk } : { ':pk': pk, ':from': fromSk },
+        ...keyCondition(pk, fromSk, toSk),
         ConsistentRead: true,
         ExclusiveStartKey: startKey,
       }),
@@ -324,6 +343,29 @@ function toPattern(item: Item): WeeklyPattern {
 // The id after the first '#' of an SK `<date or instant>#<id>`.
 const idOf = (sk: string) => sk.slice(sk.indexOf('#') + 1);
 
+// An override item (OVERRIDE / <date>): its date and windows, as the rules read them.
+function toOverride(item: Item): OverrideInput {
+  return {
+    date: item.SK as string,
+    windows: ((item.windows as Item[] | undefined) ?? []).map((w) => ({
+      start: w.start as string,
+      end: w.end as string,
+      typeId: w.typeId as string,
+    })),
+  };
+}
+
+// A one-off window item (WINDOW / <date>#<windowId>), as the rules read it.
+function toOneOff(item: Item): OneOffInput {
+  return {
+    windowId: idOf(item.SK as string),
+    date: item.date as string,
+    start: item.start as string,
+    end: item.end as string,
+    typeId: item.typeId as string,
+  };
+}
+
 /**
  * The availability state of a locked attempt (13.2 access patterns, all consistent): every type
  * and every pattern; the overrides and one-off windows dated `today` or later (a window's SK is
@@ -345,25 +387,8 @@ async function readState(table: string, today: string, now: string): Promise<Rea
   return {
     types: types.map(toTypeRecord),
     patterns: patterns.map(toPattern),
-    overrides: overrides.map(
-      (o): OverrideInput => ({
-        date: o.SK as string,
-        windows: ((o.windows as Item[] | undefined) ?? []).map((w) => ({
-          start: w.start as string,
-          end: w.end as string,
-          typeId: w.typeId as string,
-        })),
-      }),
-    ),
-    oneOffs: oneOffs.map(
-      (w): OneOffInput => ({
-        windowId: idOf(w.SK as string),
-        date: w.date as string,
-        start: w.start as string,
-        end: w.end as string,
-        typeId: w.typeId as string,
-      }),
-    ),
+    overrides: overrides.map(toOverride),
+    oneOffs: oneOffs.map(toOneOff),
     appointments: appointments.map(
       (a): StateAppointment => ({
         appointmentId: idOf(a.SK as string),
@@ -493,4 +518,88 @@ export async function deletePattern<C extends ApiErrorCode>(
     if (refusal) return { write: null, result: refused(refusal) };
     return { write: [{ Delete: { TableName: table, Key: { PK: PATTERN_PK, SK: patternId } } }], result: { ok: true, value: null } };
   });
+}
+
+// ── The calendar view (spec 11.6; reads of 13.2, no lock) ──────────────────────────────────────
+
+const APPT_PK = 'APPT';
+
+// The appointment item (APPT / <start instant>#<appointmentId>, spec 8.1 and 13.2; attribute names
+// in architecture 5.3). Step 48 writes it; the view reads it. The id is the SK after '#' and is not
+// repeated. `note`, `cancelledAt`, `cancelledBy`, `cancelReason`, `replaces` and `replacedBy` are
+// null (stored as NULL) until set; a missing attribute reads as null too. `version` is internal.
+function toViewAppointment(item: Item, typeNames: ReadonlyMap<string, string>): ViewAppointment {
+  const typeId = item.typeId as string;
+  return {
+    userId: item.userId as string,
+    appointment: {
+      appointmentId: idOf(item.SK as string),
+      username: item.username as string,
+      start: item.start as string,
+      end: item.end as string,
+      date: item.date as string,
+      typeId,
+      // The type's current name; the snapshot taken at booking once the type is gone (R-TYPE-03).
+      typeName: typeNames.get(typeId) ?? (item.typeNameAtBooking as string),
+      note: (item.note as string | null | undefined) ?? null,
+      status: item.status as AppointmentStatus,
+      createdAt: item.createdAt as string,
+      createdBy: toActor(item.createdBy as Item),
+      updatedAt: item.updatedAt as string,
+      updatedBy: toActor(item.updatedBy as Item),
+      cancelledAt: (item.cancelledAt as string | null | undefined) ?? null,
+      cancelledBy: item.cancelledBy ? toActor(item.cancelledBy as Item) : null,
+      cancelReason: (item.cancelReason as CancelReason | null | undefined) ?? null,
+      replaces: (item.replaces as string | null | undefined) ?? null,
+      replacedBy: (item.replacedBy as string | null | undefined) ?? null,
+    },
+  };
+}
+
+// An actor map, picked field by field so nothing else stored with it reaches a response.
+function toActor(item: Item): Actor {
+  return { username: item.username as string, role: item.role as Actor['role'] };
+}
+
+/** What one calendar view reads (11.6): the inputs of calendarView, except the request's own. */
+export type CalendarRange = {
+  settings: CalendarSettings;
+  types: AvailabilityType[];
+  patterns: WeeklyPattern[];
+  overrides: OverrideInput[];
+  oneOffs: OneOffInput[];
+  appointments: ViewAppointment[];
+};
+
+/**
+ * The reads of the calendar view of `from`..`to` (local dates, inclusive), consistent and without
+ * the lock (a read): the settings, every type, every pattern, the overrides `SK BETWEEN from AND
+ * to`, the one-off windows `SK BETWEEN from AND to#~`, and the appointments that start in the
+ * range, every status. The range starts at the local midnight of `from` and ends, exclusive, at
+ * the local midnight after `to`. An appointment's SK is `<start>#<id>` and instants have one
+ * length, so `SK BETWEEN <rangeStart> AND <rangeEnd>` takes exactly the starts with
+ * rangeStart ≤ start < rangeEnd: one starting at rangeEnd has the SK `<rangeEnd>#…`, which sorts
+ * after `<rangeEnd>` (spec 13.2, v7).
+ */
+export async function readCalendarRange(from: string, to: string): Promise<CalendarRange> {
+  const { table, timeZone } = calendarConfig();
+  const rangeStart = toInstant(from, '00:00', timeZone);
+  const rangeEnd = toInstant(addDays(to, 1), '00:00', timeZone);
+  const [settings, types, patterns, overrides, oneOffs, appointments] = await Promise.all([
+    readSettings(table, timeZone),
+    readTypes(table),
+    queryPartition(table, PATTERN_PK),
+    queryPartition(table, 'OVERRIDE', from, to),
+    queryPartition(table, 'WINDOW', from, `${to}#~`),
+    queryPartition(table, APPT_PK, rangeStart, rangeEnd),
+  ]);
+  const typeNames = new Map(types.map((t) => [t.typeId, t.name]));
+  return {
+    settings,
+    types: types.map(toAvailabilityType),
+    patterns: patterns.map(toPattern),
+    overrides: overrides.map(toOverride),
+    oneOffs: oneOffs.map(toOneOff),
+    appointments: appointments.map((a) => toViewAppointment(a, typeNames)),
+  };
 }
