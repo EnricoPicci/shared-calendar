@@ -4,6 +4,8 @@ import {
   cancellableUntil,
   definedWindows,
   effectiveWindows,
+  isOnQuarterGrid,
+  isWholeLocalHour,
   localDateOf,
   overlaps,
   slotsOf,
@@ -25,6 +27,7 @@ import {
   type PatternInput,
   type SourcedWindow,
   type WindowBody,
+  type EffectiveWindow,
 } from '@shared-calendar/shared';
 
 // The calendar's server-side checks (docs/SHARED_CALENDAR_SPEC.md 14.2): pure functions over what
@@ -45,8 +48,14 @@ const refuse = <C extends ApiErrorCode>(error: C, message?: string): Refusal<C> 
 
 // ── The calendar as the checks see it ──────────────────────────────────────────────────────────
 
-/** What a check needs of an appointment (8.1); `appointmentId`, `username` only for `conflicts`. */
-export type StateAppointment = Pick<Appointment, 'appointmentId' | 'username' | 'start' | 'end' | 'date' | 'typeId' | 'status'>;
+/**
+ * What a check needs of an appointment (8.1); `appointmentId`, `username` only for `conflicts`.
+ * `userId` (the owner's Cognito `sub`) is internal: the limit of R-BOOK-09 counts on it, never on
+ * the username, which a later User could be given.
+ */
+export type StateAppointment = Pick<Appointment, 'appointmentId' | 'username' | 'start' | 'end' | 'date' | 'typeId' | 'status'> & {
+  userId: string;
+};
 
 /**
  * The availability state calendarDb reads inside a locked attempt (13.2 access patterns): every
@@ -295,6 +304,98 @@ export function checkAvailabilityWrite(
   return checkOverlap(write, after, today) ?? checkConflicts(write, state, after, now, zone);
 }
 
+// ── Booking (spec 8.2) ───────────────────────────────────────────────────────────────────────
+
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const SLOT_MS = HOUR_MS; // a slot, and a User's appointment, is 60 real minutes (R-SLOT-01)
+const QUARTER_MS = 15 * MINUTE_MS;
+
+/**
+ * R-BOOK-02, the times for the caller's role, from the body alone (the zone is the only other
+ * input): `400 invalid_request` before Cognito and the lock (8.2 order, v9). A User's `start` is a
+ * whole local hour and `end` absent or `start + 60 min`; the Administrator's `start` and `end` lie
+ * on the local 15-minute grid, `end` defaults to `start + 60 min`, and lasts at least 15 minutes.
+ * The schema has already checked the exact instant form and `end > start`. Answers the times to
+ * book, `end` filled in.
+ */
+export function checkBookingTimes(
+  start: string,
+  end: string | undefined,
+  role: Role,
+  zone: string,
+): { start: string; end: string } | Refusal<'invalid_request'> {
+  const hourLater = new Date(Date.parse(start) + SLOT_MS).toISOString();
+  if (role === 'user') {
+    if (!isWholeLocalHour(start, zone)) return refuse('invalid_request', 'Invalid input: start must be a whole hour');
+    if (end !== undefined && end !== hourLater) return refuse('invalid_request', 'Invalid input: end must be one hour after start');
+    return { start, end: hourLater };
+  }
+  if (!isOnQuarterGrid(start, zone)) return refuse('invalid_request', 'Invalid input: start must be on a 15-minute step');
+  const until = end ?? hourLater;
+  if (!isOnQuarterGrid(until, zone)) return refuse('invalid_request', 'Invalid input: end must be on a 15-minute step');
+  if (Date.parse(until) - Date.parse(start) < QUARTER_MS) return refuse('invalid_request', 'Invalid input: an appointment lasts at least 15 minutes');
+  return { start, end: until };
+}
+
+export type BookingRefusal = Refusal<
+  'booking_too_soon' | 'booking_too_far' | 'outside_availability' | 'slot_taken' | 'appointment_limit_reached'
+>;
+
+export type BookingInput = {
+  /** The times R-BOOK-02 accepted, `end` filled in. */
+  start: string;
+  end: string;
+  role: Role;
+  /** The Cognito `sub` of the User the appointment is for. */
+  userId: string;
+  settings: Pick<CalendarSettings, 'minBookingNoticeHours' | 'bookingHorizonDays' | 'maxFutureAppointmentsPerUser'>;
+  state: CalendarState;
+  now: string;
+  today: string;
+  zone: string;
+};
+
+/**
+ * The booking rules that need the calendar (8.2, the order of v9 step 5), on the settings and the
+ * state read inside the locked attempt, in table order; the first that fails decides:
+ * - R-BOOK-03 `start > now`, and R-BOOK-04 `start − now ≥ minBookingNoticeHours` (a User only):
+ *   `booking_too_soon`;
+ * - R-BOOK-05 `localDateOf(start) ≤ today + bookingHorizonDays` (a User only): `booking_too_far`;
+ * - R-BOOK-06 inside one effective window (6.6: merged across sources) of the start's local date, a
+ *   window whose type no longer exists left out as in the view: `outside_availability`;
+ * - R-BOOK-07 no booked appointment overlaps, compared as instants (R-SLOT-02): `slot_taken`;
+ * - R-BOOK-09 (a User only) the User's booked appointments with `start > now`, by `userId`, are
+ *   fewer than `maxFutureAppointmentsPerUser` when it is not null: `appointment_limit_reached`. One
+ *   in progress or ended does not count.
+ * R-BOOK-08 needs no check here: R-BOOK-02 already allowed the Administrator's custom times.
+ * Answers the effective window that holds the appointment: its type is the appointment's.
+ */
+export function checkBooking(input: BookingInput): { window: EffectiveWindow } | BookingRefusal {
+  const { start, end, role, userId, settings, state, now, today, zone } = input;
+  const admin = role === 'admin';
+  const ahead = Date.parse(start) - Date.parse(now);
+  if (ahead <= 0) return refuse('booking_too_soon', 'The start is not in the future');
+  if (!admin && ahead < settings.minBookingNoticeHours * HOUR_MS) return refuse('booking_too_soon', 'Not enough notice before the start');
+  const date = localDateOf(start, zone);
+  if (!admin && date > addDays(today, settings.bookingHorizonDays)) return refuse('booking_too_far', 'The start is too far ahead');
+
+  const typeIds = new Set(state.types.map((t) => t.typeId));
+  const override = state.overrides.find((o) => o.date === date) ?? null;
+  const defined = definedWindows(date, state.patterns, override, state.oneOffs).filter((w) => typeIds.has(w.typeId));
+  const window = effectiveWindows(toInstantWindows(date, defined, zone)).find((w) => w.start <= start && end <= w.end);
+  if (!window) return refuse('outside_availability', 'The time is not inside the availability');
+
+  const booked = state.appointments.filter((a) => a.status === 'booked');
+  if (booked.some((a) => overlaps(a, { start, end }))) return refuse('slot_taken', 'The time is already booked');
+
+  const limit = settings.maxFutureAppointmentsPerUser;
+  if (!admin && limit !== null && booked.filter((a) => a.userId === userId && a.start > now).length >= limit) {
+    return refuse('appointment_limit_reached', 'The maximum number of future appointments is reached');
+  }
+  return { window };
+}
+
 // ── The calendar view (spec 11.6, 7, 8.6, 17) ────────────────────────────────────────────────
 
 /**
@@ -324,11 +425,9 @@ export type CalendarViewInput = {
   appointments: readonly ViewAppointment[];
 };
 
-const HOUR_MS = 60 * 60 * 1000;
-
 // The appointment as a response (11.5), field by field in the contract's order, so nothing stored
 // beside it can reach the body. `cancellableUntil` for a User; null for the Administrator.
-function toResponse(a: Omit<Appointment, 'cancellableUntil'>, until: string | null): Appointment {
+export function toResponse(a: Omit<Appointment, 'cancellableUntil'>, until: string | null): Appointment {
   return {
     appointmentId: a.appointmentId,
     username: a.username,

@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v8 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
-| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13 |
+| Status | v9 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
+| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9 2026-11-14 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
@@ -20,6 +20,7 @@
 | v6 | 2026-11-12 | Brief 46 (plan step 45). R-AV-01: windows are compared as local times, not instants (the spring-forward night), and two patterns overlap only if they share at least one date (6.5, text and table). |
 | v7 | 2026-11-13 | Brief 47 (plan step 46). The 11.6 example corrected: the four Swimming Pool slots added, alice's appointment written out in full, real ULIDs. The night clocks go back gives two slots at the same local time (R-SLOT-01, 16.8). A window whose type has been deleted is not shown (R-VIEW-03). The view's appointment range is `SK BETWEEN <rangeStart> AND <rangeEnd>`, `rangeEnd` exclusive (13.2). |
 | v8 | 2026-11-13 | Brief 48 (plan step 47). A one-off window dated before today cannot be deleted: `409 date_in_past`, as for an override (R-ONE-02, route 14). An override's windows are stored and returned sorted by start; two of its own windows that overlap are `409 availability_overlap` (6.3). |
+| v9 | 2026-11-14 | Brief 49 (plan step 48). The order of the booking checks is stated as the handler runs them (8.2): the body's shape with the note first, R-BOOK-01's Cognito part after R-BOOK-02 and before the lock, R-BOOK-10 in the transaction. A booking target in no group is `409 target_not_user` (R-BOOK-01). The `APPT` item stores the fields of 8.1 except `appointmentId`, `typeName` and `cancellableUntil` (13.2). |
 
 ---
 
@@ -432,7 +433,7 @@ Request: `{ start, end?, username?, note? }` (section 11.7).
 
 | Rule | User | Administrator | Error if broken |
 |---|---|---|---|
-| **R-BOOK-01** `username`: the User the appointment is for | must be absent or equal to the caller | required; must be an existing account in group `user` and not in `admin` | `400 invalid_request` · `404 user_not_found` (admin, unknown) · `409 target_not_user` (admin, target is an admin) · `403 forbidden` (User naming someone else) |
+| **R-BOOK-01** `username`: the User the appointment is for | must be absent or equal to the caller | required; must be an existing account in group `user` and not in `admin` | `400 invalid_request` (admin, absent) · `404 user_not_found` (admin, unknown) · `409 target_not_user` (admin, target not a plain User: an Administrator, or in no group) · `403 forbidden` (User naming someone else) |
 | **R-BOOK-02** Times | `start` a whole local hour; `end` absent or `start + 60 min` | `start` and `end` on 15-minute local steps; `end` defaults to `start + 60 min` (then `start` may be any 15-minute step); `end − start ≥ 15 min` | `400 invalid_request` |
 | **R-BOOK-03** In the future | `start > now` | `start > now` | `409 booking_too_soon` |
 | **R-BOOK-04** Minimum notice | `start − now ≥ minBookingNoticeHours` | exempt | `409 booking_too_soon` |
@@ -444,8 +445,23 @@ Request: `{ start, end?, username?, note? }` (section 11.7).
 | **R-BOOK-10** Account still alive | the target User has not been deleted (section 10.2) | same | `404 user_not_found` |
 | **R-BOOK-11** Note | optional; trimmed; empty → `null`; at most 500 characters (counted as in 11.4); no control characters except line feed | same | `400 invalid_request` |
 
-Rules are checked in the order of the table. The first one that fails decides the answer, so the
-same request always gets the same error.
+The checks run in this order, and the first that fails decides the answer, so the same request
+always gets the same error:
+
+1. the body's shape, including the note of R-BOOK-11 and the instant form of 11.4 (`400
+   invalid_json` / `invalid_request`);
+2. the parts of R-BOOK-01 that need only the body and the caller: a User naming someone else (`403
+   forbidden`), the Administrator's `username` absent (`400`);
+3. R-BOOK-02 (`400`);
+4. the Administrator's target through Cognito (R-BOOK-01: `404 user_not_found`, `409
+   target_not_user`), before the calendar lock: its answer does not depend on the calendar, so a
+   lock retry does not repeat it;
+5. inside the locked attempt, on the data read in it: R-BOOK-03, 04, 05, 06, 07, 09;
+6. R-BOOK-10, as a condition of the booking transaction itself (13.4): a cancellation on that item
+   answers `404 user_not_found` without a retry.
+
+R-BOOK-08 is a permission, not a check: R-BOOK-02 applies it. A User books on the `sub` of their
+token, which is also the `sub` the marker is checked on.
 
 Success: `201` with the appointment. A calendar event `appointment.booked` is written in the same
 transaction (section 15).
@@ -897,7 +913,7 @@ kinds of item (single-table design). This is the reason `hello-messages`, with i
 | Weekly pattern | `PATTERN` | `<patternId>` | `weekday`, `start`, `end`, `typeId`, `validFrom`, `validUntil`, `createdAt`, `updatedAt` |
 | Date override | `OVERRIDE` | `<date>` | `windows` (list of maps), `updatedAt`, `updatedBy` |
 | One-off window | `WINDOW` | `<date>#<windowId>` | `date`, `start`, `end`, `typeId`, `createdAt`, `createdBy` |
-| Appointment | `APPT` | `<start instant>#<appointmentId>` | every field of 8.1 |
+| Appointment | `APPT` | `<start instant>#<appointmentId>` | the fields of 8.1 except `appointmentId` (the `SK` after `#`), `typeName` and `cancellableUntil` (responses only); `version` starts at 1; at creation `updatedAt`/`updatedBy` equal `createdAt`/`createdBy`. Names in architecture 5.3 |
 | Appointment pointer | `APPTID#<appointmentId>` | `APPTID` | `sk` (the appointment's `SK`) |
 | Calendar event | `EVENT` | `<occurredAt>#<eventId>` | section 15.2 |
 | Deleted-user marker | `DELETEDUSER#<sub>` | `DELETEDUSER` | `username`, `deletedAt`, `deletedBy` |

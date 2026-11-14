@@ -222,6 +222,37 @@ describe('withCalendarLock', () => {
     expect(transactions()).toHaveLength(1);
   });
 
+  describe('a condition the plan names (onConditionFailed)', () => {
+    const named = [...write, { ConditionCheck: { TableName: TABLE, Key: { PK: 'M', SK: 'M' }, ConditionExpression: 'attribute_not_exists(PK)' } }];
+    const plan = async () => ({ write: named, result: 'done', onConditionFailed: { item: 1, result: 'refused' } });
+
+    it('answers its result at once, without a retry, when that item’s condition fails (reason index item + 1)', async () => {
+      ddb.on(TransactWriteCommand).rejects(cancelled('None', 'None', 'ConditionalCheckFailed'));
+      expect(await db.withCalendarLock(plan)).toEqual({ result: 'refused', attempts: 1 });
+      expect(transactions()).toHaveLength(1);
+    });
+
+    it('retries when the lock was lost too: the lock is looked at first', async () => {
+      vi.useFakeTimers();
+      ddb.on(TransactWriteCommand).rejectsOnce(cancelled('ConditionalCheckFailed', 'None', 'ConditionalCheckFailed')).resolves({});
+      const locked = db.withCalendarLock(plan);
+      await vi.runAllTimersAsync();
+      expect(await locked).toEqual({ result: 'done', attempts: 2 });
+    });
+
+    it('throws a condition failure on another item', async () => {
+      const other = cancelled('None', 'ConditionalCheckFailed', 'None');
+      ddb.on(TransactWriteCommand).rejects(other);
+      await expect(db.withCalendarLock(plan)).rejects.toBe(other);
+    });
+
+    it('throws any other failure', async () => {
+      const throttled = Object.assign(new Error('Rate exceeded'), { name: 'ProvisionedThroughputExceededException' });
+      ddb.on(TransactWriteCommand).rejects(throttled);
+      await expect(db.withCalendarLock(plan)).rejects.toBe(throttled);
+    });
+  });
+
   it('does not retry a cancellation without reasons', async () => {
     const noReasons = new TransactionCanceledException({ message: 'cancelled', $metadata: {} });
     ddb.on(TransactWriteCommand).rejects(noReasons);
@@ -572,6 +603,7 @@ describe('the state read inside a locked attempt', () => {
         {
           PK: 'APPT',
           SK: '2026-11-18T08:00:00.000Z#A1',
+          userId: 'sub-alice',
           username: 'alice',
           start: '2026-11-18T08:00:00.000Z',
           end: '2026-11-18T09:00:00.000Z',
@@ -599,6 +631,7 @@ describe('the state read inside a locked attempt', () => {
       appointments: [
         {
           appointmentId: 'A1',
+          userId: 'sub-alice',
           username: 'alice',
           start: '2026-11-18T08:00:00.000Z',
           end: '2026-11-18T09:00:00.000Z',
@@ -1243,5 +1276,214 @@ describe('readCalendarRange', () => {
     await expect(db.readCalendarRange('2026-11-16', '2026-11-16')).rejects.toThrow('network down');
     const broken = await load({ CALENDAR_TIME_ZONE: 'Not/AZone' });
     await expect(broken.readCalendarRange('2026-11-16', '2026-11-16')).rejects.toThrow(broken.CalendarConfigError);
+  });
+});
+
+describe('bookAppointment', () => {
+  // AC-10: now 2026-11-10T09:00Z; alice books Monday 2026-11-16 09:00 local (08:00Z) at the Studio.
+  const BOOK_NOW = '2026-11-10T09:00:00.000Z';
+  const BOOK_TODAY = '2026-11-10';
+  const STUDIO = '01JC0000000000000000000001';
+  const APPT_ID = '01M70NR5E0Q7R2C9T5XH3KD8MV';
+  const EVENT_ID = '01M70NR5E0Q7R2C9T5XH3KD8EV';
+  const ALICE = { username: 'alice', role: 'user' } as const;
+  const START = '2026-11-16T08:00:00.000Z';
+  const END = '2026-11-16T09:00:00.000Z';
+  const booking = {
+    appointmentId: APPT_ID,
+    eventId: EVENT_ID,
+    userId: 'sub-alice',
+    username: 'alice',
+    start: START,
+    end: END,
+    note: 'First lesson',
+    by: ALICE,
+  };
+  const studioWindow = { window: { start: '2026-11-16T07:00:00.000Z', end: '2026-11-16T11:00:00.000Z', typeId: STUDIO } };
+  const queries = () => ddb.commandCalls(QueryCommand).map((call) => call.args[0].input);
+  const stored = {
+    userId: 'sub-alice',
+    username: 'alice',
+    start: START,
+    end: END,
+    date: '2026-11-16',
+    typeId: STUDIO,
+    typeNameAtBooking: 'Studio',
+    note: 'First lesson',
+    status: 'booked',
+    createdAt: BOOK_NOW,
+    createdBy: ALICE,
+    updatedAt: BOOK_NOW,
+    updatedBy: ALICE,
+    cancelledAt: null,
+    cancelledBy: null,
+    cancelReason: null,
+    replaces: null,
+    replacedBy: null,
+    version: 1,
+  };
+
+  beforeEach(() => {
+    ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'TYPE' } }).resolves({
+      Items: [{ PK: 'TYPE', SK: STUDIO, name: 'Studio', nameKey: 'studio', createdAt: NOW, updatedAt: NOW }],
+    });
+  });
+
+  it('writes the exact five-item transaction: lock, APPT, APPTID, EVENT, the marker check', async () => {
+    await db.bookAppointment(booking, BOOK_TODAY, BOOK_NOW, () => studioWindow);
+    expect(transactions()).toHaveLength(1);
+    const [lock, appt, pointer, event, marker, ...rest] = transactions()[0]!.TransactItems!;
+    expect(rest).toEqual([]);
+    expect(lock!.Update!.Key).toEqual({ PK: 'LOCK', SK: 'LOCK' });
+    expect(appt).toEqual({ Put: { TableName: TABLE, Item: { PK: 'APPT', SK: `${START}#${APPT_ID}`, ...stored } } });
+    expect(pointer).toEqual({ Put: { TableName: TABLE, Item: { PK: `APPTID#${APPT_ID}`, SK: 'APPTID', sk: `${START}#${APPT_ID}` } } });
+    expect(event).toEqual({
+      Put: {
+        TableName: TABLE,
+        Item: {
+          PK: 'EVENT',
+          SK: `${BOOK_NOW}#${EVENT_ID}`,
+          eventId: EVENT_ID,
+          type: 'appointment.booked',
+          occurredAt: BOOK_NOW,
+          actor: ALICE,
+          recipients: { userId: 'sub-alice', username: 'alice', administrator: true },
+          appointment: { appointmentId: APPT_ID, ...stored },
+          schemaVersion: 1,
+        },
+      },
+    });
+    expect(marker).toEqual({
+      ConditionCheck: { TableName: TABLE, Key: { PK: 'DELETEDUSER#sub-alice', SK: 'DELETEDUSER' }, ConditionExpression: 'attribute_not_exists(PK)' },
+    });
+  });
+
+  it('answers the stored appointment as response fields (no userId, no version) and the settings it read', async () => {
+    ddb.on(GetCommand, { Key: { PK: 'SETTINGS', SK: 'SETTINGS' } }).resolves({ Item: { PK: 'SETTINGS', SK: 'SETTINGS', ...VALUES, updatedAt: NOW, updatedBy: ADMIN } });
+    const { result, attempts } = await db.bookAppointment(booking, BOOK_TODAY, BOOK_NOW, () => studioWindow);
+    expect(attempts).toBe(1);
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        appointment: {
+          appointmentId: APPT_ID,
+          username: 'alice',
+          start: START,
+          end: END,
+          date: '2026-11-16',
+          typeId: STUDIO,
+          typeName: 'Studio',
+          note: 'First lesson',
+          status: 'booked',
+          createdAt: BOOK_NOW,
+          createdBy: ALICE,
+          updatedAt: BOOK_NOW,
+          updatedBy: ALICE,
+          cancelledAt: null,
+          cancelledBy: null,
+          cancelReason: null,
+          replaces: null,
+          replacedBy: null,
+        },
+        settings: { timeZone: 'Europe/Rome', ...VALUES, updatedAt: NOW, updatedBy: ADMIN },
+      },
+    });
+  });
+
+  it('stores the date as the local date of start (a 00:30 local start is the next UTC day’s date)', async () => {
+    const late = { ...booking, start: '2026-11-15T23:30:00.000Z', end: '2026-11-16T00:30:00.000Z' };
+    await db.bookAppointment(late, BOOK_TODAY, BOOK_NOW, () => studioWindow);
+    expect(transactions()[0]!.TransactItems![1]!.Put!.Item!.date).toBe('2026-11-16');
+  });
+
+  it('copies the actor field by field and stores a null note as null', async () => {
+    const by = { username: 'admin', role: 'admin', extra: 'x' } as unknown as typeof ALICE;
+    await db.bookAppointment({ ...booking, note: null, by }, BOOK_TODAY, BOOK_NOW, () => studioWindow);
+    const item = transactions()[0]!.TransactItems![1]!.Put!.Item!;
+    expect(item.note).toBeNull();
+    expect(item.createdBy).toEqual(ADMIN);
+    expect(item.updatedBy).toEqual(ADMIN);
+  });
+
+  it('reads the settings and the state inside the attempt, consistently, appointments from now − 24 h', async () => {
+    ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'APPT' } }).resolves({
+      Items: [{ PK: 'APPT', SK: `${START}#A9`, userId: 'sub-bob', username: 'bob', start: START, end: END, date: '2026-11-16', typeId: STUDIO, status: 'booked', note: 'private' }],
+    });
+    const check = vi.fn(() => studioWindow);
+    await db.bookAppointment(booking, BOOK_TODAY, BOOK_NOW, check);
+    expect(ddb.commandCalls(GetCommand).map((c) => c.args[0].input)).toEqual([
+      { TableName: TABLE, Key: { PK: 'LOCK', SK: 'LOCK' }, ConsistentRead: true },
+      { TableName: TABLE, Key: { PK: 'SETTINGS', SK: 'SETTINGS' }, ConsistentRead: true },
+    ]);
+    const conditions = Object.fromEntries(queries().map((q) => [q.ExpressionAttributeValues![':pk'], [q.KeyConditionExpression, q.ExpressionAttributeValues![':from']]]));
+    expect(conditions).toEqual({
+      TYPE: ['PK = :pk', undefined],
+      PATTERN: ['PK = :pk', undefined],
+      OVERRIDE: ['PK = :pk AND SK >= :from', BOOK_TODAY],
+      WINDOW: ['PK = :pk AND SK >= :from', BOOK_TODAY],
+      APPT: ['PK = :pk AND SK >= :from', '2026-11-09T09:00:00.000Z'],
+    });
+    expect(queries().every((q) => q.ConsistentRead)).toBe(true);
+    // The check gets the state with the owner's userId, never the note, and the default settings.
+    expect(check).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appointments: [{ appointmentId: 'A9', userId: 'sub-bob', username: 'bob', start: START, end: END, date: '2026-11-16', typeId: STUDIO, status: 'booked' }],
+      }),
+      { timeZone: 'Europe/Rome', cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: null, updatedAt: null, updatedBy: null },
+    );
+  });
+
+  it('writes nothing and answers the refusal when the check fails', async () => {
+    const { result } = await db.bookAppointment(booking, BOOK_TODAY, BOOK_NOW, () => ({ error: 'slot_taken' as const, message: 'The time is already booked' }));
+    expect(result).toEqual({ ok: false, error: 'slot_taken', message: 'The time is already booked' });
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('AC-34: after a lost lock it re-reads and re-checks; the slot is now taken, so nothing is written', async () => {
+    vi.useFakeTimers();
+    ddb
+      .on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'APPT' } })
+      .resolvesOnce({ Items: [] })
+      .resolves({ Items: [{ PK: 'APPT', SK: `${START}#B1`, userId: 'sub-bob', username: 'bob', start: START, end: END, date: '2026-11-16', typeId: STUDIO, status: 'booked' }] });
+    ddb.on(TransactWriteCommand).rejectsOnce(lockBusy());
+    const check = vi.fn((state: { appointments: readonly unknown[] }) =>
+      state.appointments.length === 0 ? studioWindow : { error: 'slot_taken' as const, message: 'The time is already booked' },
+    );
+    const pending = db.bookAppointment(booking, BOOK_TODAY, BOOK_NOW, check);
+    await vi.runAllTimersAsync();
+    expect(await pending).toEqual({ result: { ok: false, error: 'slot_taken', message: 'The time is already booked' }, attempts: 2 });
+    expect(check).toHaveBeenCalledTimes(2);
+    expect(transactions()).toHaveLength(1);
+  });
+
+  it('keeps the same ids across a retry', async () => {
+    vi.useFakeTimers();
+    ddb.on(TransactWriteCommand).rejectsOnce(lockBusy()).resolves({});
+    const pending = db.bookAppointment(booking, BOOK_TODAY, BOOK_NOW, () => studioWindow);
+    await vi.runAllTimersAsync();
+    expect((await pending).attempts).toBe(2);
+    expect(transactions().map((t) => [t.TransactItems![1]!.Put!.Item!.SK, t.TransactItems![3]!.Put!.Item!.SK])).toEqual([
+      [`${START}#${APPT_ID}`, `${BOOK_NOW}#${EVENT_ID}`],
+      [`${START}#${APPT_ID}`, `${BOOK_NOW}#${EVENT_ID}`],
+    ]);
+  });
+
+  it('R-BOOK-10: a failed marker check answers user_not_found without a retry', async () => {
+    ddb.on(TransactWriteCommand).rejects(cancelled('None', 'None', 'None', 'None', 'ConditionalCheckFailed'));
+    expect(await db.bookAppointment(booking, BOOK_TODAY, BOOK_NOW, () => studioWindow)).toEqual({
+      result: { ok: false, error: 'user_not_found' },
+      attempts: 1,
+    });
+    expect(transactions()).toHaveLength(1);
+  });
+
+  it('three lost attempts throw ConcurrentUpdateError', async () => {
+    vi.useFakeTimers();
+    ddb.on(TransactWriteCommand).rejects(lockBusy());
+    const pending = db.bookAppointment(booking, BOOK_TODAY, BOOK_NOW, () => studioWindow);
+    const failed = expect(pending).rejects.toEqual(expect.objectContaining({ name: 'ConcurrentUpdateError', attempts: 3 }));
+    await vi.runAllTimersAsync();
+    await failed;
+    expect(transactions()).toHaveLength(3);
   });
 });

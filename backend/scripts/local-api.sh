@@ -24,6 +24,8 @@ unset AWS_PROFILE AWS_SESSION_TOKEN
 # sam build needs the repository's esbuild on the PATH (npm workspaces hoist it to the root).
 export PATH="$PWD/../node_modules/.bin:$PWD/node_modules/.bin:$PATH"
 # The monorepo build of samconfig.toml: one install at the repository root, then esbuild in place.
+# Needs SAM CLI 1.171.0 or newer; an older one ignores the variable and strips node_modules.
+bash scripts/check-sam.sh
 export SAM_CLI_BETA_NODEJS_MONOREPO=1
 
 # The functions run on the machine's own CPU type: on an x86 machine Docker would have to emulate

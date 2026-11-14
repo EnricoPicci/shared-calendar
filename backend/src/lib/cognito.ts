@@ -2,6 +2,7 @@ import {
   AdminAddUserToGroupCommand,
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
+  AdminGetUserCommand,
   AdminListGroupsForUserCommand,
   AdminSetUserPasswordCommand,
   AdminUserGlobalSignOutCommand,
@@ -77,6 +78,25 @@ export async function listGroups(username: string): Promise<string[]> {
     .send(new AdminListGroupsForUserCommand({ UserPoolId: userPoolId(), Username: username }))
     .catch((err: unknown) => mapError(err, username));
   return (result.Groups ?? []).flatMap((group) => (group.GroupName ? [group.GroupName] : []));
+}
+
+// The account's Cognito `sub`, the id the calendar stores as `userId` (spec 8.1, 15.4). Every
+// account has one (Cognito and cognito-local set it at AdminCreateUser); an answer without it is
+// a broken directory, not a missing user, so it is an ordinary error (a 500).
+export async function getUserSub(username: string): Promise<string> {
+  const result = await cognitoClient
+    .send(new AdminGetUserCommand({ UserPoolId: userPoolId(), Username: username }))
+    .catch((err: unknown) => mapError(err, username));
+  const sub = result.UserAttributes?.find((attribute) => attribute.Name === 'sub')?.Value;
+  if (!sub) throw new Error(`User ${username} has no sub attribute`);
+  return sub;
+}
+
+// A plain User: in group 'user' and not in 'admin' (admin wins, architecture section 3). An account
+// in neither group is not one either (spec R-BOOK-01, v9). An unknown username is UserNotFoundError.
+export async function isPlainUser(username: string): Promise<boolean> {
+  const groups = await listGroups(username);
+  return groups.includes('user') && !groups.includes('admin');
 }
 
 // Revokes the user's refresh tokens.

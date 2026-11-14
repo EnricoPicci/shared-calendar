@@ -1,6 +1,15 @@
 import { addDays, localDateOf, toInstant, weekdayOf } from '@shared-calendar/shared';
 import { ulid } from 'ulid';
-import { api, getCalendarItem, putCalendarItem, resetCalendarTable, signIn } from './setup';
+import {
+  api,
+  deleteCalendarItem,
+  getCalendarItem,
+  putCalendarItem,
+  queryCalendarPartition,
+  removeUserIfPresent,
+  resetCalendarTable,
+  signIn,
+} from './setup';
 
 // The shared calendar's journeys (docs/SHARED_CALENDAR_SPEC.md 18.2), end to end through sam
 // local. Each route step adds its own. The calendar is global, so this file owns the local
@@ -643,5 +652,313 @@ describe('date overrides and one-off windows (routes 11–14)', () => {
     // Nothing changed: D has no override, D + 7 keeps its empty one.
     expect((await dayOf(adminToken, date)).hasOverride).toBe(false);
     expect((await dayOf(adminToken, addDays(date, 7))).hasOverride).toBe(true);
+  });
+});
+
+describe('booking (route 17)', () => {
+  // What the earlier journeys leave behind (read from the step 47 journeys above):
+  // - settings cancellationNoticeHours 48, minBookingNoticeHours 2, bookingHorizonDays 30,
+  //   maxFutureAppointmentsPerUser null;
+  // - types GYM (ids.pool) and Studio (ids.viewStudio);
+  // - patterns Monday 07:00–08:00 GYM from 2026-11-01 and Monday 08:00–12:00 Studio from a past
+  //   Monday (both open-ended), and Sunday 01:00–04:00 Studio on the next spring-forward Sunday only;
+  // - an empty override on D + 7 (D = the next Monday at least 8 days ahead); one one-off window
+  //   dated yesterday (written directly); no other override or window; no appointment.
+  // These journeys rely on none of it. They save their own settings first (and restore the
+  // leftover ones at the end), and book on Wednesdays, which no earlier journey touches, at their
+  // own two types with their own Wednesday pattern. W is the next Wednesday at least 8 days ahead,
+  // W2 = W + 7; dates come from the real today, computed with the shared helpers. In the
+  // scenarios of 18.3, dave plays alice and erin plays bob (18.2).
+  const ZONE = 'Europe/Rome';
+  const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+  const HOUR_MS = 60 * 60 * 1000;
+  const today = () => localDateOf(new Date().toISOString(), ZONE);
+  const nextWednesday = (from: string) => {
+    let d = from;
+    while (weekdayOf(d) !== 3) d = addDays(d, 1);
+    return d;
+  };
+  const W = () => nextWednesday(addDays(today(), 8));
+  const W2 = () => addDays(W(), 7);
+  const at = (date: string, time: string) => toInstant(date, time, ZONE);
+  const plus = (instant: string, minutes: number) => new Date(Date.parse(instant) + minutes * 60_000).toISOString();
+  const book = (token: string, body: Record<string, unknown>) => api('POST', '/calendar/appointments', token, body);
+  // The access token's `sub` claim: what the appointment stores as userId.
+  const subOf = (token: string) => (JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString('utf8')) as { sub: string }).sub;
+  const BOOKING_SETTINGS = { cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: null };
+  const setSettings = async (values: Record<string, unknown>) => {
+    expect((await api('PUT', '/calendar/settings', adminToken, { ...BOOKING_SETTINGS, ...values })).status).toBe(200);
+  };
+
+  let daveToken: string;
+  let erinToken: string;
+  let leftover: Record<string, unknown>;
+  const room: Record<string, string> = {};
+  const booked: Record<string, Record<string, unknown>> = {};
+  let patternId: string;
+  const pattern = (more: object = {}) => ({ weekday: 3, start: '08:00', end: '12:00', typeId: room.main, validFrom: addDays(W(), -21), validUntil: null, ...more });
+
+  beforeAll(async () => {
+    for (const username of ['dave', 'erin']) {
+      await removeUserIfPresent(username);
+      const res = await api('POST', '/users', adminToken, { username });
+      expect(res.status).toBe(201);
+      const token = await signIn(username, res.body?.password as string);
+      if (username === 'dave') daveToken = token;
+      else erinToken = token;
+    }
+  });
+
+  afterAll(async () => {
+    await removeUserIfPresent('dave');
+    await removeUserIfPresent('erin');
+  });
+
+  it('prepares the settings, two types and the Wednesday pattern 08:00–12:00 from a past Wednesday', async () => {
+    leftover = (await api('GET', '/calendar/settings', adminToken)).body!;
+    await setSettings({});
+    for (const [key, name] of [['main', 'Booking room'], ['other', 'Booking pool']] as const) {
+      const res = await api('POST', '/calendar/types', adminToken, { name });
+      expect(res.status).toBe(201);
+      room[key] = res.body?.typeId as string;
+    }
+    const res = await api('POST', '/calendar/patterns', adminToken, pattern());
+    expect(res.status).toBe(201);
+    patternId = res.body?.patternId as string;
+  });
+
+  it('AC-10: dave books W 09:00: 201, end + 60 min, the type, cancellableUntil; APPT, APPTID and EVENT items written', async () => {
+    const start = at(W(), '09:00');
+    const res = await book(daveToken, { start, note: '  First lesson ' });
+    expect(res.status).toBe(201);
+    const id = res.body?.appointmentId as string;
+    const createdAt = res.body?.createdAt as string;
+    const dave = { username: 'dave', role: 'user' };
+    expect(res.body).toEqual({
+      appointmentId: expect.stringMatching(ULID),
+      username: 'dave',
+      start,
+      end: plus(start, 60),
+      date: W(),
+      typeId: room.main,
+      typeName: 'Booking room',
+      note: 'First lesson',
+      status: 'booked',
+      createdAt: expect.any(String),
+      createdBy: dave,
+      updatedAt: createdAt,
+      updatedBy: dave,
+      cancelledAt: null,
+      cancelledBy: null,
+      cancelReason: null,
+      replaces: null,
+      replacedBy: null,
+      cancellableUntil: new Date(Date.parse(start) - 24 * HOUR_MS).toISOString(),
+    });
+    booked.ac10 = res.body!;
+
+    const sk = `${start}#${id}`;
+    const stored = {
+      userId: subOf(daveToken),
+      username: 'dave',
+      start,
+      end: plus(start, 60),
+      date: W(),
+      typeId: room.main,
+      typeNameAtBooking: 'Booking room',
+      note: 'First lesson',
+      status: 'booked',
+      createdAt,
+      createdBy: dave,
+      updatedAt: createdAt,
+      updatedBy: dave,
+      cancelledAt: null,
+      cancelledBy: null,
+      cancelReason: null,
+      replaces: null,
+      replacedBy: null,
+      version: 1,
+    };
+    expect(await getCalendarItem('APPT', sk)).toEqual({ PK: 'APPT', SK: sk, ...stored });
+    expect(await getCalendarItem(`APPTID#${id}`, 'APPTID')).toEqual({ PK: `APPTID#${id}`, SK: 'APPTID', sk });
+    const events = (await queryCalendarPartition('EVENT')).filter((e) => (e.appointment as { appointmentId?: string }).appointmentId === id);
+    expect(events).toEqual([
+      {
+        PK: 'EVENT',
+        SK: `${createdAt}#${events[0]?.eventId}`,
+        eventId: expect.stringMatching(ULID),
+        type: 'appointment.booked',
+        occurredAt: createdAt,
+        actor: dave,
+        recipients: { userId: subOf(daveToken), username: 'dave', administrator: true },
+        appointment: { appointmentId: id, ...stored },
+        schemaVersion: 1,
+      },
+    ]);
+  });
+
+  it('AC-11: erin books the same slot: 409 slot_taken', async () => {
+    const res = await book(erinToken, { start: at(W(), '09:00') });
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ error: 'slot_taken' });
+  });
+
+  it('AC-12: erin’s view of W has the busy interval and no slot at 09:00, and nothing of dave’s', async () => {
+    const res = await api('GET', `/calendar?from=${W()}&to=${W()}`, erinToken);
+    expect(res.status).toBe(200);
+    const day = (res.body?.days as { busy: unknown[]; slots: { start: string }[] }[])[0]!;
+    expect(day.busy).toEqual([{ start: at(W(), '09:00'), end: at(W(), '10:00') }]);
+    expect(day.slots.map((s) => s.start)).toEqual(['08:00', '10:00', '11:00'].map((t) => at(W(), t)));
+    expect(res.body?.appointments).toEqual([]);
+    const text = JSON.stringify(res.body);
+    expect(text).not.toContain('dave');
+    expect(text).not.toContain(booked.ac10!.appointmentId as string);
+    // dave sees his own, with cancellableUntil.
+    const own = await api('GET', `/calendar?from=${W()}&to=${W()}`, daveToken);
+    expect(own.body?.appointments).toEqual([booked.ac10]);
+  });
+
+  it('AC-13: dave books 09:30: 400 invalid_request', async () => {
+    const res = await book(daveToken, { start: at(W(), '09:30') });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'invalid_request', message: 'Invalid input: start must be a whole hour' });
+  });
+
+  it('AC-14: the Administrator books dave W2 09:15–10:00: 201, cancellableUntil null', async () => {
+    const res = await book(adminToken, { username: 'dave', start: at(W2(), '09:15'), end: at(W2(), '10:00') });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ username: 'dave', createdBy: { username: 'admin', role: 'admin' }, cancellableUntil: null });
+    booked.ac14 = res.body!;
+    expect((await getCalendarItem('APPT', `${at(W2(), '09:15')}#${res.body?.appointmentId}`))?.userId).toBe(subOf(daveToken));
+  });
+
+  it('AC-15: dave then books W2 09:00: 409 slot_taken (partial overlap)', async () => {
+    const res = await book(daveToken, { start: at(W2(), '09:00') });
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ error: 'slot_taken' });
+  });
+
+  it('AC-16: dave books 12:00, outside the window: 409 outside_availability', async () => {
+    const res = await book(daveToken, { start: at(W(), '12:00') });
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ error: 'outside_availability' });
+  });
+
+  it('AC-17: horizon 7, W 11:00 (8 or more days ahead): dave 409 booking_too_far; the Administrator books it for dave: 201', async () => {
+    await setSettings({ bookingHorizonDays: 7 });
+    const start = at(W(), '11:00');
+    const res = await book(daveToken, { start });
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ error: 'booking_too_far' });
+    const admin = await book(adminToken, { username: 'dave', start });
+    expect(admin.status).toBe(201);
+    booked.ac17 = admin.body!;
+    await setSettings({});
+  });
+
+  it('AC-18: notice 720 h: dave books W 10:00: 409 booking_too_soon', async () => {
+    await setSettings({ minBookingNoticeHours: 720 });
+    const res = await book(daveToken, { start: at(W(), '10:00') });
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ error: 'booking_too_soon' });
+    await setSettings({});
+  });
+
+  it('AC-19: limit 1 while dave holds future appointments: dave 409 appointment_limit_reached; the Administrator books for dave: 201', async () => {
+    await setSettings({ maxFutureAppointmentsPerUser: 1 });
+    const start = at(W2(), '10:00');
+    const res = await book(daveToken, { start });
+    expect(res.status).toBe(409);
+    expect(res.body).toMatchObject({ error: 'appointment_limit_reached' });
+    // erin holds none, so the limit does not stop her (counted per User).
+    expect((await book(erinToken, { start: at(W2(), '08:00') })).status).toBe(201);
+    const admin = await book(adminToken, { username: 'dave', start });
+    expect(admin.status).toBe(201);
+    await setSettings({});
+  });
+
+  it('a User naming someone else is 403; the Administrator booking without a username is 400, for admin 409 target_not_user, for an unknown username 404', async () => {
+    const start = at(W2(), '11:00');
+    const other = await book(daveToken, { username: 'erin', start });
+    expect(other.status).toBe(403);
+    expect(other.body).toMatchObject({ error: 'forbidden' });
+    const missing = await book(adminToken, { start });
+    expect(missing.status).toBe(400);
+    expect(missing.body).toEqual({ error: 'invalid_request', message: 'Invalid input: username' });
+    const toAdmin = await book(adminToken, { username: 'admin', start });
+    expect(toAdmin.status).toBe(409);
+    expect(toAdmin.body).toMatchObject({ error: 'target_not_user' });
+    const unknown = await book(adminToken, { username: 'nobody-here', start });
+    expect(unknown.status).toBe(404);
+    expect(unknown.body).toMatchObject({ error: 'user_not_found' });
+  });
+
+  it('AC-25: an empty override on W is 409 availability_conflict listing dave’s appointments; a User gets 403 and no conflicts', async () => {
+    const res = await api('PUT', `/calendar/overrides/${W()}`, adminToken, { windows: [] });
+    expect(res.status).toBe(409);
+    const conflict = (a: Record<string, unknown>) => ({ appointmentId: a.appointmentId, username: 'dave', start: a.start, end: a.end });
+    expect(res.body).toEqual({
+      error: 'availability_conflict',
+      message: '2 appointments would fall outside the availability',
+      conflicts: [conflict(booked.ac10!), conflict(booked.ac17!)],
+    });
+    expect(await getCalendarItem('OVERRIDE', W())).toBeUndefined();
+    const asUser = await api('PUT', `/calendar/overrides/${W()}`, daveToken, { windows: [] });
+    expect(asUser.status).toBe(403);
+    expect(asUser.body).not.toHaveProperty('conflicts');
+  });
+
+  it('AC-26: changing the pattern’s type is 409 availability_conflict; AC-27: extending it to 07:00–12:00 is 200', async () => {
+    const changed = await api('PUT', `/calendar/patterns/${patternId}`, adminToken, pattern({ typeId: room.other }));
+    expect(changed.status).toBe(409);
+    expect(changed.body).toMatchObject({ error: 'availability_conflict' });
+    expect((changed.body?.conflicts as { appointmentId: string }[]).map((c) => c.appointmentId)).toContain(booked.ac10!.appointmentId);
+    expect(await getCalendarItem('PATTERN', patternId)).toMatchObject({ typeId: room.main });
+
+    const extended = await api('PUT', `/calendar/patterns/${patternId}`, adminToken, pattern({ start: '07:00' }));
+    expect(extended.status).toBe(200);
+    expect(extended.body).toMatchObject({ start: '07:00', end: '12:00', typeId: room.main });
+  });
+
+  it('AC-34: two bookings of the same slot at the same moment: exactly one 201, the other 409 slot_taken', async () => {
+    const start = at(W2(), '11:00');
+    const answers = await Promise.all([book(daveToken, { start }), book(erinToken, { start })]);
+    expect(answers.map((a) => a.status).sort()).toEqual([201, 409]);
+    expect(answers.find((a) => a.status === 409)?.body).toMatchObject({ error: 'slot_taken' });
+    expect((await queryCalendarPartition('APPT')).filter((a) => a.start === start)).toHaveLength(1);
+  });
+
+  it('R-BOOK-10: a deleted-user marker for dave’s sub makes his booking 404 user_not_found and writes nothing', async () => {
+    const marker = { PK: `DELETEDUSER#${subOf(daveToken)}`, SK: 'DELETEDUSER' };
+    await putCalendarItem({ ...marker, username: 'dave', deletedAt: new Date().toISOString(), deletedBy: { username: 'admin', role: 'admin' } });
+    const before = (await queryCalendarPartition('APPT')).length;
+    const events = (await queryCalendarPartition('EVENT')).length;
+    try {
+      const start = at(W2(), '07:00');
+      for (const res of [await book(daveToken, { start }), await book(adminToken, { username: 'dave', start })]) {
+        expect(res.status).toBe(404);
+        expect(res.body).toEqual({ error: 'user_not_found', message: 'The user has been deleted' });
+      }
+      expect(await queryCalendarPartition('APPT')).toHaveLength(before);
+      expect(await queryCalendarPartition('EVENT')).toHaveLength(events);
+      // erin is not affected.
+      expect((await book(erinToken, { start })).status).toBe(201);
+    } finally {
+      await deleteCalendarItem(marker.PK, marker.SK);
+    }
+    expect(await getCalendarItem(marker.PK, marker.SK)).toBeUndefined();
+  });
+
+  it('every booking wrote exactly one event; the settings are restored to what the earlier journeys left', async () => {
+    const appointments = await queryCalendarPartition('APPT');
+    const events = await queryCalendarPartition('EVENT');
+    expect(events).toHaveLength(appointments.length);
+    expect(events.every((e) => e.type === 'appointment.booked' && e.schemaVersion === 1)).toBe(true);
+
+    const { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser } = leftover;
+    const values = { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser };
+    const res = await api('PUT', '/calendar/settings', adminToken, values);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject(values);
   });
 });

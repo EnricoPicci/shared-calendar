@@ -170,7 +170,10 @@ public registry. Three settings in `backend/` make the build work in the monorep
   function without an install of its own. Without it, building in source runs `npm update
   --omit dev` once per function, in parallel: in a workspace that strips the root's development
   tools (esbuild, TypeScript, vitest) and re-resolves versions. Found while applying this
-  layout.
+  layout. The beta exists only from SAM CLI 1.171.0: an older SAM ignores the variable without a
+  word and takes that per-function path (found 2026-11-14 with 1.170.0: the npm warning
+  `backend in filter set, but no workspace folder present`, then a failed build). So both callers
+  first run `scripts/check-sam.sh`, which refuses a SAM older than 1.171.0 before any npm step.
 - `cached = false` in `samconfig.toml`: the beta does not apply to cached builds. The build
   only bundles, so caching saved little.
 

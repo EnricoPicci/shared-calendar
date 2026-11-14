@@ -114,7 +114,9 @@ form works the same. Paths below without a folder are relative to `backend/`.
 - `npm run build -w backend`: `sam build`. Always go through npm: SAM needs the repository's
   `esbuild` on the PATH and `SAM_CLI_BETA_NODEJS_MONOREPO=1`, which the script sets. Without the
   beta, building in source runs `npm update --omit dev` per function, which strips the root's dev
-  tools (`docs/FOLDER_STRUCTURE.md` 4.3; repair with `npm ci` at the root).
+  tools (`docs/FOLDER_STRUCTURE.md` 4.3; repair with `npm ci` at the root). The beta needs SAM CLI
+  ≥ 1.171.0 (older ones ignore it): the script and `local-api.sh` run `scripts/check-sam.sh` first,
+  which refuses an older SAM.
 - `sam validate --lint` (inside `backend/`): checks `template.yaml`.
 - `npm run local:up -w backend`: starts DynamoDB Local, dynamodb-admin (http://localhost:8001) and
   cognito-local, then seeds them (tables `hello-messages` and `calendar`, the latter empty; pool,
@@ -124,7 +126,9 @@ form works the same. Paths below without a folder are relative to `backend/`.
 - Calendar variables: every calendar function declares `CALENDAR_TABLE`, `CALENDAR_TIME_ZONE` and
   `DYNAMODB_ENDPOINT` in `template.yaml`. `env.local.json` sets `CALENDAR_TABLE` and
   `DYNAMODB_ENDPOINT` once, in its `Parameters` section, which `sam local` applies to every
-  function declaring the variable: a new calendar function needs no seed line. `CALENDAR_TIME_ZONE`
+  function declaring the variable: a new calendar function needs no seed line, unless it also calls
+  Cognito (`BookAppointmentFunction` has its own section with `USER_POOL_ID`, `COGNITO_ENDPOINT` and
+  the dummy credentials, like `CreateUserFunction`). `CALENDAR_TIME_ZONE`
   is deliberately not in the file (a value there would win over the template): it comes from the
   parameter `CalendarTimeZone` (default `Europe/Rome`). An invalid zone makes every calendar
   request answer 500.
@@ -214,12 +218,20 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     availability state (`CalendarState`: types, patterns, overrides and one-off windows from today,
     appointments from now − 24 h). Its availability writes: patterns, `setOverride`, `deleteOverride`,
     `createOneOffWindow`, `deleteOneOffWindow` (a window by id: the state first, the whole `WINDOW`
-    partition only on a miss, to tell a past window, `date_in_past`, from an unknown one). `calendarRules.ts`: the calendar's checks (`checkTypeName`,
-    `checkTypeDelete`, `typeNameKey`, and `checkAvailabilityWrite` for every availability write:
-    patterns, overrides, one-off windows; and `calendarView`, the calendar view built for one
-    caller's role from what `calendarDb.readCalendarRange` reads), pure, no AWS, "today", "now" and
-    the zone passed in; a failed check is `Refusal` (`{ error, message?, conflicts? }`, code from
-    `ApiErrorCode`). `http.ts`: `parseJsonBody` for bodies, `parseQuery` for query strings (the
+    partition only on a miss, to tell a past window, `date_in_past`, from an unknown one). Booking:
+    `bookAppointment` (settings and state read inside the attempt; one transaction of five items:
+    lock, `APPT`, `APPTID`, `EVENT`, a `ConditionCheck` on the `DELETEDUSER#<sub>` marker, whose
+    failure `withCalendarLock` answers through the plan's `onConditionFailed`, without a retry).
+    `calendarEvents.ts`: builds the `EVENT` item (`appointmentEvent`, the `AppointmentSnapshot` of
+    the stored appointment), pure; ids and "now" passed in. `calendarRules.ts`: the calendar's
+    checks (`checkTypeName`, `checkTypeDelete`, `typeNameKey`, and `checkAvailabilityWrite` for
+    every availability write: patterns, overrides, one-off windows; `checkBookingTimes`, R-BOOK-02
+    before the lock, and `checkBooking`, R-BOOK-03..07 and 09 under it; `calendarView`, the
+    calendar view built for one caller's role from what `calendarDb.readCalendarRange` reads;
+    `toResponse`, an appointment as a response), pure, no AWS, "today", "now" and the zone passed
+    in; a failed check is `Refusal` (`{ error, message?, conflicts? }`, code from `ApiErrorCode`).
+    `cognito.ts` also has `getUserSub` (`AdminGetUser`, the `sub`) and `isPlainUser` (in `user`,
+    not in `admin`). `http.ts`: `parseJsonBody` for bodies, `parseQuery` for query strings (the
     object a `.strict()` query schema checks).
   - `src/handlers/`, calendar: `getCalendarSettings.ts`, `updateCalendarSettings.ts` (the pattern
     the other calendar handlers copy: claims → configuration check → role → path → body →
@@ -228,13 +240,16 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     `deleteAvailabilityType.ts`; weekly patterns: `listPatterns.ts`, `createPattern.ts`,
     `updatePattern.ts`, `deletePattern.ts`; date overrides: `setOverride.ts`, `deleteOverride.ts`; one-off
     windows: `createOneOffWindow.ts`, `deleteOneOffWindow.ts` (all admin only; `date_in_past` from the
-    path or body before the lock, except the window delete); the view: `getCalendar.ts` (`GET /calendar`, both roles).
+    path or body before the lock, except the window delete); the view: `getCalendar.ts` (`GET /calendar`, both roles);
+    booking: `bookAppointment.ts` (`POST /calendar/appointments`, both roles; the checks in the order
+    of spec 8.2 v9, the Administrator's target through Cognito before the lock).
   - `tests/unit/`: vitest unit tests, mirroring `src/` (e.g. `tests/unit/lib/http.test.ts`).
   - `tests/integration/`: end-to-end tests against the local Docker stack: `setup.ts` (helpers,
-    including `resetCalendarTable()`, `putCalendarItem()`, `getCalendarItem()`), `journeys.test.ts`
+    including `resetCalendarTable()`, `putCalendarItem()`, `getCalendarItem()`, `deleteCalendarItem()`,
+    `queryCalendarPartition()`), `journeys.test.ts`
     (step 9), `calendar.test.ts` (the calendar's journeys, growing per plan step).
   - `scripts/`: shell scripts behind the npm scripts (`local-seed.sh`, `local-api.sh`,
-    `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`, `budget.sh`; `target.sh` is
+    `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`, `budget.sh`, `check-sam.sh`; `target.sh` is
     sourced by the last three; the first two of those call `cognito.mjs`).
   - `docker/`: files for the local stack (`cognito-local-config.json`).
 - `frontend/`: package `frontend`, the services layer only (exception in `docs/FOLDER_STRUCTURE.md`

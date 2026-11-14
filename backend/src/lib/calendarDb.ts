@@ -10,8 +10,10 @@ import {
   DEFAULT_SETTINGS,
   addDays,
   isValidTimeZone,
+  localDateOf,
   toInstant,
   type Actor,
+  type Appointment,
   type ApiErrorCode,
   type AppointmentStatus,
   type CancelReason,
@@ -26,6 +28,7 @@ import {
   type UpdateSettingsBody,
   type WindowBody,
 } from '@shared-calendar/shared';
+import { appointmentEvent, type AppointmentSnapshot } from './calendarEvents';
 import type { CalendarState, Refusal, StateAppointment, ViewAppointment } from './calendarRules';
 import { documentClient } from './db';
 
@@ -70,9 +73,14 @@ export function calendarConfig(): CalendarConfig {
 export type TransactItem = NonNullable<TransactWriteCommandInput['TransactItems']>[number];
 
 // What one attempt of a locked operation decided, after its reads and checks:
-// - write: the operation's items, written in one transaction after the lock update;
+// - write: the operation's items, written in one transaction after the lock update. When one of
+//   them carries a condition the checks cannot see beforehand (a booking's deleted-user marker,
+//   R-BOOK-10), `onConditionFailed` names it (its index in `write`) and the result to answer if
+//   that condition fails: the transaction is cancelled, nothing is written, and there is no retry;
 // - stop: a check failed; nothing is written and the result goes back to the caller as is.
-export type LockedPlan<T> = { write: TransactItem[]; result: T } | { write: null; result: T };
+export type LockedPlan<T> =
+  | { write: TransactItem[]; result: T; onConditionFailed?: { item: number; result: T } }
+  | { write: null; result: T };
 
 export type Locked<T> = { result: T; attempts: number };
 
@@ -122,6 +130,11 @@ function lockWasBusy(err: unknown): boolean {
   return err instanceof TransactionCanceledException && LOCK_BUSY.has(err.CancellationReasons?.[0]?.Code ?? '');
 }
 
+// Whether the transaction was cancelled because the condition of item `index` failed.
+function conditionFailedAt(err: unknown, index: number): boolean {
+  return err instanceof TransactionCanceledException && err.CancellationReasons?.[index]?.Code === 'ConditionalCheckFailed';
+}
+
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 // 50 to 150 ms inclusive, so that two writers that collided do not collide again.
@@ -132,7 +145,9 @@ export function lockWaitMs(random: () => number = Math.random): number {
 // Runs one calendar write under the lock (13.4): read the lock version, let `attempt` read what
 // its rules need and check them, then write the lock update and the attempt's items in one
 // transaction. If another write took the lock in between, wait and start again from the reads,
-// at most LOCK_MAX_ATTEMPTS times in total. Any other failure is thrown at once.
+// at most LOCK_MAX_ATTEMPTS times in total. The lock is looked at first: when it was lost, any
+// other reason in the same answer is stale and the retry re-reads. Otherwise a failed condition the
+// plan named answers its result (`onConditionFailed`), and any other failure is thrown at once.
 export async function withCalendarLock<T>(attempt: () => Promise<LockedPlan<T>>): Promise<Locked<T>> {
   const { table } = calendarConfig();
   for (let attempts = 1; ; attempts++) {
@@ -143,9 +158,15 @@ export async function withCalendarLock<T>(attempt: () => Promise<LockedPlan<T>>)
       await documentClient.send(new TransactWriteCommand({ TransactItems: [lockUpdate(table, version), ...plan.write] }));
       return { result: plan.result, attempts };
     } catch (err) {
-      if (!lockWasBusy(err)) throw err;
-      if (attempts === LOCK_MAX_ATTEMPTS) throw new ConcurrentUpdateError(attempts);
-      await wait(lockWaitMs());
+      if (lockWasBusy(err)) {
+        if (attempts === LOCK_MAX_ATTEMPTS) throw new ConcurrentUpdateError(attempts);
+        await wait(lockWaitMs());
+        continue;
+      }
+      // The plan's items follow the lock update, so item i of `write` is reason i + 1.
+      const failed = plan.onConditionFailed;
+      if (failed && conditionFailedAt(err, failed.item + 1)) return { result: failed.result, attempts };
+      throw err;
     }
   }
 }
@@ -397,6 +418,7 @@ async function readState(table: string, today: string, now: string): Promise<Rea
     appointments: appointments.map(
       (a): StateAppointment => ({
         appointmentId: idOf(a.SK as string),
+        userId: a.userId as string,
         username: a.username as string,
         start: a.start as string,
         end: a.end as string,
@@ -727,5 +749,120 @@ export async function readCalendarRange(from: string, to: string): Promise<Calen
     overrides: overrides.map(toOverride),
     oneOffs: oneOffs.map(toOneOff),
     appointments: appointments.map((a) => toViewAppointment(a, typeNames)),
+  };
+}
+
+// ── Booking (spec 8.2; items APPT, APPTID, EVENT and the DELETEDUSER marker of 13.2) ──────────
+
+/** What the handler decided before the lock: the ids (made once per request), the User, the times. */
+export type NewBooking = {
+  appointmentId: string;
+  eventId: string;
+  /** The Cognito `sub` of the User the appointment is for: the token's, or AdminGetUser's. */
+  userId: string;
+  username: string;
+  /** The times R-BOOK-02 accepted, `end` filled in. */
+  start: string;
+  end: string;
+  /** Trimmed; an empty note is null (R-BOOK-11). */
+  note: string | null;
+  by: Actor;
+};
+
+/**
+ * The booking check (calendarRules.checkBooking), on the settings and the state read inside the
+ * locked attempt: a refusal, or the effective window that holds the appointment.
+ */
+export type BookingCheck<C extends ApiErrorCode> = (state: CalendarState, settings: CalendarSettings) => Refusal<C> | { window: { typeId: string } };
+
+/** A stored booking as the handler answers it: the response fields but `cancellableUntil`, and the settings it was checked with. */
+export type BookedAppointment = { appointment: Omit<Appointment, 'cancellableUntil'>; settings: CalendarSettings };
+
+const deletedUserKey = (sub: string) => ({ PK: `DELETEDUSER#${sub}`, SK: 'DELETEDUSER' });
+
+/**
+ * Books an appointment under the lock (8.2, 13.4). Inside each attempt it reads the settings and the
+ * availability state (types, patterns, overrides and one-off windows from today, appointments from
+ * now − 24 h), and `check` decides on them, so a retry re-reads and re-checks. Then one transaction
+ * of five items: the lock update; `Put APPT` (`SK` `<start>#<appointmentId>`, the attributes of
+ * architecture 5.3, `version` 1, `updatedAt`/`updatedBy` = `createdAt`/`createdBy`); `Put APPTID`
+ * (the pointer, `sk`); `Put EVENT` (`appointment.booked`, calendarEvents); and a `ConditionCheck`
+ * that `DELETEDUSER#<userId>` does not exist (R-BOOK-10), whose failure answers `user_not_found`
+ * without a retry. The type's name is the appointment's `typeName` and its snapshot.
+ */
+export async function bookAppointment<C extends ApiErrorCode>(
+  booking: NewBooking,
+  today: string,
+  now: string,
+  check: BookingCheck<C>,
+): Promise<Locked<Checked<BookedAppointment, C | 'user_not_found'>>> {
+  const { table, timeZone } = calendarConfig();
+  const { appointmentId, eventId, userId, username, start, end, note, by } = booking;
+  const date = localDateOf(start, timeZone);
+  return withCalendarLock<Checked<BookedAppointment, C | 'user_not_found'>>(async () => {
+    const [settings, state] = await Promise.all([readSettings(table, timeZone), readState(table, today, now)]);
+    const outcome = check(state, settings);
+    if ('error' in outcome) return { write: null, result: refused(outcome) };
+    // The check found the window among the existing types only, so the type is there.
+    const type = state.types.find((t) => t.typeId === outcome.window.typeId)!;
+    const stored: AppointmentSnapshot = {
+      appointmentId,
+      userId,
+      username,
+      start,
+      end,
+      date,
+      typeId: type.typeId,
+      typeNameAtBooking: type.name,
+      note,
+      status: 'booked',
+      createdAt: now,
+      createdBy: actorItem(by),
+      updatedAt: now,
+      updatedBy: actorItem(by),
+      cancelledAt: null,
+      cancelledBy: null,
+      cancelReason: null,
+      replaces: null,
+      replacedBy: null,
+      version: 1,
+    };
+    const sk = `${start}#${appointmentId}`;
+    const { appointmentId: id, ...attributes } = stored;
+    const marker = 3;
+    return {
+      write: [
+        { Put: { TableName: table, Item: { PK: APPT_PK, SK: sk, ...attributes } } },
+        { Put: { TableName: table, Item: { PK: `APPTID#${id}`, SK: 'APPTID', sk } } },
+        { Put: { TableName: table, Item: appointmentEvent({ type: 'appointment.booked', eventId, occurredAt: now, actor: by, appointment: stored }) } },
+        { ConditionCheck: { TableName: table, Key: deletedUserKey(userId), ConditionExpression: 'attribute_not_exists(PK)' } },
+      ],
+      onConditionFailed: { item: marker, result: notFound('user_not_found') },
+      result: { ok: true, value: { appointment: toBookedAppointment(stored, type.name), settings } },
+    };
+  });
+}
+
+// The response fields of a stored appointment (11.5) but `cancellableUntil`: no userId, no version.
+function toBookedAppointment(a: AppointmentSnapshot, typeName: string): Omit<Appointment, 'cancellableUntil'> {
+  return {
+    appointmentId: a.appointmentId,
+    username: a.username,
+    start: a.start,
+    end: a.end,
+    date: a.date,
+    typeId: a.typeId,
+    typeName,
+    note: a.note,
+    status: a.status,
+    createdAt: a.createdAt,
+    createdBy: a.createdBy,
+    updatedAt: a.updatedAt,
+    updatedBy: a.updatedBy,
+    cancelledAt: a.cancelledAt,
+    cancelledBy: a.cancelledBy,
+    cancelReason: a.cancelReason,
+    replaces: a.replaces,
+    replacedBy: a.replacedBy,
   };
 }

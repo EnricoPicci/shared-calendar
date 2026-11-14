@@ -194,7 +194,7 @@ Resources:
   # which lists the sets its route needs under ManagedPolicyArns. Written once here instead of
   # repeated in every role. Resource: the calendar table only. Writes go through
   # TransactWriteItems, which DynamoDB authorizes by the actions of its parts (Put, Update...).
-  # One more set comes with the routes that need it: CalendarBookPolicy (step 48).
+  # CalendarBookPolicy adds the one action only a booking needs (ConditionCheckItem).
   CalendarReadPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -236,6 +236,22 @@ Resources:
             Action:
               - dynamodb:DeleteItem
               - dynamodb:UpdateItem
+            Resource: !GetAtt CalendarTable.Arn
+
+  # The booking's check that the account still exists (spec R-BOOK-10): the booking transaction ends
+  # with a ConditionCheck that no deleted-user marker exists for the User. A ConditionCheck reads one
+  # item and writes nothing, and DynamoDB authorizes it as its own action. Booking only (route 17;
+  # changing an appointment, step 50, will attach it too).
+  CalendarBookPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Check a calendar item's condition inside a transaction (ConditionCheckItem).
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:ConditionCheckItem
             Resource: !GetAtt CalendarTable.Arn
 
   # ---------------------------------------------------------------------------
@@ -1558,6 +1574,86 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeleteOneOffWindowLogGroup}:log-stream:*
+
+  # POST /calendar/appointments (route 17, Administrator and Users): books an appointment under the
+  # lock, with the event of spec section 15 in the same transaction. The Administrator books for a
+  # User named in the body: the function asks Cognito for that account's id (AdminGetUser) and
+  # groups (AdminListGroupsForUser), read-only, on this user pool only.
+  BookAppointmentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: bookAppointment.handler
+      Role: !GetAtt BookAppointmentRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref BookAppointmentLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+          USER_POOL_ID: !Ref UserPool
+          COGNITO_ENDPOINT: ''
+      Events:
+        BookAppointment:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /calendar/appointments
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/bookAppointment.ts
+
+  BookAppointmentLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-bookAppointment
+      RetentionInDays: 14
+
+  BookAppointmentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+        - !Ref CalendarWritePolicy
+        - !Ref CalendarBookPolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${BookAppointmentLogGroup}:log-stream:*
+        - PolicyName: read-booking-target
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:AdminListGroupsForUser
+                Resource: !GetAtt UserPool.Arn
 
   # ---------------------------------------------------------------------------
   # Error alarms (architecture section 11)

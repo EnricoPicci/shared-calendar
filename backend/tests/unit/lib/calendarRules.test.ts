@@ -155,6 +155,7 @@ describe('checkAvailabilityWrite', () => {
   // Monday 2026-11-16, 09:00–10:00 local = 08:00Z–09:00Z (AC-10).
   const appt = (more: Partial<StateAppointment> = {}): StateAppointment => ({
     appointmentId: 'A1',
+    userId: 'sub-alice',
     username: 'alice',
     start: '2026-11-16T08:00:00.000Z',
     end: '2026-11-16T09:00:00.000Z',

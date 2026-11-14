@@ -34,7 +34,7 @@ Where the full story is:
 | npm | bundled with Node | `npm -v` |
 | git, curl | any current | `git --version`, `curl --version` |
 | Docker with the Compose v2 plugin | current | `docker info`, `docker compose version` |
-| AWS SAM CLI | ≥ 1.80 | `sam --version` |
+| AWS SAM CLI | ≥ 1.171.0 (the monorepo build; `scripts/check-sam.sh` refuses older) | `sam --version` |
 | AWS CLI v2 | current | `aws --version` |
 
 The AWS CLI is needed locally too: the seed script creates the local table, user pool and

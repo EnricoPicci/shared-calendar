@@ -2,6 +2,7 @@ import {
   AdminAddUserToGroupCommand,
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
+  AdminGetUserCommand,
   AdminListGroupsForUserCommand,
   AdminSetUserPasswordCommand,
   AdminUserGlobalSignOutCommand,
@@ -14,7 +15,9 @@ import {
   addToGroup,
   createUser,
   deleteUser,
+  getUserSub,
   globalSignOut,
+  isPlainUser,
   listGroups,
   setPermanentPassword,
   UserExistsError,
@@ -114,6 +117,70 @@ describe('listGroups', () => {
   it('maps UserNotFoundException to UserNotFoundError', async () => {
     cognito.on(AdminListGroupsForUserCommand).rejects(notFound());
     await expect(listGroups('ghost')).rejects.toBeInstanceOf(UserNotFoundError);
+  });
+});
+
+describe('getUserSub', () => {
+  it('sends AdminGetUser and returns the sub attribute', async () => {
+    cognito.on(AdminGetUserCommand).resolves({
+      Username: 'bob',
+      UserAttributes: [
+        { Name: 'email_verified', Value: 'false' },
+        { Name: 'sub', Value: 'c0a8-sub-of-bob' },
+      ],
+    });
+    await expect(getUserSub('bob')).resolves.toBe('c0a8-sub-of-bob');
+    const calls = cognito.commandCalls(AdminGetUserCommand);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.args[0].input).toEqual({ UserPoolId: POOL, Username: 'bob' });
+  });
+
+  it('fails as an ordinary error when the answer has no sub attribute', async () => {
+    cognito.on(AdminGetUserCommand).resolves({ Username: 'bob', UserAttributes: [{ Name: 'email', Value: 'b@example.com' }] });
+    const err = await getUserSub('bob').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(UserNotFoundError);
+    expect((err as Error).message).toBe('User bob has no sub attribute');
+  });
+
+  it('fails as an ordinary error when the answer has no attributes at all', async () => {
+    cognito.on(AdminGetUserCommand).resolves({ Username: 'bob' });
+    await expect(getUserSub('bob')).rejects.toThrow('User bob has no sub attribute');
+  });
+
+  it('maps UserNotFoundException to UserNotFoundError', async () => {
+    cognito.on(AdminGetUserCommand).rejects(notFound());
+    await expect(getUserSub('ghost')).rejects.toBeInstanceOf(UserNotFoundError);
+  });
+});
+
+describe('isPlainUser', () => {
+  const groups = (...names: string[]) => cognito.on(AdminListGroupsForUserCommand).resolves({ Groups: names.map((GroupName) => ({ GroupName })) });
+
+  it('is true for an account in group user only', async () => {
+    groups('user');
+    await expect(isPlainUser('bob')).resolves.toBe(true);
+    expect(cognito.commandCalls(AdminListGroupsForUserCommand)[0]!.args[0].input).toEqual({ UserPoolId: POOL, Username: 'bob' });
+  });
+
+  it('is false for an account in group admin only', async () => {
+    groups('admin');
+    await expect(isPlainUser('admin')).resolves.toBe(false);
+  });
+
+  it('is false for an account in both groups: admin wins', async () => {
+    groups('user', 'admin');
+    await expect(isPlainUser('both')).resolves.toBe(false);
+  });
+
+  it('is false for an account in neither group', async () => {
+    groups();
+    await expect(isPlainUser('orphan')).resolves.toBe(false);
+  });
+
+  it('maps UserNotFoundException to UserNotFoundError', async () => {
+    cognito.on(AdminListGroupsForUserCommand).rejects(notFound());
+    await expect(isPlainUser('ghost')).rejects.toBeInstanceOf(UserNotFoundError);
   });
 });
 

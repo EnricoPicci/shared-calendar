@@ -7,7 +7,7 @@
     "node": ">=22 <23"
   },
   "scripts": {
-    "build": "SAM_CLI_BETA_NODEJS_MONOREPO=1 sam build",
+    "build": "bash scripts/check-sam.sh && SAM_CLI_BETA_NODEJS_MONOREPO=1 sam build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "audit": "npm audit --audit-level=high",

@@ -153,7 +153,9 @@ ensure_user alice "$ALICE_PASSWORD" user
 # "Parameters" applies to every function that declares the variable in template.yaml, so each new
 # calendar function needs no section of its own. CALENDAR_TIME_ZONE is deliberately absent: a value
 # here would win over the template, and the CalendarTimeZone parameter (default Europe/Rome, or
-# --parameter-overrides) must stay its one source.
+# --parameter-overrides) must stay its one source. The one exception is BookAppointmentFunction,
+# which also calls Cognito (the Administrator books for a User): it gets the pool, the emulator's
+# address and the dummy credentials in a section of its own, like CreateUserFunction.
 cat > env.local.json <<EOF
 {
   "Parameters": {
@@ -184,6 +186,12 @@ cat > env.local.json <<EOF
     "USER_POOL_ID": "$POOL_ID",
     "COGNITO_ENDPOINT": "http://cognito:9229",
     "SKIP_GLOBAL_SIGN_OUT": "true",
+    "AWS_ACCESS_KEY_ID": "local",
+    "AWS_SECRET_ACCESS_KEY": "local"
+  },
+  "BookAppointmentFunction": {
+    "USER_POOL_ID": "$POOL_ID",
+    "COGNITO_ENDPOINT": "http://cognito:9229",
     "AWS_ACCESS_KEY_ID": "local",
     "AWS_SECRET_ACCESS_KEY": "local"
   }

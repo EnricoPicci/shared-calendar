@@ -6,9 +6,11 @@ import {
 import { DescribeTableCommand, DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   BatchWriteCommand,
+  DeleteCommand,
   DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
+  QueryCommand,
   ScanCommand,
   type BatchWriteCommandInput,
 } from '@aws-sdk/lib-dynamodb';
@@ -197,4 +199,31 @@ export async function getCalendarItem(PK: string, SK: string): Promise<CalendarI
   const client = await localCalendar();
   const { Item } = await client.send(new GetCommand({ TableName: CALENDAR_TABLE, Key: { PK, SK }, ConsistentRead: true }));
   return Item as CalendarItem | undefined;
+}
+
+// Deletes one item directly (e.g. a deleted-user marker a journey wrote with putCalendarItem).
+export async function deleteCalendarItem(PK: string, SK: string): Promise<void> {
+  const client = await localCalendar();
+  await client.send(new DeleteCommand({ TableName: CALENDAR_TABLE, Key: { PK, SK } }));
+}
+
+// Every item of one partition (consistent), in SK order, following LastEvaluatedKey.
+export async function queryCalendarPartition(PK: string): Promise<CalendarItem[]> {
+  const client = await localCalendar();
+  const items: CalendarItem[] = [];
+  let startKey: Record<string, unknown> | undefined;
+  do {
+    const page = await client.send(
+      new QueryCommand({
+        TableName: CALENDAR_TABLE,
+        KeyConditionExpression: 'PK = :pk',
+        ExpressionAttributeValues: { ':pk': PK },
+        ConsistentRead: true,
+        ExclusiveStartKey: startKey,
+      }),
+    );
+    items.push(...((page.Items ?? []) as CalendarItem[]));
+    startKey = page.LastEvaluatedKey;
+  } while (startKey);
+  return items;
 }
