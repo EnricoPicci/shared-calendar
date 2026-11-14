@@ -396,6 +396,86 @@ export function checkBooking(input: BookingInput): { window: EffectiveWindow } |
   return { window };
 }
 
+// ── Cancelling and the note (spec 8.3, 8.5, v10) ─────────────────────────────────────────────
+
+/**
+ * `cancellableUntil` of an appointment in a response (8.1, 11.5, v10): for a User caller on a
+ * `booked` appointment, `start − cancellationNoticeHours` (already in the past once that moment has
+ * passed, ended appointments included); `null` on a `cancelled` one and in every answer to the
+ * Administrator. It depends on the stored status only, never on the clock.
+ */
+export function cancellableUntilFor(
+  appointment: { start: string; status: AppointmentStatus },
+  role: Role,
+  settings: Pick<CalendarSettings, 'cancellationNoticeHours'>,
+): string | null {
+  return role === 'user' && appointment.status === 'booked' ? cancellableUntil(appointment, settings) : null;
+}
+
+/** Who asks: the role and the Cognito `sub` of the token. A User's ownership is decided on the `sub`. */
+export type Caller = { role: Role; sub: string };
+
+/** What the cancel and note checks need of the appointment read inside the locked attempt. */
+export type CheckedAppointment = { userId: string; start: string; end: string; status: AppointmentStatus };
+
+export type NoteRefusal = Refusal<'appointment_not_found' | 'appointment_not_active'>;
+export type CancelRefusal = Refusal<'appointment_not_found' | 'appointment_not_active' | 'cancellation_too_late'>;
+
+// The two checks routes 18 and 19 share, in the order of 8.3 (v10): R-CAN-01 / R-PERM-01, absent or
+// (for a User) not theirs by `sub`, is 404, before anything that would tell its status; then
+// R-CAN-02 / R-NOTE-01, `status = booked` and `end > now`, else 409.
+function checkVisibleAndActive(appointment: CheckedAppointment | null, caller: Caller, now: string): NoteRefusal | null {
+  if (!appointment || (caller.role !== 'admin' && appointment.userId !== caller.sub)) {
+    return refuse('appointment_not_found', 'No appointment with this id');
+  }
+  if (appointment.status !== 'booked' || appointment.end <= now) {
+    return refuse('appointment_not_active', 'The appointment is cancelled or has ended');
+  }
+  return null;
+}
+
+/**
+ * The cancel checks (8.3, the order of v10), on the appointment read inside the locked attempt (or
+ * `null` if there is none) and the settings read with it; the first that fails decides:
+ * - R-CAN-01 / R-PERM-01: absent, or a User caller whose `sub` is not its `userId`:
+ *   `appointment_not_found` (404, never 403, so ids cannot be probed);
+ * - R-CAN-02: `status = booked` and `end > now`: `appointment_not_active`;
+ * - R-CAN-03 (a User only): `now ≤ start − cancellationNoticeHours`, the response's
+ *   `cancellableUntil`, compared to the millisecond: `cancellation_too_late`. Exactly the notice
+ *   before the start is allowed; an appointment in progress is refused here, not by R-CAN-02. The
+ *   Administrator is exempt and may cancel one in progress.
+ * Answers null when the cancel may be written.
+ */
+export function checkCancel(
+  appointment: CheckedAppointment | null,
+  caller: Caller,
+  settings: Pick<CalendarSettings, 'cancellationNoticeHours'>,
+  now: string,
+): CancelRefusal | null {
+  const refusal = checkVisibleAndActive(appointment, caller, now);
+  if (refusal) return refusal;
+  if (caller.role !== 'admin' && Date.parse(now) > Date.parse(cancellableUntil(appointment!, settings))) {
+    return refuse('cancellation_too_late', 'Too late to cancel this appointment');
+  }
+  return null;
+}
+
+/**
+ * The note checks (R-NOTE-01, 8.5 v10), on the appointment read inside the locked attempt (or
+ * `null`): R-PERM-01 (`appointment_not_found`), then active and not ended
+ * (`appointment_not_active`); no notice applies. `note` is the new note, already trimmed with an
+ * empty one made `null` (R-BOOK-11). Answers whether it equals the stored one: then nothing is
+ * written, no event either (v10).
+ */
+export function checkNote(
+  appointment: (CheckedAppointment & { note: string | null }) | null,
+  note: string | null,
+  caller: Caller,
+  now: string,
+): NoteRefusal | { unchanged: boolean } {
+  return checkVisibleAndActive(appointment, caller, now) ?? { unchanged: appointment!.note === note };
+}
+
 // ── The calendar view (spec 11.6, 7, 8.6, 17) ────────────────────────────────────────────────
 
 /**
@@ -521,6 +601,6 @@ export function calendarView(input: CalendarViewInput): CalendarView {
 
   const appointments = booked
     .filter((a) => admin || a.userId === callerSub)
-    .map((a) => toResponse(a.appointment, admin ? null : cancellableUntil(a.appointment, settings)));
+    .map((a) => toResponse(a.appointment, cancellableUntilFor(a.appointment, role, settings)));
   return { timeZone: zone, from, to, generatedAt: now, days, appointments };
 }

@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v9 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
-| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9 2026-11-14 |
+| Status | v10 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
+| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9 and v10 2026-11-14 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
@@ -21,6 +21,7 @@
 | v7 | 2026-11-13 | Brief 47 (plan step 46). The 11.6 example corrected: the four Swimming Pool slots added, alice's appointment written out in full, real ULIDs. The night clocks go back gives two slots at the same local time (R-SLOT-01, 16.8). A window whose type has been deleted is not shown (R-VIEW-03). The view's appointment range is `SK BETWEEN <rangeStart> AND <rangeEnd>`, `rangeEnd` exclusive (13.2). |
 | v8 | 2026-11-13 | Brief 48 (plan step 47). A one-off window dated before today cannot be deleted: `409 date_in_past`, as for an override (R-ONE-02, route 14). An override's windows are stored and returned sorted by start; two of its own windows that overlap are `409 availability_overlap` (6.3). |
 | v9 | 2026-11-14 | Brief 49 (plan step 48). The order of the booking checks is stated as the handler runs them (8.2): the body's shape with the note first, R-BOOK-01's Cognito part after R-BOOK-02 and before the lock, R-BOOK-10 in the transaction. A booking target in no group is `409 target_not_user` (R-BOOK-01). The `APPT` item stores the fields of 8.1 except `appointmentId`, `typeName` and `cancellableUntil` (13.2). |
+| v10 | 2026-11-14 | Brief 50 (plan step 49). The appointment list (route 16): exactly one selection, `from`+`to` or `upcoming=true`; `upcoming` selects by time and `status` filters it; a range takes the appointments dated in it; "ended" is not a status (11.1, 11.2, R-VIEW-01). A User's list is matched on the `sub`, the Administrator's `username` on the stored name, earlier accounts with it included (11.1, 11.2, 13.2). `cancellableUntil` is `null` on a cancelled appointment (8.1, 11.5). Cancel and note: the order of the checks, R-CAN-03 as `now ≤ cancellableUntil` to the millisecond, the lookup inside the locked attempt, an `Update` of the changed attributes without a condition of its own, and an unchanged note writes nothing (8.3, 8.5, 13.2, 13.4). Routes 18 and 19 read with `GetItem` only (14.3). |
 
 ---
 
@@ -407,7 +408,7 @@ custom times.
 | `updatedAt`, `updatedBy` | last change of any kind (note or status) |
 | `cancelledAt`, `cancelledBy`, `cancelReason` | set when cancelled; `cancelReason` ∈ `cancelled` (an explicit cancel), `changed` (replaced by a change), `user_deleted` (D19) |
 | `replaces`, `replacedBy` | appointment ids linking the two halves of a change, or `null` |
-| `cancellableUntil` | in responses only, for a User caller: `start − cancellationNoticeHours`, i.e. the last instant at which the User may cancel or change; `null` for the Administrator (no limit) |
+| `cancellableUntil` | in responses only, for a User caller on a `booked` appointment: `start − cancellationNoticeHours`, i.e. the last instant at which the User may cancel or change (already in the past once that moment has passed, ended appointments included); `null` on a `cancelled` appointment and in every answer to the Administrator (v10) |
 | `version` | internal optimistic-locking counter |
 
 Lifecycle:
@@ -480,6 +481,24 @@ the table (D17). Event `appointment.cancelled`. Cancelling frees the time at onc
 With the default notice of 24 h, an appointment on Tuesday at 10:00 can be cancelled by its User
 until Monday at 10:00 (the comparison is `≥`, so exactly 24 h before is still allowed).
 
+R-CAN-03 is the same instant as the response's `cancellableUntil`: the cancel is allowed while
+`now ≤ start − cancellationNoticeHours`, compared to the millisecond with `now` read once per request.
+A `now` one millisecond later is refused. A User's appointment in progress passes R-CAN-02 and is
+refused by R-CAN-03 (v10).
+
+The checks run in this order, and the first that fails decides (v10):
+
+1. the path id is a ULID (`400 invalid_request`);
+2. inside the locked attempt, on the appointment read in it: R-CAN-01 / R-PERM-01, absent or (for a
+   User caller) a `userId` other than the `sub` of the token (`404 appointment_not_found`); R-CAN-02
+   (`409 appointment_not_active`); for a User, R-CAN-03 (`403 cancellation_too_late`).
+
+The 404 comes first, so a User learns nothing about the status of someone else's appointment. The
+lookup by id (13.2) runs inside the locked attempt: the pointer never changes, but the `APPT` item
+does, and a retry must re-check it. The cancel writes, with the lock update and the event, an
+`Update` of the `APPT` item that sets `status` `cancelled`, `cancelledAt` and `updatedAt` now,
+`cancelledBy` and `updatedBy` the caller, `cancelReason` `cancelled` and `version` + 1 (13.4).
+
 ### 8.4 Changing (D16)
 
 Request: `POST /calendar/appointments/{id}/change` with `{ start, end?, note? }`. The User of the
@@ -511,13 +530,22 @@ not ended (no notice applies: a note changes nothing in the schedule). Errors: `
 appointment_not_found`, `409 appointment_not_active`, `400 invalid_request`. Event
 `appointment.note_updated`.
 
+The checks run in the order of 8.3 (v10): the path id (`400`); the body, JSON then `NoteBody` with
+the note of R-BOOK-11 (`400 invalid_json` / `invalid_request`); inside the locked attempt, R-PERM-01
+(`404 appointment_not_found`, also for someone else's appointment: route 18 has no `403`), then
+active and not ended (`409 appointment_not_active`). The write is an `Update` of `note`, `updatedAt`,
+`updatedBy` and `version` + 1. A note equal to the stored one, after trimming (empty → `null`),
+changes nothing: `200` with the appointment, no write, no event. Every `appointment.note_updated`
+event is therefore a real change.
+
 **R-NOTE-02** The note is personal data. It is never written to logs (section 14.5).
 
 ### 8.6 Listing and viewing
 
 - **R-VIEW-01** A User sees their own appointments in every status and every time range: their
   history. They see others' active appointments only as anonymous `busy` intervals in the calendar
-  view.
+  view. "Ended" is not a status: a booked appointment that has ended is listed as `booked` (v10).
+  A history longer than 92 days is read through several ranges.
 - **R-VIEW-02** The Administrator sees every appointment, in every status.
 - **R-VIEW-03** Past dates can be viewed. Their windows are shown as the *current* rules define
   them, which may differ from what applied at the time (assumption A3); their slots are empty. A
@@ -636,8 +664,17 @@ availability-write helper can answer it; in practice it never does.
 Notes on the route design:
 - Cancel is a `POST …/cancel`, not a `DELETE`, because the appointment is not deleted: it changes
   status and is kept (D17). Change is a `POST` because it creates a new appointment.
-- `upcoming=true` returns active appointments with `end > now` (no date bound). For a User this
-  is "my next appointments"; the Administrator can add `username`.
+- `upcoming=true` selects the appointments with `end > now`, with no date bound; `status` filters
+  them as it filters a range (v10). With the default `status=booked` this means the active
+  appointments not yet ended: for a User "my next appointments". `status=all` adds the cancelled
+  ones whose time has not passed.
+- On route 16 a User's list is always their own appointments, matched on the `sub` of their token
+  (`userId`). A User who passes `username` must pass their own (otherwise `403 forbidden`), and gets
+  the same answer as without it. The Administrator's `username` filters on the `username` stored on
+  the appointment, with no Cognito call. It means "the appointments booked under that name",
+  including those of earlier deleted accounts with the same name (R-DEL-02: a new account gets a new
+  `sub`). A name nobody has booked under answers `200` with an empty list. Without `username`, the
+  Administrator gets every appointment (v10).
 - There is no `GET` for a single appointment, pattern, override or window: the lists and the
   calendar view carry everything, and every write returns the stored object.
 - Overrides and one-off windows have no list route of their own. The Administrator's calendar
@@ -650,10 +687,10 @@ Notes on the route design:
 |---|---|
 | `typeId`, `patternId`, `windowId`, `appointmentId` | ULID: 26 characters of Crockford base32 (`^[0-9A-HJKMNP-TV-Z]{26}$`) |
 | `date` | local date `YYYY-MM-DD`, a real calendar date |
-| `from`, `to` | local dates; `from ≤ to`; span ≤ 31 days (#15) or ≤ 92 days (#16) |
-| `upcoming` | `true` only; mutually exclusive with `from`/`to` |
-| `username` | the shared `Username` schema |
-| `status` | `booked`, `cancelled`, `all` |
+| `from`, `to` | local dates; `from ≤ to`; span ≤ 31 days (#15) or ≤ 92 days (#16). For #16, the appointments whose `date` (the local date of `start`) lies in `from`..`to`; an appointment never crosses midnight, so this is also every appointment that overlaps the range (v10) |
+| `upcoming` | `true` only. A query has exactly one selection: `from` and `to` together, or `upcoming=true`. Neither, both, or `from` or `to` alone is `400 invalid_request` (v10) |
+| `username` | the shared `Username` schema. Administrator: a filter on the stored `username` (see the notes under 11.1). User: absent or the caller's own (`403 forbidden` otherwise) (v10) |
+| `status` | `booked` (default), `cancelled`, `all`; filters whichever selection the query makes |
 
 ### 11.3 Error codes added to `ApiErrorCode`
 
@@ -753,7 +790,7 @@ type Appointment = {
   cancelledAt: string | null; cancelledBy: Actor | null;
   cancelReason: 'cancelled' | 'changed' | 'user_deleted' | null;
   replaces: string | null; replacedBy: string | null;
-  cancellableUntil: string | null; // User callers only; null for the Administrator
+  cancellableUntil: string | null; // User callers on a booked appointment; null on a cancelled one and for the Administrator
 };
 
 type UserSummary = { username: string; createdAt: string };
@@ -927,8 +964,8 @@ Access patterns, every one a `GetItem` or a `Query` on the base table with `Cons
 | One-off windows in a date range | `Query PK = WINDOW, SK BETWEEN from AND to#~` |
 | Appointments in a time range (view, overlap check) | `Query PK = APPT, SK BETWEEN <rangeStart> AND <rangeEnd>`; filter `status` in code. `rangeEnd` is exclusive (for the view, the local midnight after `to`): an `SK` is `<start>#<appointmentId>` and instants have one length, so an appointment starting exactly at `rangeEnd` has an `SK` that sorts after `<rangeEnd>` and is not taken. |
 | Active appointments not yet ended (conflict check R-AV-03, `upcoming`, limit R-BOOK-09) | `Query PK = APPT, SK ≥ <now − longest window>`, filter `status = booked` and `end > now`. An appointment lasts at most one day, so `SK ≥ (now − 24 h)` is enough. |
-| Appointment by id | `GetItem APPTID#<id>` → `GetItem APPT / sk` |
-| A User's appointments | the range queries above, filtered on `userId` (ranges are bounded to 92 days, or "upcoming") |
+| Appointment by id | `GetItem APPTID#<id>` → `GetItem APPT / sk`; for a write, both inside the locked attempt (v10). A pointer without its item is treated as absent (it cannot happen: both are written in one transaction, and an appointment is never deleted) |
+| A User's appointments, or those under a name | the range queries above. For a User caller, filtered on `userId` = the token's `sub`. For the Administrator's `username` filter, filtered on the stored `username`, which includes earlier accounts with that name (11.1). Ranges are bounded to 92 days, or "upcoming" (v10) |
 
 **Scale note.** All appointments share one partition (`APPT`). That is fine for N6: a partition
 serves 3 000 reads and 1 000 writes per second, and the expected volume is in the thousands of
@@ -976,6 +1013,11 @@ applies here too: per-day locks would be the next step.
 Transaction sizes: booking 5 items, change 6, cancel 3, note 3, availability writes 2–3,
 user-deletion chunk ≤ 82. All are under DynamoDB's limit of 100.
 
+A cancel and a note write the `APPT` item as an `Update` of the changed attributes only, so an
+attribute the code does not know is kept, and without a condition of its own: every appointment
+write takes the lock, so a condition on `version` could never fail. `version` still goes to
+`v + 1` (v10).
+
 DynamoDB Local supports `TransactWriteItems` and `ConditionCheck`, so the integration tests
 exercise the real path.
 
@@ -1017,7 +1059,7 @@ IAM resources are the table's ARN and the user pool's ARN only, with no wildcard
 rule). DynamoDB authorizes `TransactWriteItems` through the actions of its parts (Put, Update,
 Delete, ConditionCheck), so no extra action is needed. `PutItem` appears where an event is written.
 The DynamoDB actions come from the four shared policies of 14.3, so every route that reads gets both
-`GetItem` and `Query` (routes 1, 2, 3 and 7 use only one of them; 14.3 explains why that is accepted).
+`GetItem` and `Query` (routes 1, 2, 3, 7, 18 and 19 use only one of them; 14.3 explains why that is accepted).
 
 `changeAppointment` books the User of the old appointment, whose `sub` is stored on it, so it needs
 no Cognito call.
@@ -1068,8 +1110,8 @@ response + one log line. Coverage stays at 100 % lines on `src/lib`.
   - The Cognito statements of routes 17 and 21 and of `DeleteUserRole`, because each belongs to one
     role only and there is nothing to share. They name the user pool's ARN only, as today.
 
-  **What this gives up.** Routes 1, 2, 3 and 7 get one read action they do not call (the 14.1 table
-  lists them). That exposes nothing new. A role that may `GetItem` on the table can already read any
+  **What this gives up.** Routes 1, 2, 3, 7, 18 and 19 get one read action they do not call (the 14.1 table
+  lists them; 18 and 19 read with `GetItem` only, v10). That exposes nothing new. A role that may `GetItem` on the table can already read any
   item in it, and `Query` only reads the same items in fewer calls. Every write and delete permission
   still matches the route exactly.
 

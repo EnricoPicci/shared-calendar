@@ -1655,6 +1655,205 @@ Resources:
                   - cognito-idp:AdminListGroupsForUser
                 Resource: !GetAtt UserPool.Arn
 
+  # GET /calendar/appointments (route 16, Administrator and Users): the appointments of a date range
+  # (at most 92 days) or the upcoming ones, filtered by status; a User's own only. A read: no lock,
+  # no write, no Cognito call (the Administrator's username filter is on the stored name).
+  ListAppointmentsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: listAppointments.handler
+      Role: !GetAtt ListAppointmentsRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref ListAppointmentsLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        ListAppointments:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /calendar/appointments
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/listAppointments.ts
+
+  ListAppointmentsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-listAppointments
+      RetentionInDays: 14
+
+  ListAppointmentsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ListAppointmentsLogGroup}:log-stream:*
+
+  # PATCH /calendar/appointments/{appointmentId} (route 18, Administrator and the appointment's User):
+  # sets or clears the note of an active appointment not yet ended, under the lock, with its event.
+  UpdateAppointmentNoteFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: updateAppointmentNote.handler
+      Role: !GetAtt UpdateAppointmentNoteRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref UpdateAppointmentNoteLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        UpdateAppointmentNote:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: PATCH
+            Path: /calendar/appointments/{appointmentId}
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/updateAppointmentNote.ts
+
+  UpdateAppointmentNoteLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-updateAppointmentNote
+      RetentionInDays: 14
+
+  UpdateAppointmentNoteRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+        - !Ref CalendarWritePolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${UpdateAppointmentNoteLogGroup}:log-stream:*
+
+  # POST /calendar/appointments/{appointmentId}/cancel (route 19, Administrator and the appointment's
+  # User): cancels an active appointment not yet ended (a User only with enough notice), under the
+  # lock, with its event. The appointment is kept as cancelled, never deleted.
+  CancelAppointmentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: cancelAppointment.handler
+      Role: !GetAtt CancelAppointmentRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref CancelAppointmentLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        CancelAppointment:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /calendar/appointments/{appointmentId}/cancel
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/cancelAppointment.ts
+
+  CancelAppointmentLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-cancelAppointment
+      RetentionInDays: 14
+
+  CancelAppointmentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+        - !Ref CalendarWritePolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CancelAppointmentLogGroup}:log-stream:*
+
   # ---------------------------------------------------------------------------
   # Error alarms (architecture section 11)
   # ---------------------------------------------------------------------------

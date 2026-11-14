@@ -1,9 +1,9 @@
-import { BookBody, cancellableUntil, localDateOf, resolveRole, type Role } from '@shared-calendar/shared';
+import { BookBody, localDateOf, resolveRole, type Role } from '@shared-calendar/shared';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { ulid } from 'ulid';
 import { getClaims } from '../lib/auth';
 import { bookAppointment, calendarConfig, ConcurrentUpdateError, type CalendarConfig } from '../lib/calendarDb';
-import { checkBooking, checkBookingTimes, toResponse } from '../lib/calendarRules';
+import { cancellableUntilFor, checkBooking, checkBookingTimes, toResponse } from '../lib/calendarRules';
 import { getUserSub, isPlainUser, UserNotFoundError } from '../lib/cognito';
 import { error, ok, parseJsonBody, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
@@ -115,8 +115,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
       return done('conflict', error(409, result.error, result.message!), fields);
     }
     const { appointment, settings } = result.value;
-    const until = role === 'user' ? cancellableUntil(appointment, settings) : null;
-    return done('created', ok(201, toResponse(appointment, until)), { ...fields, appointmentId: appointment.appointmentId });
+    return done('created', ok(201, toResponse(appointment, cancellableUntilFor(appointment, role, settings))), { ...fields, appointmentId: appointment.appointmentId });
   } catch (err) {
     if (err instanceof ConcurrentUpdateError) {
       return done('conflict', error(409, 'concurrent_update', 'The calendar is busy; try again'), {

@@ -962,3 +962,267 @@ describe('booking (route 17)', () => {
     expect(res.body).toMatchObject(values);
   });
 });
+
+describe('listing, note and cancel (routes 16, 18, 19)', () => {
+  // What the earlier journeys leave behind (read from the booking journeys above):
+  // - settings cancellationNoticeHours 48, minBookingNoticeHours 2, bookingHorizonDays 30,
+  //   maxFutureAppointmentsPerUser null (restored by the booking journeys);
+  // - types GYM, Studio, "Booking room" and "Booking pool"; the Monday patterns, the Sunday
+  //   spring-forward pattern and the Wednesday 07:00–12:00 "Booking room" pattern; an empty
+  //   override on a Monday; a one-off window dated yesterday;
+  // - booked appointments on the Wednesdays W and W2 (W the next Wednesday at least 8 days ahead):
+  //   five or four of the earlier `dave` (a deleted account, its own `sub`), two or three of the
+  //   earlier `erin` (AC-34's goes to whichever won). Both accounts were removed; their
+  //   appointments stay as history under the names `dave` and `erin`.
+  // These journeys rely on one part only: the earlier `dave` has booked appointments, which the
+  // Administrator's `username=dave` returns and the new `dave`'s own list does not (spec v10). They
+  // save their own settings (restoring the leftover ones at the end), create a new `dave` and
+  // `erin` (new `sub`s), and book on Thursdays, which no earlier journey touches, at their own type
+  // with their own Thursday pattern. T is the next Thursday at least 8 days ahead, T2 = T + 7. The
+  // ended appointment of AC-31 is written directly, dated yesterday. Dates come from the real
+  // today, computed with the shared helpers. In the scenarios of 18.3, dave plays alice and erin bob.
+  const ZONE = 'Europe/Rome';
+  const HOUR_MS = 60 * 60 * 1000;
+  const today = () => localDateOf(new Date().toISOString(), ZONE);
+  const nextThursday = (from: string) => {
+    let d = from;
+    while (weekdayOf(d) !== 4) d = addDays(d, 1);
+    return d;
+  };
+  const T = () => nextThursday(addDays(today(), 8));
+  const T2 = () => addDays(T(), 7);
+  const at = (date: string, time: string) => toInstant(date, time, ZONE);
+  const plus = (instant: string, minutes: number) => new Date(Date.parse(instant) + minutes * 60_000).toISOString();
+  const subOf = (token: string) => (JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString('utf8')) as { sub: string }).sub;
+  const SETTINGS = { cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: null };
+  const setSettings = async (values: Record<string, unknown>) => {
+    expect((await api('PUT', '/calendar/settings', adminToken, { ...SETTINGS, ...values })).status).toBe(200);
+  };
+  const book = (token: string, body: Record<string, unknown>) => api('POST', '/calendar/appointments', token, body);
+  const cancel = (token: string, id: string) => api('POST', `/calendar/appointments/${id}/cancel`, token);
+  const note = (token: string, id: string, value: unknown) => api('PATCH', `/calendar/appointments/${id}`, token, { note: value });
+  const list = async (token: string, query: string) => {
+    const res = await api('GET', `/calendar/appointments?${query}`, token);
+    expect(res.status).toBe(200);
+    return res.body?.appointments as Record<string, unknown>[];
+  };
+  const eventsOf = async (id: string) =>
+    (await queryCalendarPartition('EVENT')).filter((e) => (e.appointment as { appointmentId?: string }).appointmentId === id);
+  const sk = (a: Record<string, unknown>) => `${a.start}#${a.appointmentId}`;
+
+  let daveToken: string;
+  let erinToken: string;
+  let leftover: Record<string, unknown>;
+  let typeId: string;
+  const ids: Record<string, string> = {};
+  const appts: Record<string, Record<string, unknown>> = {};
+
+  beforeAll(async () => {
+    for (const username of ['dave', 'erin']) {
+      await removeUserIfPresent(username);
+      const res = await api('POST', '/users', adminToken, { username });
+      expect(res.status).toBe(201);
+      const token = await signIn(username, res.body?.password as string);
+      if (username === 'dave') daveToken = token;
+      else erinToken = token;
+    }
+  });
+
+  afterAll(async () => {
+    await removeUserIfPresent('dave');
+    await removeUserIfPresent('erin');
+  });
+
+  it('prepares the settings, a type, the Thursday pattern 08:00–12:00, and three bookings of dave and one of erin', async () => {
+    leftover = (await api('GET', '/calendar/settings', adminToken)).body!;
+    await setSettings({});
+    const type = await api('POST', '/calendar/types', adminToken, { name: 'Listing room' });
+    expect(type.status).toBe(201);
+    typeId = type.body?.typeId as string;
+    const pattern = await api('POST', '/calendar/patterns', adminToken, {
+      weekday: 4, start: '08:00', end: '12:00', typeId, validFrom: addDays(T(), -21), validUntil: null,
+    });
+    expect(pattern.status).toBe(201);
+    for (const [key, token, date, time] of [
+      ['t9', daveToken, T(), '09:00'],
+      ['t10', daveToken, T(), '10:00'],
+      ['t2', daveToken, T2(), '09:00'],
+      ['erin', erinToken, T(), '11:00'],
+    ] as const) {
+      const res = await book(token, { start: at(date, time) });
+      expect(res.status).toBe(201);
+      appts[key] = res.body!;
+      ids[key] = res.body?.appointmentId as string;
+    }
+  });
+
+  it('AC-20: dave cancels T 09:00 with enough notice: 200, cancelled; the APPT item and one appointment.cancelled event; the slot is free again', async () => {
+    const slotsOfT = async () => {
+      const res = await api('GET', `/calendar?from=${T()}&to=${T()}`, erinToken);
+      const day = (res.body?.days as { slots: { start: string }[]; busy: { start: string }[] }[])[0]!;
+      return { slots: day.slots.map((s) => s.start), busy: day.busy.map((b) => b.start) };
+    };
+    expect(await slotsOfT()).toEqual({ slots: [at(T(), '08:00')], busy: [at(T(), '09:00'), at(T(), '10:00')] });
+
+    const res = await cancel(daveToken, ids.t9!);
+    expect(res.status).toBe(200);
+    const dave = { username: 'dave', role: 'user' };
+    const cancelledAt = res.body?.cancelledAt as string;
+    expect(res.body).toEqual({
+      ...appts.t9,
+      status: 'cancelled',
+      cancelledAt: expect.any(String),
+      cancelledBy: dave,
+      cancelReason: 'cancelled',
+      updatedAt: cancelledAt,
+      updatedBy: dave,
+      cancellableUntil: null,
+    });
+    const item = await getCalendarItem('APPT', sk(appts.t9!));
+    expect(item).toMatchObject({ status: 'cancelled', cancelledAt, cancelledBy: dave, cancelReason: 'cancelled', updatedAt: cancelledAt, updatedBy: dave, version: 2, userId: subOf(daveToken) });
+    const events = await eventsOf(ids.t9!);
+    expect(events.map((e) => e.type)).toEqual(['appointment.booked', 'appointment.cancelled']);
+    expect(events[1]).toMatchObject({ occurredAt: cancelledAt, actor: dave, recipients: { userId: subOf(daveToken), username: 'dave', administrator: true } });
+    const stored = Object.fromEntries(Object.entries(item!).filter(([key]) => key !== 'PK' && key !== 'SK'));
+    expect(events[1]!.appointment).toEqual({ appointmentId: ids.t9, ...stored });
+
+    expect(await slotsOfT()).toEqual({ slots: [at(T(), '08:00'), at(T(), '09:00')], busy: [at(T(), '10:00')] });
+    // Cancelling it again: no longer active.
+    expect((await cancel(daveToken, ids.t9!)).body).toMatchObject({ error: 'appointment_not_active' });
+  });
+
+  it('AC-21: notice 720 h: dave cancelling T 10:00 is 403 cancellation_too_late; the Administrator cancels it: 200', async () => {
+    await setSettings({ cancellationNoticeHours: 720 });
+    try {
+      const res = await cancel(daveToken, ids.t10!);
+      expect(res.status).toBe(403);
+      expect(res.body).toEqual({ error: 'cancellation_too_late', message: 'Too late to cancel this appointment' });
+      expect(await getCalendarItem('APPT', sk(appts.t10!))).toMatchObject({ status: 'booked', version: 1 });
+      const admin = await cancel(adminToken, ids.t10!);
+      expect(admin.status).toBe(200);
+      expect(admin.body).toMatchObject({ status: 'cancelled', cancelledBy: { username: 'admin', role: 'admin' }, cancelReason: 'cancelled', cancellableUntil: null });
+    } finally {
+      await setSettings({});
+    }
+  });
+
+  it('AC-30: erin cancelling or editing dave’s appointment is 404 appointment_not_found; an unknown id too; a malformed one 400', async () => {
+    for (const res of [await cancel(erinToken, ids.t2!), await note(erinToken, ids.t2!, 'mine now')]) {
+      expect(res.status).toBe(404);
+      expect(res.body).toEqual({ error: 'appointment_not_found', message: 'No appointment with this id' });
+    }
+    expect(await getCalendarItem('APPT', sk(appts.t2!))).toMatchObject({ status: 'booked', note: null, version: 1 });
+    const unknown = ulid();
+    for (const token of [daveToken, adminToken]) {
+      expect((await cancel(token, unknown)).status).toBe(404);
+      expect((await note(token, unknown, 'x')).status).toBe(404);
+    }
+    expect((await cancel(daveToken, 'not-a-ulid')).status).toBe(400);
+  });
+
+  it('AC-31: an ended appointment (written directly): the Administrator’s cancel and note are 409 appointment_not_active', async () => {
+    const yesterday = addDays(today(), -1);
+    const start = at(yesterday, '09:00');
+    const id = ulid();
+    const by = { username: 'dave', role: 'user' };
+    const created = new Date(Date.parse(start) - 7 * 24 * HOUR_MS).toISOString();
+    await putCalendarItem({
+      PK: 'APPT', SK: `${start}#${id}`, userId: subOf(daveToken), username: 'dave', start, end: plus(start, 60), date: yesterday,
+      typeId, typeNameAtBooking: 'Listing room', note: null, status: 'booked', createdAt: created, createdBy: by, updatedAt: created,
+      updatedBy: by, cancelledAt: null, cancelledBy: null, cancelReason: null, replaces: null, replacedBy: null, version: 1,
+    });
+    await putCalendarItem({ PK: `APPTID#${id}`, SK: 'APPTID', sk: `${start}#${id}` });
+    ids.ended = id;
+    for (const res of [await cancel(adminToken, id), await note(adminToken, id, 'late'), await cancel(daveToken, id)]) {
+      expect(res.status).toBe(409);
+      expect(res.body).toEqual({ error: 'appointment_not_active', message: 'The appointment is cancelled or has ended' });
+    }
+    expect(await getCalendarItem('APPT', `${start}#${id}`)).toMatchObject({ status: 'booked', note: null, version: 1 });
+    expect(await eventsOf(id)).toEqual([]);
+  });
+
+  it('the note: dave sets it (200, one appointment.note_updated event), the same note writes nothing, the Administrator clears it with null', async () => {
+    const set = await note(daveToken, ids.t2!, '  Bring the music  ');
+    expect(set.status).toBe(200);
+    expect(set.body).toMatchObject({ note: 'Bring the music', status: 'booked', updatedBy: { username: 'dave', role: 'user' } });
+    expect(set.body?.cancellableUntil).toBe(new Date(Date.parse(at(T2(), '09:00')) - 24 * HOUR_MS).toISOString());
+    expect(await getCalendarItem('APPT', sk(appts.t2!))).toMatchObject({ note: 'Bring the music', version: 2 });
+    let events = await eventsOf(ids.t2!);
+    expect(events.map((e) => e.type)).toEqual(['appointment.booked', 'appointment.note_updated']);
+    expect((events[1]!.appointment as { note: string }).note).toBe('Bring the music');
+
+    const same = await note(daveToken, ids.t2!, 'Bring the music');
+    expect(same.status).toBe(200);
+    expect(same.body?.updatedAt).toBe(set.body?.updatedAt);
+    expect(await eventsOf(ids.t2!)).toHaveLength(2);
+
+    const cleared = await note(adminToken, ids.t2!, null);
+    expect(cleared.status).toBe(200);
+    expect(cleared.body).toMatchObject({ note: null, updatedBy: { username: 'admin', role: 'admin' }, cancellableUntil: null });
+    events = await eventsOf(ids.t2!);
+    expect(events.map((e) => e.type)).toEqual(['appointment.booked', 'appointment.note_updated', 'appointment.note_updated']);
+    expect(await getCalendarItem('APPT', sk(appts.t2!))).toMatchObject({ note: null, version: 3 });
+
+    const tooLong = await note(daveToken, ids.t2!, 'a'.repeat(501));
+    expect(tooLong.status).toBe(400);
+    // A cancelled appointment's note cannot change.
+    expect((await note(daveToken, ids.t9!, 'x')).body).toMatchObject({ error: 'appointment_not_active' });
+  });
+
+  it('A6: dave’s history with status=all has his booked, cancelled and ended appointments and nobody else’s; upcoming only the future booked one', async () => {
+    const range = `from=${addDays(today(), -1)}&to=${addDays(today(), 28)}`;
+    const history = await list(daveToken, `${range}&status=all`);
+    expect(history.map((a) => a.appointmentId)).toEqual([ids.ended, ids.t9, ids.t10, ids.t2]);
+    expect(history.map((a) => [a.status, a.cancellableUntil === null])).toEqual([
+      ['booked', false], // ended: an instant in the past
+      ['cancelled', true],
+      ['cancelled', true],
+      ['booked', false],
+    ]);
+    expect(history.every((a) => a.username === 'dave' && !('userId' in a) && a.typeName === 'Listing room')).toBe(true);
+    expect((await list(daveToken, range)).map((a) => a.appointmentId)).toEqual([ids.ended, ids.t2]);
+    expect((await list(daveToken, `${range}&status=cancelled`)).map((a) => a.appointmentId)).toEqual([ids.t9, ids.t10]);
+    expect((await list(daveToken, 'upcoming=true')).map((a) => a.appointmentId)).toEqual([ids.t2]);
+    expect((await list(daveToken, 'upcoming=true&status=all')).map((a) => a.appointmentId)).toEqual([ids.t9, ids.t10, ids.t2]);
+    // Naming himself changes nothing; naming erin is 403.
+    expect((await list(daveToken, `${range}&status=all&username=dave`)).map((a) => a.appointmentId)).toEqual(history.map((a) => a.appointmentId));
+    const other = await api('GET', `/calendar/appointments?${range}&username=erin`, daveToken);
+    expect(other.status).toBe(403);
+    expect(other.body).toMatchObject({ error: 'forbidden' });
+    expect((await list(erinToken, `${range}&status=all`)).map((a) => a.appointmentId)).toEqual([ids.erin]);
+  });
+
+  it('the Administrator’s list: everything without username; username=dave includes the earlier dave’s appointments; an unknown name is empty', async () => {
+    const range = `from=${addDays(today(), -1)}&to=${addDays(today(), 28)}`;
+    const inRange = (date: string) => date >= addDays(today(), -1) && date <= addDays(today(), 28);
+    const stored = (await queryCalendarPartition('APPT')).filter((a) => inRange(a.date as string));
+    const earlierDave = stored.filter((a) => a.username === 'dave' && a.userId !== subOf(daveToken));
+    expect(earlierDave.length).toBeGreaterThan(0);
+
+    const all = await list(adminToken, `${range}&status=all`);
+    expect(all.map((a) => a.appointmentId)).toEqual(stored.map((a) => (a.SK as string).split('#')[1]));
+    expect(all.every((a) => a.cancellableUntil === null)).toBe(true);
+
+    const named = await list(adminToken, `${range}&status=all&username=dave`);
+    const expected = stored.filter((a) => a.username === 'dave').map((a) => (a.SK as string).split('#')[1]);
+    expect(named.map((a) => a.appointmentId)).toEqual(expected);
+    for (const a of earlierDave) expect(named.map((n) => n.appointmentId)).toContain((a.SK as string).split('#')[1]);
+    // The new dave's own list holds none of the earlier account's.
+    const own = (await list(daveToken, `${range}&status=all`)).map((a) => a.appointmentId);
+    for (const a of earlierDave) expect(own).not.toContain((a.SK as string).split('#')[1]);
+
+    expect(await list(adminToken, `${range}&username=nobody-here`)).toEqual([]);
+    const tooLong = await api('GET', `/calendar/appointments?from=${today()}&to=${addDays(today(), 92)}`, adminToken);
+    expect(tooLong.status).toBe(400);
+    const neither = await api('GET', '/calendar/appointments', adminToken);
+    expect(neither.status).toBe(400);
+  });
+
+  it('the settings are restored to what the earlier journeys left', async () => {
+    const { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser } = leftover;
+    const values = { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser };
+    const res = await api('PUT', '/calendar/settings', adminToken, values);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject(values);
+  });
+});

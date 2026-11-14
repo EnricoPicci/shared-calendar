@@ -29,7 +29,7 @@ import {
   type WindowBody,
 } from '@shared-calendar/shared';
 import { appointmentEvent, type AppointmentSnapshot } from './calendarEvents';
-import type { CalendarState, Refusal, StateAppointment, ViewAppointment } from './calendarRules';
+import type { CalendarState, NoteRefusal, Refusal, StateAppointment, ViewAppointment } from './calendarRules';
 import { documentClient } from './db';
 
 // The calendar table (docs/SHARED_CALENDAR_SPEC.md 13). This is the only module that knows its
@@ -775,8 +775,11 @@ export type NewBooking = {
  */
 export type BookingCheck<C extends ApiErrorCode> = (state: CalendarState, settings: CalendarSettings) => Refusal<C> | { window: { typeId: string } };
 
-/** A stored booking as the handler answers it: the response fields but `cancellableUntil`, and the settings it was checked with. */
-export type BookedAppointment = { appointment: Omit<Appointment, 'cancellableUntil'>; settings: CalendarSettings };
+/**
+ * A stored appointment as the handler answers it: the response fields but `cancellableUntil`, and
+ * the settings read with it (the handler works `cancellableUntil` out from them).
+ */
+export type StoredAppointment = { appointment: Omit<Appointment, 'cancellableUntil'>; settings: CalendarSettings };
 
 const deletedUserKey = (sub: string) => ({ PK: `DELETEDUSER#${sub}`, SK: 'DELETEDUSER' });
 
@@ -795,11 +798,11 @@ export async function bookAppointment<C extends ApiErrorCode>(
   today: string,
   now: string,
   check: BookingCheck<C>,
-): Promise<Locked<Checked<BookedAppointment, C | 'user_not_found'>>> {
+): Promise<Locked<Checked<StoredAppointment, C | 'user_not_found'>>> {
   const { table, timeZone } = calendarConfig();
   const { appointmentId, eventId, userId, username, start, end, note, by } = booking;
   const date = localDateOf(start, timeZone);
-  return withCalendarLock<Checked<BookedAppointment, C | 'user_not_found'>>(async () => {
+  return withCalendarLock<Checked<StoredAppointment, C | 'user_not_found'>>(async () => {
     const [settings, state] = await Promise.all([readSettings(table, timeZone), readState(table, today, now)]);
     const outcome = check(state, settings);
     if ('error' in outcome) return { write: null, result: refused(outcome) };
@@ -838,13 +841,13 @@ export async function bookAppointment<C extends ApiErrorCode>(
         { ConditionCheck: { TableName: table, Key: deletedUserKey(userId), ConditionExpression: 'attribute_not_exists(PK)' } },
       ],
       onConditionFailed: { item: marker, result: notFound('user_not_found') },
-      result: { ok: true, value: { appointment: toBookedAppointment(stored, type.name), settings } },
+      result: { ok: true, value: { appointment: toResponseFields(stored, type.name), settings } },
     };
   });
 }
 
 // The response fields of a stored appointment (11.5) but `cancellableUntil`: no userId, no version.
-function toBookedAppointment(a: AppointmentSnapshot, typeName: string): Omit<Appointment, 'cancellableUntil'> {
+function toResponseFields(a: AppointmentSnapshot, typeName: string): Omit<Appointment, 'cancellableUntil'> {
   return {
     appointmentId: a.appointmentId,
     username: a.username,
@@ -865,4 +868,203 @@ function toBookedAppointment(a: AppointmentSnapshot, typeName: string): Omit<App
     replaces: a.replaces,
     replacedBy: a.replacedBy,
   };
+}
+
+// ── Listing (spec 11.1 route 16, 13.2 v10; reads, no lock) ────────────────────────────────────
+
+/** Which appointments route 16 selects: those dated `from`..`to` (local dates, inclusive), or the upcoming ones. */
+export type AppointmentSelection = { from: string; to: string } | { upcoming: true };
+
+/**
+ * The filters of route 16 (v10): the owner, either by `userId` (a User caller: the token's `sub`)
+ * or by the stored `username` (the Administrator's filter: every account booked under that name,
+ * earlier deleted ones included), or neither (the Administrator, everything); and the status.
+ */
+export type AppointmentFilter = {
+  owner: { userId: string } | { username: string } | null;
+  status: AppointmentStatus | 'all';
+};
+
+/** What route 16 answers before `cancellableUntil`: the appointments, sorted by start, and the settings. */
+export type AppointmentList = { appointments: ViewAppointment[]; settings: CalendarSettings };
+
+/**
+ * The appointments of route 16, consistent and without the lock (a read), with the settings and
+ * every type (for `typeName`):
+ * - a range: `Query PK = APPT, SK BETWEEN <local midnight of from> AND <local midnight after to>`,
+ *   the upper bound exclusive as in the view (readCalendarRange). An appointment never crosses
+ *   midnight, so these are also the ones that overlap the range;
+ * - upcoming: `Query PK = APPT, SK ≥ now − 24 h` (none lasts longer), keeping those with `end > now`
+ *   (v10: a time selection only; `status` filters it as it filters a range).
+ * Then the owner and the status filter, in code; sorted by start, then id (the SK order).
+ */
+export async function listAppointments(selection: AppointmentSelection, filter: AppointmentFilter, now: string): Promise<AppointmentList> {
+  const { table, timeZone } = calendarConfig();
+  const query =
+    'upcoming' in selection
+      ? queryPartition(table, APPT_PK, new Date(Date.parse(now) - DAY_MS).toISOString())
+      : queryPartition(table, APPT_PK, toInstant(selection.from, '00:00', timeZone), toInstant(addDays(selection.to, 1), '00:00', timeZone));
+  const [settings, types, items] = await Promise.all([readSettings(table, timeZone), readTypes(table), query]);
+  const { owner, status } = filter;
+  const kept = items
+    .filter((item) => !('upcoming' in selection) || (item.end as string) > now)
+    .filter((item) => owner === null || ('userId' in owner ? item.userId === owner.userId : item.username === owner.username))
+    .filter((item) => status === 'all' || item.status === status)
+    .sort((a, b) => cmp(a.SK as string, b.SK as string));
+  const typeNames = new Map(types.map((t) => [t.typeId, t.name]));
+  return { appointments: kept.map((item) => toViewAppointment(item, typeNames)), settings };
+}
+
+// ── Cancelling and the note (spec 8.3, 8.5; items APPTID, APPT, EVENT of 13.2) ────────────────
+
+/** An appointment write by id: the ids the handler made once per request, and who writes. */
+export type AppointmentChange = { appointmentId: string; eventId: string; by: Actor };
+
+// The APPT item as stored, every attribute but the keys, picked one by one through the view's
+// mapper (the event snapshot); the response-only `typeName` it adds is left out.
+function toSnapshot(item: Item): AppointmentSnapshot {
+  const { userId, appointment } = toViewAppointment(item, new Map());
+  const { appointmentId, username, start, end, date, typeId, note, status, createdAt, createdBy, updatedAt, updatedBy } = appointment;
+  const { cancelledAt, cancelledBy, cancelReason, replaces, replacedBy } = appointment;
+  return {
+    appointmentId, userId, username, start, end, date, typeId,
+    typeNameAtBooking: item.typeNameAtBooking as string,
+    note, status, createdAt, createdBy, updatedAt, updatedBy,
+    cancelledAt, cancelledBy, cancelReason, replaces, replacedBy,
+    version: item.version as number,
+  };
+}
+
+/**
+ * An appointment by id (13.2, 13.3): `GetItem APPTID#<id>` for the pointer, then `GetItem APPT /
+ * <sk>`, both consistent. `null` when there is no pointer, and also when the pointer names no item:
+ * that cannot happen through the API (the two are written in one transaction and an appointment is
+ * never deleted), so it is treated as absent rather than as an error.
+ */
+async function readAppointment(table: string, appointmentId: string): Promise<AppointmentSnapshot | null> {
+  const pointer = await documentClient.send(
+    new GetCommand({ TableName: table, Key: { PK: `APPTID#${appointmentId}`, SK: 'APPTID' }, ConsistentRead: true }),
+  );
+  if (!pointer.Item) return null;
+  const { Item } = await documentClient.send(
+    new GetCommand({ TableName: table, Key: { PK: APPT_PK, SK: pointer.Item.sk as string }, ConsistentRead: true }),
+  );
+  return Item ? toSnapshot(Item) : null;
+}
+
+// The type's current name, or the snapshot once the type is gone (R-TYPE-03, 8.1).
+async function typeNameOf(table: string, a: AppointmentSnapshot): Promise<string> {
+  const { Item } = await documentClient.send(new GetCommand({ TableName: table, Key: { PK: TYPE_PK, SK: a.typeId }, ConsistentRead: true }));
+  return (Item?.name as string | undefined) ?? a.typeNameAtBooking;
+}
+
+// The three items of a cancel or a note (13.4) after the lock update: `Update APPT` with SET on the
+// changed attributes only (an attribute this code does not know is kept), no condition of its own
+// (every appointment write takes the lock, v10), and `Put EVENT` with the snapshot after the change.
+function appointmentWrite(
+  table: string,
+  after: AppointmentSnapshot,
+  set: Record<string, unknown>,
+  event: Parameters<typeof appointmentEvent>[0],
+): TransactItem[] {
+  const names: Record<string, string> = {};
+  const values: Record<string, unknown> = {};
+  const parts = Object.entries(set).map(([attribute, value]) => {
+    names[`#${attribute}`] = attribute;
+    values[`:${attribute}`] = value;
+    return `#${attribute} = :${attribute}`;
+  });
+  return [
+    {
+      Update: {
+        TableName: table,
+        Key: { PK: APPT_PK, SK: `${after.start}#${after.appointmentId}` },
+        UpdateExpression: `SET ${parts.join(', ')}`,
+        ExpressionAttributeNames: names,
+        ExpressionAttributeValues: values,
+      },
+    },
+    { Put: { TableName: table, Item: appointmentEvent(event) } },
+  ];
+}
+
+/** The cancel check (calendarRules.checkCancel) on the appointment read inside the attempt, or null. */
+export type CancelCheck<C extends ApiErrorCode> = (appointment: AppointmentSnapshot | null, settings: CalendarSettings) => Refusal<C> | null;
+
+/**
+ * Cancels an appointment under the lock (8.3). Inside each attempt: the pointer and the settings,
+ * then the `APPT` item; `check` decides on them, so a retry re-reads and re-checks (an appointment
+ * cancelled meanwhile answers what the check says of it). Then one transaction of three items: the
+ * lock update; `Update APPT` SET `status` `cancelled`, `cancelledAt` and `updatedAt` now,
+ * `cancelledBy` and `updatedBy` the caller, `cancelReason` `cancelled`, `version` + 1; `Put EVENT`
+ * `appointment.cancelled`. Answers the appointment as stored after the cancel.
+ */
+export async function cancelAppointment<C extends ApiErrorCode>(
+  change: AppointmentChange,
+  now: string,
+  check: CancelCheck<C>,
+): Promise<Locked<Checked<StoredAppointment, C>>> {
+  const { table, timeZone } = calendarConfig();
+  return withCalendarLock<Checked<StoredAppointment, C>>(async () => {
+    const [settings, before] = await Promise.all([readSettings(table, timeZone), readAppointment(table, change.appointmentId)]);
+    const refusal = check(before, settings);
+    if (refusal) return { write: null, result: refused(refusal) };
+    const by = actorItem(change.by);
+    // The check refuses a missing appointment, so it is there.
+    const after: AppointmentSnapshot = {
+      ...before!,
+      status: 'cancelled',
+      cancelledAt: now,
+      cancelledBy: by,
+      cancelReason: 'cancelled',
+      updatedAt: now,
+      updatedBy: by,
+      version: before!.version + 1,
+    };
+    const set = { status: after.status, cancelledAt: now, cancelledBy: by, cancelReason: after.cancelReason, updatedAt: now, updatedBy: by, version: after.version };
+    return {
+      write: appointmentWrite(table, after, set, { type: 'appointment.cancelled', eventId: change.eventId, occurredAt: now, actor: by, appointment: after }),
+      result: { ok: true, value: { appointment: toResponseFields(after, await typeNameOf(table, after)), settings } },
+    };
+  });
+}
+
+/** The note check (calendarRules.checkNote) on the appointment read inside the attempt, or null. */
+export type NoteCheck = (appointment: AppointmentSnapshot | null) => NoteRefusal | { unchanged: boolean };
+
+/** What a note write answers: the appointment, and whether it was written (`unchanged`: nothing was). */
+export type NotedAppointment = StoredAppointment & { unchanged: boolean };
+
+/**
+ * Sets or clears the note of an appointment under the lock (8.5). Inside each attempt: the pointer
+ * and the settings, then the `APPT` item; `check` decides. A note equal to the stored one writes
+ * nothing, not even the lock (v10): the stored appointment is answered as it is. Otherwise one
+ * transaction of three items: the lock update; `Update APPT` SET `note`, `updatedAt` now,
+ * `updatedBy` the caller, `version` + 1; `Put EVENT` `appointment.note_updated`. `note` is
+ * already trimmed, an empty one `null` (R-BOOK-11).
+ */
+export async function updateAppointmentNote(
+  change: AppointmentChange & { note: string | null },
+  now: string,
+  check: NoteCheck,
+): Promise<Locked<Checked<NotedAppointment, NoteRefusal['error']>>> {
+  const { table, timeZone } = calendarConfig();
+  return withCalendarLock<Checked<NotedAppointment, NoteRefusal['error']>>(async () => {
+    const [settings, before] = await Promise.all([readSettings(table, timeZone), readAppointment(table, change.appointmentId)]);
+    const outcome = check(before);
+    if ('error' in outcome) return { write: null, result: refused(outcome) };
+    // The check refuses a missing appointment, so it is there.
+    const stored = before!;
+    const typeName = await typeNameOf(table, stored);
+    if (outcome.unchanged) {
+      return { write: null, result: { ok: true, value: { appointment: toResponseFields(stored, typeName), settings, unchanged: true } } };
+    }
+    const by = actorItem(change.by);
+    const after: AppointmentSnapshot = { ...stored, note: change.note, updatedAt: now, updatedBy: by, version: stored.version + 1 };
+    const set = { note: change.note, updatedAt: now, updatedBy: by, version: after.version };
+    return {
+      write: appointmentWrite(table, after, set, { type: 'appointment.note_updated', eventId: change.eventId, occurredAt: now, actor: by, appointment: after }),
+      result: { ok: true, value: { appointment: toResponseFields(after, typeName), settings, unchanged: false } },
+    };
+  });
 }

@@ -33,8 +33,8 @@ export type AppointmentSnapshot = {
   version: number;
 };
 
-/** The event types written so far; each later step adds its own (steps 49–51). */
-export type WrittenEventType = Extract<CalendarEventType, 'appointment.booked'>;
+/** The event types written so far; each later step adds its own (`appointment.changed` in step 50). */
+export type WrittenEventType = Extract<CalendarEventType, 'appointment.booked' | 'appointment.cancelled' | 'appointment.note_updated'>;
 
 export const EVENT_PK = 'EVENT';
 export const EVENT_SCHEMA_VERSION = 1;

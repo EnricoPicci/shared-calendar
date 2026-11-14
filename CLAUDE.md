@@ -222,11 +222,19 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     `bookAppointment` (settings and state read inside the attempt; one transaction of five items:
     lock, `APPT`, `APPTID`, `EVENT`, a `ConditionCheck` on the `DELETEDUSER#<sub>` marker, whose
     failure `withCalendarLock` answers through the plan's `onConditionFailed`, without a retry).
+    Appointments by id (`readAppointment`, internal: `GetItem APPTID#<id>` → `GetItem APPT`, inside
+    the locked attempt; a pointer without its item is absent): `cancelAppointment` and
+    `updateAppointmentNote` (check callback on the appointment or `null`; three items: lock, an
+    `Update` of the changed `APPT` attributes without a condition, `EVENT`; an unchanged note writes
+    nothing). `listAppointments` (route 16, a read: a range `SK BETWEEN` as the view, or upcoming
+    `SK ≥ now − 24 h` with `end > now`; owner by `userId` or stored `username`; status; by start).
     `calendarEvents.ts`: builds the `EVENT` item (`appointmentEvent`, the `AppointmentSnapshot` of
-    the stored appointment), pure; ids and "now" passed in. `calendarRules.ts`: the calendar's
+    the stored appointment; types `booked`, `cancelled`, `note_updated`), pure; ids and "now" passed in. `calendarRules.ts`: the calendar's
     checks (`checkTypeName`, `checkTypeDelete`, `typeNameKey`, and `checkAvailabilityWrite` for
     every availability write: patterns, overrides, one-off windows; `checkBookingTimes`, R-BOOK-02
-    before the lock, and `checkBooking`, R-BOOK-03..07 and 09 under it; `calendarView`, the
+    before the lock, and `checkBooking`, R-BOOK-03..07 and 09 under it; `checkCancel` (R-CAN-01..03,
+    R-PERM-01 by `sub`) and `checkNote` (R-NOTE-01, answers `unchanged`); `cancellableUntilFor` (a
+    User on a booked appointment, else `null`); `calendarView`, the
     calendar view built for one caller's role from what `calendarDb.readCalendarRange` reads;
     `toResponse`, an appointment as a response), pure, no AWS, "today", "now" and the zone passed
     in; a failed check is `Refusal` (`{ error, message?, conflicts? }`, code from `ApiErrorCode`).
@@ -242,7 +250,10 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     windows: `createOneOffWindow.ts`, `deleteOneOffWindow.ts` (all admin only; `date_in_past` from the
     path or body before the lock, except the window delete); the view: `getCalendar.ts` (`GET /calendar`, both roles);
     booking: `bookAppointment.ts` (`POST /calendar/appointments`, both roles; the checks in the order
-    of spec 8.2 v9, the Administrator's target through Cognito before the lock).
+    of spec 8.2 v9, the Administrator's target through Cognito before the lock); appointments:
+    `listAppointments.ts` (`GET /calendar/appointments`, both roles, read-only, no Cognito),
+    `updateAppointmentNote.ts` (`PATCH …/{appointmentId}`) and `cancelAppointment.ts`
+    (`POST …/{appointmentId}/cancel`), admin or owner (someone else's is 404, spec v10 order).
   - `tests/unit/`: vitest unit tests, mirroring `src/` (e.g. `tests/unit/lib/http.test.ts`).
   - `tests/integration/`: end-to-end tests against the local Docker stack: `setup.ts` (helpers,
     including `resetCalendarTable()`, `putCalendarItem()`, `getCalendarItem()`, `deleteCalendarItem()`,

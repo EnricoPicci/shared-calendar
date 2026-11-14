@@ -71,4 +71,51 @@ describe('appointmentEvent (spec 15.2)', () => {
       role: 'user',
     });
   });
+
+  // Step 49: the cancel and the note write their own types through the same builder, unchanged.
+  const ALICE = { username: 'alice', role: 'user' } as const;
+  const LATER = '2026-11-15T08:00:00.000Z';
+
+  it('builds the exact appointment.cancelled item: the snapshot after the cancel, no previous', () => {
+    const cancelled: AppointmentSnapshot = {
+      ...stored,
+      status: 'cancelled',
+      cancelledAt: LATER,
+      cancelledBy: ALICE,
+      cancelReason: 'cancelled',
+      updatedAt: LATER,
+      updatedBy: ALICE,
+      version: 2,
+    };
+    expect(appointmentEvent({ type: 'appointment.cancelled', eventId: EVENT_ID, occurredAt: LATER, actor: ALICE, appointment: cancelled })).toEqual({
+      PK: 'EVENT',
+      SK: `${LATER}#${EVENT_ID}`,
+      eventId: EVENT_ID,
+      type: 'appointment.cancelled',
+      occurredAt: LATER,
+      actor: ALICE,
+      recipients: { userId: 'c0a8-sub-of-alice', username: 'alice', administrator: true },
+      appointment: cancelled,
+      schemaVersion: 1,
+    });
+  });
+
+  it('builds the exact appointment.note_updated item, the note only inside the snapshot', () => {
+    const noted: AppointmentSnapshot = { ...stored, note: 'Bring shoes', updatedAt: LATER, updatedBy: ALICE, version: 2 };
+    const item = appointmentEvent({ type: 'appointment.note_updated', eventId: EVENT_ID, occurredAt: LATER, actor: ALICE, appointment: noted });
+    expect(item).toEqual({
+      PK: 'EVENT',
+      SK: `${LATER}#${EVENT_ID}`,
+      eventId: EVENT_ID,
+      type: 'appointment.note_updated',
+      occurredAt: LATER,
+      actor: ALICE,
+      recipients: { userId: 'c0a8-sub-of-alice', username: 'alice', administrator: true },
+      appointment: noted,
+      schemaVersion: 1,
+    });
+    const { appointment, ...rest } = item;
+    expect(appointment.note).toBe('Bring shoes');
+    expect(JSON.stringify(rest)).not.toContain('Bring shoes');
+  });
 });
