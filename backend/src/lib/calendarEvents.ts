@@ -33,23 +33,44 @@ export type AppointmentSnapshot = {
   version: number;
 };
 
-/** The event types written so far; each later step adds its own (`appointment.changed` in step 50). */
-export type WrittenEventType = Extract<CalendarEventType, 'appointment.booked' | 'appointment.cancelled' | 'appointment.note_updated'>;
+/** The event types written so far (step 50 added `appointment.changed`, with `previous`). */
+export type WrittenEventType = Extract<
+  CalendarEventType,
+  'appointment.booked' | 'appointment.cancelled' | 'appointment.changed' | 'appointment.note_updated'
+>;
+
+/** The types whose event carries one snapshot only. */
+type SingleEventType = Exclude<WrittenEventType, 'appointment.changed'>;
 
 export const EVENT_PK = 'EVENT';
 export const EVENT_SCHEMA_VERSION = 1;
 
-export type EventItem = {
+type EventBase = {
   PK: typeof EVENT_PK;
   SK: string;
   eventId: string;
-  type: WrittenEventType;
   occurredAt: string;
   actor: Actor;
   recipients: { userId: string; username: string; administrator: true };
   appointment: AppointmentSnapshot;
   schemaVersion: typeof EVENT_SCHEMA_VERSION;
 };
+
+/**
+ * An event item (15.2). `previous` exists on `appointment.changed` only (v11): the old appointment
+ * as stored after the change (cancelled, `replacedBy` set). The other types have no such key.
+ */
+export type EventItem =
+  | (EventBase & { type: SingleEventType })
+  | (EventBase & { type: 'appointment.changed'; previous: AppointmentSnapshot });
+
+/** What an event is built from: `previous` with `appointment.changed`, and only with it. */
+export type EventInput = {
+  eventId: string;
+  occurredAt: string;
+  actor: Actor;
+  appointment: AppointmentSnapshot;
+} & ({ type: SingleEventType } | { type: 'appointment.changed'; previous: AppointmentSnapshot });
 
 const actor = (a: Actor): Actor => ({ username: a.username, role: a.role });
 const actorOrNull = (a: Actor | null): Actor | null => (a ? actor(a) : null);
@@ -84,25 +105,23 @@ function snapshot(a: AppointmentSnapshot): AppointmentSnapshot {
  * The event item of one appointment change (15.2): `PK` `EVENT`, `SK` `<occurredAt>#<eventId>`.
  * `eventId` is a ULID the caller generates once per request (a lock retry writes the same event);
  * `occurredAt` is the request's "now". The recipients are the appointment's User and the
- * Administrator. The note appears only inside the `appointment` snapshot.
+ * Administrator (a change keeps the User, so `previous` has the same one). The note appears only
+ * inside the snapshots. `appointment.changed` adds `previous` after `appointment`; the other types
+ * are built exactly as before, without the key.
  */
-export function appointmentEvent(input: {
-  type: WrittenEventType;
-  eventId: string;
-  occurredAt: string;
-  actor: Actor;
-  appointment: AppointmentSnapshot;
-}): EventItem {
-  const { type, eventId, occurredAt, appointment } = input;
-  return {
+export function appointmentEvent(input: EventInput): EventItem {
+  const { eventId, occurredAt, appointment } = input;
+  const base: EventBase = {
     PK: EVENT_PK,
     SK: `${occurredAt}#${eventId}`,
     eventId,
-    type,
     occurredAt,
     actor: actor(input.actor),
     recipients: { userId: appointment.userId, username: appointment.username, administrator: true },
     appointment: snapshot(appointment),
     schemaVersion: EVENT_SCHEMA_VERSION,
   };
+  return input.type === 'appointment.changed'
+    ? { ...base, type: input.type, previous: snapshot(input.previous) }
+    : { ...base, type: input.type };
 }

@@ -118,4 +118,64 @@ describe('appointmentEvent (spec 15.2)', () => {
     expect(appointment.note).toBe('Bring shoes');
     expect(JSON.stringify(rest)).not.toContain('Bring shoes');
   });
+
+  // Step 50: appointment.changed carries the new appointment and, in `previous`, the old one as
+  // stored after the change (v11). The three earlier types keep their exact items above, no previous.
+  const NEW_ID = '01M70NR5E0Q7R2C9T5XH3KD8NW';
+  const old: AppointmentSnapshot = {
+    ...stored,
+    status: 'cancelled',
+    cancelledAt: LATER,
+    cancelledBy: ALICE,
+    cancelReason: 'changed',
+    replacedBy: NEW_ID,
+    updatedAt: LATER,
+    updatedBy: ALICE,
+    version: 2,
+  };
+  const moved: AppointmentSnapshot = {
+    ...stored,
+    appointmentId: NEW_ID,
+    start: '2026-11-16T09:00:00.000Z',
+    end: '2026-11-16T10:00:00.000Z',
+    createdAt: LATER,
+    createdBy: ALICE,
+    updatedAt: LATER,
+    updatedBy: ALICE,
+    replaces: stored.appointmentId,
+  };
+
+  it('builds the exact appointment.changed item, with previous', () => {
+    expect(
+      appointmentEvent({ type: 'appointment.changed', eventId: EVENT_ID, occurredAt: LATER, actor: ALICE, appointment: moved, previous: old }),
+    ).toEqual({
+      PK: 'EVENT',
+      SK: `${LATER}#${EVENT_ID}`,
+      eventId: EVENT_ID,
+      type: 'appointment.changed',
+      occurredAt: LATER,
+      actor: ALICE,
+      recipients: { userId: 'c0a8-sub-of-alice', username: 'alice', administrator: true },
+      appointment: moved,
+      previous: old,
+      schemaVersion: 1,
+    });
+  });
+
+  it('copies previous field by field, and carries the note only inside the two snapshots', () => {
+    const withKeys = { ...old, PK: 'APPT', SK: 'x' } as AppointmentSnapshot;
+    const item = appointmentEvent({ type: 'appointment.changed', eventId: EVENT_ID, occurredAt: LATER, actor: ALICE, appointment: moved, previous: withKeys });
+    if (item.type !== 'appointment.changed') throw new Error('not a change');
+    expect(Object.keys(item.previous)).toEqual(Object.keys(stored));
+    const { appointment, previous, ...rest } = item;
+    expect([appointment.note, previous.note]).toEqual(['First lesson', 'First lesson']);
+    expect(JSON.stringify(rest)).not.toContain('First lesson');
+  });
+
+  it('the three earlier types have no previous key, even when the input carries one', () => {
+    for (const type of ['appointment.booked', 'appointment.cancelled', 'appointment.note_updated'] as const) {
+      const input = { type, eventId: EVENT_ID, occurredAt: NOW, actor: ADMIN, appointment: stored, previous: old };
+      expect(appointmentEvent(input as Parameters<typeof appointmentEvent>[0])).not.toHaveProperty('previous');
+    }
+  });
 });

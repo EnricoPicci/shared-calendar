@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v10 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
-| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9 and v10 2026-11-14 |
+| Status | v11 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
+| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10 and v11 2026-11-14 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
@@ -22,6 +22,7 @@
 | v8 | 2026-11-13 | Brief 48 (plan step 47). A one-off window dated before today cannot be deleted: `409 date_in_past`, as for an override (R-ONE-02, route 14). An override's windows are stored and returned sorted by start; two of its own windows that overlap are `409 availability_overlap` (6.3). |
 | v9 | 2026-11-14 | Brief 49 (plan step 48). The order of the booking checks is stated as the handler runs them (8.2): the body's shape with the note first, R-BOOK-01's Cognito part after R-BOOK-02 and before the lock, R-BOOK-10 in the transaction. A booking target in no group is `409 target_not_user` (R-BOOK-01). The `APPT` item stores the fields of 8.1 except `appointmentId`, `typeName` and `cancellableUntil` (13.2). |
 | v10 | 2026-11-14 | Brief 50 (plan step 49). The appointment list (route 16): exactly one selection, `from`+`to` or `upcoming=true`; `upcoming` selects by time and `status` filters it; a range takes the appointments dated in it; "ended" is not a status (11.1, 11.2, R-VIEW-01). A User's list is matched on the `sub`, the Administrator's `username` on the stored name, earlier accounts with it included (11.1, 11.2, 13.2). `cancellableUntil` is `null` on a cancelled appointment (8.1, 11.5). Cancel and note: the order of the checks, R-CAN-03 as `now ≤ cancellableUntil` to the millisecond, the lookup inside the locked attempt, an `Update` of the changed attributes without a condition of its own, and an unchanged note writes nothing (8.3, 8.5, 13.2, 13.4). Routes 18 and 19 read with `GetItem` only (14.3). |
+| v11 | 2026-11-14 | Brief 51 (plan step 50). Change: the order of the checks, the old appointment before the new one; R-BOOK-01 is the old appointment's User, with no Cognito call, and a deleted one answers `404 user_not_found`; `end` absent is `start + 60 min`; a change to the same times is written; an appointment in progress can only be moved to a future start; the old appointment is left out of the state for R-BOOK-07 and R-BOOK-09; `replaces`/`replacedBy` are never followed (8.4). Route 20's errors listed explicitly instead of "union of #17 and #19" (11.1). The change's six items, in order (13.4). `previous` is the old appointment as stored after the change (15.2). |
 
 ---
 
@@ -511,6 +512,46 @@ Administrator cancels it and books a new one.
   half an hour or extended into its own time;
 - the limit (R-BOOK-09) does not count the old appointment.
 
+Both adjustments are one: the new appointment is checked against the state with the old one left
+out, by id (v11). The old one is always in that state (it passed R-CAN-02, so it has not ended). A
+User at a limit of 1 can therefore move their only future appointment.
+
+What the booking rules mean in a change (v11):
+- R-BOOK-01: the User is the old appointment's (its `userId` and `username`). There is no
+  `username` in the body and no Cognito call, so the account is not re-checked for being a plain
+  User. R-BOOK-08 is applied by R-BOOK-02, as in a booking.
+- R-BOOK-02: as in a booking for the caller's role; the Administrator's `end` absent is
+  `start + 60 min`, not the old appointment's duration.
+- R-BOOK-06: the new appointment takes the type of the window it lies in, which may differ from the
+  old one's; `typeNameAtBooking` is that type's name at the time of the change.
+- R-BOOK-10: checked on the old appointment's `userId`. A change by the Administrator of an
+  appointment whose User has been deleted (still `booked` only if the deletion stopped before its
+  cancellations, R-DEL-01) answers `404 user_not_found`.
+- A change to exactly the old times (and note) is allowed and written like any other: a new
+  appointment and an event.
+- The Administrator may change an appointment in progress (R-CAN-03 exempts them), but the new one
+  must start in the future (R-BOOK-03): an appointment in progress can only be moved to a future
+  start, never extended or shortened in place.
+
+The checks run in this order, and the first that fails decides (v11):
+
+1. the path id is a ULID (`400 invalid_request`);
+2. the body: JSON, then `ChangeBody` with the note of R-BOOK-11 and the instant form of 11.4 (`400
+   invalid_json` / `invalid_request`);
+3. R-BOOK-02 for the caller's role (`400`);
+4. inside the locked attempt, on the data read in it, the old appointment as in 8.3: R-CAN-01 /
+   R-PERM-01 (`404 appointment_not_found`), R-CAN-02 (`409 appointment_not_active`), for a User
+   R-CAN-03 (`403 cancellation_too_late`, "Too late to change this appointment");
+5. then the new one: R-BOOK-03, 04, 05, 06, 07, 09, with the adjustments of R-CHG-01;
+6. R-BOOK-10, as a condition of the change transaction on the old appointment's `userId` (`404
+   user_not_found`, without a retry).
+
+The old appointment comes first: the 404 of R-PERM-01 must come before anything that depends on the
+calendar, and the new appointment's checks depend on the old one (which appointment to leave out,
+whose limit, whose marker). An appointment already changed is `cancelled`, so a second change of it
+is `409 appointment_not_active`. `replaces` and `replacedBy` are stored and answered, never followed:
+no rule or read walks a chain in v1.
+
 **R-CHG-02** Atomic: one transaction cancels the old appointment (`cancelReason: "changed"`,
 `replacedBy` = new id) and creates the new one (`replaces` = old id). If any rule fails, nothing
 changes. Errors are those of 8.2 and 8.3.
@@ -655,7 +696,7 @@ are validated the same way.
 | 17 | `POST /calendar/appointments` | admin, user | `BookBody` | `201` `Appointment` | 400 · 403 `forbidden` · 404 `user_not_found` · 409 `target_not_user`, `booking_too_soon`, `booking_too_far`, `outside_availability`, `slot_taken`, `appointment_limit_reached`, `concurrent_update` |
 | 18 | `PATCH /calendar/appointments/{appointmentId}` | admin, owner | `{ note }` | `200` `Appointment` | 400 · 404 `appointment_not_found` · 409 `appointment_not_active`, `concurrent_update` |
 | 19 | `POST /calendar/appointments/{appointmentId}/cancel` | admin, owner | — | `200` `Appointment` | 400 · 403 `cancellation_too_late` · 404 `appointment_not_found` · 409 `appointment_not_active`, `concurrent_update` |
-| 20 | `POST /calendar/appointments/{appointmentId}/change` | admin, owner | `ChangeBody` | `201` `{ cancelled, booked }` | union of #17 and #19 |
+| 20 | `POST /calendar/appointments/{appointmentId}/change` | admin, owner | `ChangeBody` | `201` `{ cancelled, booked }` | 400 · 403 `cancellation_too_late` · 404 `appointment_not_found`, `user_not_found` · 409 `appointment_not_active`, `booking_too_soon`, `booking_too_far`, `outside_availability`, `slot_taken`, `appointment_limit_reached`, `concurrent_update` (v11; in the order of 8.4) |
 | 21 | `GET /users` | admin | — | `200` `{ users: UserSummary[] }` | — |
 
 ¹ Deleting a pattern cannot create an overlap. The code is listed only because the shared
@@ -1013,10 +1054,17 @@ applies here too: per-day locks would be the next step.
 Transaction sizes: booking 5 items, change 6, cancel 3, note 3, availability writes 2–3,
 user-deletion chunk ≤ 82. All are under DynamoDB's limit of 100.
 
-A cancel and a note write the `APPT` item as an `Update` of the changed attributes only, so an
-attribute the code does not know is kept, and without a condition of its own: every appointment
-write takes the lock, so a condition on `version` could never fail. `version` still goes to
-`v + 1` (v10).
+A cancel, a note and a change (its old appointment) write the `APPT` item as an `Update` of the
+changed attributes only, so an attribute the code does not know is kept, and without a condition
+of its own: every appointment write takes the lock, so a condition on `version` could never fail.
+`version` still goes to `v + 1` (v10).
+
+The six items of a change, in this order (v11): the lock update; `Update` of the old `APPT` (`status`
+`cancelled`, `cancelledAt` and `updatedAt` now, `cancelledBy` and `updatedBy` the caller,
+`cancelReason` `changed`, `replacedBy` the new id, `version` + 1); `Put` of the new `APPT` (`replaces`
+the old id, `userId` and `username` the old one's, `createdAt`/`updatedAt` now and
+`createdBy`/`updatedBy` the caller, `version` 1); `Put` of its `APPTID`; `Put EVENT`
+`appointment.changed`; the `ConditionCheck` on `DELETEDUSER#<userId>`, last, as in a booking.
 
 DynamoDB Local supports `TransactWriteItems` and `ConditionCheck`, so the integration tests
 exercise the real path.
@@ -1185,6 +1233,11 @@ transaction as the change**. This is the "transactional outbox" pattern.
   "schemaVersion": 1
 }
 ```
+
+`previous` (on `appointment.changed` only, v11): the old appointment as stored after the change
+(`status` `cancelled`, `cancelReason` `changed`, `replacedBy` the new id); its `start`, `end` and type
+are what the appointment was moved from. The recipients are the same for both, since a change keeps
+the User. The other event types have no `previous` key.
 
 Events are never updated or deleted by v1. `schemaVersion` lets the notifier read old events after
 the format evolves. The type `CalendarEventType` lives in `shared/` so that a later "my activity"

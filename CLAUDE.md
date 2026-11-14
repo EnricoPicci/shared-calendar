@@ -226,14 +226,20 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     the locked attempt; a pointer without its item is absent): `cancelAppointment` and
     `updateAppointmentNote` (check callback on the appointment or `null`; three items: lock, an
     `Update` of the changed `APPT` attributes without a condition, `EVENT`; an unchanged note writes
-    nothing). `listAppointments` (route 16, a read: a range `SK BETWEEN` as the view, or upcoming
+    nothing). `changeAppointment` (settings, state and the old appointment by id read inside the
+    attempt, check callback on the three; six items: lock, an `Update` of the old `APPT` (`changed`,
+    `replacedBy`), `Put` of the new `APPT` (`replaces`, built by the booking's `newAppointment`) and
+    its `APPTID`, `EVENT`, the marker `ConditionCheck` on the old one's `userId`, last).
+    `listAppointments` (route 16, a read: a range `SK BETWEEN` as the view, or upcoming
     `SK ≥ now − 24 h` with `end > now`; owner by `userId` or stored `username`; status; by start).
     `calendarEvents.ts`: builds the `EVENT` item (`appointmentEvent`, the `AppointmentSnapshot` of
-    the stored appointment; types `booked`, `cancelled`, `note_updated`), pure; ids and "now" passed in. `calendarRules.ts`: the calendar's
+    the stored appointment; types `booked`, `cancelled`, `note_updated`, and `changed` with `previous`, the old
+    appointment as stored after the change, a key the other types never have), pure; ids and "now" passed in. `calendarRules.ts`: the calendar's
     checks (`checkTypeName`, `checkTypeDelete`, `typeNameKey`, and `checkAvailabilityWrite` for
     every availability write: patterns, overrides, one-off windows; `checkBookingTimes`, R-BOOK-02
     before the lock, and `checkBooking`, R-BOOK-03..07 and 09 under it; `checkCancel` (R-CAN-01..03,
-    R-PERM-01 by `sub`) and `checkNote` (R-NOTE-01, answers `unchanged`); `cancellableUntilFor` (a
+    R-PERM-01 by `sub`) and `checkNote` (R-NOTE-01, answers `unchanged`); `checkChange` (spec 8.4 v11:
+    `checkCancel` on the old appointment, then `checkBooking` for its User on the state without it); `cancellableUntilFor` (a
     User on a booked appointment, else `null`); `calendarView`, the
     calendar view built for one caller's role from what `calendarDb.readCalendarRange` reads;
     `toResponse`, an appointment as a response), pure, no AWS, "today", "now" and the zone passed
@@ -253,7 +259,10 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     of spec 8.2 v9, the Administrator's target through Cognito before the lock); appointments:
     `listAppointments.ts` (`GET /calendar/appointments`, both roles, read-only, no Cognito),
     `updateAppointmentNote.ts` (`PATCH …/{appointmentId}`) and `cancelAppointment.ts`
-    (`POST …/{appointmentId}/cancel`), admin or owner (someone else's is 404, spec v10 order).
+    (`POST …/{appointmentId}/cancel`), admin or owner (someone else's is 404, spec v10 order);
+    change: `changeAppointment.ts` (`POST …/{appointmentId}/change`, admin or owner, no Cognito: the
+    User is the old appointment's; `checkBookingTimes` before the lock; spec 8.4 v11 order; logs
+    `appointmentId` and `newAppointmentId`).
   - `tests/unit/`: vitest unit tests, mirroring `src/` (e.g. `tests/unit/lib/http.test.ts`).
   - `tests/integration/`: end-to-end tests against the local Docker stack: `setup.ts` (helpers,
     including `resetCalendarTable()`, `putCalendarItem()`, `getCalendarItem()`, `deleteCalendarItem()`,

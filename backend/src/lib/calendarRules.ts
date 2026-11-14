@@ -476,6 +476,47 @@ export function checkNote(
   return checkVisibleAndActive(appointment, caller, now) ?? { unchanged: appointment!.note === note };
 }
 
+// ── Changing (spec 8.4, v11) ─────────────────────────────────────────────────────────────────
+
+export type ChangeRefusal = CancelRefusal | BookingRefusal;
+
+export type ChangeInput = {
+  /** The old appointment read inside the locked attempt, or null when there is none. */
+  appointment: (CheckedAppointment & { appointmentId: string }) | null;
+  caller: Caller;
+  /** The new times R-BOOK-02 accepted for the caller's role, `end` filled in. */
+  start: string;
+  end: string;
+  settings: Pick<CalendarSettings, 'cancellationNoticeHours' | 'minBookingNoticeHours' | 'bookingHorizonDays' | 'maxFutureAppointmentsPerUser'>;
+  state: CalendarState;
+  now: string;
+  today: string;
+  zone: string;
+};
+
+/**
+ * The change checks (8.4, the order of v11), on what calendarDb read inside the locked attempt; the
+ * first that fails decides:
+ * - the old appointment, as a cancel (checkCancel): R-CAN-01 / R-PERM-01 (`appointment_not_found`),
+ *   R-CAN-02 (`appointment_not_active`, also for one already changed), for a User R-CAN-03
+ *   (`cancellation_too_late`, with a change's wording);
+ * - the new one, as a booking (checkBooking) for the old appointment's User (R-BOOK-01: its
+ *   `userId`), on the state with the old appointment left out by id: that is both adjustments of
+ *   R-CHG-01, R-BOOK-07 ignores it and R-BOOK-09 does not count it.
+ * R-BOOK-10 is not here: the marker is a condition of the transaction. Answers the effective window
+ * that holds the new appointment: its type is the new appointment's.
+ */
+export function checkChange(input: ChangeInput): { window: EffectiveWindow } | ChangeRefusal {
+  const { appointment, caller, start, end, settings, state, now, today, zone } = input;
+  const refusal = checkCancel(appointment, caller, settings, now);
+  if (refusal) {
+    return refusal.error === 'cancellation_too_late' ? refuse(refusal.error, 'Too late to change this appointment') : refusal;
+  }
+  const old = appointment!;
+  const others = { ...state, appointments: state.appointments.filter((a) => a.appointmentId !== old.appointmentId) };
+  return checkBooking({ start, end, role: caller.role, userId: old.userId, settings, state: others, now, today, zone });
+}
+
 // ── The calendar view (spec 11.6, 7, 8.6, 17) ────────────────────────────────────────────────
 
 /**

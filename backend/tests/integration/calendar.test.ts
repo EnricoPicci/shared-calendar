@@ -1226,3 +1226,215 @@ describe('listing, note and cancel (routes 16, 18, 19)', () => {
     expect(res.body).toMatchObject(values);
   });
 });
+
+describe('change (route 20)', () => {
+  // What the earlier journeys leave behind (read from the listing journeys above):
+  // - settings cancellationNoticeHours 48, minBookingNoticeHours 2, bookingHorizonDays 30,
+  //   maxFutureAppointmentsPerUser null (restored by the listing journeys);
+  // - types GYM, Studio, "Booking room", "Booking pool" and "Listing room"; the Monday, Sunday,
+  //   Wednesday and Thursday patterns; an empty override on a Monday; a one-off window dated
+  //   yesterday;
+  // - appointments on Wednesdays and Thursdays and one ended yesterday, booked or cancelled, all
+  //   under earlier `dave` and `erin` accounts (removed; their own `sub`s).
+  // These journeys rely on none of it. They save their own settings first (restoring the leftover
+  // ones at the end), create a new `dave` and `erin`, and book on Fridays, which no earlier journey
+  // touches, at their own type with their own Friday pattern 08:00–12:00. F is the next Friday at
+  // least 8 days ahead. One appointment of dave is changed step by step (d1 → c1 → … → c5); the
+  // limit counts only booked appointments of the new dave with start > now, so the earlier
+  // accounts' appointments do not matter. Dates come from the real today, computed with the shared
+  // helpers. In the scenarios of 18.3, dave plays alice and erin bob.
+  const ZONE = 'Europe/Rome';
+  const today = () => localDateOf(new Date().toISOString(), ZONE);
+  const nextFriday = (from: string) => {
+    let d = from;
+    while (weekdayOf(d) !== 5) d = addDays(d, 1);
+    return d;
+  };
+  const F = () => nextFriday(addDays(today(), 8));
+  const at = (time: string) => toInstant(F(), time, ZONE);
+  const subOf = (token: string) => (JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString('utf8')) as { sub: string }).sub;
+  const SETTINGS = { cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: null };
+  const setSettings = async (values: Record<string, unknown>) => {
+    expect((await api('PUT', '/calendar/settings', adminToken, { ...SETTINGS, ...values })).status).toBe(200);
+  };
+  const changeOf = (token: string, id: string, body: Record<string, unknown>) => api('POST', `/calendar/appointments/${id}/change`, token, body);
+  const sk = (a: Record<string, unknown>) => `${a.start}#${a.appointmentId}`;
+  const stored = async (a: Record<string, unknown>) => {
+    const item = await getCalendarItem('APPT', sk(a));
+    return item && { appointmentId: a.appointmentId, ...Object.fromEntries(Object.entries(item).filter(([key]) => key !== 'PK' && key !== 'SK')) };
+  };
+  const changedEvents = async (oldId: string) =>
+    (await queryCalendarPartition('EVENT')).filter((e) => e.type === 'appointment.changed' && (e.previous as { appointmentId: string }).appointmentId === oldId);
+  const viewOfF = async (token: string) => {
+    const res = await api('GET', `/calendar?from=${F()}&to=${F()}`, token);
+    const day = (res.body?.days as { slots: { start: string }[]; busy: { start: string }[] }[])[0]!;
+    return { slots: day.slots.map((s) => s.start), busy: day.busy.map((b) => b.start) };
+  };
+  const DAVE = { username: 'dave', role: 'user' };
+  const ADMIN = { username: 'admin', role: 'admin' };
+
+  let daveToken: string;
+  let erinToken: string;
+  let leftover: Record<string, unknown>;
+  // dave's appointment as it is changed: d1, then the new one of each change.
+  const appts: Record<string, Record<string, unknown>> = {};
+
+  beforeAll(async () => {
+    for (const username of ['dave', 'erin']) {
+      await removeUserIfPresent(username);
+      const res = await api('POST', '/users', adminToken, { username });
+      expect(res.status).toBe(201);
+      const token = await signIn(username, res.body?.password as string);
+      if (username === 'dave') daveToken = token;
+      else erinToken = token;
+    }
+  });
+
+  afterAll(async () => {
+    await removeUserIfPresent('dave');
+    await removeUserIfPresent('erin');
+  });
+
+  it('prepares the settings, a type, the Friday pattern 08:00–12:00, and dave’s F 09:00 with a note', async () => {
+    leftover = (await api('GET', '/calendar/settings', adminToken)).body!;
+    await setSettings({});
+    const type = await api('POST', '/calendar/types', adminToken, { name: 'Change room' });
+    expect(type.status).toBe(201);
+    const pattern = await api('POST', '/calendar/patterns', adminToken, {
+      weekday: 5, start: '08:00', end: '12:00', typeId: type.body?.typeId, validFrom: addDays(F(), -21), validUntil: null,
+    });
+    expect(pattern.status).toBe(201);
+    const res = await api('POST', '/calendar/appointments', daveToken, { start: at('09:00'), note: 'Warm-up first' });
+    expect(res.status).toBe(201);
+    appts.d1 = res.body!;
+  });
+
+  it('AC-22: dave changes 09:00 to 10:00: 201; old cancelled/changed with replacedBy, new with replaces and its pointer, one appointment.changed event; the view moves', async () => {
+    expect(await viewOfF(erinToken)).toEqual({ slots: [at('08:00'), at('10:00'), at('11:00')], busy: [at('09:00')] });
+    const res = await changeOf(daveToken, appts.d1!.appointmentId as string, { start: at('10:00') });
+    expect(res.status).toBe(201);
+    const { cancelled, booked } = res.body as Record<string, Record<string, unknown>>;
+    const changedAt = booked!.createdAt as string;
+    expect(cancelled).toEqual({
+      ...appts.d1,
+      status: 'cancelled',
+      cancelledAt: changedAt,
+      cancelledBy: DAVE,
+      cancelReason: 'changed',
+      replacedBy: booked!.appointmentId,
+      updatedAt: changedAt,
+      updatedBy: DAVE,
+      cancellableUntil: null,
+    });
+    expect(booked).toMatchObject({
+      username: 'dave', start: at('10:00'), end: at('11:00'), typeName: 'Change room', note: 'Warm-up first', status: 'booked',
+      createdBy: DAVE, replaces: appts.d1!.appointmentId, replacedBy: null,
+      cancellableUntil: new Date(Date.parse(at('10:00')) - 24 * 3_600_000).toISOString(),
+    });
+    expect(booked).not.toHaveProperty('userId');
+    appts.c1 = booked!;
+
+    const oldItem = await stored(appts.d1!);
+    const newItem = await stored(booked!);
+    expect(oldItem).toMatchObject({ status: 'cancelled', cancelReason: 'changed', replacedBy: booked!.appointmentId, version: 2 });
+    expect(newItem).toMatchObject({ status: 'booked', replaces: appts.d1!.appointmentId, userId: subOf(daveToken), version: 1 });
+    expect(await getCalendarItem(`APPTID#${booked!.appointmentId as string}`, 'APPTID')).toMatchObject({ sk: sk(booked!) });
+    const events = await changedEvents(appts.d1!.appointmentId as string);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ occurredAt: changedAt, actor: DAVE, recipients: { userId: subOf(daveToken), username: 'dave', administrator: true } });
+    expect(events[0]!.appointment).toEqual(newItem);
+    expect(events[0]!.previous).toEqual(oldItem);
+
+    expect(await viewOfF(erinToken)).toEqual({ slots: [at('08:00'), at('09:00'), at('11:00')], busy: [at('10:00')] });
+  });
+
+  it('AC-23: erin holds 11:00; dave changing 10:00 to 11:00 is 409 slot_taken, and nothing is written', async () => {
+    expect((await api('POST', '/calendar/appointments', erinToken, { start: at('11:00') })).status).toBe(201);
+    const counts = async () => [(await queryCalendarPartition('APPT')).length, (await queryCalendarPartition('EVENT')).length];
+    const before = await counts();
+    const res = await changeOf(daveToken, appts.c1!.appointmentId as string, { start: at('11:00') });
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ error: 'slot_taken', message: 'The time is already booked' });
+    expect(await stored(appts.c1!)).toMatchObject({ status: 'booked', replacedBy: null, version: 1 });
+    expect(await counts()).toEqual(before);
+    expect(await changedEvents(appts.c1!.appointmentId as string)).toEqual([]);
+  });
+
+  it('R-CHG-03: a change with note null clears the note (dave moves back to 09:00)', async () => {
+    const res = await changeOf(daveToken, appts.c1!.appointmentId as string, { start: at('09:00'), note: null });
+    expect(res.status).toBe(201);
+    const { booked } = res.body as Record<string, Record<string, unknown>>;
+    expect(booked).toMatchObject({ start: at('09:00'), note: null, replaces: appts.c1!.appointmentId });
+    expect(await stored(booked!)).toMatchObject({ note: null });
+    appts.c2 = booked!;
+  });
+
+  it('AC-24: the Administrator changes dave’s 09:00–10:00 to 09:00–10:30 over its own old time: 201', async () => {
+    const res = await changeOf(adminToken, appts.c2!.appointmentId as string, { start: at('09:00'), end: toInstant(F(), '10:30', ZONE) });
+    expect(res.status).toBe(201);
+    const { cancelled, booked } = res.body as Record<string, Record<string, unknown>>;
+    expect(cancelled).toMatchObject({ status: 'cancelled', cancelledBy: ADMIN, cancelReason: 'changed', cancellableUntil: null });
+    expect(booked).toMatchObject({ username: 'dave', start: at('09:00'), end: toInstant(F(), '10:30', ZONE), createdBy: ADMIN, cancellableUntil: null });
+    expect(await stored(booked!)).toMatchObject({ userId: subOf(daveToken), createdBy: ADMIN });
+    appts.c3 = booked!;
+  });
+
+  it('someone else’s appointment is 404; an already changed one is 409 appointment_not_active; a malformed id 400', async () => {
+    const other = await changeOf(erinToken, appts.c3!.appointmentId as string, { start: at('08:00') });
+    expect(other.status).toBe(404);
+    expect(other.body).toEqual({ error: 'appointment_not_found', message: 'No appointment with this id' });
+    for (const token of [daveToken, adminToken]) {
+      const again = await changeOf(token, appts.d1!.appointmentId as string, { start: at('08:00') });
+      expect(again.status).toBe(409);
+      expect(again.body).toMatchObject({ error: 'appointment_not_active' });
+    }
+    expect((await changeOf(adminToken, ulid(), { start: at('08:00') })).status).toBe(404);
+    expect((await changeOf(daveToken, 'not-a-ulid', { start: at('08:00') })).status).toBe(400);
+    expect((await changeOf(daveToken, appts.c3!.appointmentId as string, { start: at('08:00'), username: 'dave' })).status).toBe(400);
+    expect(await stored(appts.c3!)).toMatchObject({ status: 'booked', version: 1 });
+  });
+
+  it('the notice: with 720 h dave’s change is 403 cancellation_too_late; the Administrator’s is 201', async () => {
+    await setSettings({ cancellationNoticeHours: 720 });
+    try {
+      const res = await changeOf(daveToken, appts.c3!.appointmentId as string, { start: at('09:00') });
+      expect(res.status).toBe(403);
+      expect(res.body).toEqual({ error: 'cancellation_too_late', message: 'Too late to change this appointment' });
+      expect(await stored(appts.c3!)).toMatchObject({ status: 'booked', version: 1 });
+      const admin = await changeOf(adminToken, appts.c3!.appointmentId as string, { start: at('09:00') });
+      expect(admin.status).toBe(201);
+      appts.c4 = (admin.body as Record<string, Record<string, unknown>>).booked!;
+      expect(appts.c4).toMatchObject({ start: at('09:00'), end: at('10:00') });
+    } finally {
+      await setSettings({});
+    }
+  });
+
+  it('the limit: with maxFutureAppointmentsPerUser 1 dave cannot book another, but moves his only future appointment', async () => {
+    await setSettings({ maxFutureAppointmentsPerUser: 1 });
+    try {
+      const another = await api('POST', '/calendar/appointments', daveToken, { start: at('08:00') });
+      expect(another.status).toBe(409);
+      expect(another.body).toMatchObject({ error: 'appointment_limit_reached' });
+      const res = await changeOf(daveToken, appts.c4!.appointmentId as string, { start: at('10:00') });
+      expect(res.status).toBe(201);
+      appts.c5 = (res.body as Record<string, Record<string, unknown>>).booked!;
+      expect(appts.c5).toMatchObject({ start: at('10:00'), replaces: appts.c4!.appointmentId, status: 'booked' });
+    } finally {
+      await setSettings({});
+    }
+    // One appointment.changed event per change, each naming the one before: five changes, d1 → c5.
+    for (const [from, to] of [['d1', 'c1'], ['c1', 'c2'], ['c2', 'c3'], ['c3', 'c4'], ['c4', 'c5']] as const) {
+      const events = await changedEvents(appts[from]!.appointmentId as string);
+      expect(events.map((e) => (e.appointment as { appointmentId: string }).appointmentId)).toEqual([appts[to]!.appointmentId]);
+    }
+  });
+
+  it('the settings are restored to what the earlier journeys left', async () => {
+    const { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser } = leftover;
+    const values = { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser };
+    const res = await api('PUT', '/calendar/settings', adminToken, values);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject(values);
+  });
+});

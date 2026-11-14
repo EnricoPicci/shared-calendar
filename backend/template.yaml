@@ -240,8 +240,8 @@ Resources:
 
   # The booking's check that the account still exists (spec R-BOOK-10): the booking transaction ends
   # with a ConditionCheck that no deleted-user marker exists for the User. A ConditionCheck reads one
-  # item and writes nothing, and DynamoDB authorizes it as its own action. Booking only (route 17;
-  # changing an appointment, step 50, will attach it too).
+  # item and writes nothing, and DynamoDB authorizes it as its own action. Booking (route 17) and
+  # changing an appointment (route 20), which books the new one.
   CalendarBookPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -1853,6 +1853,76 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CancelAppointmentLogGroup}:log-stream:*
+
+  # POST /calendar/appointments/{appointmentId}/change (route 20, Administrator and the appointment's
+  # User): cancels the old appointment (cancelReason changed) and books the new one for the same User
+  # in one transaction under the lock, with one appointment.changed event. Like booking it checks the
+  # deleted-user marker (CalendarBookPolicy); unlike booking it needs no Cognito: the User's sub is
+  # stored on the old appointment.
+  ChangeAppointmentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: changeAppointment.handler
+      Role: !GetAtt ChangeAppointmentRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref ChangeAppointmentLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        ChangeAppointment:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /calendar/appointments/{appointmentId}/change
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/changeAppointment.ts
+
+  ChangeAppointmentLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-changeAppointment
+      RetentionInDays: 14
+
+  ChangeAppointmentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+        - !Ref CalendarWritePolicy
+        - !Ref CalendarBookPolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ChangeAppointmentLogGroup}:log-stream:*
 
   # ---------------------------------------------------------------------------
   # Error alarms (architecture section 11)

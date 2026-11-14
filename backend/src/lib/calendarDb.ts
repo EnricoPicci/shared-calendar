@@ -28,7 +28,7 @@ import {
   type UpdateSettingsBody,
   type WindowBody,
 } from '@shared-calendar/shared';
-import { appointmentEvent, type AppointmentSnapshot } from './calendarEvents';
+import { appointmentEvent, type AppointmentSnapshot, type EventInput } from './calendarEvents';
 import type { CalendarState, NoteRefusal, Refusal, StateAppointment, ViewAppointment } from './calendarRules';
 import { documentClient } from './db';
 
@@ -808,43 +808,76 @@ export async function bookAppointment<C extends ApiErrorCode>(
     if ('error' in outcome) return { write: null, result: refused(outcome) };
     // The check found the window among the existing types only, so the type is there.
     const type = state.types.find((t) => t.typeId === outcome.window.typeId)!;
-    const stored: AppointmentSnapshot = {
-      appointmentId,
-      userId,
-      username,
-      start,
-      end,
-      date,
-      typeId: type.typeId,
-      typeNameAtBooking: type.name,
-      note,
-      status: 'booked',
-      createdAt: now,
-      createdBy: actorItem(by),
-      updatedAt: now,
-      updatedBy: actorItem(by),
-      cancelledAt: null,
-      cancelledBy: null,
-      cancelReason: null,
-      replaces: null,
-      replacedBy: null,
-      version: 1,
-    };
-    const sk = `${start}#${appointmentId}`;
-    const { appointmentId: id, ...attributes } = stored;
+    const stored = newAppointment({ appointmentId, userId, username, start, end, date, type, note, by, now, replaces: null });
     const marker = 3;
     return {
       write: [
-        { Put: { TableName: table, Item: { PK: APPT_PK, SK: sk, ...attributes } } },
-        { Put: { TableName: table, Item: { PK: `APPTID#${id}`, SK: 'APPTID', sk } } },
-        { Put: { TableName: table, Item: appointmentEvent({ type: 'appointment.booked', eventId, occurredAt: now, actor: by, appointment: stored }) } },
-        { ConditionCheck: { TableName: table, Key: deletedUserKey(userId), ConditionExpression: 'attribute_not_exists(PK)' } },
+        ...putAppointment(table, stored),
+        eventPut(table, { type: 'appointment.booked', eventId, occurredAt: now, actor: by, appointment: stored }),
+        markerCheck(table, userId),
       ],
       onConditionFailed: { item: marker, result: notFound('user_not_found') },
       result: { ok: true, value: { appointment: toResponseFields(stored, type.name), settings } },
     };
   });
 }
+
+// A new appointment as stored (8.1, 13.2): `booked`, `version` 1, created and updated now by `by`,
+// the cancellation fields null; `replaces` the old id in a change, else null. The booking and the
+// change both build it here, so the attribute list is written once.
+function newAppointment(a: {
+  appointmentId: string;
+  userId: string;
+  username: string;
+  start: string;
+  end: string;
+  date: string;
+  type: { typeId: string; name: string };
+  note: string | null;
+  by: Actor;
+  now: string;
+  replaces: string | null;
+}): AppointmentSnapshot {
+  return {
+    appointmentId: a.appointmentId,
+    userId: a.userId,
+    username: a.username,
+    start: a.start,
+    end: a.end,
+    date: a.date,
+    typeId: a.type.typeId,
+    typeNameAtBooking: a.type.name,
+    note: a.note,
+    status: 'booked',
+    createdAt: a.now,
+    createdBy: actorItem(a.by),
+    updatedAt: a.now,
+    updatedBy: actorItem(a.by),
+    cancelledAt: null,
+    cancelledBy: null,
+    cancelReason: null,
+    replaces: a.replaces,
+    replacedBy: null,
+    version: 1,
+  };
+}
+
+// `Put APPT` (`SK` `<start>#<appointmentId>`, the id not repeated) and `Put APPTID` (the pointer).
+function putAppointment(table: string, stored: AppointmentSnapshot): TransactItem[] {
+  const sk = `${stored.start}#${stored.appointmentId}`;
+  const { appointmentId, ...attributes } = stored;
+  return [
+    { Put: { TableName: table, Item: { PK: APPT_PK, SK: sk, ...attributes } } },
+    { Put: { TableName: table, Item: { PK: `APPTID#${appointmentId}`, SK: 'APPTID', sk } } },
+  ];
+}
+
+const eventPut = (table: string, event: EventInput): TransactItem => ({ Put: { TableName: table, Item: appointmentEvent(event) } });
+
+// R-BOOK-10: the User has not been deleted. Last item of a booking and of a change.
+const markerCheck = (table: string, userId: string): TransactItem => ({
+  ConditionCheck: { TableName: table, Key: deletedUserKey(userId), ConditionExpression: 'attribute_not_exists(PK)' },
+});
 
 // The response fields of a stored appointment (11.5) but `cancellableUntil`: no userId, no version.
 function toResponseFields(a: AppointmentSnapshot, typeName: string): Omit<Appointment, 'cancellableUntil'> {
@@ -958,15 +991,9 @@ async function typeNameOf(table: string, a: AppointmentSnapshot): Promise<string
   return (Item?.name as string | undefined) ?? a.typeNameAtBooking;
 }
 
-// The three items of a cancel or a note (13.4) after the lock update: `Update APPT` with SET on the
-// changed attributes only (an attribute this code does not know is kept), no condition of its own
-// (every appointment write takes the lock, v10), and `Put EVENT` with the snapshot after the change.
-function appointmentWrite(
-  table: string,
-  after: AppointmentSnapshot,
-  set: Record<string, unknown>,
-  event: Parameters<typeof appointmentEvent>[0],
-): TransactItem[] {
+// `Update APPT` with SET on the changed attributes only (an attribute this code does not know is
+// kept), no condition of its own (every appointment write takes the lock, v10).
+function appointmentUpdate(table: string, after: AppointmentSnapshot, set: Record<string, unknown>): TransactItem {
   const names: Record<string, string> = {};
   const values: Record<string, unknown> = {};
   const parts = Object.entries(set).map(([attribute, value]) => {
@@ -974,18 +1001,44 @@ function appointmentWrite(
     values[`:${attribute}`] = value;
     return `#${attribute} = :${attribute}`;
   });
-  return [
-    {
-      Update: {
-        TableName: table,
-        Key: { PK: APPT_PK, SK: `${after.start}#${after.appointmentId}` },
-        UpdateExpression: `SET ${parts.join(', ')}`,
-        ExpressionAttributeNames: names,
-        ExpressionAttributeValues: values,
-      },
+  return {
+    Update: {
+      TableName: table,
+      Key: { PK: APPT_PK, SK: `${after.start}#${after.appointmentId}` },
+      UpdateExpression: `SET ${parts.join(', ')}`,
+      ExpressionAttributeNames: names,
+      ExpressionAttributeValues: values,
     },
-    { Put: { TableName: table, Item: appointmentEvent(event) } },
-  ];
+  };
+}
+
+// The two items of a cancel or a note (13.4) after the lock update: the `Update APPT`, and `Put
+// EVENT` with the snapshot after the change.
+function appointmentWrite(table: string, after: AppointmentSnapshot, set: Record<string, unknown>, event: EventInput): TransactItem[] {
+  return [appointmentUpdate(table, after, set), eventPut(table, event)];
+}
+
+// The old appointment of a cancel or a change, as stored after it (8.3, 8.4): `cancelled` now by
+// `by` with `reason`, `version` + 1; `replacedBy` the new id in a change. `set` is what the
+// `Update` writes: exactly the attributes that changed.
+function cancelled(
+  before: AppointmentSnapshot,
+  by: Actor,
+  now: string,
+  reason: 'cancelled' | 'changed',
+  replacedBy?: string,
+): { after: AppointmentSnapshot; set: Record<string, unknown> } {
+  const set: Record<string, unknown> = {
+    status: 'cancelled',
+    cancelledAt: now,
+    cancelledBy: by,
+    cancelReason: reason,
+    ...(replacedBy === undefined ? {} : { replacedBy }),
+    updatedAt: now,
+    updatedBy: by,
+    version: before.version + 1,
+  };
+  return { after: { ...before, ...set } as AppointmentSnapshot, set };
 }
 
 /** The cancel check (calendarRules.checkCancel) on the appointment read inside the attempt, or null. */
@@ -1011,17 +1064,7 @@ export async function cancelAppointment<C extends ApiErrorCode>(
     if (refusal) return { write: null, result: refused(refusal) };
     const by = actorItem(change.by);
     // The check refuses a missing appointment, so it is there.
-    const after: AppointmentSnapshot = {
-      ...before!,
-      status: 'cancelled',
-      cancelledAt: now,
-      cancelledBy: by,
-      cancelReason: 'cancelled',
-      updatedAt: now,
-      updatedBy: by,
-      version: before!.version + 1,
-    };
-    const set = { status: after.status, cancelledAt: now, cancelledBy: by, cancelReason: after.cancelReason, updatedAt: now, updatedBy: by, version: after.version };
+    const { after, set } = cancelled(before!, by, now, 'cancelled');
     return {
       write: appointmentWrite(table, after, set, { type: 'appointment.cancelled', eventId: change.eventId, occurredAt: now, actor: by, appointment: after }),
       result: { ok: true, value: { appointment: toResponseFields(after, await typeNameOf(table, after)), settings } },
@@ -1065,6 +1108,102 @@ export async function updateAppointmentNote(
     return {
       write: appointmentWrite(table, after, set, { type: 'appointment.note_updated', eventId: change.eventId, occurredAt: now, actor: by, appointment: after }),
       result: { ok: true, value: { appointment: toResponseFields(after, typeName), settings, unchanged: false } },
+    };
+  });
+}
+
+// ── Changing (spec 8.4 v11; items APPTID, APPT, EVENT and the DELETEDUSER marker of 13.2) ─────
+
+/** What the handler decided before the lock: the ids (made once per request), the new times, the note. */
+export type NewChange = {
+  /** The old appointment, from the path. */
+  appointmentId: string;
+  newAppointmentId: string;
+  eventId: string;
+  /** The times R-BOOK-02 accepted, `end` filled in. */
+  start: string;
+  end: string;
+  /** R-CHG-03: `undefined` keeps the old note; otherwise the new one, trimmed, an empty one null. */
+  note: string | null | undefined;
+  by: Actor;
+};
+
+/**
+ * The change check (calendarRules.checkChange), on the old appointment (or null), the state and the
+ * settings read inside the locked attempt: a refusal, or the effective window of the new appointment.
+ */
+export type ChangeCheck<C extends ApiErrorCode> = (
+  appointment: AppointmentSnapshot | null,
+  state: CalendarState,
+  settings: CalendarSettings,
+) => Refusal<C> | { window: { typeId: string } };
+
+/** What a change answers before `cancellableUntil`: both appointments as stored, and the settings. */
+export type ChangedAppointments = {
+  cancelled: Omit<Appointment, 'cancellableUntil'>;
+  booked: Omit<Appointment, 'cancellableUntil'>;
+  settings: CalendarSettings;
+};
+
+/**
+ * Changes an appointment under the lock (8.4, 13.4). Inside each attempt it reads the settings, the
+ * availability state and the old appointment by id (pointer, then `APPT`), and `check` decides on
+ * them, so a retry re-reads and re-checks. Then one transaction of six items: the lock update;
+ * `Update` of the old `APPT` (cancelled, `cancelReason` `changed`, `replacedBy` the new id,
+ * `version` + 1); `Put` of the new `APPT` (`replaces` the old id, the old one's User, the note of
+ * R-CHG-03, the window's type) and its `APPTID`; `Put EVENT` `appointment.changed` with `previous`,
+ * the old one as stored after the change; the `ConditionCheck` on the User's marker (R-BOOK-10),
+ * whose failure answers `user_not_found` without a retry. Each `typeName` is the current name from
+ * the state's types, or the snapshot once the type is gone.
+ */
+export async function changeAppointment<C extends ApiErrorCode>(
+  change: NewChange,
+  today: string,
+  now: string,
+  check: ChangeCheck<C>,
+): Promise<Locked<Checked<ChangedAppointments, C | 'user_not_found'>>> {
+  const { table, timeZone } = calendarConfig();
+  const { newAppointmentId, eventId, start, end } = change;
+  const by = actorItem(change.by);
+  return withCalendarLock<Checked<ChangedAppointments, C | 'user_not_found'>>(async () => {
+    const [settings, state, before] = await Promise.all([
+      readSettings(table, timeZone),
+      readState(table, today, now),
+      readAppointment(table, change.appointmentId),
+    ]);
+    const outcome = check(before, state, settings);
+    if ('error' in outcome) return { write: null, result: refused(outcome) };
+    // The check refuses a missing appointment and finds the window among the existing types only.
+    const old = before!;
+    const type = state.types.find((t) => t.typeId === outcome.window.typeId)!;
+    const booked = newAppointment({
+      appointmentId: newAppointmentId,
+      userId: old.userId,
+      username: old.username,
+      start,
+      end,
+      date: localDateOf(start, timeZone),
+      type,
+      note: change.note === undefined ? old.note : change.note,
+      by,
+      now,
+      replaces: old.appointmentId,
+    });
+    const { after, set } = cancelled(old, by, now, 'changed', newAppointmentId);
+    const oldTypeName = state.types.find((t) => t.typeId === after.typeId)?.name ?? after.typeNameAtBooking;
+    const marker = 4;
+    return {
+      write: [
+        appointmentUpdate(table, after, set),
+        ...putAppointment(table, booked),
+        eventPut(table, { type: 'appointment.changed', eventId, occurredAt: now, actor: by, appointment: booked, previous: after }),
+        markerCheck(table, old.userId),
+      ],
+      onConditionFailed: { item: marker, result: notFound('user_not_found') },
+      result: {
+        ok: true,
+        value: { cancelled: toResponseFields(after, oldTypeName), booked: toResponseFields(booked, type.name), settings },
+      },
     };
   });
 }
