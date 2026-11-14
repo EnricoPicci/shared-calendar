@@ -187,8 +187,13 @@ form works the same. Paths below without a folder are relative to `backend/`.
   pool policy checked first). Only sets the password. Reads stdin, so
   `printf '%s\n%s\n' "$pw" "$pw" | npm run bootstrap-admin -w backend -- local` works in tests.
 - `DYNAMODB_PORT=8002 npm run smoke -w backend -- <stack|local>`: journeys 3, 4, 6, 11 with a throw-away
-  `smoke-<epoch>` user, PASS/FAIL per check, deletes the user on every exit. Prompts for the
-  admin password (stdin). Leaves its message rows in the table (history).
+  `smoke-<epoch>` user and, before 11, the calendar journey of spec 18.4 (a type `smoke-<epoch>`
+  and a one-off window on the first free 03:00–04:00 from 50 days ahead, booked for the user,
+  listed and cancelled by it, then window and type deleted; settings never changed); 19 checks,
+  PASS/FAIL each. On every exit it removes the type, window and booking and deletes the user.
+  Prompts for the admin password (stdin). Leaves its message rows and, in `calendar`, the
+  cancelled appointment, its events and the user's deleted-user marker (history). Its date
+  arithmetic imports `shared/src/calendar/time.ts` in node (Node ≥ 22.18, type stripping).
 - `npm run budget -w backend -- <stack> [--dry-run]`: creates the 1 USD monthly budget `<stack>-monthly`
   (e-mail to the stack's `AlertEmail`) through the Budgets API. Not in `template.yaml`: no
   `AWS::Budgets::Budget` in CloudFormation in `eu-north-1`. Idempotent; no local target.

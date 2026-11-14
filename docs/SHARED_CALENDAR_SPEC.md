@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v12 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
-| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10, v11 and v12 2026-11-14 |
+| Status | v13 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
+| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10, v11, v12 and v13 2026-11-14 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
@@ -24,6 +24,7 @@
 | v10 | 2026-11-14 | Brief 50 (plan step 49). The appointment list (route 16): exactly one selection, `from`+`to` or `upcoming=true`; `upcoming` selects by time and `status` filters it; a range takes the appointments dated in it; "ended" is not a status (11.1, 11.2, R-VIEW-01). A User's list is matched on the `sub`, the Administrator's `username` on the stored name, earlier accounts with it included (11.1, 11.2, 13.2). `cancellableUntil` is `null` on a cancelled appointment (8.1, 11.5). Cancel and note: the order of the checks, R-CAN-03 as `now ≤ cancellableUntil` to the millisecond, the lookup inside the locked attempt, an `Update` of the changed attributes without a condition of its own, and an unchanged note writes nothing (8.3, 8.5, 13.2, 13.4). Routes 18 and 19 read with `GetItem` only (14.3). |
 | v11 | 2026-11-14 | Brief 51 (plan step 50). Change: the order of the checks, the old appointment before the new one; R-BOOK-01 is the old appointment's User, with no Cognito call, and a deleted one answers `404 user_not_found`; `end` absent is `start + 60 min`; a change to the same times is written; an appointment in progress can only be moved to a future start; the old appointment is left out of the state for R-BOOK-07 and R-BOOK-09; `replaces`/`replacedBy` are never followed (8.4). Route 20's errors listed explicitly instead of "union of #17 and #19" (11.1). The change's six items, in order (13.4). `previous` is the old appointment as stored after the change (15.2). |
 | v12 | 2026-11-14 | Brief 52 (plan step 51). User deletion: the order of the checks and their answers, the time-zone check after the Cognito checks, a busy lock `409 concurrent_update`, a target in no group marked and cancelled too (10.2); an appointment in progress is cancelled too (10.2, AC-29); the marker is written in the first chunk as a plain `Put`, so a repeated deletion writes it again (10.2, 13.4); one event id per appointment, kept across retries and chunks (10.2). `GET /users` sorted by UTF-16 code units, an account in no group not listed (10.1). `DeleteUserFunction` declares the three calendar variables (14.1, 14.3). A notifier cannot look up a deleted User's address through Cognito (15.1). |
+| v13 | 2026-11-14 | Brief 53 (plan step 52). The smoke test's calendar journey made independent of the settings and of the real calendar: it reads both first and searches a free 03:00–04:00 instead of assuming one; the Administrator's booking makes only `cancellationNoticeHours` matter; DST days skipped; a recognisable note for the AC-36 log search; the check lines, the clean-up on every exit and what stays as history (18.4, now "local and cloud"). |
 
 ---
 
@@ -1480,13 +1481,47 @@ into DynamoDB Local, as the existing journeys already read the table directly.
 | AC-35 | Pattern Sun 01:00–04:00 local valid on 2027-03-28 (clocks go forward) | admin views 2027-03-28 | slots 01:00 and 03:00 local, each 60 real minutes |
 | AC-36 | Any write above | inspect CloudWatch/local logs | no note text, no request body |
 
-### 18.4 Smoke test (cloud)
+### 18.4 Smoke test (local and cloud)
 
-`scripts/smoke.sh` gains one journey that works whatever the real availability is. As the admin:
-create a one-off window at 03:00–04:00 local, 50 days ahead, with a type `smoke-<epoch>`; book it
-for the throw-away User. As that User: see it in `upcoming`, then cancel it. As the admin: delete
-the window and the type. The appointment and its events stay as history, as the smoke test's
-messages do.
+`scripts/smoke.sh` gains one journey that works whatever the real settings and availability are
+(v13). It runs between the throw-away User's `/hello` and its deletion, against the local stack and,
+after every deploy, the cloud; it uses the API only and never prints a calendar answer body (the
+status and the error code only, since an answer may hold a note).
+
+1. **Settings.** The admin reads `GET /calendar/settings`; nothing is ever written to them. The
+   Administrator books, so R-BOOK-04, R-BOOK-05 and R-BOOK-09 do not apply: only
+   `cancellationNoticeHours` matters, because the User cancels (R-CAN-03). The earliest start is
+   now + `cancellationNoticeHours` + 24 h. "Local" is the answer's `timeZone`.
+2. **The date.** The preferred date is today + 50 (local); the search starts there, or at the
+   earliest start's date if that is later (never, with the ranges of section 9: 720 h is 30 days).
+   One `GET /calendar` as the admin covers the 31 days from there, forward. A date is taken when
+   03:00 local exists, is a whole hour and 03:00–04:00 lasts 60 real minutes (a DST day where it
+   does not is skipped), starts no earlier than the earliest start, and that hour overlaps none of
+   the date's `windows` (every source) and none of the view's `appointments` (all active ones, for
+   the Administrator), with fewer than 10 one-off windows on the date. None found: a FAIL line
+   naming the range (or, when every date was too soon, the setting and the earliest start) and no
+   calendar journey. Something created between the read and the writes answers 409: FAIL with
+   its code, clean-up, no retry.
+3. **The journey, one check line each** (19 checks with Hello World's 10): the settings read; the
+   free hour found; as the admin, create the type `smoke-<epoch>` (the User's epoch), create the
+   one-off window 03:00–04:00 on the date, book it for the User (`username`, `start`, no `end`,
+   and the note `smoke-test note <epoch>, must never reach a log`; the answer is `booked`, 60
+   minutes, that type, that note); as the User, `upcoming` holds exactly that appointment (id,
+   start, end, type, `booked`, note, a `cancellableUntil`), then cancel it (`cancelled`,
+   `cancelReason` `cancelled`); as the admin, delete the window, then the type (R-TYPE-03: the
+   cancelled appointment does not block it). The script never prints the note.
+4. **Clean-up.** After a failed calendar check, and on every exit (Ctrl-C included), the script
+   cancels the appointment if still booked, then deletes the window and the type, through the API
+   as the admin, before the User is deleted; a write whose answer was not read is looked up first.
+   It does not rely on the User's deletion (10.2), which the exit path does directly in Cognito.
+   A clean-up call that fails prints the ids to remove by hand, never a body, and the exit is 1.
+5. **History.** The appointment (cancelled, by the User or by the admin's clean-up), its pointer,
+   its two events and, after the User's deletion through the API, the deleted-user marker stay, as
+   the smoke test's messages do. They carry the username and type name `smoke-<epoch>`.
+
+AC-36 is checked on top of it: locally by searching `local:api`'s output for every journey's note
+texts, body-only keys, tokens and passwords (plan step 52); in the cloud by searching the calendar
+functions' logs for `must never reach a log` (plan step 55, `docs/RUNBOOK.md`).
 
 ---
 
