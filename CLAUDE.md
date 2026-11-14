@@ -156,7 +156,14 @@ form works the same. Paths below without a folder are relative to `backend/`.
   Local weight with 10 functions (step 44): about 0.75 GB for the whole stack, ready in about 14 s;
   with 15 calendar functions (step 47): about 1.1 GB (26 containers after the journeys; start-up not timed);
   with 25 functions (step 51): about 1.5 GB (36 containers after both packages' journeys, emulators
-  included).
+  included); `local:api` ready in about 11 s, build included.
+- Runtime image: `samconfig.toml` sets `skip_pull_image = true` for `start-api`. Without it every warm
+  container's start asks Docker for the runtime image's digest at public.ecr.aws ("Local image is
+  up-to-date"), several in parallel with no timeout: 6–42 s, sometimes never completing (step 51).
+  Instead `local-api.sh` runs one `docker pull public.ecr.aws/lambda/nodejs:22-<arch>` (120 s at
+  most); when that brings a new base it removes `…:22-rapid-<arch>` (SAM's image: base + Lambda
+  emulator), which SAM then rebuilds. Registry unreachable: a warning, the local copy is used. A raw
+  `sam local start-api --config-env local` skips the lookup altogether.
 - Under `sam local`, every event carries the same fake `requestContext.requestId`, so
   identical request ids in local logs are expected. In the cloud they are unique.
 - cognito-local does not implement `AdminUserGlobalSignOut`. `env.local.json` sets

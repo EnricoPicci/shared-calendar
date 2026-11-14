@@ -34,6 +34,45 @@ export SAM_CLI_BETA_NODEJS_MONOREPO=1
 arch=arm64
 [[ "$(uname -m)" == x86_64 ]] && arch=x86_64
 
+# One registry lookup per start. samconfig.toml sets skip_pull_image: otherwise every warm
+# container's start asks Docker for the runtime image's digest at public.ecr.aws, several in
+# parallel with no timeout, and the start-up takes 6-42 s or never completes (step 51, 25 functions).
+# Here: one `docker pull` of AWS's Lambda base image (a no-op when it is current), at most 120 s.
+# When it brings a new base, the local image SAM built on top of it ("rapid": the base plus the
+# Lambda emulator) is removed, so that SAM rebuilds it from the new base. If the registry cannot be
+# reached, the local image is used as it is.
+runtime=$(awk '/^ *Runtime: nodejs/ { sub(/.*nodejs/, ""); sub(/\.x.*/, ""); print; exit }' template.yaml)
+base_image="public.ecr.aws/lambda/nodejs:${runtime}-${arch}"
+rapid_image="public.ecr.aws/lambda/nodejs:${runtime}-rapid-${arch}"
+image_id() { docker image inspect -f '{{.Id}}' "$1" 2> /dev/null || true; }
+pull_base_image() {
+  docker pull -q "$base_image" > /dev/null 2>&1 &
+  local pid=$! waited=0
+  while kill -0 "$pid" 2> /dev/null; do
+    if ((waited >= 120)); then
+      kill "$pid" 2> /dev/null || true
+      wait "$pid" 2> /dev/null || true
+      return 1
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  wait "$pid"
+}
+before=$(image_id "$base_image")
+if pull_base_image; then
+  if [[ "$(image_id "$base_image")" != "$before" ]]; then
+    echo "New Lambda base image $base_image: SAM rebuilds $rapid_image"
+    docker rmi "$rapid_image" > /dev/null 2>&1 \
+      || echo "WARNING: could not remove $rapid_image (in use?); SAM keeps the old one" >&2
+  fi
+elif [[ -z "$before" ]]; then
+  echo "ERROR: cannot pull $base_image and there is no local copy" >&2
+  exit 1
+else
+  echo "WARNING: could not check $base_image at the registry; using the local copy" >&2
+fi
+
 # On exit (Ctrl-C included), remove the Lambda containers sam local leaves running. It cleans up
 # its EAGER containers but not the extra ones it starts on a first request; they pile up with every
 # restart (step 44: 14 of 18 still running after Ctrl-C). Only containers SAM labels as Lambda

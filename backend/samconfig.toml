@@ -45,3 +45,6 @@ parameter_overrides = "AlertEmail=local@example.invalid"
 env_vars = "env.local.json"
 docker_network = "hello-local"
 warm_containers = "EAGER"
+# No registry lookup per container (they ran in parallel without a timeout and could hang the
+# start-up); scripts/local-api.sh pulls the Lambda base image once before starting instead.
+skip_pull_image = true
