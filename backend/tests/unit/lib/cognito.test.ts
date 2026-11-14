@@ -7,6 +7,7 @@ import {
   AdminSetUserPasswordCommand,
   AdminUserGlobalSignOutCommand,
   CognitoIdentityProviderClient,
+  ListUsersInGroupCommand,
   UsernameExistsException,
   UserNotFoundException,
 } from '@aws-sdk/client-cognito-identity-provider';
@@ -19,6 +20,7 @@ import {
   globalSignOut,
   isPlainUser,
   listGroups,
+  listPlainUsers,
   setPermanentPassword,
   UserExistsError,
   UserNotFoundError,
@@ -181,6 +183,52 @@ describe('isPlainUser', () => {
   it('maps UserNotFoundException to UserNotFoundError', async () => {
     cognito.on(AdminListGroupsForUserCommand).rejects(notFound());
     await expect(isPlainUser('ghost')).rejects.toBeInstanceOf(UserNotFoundError);
+  });
+});
+
+describe('listPlainUsers', () => {
+  const member = (Username: string, day: number) => ({ Username, UserCreateDate: new Date(Date.UTC(2026, 10, day, 8)) });
+  const pageOf = (group: string, token: string | undefined, users: ReturnType<typeof member>[], next?: string) =>
+    cognito
+      .on(ListUsersInGroupCommand, { UserPoolId: POOL, GroupName: group, NextToken: token })
+      .resolves({ Users: users, ...(next && { NextToken: next }) });
+
+  it('follows NextToken in both groups, keeps the members of user not in admin, sorted by username', async () => {
+    pageOf('user', undefined, [member('erin', 3), member('dave', 2)], 'u2');
+    pageOf('user', 'u2', [member('both', 1), member('alice', 4)], 'u3');
+    pageOf('user', 'u3', [member('carol.b', 5), member('carol-a', 6)]);
+    pageOf('admin', undefined, [member('admin', 1)], 'a2');
+    pageOf('admin', 'a2', [member('both', 1)]);
+
+    const users = await listPlainUsers();
+
+    expect(users).toEqual([
+      { username: 'alice', createdAt: '2026-11-04T08:00:00.000Z' },
+      { username: 'carol-a', createdAt: '2026-11-06T08:00:00.000Z' },
+      { username: 'carol.b', createdAt: '2026-11-05T08:00:00.000Z' },
+      { username: 'dave', createdAt: '2026-11-02T08:00:00.000Z' },
+      { username: 'erin', createdAt: '2026-11-03T08:00:00.000Z' },
+    ]);
+    const calls = cognito.commandCalls(ListUsersInGroupCommand).map((c) => c.args[0].input);
+    expect(calls).toHaveLength(5);
+    expect(calls).toContainEqual({ UserPoolId: POOL, GroupName: 'user', NextToken: 'u3' });
+    expect(calls).toContainEqual({ UserPoolId: POOL, GroupName: 'admin', NextToken: 'a2' });
+  });
+
+  it('answers an empty list when the groups have no members (Users omitted)', async () => {
+    cognito.on(ListUsersInGroupCommand).resolves({});
+    expect(await listPlainUsers()).toEqual([]);
+  });
+
+  it('fails as an ordinary error for a member without a creation date', async () => {
+    pageOf('user', undefined, [{ Username: 'dave' } as ReturnType<typeof member>]);
+    pageOf('admin', undefined, []);
+    await expect(listPlainUsers()).rejects.toThrow('A member of group user has no username or creation date');
+  });
+
+  it('rethrows a Cognito failure unchanged', async () => {
+    cognito.on(ListUsersInGroupCommand).rejects(new Error('boom'));
+    await expect(listPlainUsers()).rejects.toThrow('boom');
   });
 });
 

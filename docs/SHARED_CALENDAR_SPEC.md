@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v11 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
-| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10 and v11 2026-11-14 |
+| Status | v12 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
+| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10, v11 and v12 2026-11-14 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
@@ -23,6 +23,7 @@
 | v9 | 2026-11-14 | Brief 49 (plan step 48). The order of the booking checks is stated as the handler runs them (8.2): the body's shape with the note first, R-BOOK-01's Cognito part after R-BOOK-02 and before the lock, R-BOOK-10 in the transaction. A booking target in no group is `409 target_not_user` (R-BOOK-01). The `APPT` item stores the fields of 8.1 except `appointmentId`, `typeName` and `cancellableUntil` (13.2). |
 | v10 | 2026-11-14 | Brief 50 (plan step 49). The appointment list (route 16): exactly one selection, `from`+`to` or `upcoming=true`; `upcoming` selects by time and `status` filters it; a range takes the appointments dated in it; "ended" is not a status (11.1, 11.2, R-VIEW-01). A User's list is matched on the `sub`, the Administrator's `username` on the stored name, earlier accounts with it included (11.1, 11.2, 13.2). `cancellableUntil` is `null` on a cancelled appointment (8.1, 11.5). Cancel and note: the order of the checks, R-CAN-03 as `now ≤ cancellableUntil` to the millisecond, the lookup inside the locked attempt, an `Update` of the changed attributes without a condition of its own, and an unchanged note writes nothing (8.3, 8.5, 13.2, 13.4). Routes 18 and 19 read with `GetItem` only (14.3). |
 | v11 | 2026-11-14 | Brief 51 (plan step 50). Change: the order of the checks, the old appointment before the new one; R-BOOK-01 is the old appointment's User, with no Cognito call, and a deleted one answers `404 user_not_found`; `end` absent is `start + 60 min`; a change to the same times is written; an appointment in progress can only be moved to a future start; the old appointment is left out of the state for R-BOOK-07 and R-BOOK-09; `replaces`/`replacedBy` are never followed (8.4). Route 20's errors listed explicitly instead of "union of #17 and #19" (11.1). The change's six items, in order (13.4). `previous` is the old appointment as stored after the change (15.2). |
+| v12 | 2026-11-14 | Brief 52 (plan step 51). User deletion: the order of the checks and their answers, the time-zone check after the Cognito checks, a busy lock `409 concurrent_update`, a target in no group marked and cancelled too (10.2); an appointment in progress is cancelled too (10.2, AC-29); the marker is written in the first chunk as a plain `Put`, so a repeated deletion writes it again (10.2, 13.4); one event id per appointment, kept across retries and chunks (10.2). `GET /users` sorted by UTF-16 code units, an account in no group not listed (10.1). `DeleteUserFunction` declares the three calendar variables (14.1, 14.3). A notifier cannot look up a deleted User's address through Cognito (15.1). |
 
 ---
 
@@ -623,7 +624,11 @@ event is therefore a real change.
 `GET /users`, Administrator only. It returns the members of group `user` that are not in group
 `admin`, sorted by username: `{ "users": [ { "username": "alice", "createdAt": "…" } ] }`. It is
 needed for the "book for a User" choice. It reads Cognito (`ListUsersInGroup` for both groups,
-following pagination); there is still no users table (architecture section 13).
+following pagination); there is still no users table (architecture section 13). Usernames are
+compared by UTF-16 code units, as the type list is (v12); `createdAt` is the account's creation
+instant. An account in no group is not listed (it cannot be booked for: R-BOOK-01). A User or a
+token in neither group gets `403 forbidden`. The route reads no calendar data, so the time-zone
+check of R-TIME-01 does not apply to it.
 
 ### 10.2 Deleting a User (D19)
 
@@ -642,6 +647,30 @@ delete:
 4. It runs the existing global sign-out and `AdminDeleteUser`.
 
 Past appointments (and cancelled ones) are kept: history (D17), as Hello World messages are.
+
+**The order** (v12), the first failure decides: the Administrator (`403 forbidden`); the username
+(`400 invalid_request`); `AdminListGroupsForUser` (`404 user_not_found`, `403 cannot_delete_admin`
+for a target in group `admin`, also in both groups), so no calendar write ever happens for an
+administrator; the calendar's configuration (R-TIME-01, `500`: the route needs no zone, but a broken
+deployment stops it too, before any write); step 1 (`404 user_not_found` if the account disappeared
+meanwhile); steps 2–3 (R-DEL-01: `409 concurrent_update` when the lock was busy three times in a
+row, `500` for any other failure); step 4 (`500`); `204`. A target in no group is deletable, as
+before, and gets its marker and cancellations too. "Active with `end > now`" includes an appointment
+in progress; an ended one keeps everything.
+
+**How steps 2–3 are written** (v12). Each chunk is its own transaction under the lock (13.4), reading
+inside its locked attempt the appointments from now − 24 h and keeping in code those of the User's
+`sub` (never the username: R-DEL-02), `booked`, with `end > now`. The marker is written in the
+**first** chunk, with the lock update and up to 40 cancellations (at most 82 items); each later
+chunk re-reads and cancels the next 40. A User without appointments writes one transaction: the lock
+update and the marker. A booking at the same moment is serialized by the lock: before the first
+chunk, its appointment is read and cancelled; after it, the marker refuses it. The marker is a plain
+`Put` (`username`, `deletedAt` the request's "now", `deletedBy` the Administrator), so a repeated
+deletion writes it again. Each cancellation sets what a cancel sets (13.2), with `cancelReason`
+`user_deleted`; its `appointment.cancelled` event has the Administrator as `actor` and the deleted
+User and the Administrator as `recipients`. One event id is made per appointment on first sight and
+kept across lock retries and chunks, so a retry writes the same one. If a later chunk fails, the
+earlier ones stay written and the answer comes before any Cognito change; the retry finds the rest.
 
 **R-DEL-01 — Failure handling.** If steps 2–3 fail, the handler answers `500` before touching
 Cognito, and the Administrator retries. Every step can be repeated safely: the marker is written
@@ -1052,7 +1081,8 @@ does not matter at ≤ 10 users who almost never act at the same time (N6). The 
 applies here too: per-day locks would be the next step.
 
 Transaction sizes: booking 5 items, change 6, cancel 3, note 3, availability writes 2–3,
-user-deletion chunk ≤ 82. All are under DynamoDB's limit of 100.
+user-deletion chunk ≤ 82 (the first: lock, marker, 40 × (`Update APPT` + `Put EVENT`); a later one
+≤ 81, without the marker; v12). All are under DynamoDB's limit of 100.
 
 A cancel, a note and a change (its old appointment) write the `APPT` item as an `Update` of the
 changed attributes only, so an attribute the code does not know is kept, and without a condition
@@ -1113,7 +1143,10 @@ The DynamoDB actions come from the four shared policies of 14.3, so every route 
 no Cognito call.
 
 Environment of every calendar function: `CALENDAR_TABLE`, `CALENDAR_TIME_ZONE`,
-`DYNAMODB_ENDPOINT` (`''` in the cloud), plus `USER_POOL_ID` and `COGNITO_ENDPOINT` for #17 and #21.
+`DYNAMODB_ENDPOINT` (`''` in the cloud), plus `USER_POOL_ID` and `COGNITO_ENDPOINT` for #17. Route
+#21 has `USER_POOL_ID` and `COGNITO_ENDPOINT` only (it reads no calendar data). `deleteUser.ts`
+declares the three calendar variables besides its own (v12): it writes the table, and the
+configuration check reads the zone.
 
 ### 14.2 Modules (`backend/src/lib/`)
 
@@ -1170,7 +1203,7 @@ response + one log line. Coverage stays at 100 % lines on `src/lib`.
   shared policies is review, not length.
 - `DeleteUserRole` gains the permissions of 14.1: `CalendarReadPolicy` and `CalendarWritePolicy`,
   plus `AdminGetUser` added to its inline Cognito statement. `DeleteUserFunction` gains
-  `CALENDAR_TABLE`.
+  `CALENDAR_TABLE`, `CALENDAR_TIME_ZONE` and `DYNAMODB_ENDPOINT` (v12).
 - Existing throttling (5 req/s, burst 10) and alarms cover the new routes without change. The 5xx
   alarm covers handled 500s, including a broken `CalendarTimeZone`.
 
@@ -1215,7 +1248,7 @@ transaction as the change**. This is the "transactional outbox" pattern.
 | who must be told | `recipients`: the User's `userId` + `username`, and `administrator: true` |
 | what the appointment was / became | `appointment` (the snapshot after the change), and `previous` for `changed` |
 | why (for the wording) | `cancelReason` on the snapshot (`cancelled`, `changed`, `user_deleted`) |
-| the recipient's address | not stored by the calendar: it will be the Cognito `email` attribute, found through `userId` (`sub`). The pool already allows `email` (architecture 7.4 option C) |
+| the recipient's address | not stored by the calendar: it will be the Cognito `email` attribute, found through `userId` (`sub`). The pool already allows `email` (architecture 7.4 option C). A deleted User's account is gone seconds after the `user_deleted` events are written, so a notifier cannot look the address up then: the future feature must copy it before the delete (onto the marker or the events). v1 stores no address, so nothing changes now (v12) |
 | reminders ("your appointment is tomorrow") | the `APPT` partition is sorted by start, so a scheduled job can query "appointments starting in the next 24–25 h" without a new index |
 
 ### 15.2 Event item
@@ -1438,7 +1471,7 @@ into DynamoDB Local, as the existing journeys already read the table directly.
 | AC-26 | AC-25 | admin changes the pattern's type to Pool | 409 `availability_conflict` |
 | AC-27 | AC-25 | admin extends the pattern to 07:00–12:00 | 200 |
 | AC-28 | Studio used by a pattern | admin deletes Studio | 409 `type_in_use` |
-| AC-29 | alice holds two future and one past appointment | admin deletes alice | 204; both future ones `cancelled` / `user_deleted`, two events; the past one unchanged; alice's still-valid token gets 404 `user_not_found` when booking |
+| AC-29 | alice holds two future and one past appointment | admin deletes alice | 204; both future ones `cancelled` / `user_deleted`, two events (one in progress would be cancelled too: `end > now`, v12); the past one unchanged; alice's still-valid token gets 404 `user_not_found` when booking |
 | AC-30 | alice's appointment id | bob cancels it | 404 `appointment_not_found` |
 | AC-31 | an ended appointment | admin cancels | 409 `appointment_not_active` |
 | AC-32 | — | admin `GET /users` | alice, bob; not admin |

@@ -4,7 +4,7 @@ Description: >
   Hello World API (docs/ARCHITECTURE.md). Cognito user pool for identities and roles,
   HTTP API with a Lambda authorizer, three business Lambdas, one DynamoDB table; and the shared
   calendar (docs/SHARED_CALENDAR_SPEC.md, being built in plan steps 41-56): its table, its
-  shared permission sets and, so far, the settings, availability-type and weekly-pattern functions.
+  shared permission sets, one function per calendar route, and GET /users.
 
 # Values given at deploy time: samconfig.toml holds all but AlertEmail, which the first deploy
 # passes on the command line (public repository) and CloudFormation then keeps.
@@ -512,7 +512,9 @@ Resources:
                   - cognito-idp:AdminDeleteUser
                 Resource: !GetAtt UserPool.Arn
 
-  # DELETE /users/{username}: refuses administrators, signs the user out everywhere, deletes them.
+  # DELETE /users/{username}: refuses administrators; then, in the shared calendar (spec 10.2),
+  # writes the deleted-user marker and cancels the user's appointments not yet ended; then signs
+  # the user out everywhere and deletes them. Hence the calendar variables, like a calendar function.
   DeleteUserFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -524,6 +526,9 @@ Resources:
         Variables:
           USER_POOL_ID: !Ref UserPool
           COGNITO_ENDPOINT: ''
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
           # Local development only, never set in the cloud. The local Cognito emulator
           # (cognito-local) does not support AdminUserGlobalSignOut, so env.local.json sets
           # this to 'true' to skip that one call and let local deletes work. It is declared
@@ -568,6 +573,11 @@ Resources:
             Principal:
               Service: lambda.amazonaws.com
             Action: sts:AssumeRole
+      # The calendar part of a deletion: read the lock and the appointments, write the marker, the
+      # cancelled appointments and their events, move the lock on.
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+        - !Ref CalendarWritePolicy
       Policies:
         - PolicyName: write-own-logs
           PolicyDocument:
@@ -578,15 +588,87 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeleteUserLogGroup}:log-stream:*
+        # AdminGetUser reads the account's id (sub), which the calendar's marker is keyed by.
         - PolicyName: delete-user
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
+                  - cognito-idp:AdminGetUser
                   - cognito-idp:AdminListGroupsForUser
                   - cognito-idp:AdminUserGlobalSignOut
                   - cognito-idp:AdminDeleteUser
+                Resource: !GetAtt UserPool.Arn
+
+  # GET /users (spec 10.1, route 21, Administrator only): the plain Users (in group user, not in
+  # admin), for the "book for a User" choice. Reads Cognito only, on this user pool; no table.
+  ListUsersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: listUsers.handler
+      Role: !GetAtt ListUsersRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref ListUsersLogGroup
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref UserPool
+          COGNITO_ENDPOINT: ''
+      Events:
+        ListUsers:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /users
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/listUsers.ts
+
+  ListUsersLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-listUsers
+      RetentionInDays: 14
+
+  ListUsersRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ListUsersLogGroup}:log-stream:*
+        - PolicyName: list-users
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:ListUsersInGroup
                 Resource: !GetAtt UserPool.Arn
 
   # ---------------------------------------------------------------------------

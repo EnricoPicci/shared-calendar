@@ -7,7 +7,10 @@ import {
   AdminSetUserPasswordCommand,
   AdminUserGlobalSignOutCommand,
   CognitoIdentityProviderClient,
+  ListUsersInGroupCommand,
+  type UserType,
 } from '@aws-sdk/client-cognito-identity-provider';
+import type { UserSummary } from '@shared-calendar/shared';
 
 export class UserExistsError extends Error {
   constructor(username: string) {
@@ -97,6 +100,35 @@ export async function getUserSub(username: string): Promise<string> {
 export async function isPlainUser(username: string): Promise<boolean> {
   const groups = await listGroups(username);
   return groups.includes('user') && !groups.includes('admin');
+}
+
+// Every member of one group, following NextToken to the last page (real Cognito pages by 60;
+// cognito-local answers everything at once, without a NextToken).
+async function membersOf(group: 'user' | 'admin'): Promise<UserType[]> {
+  const members: UserType[] = [];
+  let token: string | undefined;
+  do {
+    const page = await cognitoClient.send(new ListUsersInGroupCommand({ UserPoolId: userPoolId(), GroupName: group, NextToken: token }));
+    members.push(...(page.Users ?? []));
+    token = page.NextToken;
+  } while (token);
+  return members;
+}
+
+// The plain Users for GET /users (spec 10.1, route 21): the members of 'user' that are not in
+// 'admin' (admin wins, architecture section 3); an account in no group is not one. Sorted by
+// username in UTF-16 code-unit order (spec v12), `createdAt` from UserCreateDate as an ISO instant.
+// A member without a username or a creation date is a broken directory: an ordinary error (500).
+export async function listPlainUsers(): Promise<UserSummary[]> {
+  const [users, admins] = await Promise.all([membersOf('user'), membersOf('admin')]);
+  const adminNames = new Set(admins.map((a) => a.Username));
+  return users
+    .filter((u) => !adminNames.has(u.Username))
+    .map((u): UserSummary => {
+      if (!u.Username || !u.UserCreateDate) throw new Error('A member of group user has no username or creation date');
+      return { username: u.Username, createdAt: u.UserCreateDate.toISOString() };
+    })
+    .sort((a, b) => (a.username < b.username ? -1 : a.username > b.username ? 1 : 0));
 }
 
 // Revokes the user's refresh tokens.

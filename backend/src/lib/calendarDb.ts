@@ -1018,14 +1018,15 @@ function appointmentWrite(table: string, after: AppointmentSnapshot, set: Record
   return [appointmentUpdate(table, after, set), eventPut(table, event)];
 }
 
-// The old appointment of a cancel or a change, as stored after it (8.3, 8.4): `cancelled` now by
-// `by` with `reason`, `version` + 1; `replacedBy` the new id in a change. `set` is what the
+// The old appointment of a cancel or a change, or one cancelled by a user deletion, as stored after
+// it (8.3, 8.4, 10.2): `cancelled` now by `by` with `reason`, `version` + 1; `replacedBy` the new id
+// in a change. `set` is what the
 // `Update` writes: exactly the attributes that changed.
 function cancelled(
   before: AppointmentSnapshot,
   by: Actor,
   now: string,
-  reason: 'cancelled' | 'changed',
+  reason: CancelReason,
   replacedBy?: string,
 ): { after: AppointmentSnapshot; set: Record<string, unknown> } {
   const set: Record<string, unknown> = {
@@ -1206,4 +1207,64 @@ export async function changeAppointment<C extends ApiErrorCode>(
       },
     };
   });
+}
+
+// ── Deleting a User (spec 10.2 v12; the DELETEDUSER marker, APPT and EVENT items of 13.2) ─────
+
+/** The account being deleted: its Cognito `sub` (the appointments' `userId`) and its username. */
+export type DeletedUser = { userId: string; username: string };
+
+/** What a user deletion did in the calendar: the appointments it cancelled, and the lock attempts over every chunk. */
+export type UserDeletion = { cancelledCount: number; attempts: number };
+
+/** Appointments cancelled per transaction: two items each, plus the lock and the marker, ≤ 82 (13.4). */
+export const DELETION_CHUNK = 40;
+
+/**
+ * Writes the deleted-user marker and cancels the User's active appointments not yet ended (10.2
+ * steps 2 and 3), in chunks, each under the lock as its own transaction. Inside each attempt it
+ * reads `APPT` from now − 24 h and keeps, in code, those with `userId` = the User's `sub` (never the
+ * username: an earlier account with the same name keeps its own, R-DEL-02), `status` `booked` and
+ * `end > now`, one in progress included; an ended or cancelled one is left as it is. The first
+ * chunk writes the lock update, `Put DELETEDUSER#<sub>` (`username`, `deletedAt`, `deletedBy`; a
+ * plain Put, so a repeated deletion writes it again) and up to 40 × (`Update APPT` cancelled with
+ * `cancelReason` `user_deleted`, `Put EVENT` `appointment.cancelled`); each later chunk the lock
+ * update and the next 40. A chunk re-reads, so a retry or the next chunk skips what is already
+ * cancelled. `newEventId` is called once per appointment, on first sight: a retry writes the same
+ * event id. A failure in any chunk is thrown (ConcurrentUpdateError after three lost locks); the
+ * chunks already written stay written, and a repeated deletion finds the rest (R-DEL-01).
+ */
+export async function markUserDeleted(user: DeletedUser, by: Actor, now: string, newEventId: () => string): Promise<UserDeletion> {
+  const { table } = calendarConfig();
+  const actor = actorItem(by);
+  const since = new Date(Date.parse(now) - DAY_MS).toISOString();
+  const eventIds = new Map<string, string>();
+  const eventIdOf = (appointmentId: string) => {
+    if (!eventIds.has(appointmentId)) eventIds.set(appointmentId, newEventId());
+    return eventIds.get(appointmentId)!;
+  };
+  const marker: TransactItem = {
+    Put: { TableName: table, Item: { ...deletedUserKey(user.userId), username: user.username, deletedAt: now, deletedBy: actor } },
+  };
+  let cancelledCount = 0;
+  let attempts = 0;
+  for (let first = true; ; first = false) {
+    const chunk = await withCalendarLock(async () => {
+      const items = await queryPartition(table, APPT_PK, since);
+      const active = items
+        .filter((item) => item.userId === user.userId && item.status === 'booked' && (item.end as string) > now)
+        .map(toSnapshot);
+      const taken = active.slice(0, DELETION_CHUNK);
+      const writes = taken.flatMap((before) => {
+        const { after, set } = cancelled(before, actor, now, 'user_deleted');
+        const event: EventInput = { type: 'appointment.cancelled', eventId: eventIdOf(after.appointmentId), occurredAt: now, actor, appointment: after };
+        return appointmentWrite(table, after, set, event);
+      });
+      const result = { count: taken.length, more: active.length > taken.length };
+      return writes.length === 0 && !first ? { write: null, result } : { write: first ? [marker, ...writes] : writes, result };
+    });
+    cancelledCount += chunk.result.count;
+    attempts += chunk.attempts;
+    if (!chunk.result.more) return { cancelledCount, attempts };
+  }
 }

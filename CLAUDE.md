@@ -128,7 +128,9 @@ form works the same. Paths below without a folder are relative to `backend/`.
   `DYNAMODB_ENDPOINT` once, in its `Parameters` section, which `sam local` applies to every
   function declaring the variable: a new calendar function needs no seed line, unless it also calls
   Cognito (`BookAppointmentFunction` has its own section with `USER_POOL_ID`, `COGNITO_ENDPOINT` and
-  the dummy credentials, like `CreateUserFunction`). `CALENDAR_TIME_ZONE`
+  the dummy credentials, like `CreateUserFunction`; `DeleteUserFunction` declares the calendar
+  variables too and keeps its own section; `ListUsersFunction` has a section of its own and no
+  calendar variable). `CALENDAR_TIME_ZONE`
   is deliberately not in the file (a value there would win over the template): it comes from the
   parameter `CalendarTimeZone` (default `Europe/Rome`). An invalid zone makes every calendar
   request answer 500.
@@ -152,7 +154,9 @@ form works the same. Paths below without a folder are relative to `backend/`.
   emulators are untouched. After a `kill -9` or a closed terminal, remove them by hand:
   `docker rm -f $(docker ps -aq --filter label=sam.cli.container.type=lambda --filter network=hello-local)`.
   Local weight with 10 functions (step 44): about 0.75 GB for the whole stack, ready in about 14 s;
-  with 15 calendar functions (step 47): about 1.1 GB (26 containers after the journeys; start-up not timed).
+  with 15 calendar functions (step 47): about 1.1 GB (26 containers after the journeys; start-up not timed);
+  with 25 functions (step 51): about 1.5 GB (36 containers after both packages' journeys, emulators
+  included).
 - Under `sam local`, every event carries the same fake `requestContext.requestId`, so
   identical request ids in local logs are expected. In the cloud they are unique.
 - cognito-local does not implement `AdminUserGlobalSignOut`. `env.local.json` sets
@@ -230,6 +234,11 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     attempt, check callback on the three; six items: lock, an `Update` of the old `APPT` (`changed`,
     `replacedBy`), `Put` of the new `APPT` (`replaces`, built by the booking's `newAppointment`) and
     its `APPTID`, `EVENT`, the marker `ConditionCheck` on the old one's `userId`, last).
+    User deletion: `markUserDeleted` (spec 10.2 v12; chunks of `DELETION_CHUNK` = 40, each under the
+    lock: `APPT` from now − 24 h read inside the attempt, kept by `userId` = the `sub`, `booked`,
+    `end > now`; the first chunk also writes the `DELETEDUSER#<sub>` marker, a plain `Put`; per
+    appointment an `Update` with `cancelReason` `user_deleted` and `Put EVENT`; one event id per
+    appointment on first sight, kept across retries and chunks).
     `listAppointments` (route 16, a read: a range `SK BETWEEN` as the view, or upcoming
     `SK ≥ now − 24 h` with `end > now`; owner by `userId` or stored `username`; status; by start).
     `calendarEvents.ts`: builds the `EVENT` item (`appointmentEvent`, the `AppointmentSnapshot` of
@@ -244,8 +253,9 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     calendar view built for one caller's role from what `calendarDb.readCalendarRange` reads;
     `toResponse`, an appointment as a response), pure, no AWS, "today", "now" and the zone passed
     in; a failed check is `Refusal` (`{ error, message?, conflicts? }`, code from `ApiErrorCode`).
-    `cognito.ts` also has `getUserSub` (`AdminGetUser`, the `sub`) and `isPlainUser` (in `user`,
-    not in `admin`). `http.ts`: `parseJsonBody` for bodies, `parseQuery` for query strings (the
+    `cognito.ts` also has `getUserSub` (`AdminGetUser`, the `sub`), `isPlainUser` (in `user`,
+    not in `admin`) and `listPlainUsers` (`ListUsersInGroup` for both groups, every page; sorted by
+    code units). `http.ts`: `parseJsonBody` for bodies, `parseQuery` for query strings (the
     object a `.strict()` query schema checks).
   - `src/handlers/`, calendar: `getCalendarSettings.ts`, `updateCalendarSettings.ts` (the pattern
     the other calendar handlers copy: claims → configuration check → role → path → body →
@@ -262,7 +272,11 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     (`POST …/{appointmentId}/cancel`), admin or owner (someone else's is 404, spec v10 order);
     change: `changeAppointment.ts` (`POST …/{appointmentId}/change`, admin or owner, no Cognito: the
     User is the old appointment's; `checkBookingTimes` before the lock; spec 8.4 v11 order; logs
-    `appointmentId` and `newAppointmentId`).
+    `appointmentId` and `newAppointmentId`); users: `listUsers.ts` (`GET /users`, admin, Cognito only,
+    no calendar configuration check; logs `userCount`). `deleteUser.ts` (Hello World's route) has a
+    calendar part since step 51: after the admin and group checks, `calendarConfig()`, the `sub`,
+    then `calendarDb.markUserDeleted` before the sign-out and delete; a failure there answers before
+    any Cognito change (`409 concurrent_update` or `500`); logs `cancelledCount` and `lockAttempts`.
   - `tests/unit/`: vitest unit tests, mirroring `src/` (e.g. `tests/unit/lib/http.test.ts`).
   - `tests/integration/`: end-to-end tests against the local Docker stack: `setup.ts` (helpers,
     including `resetCalendarTable()`, `putCalendarItem()`, `getCalendarItem()`, `deleteCalendarItem()`,

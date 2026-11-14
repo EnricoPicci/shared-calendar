@@ -1438,3 +1438,193 @@ describe('change (route 20)', () => {
     expect(res.body).toMatchObject(values);
   });
 });
+
+describe('users (route 21, deletion)', () => {
+  // What the earlier journeys leave behind (read from the change journeys above):
+  // - settings cancellationNoticeHours 48, minBookingNoticeHours 2, bookingHorizonDays 30,
+  //   maxFutureAppointmentsPerUser null (restored by the change journeys);
+  // - the types and patterns of the earlier blocks (Monday, Sunday, Wednesday, Thursday, Friday;
+  //   the Tuesday pattern of the pattern journeys was deleted again in AC-28); an empty override on
+  //   a Monday; a one-off window dated yesterday;
+  // - appointments on Wednesdays, Thursdays and Fridays and one ended yesterday, booked or
+  //   cancelled, all under earlier `dave` and `erin` accounts (removed by removeUserIfPresent, which
+  //   writes no marker; their own `sub`s).
+  // These journeys rely on one part only: the earlier `dave` accounts have booked appointments not
+  // yet ended, which the deletion of the new `dave` must leave alone (it selects by `sub`, R-DEL-02).
+  // They save their own settings first (restoring the leftover ones at the end), create a new `dave`
+  // and `erin`, and book on Tuesdays, which no earlier journey books on, at their own type with
+  // their own Tuesday pattern 08:00–12:00. U is the next Tuesday at least 8 days ahead, U2 = U + 7.
+  // The ended appointment and the one in progress are written directly. Dates come from the real
+  // today, computed with the shared helpers. In the scenarios of 18.3, dave plays alice, erin bob.
+  const ZONE = 'Europe/Rome';
+  const HOUR_MS = 60 * 60 * 1000;
+  const today = () => localDateOf(new Date().toISOString(), ZONE);
+  const nextTuesday = (from: string) => {
+    let d = from;
+    while (weekdayOf(d) !== 2) d = addDays(d, 1);
+    return d;
+  };
+  const U = () => nextTuesday(addDays(today(), 8));
+  const U2 = () => addDays(U(), 7);
+  const at = (date: string, time: string) => toInstant(date, time, ZONE);
+  const subOf = (token: string) => (JSON.parse(Buffer.from(token.split('.')[1]!, 'base64url').toString('utf8')) as { sub: string }).sub;
+  const SETTINGS = { cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: null };
+  const book = (token: string, body: Record<string, unknown>) => api('POST', '/calendar/appointments', token, body);
+  const sk = (a: Record<string, unknown>) => `${a.start}#${a.appointmentId}`;
+  const ADMIN = { username: 'admin', role: 'admin' };
+  const DAVE = { username: 'dave', role: 'user' };
+
+  let daveToken: string;
+  let erinToken: string;
+  let daveSub: string;
+  let typeId: string;
+  let leftover: Record<string, unknown>;
+  const appts: Record<string, Record<string, unknown>> = {};
+  // The earlier `dave` accounts' booked appointments not yet ended, as stored before the deletion.
+  let earlierDaves: Awaited<ReturnType<typeof queryCalendarPartition>>;
+
+  // An appointment of the new dave written directly (the API cannot book a past start).
+  const writeDirectly = async (start: string, end: string) => {
+    const id = ulid();
+    const created = new Date(Date.parse(start) - 7 * 24 * HOUR_MS).toISOString();
+    const item = {
+      PK: 'APPT', SK: `${start}#${id}`, userId: daveSub, username: 'dave', start, end, date: localDateOf(start, ZONE),
+      typeId, typeNameAtBooking: 'Users room', note: null, status: 'booked', createdAt: created, createdBy: DAVE, updatedAt: created,
+      updatedBy: DAVE, cancelledAt: null, cancelledBy: null, cancelReason: null, replaces: null, replacedBy: null, version: 1,
+    };
+    await putCalendarItem(item);
+    await putCalendarItem({ PK: `APPTID#${id}`, SK: 'APPTID', sk: item.SK });
+    return { appointmentId: id, start };
+  };
+
+  beforeAll(async () => {
+    for (const username of ['dave', 'erin']) {
+      await removeUserIfPresent(username);
+      const res = await api('POST', '/users', adminToken, { username });
+      expect(res.status).toBe(201);
+      const token = await signIn(username, res.body?.password as string);
+      if (username === 'dave') daveToken = token;
+      else erinToken = token;
+    }
+    daveSub = subOf(daveToken);
+  });
+
+  afterAll(async () => {
+    await removeUserIfPresent('dave');
+    await removeUserIfPresent('erin');
+  });
+
+  it('prepares the settings, a type and the Tuesday pattern 08:00–12:00', async () => {
+    leftover = (await api('GET', '/calendar/settings', adminToken)).body!;
+    expect((await api('PUT', '/calendar/settings', adminToken, SETTINGS)).status).toBe(200);
+    const type = await api('POST', '/calendar/types', adminToken, { name: 'Users room' });
+    expect(type.status).toBe(201);
+    typeId = type.body?.typeId as string;
+    const pattern = await api('POST', '/calendar/patterns', adminToken, {
+      weekday: 2, start: '08:00', end: '12:00', typeId, validFrom: addDays(U(), -21), validUntil: null,
+    });
+    expect(pattern.status).toBe(201);
+  });
+
+  it('AC-32: GET /users lists alice, dave and erin, not admin, sorted by username; a User gets 403', async () => {
+    const res = await api('GET', '/users', adminToken);
+    expect(res.status).toBe(200);
+    const users = res.body?.users as { username: string; createdAt: string }[];
+    const names = users.map((u) => u.username);
+    // Other files' throw-away users may be left over: assert on these three, not an exact list.
+    expect(names).toEqual(expect.arrayContaining(['alice', 'dave', 'erin']));
+    expect(names).not.toContain('admin');
+    expect(names).toEqual([...names].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)));
+    for (const u of users) expect(u.createdAt).toBe(new Date(Date.parse(u.createdAt)).toISOString());
+    expect(Object.keys(users[0]!).sort()).toEqual(['createdAt', 'username']);
+
+    const asUser = await api('GET', '/users', aliceToken);
+    expect(asUser.status).toBe(403);
+    expect(asUser.body).toEqual({ error: 'forbidden', message: 'Not allowed for this account' });
+  });
+
+  it('AC-29 prepared: dave books U 09:00 and U2 10:00, erin U 08:00; an ended one and one in progress written directly', async () => {
+    for (const [name, token, start] of [
+      ['d1', daveToken, at(U(), '09:00')],
+      ['d2', daveToken, at(U2(), '10:00')],
+      ['e1', erinToken, at(U(), '08:00')],
+    ] as const) {
+      const res = await book(token, { start, note: 'Private note' });
+      expect(res.status).toBe(201);
+      appts[name] = res.body!;
+    }
+    const now = Date.now();
+    const yesterday = addDays(today(), -1);
+    appts.ended = await writeDirectly(at(yesterday, '09:00'), at(yesterday, '10:00'));
+    appts.inProgress = await writeDirectly(new Date(now - 30 * 60_000).toISOString(), new Date(now + 60 * 60_000).toISOString());
+
+    earlierDaves = (await queryCalendarPartition('APPT')).filter(
+      (a) => a.username === 'dave' && a.userId !== daveSub && a.status === 'booked' && (a.end as string) > new Date().toISOString(),
+    );
+    expect(earlierDaves.length).toBeGreaterThan(0);
+  });
+
+  it('AC-29: DELETE /users/dave: 204; the future one and the one in progress cancelled/user_deleted by the Administrator with their events; the ended one, erin’s and the earlier daves’ untouched; the marker written', async () => {
+    const endedBefore = await getCalendarItem('APPT', sk(appts.ended!));
+    const erinBefore = await getCalendarItem('APPT', sk(appts.e1!));
+
+    const res = await api('DELETE', '/users/dave', adminToken);
+    expect(res.status).toBe(204);
+
+    const events = await queryCalendarPartition('EVENT');
+    for (const name of ['d1', 'd2', 'inProgress']) {
+      const item = await getCalendarItem('APPT', sk(appts[name]!));
+      expect(item).toMatchObject({ status: 'cancelled', cancelReason: 'user_deleted', cancelledBy: ADMIN, updatedBy: ADMIN, version: 2 });
+      expect(item!.cancelledAt).toBe(item!.updatedAt);
+      const own = events.filter((e) => (e.appointment as { appointmentId: string }).appointmentId === appts[name]!.appointmentId && e.type === 'appointment.cancelled');
+      expect(own).toHaveLength(1);
+      expect(own[0]).toMatchObject({
+        actor: ADMIN,
+        occurredAt: item!.cancelledAt,
+        recipients: { userId: daveSub, username: 'dave', administrator: true },
+        appointment: { status: 'cancelled', cancelReason: 'user_deleted' },
+      });
+    }
+    expect(await getCalendarItem('APPT', sk(appts.ended!))).toEqual(endedBefore);
+    expect(await getCalendarItem('APPT', sk(appts.e1!))).toEqual(erinBefore);
+    for (const earlier of earlierDaves) expect(await getCalendarItem(earlier.PK as string, earlier.SK as string)).toEqual(earlier);
+
+    const marker = await getCalendarItem(`DELETEDUSER#${daveSub}`, 'DELETEDUSER');
+    expect(marker).toMatchObject({ username: 'dave', deletedBy: ADMIN });
+    expect(marker!.deletedAt).toBe((await getCalendarItem('APPT', sk(appts.d1!)))!.cancelledAt);
+  });
+
+  it('AC-29: dave’s still-valid token booking a free slot answers 404 user_not_found, and nothing is written', async () => {
+    const before = (await queryCalendarPartition('APPT')).length;
+    const res = await book(daveToken, { start: at(U(), '11:00') });
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'user_not_found', message: 'The user has been deleted' });
+    expect((await queryCalendarPartition('APPT')).length).toBe(before);
+  });
+
+  it('the freed slots appear in erin’s view; dave is no longer listed; deleting dave again is 404', async () => {
+    const day = async (date: string) => {
+      const res = await api('GET', `/calendar?from=${date}&to=${date}`, erinToken);
+      const d = (res.body?.days as { slots: { start: string }[]; busy: { start: string }[] }[])[0]!;
+      return { slots: d.slots.map((s) => s.start), busy: d.busy.map((b) => b.start) };
+    };
+    // erin's own 08:00 is not a free slot; nobody else's is busy any more.
+    expect(await day(U())).toEqual({ slots: [at(U(), '09:00'), at(U(), '10:00'), at(U(), '11:00')], busy: [] });
+    expect((await day(U2())).slots).toContain(at(U2(), '10:00'));
+
+    const listed = await api('GET', '/users', adminToken);
+    expect((listed.body?.users as { username: string }[]).map((u) => u.username)).not.toContain('dave');
+
+    const again = await api('DELETE', '/users/dave', adminToken);
+    expect(again.status).toBe(404);
+    expect(again.body).toEqual({ error: 'user_not_found', message: 'No user with this username' });
+  });
+
+  it('the settings are restored to what the earlier journeys left', async () => {
+    const { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser } = leftover;
+    const values = { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser };
+    const res = await api('PUT', '/calendar/settings', adminToken, values);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject(values);
+  });
+});

@@ -156,6 +156,8 @@ ensure_user alice "$ALICE_PASSWORD" user
 # --parameter-overrides) must stay its one source. The one exception is BookAppointmentFunction,
 # which also calls Cognito (the Administrator books for a User): it gets the pool, the emulator's
 # address and the dummy credentials in a section of its own, like CreateUserFunction.
+# DeleteUserFunction also declares the calendar variables (spec 10.2) and gets the table and the
+# endpoint from "Parameters" too, beside its own section. ListUsersFunction reads Cognito only.
 cat > env.local.json <<EOF
 {
   "Parameters": {
@@ -190,6 +192,12 @@ cat > env.local.json <<EOF
     "AWS_SECRET_ACCESS_KEY": "local"
   },
   "BookAppointmentFunction": {
+    "USER_POOL_ID": "$POOL_ID",
+    "COGNITO_ENDPOINT": "http://cognito:9229",
+    "AWS_ACCESS_KEY_ID": "local",
+    "AWS_SECRET_ACCESS_KEY": "local"
+  },
+  "ListUsersFunction": {
     "USER_POOL_ID": "$POOL_ID",
     "COGNITO_ENDPOINT": "http://cognito:9229",
     "AWS_ACCESS_KEY_ID": "local",
