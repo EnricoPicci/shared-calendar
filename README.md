@@ -24,6 +24,7 @@ Where the full story is:
 | `docs/AWS_ACCOUNTS.md` | Which AWS identity to sign in with, and why |
 | `docs/FOLDER_STRUCTURE.md` | The monorepo layout (back end, front end, shared): which folder holds what, and how the pieces are built |
 | `docs/FRONTEND_SERVICES.md` | The front end's services layer: `SessionStore`, `LoginService`, `RefreshService`, `HelloService`, `UsersService` (implemented in `frontend/src/services/`) |
+| `docs/journeys/` | The integration journeys explained in simple words, one page per `describe` block (index in `docs/journeys/README.md`) |
 | `CLAUDE.md` | Working rules and the complete list of commands |
 
 ## Prerequisites

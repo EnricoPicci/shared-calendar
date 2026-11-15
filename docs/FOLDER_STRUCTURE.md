@@ -48,6 +48,7 @@ stays at the root.
 ├── CLAUDE.md                    # guidance for Claude Code (repository-wide)
 ├── README.md                    # written by plan step 12
 ├── docs/                        # repository-wide documentation (section 8)
+│   └── journeys/                # the integration journeys explained in simple words (section 8)
 ├── prompts/                     # the numbered briefs that produced the documents and the code
 │
 ├── backend/                     # ── the API ──────────────────────────────────────────────
@@ -114,6 +115,7 @@ three folders the extra level would add nesting without adding information.
 | A request or response shape, an error code, a role name, a validation rule that both the API and the UI must apply identically | `shared/src` | One definition, two consumers; a change there is a contract change and must be visible as such in review |
 | A type that only one side uses (a DynamoDB item, an authorizer context, a React prop type) | That side's `src` | Putting it in `shared/` would suggest a contract that does not exist |
 | A document about one component | `docs/` with the component in the file name (`FRONTEND_ARCHITECTURE.md`) | Section 8 |
+| A page that explains an integration journey | `docs/journeys/backend` or `docs/journeys/frontend`, format in `docs/journeys/README.md` | Section 8 |
 | A tool configuration every package needs (lint rule, TypeScript strictness, Node version) | The root | One setting, one place |
 | A check that runs over every package (the comment check of CLAUDE.md, "Comments") | `scripts/` at the root | It reads every package's files; `npm run lint` (root and `-w backend`) runs it |
 | A tool configuration one package needs (Vite, SAM, vitest coverage thresholds) | That package | Each package owns its build |
@@ -317,6 +319,10 @@ repository, they cross-reference each other, and `CLAUDE.md` points at them.
   `RUNBOOK.md`) to break no link; the day the front-end documents arrive they may be renamed
   with a `BACKEND_` prefix in one commit that also fixes every reference.
 - Repository-wide documents have no prefix: this one, `AWS_ACCOUNTS.md`, `NEW_ACCOUNT.md`.
+- `docs/journeys/` explains the integration journeys in simple words, one page per `describe`
+  block, for a developer new to the project. These pages are not a source of truth: they explain
+  the tests, and the documents above win. `docs/journeys/README.md` holds the format and the list
+  of pages; `concepts.md` the ideas several pages share.
 - `prompts/` keeps one numbered sequence for the whole repository, whichever component a brief
   concerns.
 

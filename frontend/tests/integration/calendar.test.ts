@@ -475,6 +475,7 @@ function list(store: SessionStore, query: Parameters<AppointmentsService['list']
 
 // ── The calendar view (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 15) ──────────────────
 
+// Explained in simple words in docs/journeys/frontend/calendar-view.md.
 describe('calendar view', () => {
   bookingSettings();
 

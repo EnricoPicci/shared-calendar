@@ -25,6 +25,11 @@ document). Layout and placement rules: `docs/FOLDER_STRUCTURE.md`.
 - `docs/SHARED_CALENDAR_SPEC.md` specifies the shared calendar (agreed with the Product Owner,
   brief 40, not yet implemented). It is the input for the calendar's plan steps; once merged into
   `ARCHITECTURE.md` (spec section 19), the architecture wins as usual.
+- `docs/journeys/` explains the integration journeys in simple words, one page per `describe`
+  block, for a new developer (format, rules and the list of pages in `docs/journeys/README.md`).
+  Not a source of truth: on any conflict the documents above and the tests win, and the page is
+  fixed. When a journey changes, its page changes in the same commit; the `describe` carries the
+  pointer comment `// Explained in simple words in docs/journeys/<package>/<page>.md.`
 - `prompts/` holds the numbered briefs that produced those documents. Keep new briefs
   numbered in sequence.
 
@@ -85,7 +90,7 @@ Applies to every comment in every file: TypeScript, JavaScript, shell, `template
 - Enforced by `npm run lint` (root and `-w backend`, so also by `verify`): the ESLint rule
   `local/doc-references` (`scripts/eslint-doc-references.mjs`) on TypeScript and JavaScript, and
   `scripts/check-doc-references.mjs` on the `#` comments of shell, YAML and TOML files. Both use
-  `scripts/doc-references.mjs`. The check finds references it cannot follow, an unknown document
+  `scripts/doc-references.mjs`, which also knows the lower-case journey pages under `docs/journeys/`. The check finds references it cannot follow, an unknown document
   and history tags; whether a comment is clear stays a matter for review.
 
 ## Cloud safety

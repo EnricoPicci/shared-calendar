@@ -9,9 +9,10 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-// A document path as a comment must write it: `docs/ARCHITECTURE.md`, or a root file such as
-// `README.md` or `CLAUDE.md`.
-const DOC = /\b(?:docs\/)?[A-Z][A-Z0-9_]*\.md\b/g;
+// A document path as a comment must write it: `docs/ARCHITECTURE.md`, a root file such as
+// `README.md` or `CLAUDE.md`, or a journey page under `docs/journeys/`, whose names are lower case
+// (`docs/journeys/frontend/calendar-view.md`, the pointer comment of `docs/journeys/README.md`).
+const DOC = /\bdocs\/journeys\/(?:[a-z0-9-]+\/)*[A-Za-z0-9-]+\.md\b|\b(?:docs\/)?[A-Z][A-Z0-9_]*\.md\b/g;
 
 // Items inside a document: they need a document path earlier in the same sentence.
 const ITEMS = [
