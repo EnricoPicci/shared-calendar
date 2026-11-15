@@ -322,7 +322,8 @@ repository, they cross-reference each other, and `CLAUDE.md` points at them.
 - `docs/journeys/` explains the integration journeys in simple words, one page per `describe`
   block, for a developer new to the project. These pages are not a source of truth: they explain
   the tests, and the documents above win. `docs/journeys/README.md` holds the format and the list
-  of pages; `concepts.md` the ideas several pages share.
+  of pages, `PLAN.md` the plan of the pages still to write, `concepts.md` the ideas several pages
+  share.
 - `prompts/` keeps one numbered sequence for the whole repository, whichever component a brief
   concerns.
 

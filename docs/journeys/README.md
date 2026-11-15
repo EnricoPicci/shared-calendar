@@ -19,6 +19,7 @@ the page is fixed.
 | Path | What it holds |
 |---|---|
 | `README.md` | this page: the format, the rules and the list of pages |
+| `PLAN.md` | the plan of the pages still to write: phases, batches, sessions, acceptance check |
 | `concepts.md` | the calendar ideas several journeys use, explained once; every page links to the sections it needs |
 | `backend/` | one page per journey of `backend/tests/integration/` |
 | `frontend/` | one page per journey of `frontend/tests/integration/` |
@@ -64,26 +65,15 @@ test file name adds nothing (`frontend/calendar-view.md` for the block `calendar
 
 ## The pages
 
-One session per page (two for the small ones marked "together"), reviewed before the next. The
-order puts one back-end page early, to prove the format on the stored items too. After the third
-page the format is frozen into a project skill (`.claude/skills/explain-journey/`), which the
-later pages use.
+The pages written so far. Which pages are still to come, and in which order, is in
+[`PLAN.md`](PLAN.md).
 
-| # | Page | Explains | Status |
-|---|---|---|---|
-| 1 | [`frontend/calendar-view.md`](frontend/calendar-view.md) | `frontend/tests/integration/calendar.test.ts`, `calendar view` | done |
-| 2 | `backend/calendar-booking.md` | `backend/tests/integration/calendar.test.ts`, `booking (route 17)`; adds the stored items and the calendar lock to `concepts.md` | planned |
-| 3 | `frontend/calendar-appointments.md` | `frontend/tests/integration/calendar.test.ts`, `appointments` | planned |
-| — | the skill `explain-journey` | from pages 1–3 | planned |
-| 4 | `frontend/calendar-availability-conflict.md` | `frontend/tests/integration/calendar.test.ts`, `availability conflict` | planned |
-| 5 | `backend/calendar-listing-note-cancel.md` | `backend/tests/integration/calendar.test.ts`, `listing, note and cancel (routes 16, 18, 19)` | planned |
-| 6 | `backend/calendar-change.md` | `backend/tests/integration/calendar.test.ts`, `change (route 20)` | planned |
-| 7 | `backend/calendar-users.md` | `backend/tests/integration/calendar.test.ts`, `users (route 21, deletion)` | planned |
-| 8 | `backend/calendar-view.md` | `backend/tests/integration/calendar.test.ts`, `calendar view (route 15)` | planned |
-| 9 | `backend/calendar-overrides-and-one-off-windows.md` | `backend/tests/integration/calendar.test.ts`, `date overrides and one-off windows (routes 11–14)` | planned |
-| 10 | `backend/calendar-weekly-patterns.md` | `backend/tests/integration/calendar.test.ts`, `weekly patterns (routes 7–10)` | planned |
-| 11 | `backend/calendar-settings.md`, `backend/calendar-availability-types.md` (together) | `backend/tests/integration/calendar.test.ts`, `calendar settings (routes 1 and 2)` and `availability types (routes 3–6)` | planned |
-| 12 | `frontend/calendar-patterns.md`, `frontend/calendar-overrides.md`, `frontend/calendar-one-off-windows.md` (together) | `frontend/tests/integration/calendar.test.ts`, `patterns`, `overrides`, `one-off windows` | planned |
-| 13 | `frontend/calendar-settings.md`, `frontend/calendar-types.md`, `frontend/calendar-users.md` (together) | `frontend/tests/integration/calendar.test.ts`, `settings`, `types`, `users` | planned |
-| 14 | `backend/hello-world-journeys.md` | `backend/tests/integration/journeys.test.ts` (no `describe`: the whole file) | planned |
-| 15 | `frontend/hello-world-journeys.md`, `frontend/login.md` (together) | `frontend/tests/integration/journeys.test.ts` and `login.service.test.ts` (whole files) | planned |
+### Front end
+
+| Page | Explains |
+|---|---|
+| [`frontend/calendar-view.md`](frontend/calendar-view.md) | `frontend/tests/integration/calendar.test.ts`, `calendar view` |
+
+### Back end
+
+None yet.

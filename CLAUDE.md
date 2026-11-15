@@ -26,7 +26,8 @@ document). Layout and placement rules: `docs/FOLDER_STRUCTURE.md`.
   brief 40, not yet implemented). It is the input for the calendar's plan steps; once merged into
   `ARCHITECTURE.md` (spec section 19), the architecture wins as usual.
 - `docs/journeys/` explains the integration journeys in simple words, one page per `describe`
-  block, for a new developer (format, rules and the list of pages in `docs/journeys/README.md`).
+  block, for a new developer (format, rules and the list of pages in `docs/journeys/README.md`;
+  the pages still to write, in sessions and batches, in `docs/journeys/PLAN.md`).
   Not a source of truth: on any conflict the documents above and the tests win, and the page is
   fixed. When a journey changes, its page changes in the same commit; the `describe` carries the
   pointer comment `// Explained in simple words in docs/journeys/<package>/<page>.md.`
