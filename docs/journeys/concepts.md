@@ -309,6 +309,54 @@ booked appointment at 08:00, the Administrator sets an override with only 10:00�
 | from a pattern | `availability_conflict`, listing the 08:00 appointment | the override replaces the pattern's window, so 08:00 would no longer be open |
 | a one-off window | `availability_overlap` | the override does not replace a one-off window, so nothing is stranded; but 10:00–12:00 overlaps the one-off window 08:00–12:00 that stays |
 
+## The life of an appointment
+
+An appointment is never deleted. It is `booked` until it is cancelled, and then it stays in the
+table as `cancelled`, as history (`docs/SHARED_CALENDAR_SPEC.md` section 8.1 and decision D17).
+"Ended" is not a status: a booked appointment whose end has passed is still `booked`, but nothing
+can be done to it any more.
+
+| What happens | Who may | Route | The appointment after it | Event |
+|---|---|---|---|---|
+| book | a User for themself; the Administrator for any plain User | `POST /calendar/appointments` | `booked`, `createdBy` the caller | `appointment.booked` |
+| edit the note | its User or the Administrator, until its end | `PATCH /calendar/appointments/{appointmentId}` | still `booked`, with the new `note` | `appointment.note_updated` |
+| cancel | its User until `cancellableUntil`; the Administrator until its end | `POST …/{appointmentId}/cancel` | `cancelled`, `cancelReason: 'cancelled'`, `cancelledBy` the caller | `appointment.cancelled` |
+| change | as cancel | `POST …/{appointmentId}/change` | `cancelled`, `cancelReason: 'changed'`, and a new appointment ([below](#a-change-cancels-one-appointment-and-books-another)) | `appointment.changed` |
+| its User is deleted | the Administrator, through `DELETE /users/{username}` | — | `cancelled`, `cancelReason: 'user_deleted'` | `appointment.cancelled` |
+
+Two answers come back from every route that takes an appointment id
+(`docs/SHARED_CALENDAR_SPEC.md` sections 8.3 to 8.5):
+
+- **`404 appointment_not_found`** when the id is unknown, *and* when a User names someone else's
+  appointment. A User cannot tell the two apart, so ids cannot be probed
+  (`docs/SHARED_CALENDAR_SPEC.md` R-PERM-01).
+- **`409 appointment_not_active`** when the appointment is already cancelled or has ended
+  (`docs/SHARED_CALENDAR_SPEC.md` R-CAN-02 and R-NOTE-01). So a second cancel of the same
+  appointment is refused, and so is a second change.
+
+### A change cancels one appointment and books another
+
+A change does not move the appointment. In one transaction it cancels the old one and books a new
+one, with a new id (`docs/SHARED_CALENDAR_SPEC.md` section 8.4, R-CHG-02):
+
+| | The old appointment | The new appointment |
+|---|---|---|
+| `status` | `cancelled`, `cancelReason: 'changed'` | `booked` |
+| link | `replacedBy`: the new id | `replaces`: the old id |
+| User | — | always the old one's: a change cannot give the appointment to someone else |
+| note | — | the old note, unless the request sends `note` (`null` clears it) (`docs/SHARED_CALENDAR_SPEC.md` R-CHG-03) |
+| type | — | the type of the window the new time lies in |
+
+The answer is `201 { cancelled, booked }`, the two halves. One event, `appointment.changed`, holds
+the new appointment as `appointment` and the old one as `previous`.
+
+The new appointment must pass the booking rules, checked against the calendar **without the old
+one** (`docs/SHARED_CALENDAR_SPEC.md` R-CHG-01). So an appointment can be moved by half an hour into
+its own time, and a User at the limit of future appointments can still move their only one. The
+old appointment must pass the cancel rules, the notice included: a User cannot change what they
+could no longer cancel. The links `replaces` and `replacedBy` are stored and answered, but no rule
+follows them.
+
 ## `busy` and `appointments` in the calendar view
 
 The calendar view (`GET /calendar`) has two places that hold appointments
@@ -328,3 +376,37 @@ list for the whole range.
   appointments would add nothing.
 
 A range covers at most 31 days.
+
+## The front end's services in the journeys
+
+The front end's journeys (`frontend/tests/integration/`) reach the API only through the services
+of `frontend/src/services/`, as a screen will (`docs/FRONTEND_SERVICES.md` section 14).
+
+- **A method returns nothing; its result arrives on a stream.** Each method has its own pair of
+  streams, a result and a state: `book()` answers on `bookResult$`, `cancel()` on `cancelResult$`
+  (`docs/FRONTEND_SERVICES.md` section 3). The names are those of `docs/FRONTEND_SERVICES.md`;
+  where they differ from `docs/SHARED_CALENDAR_SPEC.md` section 16.2, the services document wins
+  (`docs/FRONTEND_SERVICES.md` section 8, decision 40).
+- **The helper `outcome(stream, call)`** (`frontend/tests/integration/local.ts`) subscribes to the
+  stream first, then makes the call, waits up to 30 seconds for one new value and returns it.
+- **A result** is `{ status: 'success', … }` with what the API answered, or
+  `{ status: 'failure', reason, message }`. The `reason` is the API's `error` code
+  (`slot_taken`), or one of the service's own (`network`, `not_signed_in`, …). The test helper
+  `ok()` fails the test with the whole result when it is not a success, and returns the success.
+
+### Refused before sending, or by the API
+
+A service checks its input with the shared schemas (`shared/src/calendar/schemas.ts`) before it
+sends anything. If the input fails, the service answers `invalid_request` at once, with the field
+in the message (`note: at most 500 characters`), and **no request leaves**
+(`docs/FRONTEND_SERVICES.md` section 8, decision 33). When the input passes, the service sends
+what the schema made of it: a trimmed name or note, a default filled in.
+
+A schema knows nothing of the caller's role, the clock or the stored data. So everything that
+depends on them is sent, and the API decides: a User's whole hours, a taken slot, the notice, an
+unknown id, someone else's appointment (`docs/FRONTEND_SERVICES.md` section 8, decision 42). The
+same `invalid_request` can therefore come from either side.
+
+A journey shows which side decided by counting the requests with a spy on `fetch`. The helper
+`noRequest()` of `frontend/tests/integration/calendar.test.ts` expects none; a test that expects
+the API to decide can expect exactly one.

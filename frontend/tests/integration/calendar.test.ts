@@ -543,6 +543,7 @@ describe('calendar view', () => {
 
 // ── Appointments (docs/SHARED_CALENDAR_SPEC.md section 11.1, routes 16–20) ───────────────────
 
+// Explained in simple words in docs/journeys/frontend/calendar-appointments.md.
 describe('appointments', () => {
   bookingSettings();
 

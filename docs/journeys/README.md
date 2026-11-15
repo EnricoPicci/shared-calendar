@@ -35,13 +35,16 @@ test file name adds nothing (`frontend/calendar-view.md` for the block `calendar
    order) and the stack it runs against. The numbers are the tests' names on the page: the story's
    headings are "Test N: …" (with the scenario, if the test names one: "Test 2 (AC-10): …"), and
    one test refers to another as "test N".
+   Under the table, one line "Ideas used here, explained once for all journeys:" links to the
+   sections of `concepts.md` the page relies on.
 3. **What this block proves**: two to four lines naming the rules and scenarios it covers, each with
    its document (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-02, AC-12).
 4. **Who takes part**: the actors and what each one is for.
 5. **Before the block starts**: the state the file's and the block's `beforeAll` set up.
 6. **The story**: one subsection per test, in order, in one of two forms.
-   - **The short form**, for a test that sends one request and checks its answer: one paragraph
-     saying the request, what the test checks, and the rule behind it.
+   - **The short form**, for a test that makes one call and checks its answer (whether a request
+     leaves or the service refuses it first): one paragraph saying the call, what the test checks,
+     and the rule behind it.
    - **The full form**, for a test that tells a story: numbered steps, a small table of the state
      where it helps (for example the slots of a day), and a Mermaid sequence diagram when three or
      more actors take part.
@@ -88,6 +91,7 @@ The pages written so far. Which pages are still to come, and in which order, is 
 | Page | Explains |
 |---|---|
 | [`frontend/calendar-view.md`](frontend/calendar-view.md) | `frontend/tests/integration/calendar.test.ts`, `calendar view` |
+| [`frontend/calendar-appointments.md`](frontend/calendar-appointments.md) | `frontend/tests/integration/calendar.test.ts`, `appointments` |
 
 ### Back end
 

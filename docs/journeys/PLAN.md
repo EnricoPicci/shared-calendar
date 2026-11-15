@@ -60,7 +60,7 @@ About two agents per page, so eight to ten per batch.
 |---|---|---|---|---|
 | 1 | By hand | `frontend/calendar-view.md` | `frontend/tests/integration/calendar.test.ts`, `calendar view` | done |
 | 2 | By hand | `backend/calendar-booking.md`; adds the stored items and the calendar lock to `concepts.md` | `backend/tests/integration/calendar.test.ts`, `booking (route 17)` | done |
-| 3 | By hand | `frontend/calendar-appointments.md` | `frontend/tests/integration/calendar.test.ts`, `appointments` | planned |
+| 3 | By hand | `frontend/calendar-appointments.md`; adds the life of an appointment and the front end's services to `concepts.md` | `frontend/tests/integration/calendar.test.ts`, `appointments` | done |
 | 4 | Skill | `.claude/skills/explain-journey/SKILL.md`, from sessions 1–3 | — | planned |
 | 5 | Batch 1: back-end availability | `backend/calendar-settings.md`, `backend/calendar-availability-types.md`, `backend/calendar-weekly-patterns.md`, `backend/calendar-view.md`, `backend/calendar-overrides-and-one-off-windows.md` | `backend/tests/integration/calendar.test.ts`: `calendar settings (routes 1 and 2)`, `availability types (routes 3–6)`, `weekly patterns (routes 7–10)`, `calendar view (route 15)`, `date overrides and one-off windows (routes 11–14)` | planned |
 | 6 | Batch 2: back-end appointments and users | `backend/calendar-listing-note-cancel.md`, `backend/calendar-change.md`, `backend/calendar-users.md`, `backend/hello-world-journeys.md` | `backend/tests/integration/calendar.test.ts`: `listing, note and cancel (routes 16, 18, 19)`, `change (route 20)`, `users (route 21, deletion)`; `backend/tests/integration/journeys.test.ts` (whole file) | planned |
@@ -106,6 +106,37 @@ session adds its own.
 - **Read the tests as consumers of one table.** The back end's journeys empty the `calendar` table
   first, so a page can count items exactly; the front end's do not, so a page must say why a count
   or a free date can be trusted.
+
+**Session 3** (`frontend/calendar-appointments.md`):
+
+- **Write the state table before the story, again.** In a test that tells a long story, the
+  answer of a step depends on every step before it (the slot a change frees, the appointment a
+  second cancel finds cancelled). The table of the day after the change was the check of every
+  later step.
+- **Read what each list really returns, then what the test filters.** A list's server filter (by
+  `sub` for a User, by the stored name for the Administrator, booked by default) and the test's own
+  filter (`date === D`, a set of ids) together decide why a count holds on a table that is never
+  reset. Explain both, per list: that is the answer to "why can this be trusted".
+- **Look at the blocks before, not only after.** On a table that is never reset, the block before
+  (here "calendar view") can leave history on the very date this block picks, under the same
+  account. The test's comments hint at it ("an earlier block may have left a cancelled one");
+  find the exact cause in the helpers (`freeDate()` takes the first free date, and a released
+  date is free again).
+- **Name the method, the stream and the route of every call.** The front end's stream names can
+  differ from the specification's (`docs/FRONTEND_SERVICES.md` section 8, decision 40); take them
+  from the service's code, and give the table method → stream → route in "Where in the code".
+- **Who decided a refusal: count the requests.** A front-end refusal is the service's when no
+  request leaves (`noRequest()`), the API's when one does. The same `invalid_request` can come from
+  either; the page says which, and why that side (the schema knows no role, clock or data).
+- **Ideas several pages need go to `concepts.md` at once.** This session added the life of an
+  appointment (with the change) and the front end's services (streams, `outcome()`, refused before
+  sending or by the API); the earlier front-end page was brought in line with links.
+- **Format changes of this session** (`docs/journeys/README.md`, "The format of a page"): the
+  line "Ideas used here" under the header table is now part of the format, and the short form
+  covers a call that sends no request. The earlier pages already matched.
+- **Mind the specification's older parts.** `docs/SHARED_CALENDAR_SPEC.md` section 16 describes the
+  services before `docs/FRONTEND_SERVICES.md` had them; where they differ the services document
+  and the test win, and the difference is reported, not written into the page.
 
 ## 6. After the plan
 

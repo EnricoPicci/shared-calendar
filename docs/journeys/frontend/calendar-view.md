@@ -7,7 +7,10 @@
 | Tests | 1. "a week: the Administrator sees sources and names; fe-calendar its own appointment and fe-calendar-b's as busy"<br>2. "a range of 32 days: invalid_request with the field, no request sent"<br>3. "reload before any load: invalid_request, no request sent" |
 | Runs against | the local stack: the API on port 3000, cognito-local on port 9229 (`RUN_INTEGRATION=1`) |
 
-Ideas used here, explained once for all journeys: [the settings](../concepts.md#the-settings),
+Ideas used here, explained once for all journeys:
+[the front end's services in the journeys](../concepts.md#the-front-ends-services-in-the-journeys),
+[refused before sending, or by the API](../concepts.md#refused-before-sending-or-by-the-api),
+[the settings](../concepts.md#the-settings),
 [availability types](../concepts.md#availability-types),
 [where a window comes from](../concepts.md#where-a-window-comes-from),
 [windows and slots](../concepts.md#windows-and-slots),
