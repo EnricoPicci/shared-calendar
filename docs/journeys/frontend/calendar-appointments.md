@@ -14,13 +14,16 @@ Ideas used here, explained once for all journeys:
 [the settings](../concepts.md#the-settings),
 [windows and slots](../concepts.md#windows-and-slots),
 [the life of an appointment](../concepts.md#the-life-of-an-appointment),
-[a change cancels one appointment and books another](../concepts.md#a-change-cancels-one-appointment-and-books-another).
+[a change cancels one appointment and books another](../concepts.md#a-change-cancels-one-appointment-and-books-another),
+[booked appointments keep their window](../concepts.md#booked-appointments-keep-their-window),
+[the event log](../concepts.md#the-event-log),
+[the deleted-user marker](../concepts.md#the-deleted-user-marker).
 
 ## What this block proves
 
-- `AppointmentsService` reaches all five appointment routes, as a User and as the Administrator:
-  book, edit the note, change, list and cancel (`docs/SHARED_CALENDAR_SPEC.md` section 11.1,
-  routes 16 to 20, and sections 8.2 to 8.6).
+- `AppointmentsService` reaches all five appointment routes: a User books, edits the note,
+  changes, lists and cancels; the Administrator books, lists and cancels
+  (`docs/SHARED_CALENDAR_SPEC.md` section 11.1, routes 16 to 20, and sections 8.2 to 8.6).
 - A change cancels the old appointment and books a new one that keeps the note
   (`docs/SHARED_CALENDAR_SPEC.md` R-CHG-02 and R-CHG-03); a cancelled appointment can be neither
   changed nor cancelled again (`docs/SHARED_CALENDAR_SPEC.md` R-CAN-02).
@@ -31,8 +34,8 @@ Ideas used here, explained once for all journeys:
 ## Who takes part
 
 - **`fe-calendar`**: a plain User created by the test file. It books for itself, writes a note,
-  changes, lists and cancels. Every call of its own goes through one `AppointmentsService` in
-  test 1.
+  changes, lists and cancels. In test 1 its bookings, note, changes and cancels go through one
+  `AppointmentsService`; its lists go through the helper `list()`.
 - **The Administrator** (`admin`): tries to book a taken slot, books for `fe-calendar` with a
   custom end, lists `fe-calendar`'s appointments and cancels one. It also prepares and removes the
   day (`bookableDate()`, `release()`).
@@ -96,9 +99,10 @@ The helper `at('08:00')` turns a local time of `D` into the instant the API want
 date is free again. Its cancelled appointments may therefore lie on `D`. They take no slot: only
 active appointments do.
 
-The test creates one `AppointmentsService` for `fe-calendar`, called `a`, and uses it for every
-call `fe-calendar` makes in this test. The Administrator's calls go through the helpers `book()`,
-`cancel()` and `list()`, each with a new service.
+The test creates one `AppointmentsService` for `fe-calendar`, called `a`, and uses it for
+`fe-calendar`'s booking, note, changes and cancels. Every list, `fe-calendar`'s and the
+Administrator's, and every call of the Administrator go through the helpers `book()`, `cancel()`
+and `list()`, each with a new service.
 
 ### 2. `fe-calendar` books 08:00 for itself
 
@@ -122,8 +126,9 @@ the overlap rule (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-07). Nothing is written.
 ### 4. The Administrator books 10:00–10:30 for `fe-calendar`
 
 `book(admin, { start: at('10:00'), end: at('10:30'), username: 'fe-calendar' })`. A User could not
-send this `end`: only the Administrator may book custom times inside a window, on 15-minute steps
-(`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-08). The test checks that the appointment has:
+send this `end`: only the Administrator may book custom times inside a window
+(`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-08), on 15-minute local steps
+(`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-02). The test checks that the appointment has:
 
 - `username` `fe-calendar` and `end` 10:30;
 - `createdBy` `{ username: 'admin', role: 'admin' }`;
@@ -258,8 +263,9 @@ request leaves (the helper `noRequest()`). So the unknown id never reaches the s
 
 Nothing booked, no type and no pattern: test 1 cancels everything and `release()` removes the
 pattern and the type. The block's `afterAll` writes the settings back to the values it read and
-removes `fe-calendar-settings.local.json`. On `D` three cancelled appointments stay as history,
-all of them `fe-calendar`'s:
+removes `fe-calendar-settings.local.json`. On `D` this block's three cancelled appointments stay
+as history, all of them `fe-calendar`'s (next to whatever the "calendar view" block and earlier
+runs left there):
 
 | Time | Booked by | `cancelReason` | Cancelled by |
 |---|---|---|---|

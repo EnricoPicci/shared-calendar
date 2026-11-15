@@ -5,6 +5,9 @@ per test file when the file has no `describe`). Each page tells the block's stor
 what is in place before it starts, what happens step by step, what the test checks at each step, and
 what is left behind.
 
+How to write, check and refresh a page, step by step, is the project skill
+`.claude/skills/explain-journey/SKILL.md`; this page keeps the format and the rules it follows.
+
 **The reader** is a developer new to the project: someone who reads TypeScript and tests but does
 not know the calendar specification yet. The pages name the code (services, routes, helpers,
 fields, error codes) and explain the calendar ideas the story needs.
@@ -76,7 +79,10 @@ test file name adds nothing (`frontend/calendar-view.md` for the block `calendar
 - Every claim is checked against the test and the code it calls before the page is written.
   When the test and the specification disagree, the page says so and the disagreement is reported.
 - **The pointer comment.** The `describe` the page explains carries a one-line comment above it:
-  `// Explained in simple words in docs/journeys/frontend/calendar-view.md.` Whoever changes the
+  `// Explained in simple words in docs/journeys/frontend/calendar-view.md.` When the `describe`
+  has a "Test names:" comment, the pointer goes above it, so that comment stays directly above the
+  `describe`. A page that explains a whole file without a `describe` puts the same line directly
+  above the file's opening comment (the first comment after the imports). Whoever changes the
   test sees the page in the same diff. The lint rule `local/doc-references` checks that the page
   exists (`scripts/doc-references.mjs`).
 - When a test changes, its page changes in the same commit.

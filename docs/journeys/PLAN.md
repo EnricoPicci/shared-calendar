@@ -26,6 +26,11 @@ The work has three phases.
 
 ## 2. How a batch session works
 
+The main session starts each agent with a prompt that gives the skill's path,
+`.claude/skills/explain-journey/SKILL.md`, and tells it to read it first, with the page's target
+(test file, `describe`, page path) and, for a checker, that it edits nothing. A subagent is not
+sure to load a project skill on its own.
+
 1. **One writer agent per page**, each in a fresh context, following the skill. The writers run
    in parallel. A writer:
    - reads the block, the helpers it calls, the code they reach, the specification sections it
@@ -61,7 +66,7 @@ About two agents per page, so eight to ten per batch.
 | 1 | By hand | `frontend/calendar-view.md` | `frontend/tests/integration/calendar.test.ts`, `calendar view` | done |
 | 2 | By hand | `backend/calendar-booking.md`; adds the stored items and the calendar lock to `concepts.md` | `backend/tests/integration/calendar.test.ts`, `booking (route 17)` | done |
 | 3 | By hand | `frontend/calendar-appointments.md`; adds the life of an appointment and the front end's services to `concepts.md` | `frontend/tests/integration/calendar.test.ts`, `appointments` | done |
-| 4 | Skill | `.claude/skills/explain-journey/SKILL.md`, from sessions 1–3 | — | planned |
+| 4 | Skill | `.claude/skills/explain-journey/SKILL.md`, from sessions 1–3 | — | done |
 | 5 | Batch 1: back-end availability | `backend/calendar-settings.md`, `backend/calendar-availability-types.md`, `backend/calendar-weekly-patterns.md`, `backend/calendar-view.md`, `backend/calendar-overrides-and-one-off-windows.md` | `backend/tests/integration/calendar.test.ts`: `calendar settings (routes 1 and 2)`, `availability types (routes 3–6)`, `weekly patterns (routes 7–10)`, `calendar view (route 15)`, `date overrides and one-off windows (routes 11–14)` | planned |
 | 6 | Batch 2: back-end appointments and users | `backend/calendar-listing-note-cancel.md`, `backend/calendar-change.md`, `backend/calendar-users.md`, `backend/hello-world-journeys.md` | `backend/tests/integration/calendar.test.ts`: `listing, note and cancel (routes 16, 18, 19)`, `change (route 20)`, `users (route 21, deletion)`; `backend/tests/integration/journeys.test.ts` (whole file) | planned |
 | 7 | Batch 3: front-end availability | `frontend/calendar-settings.md`, `frontend/calendar-types.md`, `frontend/calendar-patterns.md`, `frontend/calendar-overrides.md`, `frontend/calendar-one-off-windows.md` | `frontend/tests/integration/calendar.test.ts`: `settings`, `types`, `patterns`, `overrides`, `one-off windows` | planned |
@@ -75,6 +80,9 @@ batches come before the front-end ones.
 
 What the sessions by hand learned, kept here for session 4, which turns them into the skill. Each
 session adds its own.
+
+The skill `.claude/skills/explain-journey/` now holds these notes as steps and checks: this section
+stays as the record, and a later change goes to the skill.
 
 **Session 1** (`frontend/calendar-view.md`): the first page set the format of
 `docs/journeys/README.md`.

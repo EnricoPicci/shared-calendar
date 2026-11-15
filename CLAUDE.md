@@ -28,6 +28,7 @@ document). Layout and placement rules: `docs/FOLDER_STRUCTURE.md`.
 - `docs/journeys/` explains the integration journeys in simple words, one page per `describe`
   block, for a new developer (format, rules and the list of pages in `docs/journeys/README.md`;
   the pages still to write, in sessions and batches, in `docs/journeys/PLAN.md`).
+  Writing, checking and refreshing a page follow the project skill `.claude/skills/explain-journey/SKILL.md`.
   Not a source of truth: on any conflict the documents above and the tests win, and the page is
   fixed. When a journey changes, its page changes in the same commit; the `describe` carries the
   pointer comment `// Explained in simple words in docs/journeys/<package>/<page>.md.`
