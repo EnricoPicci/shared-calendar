@@ -102,11 +102,11 @@ describe('cancelAppointment handler', () => {
     expect(output.join('')).not.toContain('sub-alice');
   });
 
-  it('AC-21: one minute later alice is 403 cancellation_too_late, nothing written; the Administrator cancels: 200', async () => {
+  it('AC-21: one minute later alice is 403 cancellation_notice_too_short, nothing written; the Administrator cancels: 200', async () => {
     at(AC21_NOW);
     const response = await cancel();
     expect(response.statusCode).toBe(403);
-    expect(bodyOf(response)).toEqual({ error: 'cancellation_too_late', message: 'Too late to cancel this appointment' });
+    expect(bodyOf(response)).toEqual({ error: 'cancellation_notice_too_short', message: 'Too late to cancel this appointment' });
     expect(transactions()).toHaveLength(0);
     expect(logLines()[0]).toMatchObject({ outcome: 'too_late', status: 403, appointmentId: APPT_ID, lockAttempts: 1 });
 

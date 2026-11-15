@@ -188,11 +188,11 @@ describe('changeAppointment handler', () => {
   });
 
   describe('the old appointment', () => {
-    it('the notice: alice at 09:01 the day before is 403 cancellation_too_late; the Administrator 201', async () => {
+    it('the notice: alice at 09:01 the day before is 403 cancellation_notice_too_short; the Administrator 201', async () => {
       at(AC21_NOW);
       const response = await post({ start: H1000 });
       expect(response.statusCode).toBe(403);
-      expect(bodyOf(response)).toEqual({ error: 'cancellation_too_late', message: 'Too late to change this appointment' });
+      expect(bodyOf(response)).toEqual({ error: 'cancellation_notice_too_short', message: 'Too late to change this appointment' });
       expect(logLines()[0]).toMatchObject({ outcome: 'too_late', status: 403 });
       expect(transactions()).toHaveLength(0);
       expect((await post({ start: H1000 }, admin)).statusCode).toBe(201);
@@ -220,11 +220,11 @@ describe('changeAppointment handler', () => {
   });
 
   describe('the new appointment: the booking rules', () => {
-    it('booking_too_soon, booking_too_far, outside_availability as 409', async () => {
+    it('booking_notice_too_short, booking_beyond_horizon, outside_availability as 409', async () => {
       withSettings({ minBookingNoticeHours: 200 });
-      expect(bodyOf(await post({ start: H1000 }))).toMatchObject({ error: 'booking_too_soon' });
+      expect(bodyOf(await post({ start: H1000 }))).toMatchObject({ error: 'booking_notice_too_short' });
       withSettings({ bookingHorizonDays: 5 });
-      expect(bodyOf(await post({ start: H1000 }))).toMatchObject({ error: 'booking_too_far' });
+      expect(bodyOf(await post({ start: H1000 }))).toMatchObject({ error: 'booking_beyond_horizon' });
       withSettings({});
       const response = await post({ start: '2026-11-16T11:00:00.000Z' });
       expect(response.statusCode).toBe(409);

@@ -339,7 +339,7 @@ export function checkBookingTimes(
 }
 
 export type BookingRefusal = Refusal<
-  'booking_too_soon' | 'booking_too_far' | 'outside_availability' | 'slot_taken' | 'appointment_limit_reached'
+  'booking_in_past' | 'booking_notice_too_short' | 'booking_beyond_horizon' | 'outside_availability' | 'slot_taken' | 'appointment_limit_reached'
 >;
 
 export type BookingInput = {
@@ -359,9 +359,9 @@ export type BookingInput = {
 /**
  * The booking rules that need the calendar (8.2, the order of v9 step 5), on the settings and the
  * state read inside the locked attempt, in table order; the first that fails decides:
- * - R-BOOK-03 `start > now`, and R-BOOK-04 `start − now ≥ minBookingNoticeHours` (a User only):
- *   `booking_too_soon`;
- * - R-BOOK-05 `localDateOf(start) ≤ today + bookingHorizonDays` (a User only): `booking_too_far`;
+ * - R-BOOK-03 `start > now`: `booking_in_past`;
+ * - R-BOOK-04 `start − now ≥ minBookingNoticeHours` (a User only): `booking_notice_too_short`;
+ * - R-BOOK-05 `localDateOf(start) ≤ today + bookingHorizonDays` (a User only): `booking_beyond_horizon`;
  * - R-BOOK-06 inside one effective window (6.6: merged across sources) of the start's local date, a
  *   window whose type no longer exists left out as in the view: `outside_availability`;
  * - R-BOOK-07 no booked appointment overlaps, compared as instants (R-SLOT-02): `slot_taken`;
@@ -375,10 +375,10 @@ export function checkBooking(input: BookingInput): { window: EffectiveWindow } |
   const { start, end, role, userId, settings, state, now, today, zone } = input;
   const admin = role === 'admin';
   const ahead = Date.parse(start) - Date.parse(now);
-  if (ahead <= 0) return refuse('booking_too_soon', 'The start is not in the future');
-  if (!admin && ahead < settings.minBookingNoticeHours * HOUR_MS) return refuse('booking_too_soon', 'Not enough notice before the start');
+  if (ahead <= 0) return refuse('booking_in_past', 'The start is not in the future');
+  if (!admin && ahead < settings.minBookingNoticeHours * HOUR_MS) return refuse('booking_notice_too_short', 'Not enough notice before the start');
   const date = localDateOf(start, zone);
-  if (!admin && date > addDays(today, settings.bookingHorizonDays)) return refuse('booking_too_far', 'The start is too far ahead');
+  if (!admin && date > addDays(today, settings.bookingHorizonDays)) return refuse('booking_beyond_horizon', 'The start is too far ahead');
 
   const typeIds = new Set(state.types.map((t) => t.typeId));
   const override = state.overrides.find((o) => o.date === date) ?? null;
@@ -419,7 +419,7 @@ export type Caller = { role: Role; sub: string };
 export type CheckedAppointment = { userId: string; start: string; end: string; status: AppointmentStatus };
 
 export type NoteRefusal = Refusal<'appointment_not_found' | 'appointment_not_active'>;
-export type CancelRefusal = Refusal<'appointment_not_found' | 'appointment_not_active' | 'cancellation_too_late'>;
+export type CancelRefusal = Refusal<'appointment_not_found' | 'appointment_not_active' | 'cancellation_notice_too_short'>;
 
 // The two checks routes 18 and 19 share, in the order of 8.3 (v10): R-CAN-01 / R-PERM-01, absent or
 // (for a User) not theirs by `sub`, is 404, before anything that would tell its status; then
@@ -441,7 +441,7 @@ function checkVisibleAndActive(appointment: CheckedAppointment | null, caller: C
  *   `appointment_not_found` (404, never 403, so ids cannot be probed);
  * - R-CAN-02: `status = booked` and `end > now`: `appointment_not_active`;
  * - R-CAN-03 (a User only): `now ≤ start − cancellationNoticeHours`, the response's
- *   `cancellableUntil`, compared to the millisecond: `cancellation_too_late`. Exactly the notice
+ *   `cancellableUntil`, compared to the millisecond: `cancellation_notice_too_short`. Exactly the notice
  *   before the start is allowed; an appointment in progress is refused here, not by R-CAN-02. The
  *   Administrator is exempt and may cancel one in progress.
  * Answers null when the cancel may be written.
@@ -455,7 +455,7 @@ export function checkCancel(
   const refusal = checkVisibleAndActive(appointment, caller, now);
   if (refusal) return refusal;
   if (caller.role !== 'admin' && Date.parse(now) > Date.parse(cancellableUntil(appointment!, settings))) {
-    return refuse('cancellation_too_late', 'Too late to cancel this appointment');
+    return refuse('cancellation_notice_too_short', 'Too late to cancel this appointment');
   }
   return null;
 }
@@ -499,7 +499,7 @@ export type ChangeInput = {
  * first that fails decides:
  * - the old appointment, as a cancel (checkCancel): R-CAN-01 / R-PERM-01 (`appointment_not_found`),
  *   R-CAN-02 (`appointment_not_active`, also for one already changed), for a User R-CAN-03
- *   (`cancellation_too_late`, with a change's wording);
+ *   (`cancellation_notice_too_short`, with a change's wording);
  * - the new one, as a booking (checkBooking) for the old appointment's User (R-BOOK-01: its
  *   `userId`), on the state with the old appointment left out by id: that is both adjustments of
  *   R-CHG-01, R-BOOK-07 ignores it and R-BOOK-09 does not count it.
@@ -510,7 +510,7 @@ export function checkChange(input: ChangeInput): { window: EffectiveWindow } | C
   const { appointment, caller, start, end, settings, state, now, today, zone } = input;
   const refusal = checkCancel(appointment, caller, settings, now);
   if (refusal) {
-    return refusal.error === 'cancellation_too_late' ? refuse(refusal.error, 'Too late to change this appointment') : refusal;
+    return refusal.error === 'cancellation_notice_too_short' ? refuse(refusal.error, 'Too late to change this appointment') : refusal;
   }
   const old = appointment!;
   const others = { ...state, appointments: state.appointments.filter((a) => a.appointmentId !== old.appointmentId) };

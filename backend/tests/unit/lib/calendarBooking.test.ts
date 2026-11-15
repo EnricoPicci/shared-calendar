@@ -172,9 +172,9 @@ describe('checkBooking (R-BOOK-03..09)', () => {
 
     describe('AC-17: horizon 7, now 2026-11-10', () => {
       const MON_23 = '2026-11-23T08:00:00.000Z';
-      it('alice books 2026-11-23 09:00: booking_too_far', () => {
+      it('alice books 2026-11-23 09:00: booking_beyond_horizon', () => {
         expect(book(MON_23, '2026-11-23T09:00:00.000Z', { settings: { bookingHorizonDays: 7 } })).toEqual({
-          error: 'booking_too_far',
+          error: 'booking_beyond_horizon',
           message: 'The start is too far ahead',
         });
       });
@@ -189,9 +189,9 @@ describe('checkBooking (R-BOOK-03..09)', () => {
 
     describe('AC-18: notice 48 h, now 2026-11-15T10:00 local', () => {
       const now = '2026-11-15T09:00:00.000Z';
-      it('alice books 2026-11-16 09:00 (23 h ahead): booking_too_soon', () => {
+      it('alice books 2026-11-16 09:00 (23 h ahead): booking_notice_too_short', () => {
         expect(book(MON_0900, MON_1000, { now, today: '2026-11-15', settings: { minBookingNoticeHours: 48 } })).toEqual({
-          error: 'booking_too_soon',
+          error: 'booking_notice_too_short',
           message: 'Not enough notice before the start',
         });
       });
@@ -228,9 +228,9 @@ describe('checkBooking (R-BOOK-03..09)', () => {
   });
 
   describe('R-BOOK-03: the start is in the future, for both roles', () => {
-    it.each<Role>(['user', 'admin'])('%s: a start at now is booking_too_soon', (role) => {
+    it.each<Role>(['user', 'admin'])('%s: a start at now is booking_in_past', (role) => {
       const now = MON_0900;
-      expect(book(MON_0900, MON_1000, { role, now, today: '2026-11-16' })).toEqual({ error: 'booking_too_soon', message: 'The start is not in the future' });
+      expect(book(MON_0900, MON_1000, { role, now, today: '2026-11-16' })).toEqual({ error: 'booking_in_past', message: 'The start is not in the future' });
     });
     it('one minute later is fine (notice 0)', () => {
       expect(book(MON_0900, MON_1000, { now: '2026-11-16T07:59:00.000Z', today: '2026-11-16' })).not.toHaveProperty('error');
@@ -327,20 +327,20 @@ describe('checkBooking (R-BOOK-03..09)', () => {
   });
 
   describe('the order: a request that breaks two neighbouring rules gets the earlier one’s code', () => {
-    it('R-BOOK-03 before R-BOOK-04 (same code, the first message)', () => {
+    it('R-BOOK-03 before R-BOOK-04: booking_in_past', () => {
       expect(book(MON_0900, MON_1000, { now: MON_1000, today: '2026-11-16', settings: { minBookingNoticeHours: 48 } })).toEqual({
-        error: 'booking_too_soon',
+        error: 'booking_in_past',
         message: 'The start is not in the future',
       });
     });
 
     it('R-BOOK-04 before R-BOOK-05: notice 720 h and horizon 7, booking 13 days ahead', () => {
       const MON_23 = '2026-11-23T08:00:00.000Z';
-      expect(book(MON_23, '2026-11-23T09:00:00.000Z', { settings: { minBookingNoticeHours: 720, bookingHorizonDays: 7 } })).toEqual(refused('booking_too_soon'));
+      expect(book(MON_23, '2026-11-23T09:00:00.000Z', { settings: { minBookingNoticeHours: 720, bookingHorizonDays: 7 } })).toEqual(refused('booking_notice_too_short'));
     });
 
     it('R-BOOK-05 before R-BOOK-06: too far and outside the availability', () => {
-      expect(book('2026-11-23T11:00:00.000Z', '2026-11-23T12:00:00.000Z', { settings: { bookingHorizonDays: 7 } })).toEqual(refused('booking_too_far'));
+      expect(book('2026-11-23T11:00:00.000Z', '2026-11-23T12:00:00.000Z', { settings: { bookingHorizonDays: 7 } })).toEqual(refused('booking_beyond_horizon'));
     });
 
     it('R-BOOK-06 before R-BOOK-07: outside the availability and overlapping an appointment', () => {

@@ -9,7 +9,7 @@ import { log } from '../lib/logger';
 import { validate } from '../lib/validation';
 
 // The status of each refusal (spec 11.3); the message is the check's.
-const STATUS = { appointment_not_found: 404, appointment_not_active: 409, cancellation_too_late: 403 } as const;
+const STATUS = { appointment_not_found: 404, appointment_not_active: 409, cancellation_notice_too_short: 403 } as const;
 const OUTCOME = { 404: 'not_found', 409: 'conflict', 403: 'too_late' } as const;
 
 // POST /calendar/appointments/{appointmentId}/cancel (docs/SHARED_CALENDAR_SPEC.md 11.1, route 19;

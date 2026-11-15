@@ -91,7 +91,7 @@ describe('checkChange (8.4, R-CHG-01)', () => {
   describe('the old appointment: the cancel rules (R-CAN-01..03)', () => {
     it('the notice applies to the old one: a User at 09:01 the day before is 403, with a change’s wording', () => {
       expect(change(H1000, H1100, { now: LATE_NOW, today: '2026-11-15' })).toEqual({
-        error: 'cancellation_too_late',
+        error: 'cancellation_notice_too_short',
         message: 'Too late to change this appointment',
       });
     });
@@ -113,18 +113,18 @@ describe('checkChange (8.4, R-CHG-01)', () => {
     it('the Administrator changes one in progress only to a future start (R-BOOK-03)', () => {
       const during = at('09:30');
       expect(change(H1000, H1100, { caller: ADMIN, now: during, today: '2026-11-16' })).toEqual(studio);
-      expect(change(H0900, H1030, { caller: ADMIN, now: during, today: '2026-11-16' })).toEqual(refused('booking_too_soon'));
+      expect(change(H0900, H1030, { caller: ADMIN, now: during, today: '2026-11-16' })).toEqual(refused('booking_in_past'));
     });
   });
 
   describe('the new appointment: the booking rules (R-BOOK-03..09)', () => {
-    it('booking_too_soon: the minimum notice for a User; the Administrator exempt', () => {
-      expect(change(H1000, H1100, { settings: { minBookingNoticeHours: 200 } })).toEqual(refused('booking_too_soon'));
+    it('booking_notice_too_short: the minimum notice for a User; the Administrator exempt', () => {
+      expect(change(H1000, H1100, { settings: { minBookingNoticeHours: 200 } })).toEqual(refused('booking_notice_too_short'));
       expect(change(H1000, H1100, { caller: ADMIN, settings: { minBookingNoticeHours: 200 } })).toEqual(studio);
     });
 
-    it('booking_too_far: the horizon for a User; the Administrator exempt', () => {
-      expect(change(H1000, H1100, { settings: { bookingHorizonDays: 5 } })).toEqual(refused('booking_too_far'));
+    it('booking_beyond_horizon: the horizon for a User; the Administrator exempt', () => {
+      expect(change(H1000, H1100, { settings: { bookingHorizonDays: 5 } })).toEqual(refused('booking_beyond_horizon'));
       expect(change(H1000, H1100, { caller: ADMIN, settings: { bookingHorizonDays: 5 } })).toEqual(studio);
     });
 
@@ -166,7 +166,7 @@ describe('checkChange (8.4, R-CHG-01)', () => {
     });
 
     it('too late on the old one and a taken slot: 403, not 409', () => {
-      expect(change(H1000, H1100, { state: taken, now: LATE_NOW, today: '2026-11-15' })).toEqual(refused('cancellation_too_late'));
+      expect(change(H1000, H1100, { state: taken, now: LATE_NOW, today: '2026-11-15' })).toEqual(refused('cancellation_notice_too_short'));
     });
 
     it('a cancelled old one outside availability: 409 appointment_not_active, not outside_availability', () => {

@@ -844,23 +844,23 @@ describe('booking (route 17)', () => {
     expect(res.body).toMatchObject({ error: 'outside_availability' });
   });
 
-  it('AC-17: horizon 7, W 11:00 (8 or more days ahead): dave 409 booking_too_far; the Administrator books it for dave: 201', async () => {
+  it('AC-17: horizon 7, W 11:00 (8 or more days ahead): dave 409 booking_beyond_horizon; the Administrator books it for dave: 201', async () => {
     await setSettings({ bookingHorizonDays: 7 });
     const start = at(W(), '11:00');
     const res = await book(daveToken, { start });
     expect(res.status).toBe(409);
-    expect(res.body).toMatchObject({ error: 'booking_too_far' });
+    expect(res.body).toMatchObject({ error: 'booking_beyond_horizon' });
     const admin = await book(adminToken, { username: 'dave', start });
     expect(admin.status).toBe(201);
     booked.ac17 = admin.body!;
     await setSettings({});
   });
 
-  it('AC-18: notice 720 h: dave books W 10:00: 409 booking_too_soon', async () => {
+  it('AC-18: notice 720 h: dave books W 10:00: 409 booking_notice_too_short', async () => {
     await setSettings({ minBookingNoticeHours: 720 });
     const res = await book(daveToken, { start: at(W(), '10:00') });
     expect(res.status).toBe(409);
-    expect(res.body).toMatchObject({ error: 'booking_too_soon' });
+    expect(res.body).toMatchObject({ error: 'booking_notice_too_short' });
     await setSettings({});
   });
 
@@ -1091,12 +1091,12 @@ describe('listing, note and cancel (routes 16, 18, 19)', () => {
     expect((await cancel(daveToken, ids.t9!)).body).toMatchObject({ error: 'appointment_not_active' });
   });
 
-  it('AC-21: notice 720 h: dave cancelling T 10:00 is 403 cancellation_too_late; the Administrator cancels it: 200', async () => {
+  it('AC-21: notice 720 h: dave cancelling T 10:00 is 403 cancellation_notice_too_short; the Administrator cancels it: 200', async () => {
     await setSettings({ cancellationNoticeHours: 720 });
     try {
       const res = await cancel(daveToken, ids.t10!);
       expect(res.status).toBe(403);
-      expect(res.body).toEqual({ error: 'cancellation_too_late', message: 'Too late to cancel this appointment' });
+      expect(res.body).toEqual({ error: 'cancellation_notice_too_short', message: 'Too late to cancel this appointment' });
       expect(await getCalendarItem('APPT', sk(appts.t10!))).toMatchObject({ status: 'booked', version: 1 });
       const admin = await cancel(adminToken, ids.t10!);
       expect(admin.status).toBe(200);
@@ -1394,12 +1394,12 @@ describe('change (route 20)', () => {
     expect(await stored(appts.c3!)).toMatchObject({ status: 'booked', version: 1 });
   });
 
-  it('the notice: with 720 h dave’s change is 403 cancellation_too_late; the Administrator’s is 201', async () => {
+  it('the notice: with 720 h dave’s change is 403 cancellation_notice_too_short; the Administrator’s is 201', async () => {
     await setSettings({ cancellationNoticeHours: 720 });
     try {
       const res = await changeOf(daveToken, appts.c3!.appointmentId as string, { start: at('09:00') });
       expect(res.status).toBe(403);
-      expect(res.body).toEqual({ error: 'cancellation_too_late', message: 'Too late to change this appointment' });
+      expect(res.body).toEqual({ error: 'cancellation_notice_too_short', message: 'Too late to change this appointment' });
       expect(await stored(appts.c3!)).toMatchObject({ status: 'booked', version: 1 });
       const admin = await changeOf(adminToken, appts.c3!.appointmentId as string, { start: at('09:00') });
       expect(admin.status).toBe(201);

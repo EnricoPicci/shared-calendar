@@ -27,22 +27,22 @@ describe('checkCancel', () => {
     expect(checkCancel(appt(), ALICE, NOTICE, AC20_NOW)).toBeNull();
   });
 
-  it('AC-21: one minute later alice is refused 403 cancellation_too_late; the Administrator may', () => {
-    expect(checkCancel(appt(), ALICE, NOTICE, AC21_NOW)).toEqual({ error: 'cancellation_too_late', message: 'Too late to cancel this appointment' });
+  it('AC-21: one minute later alice is refused 403 cancellation_notice_too_short; the Administrator may', () => {
+    expect(checkCancel(appt(), ALICE, NOTICE, AC21_NOW)).toEqual({ error: 'cancellation_notice_too_short', message: 'Too late to cancel this appointment' });
     expect(checkCancel(appt(), ADMIN, NOTICE, AC21_NOW)).toBeNull();
   });
 
   it('compares to the millisecond: one millisecond past start − notice is refused', () => {
-    expect(checkCancel(appt(), ALICE, NOTICE, '2026-11-15T08:00:00.001Z')).toMatchObject({ error: 'cancellation_too_late' });
+    expect(checkCancel(appt(), ALICE, NOTICE, '2026-11-15T08:00:00.001Z')).toMatchObject({ error: 'cancellation_notice_too_short' });
     expect(checkCancel(appt(), ALICE, NOTICE, '2026-11-15T07:59:59.999Z')).toBeNull();
   });
 
   it('the notice comes from the settings: 0 h lets a User cancel until the start itself', () => {
     expect(checkCancel(appt(), ALICE, { cancellationNoticeHours: 0 }, START)).toBeNull();
-    expect(checkCancel(appt(), ALICE, { cancellationNoticeHours: 0 }, '2026-11-16T08:00:00.001Z')).toMatchObject({ error: 'cancellation_too_late' });
+    expect(checkCancel(appt(), ALICE, { cancellationNoticeHours: 0 }, '2026-11-16T08:00:00.001Z')).toMatchObject({ error: 'cancellation_notice_too_short' });
     // 720 real hours across the end of summer time: 10:00 local on 2026-10-17 (UTC+2), not 09:00 (A2).
     expect(checkCancel(appt(), ALICE, { cancellationNoticeHours: 720 }, at('2026-10-17', '10:00'))).toBeNull();
-    expect(checkCancel(appt(), ALICE, { cancellationNoticeHours: 720 }, at('2026-10-17', '10:01'))).toMatchObject({ error: 'cancellation_too_late' });
+    expect(checkCancel(appt(), ALICE, { cancellationNoticeHours: 720 }, at('2026-10-17', '10:01'))).toMatchObject({ error: 'cancellation_notice_too_short' });
   });
 
   it('R-CAN-01: no appointment is 404 appointment_not_found, for both roles', () => {
@@ -72,7 +72,7 @@ describe('checkCancel', () => {
   it('in progress (start ≤ now < end): the Administrator cancels; a User is refused by R-CAN-03, not R-CAN-02', () => {
     const during = at('2026-11-16', '09:30');
     expect(checkCancel(appt(), ADMIN, NOTICE, during)).toBeNull();
-    expect(checkCancel(appt(), ALICE, NOTICE, during)).toMatchObject({ error: 'cancellation_too_late' });
+    expect(checkCancel(appt(), ALICE, NOTICE, during)).toMatchObject({ error: 'cancellation_notice_too_short' });
     expect(checkCancel(appt(), ADMIN, NOTICE, '2026-11-16T08:59:59.999Z')).toBeNull();
   });
 

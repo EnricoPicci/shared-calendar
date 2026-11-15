@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v14 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
-| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10, v11, v12 and v13 2026-11-14; v14 2026-11-15 |
+| Status | v15 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
+| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10, v11, v12 and v13 2026-11-14; v14 and v15 2026-11-15 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
@@ -26,6 +26,7 @@
 | v12 | 2026-11-14 | Brief 52 (plan step 51). User deletion: the order of the checks and their answers, the time-zone check after the Cognito checks, a busy lock `409 concurrent_update`, a target in no group marked and cancelled too (10.2); an appointment in progress is cancelled too (10.2, AC-29); the marker is written in the first chunk as a plain `Put`, so a repeated deletion writes it again (10.2, 13.4); one event id per appointment, kept across retries and chunks (10.2). `GET /users` sorted by UTF-16 code units, an account in no group not listed (10.1). `DeleteUserFunction` declares the three calendar variables (14.1, 14.3). A notifier cannot look up a deleted User's address through Cognito (15.1). |
 | v13 | 2026-11-14 | Brief 53 (plan step 52). The smoke test's calendar journey made independent of the settings and of the real calendar: it reads both first and searches a free 03:00–04:00 instead of assuming one; the Administrator's booking makes only `cancellationNoticeHours` matter; DST days skipped; a recognisable note for the AC-36 log search; the check lines, the clean-up on every exit and what stays as history (18.4, now "local and cloud"). |
 | v14 | 2026-11-15 | Brief 54 review (plan step 53). Route 9's errors written out instead of "as #8": `limit_reached` removed, since an update replaces a pattern and never adds one (R-PAT-04); architecture section 4 and the handler never had it (11.1). |
+| v15 | 2026-11-15 | Error codes of the timing rules renamed after the rule they break and its setting (user's decision, before plan step 54): `booking_too_soon` split into `booking_in_past` (R-BOOK-03) and `booking_notice_too_short` (R-BOOK-04, `minBookingNoticeHours`); `booking_too_far` → `booking_beyond_horizon` (R-BOOK-05, `bookingHorizonDays`); `cancellation_too_late` → `cancellation_notice_too_short` (R-CAN-03, `cancellationNoticeHours`). Statuses, order of the checks and messages unchanged (8.2, 8.3, 8.4, 11.1, 11.3, 18.3). |
 
 ---
 
@@ -440,9 +441,9 @@ Request: `{ start, end?, username?, note? }` (section 11.7).
 |---|---|---|---|
 | **R-BOOK-01** `username`: the User the appointment is for | must be absent or equal to the caller | required; must be an existing account in group `user` and not in `admin` | `400 invalid_request` (admin, absent) · `404 user_not_found` (admin, unknown) · `409 target_not_user` (admin, target not a plain User: an Administrator, or in no group) · `403 forbidden` (User naming someone else) |
 | **R-BOOK-02** Times | `start` a whole local hour; `end` absent or `start + 60 min` | `start` and `end` on 15-minute local steps; `end` defaults to `start + 60 min` (then `start` may be any 15-minute step); `end − start ≥ 15 min` | `400 invalid_request` |
-| **R-BOOK-03** In the future | `start > now` | `start > now` | `409 booking_too_soon` |
-| **R-BOOK-04** Minimum notice | `start − now ≥ minBookingNoticeHours` | exempt | `409 booking_too_soon` |
-| **R-BOOK-05** Horizon | `localDateOf(start) ≤ today + bookingHorizonDays` | exempt | `409 booking_too_far` |
+| **R-BOOK-03** In the future | `start > now` | `start > now` | `409 booking_in_past` |
+| **R-BOOK-04** Minimum notice | `start − now ≥ minBookingNoticeHours` | exempt | `409 booking_notice_too_short` |
+| **R-BOOK-05** Horizon | `localDateOf(start) ≤ today + bookingHorizonDays` | exempt | `409 booking_beyond_horizon` |
 | **R-BOOK-06** Inside availability | inside one effective window; the appointment takes that window's type | same | `409 outside_availability` |
 | **R-BOOK-07** No overlap | no active appointment overlaps | same | `409 slot_taken` |
 | **R-BOOK-08** Custom times | — (forbidden by R-BOOK-02) | allowed, subject to R-BOOK-06/07 (D12) | — |
@@ -477,7 +478,7 @@ transaction (section 15).
 |---|---|---|---|
 | **R-CAN-01** Exists and visible | own appointment | any | `404 appointment_not_found` |
 | **R-CAN-02** Active and not ended | `status = booked` and `end > now` | same | `409 appointment_not_active` |
-| **R-CAN-03** Notice (D15) | `start − now ≥ cancellationNoticeHours` | exempt; may cancel an appointment already in progress | `403 cancellation_too_late` |
+| **R-CAN-03** Notice (D15) | `start − now ≥ cancellationNoticeHours` | exempt; may cancel an appointment already in progress | `403 cancellation_notice_too_short` |
 
 Success: `200` with the cancelled appointment (`cancelReason: "cancelled"`). The row stays in
 the table (D17). Event `appointment.cancelled`. Cancelling frees the time at once.
@@ -495,7 +496,7 @@ The checks run in this order, and the first that fails decides (v10):
 1. the path id is a ULID (`400 invalid_request`);
 2. inside the locked attempt, on the appointment read in it: R-CAN-01 / R-PERM-01, absent or (for a
    User caller) a `userId` other than the `sub` of the token (`404 appointment_not_found`); R-CAN-02
-   (`409 appointment_not_active`); for a User, R-CAN-03 (`403 cancellation_too_late`).
+   (`409 appointment_not_active`); for a User, R-CAN-03 (`403 cancellation_notice_too_short`).
 
 The 404 comes first, so a User learns nothing about the status of someone else's appointment. The
 lookup by id (13.2) runs inside the locked attempt: the pointer never changes, but the `APPT` item
@@ -544,7 +545,7 @@ The checks run in this order, and the first that fails decides (v11):
 3. R-BOOK-02 for the caller's role (`400`);
 4. inside the locked attempt, on the data read in it, the old appointment as in 8.3: R-CAN-01 /
    R-PERM-01 (`404 appointment_not_found`), R-CAN-02 (`409 appointment_not_active`), for a User
-   R-CAN-03 (`403 cancellation_too_late`, "Too late to change this appointment");
+   R-CAN-03 (`403 cancellation_notice_too_short`, "Too late to change this appointment");
 5. then the new one: R-BOOK-03, 04, 05, 06, 07, 09, with the adjustments of R-CHG-01;
 6. R-BOOK-10, as a condition of the change transaction on the old appointment's `userId` (`404
    user_not_found`, without a retry).
@@ -696,7 +697,7 @@ are validated the same way.
 **Status code rule** (applied to every new route):
 - `400` — the request is malformed by itself (shape, format, grid).
 - `403` — the caller's role or a time-based permission does not allow it (`forbidden`,
-  `cancellation_too_late`).
+  `cancellation_notice_too_short`).
 - `404` — the resource **in the path** does not exist (or is not visible to the caller), or
   the target User does not exist.
 - `409` — the request is well formed but conflicts with the calendar's current state or
@@ -724,10 +725,10 @@ are validated the same way.
 | 14 | `DELETE /calendar/windows/{windowId}` | admin | — | `204` | 400 · 404 `window_not_found` · 409 `date_in_past`, `availability_conflict`, `concurrent_update` |
 | 15 | `GET /calendar` | admin, user | `?from=YYYY-MM-DD&to=YYYY-MM-DD` (inclusive, `from ≤ to`, at most 31 days) | `200` `CalendarView` | 400 `invalid_request` |
 | 16 | `GET /calendar/appointments` | admin, user | `?from&to` (at most 92 days) **or** `?upcoming=true`; optional `username` (admin only), `status` = `booked` (default) \| `cancelled` \| `all` | `200` `{ appointments: Appointment[] }` (by start) | 400 · 403 `forbidden` (a User passing another `username`) |
-| 17 | `POST /calendar/appointments` | admin, user | `BookBody` | `201` `Appointment` | 400 · 403 `forbidden` · 404 `user_not_found` · 409 `target_not_user`, `booking_too_soon`, `booking_too_far`, `outside_availability`, `slot_taken`, `appointment_limit_reached`, `concurrent_update` |
+| 17 | `POST /calendar/appointments` | admin, user | `BookBody` | `201` `Appointment` | 400 · 403 `forbidden` · 404 `user_not_found` · 409 `target_not_user`, `booking_in_past`, `booking_notice_too_short`, `booking_beyond_horizon`, `outside_availability`, `slot_taken`, `appointment_limit_reached`, `concurrent_update` |
 | 18 | `PATCH /calendar/appointments/{appointmentId}` | admin, owner | `{ note }` | `200` `Appointment` | 400 · 404 `appointment_not_found` · 409 `appointment_not_active`, `concurrent_update` |
-| 19 | `POST /calendar/appointments/{appointmentId}/cancel` | admin, owner | — | `200` `Appointment` | 400 · 403 `cancellation_too_late` · 404 `appointment_not_found` · 409 `appointment_not_active`, `concurrent_update` |
-| 20 | `POST /calendar/appointments/{appointmentId}/change` | admin, owner | `ChangeBody` | `201` `{ cancelled, booked }` | 400 · 403 `cancellation_too_late` · 404 `appointment_not_found`, `user_not_found` · 409 `appointment_not_active`, `booking_too_soon`, `booking_too_far`, `outside_availability`, `slot_taken`, `appointment_limit_reached`, `concurrent_update` (v11; in the order of 8.4) |
+| 19 | `POST /calendar/appointments/{appointmentId}/cancel` | admin, owner | — | `200` `Appointment` | 400 · 403 `cancellation_notice_too_short` · 404 `appointment_not_found` · 409 `appointment_not_active`, `concurrent_update` |
+| 20 | `POST /calendar/appointments/{appointmentId}/change` | admin, owner | `ChangeBody` | `201` `{ cancelled, booked }` | 400 · 403 `cancellation_notice_too_short` · 404 `appointment_not_found`, `user_not_found` · 409 `appointment_not_active`, `booking_in_past`, `booking_notice_too_short`, `booking_beyond_horizon`, `outside_availability`, `slot_taken`, `appointment_limit_reached`, `concurrent_update` (v11; in the order of 8.4) |
 | 21 | `GET /users` | admin | — | `200` `{ users: UserSummary[] }` | — |
 
 ¹ Deleting a pattern cannot create an overlap. The code is listed only because the shared
@@ -780,13 +781,14 @@ Notes on the route design:
 | `availability_overlap` | 409 | R-AV-01 |
 | `availability_conflict` | 409 | R-AV-03; the body carries `conflicts` |
 | `target_not_user` | 409 | R-BOOK-01, the target is an Administrator |
-| `booking_too_soon` | 409 | R-BOOK-03/04 |
-| `booking_too_far` | 409 | R-BOOK-05 |
+| `booking_in_past` | 409 | R-BOOK-03: the start is not in the future |
+| `booking_notice_too_short` | 409 | R-BOOK-04: less than `minBookingNoticeHours` ahead |
+| `booking_beyond_horizon` | 409 | R-BOOK-05: after today + `bookingHorizonDays` |
 | `outside_availability` | 409 | R-BOOK-06 |
 | `slot_taken` | 409 | R-BOOK-07 |
 | `appointment_limit_reached` | 409 | R-BOOK-09 |
 | `appointment_not_active` | 409 | R-CAN-02, R-NOTE-01 |
-| `cancellation_too_late` | 403 | R-CAN-03 |
+| `cancellation_notice_too_short` | 403 | R-CAN-03: less than `cancellationNoticeHours` before the start |
 | `concurrent_update` | 409 | the calendar changed at the same moment three times in a row (section 13.4); the client may retry |
 
 `user_not_found`, `forbidden`, `invalid_json`, `invalid_request` and `internal_error` are reused.
@@ -1439,7 +1441,7 @@ Time zone `Europe/Rome`. "Now" is set by the scenario. Defaults apply unless sta
 twice: (1) in the handler's unit tests, with a fake clock and the exact dates of the table; (2) in
 the integration journeys (18.2), with the same shape on dates counted from the real today (e.g.
 "the next Monday at least 8 days ahead") and settings chosen to make the timing rule decidable
-(e.g. a notice of 720 h to prove `cancellation_too_late`). An appointment that has already ended
+(e.g. a notice of 720 h to prove `cancellation_notice_too_short`). An appointment that has already ended
 cannot be booked through the API (R-BOOK-03), so the journeys of AC-29 and AC-31 write it directly
 into DynamoDB Local, as the existing journeys already read the table directly.
 
@@ -1461,11 +1463,11 @@ into DynamoDB Local, as the existing journeys already read the table directly.
 | AC-14 | AC-04 | admin books alice 09:15–10:00 local | 201 |
 | AC-15 | AC-14 | alice books 09:00 local | 409 `slot_taken` (partial overlap) |
 | AC-16 | AC-04 | alice books 12:00 local (outside the window) | 409 `outside_availability` |
-| AC-17 | `bookingHorizonDays` 7, now 2026-11-10 | alice books 2026-11-23 09:00 | 409 `booking_too_far`; the admin can book the same for alice: 201 |
-| AC-18 | `minBookingNoticeHours` 48, now 2026-11-15T10:00 local | alice books 2026-11-16 09:00 | 409 `booking_too_soon` |
+| AC-17 | `bookingHorizonDays` 7, now 2026-11-10 | alice books 2026-11-23 09:00 | 409 `booking_beyond_horizon`; the admin can book the same for alice: 201 |
+| AC-18 | `minBookingNoticeHours` 48, now 2026-11-15T10:00 local | alice books 2026-11-16 09:00 | 409 `booking_notice_too_short` |
 | AC-19 | `maxFutureAppointmentsPerUser` 1, alice holds one future appointment | alice books another | 409 `appointment_limit_reached`; admin booking for alice: 201 |
 | AC-20 | alice holds 2026-11-16 09:00 local; now 2026-11-15T09:00 local | alice cancels | 200, `cancelReason: cancelled`, slot free again |
-| AC-21 | same; now 2026-11-15T09:01 local | alice cancels | 403 `cancellation_too_late`; admin cancels: 200 |
+| AC-21 | same; now 2026-11-15T09:01 local | alice cancels | 403 `cancellation_notice_too_short`; admin cancels: 200 |
 | AC-22 | alice holds 09:00; enough notice | alice changes to 10:00 the same day | 201, old `changed` + `replacedBy`, new `replaces`; one `appointment.changed` event |
 | AC-23 | alice holds 09:00 and 10:00 is taken | alice changes to 10:00 | 409 `slot_taken`; the 09:00 appointment is still `booked` |
 | AC-24 | admin holds alice 09:00–10:00 | admin changes it to 09:00–10:30 | 201 (overlap with its own old time ignored) |

@@ -25,13 +25,14 @@ export type ApiErrorCode =
   | 'availability_overlap' // 409, R-AV-01
   | 'availability_conflict' // 409, R-AV-03; the body carries `conflicts`
   | 'target_not_user' // 409, R-BOOK-01: the target is an Administrator
-  | 'booking_too_soon' // 409, R-BOOK-03/04
-  | 'booking_too_far' // 409, R-BOOK-05
+  | 'booking_in_past' // 409, R-BOOK-03: the start is not in the future
+  | 'booking_notice_too_short' // 409, R-BOOK-04: less than minBookingNoticeHours ahead
+  | 'booking_beyond_horizon' // 409, R-BOOK-05: after today + bookingHorizonDays
   | 'outside_availability' // 409, R-BOOK-06
   | 'slot_taken' // 409, R-BOOK-07
   | 'appointment_limit_reached' // 409, R-BOOK-09
   | 'appointment_not_active' // 409, R-CAN-02, R-NOTE-01
-  | 'cancellation_too_late' // 403, R-CAN-03
+  | 'cancellation_notice_too_short' // 403, R-CAN-03: less than cancellationNoticeHours ahead
   | 'concurrent_update'; // 409, the calendar lock was busy three times in a row; the client may retry
 
 // An appointment that an availability write would leave outside the availability (R-AV-03).

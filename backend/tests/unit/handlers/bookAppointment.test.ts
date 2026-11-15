@@ -237,21 +237,21 @@ describe('bookAppointment handler', () => {
       expect(bodyOf(await post({ start: '2026-11-16T11:00:00.000Z' }))).toEqual({ error: 'outside_availability', message: 'The time is not inside the availability' });
     });
 
-    it('AC-17: booking_too_far with a horizon of 7', async () => {
+    it('AC-17: booking_beyond_horizon with a horizon of 7', async () => {
       ddb.on(GetCommand, { Key: { PK: 'SETTINGS', SK: 'SETTINGS' } }).resolves({
         Item: { cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 7, maxFutureAppointmentsPerUser: null, updatedAt: NOW, updatedBy: admin },
       });
       const response = await post({ start: '2026-11-23T08:00:00.000Z' });
       expect(response.statusCode).toBe(409);
-      expect(bodyOf(response).error).toBe('booking_too_far');
+      expect(bodyOf(response).error).toBe('booking_beyond_horizon');
     });
 
-    it('AC-18: booking_too_soon with a notice of 48 h at 2026-11-15T10:00 local', async () => {
+    it('AC-18: booking_notice_too_short with a notice of 48 h at 2026-11-15T10:00 local', async () => {
       vi.setSystemTime(new Date('2026-11-15T09:00:00.000Z'));
       ddb.on(GetCommand, { Key: { PK: 'SETTINGS', SK: 'SETTINGS' } }).resolves({
         Item: { cancellationNoticeHours: 24, minBookingNoticeHours: 48, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: null, updatedAt: NOW, updatedBy: admin },
       });
-      expect(bodyOf(await post({ start: START }))).toEqual({ error: 'booking_too_soon', message: 'Not enough notice before the start' });
+      expect(bodyOf(await post({ start: START }))).toEqual({ error: 'booking_notice_too_short', message: 'Not enough notice before the start' });
     });
 
     it('AC-19: appointment_limit_reached with a limit of 1', async () => {
@@ -262,10 +262,10 @@ describe('bookAppointment handler', () => {
       expect(bodyOf(await post({ start: START })).error).toBe('appointment_limit_reached');
     });
 
-    it('R-BOOK-03: a start in the past is booking_too_soon, also for the Administrator', async () => {
+    it('R-BOOK-03: a start in the past is booking_in_past, also for the Administrator', async () => {
       cognitoTarget(['user']);
       const response = await post({ username: 'dave', start: '2026-11-09T08:00:00.000Z' }, admin);
-      expect(bodyOf(response)).toEqual({ error: 'booking_too_soon', message: 'The start is not in the future' });
+      expect(bodyOf(response)).toEqual({ error: 'booking_in_past', message: 'The start is not in the future' });
     });
 
     it('AC-34: the first transaction loses the lock, the re-read finds the slot taken: 409 slot_taken', async () => {
