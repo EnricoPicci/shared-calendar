@@ -4,7 +4,7 @@
 |---|---|
 | Goal | one page per `describe` block of the integration journeys (one per test file without a `describe`), in the format of `docs/journeys/README.md` |
 | Pages | 21: the 9 `describe` blocks of `backend/tests/integration/calendar.test.ts`, the 9 of `frontend/tests/integration/calendar.test.ts`, and 3 whole files (the Hello World journeys of both packages, the front end's login test) |
-| Brief | `prompts/57-explore-how-to-add-journey-explanation-docs.md` |
+| Brief | `prompts/60-explore-how-to-add-journey-explanation-docs.md` |
 
 This plan says in which order the pages are written, how, and what makes a session done. The
 format and the writing rules are in `docs/journeys/README.md`; this plan does not repeat them.
