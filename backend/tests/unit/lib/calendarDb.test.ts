@@ -301,6 +301,7 @@ describe('lockWaitMs', () => {
   });
 });
 
+// Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('getSettings', () => {
   it('answers the defaults with no author until the first save (R-SET-01)', async () => {
     expect(await db.getSettings()).toEqual({
@@ -885,6 +886,7 @@ const windowItem = (windowId: string, date: string, more: Record<string, unknown
 const onPartition = (pk: string, ...items: object[]) =>
   ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': pk } }).resolves({ Items: items });
 
+// Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('setOverride', () => {
   const TODAY = '2026-11-12';
   const DATE = '2026-11-16';
@@ -894,7 +896,7 @@ describe('setOverride', () => {
   it('reads the state after the lock, then puts the whole OVERRIDE item with updatedBy, windows sorted by start', async () => {
     const check = vi.fn(() => null);
     const locked = await db.setOverride(DATE, [pool, studio], ADMIN, TODAY, NOW, check);
-    // The answer has no updatedBy (11.5).
+    // The answer has no updatedBy (docs/SHARED_CALENDAR_SPEC.md section 11.5).
     expect(locked).toEqual({ result: { ok: true, value: { date: DATE, windows: [studio, pool], updatedAt: NOW } }, attempts: 1 });
     expect(check).toHaveBeenCalledTimes(1);
     expect(queries().map((q) => q.ExpressionAttributeValues![':pk'])).toEqual(['TYPE', 'PATTERN', 'OVERRIDE', 'WINDOW', 'APPT']);
@@ -995,7 +997,7 @@ describe('createOneOffWindow', () => {
   it('reads the state after the lock, then puts the WINDOW item <date>#<windowId> with createdBy', async () => {
     const check = vi.fn(() => null);
     const locked = await db.createOneOffWindow(window, ADMIN, TODAY, NOW, check);
-    // The answer has no createdBy (11.5).
+    // The answer has no createdBy (docs/SHARED_CALENDAR_SPEC.md section 11.5).
     expect(locked).toEqual({ result: { ok: true, value: { ...window, createdAt: NOW } }, attempts: 1 });
     expect(check).toHaveBeenCalledTimes(1);
     expect(queries().map((q) => q.ExpressionAttributeValues![':pk'])).toEqual(['TYPE', 'PATTERN', 'OVERRIDE', 'WINDOW', 'APPT']);
@@ -1050,7 +1052,7 @@ describe('deleteOneOffWindow', () => {
     expect((await db.deleteOneOffWindow(W1, TODAY, NOW, () => null)).result).toEqual({ ok: true, value: null });
   });
 
-  it('answers date_in_past for a window dated before today, found in the whole partition (spec v8)', async () => {
+  it('answers date_in_past for a window dated before today, found in the whole partition', async () => {
     ddb
       .on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'WINDOW', ':from': TODAY } })
       .resolves({ Items: [windowItem(W2, '2026-11-16')] });
@@ -1099,6 +1101,7 @@ describe('deleteOneOffWindow', () => {
 
 // ── The calendar view's reads ──────────────────────────────────────────────────────────────────
 
+// Test names: section numbers are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('readCalendarRange', () => {
   const between = (pk: string, from: string, to: string) => ({
     TableName: TABLE,
@@ -1108,7 +1111,7 @@ describe('readCalendarRange', () => {
     ExclusiveStartKey: undefined,
   });
   const ALICE = { username: 'alice', role: 'user' } as const;
-  /** Every attribute of the appointment item (architecture 5.3), as step 48 writes it. */
+  /** Every attribute of the appointment item (docs/ARCHITECTURE.md section 5.3), as a booking writes it. */
   const apptItem = (more: Record<string, unknown> = {}) => ({
     PK: 'APPT',
     SK: '2026-11-16T08:00:00.000Z#01M70NR5E0Q7R2C9T5XH3KD8MV',
@@ -1279,8 +1282,11 @@ describe('readCalendarRange', () => {
   });
 });
 
+// Test names: R-… rules and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in
+// its section 18.3).
 describe('bookAppointment', () => {
-  // AC-10: now 2026-11-10T09:00Z; alice books Monday 2026-11-16 09:00 local (08:00Z) at the Studio.
+  // The scenario of docs/SHARED_CALENDAR_SPEC.md AC-10: now 2026-11-10T09:00Z; alice books Monday
+  // 2026-11-16 09:00 local (08:00Z) at the Studio.
   const BOOK_NOW = '2026-11-10T09:00:00.000Z';
   const BOOK_TODAY = '2026-11-10';
   const STUDIO = '01JC0000000000000000000001';

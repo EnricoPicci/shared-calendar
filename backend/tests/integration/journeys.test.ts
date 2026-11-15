@@ -1,7 +1,8 @@
 import { api, removeUserIfPresent, scanMessages, signIn } from './setup';
 
-// The journeys of architecture section 6, end to end through sam local (plan step 9, table of
-// journeys 1 to 12). They run in order and share tokens. carol is the throw-away user.
+// The journeys of docs/ARCHITECTURE.md section 6, end to end through sam local, as numbered in the
+// table of docs/IMPLEMENTATION_PLAN.md step 9 (journeys 1 to 12). They run in order and share
+// tokens. carol is the throw-away user.
 //
 // Secrets: tokens and carol's password stay in variables. Assertions look at their presence
 // and length only, so a failure message never prints one.
@@ -21,7 +22,8 @@ async function messageRow(messageId: string) {
 }
 
 beforeAll(async () => {
-  // A run that failed between journeys 6 and 11 leaves carol behind; journey 6 would then get 409.
+  // A run that failed after carol was created (test 6) and before she was deleted (test 11) leaves
+  // her behind; creating her again would then get 409.
   await removeUserIfPresent('carol');
 });
 

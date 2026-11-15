@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config';
 
-// Integration tests need the local Docker stack (architecture section 8),
+// Integration tests need the local Docker stack (docs/ARCHITECTURE.md section 8),
 // so they only run when RUN_INTEGRATION=1 is set.
 const runIntegration = process.env.RUN_INTEGRATION === '1';
 
@@ -8,7 +8,7 @@ export default defineConfig({
   test: {
     // Without RUN_INTEGRATION the integration project selects no files; that is not a failure.
     passWithNoTests: !runIntegration,
-    // Plan step 4: the shared libraries must stay at 100 % line coverage.
+    // The shared libraries must stay at 100 % line coverage (docs/IMPLEMENTATION_PLAN.md step 4).
     coverage: {
       provider: 'v8',
       include: ['src/lib/**/*.ts'],

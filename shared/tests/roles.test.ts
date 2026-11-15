@@ -1,6 +1,6 @@
 import { resolveRole } from '../src/index';
 
-// Architecture section 3, the four group combinations.
+// The four group combinations of docs/ARCHITECTURE.md section 3.
 describe('resolveRole', () => {
   it.each([
     [['admin'], 'admin'],

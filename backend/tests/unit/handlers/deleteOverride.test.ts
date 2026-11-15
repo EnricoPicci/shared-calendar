@@ -37,13 +37,15 @@ const del = (date: string, claims = admin) => handler(eventAt(ROUTE, claims, { d
 
 beforeEach(async () => {
   reset();
-  // The AC-04 pattern, Mon 08:00–12:00 Studio, and the AC-06 override on 2026-11-16.
+  // The pattern of docs/SHARED_CALENDAR_SPEC.md AC-04 (Mon 08:00–12:00 Studio) and the override of
+  // docs/SHARED_CALENDAR_SPEC.md AC-06 on 2026-11-16.
   onPartition('PATTERN', [patternItem(P1)]);
   onPartition('OVERRIDE', [overrideItem(MONDAY, [{ start: '09:00', end: '12:00', typeId: STUDIO }])]);
   handler = await load();
 });
 afterEach(cleanUp);
 
+// Test names: section numbers and R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('deleteOverride handler', () => {
   it('deletes the override and answers 204 with no body; the patterns apply again (R-OVR-02)', async () => {
     const response = await del(MONDAY);
@@ -152,6 +154,8 @@ describe('deleteOverride handler', () => {
   });
 });
 
+// Test names: AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in its section
+// 18.3).
 describe('deleteOverride handler logging (AC-36)', () => {
   it('writes one info line with the date and the lock attempts', async () => {
     await del(MONDAY);

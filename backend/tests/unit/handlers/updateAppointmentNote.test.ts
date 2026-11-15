@@ -18,7 +18,8 @@ import {
 type Handler = typeof import('../../../src/handlers/updateAppointmentNote').handler;
 let handler: Handler;
 
-// Spec 8.5 v10, route 18; R-NOTE-01..02.
+// Editing the note (docs/SHARED_CALENDAR_SPEC.md section 8.5; docs/SHARED_CALENDAR_SPEC.md section
+// 11.1, route 18; docs/SHARED_CALENDAR_SPEC.md R-NOTE-01 and R-NOTE-02).
 const ROUTE = 'PATCH /calendar/appointments/{appointmentId}';
 const { ddb, reset, logLines, transactions, output } = harness();
 const alice = claimsOf('alice', ['user']);
@@ -43,6 +44,7 @@ beforeEach(async () => {
 });
 afterEach(cleanUp);
 
+// Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('updateAppointmentNote handler', () => {
   it('alice sets her note: 200, trimmed, cancellableUntil start − notice, typeName, no userId; one note_updated event', async () => {
     const response = await patch({ note: `  ${NEW_NOTE}  ` });
@@ -80,7 +82,7 @@ describe('updateAppointmentNote handler', () => {
     expect(transactions()[0]!.TransactItems![1]!.Update!.ExpressionAttributeValues![':note']).toBeNull();
   });
 
-  it('a note equal to the stored one (after trimming) is 200 with nothing written (v10)', async () => {
+  it('a note equal to the stored one (after trimming) is 200 with nothing written', async () => {
     const response = await patch({ note: `${NOTE}  ` });
     expect(response.statusCode).toBe(200);
     expect(bodyOf(response)).toMatchObject({ note: NOTE, updatedAt: '2026-11-10T09:00:00.000Z' });

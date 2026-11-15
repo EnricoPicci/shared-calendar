@@ -2,7 +2,8 @@ import { CognitoIdentityProviderClient, ListUsersInGroupCommand } from '@aws-sdk
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { mockClient } from 'aws-sdk-client-mock';
 
-// GET /users (spec 10.1, route 21). Handler tests reload the module per test, like the others.
+// GET /users (docs/SHARED_CALENDAR_SPEC.md section 10.1; docs/SHARED_CALENDAR_SPEC.md section 11.1,
+// route 21). Handler tests reload the module per test, like the others.
 type Handler = typeof import('../../../src/handlers/listUsers').handler;
 let handler: Handler;
 

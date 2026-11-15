@@ -5,8 +5,9 @@ import { calendarConfig, getSettings } from '../lib/calendarDb';
 import { error, ok, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 
-// GET /calendar/settings (docs/SHARED_CALENDAR_SPEC.md 11.1, route 1): the Administrator and Users.
-// The settings, or the defaults until the first save (R-SET-01). One log line per request (14.5).
+// GET /calendar/settings (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 1): the Administrator
+// and Users. The settings, or the defaults until the first save (docs/SHARED_CALENDAR_SPEC.md
+// R-SET-01). One log line per request (docs/SHARED_CALENDAR_SPEC.md section 14.5).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
   const requestId = event.requestContext?.requestId ?? 'unknown';
@@ -21,7 +22,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   if (!claims.ok) return done('unauthorized', claims.response);
   const caller = { username: claims.value.username, role: resolveRole(claims.value.groups) };
 
-  // A broken CalendarTimeZone answers 500 to every request, whatever the role (R-TIME-01).
+  // A broken CalendarTimeZone answers 500 to every request, whatever the role
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-01).
   try {
     calendarConfig();
   } catch (err) {

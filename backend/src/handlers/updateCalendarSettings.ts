@@ -6,12 +6,13 @@ import { error, ok, parseJsonBody, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 import { validate } from '../lib/validation';
 
-// PUT /calendar/settings (docs/SHARED_CALENDAR_SPEC.md 11.1, route 2): the Administrator only.
-// Replaces the four editable values together (R-SET-02) under the calendar lock (13.4). One log
-// line per request with the lock attempts, never the body (14.5).
+// PUT /calendar/settings (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 2): the Administrator
+// only. Replaces the four editable values together (docs/SHARED_CALENDAR_SPEC.md R-SET-02) under
+// the calendar lock (docs/SHARED_CALENDAR_SPEC.md section 13.4). One log line per request with the
+// lock attempts, never the body (docs/SHARED_CALENDAR_SPEC.md section 14.5).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
-  // "Now" is read once per request (R-TIME-04).
+  // "Now" is read once per request (docs/SHARED_CALENDAR_SPEC.md R-TIME-04).
   const now = new Date(started).toISOString();
   const requestId = event.requestContext?.requestId ?? 'unknown';
   const route = event.routeKey;
@@ -25,7 +26,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   if (!claims.ok) return done('unauthorized', claims.response);
   const caller = { username: claims.value.username, role: resolveRole(claims.value.groups) };
 
-  // A broken CalendarTimeZone answers 500 to every request, whatever the role (R-TIME-01).
+  // A broken CalendarTimeZone answers 500 to every request, whatever the role
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-01).
   try {
     calendarConfig();
   } catch (err) {

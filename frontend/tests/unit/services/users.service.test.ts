@@ -205,7 +205,8 @@ describe('UsersService, both pairs', () => {
   });
 });
 
-// v6: deleteUser's concurrent_update (plan step 51), and listUsers through the per-method suite.
+// deleteUser's concurrent_update (docs/FRONTEND_SERVICES.md section 8, decision 37), and listUsers
+// through the per-method suite.
 
 describe('UsersService.deleteUser, the calendar lock', () => {
   it('busy lock: failure concurrent_update with the message; the session stays', async () => {

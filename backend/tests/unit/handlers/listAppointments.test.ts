@@ -4,7 +4,10 @@ import { AC20_NOW, bodyOf, claimsOf, cleanUp, harness, NOTE, queryEvent, storedI
 type Handler = typeof import('../../../src/handlers/listAppointments').handler;
 let handler: Handler;
 
-// Spec 11.1 route 16, 11.2, 8.6 and 13.2, v10. Now is AC-20's, 2026-11-15T08:00Z (09:00 local).
+// Listing appointments: docs/SHARED_CALENDAR_SPEC.md section 11.1, route 16, with its parameters
+// (docs/SHARED_CALENDAR_SPEC.md section 11.2), who sees what (docs/SHARED_CALENDAR_SPEC.md section
+// 8.6) and the reads (docs/SHARED_CALENDAR_SPEC.md section 13.2). Now is the now of
+// docs/SHARED_CALENDAR_SPEC.md AC-20, 2026-11-15T08:00Z (09:00 local).
 const ROUTE = 'GET /calendar/appointments';
 const { ddb, reset, onPartition, logLines, output } = harness();
 const alice = claimsOf('alice', ['user']);
@@ -24,10 +27,11 @@ const appt = (id: string, start: string, more: Record<string, unknown> = {}) =>
   storedItem({ SK: `${start}#${id}`, start, end: new Date(Date.parse(start) + 3_600_000).toISOString(), ...more });
 const items = [
   appt('A0ENDED', '2026-11-14T09:00:00.000Z', { date: '2026-11-14' }), // alice, ended yesterday
-  appt('A1BOOKED', '2026-11-16T08:00:00.000Z'), // alice, the AC-20 appointment
+  // Alice, the appointment of docs/SHARED_CALENDAR_SPEC.md AC-20.
+  appt('A1BOOKED', '2026-11-16T08:00:00.000Z'),
   appt('A2CANCELLED', '2026-11-16T10:00:00.000Z', { status: 'cancelled', cancelReason: 'cancelled' }),
   appt('B1', '2026-11-16T09:00:00.000Z', { userId: 'sub-bob', username: 'bob', note: 'bob private' }),
-  // An earlier, deleted account named alice: same name, another sub (R-DEL-02).
+  // An earlier, deleted account named alice: same name, another sub (docs/SHARED_CALENDAR_SPEC.md R-DEL-02).
   appt('OLDALICE', '2026-11-16T12:00:00.000Z', { userId: 'sub-old-alice' }),
 ];
 const idsOf = (response: { body?: string }) => (bodyOf(response).appointments as { appointmentId: string }[]).map((a) => a.appointmentId);
@@ -40,6 +44,8 @@ beforeEach(async () => {
 });
 afterEach(cleanUp);
 
+// Test names: section numbers and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md
+// (scenarios in its section 18.3).
 describe('listAppointments handler', () => {
   describe('a User: their own appointments, by the sub of the token', () => {
     it('a range with the default status booked: their booked ones, an ended one included, by start', async () => {
@@ -88,7 +94,7 @@ describe('listAppointments handler', () => {
       expect((bodyOf(response).appointments as { cancellableUntil: unknown }[]).every((a) => a.cancellableUntil === null)).toBe(true);
     });
 
-    it('username filters on the stored name: the earlier account with that name included (v10)', async () => {
+    it('username filters on the stored name: the earlier account with that name included', async () => {
       expect(idsOf(await list({ ...RANGE, status: 'all', username: 'alice' }, admin))).toEqual(['A0ENDED', 'A1BOOKED', 'A2CANCELLED', 'OLDALICE']);
       expect(idsOf(await list({ ...RANGE, username: 'bob' }, admin))).toEqual(['B1']);
     });

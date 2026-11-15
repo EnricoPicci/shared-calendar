@@ -7,13 +7,15 @@ import { error, ok, parseQuery, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 import { validate } from '../lib/validation';
 
-// GET /calendar?from&to (docs/SHARED_CALENDAR_SPEC.md 11.1, route 15; 11.6): the Administrator and
-// Users. The calendar view of a date range of at most 31 days, built for the caller's role. A read:
-// no lock, no write. One log line with `from` and `to`, never the appointments, another User's
-// username or a note (14.5, section 17).
+// GET /calendar?from&to (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 15): the Administrator
+// and Users. The calendar view of a date range of at most 31 days, built for the caller's role
+// (docs/SHARED_CALENDAR_SPEC.md section 11.6). A read: no lock, no write. One log line with `from`
+// and `to`, never the appointments, another User's username or a note (docs/SHARED_CALENDAR_SPEC.md
+// sections 14.5 and 17).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
-  // "Now" is read once per request (R-TIME-04): the view's generatedAt, and what its slots compare with.
+  // "Now" is read once per request (docs/SHARED_CALENDAR_SPEC.md R-TIME-04): the view's
+  // generatedAt, and what its slots compare with.
   const now = new Date(started).toISOString();
   const requestId = event.requestContext?.requestId ?? 'unknown';
   const route = event.routeKey;
@@ -28,7 +30,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   const role = resolveRole(claims.value.groups);
   const caller = { username: claims.value.username, role };
 
-  // A broken CalendarTimeZone answers 500 to every request, whatever the role (R-TIME-01).
+  // A broken CalendarTimeZone answers 500 to every request, whatever the role
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-01).
   let config: CalendarConfig;
   try {
     config = calendarConfig();

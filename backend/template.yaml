@@ -75,7 +75,8 @@ Resources:
           RequireLowercase: true
           RequireNumbers: true
           RequireSymbols: true
-      # v1 has no forgot-password flow (architecture 7.4): only an administrator can recover an account.
+      # v1 has no forgot-password flow (docs/ARCHITECTURE.md section 7.4): only an administrator can
+      # recover an account.
       AccountRecoverySetting:
         RecoveryMechanisms:
           - Name: admin_only
@@ -162,13 +163,14 @@ Resources:
         WriteCapacityUnits: 1
       DeletionProtectionEnabled: true
 
-  # The shared calendar (spec 13.1). One table holds every kind of calendar item (settings, the
-  # lock, types, patterns, appointments...), told apart by a generic two-part key: PK groups the
-  # items of one kind, SK orders them. No secondary index: every read is a strongly consistent
-  # read of these keys, which the calendar lock relies on (spec 13.4). Fixed capacity of 10 reads /
-  # 10 writes per second (11/11 with the messages table, inside the always-free 25/25). Same
-  # encryption and deletion protection as the messages table; no TTL (history is kept) and no
-  # stream (planned for notifications, spec 15).
+  # The shared calendar (docs/SHARED_CALENDAR_SPEC.md section 13.1). One table holds every kind of
+  # calendar item (settings, the lock, types, patterns, appointments...), told apart by a generic
+  # two-part key: PK groups the items of one kind, SK orders them. No secondary index: every read is
+  # a strongly consistent read of these keys, which the calendar lock relies on
+  # (docs/SHARED_CALENDAR_SPEC.md section 13.4). Fixed capacity of 10 reads / 10 writes per second
+  # (11/11 with the messages table, inside the always-free 25/25). Same encryption and deletion
+  # protection as the messages table; no TTL (history is kept) and no stream (planned for
+  # notifications, docs/SHARED_CALENDAR_SPEC.md section 15).
   CalendarTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -189,12 +191,12 @@ Resources:
         WriteCapacityUnits: 10
       DeletionProtectionEnabled: true
 
-  # Shared permission sets on the calendar table (spec 14.3). A managed policy is a named,
-  # reusable list of permissions, not an identity: each calendar function still has its own role,
-  # which lists the sets its route needs under ManagedPolicyArns. Written once here instead of
-  # repeated in every role. Resource: the calendar table only. Writes go through
-  # TransactWriteItems, which DynamoDB authorizes by the actions of its parts (Put, Update...).
-  # CalendarBookPolicy adds the one action only a booking needs (ConditionCheckItem).
+  # Shared permission sets on the calendar table (docs/SHARED_CALENDAR_SPEC.md section 14.3). A
+  # managed policy is a named, reusable list of permissions, not an identity: each calendar function
+  # still has its own role, which lists the sets its route needs under ManagedPolicyArns. Written
+  # once here instead of repeated in every role. Resource: the calendar table only. Writes go
+  # through TransactWriteItems, which DynamoDB authorizes by the actions of its parts (Put,
+  # Update...). CalendarBookPolicy adds the one action only a booking needs (ConditionCheckItem).
   CalendarReadPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -238,10 +240,11 @@ Resources:
               - dynamodb:UpdateItem
             Resource: !GetAtt CalendarTable.Arn
 
-  # The booking's check that the account still exists (spec R-BOOK-10): the booking transaction ends
-  # with a ConditionCheck that no deleted-user marker exists for the User. A ConditionCheck reads one
-  # item and writes nothing, and DynamoDB authorizes it as its own action. Booking (route 17) and
-  # changing an appointment (route 20), which books the new one.
+  # The booking's check that the account still exists (docs/SHARED_CALENDAR_SPEC.md R-BOOK-10): the
+  # booking transaction ends with a ConditionCheck that no deleted-user marker exists for the User.
+  # A ConditionCheck reads one item and writes nothing, and DynamoDB authorizes it as its own
+  # action. Attached to the roles of booking and of changing an appointment, which books the new one
+  # (docs/SHARED_CALENDAR_SPEC.md section 11.1, routes 17 and 20).
   CalendarBookPolicy:
     Type: AWS::IAM::ManagedPolicy
     Properties:
@@ -261,7 +264,8 @@ Resources:
   # Every route requires a valid token: API Gateway calls the authorizer Lambda first and only
   # forwards the request if it answers isAuthorized=true. The answer is cached per Authorization
   # header for 300 s. Throttling (5 req/s, bursts of 10) blocks brute force and bill surprises.
-  # No stage name: the default stage serves the routes at the root of the URL (architecture 4).
+  # No stage name: the default stage serves the routes at the root of the URL, the base URL of
+  # docs/ARCHITECTURE.md section 4.
   HttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
@@ -512,9 +516,10 @@ Resources:
                   - cognito-idp:AdminDeleteUser
                 Resource: !GetAtt UserPool.Arn
 
-  # DELETE /users/{username}: refuses administrators; then, in the shared calendar (spec 10.2),
-  # writes the deleted-user marker and cancels the user's appointments not yet ended; then signs
-  # the user out everywhere and deletes them. Hence the calendar variables, like a calendar function.
+  # DELETE /users/{username}: refuses administrators; then, in the shared calendar
+  # (docs/SHARED_CALENDAR_SPEC.md section 10.2), writes the deleted-user marker and cancels the
+  # user's appointments not yet ended; then signs the user out everywhere and deletes them. Hence
+  # the calendar variables, like a calendar function.
   DeleteUserFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -601,8 +606,9 @@ Resources:
                   - cognito-idp:AdminDeleteUser
                 Resource: !GetAtt UserPool.Arn
 
-  # GET /users (spec 10.1, route 21, Administrator only): the plain Users (in group user, not in
-  # admin), for the "book for a User" choice. Reads Cognito only, on this user pool; no table.
+  # GET /users (docs/SHARED_CALENDAR_SPEC.md section 10.1 and section 11.1, route 21; Administrator
+  # only): the plain Users (in group user, not in admin), for the "book for a User" choice. Reads
+  # Cognito only, on this user pool; no table.
   ListUsersFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -672,12 +678,14 @@ Resources:
                 Resource: !GetAtt UserPool.Arn
 
   # ---------------------------------------------------------------------------
-  # Calendar functions (spec 14.1), one per route, written like HelloFunction. Each one gets
-  # the calendar table and time zone in its environment, its own log group, and its own role:
-  # the inline write-own-logs statement plus the shared permission sets its route needs.
+  # Calendar functions (docs/SHARED_CALENDAR_SPEC.md section 14.1), one per route, written like
+  # HelloFunction. Each one gets the calendar table and time zone in its environment, its own log
+  # group, and its own role: the inline write-own-logs statement plus the shared permission sets its
+  # route needs.
   # ---------------------------------------------------------------------------
 
-  # GET /calendar/settings (route 1): the settings, or the defaults until the first save.
+  # GET /calendar/settings (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 1): the settings, or
+  # the defaults until the first save.
   GetCalendarSettingsFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -741,7 +749,8 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${GetCalendarSettingsLogGroup}:log-stream:*
 
-  # PUT /calendar/settings (route 2, Administrator only): replaces the settings under the lock.
+  # PUT /calendar/settings (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 2, Administrator only):
+  # replaces the settings under the lock.
   UpdateCalendarSettingsFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -806,7 +815,8 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${UpdateCalendarSettingsLogGroup}:log-stream:*
 
-  # GET /calendar/types (route 3): every availability type, sorted by name.
+  # GET /calendar/types (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 3): every availability
+  # type, sorted by name.
   ListAvailabilityTypesFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -870,7 +880,8 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ListAvailabilityTypesLogGroup}:log-stream:*
 
-  # POST /calendar/types (route 4, Administrator only): creates a type under the lock.
+  # POST /calendar/types (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 4, Administrator only):
+  # creates a type under the lock.
   CreateAvailabilityTypeFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -935,7 +946,8 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CreateAvailabilityTypeLogGroup}:log-stream:*
 
-  # PUT /calendar/types/{typeId} (route 5, Administrator only): renames a type under the lock.
+  # PUT /calendar/types/{typeId} (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 5, Administrator
+  # only): renames a type under the lock.
   RenameAvailabilityTypeFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -1000,8 +1012,8 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${RenameAvailabilityTypeLogGroup}:log-stream:*
 
-  # DELETE /calendar/types/{typeId} (route 6, Administrator only): deletes a type nothing current
-  # refers to, under the lock.
+  # DELETE /calendar/types/{typeId} (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 6,
+  # Administrator only): deletes a type nothing current refers to, under the lock.
   DeleteAvailabilityTypeFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -1066,7 +1078,8 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeleteAvailabilityTypeLogGroup}:log-stream:*
 
-  # GET /calendar/patterns (route 7, Administrator only): every weekly pattern, by weekday and start.
+  # GET /calendar/patterns (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 7, Administrator only):
+  # every weekly pattern, by weekday and start.
   ListPatternsFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -1130,8 +1143,9 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ListPatternsLogGroup}:log-stream:*
 
-  # POST /calendar/patterns (route 8, Administrator only): creates a weekly pattern under the lock,
-  # checked for overlaps and for appointments it would leave outside the availability.
+  # POST /calendar/patterns (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 8, Administrator
+  # only): creates a weekly pattern under the lock, checked for overlaps and for appointments it
+  # would leave outside the availability.
   CreatePatternFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -1196,8 +1210,8 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CreatePatternLogGroup}:log-stream:*
 
-  # PUT /calendar/patterns/{patternId} (route 9, Administrator only): replaces a weekly pattern under
-  # the lock, with the same checks.
+  # PUT /calendar/patterns/{patternId} (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 9,
+  # Administrator only): replaces a weekly pattern under the lock, with the same checks.
   UpdatePatternFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -1262,8 +1276,9 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${UpdatePatternLogGroup}:log-stream:*
 
-  # DELETE /calendar/patterns/{patternId} (route 10, Administrator only): deletes a weekly pattern
-  # under the lock, unless an appointment would fall outside the availability.
+  # DELETE /calendar/patterns/{patternId} (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 10,
+  # Administrator only): deletes a weekly pattern under the lock, unless an appointment would fall
+  # outside the availability.
   DeletePatternFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -1328,8 +1343,9 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeletePatternLogGroup}:log-stream:*
 
-  # GET /calendar (route 15, Administrator and Users): the calendar view of a date range (at most
-  # 31 days): windows, free slots, busy intervals and appointments. A read: no lock, no write.
+  # GET /calendar (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 15, Administrator and Users):
+  # the calendar view of a date range (at most 31 days): windows, free slots, busy intervals and
+  # appointments. A read: no lock, no write.
   GetCalendarFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -1393,8 +1409,9 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${GetCalendarLogGroup}:log-stream:*
 
-  # PUT /calendar/overrides/{date} (route 11, Administrator only): sets or replaces the override of a
-  # date under the lock, checked for overlaps and for appointments it would leave outside the availability.
+  # PUT /calendar/overrides/{date} (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 11,
+  # Administrator only): sets or replaces the override of a date under the lock, checked for
+  # overlaps and for appointments it would leave outside the availability.
   SetOverrideFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -1459,8 +1476,9 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${SetOverrideLogGroup}:log-stream:*
 
-  # DELETE /calendar/overrides/{date} (route 12, Administrator only): removes the override of a date
-  # under the lock, so the weekly patterns apply again, with the same checks.
+  # DELETE /calendar/overrides/{date} (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 12,
+  # Administrator only): removes the override of a date under the lock, so the weekly patterns apply
+  # again, with the same checks.
   DeleteOverrideFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -1525,8 +1543,9 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeleteOverrideLogGroup}:log-stream:*
 
-  # POST /calendar/windows (route 13, Administrator only): adds a one-off window on a date under the
-  # lock, checked for overlaps and the limit of 10 per date.
+  # POST /calendar/windows (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 13, Administrator
+  # only): adds a one-off window on a date under the lock, checked for overlaps and the limit of 10
+  # per date.
   CreateOneOffWindowFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -1591,8 +1610,9 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CreateOneOffWindowLogGroup}:log-stream:*
 
-  # DELETE /calendar/windows/{windowId} (route 14, Administrator only): removes a one-off window under
-  # the lock, unless an appointment would fall outside the availability.
+  # DELETE /calendar/windows/{windowId} (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 14,
+  # Administrator only): removes a one-off window under the lock, unless an appointment would fall
+  # outside the availability.
   DeleteOneOffWindowFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -1657,10 +1677,11 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeleteOneOffWindowLogGroup}:log-stream:*
 
-  # POST /calendar/appointments (route 17, Administrator and Users): books an appointment under the
-  # lock, with the event of spec section 15 in the same transaction. The Administrator books for a
-  # User named in the body: the function asks Cognito for that account's id (AdminGetUser) and
-  # groups (AdminListGroupsForUser), read-only, on this user pool only.
+  # POST /calendar/appointments (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 17, Administrator
+  # and Users): books an appointment under the lock, with its event (docs/SHARED_CALENDAR_SPEC.md
+  # section 15.2) in the same transaction. The Administrator books for a User named in the body: the
+  # function asks Cognito for that account's id (AdminGetUser) and groups (AdminListGroupsForUser),
+  # read-only, on this user pool only.
   BookAppointmentFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -1737,9 +1758,10 @@ Resources:
                   - cognito-idp:AdminListGroupsForUser
                 Resource: !GetAtt UserPool.Arn
 
-  # GET /calendar/appointments (route 16, Administrator and Users): the appointments of a date range
-  # (at most 92 days) or the upcoming ones, filtered by status; a User's own only. A read: no lock,
-  # no write, no Cognito call (the Administrator's username filter is on the stored name).
+  # GET /calendar/appointments (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 16, Administrator
+  # and Users): the appointments of a date range (at most 92 days) or the upcoming ones, filtered by
+  # status; a User's own only. A read: no lock, no write, no Cognito call (the Administrator's
+  # username filter is on the stored name).
   ListAppointmentsFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -1803,8 +1825,9 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ListAppointmentsLogGroup}:log-stream:*
 
-  # PATCH /calendar/appointments/{appointmentId} (route 18, Administrator and the appointment's User):
-  # sets or clears the note of an active appointment not yet ended, under the lock, with its event.
+  # PATCH /calendar/appointments/{appointmentId} (docs/SHARED_CALENDAR_SPEC.md section 11.1,
+  # route 18, Administrator and the appointment's User): sets or clears the note of an active appointment
+  # not yet ended, under the lock, with its event.
   UpdateAppointmentNoteFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -1869,9 +1892,10 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${UpdateAppointmentNoteLogGroup}:log-stream:*
 
-  # POST /calendar/appointments/{appointmentId}/cancel (route 19, Administrator and the appointment's
-  # User): cancels an active appointment not yet ended (a User only with enough notice), under the
-  # lock, with its event. The appointment is kept as cancelled, never deleted.
+  # POST /calendar/appointments/{appointmentId}/cancel (docs/SHARED_CALENDAR_SPEC.md section 11.1,
+  # route 19, Administrator and the appointment's User): cancels an active appointment not yet ended
+  # (a User only with enough notice), under the lock, with its event. The appointment is kept as
+  # cancelled, never deleted.
   CancelAppointmentFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -1936,11 +1960,11 @@ Resources:
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${CancelAppointmentLogGroup}:log-stream:*
 
-  # POST /calendar/appointments/{appointmentId}/change (route 20, Administrator and the appointment's
-  # User): cancels the old appointment (cancelReason changed) and books the new one for the same User
-  # in one transaction under the lock, with one appointment.changed event. Like booking it checks the
-  # deleted-user marker (CalendarBookPolicy); unlike booking it needs no Cognito: the User's sub is
-  # stored on the old appointment.
+  # POST /calendar/appointments/{appointmentId}/change (docs/SHARED_CALENDAR_SPEC.md section 11.1,
+  # route 20, Administrator and the appointment's User): cancels the old appointment (cancelReason
+  # changed) and books the new one for the same User in one transaction under the lock, with one
+  # appointment.changed event. Like booking it checks the deleted-user marker (CalendarBookPolicy);
+  # unlike booking it needs no Cognito: the User's sub is stored on the old appointment.
   ChangeAppointmentFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -2007,13 +2031,13 @@ Resources:
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ChangeAppointmentLogGroup}:log-stream:*
 
   # ---------------------------------------------------------------------------
-  # Error alarms (architecture section 11)
+  # Error alarms (docs/ARCHITECTURE.md section 11)
   # ---------------------------------------------------------------------------
 
   # A notification channel that forwards alarm messages to AlertEmail. After the first
   # deploy AWS sends a confirmation e-mail; no alarm e-mail arrives until it is confirmed.
   # Unconfirmed, AWS deletes the subscription after about two days and a redeploy does not
-  # recreate it: subscribe again by hand (docs/RUNBOOK.md, section 3).
+  # recreate it: subscribe again by hand (docs/RUNBOOK.md section 3).
   AlarmTopic:
     Type: AWS::SNS::Topic
     Properties:

@@ -18,8 +18,10 @@ import {
   specExample,
 } from './calendarView.fixtures';
 
-// calendarView (calendarRules.ts): pure, "now" and the zone passed in. The view of spec 11.6, the
-// slots of section 7, R-VIEW-01..03 and the privacy of section 17.
+// calendarView (calendarRules.ts): pure, with "now" and the zone passed in. Covers the view of
+// docs/SHARED_CALENDAR_SPEC.md section 11.6, the slots of docs/SHARED_CALENDAR_SPEC.md section 7,
+// docs/SHARED_CALENDAR_SPEC.md R-VIEW-01 to R-VIEW-03, and the privacy rules of
+// docs/SHARED_CALENDAR_SPEC.md section 17.
 
 const view = (more: Partial<CalendarViewInput> = {}): CalendarView => calendarView({ ...EXAMPLE, ...more });
 const admin = (more: Partial<CalendarViewInput> = {}) => view({ role: 'admin', callerSub: 'sub-admin', ...more });
@@ -38,6 +40,8 @@ const pattern = (patternId: string, weekday: number, start: string, end: string,
   validUntil: null,
 });
 
+// Test names: section numbers and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md
+// (scenarios in its section 18.3).
 describe('calendarView: the 11.6 example', () => {
   it('reproduces the spec’s example byte for byte (User alice, 2026-11-16, now 2026-11-10T09:00Z)', () => {
     expect(JSON.stringify(view())).toBe(specExample());
@@ -109,6 +113,7 @@ describe('calendarView: the 11.6 example', () => {
   });
 });
 
+// Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('calendarView: which slots are offered', () => {
   it('shows a past date with its windows and no slots (R-VIEW-03), to both roles', () => {
     for (const v of [view({ from: '2026-11-09', to: '2026-11-09', appointments: [] }), admin({ from: '2026-11-09', to: '2026-11-09', appointments: [] })]) {
@@ -192,6 +197,8 @@ describe('calendarView: which slots are offered', () => {
   });
 });
 
+// Test names: R-… rules and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in
+// its section 18.3).
 describe('calendarView: windows', () => {
   it('shows a pattern and a touching one-off of the same type as two windows, and merges them for the slots (AC-08)', () => {
     const oneOff = { windowId: '01M6DN0000000000000000W001', date: '2026-11-16', start: '12:00', end: '13:00', typeId: STUDIO };
@@ -243,7 +250,7 @@ describe('calendarView: windows', () => {
     expect(localSlots(v)).toEqual(['09:00']);
   });
 
-  it('leaves out a past window whose type was deleted (R-VIEW-03, v7); the override still counts for hasOverride', () => {
+  it('leaves out a past window whose type was deleted (R-VIEW-03); the override still counts for hasOverride', () => {
     const GONE = '01M6DN0000000000000000GONE';
     const more = {
       from: '2026-11-02',
@@ -264,6 +271,8 @@ describe('calendarView: windows', () => {
   });
 });
 
+// Test names: R-… rules and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in
+// its section 18.3).
 describe('calendarView: clock changes and the range', () => {
   it('AC-35, spring forward (2027-03-28): window 01:00–04:00 gives slots 01:00 and 03:00 local, each 60 real minutes', () => {
     const more = { from: '2027-03-28', to: '2027-03-28', patterns: [pattern('S', 7, '01:00', '04:00')], appointments: [] };
@@ -271,7 +280,8 @@ describe('calendarView: clock changes and the range', () => {
     expect(v.days[0]!.windows.map((w) => [w.start, w.end])).toEqual([['2027-03-28T00:00:00.000Z', '2027-03-28T02:00:00.000Z']]);
     expect(localSlots(v)).toEqual(['01:00', '03:00']);
     expect(v.days[0]!.slots.map((s) => Date.parse(s.end) - Date.parse(s.start))).toEqual([HOUR, HOUR]);
-    // Beyond the User's horizon (56 days from 2026-11-10): the window, no slots (R-SLOT-03).
+    // Beyond the User's horizon (56 days from 2026-11-10): the window, no slots
+    // (docs/SHARED_CALENDAR_SPEC.md R-SLOT-03).
     expect(view(more).days[0]!.windows).toHaveLength(1);
     expect(view(more).days[0]!.slots).toEqual([]);
   });
@@ -281,7 +291,7 @@ describe('calendarView: clock changes and the range', () => {
     expect(v.days[0]!.windows).toEqual([]);
   });
 
-  it('fall back (2026-10-25): window 01:00–04:00 gives four slots, two at local 02:00 an hour apart (R-SLOT-01, v7)', () => {
+  it('fall back (2026-10-25): window 01:00–04:00 gives four slots, two at local 02:00 an hour apart (R-SLOT-01)', () => {
     const more = { from: '2026-10-25', to: '2026-10-25', now: '2026-10-20T09:00:00.000Z', patterns: [pattern('S', 7, '01:00', '04:00')], appointments: [] };
     for (const v of [view(more), admin(more)]) {
       expect(slotStarts(v)).toEqual(['2026-10-24T23:00:00.000Z', '2026-10-25T00:00:00.000Z', '2026-10-25T01:00:00.000Z', '2026-10-25T02:00:00.000Z']);

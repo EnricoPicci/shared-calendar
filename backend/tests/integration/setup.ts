@@ -17,9 +17,9 @@ import {
 import { existsSync, readFileSync } from 'node:fs';
 import { connect } from 'node:net';
 
-// Helpers for the integration journeys (plan step 9). They talk to the local stack of
-// architecture section 8: `npm run local:up` (emulators) and `npm run local:api` (sam local).
-// Unlike the handlers, tests may use the AWS SDK directly.
+// Helpers for the integration journeys (docs/IMPLEMENTATION_PLAN.md step 9). They talk to the local
+// stack of docs/ARCHITECTURE.md section 8: `npm run local:up` (emulators) and `npm run local:api`
+// (sam local). Unlike the handlers, tests may use the AWS SDK directly.
 
 const API_URL = 'http://127.0.0.1:3000';
 const COGNITO_URL = 'http://localhost:9229';
@@ -81,7 +81,7 @@ export async function setup(): Promise<void> {
     // Typically another project's DynamoDB Local holds the port (DYNAMODB_PORT not set).
     missing.push(`no table ${TABLE_NAME} on port ${DYNAMODB_PORT}: wrong DYNAMODB_PORT, or run npm run local:up`);
   } else if (!(await tableExists(CALENDAR_TABLE))) {
-    // A stack started before plan step 43: local:up creates the table (it is idempotent).
+    // A stack started before the calendar table existed: local:up creates it (it is idempotent).
     missing.push(`no table ${CALENDAR_TABLE} on port ${DYNAMODB_PORT}: run npm run local:up again`);
   }
   if (!(await portOpen(9229))) missing.push('cognito-local is not listening on port 9229 (npm run local:up)');

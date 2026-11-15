@@ -9,7 +9,7 @@
   "scripts": {
     "build": "bash scripts/check-sam.sh && SAM_CLI_BETA_NODEJS_MONOREPO=1 sam build",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint .",
+    "lint": "eslint . && node ../scripts/check-doc-references.mjs",
     "audit": "npm audit --audit-level=high",
     "test:unit": "vitest run --project unit --coverage",
     "test:integration": "vitest run --project integration",

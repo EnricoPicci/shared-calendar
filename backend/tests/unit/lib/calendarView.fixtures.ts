@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import type { Appointment } from '@shared-calendar/shared';
 import type { CalendarViewInput, ViewAppointment } from '../../../src/lib/calendarRules';
 
-// The 11.6 example of docs/SHARED_CALENDAR_SPEC.md (v7), shared by the view's tests (pure and
+// The example of docs/SHARED_CALENDAR_SPEC.md section 11.6, shared by the view's tests (pure and
 // handler): Monday 2026-11-16, Europe/Rome, now 2026-11-10T09:00Z, default settings.
 
 export const ZONE = 'Europe/Rome';
@@ -82,7 +82,10 @@ export const EXAMPLE: CalendarViewInput = {
   appointments: [BOB_09, ALICE_11],
 };
 
-/** The JSON of the 11.6 example, compacted, read from the spec itself so the two cannot drift. */
+/**
+ * The JSON of the example of docs/SHARED_CALENDAR_SPEC.md section 11.6, compacted, read from the
+ * spec itself so the two cannot drift.
+ */
 export function specExample(): string {
   const spec = readFileSync(new URL('../../../../docs/SHARED_CALENDAR_SPEC.md', import.meta.url), 'utf8');
   const at = spec.indexOf('Example (User `alice`, one day');

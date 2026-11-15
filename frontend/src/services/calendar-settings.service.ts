@@ -5,8 +5,8 @@ import { apiCall, hasString, invalidRequest, unexpectedAnswer, type ApiConfig, t
 import type { SettingsResult, SettingsState, UpdateSettingsResult, UpdateSettingsState } from './calendar-settings.types';
 import type { SessionStore } from './session.store';
 
-// docs/FRONTEND_SERVICES.md section 15. GET /calendar/settings (both roles) and
-// PUT /calendar/settings (admin only): two pairs of streams, independent of each other.
+// The calendar settings (docs/FRONTEND_SERVICES.md section 15): GET /calendar/settings (both roles)
+// and PUT /calendar/settings (admin only), two pairs of streams, independent of each other.
 
 const LOAD_CODES = ['forbidden', 'internal_error'] as const satisfies readonly ApiErrorCode[];
 const UPDATE_CODES = ['forbidden', 'invalid_json', 'invalid_request', 'concurrent_update', 'internal_error'] as const satisfies readonly ApiErrorCode[];
@@ -40,7 +40,8 @@ export class CalendarSettingsService {
         map((answer): SettingsResult => (answer.status === 'ok' ? toSettingsResult(answer) : answer)),
         tap((result) => this.settingsStateSubject.next(result)),
       )
-      // Forward `next` only: a completed subject would ignore every later call (section 3.2).
+      // Forward `next` only: a completed subject would ignore every later call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
       .subscribe((result) => this.settingsResultSubject.next(result));
   }
 
@@ -48,7 +49,8 @@ export class CalendarSettingsService {
     this.pendingUpdate?.unsubscribe(); // cancels a pending update only, never a load
     this.updateStateSubject.next({ status: 'pending', settings });
 
-    // The shared schema, so the front end rejects exactly what the API rejects (section 15.4).
+    // Checked with the shared schema, so the front end rejects exactly what the API rejects
+    // (docs/FRONTEND_SERVICES.md section 15.4).
     const body = UpdateSettingsBody.safeParse(settings);
     const call: Observable<UpdateSettingsResult> = body.success
       ? apiCall(this.config, this.store, { method: 'PUT', path: '/calendar/settings', body: body.data, codes: UPDATE_CODES }).pipe(
@@ -58,12 +60,14 @@ export class CalendarSettingsService {
 
     this.pendingUpdate = call
       .pipe(tap((result) => this.updateStateSubject.next(result)))
-      // Forward `next` only: a completed subject would ignore every later call (section 3.2).
+      // Forward `next` only: a completed subject would ignore every later call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
       .subscribe((result) => this.updateResultSubject.next(result));
   }
 }
 
-// Section 15.5: the status and the object's id (`timeZone`); the rest is trusted to the contract.
+// A success is checked for its status and the object's identifying field, `timeZone`; the rest is
+// trusted to the contract (docs/FRONTEND_SERVICES.md section 15.5).
 // Both routes answer 200 with CalendarSettings.
 function toSettingsResult(answer: ApiOk): { status: 'success'; settings: CalendarSettings } | ApiFailure<never> {
   if (answer.httpStatus === 200 && hasString(answer.body, 'timeZone')) {

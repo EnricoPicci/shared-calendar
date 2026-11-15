@@ -5,7 +5,7 @@ import { apiCall, transportFailure, type ApiConfig, type ApiOk } from './api';
 import type { HelloResult, HelloState } from './hello.types';
 import type { SessionStore } from './session.store';
 
-// docs/FRONTEND_SERVICES.md section 12. POST /hello as the signed-in user.
+// Calls POST /hello as the signed-in user (docs/FRONTEND_SERVICES.md section 12).
 
 const HELLO_CODES = ['forbidden', 'internal_error'] as const satisfies readonly ApiErrorCode[];
 
@@ -31,16 +31,19 @@ export class HelloService {
 
     this.pending = apiCall(this.config, this.store, { method: 'POST', path: '/hello', codes: HELLO_CODES })
       .pipe(
-        // apiCall never errors: the network failure is already a value (section 10.2).
+        // apiCall never errors: a network failure already arrives as a value
+        // (docs/FRONTEND_SERVICES.md section 10.2).
         map((answer): HelloResult => (answer.status === 'ok' ? toHelloResult(answer) : answer)),
         tap((result) => this.stateSubject.next(result)),
       )
-      // Forward `next` only: a completed subject would ignore every later call (section 3.2).
+      // Forward `next` only: a completed subject would ignore every later call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
       .subscribe((result) => this.resultSubject.next(result));
   }
 }
 
-// Section 12.5: the 201 must have the contract's shape, checked field by field.
+// The 201 must have the contract's shape, checked field by field (docs/FRONTEND_SERVICES.md
+// section 12.5).
 function toHelloResult(answer: ApiOk): HelloResult {
   const body = (answer.body ?? {}) as Partial<Record<keyof HelloResponse, unknown>>;
   if (

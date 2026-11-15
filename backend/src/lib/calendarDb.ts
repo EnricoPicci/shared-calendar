@@ -32,16 +32,18 @@ import { appointmentEvent, type AppointmentSnapshot, type EventInput } from './c
 import type { CalendarState, NoteRefusal, Refusal, StateAppointment, ViewAppointment } from './calendarRules';
 import { documentClient } from './db';
 
-// The calendar table (docs/SHARED_CALENDAR_SPEC.md 13). This is the only module that knows its
-// item layout (13.2) and the lock (13.4). Every read is strongly consistent: the lock relies on it.
+// The calendar table (docs/SHARED_CALENDAR_SPEC.md section 13). This is the only module that knows
+// its item layout (docs/SHARED_CALENDAR_SPEC.md section 13.2) and the lock
+// (docs/SHARED_CALENDAR_SPEC.md section 13.4). Every read is strongly consistent: the lock relies
+// on it.
 
 // ── Configuration ──────────────────────────────────────────────────────────────────────────────
 
 export type CalendarConfig = { table: string; timeZone: string };
 
 // A broken deployment parameter. The handlers answer 500 internal_error for every request
-// (R-TIME-01), which the 5xx alarm counts. It is thrown on use, never at import: a module that
-// fails to load makes the Lambda crash instead of answering.
+// (docs/SHARED_CALENDAR_SPEC.md R-TIME-01), which the 5xx alarm counts. It is thrown on use, never
+// at import: a module that fails to load makes the Lambda crash instead of answering.
 export class CalendarConfigError extends Error {
   constructor(message: string) {
     super(message);
@@ -68,15 +70,16 @@ export function calendarConfig(): CalendarConfig {
   return config;
 }
 
-// ── The calendar lock (13.4) ───────────────────────────────────────────────────────────────────
+// ── The calendar lock (docs/SHARED_CALENDAR_SPEC.md section 13.4) ──────────────────────────────
 
 export type TransactItem = NonNullable<TransactWriteCommandInput['TransactItems']>[number];
 
 // What one attempt of a locked operation decided, after its reads and checks:
 // - write: the operation's items, written in one transaction after the lock update. When one of
 //   them carries a condition the checks cannot see beforehand (a booking's deleted-user marker,
-//   R-BOOK-10), `onConditionFailed` names it (its index in `write`) and the result to answer if
-//   that condition fails: the transaction is cancelled, nothing is written, and there is no retry;
+//   docs/SHARED_CALENDAR_SPEC.md R-BOOK-10), `onConditionFailed` names it (its index in `write`)
+//   and the result to answer if that condition fails: the transaction is cancelled, nothing is
+//   written, and there is no retry;
 // - stop: a check failed; nothing is written and the result goes back to the caller as is.
 export type LockedPlan<T> =
   | { write: TransactItem[]; result: T; onConditionFailed?: { item: number; result: T } }
@@ -142,12 +145,13 @@ export function lockWaitMs(random: () => number = Math.random): number {
   return LOCK_WAIT_MS.min + Math.floor(random() * (LOCK_WAIT_MS.max - LOCK_WAIT_MS.min + 1));
 }
 
-// Runs one calendar write under the lock (13.4): read the lock version, let `attempt` read what
-// its rules need and check them, then write the lock update and the attempt's items in one
-// transaction. If another write took the lock in between, wait and start again from the reads,
-// at most LOCK_MAX_ATTEMPTS times in total. The lock is looked at first: when it was lost, any
-// other reason in the same answer is stale and the retry re-reads. Otherwise a failed condition the
-// plan named answers its result (`onConditionFailed`), and any other failure is thrown at once.
+// Runs one calendar write under the lock (docs/SHARED_CALENDAR_SPEC.md section 13.4): read the lock
+// version, let `attempt` read what its rules need and check them, then write the lock update and
+// the attempt's items in one transaction. If another write took the lock in between, wait and start
+// again from the reads, at most LOCK_MAX_ATTEMPTS times in total. The lock is looked at first: when
+// it was lost, any other reason in the same answer is stale and the retry re-reads. Otherwise a
+// failed condition the plan named answers its result (`onConditionFailed`), and any other failure
+// is thrown at once.
 export async function withCalendarLock<T>(attempt: () => Promise<LockedPlan<T>>): Promise<Locked<T>> {
   const { table } = calendarConfig();
   for (let attempts = 1; ; attempts++) {
@@ -171,7 +175,7 @@ export async function withCalendarLock<T>(attempt: () => Promise<LockedPlan<T>>)
   }
 }
 
-// ── Settings (spec section 9) ──────────────────────────────────────────────────────────────────
+// ── Settings (docs/SHARED_CALENDAR_SPEC.md section 9) ──────────────────────────────────────────
 
 const SETTINGS_KEY = { PK: 'SETTINGS', SK: 'SETTINGS' } as const;
 
@@ -196,14 +200,14 @@ async function readSettings(table: string, timeZone: string): Promise<CalendarSe
   return { timeZone, ...pickValues(values) };
 }
 
-// The saved settings, or the defaults until the first save (R-SET-01).
+// The saved settings, or the defaults until the first save (docs/SHARED_CALENDAR_SPEC.md R-SET-01).
 export async function getSettings(): Promise<CalendarSettings> {
   const { table, timeZone } = calendarConfig();
   return readSettings(table, timeZone);
 }
 
-// Replaces the four editable values together (R-SET-02), under the lock. The time zone is a
-// deployment parameter and is never stored.
+// Replaces the four editable values together (docs/SHARED_CALENDAR_SPEC.md R-SET-02), under the
+// lock. The time zone is a deployment parameter and is never stored.
 export async function putSettings(values: UpdateSettingsBody, by: Actor, now: string): Promise<Locked<CalendarSettings>> {
   const { table, timeZone } = calendarConfig();
   const stored = pickValues({ ...values, updatedAt: now, updatedBy: by });
@@ -257,7 +261,8 @@ export type Checked<T, C extends ApiErrorCode> = { ok: true; value: T } | ({ ok:
 const refused = <C extends ApiErrorCode>(refusal: Refusal<C>) => ({ ok: false as const, ...refusal });
 const notFound = <C extends ApiErrorCode>(error: C) => refused({ error });
 
-// ── Availability types (spec 6.1; item TYPE / <typeId> of 13.2) ────────────────────────────────
+// ── Availability types (docs/SHARED_CALENDAR_SPEC.md section 6.1) ────────────────────────────────
+// Item TYPE / <typeId> of docs/SHARED_CALENDAR_SPEC.md section 13.2.
 
 const TYPE_PK = 'TYPE';
 
@@ -304,9 +309,9 @@ export async function listTypes(): Promise<AvailabilityType[]> {
 export type TypeNameCheck<C extends ApiErrorCode> = (types: TypeRecord[]) => Refusal<C> | null;
 
 /**
- * Creates a type under the lock (R-TYPE-01). `check` sees every type read inside the attempt, so
- * a name taken by a write that came first is seen on the retry. `typeId` is generated by the
- * caller once per request, so a retry does not change it.
+ * Creates a type under the lock (docs/SHARED_CALENDAR_SPEC.md R-TYPE-01). `check` sees every type
+ * read inside the attempt, so a name taken by a write that came first is seen on the retry.
+ * `typeId` is generated by the caller once per request, so a retry does not change it.
  */
 export async function createType<C extends ApiErrorCode>(
   type: { typeId: string; name: string; nameKey: string },
@@ -323,9 +328,9 @@ export async function createType<C extends ApiErrorCode>(
 }
 
 /**
- * Renames a type under the lock (R-TYPE-02): `type_not_found` if it is not there at the time of
- * the attempt, otherwise `check` decides. The whole item is written again (Put), from the one read
- * inside the attempt, which the lock keeps current.
+ * Renames a type under the lock (docs/SHARED_CALENDAR_SPEC.md R-TYPE-02): `type_not_found` if it is
+ * not there at the time of the attempt, otherwise `check` decides. The whole item is written again
+ * (Put), from the one read inside the attempt, which the lock keeps current.
  */
 export async function renameType<C extends ApiErrorCode>(
   typeId: string,
@@ -345,7 +350,8 @@ export async function renameType<C extends ApiErrorCode>(
   });
 }
 
-// One day in milliseconds: an appointment lasts at most this long (13.2).
+// One day in milliseconds: an appointment lasts at most this long (docs/SHARED_CALENDAR_SPEC.md
+// section 13.2).
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const PATTERN_PK = 'PATTERN';
@@ -393,7 +399,8 @@ function toOneOff(item: Item): OneOffInput {
 }
 
 /**
- * The availability state of a locked attempt (13.2 access patterns, all consistent): every type
+ * The availability state of a locked attempt (the access patterns of docs/SHARED_CALENDAR_SPEC.md
+ * section 13.2, all consistent): every type
  * and every pattern; the overrides and one-off windows dated `today` or later (a window's SK is
  * `<date>#<windowId>`, so it sorts at or after `today`); the appointments that started at most
  * 24 h before `now` (none lasts longer), so every one not yet ended. Filtering on status and end is
@@ -434,9 +441,9 @@ async function readState(table: string, today: string, now: string): Promise<Rea
 export type StateCheck<C extends ApiErrorCode> = (state: CalendarState) => Refusal<C> | null;
 
 /**
- * Deletes a type under the lock (R-TYPE-03): `type_not_found` if it is not there at the time of
- * the attempt, otherwise `check` decides on the state read inside the attempt. The lock
- * serializes every calendar write, so the delete needs no condition of its own.
+ * Deletes a type under the lock (docs/SHARED_CALENDAR_SPEC.md R-TYPE-03): `type_not_found` if it is
+ * not there at the time of the attempt, otherwise `check` decides on the state read inside the
+ * attempt. The lock serializes every calendar write, so the delete needs no condition of its own.
  */
 export async function deleteType<C extends ApiErrorCode>(
   typeId: string,
@@ -454,7 +461,8 @@ export async function deleteType<C extends ApiErrorCode>(
   });
 }
 
-// ── Weekly patterns (spec 6.2; item PATTERN / <patternId> of 13.2) ─────────────────────────────
+// ── Weekly patterns (docs/SHARED_CALENDAR_SPEC.md section 6.2) ───────────────────────────────────
+// Item PATTERN / <patternId> of docs/SHARED_CALENDAR_SPEC.md section 13.2.
 
 const byWeekdayThenStart = (a: WeeklyPattern, b: WeeklyPattern) =>
   a.weekday - b.weekday || cmp(a.start, b.start) || cmp(a.validFrom, b.validFrom) || cmp(a.patternId, b.patternId);
@@ -462,7 +470,10 @@ function cmp(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-/** Every pattern, by weekday, then start (11.1); then validity and id, so the order is stable. */
+/**
+ * Every pattern, by weekday, then start (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 7); then
+ * validity and id, so the order is stable.
+ */
 export async function listPatterns(): Promise<WeeklyPattern[]> {
   const { table } = calendarConfig();
   return (await queryPartition(table, PATTERN_PK)).map(toPattern).sort(byWeekdayThenStart);
@@ -490,8 +501,9 @@ function putPattern(table: string, p: WeeklyPattern): TransactItem {
 }
 
 /**
- * Creates a pattern under the lock (R-PAT-03/04, R-AV-01..05). `check` sees the state read inside
- * the attempt, before the write. `pattern.patternId` is generated by the caller once per request.
+ * Creates a pattern under the lock (docs/SHARED_CALENDAR_SPEC.md R-PAT-03, R-PAT-04 and R-AV-01 to
+ * R-AV-05). `check` sees the state read inside the attempt, before the write. `pattern.patternId`
+ * is generated by the caller once per request.
  */
 export async function createPattern<C extends ApiErrorCode>(
   pattern: PatternInput,
@@ -509,8 +521,9 @@ export async function createPattern<C extends ApiErrorCode>(
 }
 
 /**
- * Replaces a pattern (full replacement, R-PAT-03) under the lock: `pattern_not_found` if it is not
- * there at the time of the attempt, otherwise `check` decides. `createdAt` is kept.
+ * Replaces a pattern (full replacement, docs/SHARED_CALENDAR_SPEC.md R-PAT-03) under the lock:
+ * `pattern_not_found` if it is not there at the time of the attempt, otherwise `check` decides.
+ * `createdAt` is kept.
  */
 export async function updatePattern<C extends ApiErrorCode>(
   pattern: PatternInput,
@@ -530,7 +543,10 @@ export async function updatePattern<C extends ApiErrorCode>(
   });
 }
 
-/** Deletes a pattern under the lock: `pattern_not_found` if it is not there, otherwise `check` decides (R-AV-03). */
+/**
+ * Deletes a pattern under the lock: `pattern_not_found` if it is not there, otherwise `check`
+ * decides (docs/SHARED_CALENDAR_SPEC.md R-AV-03).
+ */
 export async function deletePattern<C extends ApiErrorCode>(
   patternId: string,
   today: string,
@@ -547,16 +563,18 @@ export async function deletePattern<C extends ApiErrorCode>(
   });
 }
 
-// ── Date overrides (spec 6.3; item OVERRIDE / <date> of 13.2) ──────────────────────────────────
+// ── Date overrides (docs/SHARED_CALENDAR_SPEC.md section 6.3) ────────────────────────────────────
+// Item OVERRIDE / <date> of docs/SHARED_CALENDAR_SPEC.md section 13.2.
 
 
 // An actor map as stored (updatedBy, createdBy): picked field by field.
 const actorItem = (by: Actor): Actor => ({ username: by.username, role: by.role });
 
 /**
- * Sets the override of `date` under the lock (R-OVR-01/02): a `Put` of the whole item, so a date
- * that already has one gets it replaced. The windows are stored and answered sorted by start
- * (spec v8, 6.3); each one picked field by field. `updatedBy` is stored, never answered. `date` is
+ * Sets the override of `date` under the lock (docs/SHARED_CALENDAR_SPEC.md R-OVR-01 and R-OVR-02):
+ * a `Put` of the whole item, so a date that already has one gets it replaced. The windows are
+ * stored and answered sorted by start (docs/SHARED_CALENDAR_SPEC.md section 6.3); each one picked
+ * field by field. `updatedBy` is stored, never answered. `date` is
  * today or later (the handler answers date_in_past before the lock), so the state read inside the
  * attempt holds the date's current override and one-off windows.
  */
@@ -582,7 +600,8 @@ export async function setOverride<C extends ApiErrorCode>(
 }
 
 /**
- * Deletes the override of `date` under the lock, so the patterns apply again (R-OVR-02):
+ * Deletes the override of `date` under the lock, so the patterns apply again
+ * (docs/SHARED_CALENDAR_SPEC.md R-OVR-02):
  * `override_not_found` if the date has none at the time of the attempt, otherwise `check` decides.
  * `date` is today or later (date_in_past is the handler's, before the lock).
  */
@@ -602,11 +621,13 @@ export async function deleteOverride<C extends ApiErrorCode>(
   });
 }
 
-// ── One-off windows (spec 6.4; item WINDOW / <date>#<windowId> of 13.2) ────────────────────────
+// ── One-off windows (docs/SHARED_CALENDAR_SPEC.md section 6.4) ───────────────────────────────────
+// Item WINDOW / <date>#<windowId> of docs/SHARED_CALENDAR_SPEC.md section 13.2.
 
 
 /**
- * Creates a one-off window under the lock (R-ONE-01/03): a `Put` of the item with SK
+ * Creates a one-off window under the lock (docs/SHARED_CALENDAR_SPEC.md R-ONE-01 and R-ONE-03): a
+ * `Put` of the item with SK
  * `<date>#<windowId>`. `window.windowId` is generated by the caller once per request, so a retry
  * writes the same id. `createdBy` is stored, never answered. `window.date` is today or later (the
  * handler answers date_in_past before the lock).
@@ -642,8 +663,8 @@ export async function createOneOffWindow<C extends ApiErrorCode>(
  * Deletes a one-off window under the lock. The path names only its id and the SK starts with its
  * date, so it is looked for in the state read inside the attempt (the windows dated today or
  * later). On a miss the whole WINDOW partition is read in the same attempt: a window found there
- * is dated before today and answers `date_in_past` (spec v8, R-ONE-02: past availability is not
- * edited); otherwise `window_not_found`. Only then does `check` decide.
+ * is dated before today and answers `date_in_past` (docs/SHARED_CALENDAR_SPEC.md R-ONE-02: past
+ * availability is not edited); otherwise `window_not_found`. Only then does `check` decide.
  */
 export async function deleteOneOffWindow<C extends ApiErrorCode>(
   windowId: string,
@@ -668,14 +689,16 @@ export async function deleteOneOffWindow<C extends ApiErrorCode>(
   });
 }
 
-// ── The calendar view (spec 11.6; reads of 13.2, no lock) ──────────────────────────────────────
+// ── The calendar view (docs/SHARED_CALENDAR_SPEC.md section 11.6) ────────────────────────────────
+// Reads of docs/SHARED_CALENDAR_SPEC.md section 13.2, no lock.
 
 const APPT_PK = 'APPT';
 
-// The appointment item (APPT / <start instant>#<appointmentId>, spec 8.1 and 13.2; attribute names
-// in architecture 5.3). Step 48 writes it; the view reads it. The id is the SK after '#' and is not
-// repeated. `note`, `cancelledAt`, `cancelledBy`, `cancelReason`, `replaces` and `replacedBy` are
-// null (stored as NULL) until set; a missing attribute reads as null too. `version` is internal.
+// The appointment item (APPT / <start instant>#<appointmentId>, docs/SHARED_CALENDAR_SPEC.md
+// sections 8.1 and 13.2; attribute names in docs/ARCHITECTURE.md section 5.3). The booking writes
+// it; the view reads it. The id is the SK after '#' and is not repeated. `note`, `cancelledAt`,
+// `cancelledBy`, `cancelReason`, `replaces` and `replacedBy` are null (stored as NULL) until set; a
+// missing attribute reads as null too. `version` is internal.
 function toViewAppointment(item: Item, typeNames: ReadonlyMap<string, string>): ViewAppointment {
   const typeId = item.typeId as string;
   return {
@@ -687,7 +710,8 @@ function toViewAppointment(item: Item, typeNames: ReadonlyMap<string, string>): 
       end: item.end as string,
       date: item.date as string,
       typeId,
-      // The type's current name; the snapshot taken at booking once the type is gone (R-TYPE-03).
+      // The type's current name; the snapshot taken at booking once the type is gone
+      // (docs/SHARED_CALENDAR_SPEC.md R-TYPE-03).
       typeName: typeNames.get(typeId) ?? (item.typeNameAtBooking as string),
       note: (item.note as string | null | undefined) ?? null,
       status: item.status as AppointmentStatus,
@@ -709,7 +733,10 @@ function toActor(item: Item): Actor {
   return { username: item.username as string, role: item.role as Actor['role'] };
 }
 
-/** What one calendar view reads (11.6): the inputs of calendarView, except the request's own. */
+/**
+ * What one calendar view reads (docs/SHARED_CALENDAR_SPEC.md section 11.6): the inputs of
+ * calendarView, except the request's own.
+ */
 export type CalendarRange = {
   settings: CalendarSettings;
   types: AvailabilityType[];
@@ -727,7 +754,7 @@ export type CalendarRange = {
  * the local midnight after `to`. An appointment's SK is `<start>#<id>` and instants have one
  * length, so `SK BETWEEN <rangeStart> AND <rangeEnd>` takes exactly the starts with
  * rangeStart ≤ start < rangeEnd: one starting at rangeEnd has the SK `<rangeEnd>#…`, which sorts
- * after `<rangeEnd>` (spec 13.2, v7).
+ * after `<rangeEnd>` (docs/SHARED_CALENDAR_SPEC.md section 13.2).
  */
 export async function readCalendarRange(from: string, to: string): Promise<CalendarRange> {
   const { table, timeZone } = calendarConfig();
@@ -752,7 +779,8 @@ export async function readCalendarRange(from: string, to: string): Promise<Calen
   };
 }
 
-// ── Booking (spec 8.2; items APPT, APPTID, EVENT and the DELETEDUSER marker of 13.2) ──────────
+// ── Booking (docs/SHARED_CALENDAR_SPEC.md section 8.2) ───────────────────────────────────────────
+// The APPT, APPTID, EVENT and DELETEDUSER items of docs/SHARED_CALENDAR_SPEC.md section 13.2.
 
 /** What the handler decided before the lock: the ids (made once per request), the User, the times. */
 export type NewBooking = {
@@ -761,10 +789,10 @@ export type NewBooking = {
   /** The Cognito `sub` of the User the appointment is for: the token's, or AdminGetUser's. */
   userId: string;
   username: string;
-  /** The times R-BOOK-02 accepted, `end` filled in. */
+  /** The times docs/SHARED_CALENDAR_SPEC.md R-BOOK-02 accepted, `end` filled in. */
   start: string;
   end: string;
-  /** Trimmed; an empty note is null (R-BOOK-11). */
+  /** Trimmed; an empty note is null (docs/SHARED_CALENDAR_SPEC.md R-BOOK-11). */
   note: string | null;
   by: Actor;
 };
@@ -784,13 +812,14 @@ export type StoredAppointment = { appointment: Omit<Appointment, 'cancellableUnt
 const deletedUserKey = (sub: string) => ({ PK: `DELETEDUSER#${sub}`, SK: 'DELETEDUSER' });
 
 /**
- * Books an appointment under the lock (8.2, 13.4). Inside each attempt it reads the settings and the
- * availability state (types, patterns, overrides and one-off windows from today, appointments from
- * now − 24 h), and `check` decides on them, so a retry re-reads and re-checks. Then one transaction
- * of five items: the lock update; `Put APPT` (`SK` `<start>#<appointmentId>`, the attributes of
- * architecture 5.3, `version` 1, `updatedAt`/`updatedBy` = `createdAt`/`createdBy`); `Put APPTID`
- * (the pointer, `sk`); `Put EVENT` (`appointment.booked`, calendarEvents); and a `ConditionCheck`
- * that `DELETEDUSER#<userId>` does not exist (R-BOOK-10), whose failure answers `user_not_found`
+ * Books an appointment under the lock (docs/SHARED_CALENDAR_SPEC.md sections 8.2 and 13.4). Inside
+ * each attempt it reads the settings and the availability state (types, patterns, overrides and
+ * one-off windows from today, appointments from now − 24 h), and `check` decides on them, so a
+ * retry re-reads and re-checks. Then one transaction of five items: the lock update; `Put APPT`
+ * (`SK` `<start>#<appointmentId>`, the attributes of docs/ARCHITECTURE.md section 5.3, `version` 1,
+ * `updatedAt`/`updatedBy` = `createdAt`/`createdBy`); `Put APPTID` (the pointer, `sk`); `Put EVENT`
+ * (`appointment.booked`, calendarEvents); and a `ConditionCheck` that `DELETEDUSER#<userId>` does
+ * not exist (docs/SHARED_CALENDAR_SPEC.md R-BOOK-10), whose failure answers `user_not_found`
  * without a retry. The type's name is the appointment's `typeName` and its snapshot.
  */
 export async function bookAppointment<C extends ApiErrorCode>(
@@ -822,9 +851,10 @@ export async function bookAppointment<C extends ApiErrorCode>(
   });
 }
 
-// A new appointment as stored (8.1, 13.2): `booked`, `version` 1, created and updated now by `by`,
-// the cancellation fields null; `replaces` the old id in a change, else null. The booking and the
-// change both build it here, so the attribute list is written once.
+// A new appointment as stored (docs/SHARED_CALENDAR_SPEC.md sections 8.1 and 13.2): `booked`,
+// `version` 1, created and updated now by `by`, the cancellation fields null; `replaces` the old id
+// in a change, else null. The booking and the change both build it here, so the attribute list is
+// written once.
 function newAppointment(a: {
   appointmentId: string;
   userId: string;
@@ -874,12 +904,14 @@ function putAppointment(table: string, stored: AppointmentSnapshot): TransactIte
 
 const eventPut = (table: string, event: EventInput): TransactItem => ({ Put: { TableName: table, Item: appointmentEvent(event) } });
 
-// R-BOOK-10: the User has not been deleted. Last item of a booking and of a change.
+// The check of docs/SHARED_CALENDAR_SPEC.md R-BOOK-10: the User has not been deleted. Last item of
+// a booking and of a change.
 const markerCheck = (table: string, userId: string): TransactItem => ({
   ConditionCheck: { TableName: table, Key: deletedUserKey(userId), ConditionExpression: 'attribute_not_exists(PK)' },
 });
 
-// The response fields of a stored appointment (11.5) but `cancellableUntil`: no userId, no version.
+// The response fields of a stored appointment (docs/SHARED_CALENDAR_SPEC.md section 11.5) but
+// `cancellableUntil`: no userId, no version.
 function toResponseFields(a: AppointmentSnapshot, typeName: string): Omit<Appointment, 'cancellableUntil'> {
   return {
     appointmentId: a.appointmentId,
@@ -903,32 +935,40 @@ function toResponseFields(a: AppointmentSnapshot, typeName: string): Omit<Appoin
   };
 }
 
-// ── Listing (spec 11.1 route 16, 13.2 v10; reads, no lock) ────────────────────────────────────
+// ── Listing (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 16) ────────────────────────────────
+// Reads of docs/SHARED_CALENDAR_SPEC.md section 13.2, no lock.
 
-/** Which appointments route 16 selects: those dated `from`..`to` (local dates, inclusive), or the upcoming ones. */
+/**
+ * Which appointments docs/SHARED_CALENDAR_SPEC.md section 11.1, route 16 selects: those dated
+ * `from`..`to` (local dates, inclusive), or the upcoming ones.
+ */
 export type AppointmentSelection = { from: string; to: string } | { upcoming: true };
 
 /**
- * The filters of route 16 (v10): the owner, either by `userId` (a User caller: the token's `sub`)
- * or by the stored `username` (the Administrator's filter: every account booked under that name,
- * earlier deleted ones included), or neither (the Administrator, everything); and the status.
+ * The filters of docs/SHARED_CALENDAR_SPEC.md section 11.1, route 16: the owner, either by `userId`
+ * (a User caller: the token's `sub`) or by the stored `username` (the Administrator's filter: every
+ * account booked under that name, earlier deleted ones included), or neither (the Administrator,
+ * everything); and the status.
  */
 export type AppointmentFilter = {
   owner: { userId: string } | { username: string } | null;
   status: AppointmentStatus | 'all';
 };
 
-/** What route 16 answers before `cancellableUntil`: the appointments, sorted by start, and the settings. */
+/**
+ * What docs/SHARED_CALENDAR_SPEC.md section 11.1, route 16 answers before `cancellableUntil`: the
+ * appointments, sorted by start, and the settings.
+ */
 export type AppointmentList = { appointments: ViewAppointment[]; settings: CalendarSettings };
 
 /**
- * The appointments of route 16, consistent and without the lock (a read), with the settings and
- * every type (for `typeName`):
+ * The appointments of docs/SHARED_CALENDAR_SPEC.md section 11.1, route 16, consistent and without
+ * the lock (a read), with the settings and every type (for `typeName`):
  * - a range: `Query PK = APPT, SK BETWEEN <local midnight of from> AND <local midnight after to>`,
  *   the upper bound exclusive as in the view (readCalendarRange). An appointment never crosses
  *   midnight, so these are also the ones that overlap the range;
- * - upcoming: `Query PK = APPT, SK ≥ now − 24 h` (none lasts longer), keeping those with `end > now`
- *   (v10: a time selection only; `status` filters it as it filters a range).
+ * - upcoming: `Query PK = APPT, SK ≥ now − 24 h` (none lasts longer), keeping those with
+ *   `end > now` (a time selection only; `status` filters it as it filters a range).
  * Then the owner and the status filter, in code; sorted by start, then id (the SK order).
  */
 export async function listAppointments(selection: AppointmentSelection, filter: AppointmentFilter, now: string): Promise<AppointmentList> {
@@ -948,7 +988,8 @@ export async function listAppointments(selection: AppointmentSelection, filter: 
   return { appointments: kept.map((item) => toViewAppointment(item, typeNames)), settings };
 }
 
-// ── Cancelling and the note (spec 8.3, 8.5; items APPTID, APPT, EVENT of 13.2) ────────────────
+// ── Cancelling and the note (docs/SHARED_CALENDAR_SPEC.md sections 8.3 and 8.5) ──────────────────
+// Items APPTID, APPT, EVENT of docs/SHARED_CALENDAR_SPEC.md section 13.2.
 
 /** An appointment write by id: the ids the handler made once per request, and who writes. */
 export type AppointmentChange = { appointmentId: string; eventId: string; by: Actor };
@@ -969,10 +1010,11 @@ function toSnapshot(item: Item): AppointmentSnapshot {
 }
 
 /**
- * An appointment by id (13.2, 13.3): `GetItem APPTID#<id>` for the pointer, then `GetItem APPT /
- * <sk>`, both consistent. `null` when there is no pointer, and also when the pointer names no item:
- * that cannot happen through the API (the two are written in one transaction and an appointment is
- * never deleted), so it is treated as absent rather than as an error.
+ * An appointment by id (docs/SHARED_CALENDAR_SPEC.md sections 13.2 and 13.3): `GetItem APPTID#<id>`
+ * for the pointer, then `GetItem APPT / <sk>`, both consistent. `null` when there is no pointer,
+ * and also when the pointer names no item: that cannot happen through the API (the two are written
+ * in one transaction and an appointment is never deleted), so it is treated as absent rather than
+ * as an error.
  */
 async function readAppointment(table: string, appointmentId: string): Promise<AppointmentSnapshot | null> {
   const pointer = await documentClient.send(
@@ -985,14 +1027,15 @@ async function readAppointment(table: string, appointmentId: string): Promise<Ap
   return Item ? toSnapshot(Item) : null;
 }
 
-// The type's current name, or the snapshot once the type is gone (R-TYPE-03, 8.1).
+// The type's current name, or the snapshot once the type is gone (docs/SHARED_CALENDAR_SPEC.md
+// R-TYPE-03 and section 8.1).
 async function typeNameOf(table: string, a: AppointmentSnapshot): Promise<string> {
   const { Item } = await documentClient.send(new GetCommand({ TableName: table, Key: { PK: TYPE_PK, SK: a.typeId }, ConsistentRead: true }));
   return (Item?.name as string | undefined) ?? a.typeNameAtBooking;
 }
 
 // `Update APPT` with SET on the changed attributes only (an attribute this code does not know is
-// kept), no condition of its own (every appointment write takes the lock, v10).
+// kept), no condition of its own (every appointment write takes the lock).
 function appointmentUpdate(table: string, after: AppointmentSnapshot, set: Record<string, unknown>): TransactItem {
   const names: Record<string, string> = {};
   const values: Record<string, unknown> = {};
@@ -1012,16 +1055,17 @@ function appointmentUpdate(table: string, after: AppointmentSnapshot, set: Recor
   };
 }
 
-// The two items of a cancel or a note (13.4) after the lock update: the `Update APPT`, and `Put
+// The two items of a cancel or a note (docs/SHARED_CALENDAR_SPEC.md section 13.4) after the lock
+// update: the `Update APPT`, and `Put
 // EVENT` with the snapshot after the change.
 function appointmentWrite(table: string, after: AppointmentSnapshot, set: Record<string, unknown>, event: EventInput): TransactItem[] {
   return [appointmentUpdate(table, after, set), eventPut(table, event)];
 }
 
 // The old appointment of a cancel or a change, or one cancelled by a user deletion, as stored after
-// it (8.3, 8.4, 10.2): `cancelled` now by `by` with `reason`, `version` + 1; `replacedBy` the new id
-// in a change. `set` is what the
-// `Update` writes: exactly the attributes that changed.
+// it (docs/SHARED_CALENDAR_SPEC.md sections 8.3, 8.4 and 10.2): `cancelled` now by `by` with
+// `reason`, `version` + 1; `replacedBy` the new id in a change. `set` is what the `Update` writes:
+// exactly the attributes that changed.
 function cancelled(
   before: AppointmentSnapshot,
   by: Actor,
@@ -1046,12 +1090,13 @@ function cancelled(
 export type CancelCheck<C extends ApiErrorCode> = (appointment: AppointmentSnapshot | null, settings: CalendarSettings) => Refusal<C> | null;
 
 /**
- * Cancels an appointment under the lock (8.3). Inside each attempt: the pointer and the settings,
- * then the `APPT` item; `check` decides on them, so a retry re-reads and re-checks (an appointment
- * cancelled meanwhile answers what the check says of it). Then one transaction of three items: the
- * lock update; `Update APPT` SET `status` `cancelled`, `cancelledAt` and `updatedAt` now,
- * `cancelledBy` and `updatedBy` the caller, `cancelReason` `cancelled`, `version` + 1; `Put EVENT`
- * `appointment.cancelled`. Answers the appointment as stored after the cancel.
+ * Cancels an appointment under the lock (docs/SHARED_CALENDAR_SPEC.md section 8.3). Inside each
+ * attempt: the pointer and the settings, then the `APPT` item; `check` decides on them, so a retry
+ * re-reads and re-checks (an appointment cancelled meanwhile answers what the check says of it).
+ * Then one transaction of three items: the lock update; `Update APPT` SET `status` `cancelled`,
+ * `cancelledAt` and `updatedAt` now, `cancelledBy` and `updatedBy` the caller, `cancelReason`
+ * `cancelled`, `version` + 1; `Put EVENT` `appointment.cancelled`. Answers the appointment as
+ * stored after the cancel.
  */
 export async function cancelAppointment<C extends ApiErrorCode>(
   change: AppointmentChange,
@@ -1080,12 +1125,13 @@ export type NoteCheck = (appointment: AppointmentSnapshot | null) => NoteRefusal
 export type NotedAppointment = StoredAppointment & { unchanged: boolean };
 
 /**
- * Sets or clears the note of an appointment under the lock (8.5). Inside each attempt: the pointer
- * and the settings, then the `APPT` item; `check` decides. A note equal to the stored one writes
- * nothing, not even the lock (v10): the stored appointment is answered as it is. Otherwise one
- * transaction of three items: the lock update; `Update APPT` SET `note`, `updatedAt` now,
- * `updatedBy` the caller, `version` + 1; `Put EVENT` `appointment.note_updated`. `note` is
- * already trimmed, an empty one `null` (R-BOOK-11).
+ * Sets or clears the note of an appointment under the lock (docs/SHARED_CALENDAR_SPEC.md section
+ * 8.5). Inside each attempt: the pointer and the settings, then the `APPT` item; `check` decides. A
+ * note equal to the stored one writes nothing, not even the lock: the stored appointment is
+ * answered as it is. Otherwise one transaction of three items: the lock update; `Update APPT` SET
+ * `note`, `updatedAt` now, `updatedBy` the caller, `version` + 1; `Put EVENT`
+ * `appointment.note_updated`. `note` is already trimmed, an empty one `null`
+ * (docs/SHARED_CALENDAR_SPEC.md R-BOOK-11).
  */
 export async function updateAppointmentNote(
   change: AppointmentChange & { note: string | null },
@@ -1113,7 +1159,8 @@ export async function updateAppointmentNote(
   });
 }
 
-// ── Changing (spec 8.4 v11; items APPTID, APPT, EVENT and the DELETEDUSER marker of 13.2) ─────
+// ── Changing (docs/SHARED_CALENDAR_SPEC.md section 8.4) ──────────────────────────────────────────
+// The APPTID, APPT, EVENT and DELETEDUSER items of docs/SHARED_CALENDAR_SPEC.md section 13.2.
 
 /** What the handler decided before the lock: the ids (made once per request), the new times, the note. */
 export type NewChange = {
@@ -1121,10 +1168,13 @@ export type NewChange = {
   appointmentId: string;
   newAppointmentId: string;
   eventId: string;
-  /** The times R-BOOK-02 accepted, `end` filled in. */
+  /** The times docs/SHARED_CALENDAR_SPEC.md R-BOOK-02 accepted, `end` filled in. */
   start: string;
   end: string;
-  /** R-CHG-03: `undefined` keeps the old note; otherwise the new one, trimmed, an empty one null. */
+  /**
+   * As docs/SHARED_CALENDAR_SPEC.md R-CHG-03 says: `undefined` keeps the old note; otherwise the
+   * new one, trimmed, an empty one null.
+   */
   note: string | null | undefined;
   by: Actor;
 };
@@ -1147,15 +1197,16 @@ export type ChangedAppointments = {
 };
 
 /**
- * Changes an appointment under the lock (8.4, 13.4). Inside each attempt it reads the settings, the
- * availability state and the old appointment by id (pointer, then `APPT`), and `check` decides on
- * them, so a retry re-reads and re-checks. Then one transaction of six items: the lock update;
- * `Update` of the old `APPT` (cancelled, `cancelReason` `changed`, `replacedBy` the new id,
- * `version` + 1); `Put` of the new `APPT` (`replaces` the old id, the old one's User, the note of
- * R-CHG-03, the window's type) and its `APPTID`; `Put EVENT` `appointment.changed` with `previous`,
- * the old one as stored after the change; the `ConditionCheck` on the User's marker (R-BOOK-10),
- * whose failure answers `user_not_found` without a retry. Each `typeName` is the current name from
- * the state's types, or the snapshot once the type is gone.
+ * Changes an appointment under the lock (docs/SHARED_CALENDAR_SPEC.md sections 8.4 and 13.4).
+ * Inside each attempt it reads the settings, the availability state and the old appointment by id
+ * (pointer, then `APPT`), and `check` decides on them, so a retry re-reads and re-checks. Then one
+ * transaction of six items: the lock update; `Update` of the old `APPT` (cancelled, `cancelReason`
+ * `changed`, `replacedBy` the new id, `version` + 1); `Put` of the new `APPT` (`replaces` the old
+ * id, the old one's User, the note of docs/SHARED_CALENDAR_SPEC.md R-CHG-03, the window's type) and
+ * its `APPTID`; `Put EVENT` `appointment.changed` with `previous`, the old one as stored after the
+ * change; the `ConditionCheck` on the User's marker (docs/SHARED_CALENDAR_SPEC.md R-BOOK-10), whose
+ * failure answers `user_not_found` without a retry. Each `typeName` is the current name from the
+ * state's types, or the snapshot once the type is gone.
  */
 export async function changeAppointment<C extends ApiErrorCode>(
   change: NewChange,
@@ -1209,30 +1260,39 @@ export async function changeAppointment<C extends ApiErrorCode>(
   });
 }
 
-// ── Deleting a User (spec 10.2 v12; the DELETEDUSER marker, APPT and EVENT items of 13.2) ─────
+// ── Deleting a User (docs/SHARED_CALENDAR_SPEC.md section 10.2) ──────────────────────────────────
+// The DELETEDUSER marker, APPT and EVENT items of docs/SHARED_CALENDAR_SPEC.md section 13.2.
 
 /** The account being deleted: its Cognito `sub` (the appointments' `userId`) and its username. */
 export type DeletedUser = { userId: string; username: string };
 
-/** What a user deletion did in the calendar: the appointments it cancelled, and the lock attempts over every chunk. */
+/**
+ * What a user deletion did in the calendar: the appointments it cancelled, and the lock attempts
+ * over every chunk.
+ */
 export type UserDeletion = { cancelledCount: number; attempts: number };
 
-/** Appointments cancelled per transaction: two items each, plus the lock and the marker, ≤ 82 (13.4). */
+/**
+ * Appointments cancelled per transaction: two items each, plus the lock and the marker, ≤ 82
+ * (docs/SHARED_CALENDAR_SPEC.md section 13.4).
+ */
 export const DELETION_CHUNK = 40;
 
 /**
- * Writes the deleted-user marker and cancels the User's active appointments not yet ended (10.2
- * steps 2 and 3), in chunks, each under the lock as its own transaction. Inside each attempt it
- * reads `APPT` from now − 24 h and keeps, in code, those with `userId` = the User's `sub` (never the
- * username: an earlier account with the same name keeps its own, R-DEL-02), `status` `booked` and
- * `end > now`, one in progress included; an ended or cancelled one is left as it is. The first
- * chunk writes the lock update, `Put DELETEDUSER#<sub>` (`username`, `deletedAt`, `deletedBy`; a
- * plain Put, so a repeated deletion writes it again) and up to 40 × (`Update APPT` cancelled with
- * `cancelReason` `user_deleted`, `Put EVENT` `appointment.cancelled`); each later chunk the lock
- * update and the next 40. A chunk re-reads, so a retry or the next chunk skips what is already
- * cancelled. `newEventId` is called once per appointment, on first sight: a retry writes the same
- * event id. A failure in any chunk is thrown (ConcurrentUpdateError after three lost locks); the
- * chunks already written stay written, and a repeated deletion finds the rest (R-DEL-01).
+ * Writes the deleted-user marker and cancels the User's active appointments not yet ended
+ * (docs/SHARED_CALENDAR_SPEC.md section 10.2, steps 2 and 3), in chunks, each under the lock as its
+ * own transaction. Inside each attempt it reads `APPT` from now − 24 h and keeps, in code, those
+ * with `userId` = the User's `sub` (never the username: an earlier account with the same name keeps
+ * its own, docs/SHARED_CALENDAR_SPEC.md R-DEL-02), `status` `booked` and `end > now`, one in
+ * progress included; an ended or cancelled one is left as it is. The first chunk writes the lock
+ * update, `Put DELETEDUSER#<sub>` (`username`, `deletedAt`, `deletedBy`; a plain Put, so a repeated
+ * deletion writes it again) and up to 40 × (`Update APPT` cancelled with `cancelReason`
+ * `user_deleted`, `Put EVENT` `appointment.cancelled`); each later chunk the lock update and the
+ * next 40. A chunk re-reads, so a retry or the next chunk skips what is already cancelled.
+ * `newEventId` is called once per appointment, on first sight: a retry writes the same event id. A
+ * failure in any chunk is thrown (ConcurrentUpdateError after three lost locks); the chunks already
+ * written stay written, and a repeated deletion finds the rest (docs/SHARED_CALENDAR_SPEC.md
+ * R-DEL-01).
  */
 export async function markUserDeleted(user: DeletedUser, by: Actor, now: string, newEventId: () => string): Promise<UserDeletion> {
   const { table } = calendarConfig();

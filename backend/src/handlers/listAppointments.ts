@@ -7,17 +7,18 @@ import { error, ok, parseQuery, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 import { validate } from '../lib/validation';
 
-// GET /calendar/appointments (docs/SHARED_CALENDAR_SPEC.md 11.1, route 16; 8.6; v10): the
-// Administrator and Users. Exactly one selection, `from` and `to` (at most 92 days, by the local
-// date of the start) or `upcoming=true` (`end > now`), then `status` (default `booked`) filters it.
-// A User gets their own appointments only, by the `sub` of their token; a `username` other than
-// their own is 403, their own changes nothing. The Administrator's `username` filters on the stored
-// name, earlier deleted accounts with it included, with no Cognito call. A read: no lock, no write.
-// One log line with the selection, the status, the Administrator's filter and the count; never an
-// appointment, a note or a `sub` (14.5).
+// GET /calendar/appointments (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 16, and section
+// 8.6): the Administrator and Users. Exactly one selection, `from` and `to` (at most 92 days, by
+// the local date of the start) or `upcoming=true` (`end > now`), then `status` (default `booked`)
+// filters it. A User gets their own appointments only, by the `sub` of their token; a `username`
+// other than their own is 403, their own changes nothing. The Administrator's `username` filters on
+// the stored name, earlier deleted accounts with it included, with no Cognito call. A read: no
+// lock, no write. One log line with the selection, the status, the Administrator's filter and the
+// count; never an appointment, a note or a `sub` (docs/SHARED_CALENDAR_SPEC.md section 14.5).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
-  // "Now" is read once per request (R-TIME-04): what `upcoming` compares with.
+  // "Now" is read once per request (docs/SHARED_CALENDAR_SPEC.md R-TIME-04): what `upcoming`
+  // compares with.
   const now = new Date(started).toISOString();
   const requestId = event.requestContext?.requestId ?? 'unknown';
   const route = event.routeKey;
@@ -32,7 +33,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   const role = resolveRole(claims.value.groups);
   const caller = { username: claims.value.username, role };
 
-  // A broken CalendarTimeZone answers 500 to every request, whatever the role (R-TIME-01).
+  // A broken CalendarTimeZone answers 500 to every request, whatever the role
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-01).
   try {
     calendarConfig();
   } catch (err) {

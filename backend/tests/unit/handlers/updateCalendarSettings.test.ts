@@ -65,6 +65,8 @@ const logLines = () => output.map((line) => JSON.parse(line) as Record<string, u
 const body = (response: Awaited<ReturnType<Handler>>) => JSON.parse(response.body ?? '') as Record<string, unknown>;
 const transactions = () => ddb.commandCalls(TransactWriteCommand);
 
+// Test names: R-… rules and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in
+// its section 18.3).
 describe('updateCalendarSettings handler', () => {
   it('saves the four values with "now" and the caller, and answers what it saved', async () => {
     const response = await handler(asAdmin());

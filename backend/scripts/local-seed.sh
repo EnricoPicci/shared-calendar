@@ -73,7 +73,8 @@ wait_for "DynamoDB Local ($DYNAMODB_URL)" ddb list-tables
 wait_for "cognito-local ($COGNITO_URL)" idp list-user-pools --max-results 1
 
 # 1. Tables. The calendar table starts empty: until the Administrator saves settings, the
-# defaults apply (spec R-SET-01). The calendar journeys empty it at their start.
+# defaults apply (docs/SHARED_CALENDAR_SPEC.md R-SET-01). The calendar journeys empty it at their
+# start.
 if ddb describe-table --table-name "$TABLE_NAME" >/dev/null 2>&1; then
   echo "table $TABLE_NAME: exists"
 else
@@ -156,8 +157,9 @@ ensure_user alice "$ALICE_PASSWORD" user
 # --parameter-overrides) must stay its one source. The one exception is BookAppointmentFunction,
 # which also calls Cognito (the Administrator books for a User): it gets the pool, the emulator's
 # address and the dummy credentials in a section of its own, like CreateUserFunction.
-# DeleteUserFunction also declares the calendar variables (spec 10.2) and gets the table and the
-# endpoint from "Parameters" too, beside its own section. ListUsersFunction reads Cognito only.
+# DeleteUserFunction also declares the calendar variables (it cancels the deleted user's
+# appointments, docs/SHARED_CALENDAR_SPEC.md section 10.2) and gets the table and the endpoint from
+# "Parameters" too, beside its own section. ListUsersFunction reads Cognito only.
 cat > env.local.json <<EOF
 {
   "Parameters": {

@@ -34,11 +34,13 @@ import type {
 } from './availability-rules.types';
 import type { SessionStore } from './session.store';
 
-// docs/FRONTEND_SERVICES.md section 17. The Administrator's availability rules, routes 7–14:
-// weekly patterns, date overrides and one-off windows. One pair of streams per method, each
-// independent of the others. Every route here is admin only: a User gets `forbidden`.
+// The Administrator's availability rules (docs/FRONTEND_SERVICES.md section 17): weekly patterns,
+// date overrides and one-off windows, docs/SHARED_CALENDAR_SPEC.md section 11.1, routes 7–14. One
+// pair of streams per method, each independent of the others. Every route here is admin only: a
+// User gets `forbidden`.
 
-// Architecture section 4, which governs (decision 32).
+// Each route's error codes as docs/ARCHITECTURE.md section 4 lists them; where the calendar spec
+// differs, the architecture wins (docs/FRONTEND_SERVICES.md section 8, decision 32).
 const LOAD_PATTERNS_CODES = ['forbidden', 'internal_error'] as const satisfies readonly ApiErrorCode[];
 const CREATE_PATTERN_CODES = [
   'forbidden',
@@ -175,7 +177,8 @@ export class AvailabilityRulesService {
   ) {}
 
   loadPatterns(): void {
-    this.pendingLoadPatterns?.unsubscribe(); // cancels a pending loadPatterns only, never another method's call
+    // Cancels a pending loadPatterns only, never another method's call.
+    this.pendingLoadPatterns?.unsubscribe();
     this.patternsStateSubject.next({ status: 'pending' });
 
     this.pendingLoadPatterns = apiCall(this.config, this.store, { method: 'GET', path: '/calendar/patterns', codes: LOAD_PATTERNS_CODES })
@@ -183,7 +186,8 @@ export class AvailabilityRulesService {
         map((answer): PatternsResult => (answer.status === 'ok' ? toPatternsResult(answer) : answer)),
         tap((result) => this.patternsStateSubject.next(result)),
       )
-      // Forward `next` only: a completed subject would ignore every later call (section 3.2).
+      // Forward `next` only: a completed subject would ignore every later call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
       .subscribe((result) => this.patternsResultSubject.next(result));
   }
 
@@ -191,7 +195,8 @@ export class AvailabilityRulesService {
     this.pendingCreatePattern?.unsubscribe(); // cancels a pending createPattern only
     this.createPatternStateSubject.next({ status: 'pending', pattern });
 
-    // The shared schema; its output is what is sent (section 17.4).
+    // Checked with the shared schema, and the schema's parsed output is what is sent
+    // (docs/FRONTEND_SERVICES.md section 8, decision 33).
     const body = PatternBody.safeParse(pattern);
     const call: Observable<CreatePatternResult> = body.success
       ? apiCall(this.config, this.store, { method: 'POST', path: '/calendar/patterns', body: body.data, codes: CREATE_PATTERN_CODES }).pipe(
@@ -201,7 +206,9 @@ export class AvailabilityRulesService {
 
     this.pendingCreatePattern = call
       .pipe(tap((result) => this.createPatternStateSubject.next(result)))
-      .subscribe((result) => this.createPatternResultSubject.next(result)); // next only: section 3.2
+      // Feed the subject with `next` only, so it stays open for the next call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
+      .subscribe((result) => this.createPatternResultSubject.next(result));
   }
 
   updatePattern(patternId: string, pattern: PatternBody): void {
@@ -224,7 +231,9 @@ export class AvailabilityRulesService {
 
     this.pendingUpdatePattern = call
       .pipe(tap((result) => this.updatePatternStateSubject.next(result)))
-      .subscribe((result) => this.updatePatternResultSubject.next(result)); // next only: section 3.2
+      // Feed the subject with `next` only, so it stays open for the next call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
+      .subscribe((result) => this.updatePatternResultSubject.next(result));
   }
 
   deletePattern(patternId: string): void {
@@ -242,7 +251,9 @@ export class AvailabilityRulesService {
 
     this.pendingDeletePattern = call
       .pipe(tap((result) => this.deletePatternStateSubject.next(result)))
-      .subscribe((result) => this.deletePatternResultSubject.next(result)); // next only: section 3.2
+      // Feed the subject with `next` only, so it stays open for the next call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
+      .subscribe((result) => this.deletePatternResultSubject.next(result));
   }
 
   setOverride(date: string, windows: WindowBody[]): void {
@@ -264,7 +275,9 @@ export class AvailabilityRulesService {
 
     this.pendingSetOverride = call
       .pipe(tap((result) => this.setOverrideStateSubject.next(result)))
-      .subscribe((result) => this.setOverrideResultSubject.next(result)); // next only: section 3.2
+      // Feed the subject with `next` only, so it stays open for the next call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
+      .subscribe((result) => this.setOverrideResultSubject.next(result));
   }
 
   deleteOverride(date: string): void {
@@ -282,7 +295,9 @@ export class AvailabilityRulesService {
 
     this.pendingDeleteOverride = call
       .pipe(tap((result) => this.deleteOverrideStateSubject.next(result)))
-      .subscribe((result) => this.deleteOverrideResultSubject.next(result)); // next only: section 3.2
+      // Feed the subject with `next` only, so it stays open for the next call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
+      .subscribe((result) => this.deleteOverrideResultSubject.next(result));
   }
 
   createWindow(window: OneOffWindowBody): void {
@@ -298,7 +313,9 @@ export class AvailabilityRulesService {
 
     this.pendingCreateWindow = call
       .pipe(tap((result) => this.createWindowStateSubject.next(result)))
-      .subscribe((result) => this.createWindowResultSubject.next(result)); // next only: section 3.2
+      // Feed the subject with `next` only, so it stays open for the next call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
+      .subscribe((result) => this.createWindowResultSubject.next(result));
   }
 
   deleteWindow(windowId: string): void {
@@ -316,11 +333,14 @@ export class AvailabilityRulesService {
 
     this.pendingDeleteWindow = call
       .pipe(tap((result) => this.deleteWindowStateSubject.next(result)))
-      .subscribe((result) => this.deleteWindowResultSubject.next(result)); // next only: section 3.2
+      // Feed the subject with `next` only, so it stays open for the next call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
+      .subscribe((result) => this.deleteWindowResultSubject.next(result));
   }
 }
 
-// Section 17.5: the status, the top-level shape and the object's id; the rest is trusted to the contract.
+// A success is checked for its status, its top-level shape and the object's id; the rest is trusted
+// to the contract (docs/FRONTEND_SERVICES.md section 17.5).
 
 function toPatternsResult(answer: ApiOk): PatternsResult {
   const body = answer.body as { patterns?: unknown } | undefined;
@@ -347,7 +367,8 @@ function toWindowResult(answer: ApiOk): CreateWindowResult {
   return unexpectedAnswer(answer);
 }
 
-// A delete's 204 has no body: the success carries the id of the call (decision 34).
+// A delete's 204 has no body, so the success carries the id the call was made with
+// (docs/FRONTEND_SERVICES.md section 8, decision 34).
 function toDeleted<T extends object>(answer: ApiOk, id: T): ({ status: 'success' } & T) | ApiFailure<never> {
   return answer.httpStatus === 204 ? { status: 'success', ...id } : unexpectedAnswer(answer);
 }

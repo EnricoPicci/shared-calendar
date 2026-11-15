@@ -3,9 +3,11 @@ import { DynamoDBDocumentClient, GetCommand, QueryCommand, TransactWriteCommand 
 import { mockClient } from 'aws-sdk-client-mock';
 import type { AppointmentSnapshot } from '../../../src/lib/calendarEvents';
 
-// calendarDb's appointment reads and writes of plan step 49 (spec 8.3, 8.5, 11.1 route 16, 13.2,
-// 13.4; v10): the list, the lookup by id through the pointer, the cancel and the note under the
-// lock. The module reads its configuration once per container, so every test imports a fresh copy.
+// calendarDb's appointment reads and writes: the list (docs/SHARED_CALENDAR_SPEC.md section 11.1,
+// route 16), the lookup by id through the pointer (docs/SHARED_CALENDAR_SPEC.md section 13.2), the
+// cancel (docs/SHARED_CALENDAR_SPEC.md section 8.3) and the note (docs/SHARED_CALENDAR_SPEC.md
+// section 8.5) under the lock (docs/SHARED_CALENDAR_SPEC.md section 13.4). The module reads its
+// configuration once per container, so every test imports a fresh copy.
 type CalendarDb = typeof import('../../../src/lib/calendarDb');
 let db: CalendarDb;
 
@@ -15,7 +17,8 @@ const STUDIO = '01JC0000000000000000000001';
 const APPT_ID = '01M70NR5E0Q7R2C9T5XH3KD8MV';
 const EVENT_ID = '01M70NR5E0Q7R2C9T5XH3KD8EV';
 const BOOKED_AT = '2026-11-10T09:00:00.000Z';
-// AC-20: now 2026-11-15T09:00 local (08:00Z); the appointment 2026-11-16 09:00 local (08:00Z).
+// The scenario of docs/SHARED_CALENDAR_SPEC.md AC-20: now 2026-11-15T09:00 local (08:00Z); the
+// appointment 2026-11-16 09:00 local (08:00Z).
 const NOW = '2026-11-15T08:00:00.000Z';
 const START = '2026-11-16T08:00:00.000Z';
 const END = '2026-11-16T09:00:00.000Z';
@@ -39,7 +42,7 @@ async function load(): Promise<CalendarDb> {
   return import('../../../src/lib/calendarDb');
 }
 
-/** Every attribute of the appointment item (architecture 5.3), as step 48 writes it. */
+/** Every attribute of the appointment item (docs/ARCHITECTURE.md section 5.3), as a booking writes it. */
 const apptItem = (more: Record<string, unknown> = {}) => ({
   PK: 'APPT',
   SK,
@@ -69,7 +72,7 @@ const snapshot = (more: Partial<AppointmentSnapshot> = {}): AppointmentSnapshot 
   const attributes = Object.fromEntries(Object.entries(apptItem()).filter(([key]) => key !== 'PK' && key !== 'SK'));
   return { appointmentId: APPT_ID, ...(attributes as Omit<AppointmentSnapshot, 'appointmentId'>), ...more };
 };
-// The response fields (11.5) but cancellableUntil.
+// The response fields (docs/SHARED_CALENDAR_SPEC.md section 11.5) but cancellableUntil.
 const response = (more: Record<string, unknown> = {}) => ({
   appointmentId: APPT_ID,
   username: 'alice',
@@ -118,7 +121,8 @@ afterEach(() => {
 
 // ── Listing ──────────────────────────────────────────────────────────────────────────────────
 
-describe('listAppointments (route 16, v10)', () => {
+// Test names: route numbers are those of docs/SHARED_CALENDAR_SPEC.md (routes in its section 11.1).
+describe('listAppointments (route 16)', () => {
   const studio = { PK: 'TYPE', SK: STUDIO, name: 'Studio', nameKey: 'studio', createdAt: BOOKED_AT, updatedAt: BOOKED_AT };
   const item = (start: string, id: string, more: Record<string, unknown> = {}) => {
     const end = new Date(Date.parse(start) + 3_600_000).toISOString();
@@ -197,7 +201,8 @@ describe('listAppointments (route 16, v10)', () => {
     );
     const range = { from: '2026-11-16', to: '2026-11-16' };
     expect(ids(await db.listAppointments(range, { owner: { userId: 'sub-new-dave' }, status: 'all' }, NOW))).toEqual(['D2']);
-    // The name means every account booked under it, an earlier deleted one included (v10).
+    // The name means every account booked under it, an earlier deleted one included
+    // (docs/SHARED_CALENDAR_SPEC.md section 11.1, the notes on route 16).
     expect(ids(await db.listAppointments(range, { owner: { username: 'dave' }, status: 'all' }, NOW))).toEqual(['D1', 'D2']);
     expect(ids(await db.listAppointments(range, { owner: { username: 'nobody' }, status: 'all' }, NOW))).toEqual([]);
     expect(ids(await db.listAppointments(range, every, NOW))).toEqual(['D1', 'D2', 'E1']);
@@ -229,6 +234,7 @@ describe('listAppointments (route 16, v10)', () => {
 
 // ── The lookup by id, cancel and note ────────────────────────────────────────────────────────
 
+// Test names: section numbers are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('cancelAppointment (8.3, 13.4)', () => {
   const change = { appointmentId: APPT_ID, eventId: EVENT_ID, by: ALICE };
   const allow = () => null;
@@ -379,6 +385,7 @@ describe('cancelAppointment (8.3, 13.4)', () => {
   });
 });
 
+// Test names: section numbers are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('updateAppointmentNote (8.5, 13.4)', () => {
   const change = (note: string | null) => ({ appointmentId: APPT_ID, eventId: EVENT_ID, by: ALICE, note });
   const changed = () => ({ unchanged: false });
@@ -432,7 +439,7 @@ describe('updateAppointmentNote (8.5, 13.4)', () => {
     expect(transactions()[0]!.TransactItems![1]!.Update!.ExpressionAttributeValues![':note']).toBeNull();
   });
 
-  it('an unchanged note writes nothing, not even the lock, and answers the stored appointment (v10)', async () => {
+  it('an unchanged note writes nothing, not even the lock, and answers the stored appointment', async () => {
     const { result, attempts } = await db.updateAppointmentNote(change('my note'), NOW, () => ({ unchanged: true }));
     expect(attempts).toBe(1);
     expect(result).toEqual({ ok: true, value: { appointment: response(), settings: SETTINGS, unchanged: true } });

@@ -36,9 +36,9 @@ arch=arm64
 
 # One registry lookup per start. samconfig.toml sets skip_pull_image: otherwise every warm
 # container's start asks Docker for the runtime image's digest at public.ecr.aws, several in
-# parallel with no timeout, and the start-up takes 6-42 s or never completes (step 51, 25 functions).
-# Here: one `docker pull` of AWS's Lambda base image (a no-op when it is current), at most 120 s.
-# When it brings a new base, the local image SAM built on top of it ("rapid": the base plus the
+# parallel with no timeout, and the start-up takes 6-42 s or never completes (seen with 25
+# functions). Here: one `docker pull` of AWS's Lambda base image (a no-op when it is current), at
+# most 120 s. When it brings a new base, the local image SAM built on top of it ("rapid": the base plus the
 # Lambda emulator) is removed, so that SAM rebuilds it from the new base. If the registry cannot be
 # reached, the local image is used as it is.
 runtime=$(awk '/^ *Runtime: nodejs/ { sub(/.*nodejs/, ""); sub(/\.x.*/, ""); print; exit }' template.yaml)
@@ -75,7 +75,7 @@ fi
 
 # On exit (Ctrl-C included), remove the Lambda containers sam local leaves running. It cleans up
 # its EAGER containers but not the extra ones it starts on a first request; they pile up with every
-# restart (step 44: 14 of 18 still running after Ctrl-C). Only containers SAM labels as Lambda
+# restart (once seen: 14 of 18 still running after Ctrl-C). Only containers SAM labels as Lambda
 # containers on this project's network: the emulators and other projects' containers are untouched.
 remove_lambda_containers() {
   local ids

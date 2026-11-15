@@ -30,7 +30,8 @@ const DAY = { from: '2026-11-16', to: '2026-11-16' };
 const caller = (username: string, groups: string[], query: Record<string, string | undefined> | null = DAY) =>
   eventWith({ sub: `sub-${username}`, username, groups: JSON.stringify(groups) }, query ?? undefined);
 
-// The 11.6 example as stored: the items calendarDb maps back into the view's input.
+// The example of docs/SHARED_CALENDAR_SPEC.md section 11.6 as stored: the items calendarDb maps
+// back into the view's input.
 const { appointment: a } = ALICE_11;
 const apptItem = ({ userId, appointment }: typeof ALICE_11) => {
   const { appointmentId, typeName, ...fields } = appointment;
@@ -70,6 +71,7 @@ afterEach(() => {
 const logLines = () => output.map((line) => JSON.parse(line) as Record<string, unknown>);
 const body = (response: Awaited<ReturnType<Handler>>) => JSON.parse(response.body ?? '') as Record<string, unknown>;
 
+// Test names: section numbers are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('getCalendar handler', () => {
   it('answers alice the 11.6 example byte for byte', async () => {
     const response = await handler(caller('alice', ['user']));

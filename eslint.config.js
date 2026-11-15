@@ -1,4 +1,5 @@
 import tseslint from 'typescript-eslint';
+import docReferences from './scripts/eslint-doc-references.mjs';
 
 export default tseslint.config(
   // '**/' so that the patterns apply inside every package (backend/, shared/), not only at the root.
@@ -11,7 +12,12 @@ export default tseslint.config(
     },
   },
   {
-    // The front end's services run in the browser (docs/FRONTEND_SERVICES.md rule 2). The compiler
+    // The comment rule of CLAUDE.md ("Comments"): a reference names its document; no history tags.
+    plugins: { local: docReferences },
+    rules: { 'local/doc-references': 'error' },
+  },
+  {
+    // The front end's services run in the browser (docs/FRONTEND_SERVICES.md section 2, rule 2). The compiler
     // cannot stop a Node import here: vitest's type declarations pull in @types/node. So: only
     // rxjs, @shared-calendar/shared and relative imports, and no Node globals.
     files: ['frontend/src/**/*.ts'],

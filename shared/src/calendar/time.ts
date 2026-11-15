@@ -1,10 +1,11 @@
-// The time helpers of the shared calendar (spec R-TIME-02, R-TIME-03, R-TIME-06).
+// The time helpers of the shared calendar (docs/SHARED_CALENDAR_SPEC.md R-TIME-02, R-TIME-03,
+// R-TIME-06).
 //
-// Only the built-in Intl API (decision T6), and nothing that depends on the machine's own time
-// zone: dates are counted through UTC (Date.UTC, getUTC*), and the wall clock of a zone is read
-// with Intl.DateTimeFormat(…, { timeZone }).formatToParts. Inputs are assumed to be valid
-// (the schemas in schemas.ts check them first): local date `YYYY-MM-DD`, local time `HH:mm`,
-// instant in the toISOString form.
+// Only the built-in Intl API (docs/SHARED_CALENDAR_SPEC.md section 20, decision T6), and nothing
+// that depends on the machine's own time zone: dates are counted through UTC (Date.UTC, getUTC*),
+// and the wall clock of a zone is read with Intl.DateTimeFormat(…, { timeZone }).formatToParts.
+// Inputs are assumed to be valid (the schemas in schemas.ts check them first): local date
+// `YYYY-MM-DD`, local time `HH:mm`, instant in the toISOString form.
 
 const MINUTE_MS = 60_000;
 const DAY_MS = 86_400_000;
@@ -63,8 +64,8 @@ function offsetAt(ms: number, zone: string): number {
 }
 
 /**
- * The instant at which the wall clock of `zone` shows `date` `time` (R-TIME-03, the "compatible"
- * rule of Temporal):
+ * The instant at which the wall clock of `zone` shows `date` `time`, by the "compatible" rule of
+ * Temporal (docs/SHARED_CALENDAR_SPEC.md R-TIME-03):
  * - a time that occurs twice (clocks go back) takes the earlier occurrence;
  * - a time that does not exist (clocks go forward) moves forward by the length of the gap.
  * `24:00` is accepted and means midnight at the end of `date` (the end of a window).
@@ -95,7 +96,7 @@ export function localTimeOf(instant: string, zone: string): string {
   return `${pad(w.hour)}:${pad(w.minute)}`;
 }
 
-/** The ISO weekday of a local date: 1 = Monday … 7 = Sunday (R-TIME-02). */
+/** The ISO weekday of a local date: 1 = Monday … 7 = Sunday (docs/SHARED_CALENDAR_SPEC.md R-TIME-02). */
 export function weekdayOf(date: string): number {
   const [y, m, d] = parseDate(date);
   const day = new Date(utcMs(y, m, d)).getUTCDay();
@@ -108,7 +109,10 @@ export function addDays(date: string, n: number): string {
   return formatUtcDate(utcMs(y, m, d + n));
 }
 
-/** Whether `Intl.DateTimeFormat` accepts `zone` as a time zone: the cold-start check of R-TIME-01. */
+/**
+ * Whether `Intl.DateTimeFormat` accepts `zone` as a time zone: the cold-start check of
+ * docs/SHARED_CALENDAR_SPEC.md R-TIME-01.
+ */
 export function isValidTimeZone(zone: unknown): boolean {
   // Checked before Intl: `timeZone: undefined` silently means the machine's own zone.
   if (typeof zone !== 'string' || zone === '') return false;

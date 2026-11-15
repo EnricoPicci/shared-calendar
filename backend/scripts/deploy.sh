@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Deploys the stack with the samconfig.toml default environment, but only after npm run verify
-# has passed (architecture 8.1). verify leaves the stamp .verify-ok:
+# has passed (docs/ARCHITECTURE.md section 8.1). verify leaves the stamp .verify-ok:
 #
 #   <commit hash> <epoch seconds> <clean|dirty>
 #

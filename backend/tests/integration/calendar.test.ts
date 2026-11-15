@@ -42,6 +42,8 @@ beforeAll(async () => {
   expect(aliceToken.length).toBeGreaterThan(100);
 });
 
+// Test names: AC-… scenarios and route numbers are those of docs/SHARED_CALENDAR_SPEC.md (scenarios
+// in its section 18.3, routes in its section 11.1).
 describe('calendar settings (routes 1 and 2)', () => {
   it('AC-01: before any save, everyone reads the defaults in Europe/Rome with updatedAt null', async () => {
     for (const token of [aliceToken, adminToken]) {
@@ -49,7 +51,7 @@ describe('calendar settings (routes 1 and 2)', () => {
       expect(res.status).toBe(200);
       expect(res.body).toEqual(DEFAULTS);
     }
-    // The defaults are not written anywhere (R-SET-01).
+    // The defaults are not written anywhere (docs/SHARED_CALENDAR_SPEC.md R-SET-01).
     expect(await getCalendarItem('SETTINGS', 'SETTINGS')).toBeUndefined();
   });
 
@@ -87,7 +89,8 @@ describe('calendar settings (routes 1 and 2)', () => {
       expect(get.status).toBe(200);
       expect(get.body).toEqual(put.body);
     }
-    // First use of the lock: the transaction created it at version 1 (spec 13.4).
+    // First use of the lock: the transaction created it at version 1 (docs/SHARED_CALENDAR_SPEC.md
+    // section 13.4).
     expect(await getCalendarItem('LOCK', 'LOCK')).toEqual({ PK: 'LOCK', SK: 'LOCK', version: 1 });
   });
 
@@ -106,6 +109,8 @@ describe('calendar settings (routes 1 and 2)', () => {
 // The ids the API gave each type, filled by the type journeys and used by the pattern journeys.
 const ids: Record<string, string> = {};
 
+// Test names: AC-… scenarios and route numbers are those of docs/SHARED_CALENDAR_SPEC.md (scenarios
+// in its section 18.3, routes in its section 11.1).
 describe('availability types (routes 3–6)', () => {
   const listNames = async (token: string) => {
     const res = await api('GET', '/calendar/types', token);
@@ -204,9 +209,12 @@ describe('availability types (routes 3–6)', () => {
   });
 });
 
+// Test names: section numbers, AC-… scenarios and route numbers are those of
+// docs/SHARED_CALENDAR_SPEC.md (scenarios in its section 18.3, routes in its section 11.1).
 describe('weekly patterns (routes 7–10)', () => {
-  // The scenario's pattern (AC-04): Monday 08:00–12:00 at Studio from 2026-11-01, no end. A pattern
-  // may start in the past (A4), and no appointment exists before step 48, so fixed dates work.
+  // The scenario's pattern (docs/SHARED_CALENDAR_SPEC.md AC-04): Monday 08:00–12:00 at Studio from
+  // 2026-11-01, no end. A pattern may start in the past (docs/SHARED_CALENDAR_SPEC.md section 22,
+  // assumption A4), and no appointment exists yet when these journeys run, so fixed dates work.
   const ac04 = () => ({ weekday: 1, start: '08:00', end: '12:00', typeId: ids.Studio, validFrom: '2026-11-01', validUntil: null });
   const created: Record<string, string> = {};
   const listed = async () => {
@@ -316,6 +324,8 @@ describe('weekly patterns (routes 7–10)', () => {
   });
 });
 
+// Test names: AC-… scenarios and route numbers are those of docs/SHARED_CALENDAR_SPEC.md (scenarios
+// in its section 18.3, routes in its section 11.1).
 describe('calendar view (route 15)', () => {
   // Dates come from the real today in the calendar zone, computed with the shared helpers, never
   // with fixed offsets. The settings journeys left minBookingNoticeHours 2 and bookingHorizonDays 30;
@@ -444,13 +454,16 @@ describe('calendar view (route 15)', () => {
     ]);
     for (const s of slots) expect(Date.parse(s.end) - Date.parse(s.start)).toBe(HOUR_MS);
 
-    // alice: the same window; slots only if S lies within the 30-day horizon (R-SLOT-03).
+    // alice: the same window; slots only if S lies within the 30-day horizon
+    // (docs/SHARED_CALENDAR_SPEC.md R-SLOT-03).
     const alice = (await view(aliceToken, S, S)).days[0]!;
     expect(alice.windows).toEqual([{ start: at(S, '01:00'), end: at(S, '04:00'), typeId: ids.viewStudio, typeName: 'Studio' }]);
     expect(alice.slots).toEqual(S > addDays(today(), 30) ? [] : slots);
   });
 });
 
+// Test names: section numbers, AC-… scenarios and route numbers are those of
+// docs/SHARED_CALENDAR_SPEC.md (scenarios in its section 18.3, routes in its section 11.1).
 describe('date overrides and one-off windows (routes 11–14)', () => {
   // Builds on what the earlier journeys leave: GYM (ids.pool) with the pattern Monday 07:00–08:00
   // from 2026-11-01, Studio (ids.viewStudio) with the pattern Monday 08:00–12:00 from a past Monday
@@ -487,7 +500,7 @@ describe('date overrides and one-off windows (routes 11–14)', () => {
     const res = await api('PUT', `/calendar/overrides/${date}`, adminToken, { windows: [studio] });
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ date, windows: [studio], updatedAt: expect.any(String) });
-    // Stored with updatedBy, which the answer leaves out (architecture 5.3).
+    // Stored with updatedBy, which the answer leaves out (docs/ARCHITECTURE.md section 5.3).
     expect(await getCalendarItem('OVERRIDE', date)).toEqual({
       PK: 'OVERRIDE',
       SK: date,
@@ -498,7 +511,8 @@ describe('date overrides and one-off windows (routes 11–14)', () => {
 
     const day = await dayOf(adminToken, date);
     expect(day.hasOverride).toBe(true);
-    // No GYM window: the override replaces every pattern window of its date (R-OVR-01).
+    // No GYM window: the override replaces every pattern window of its date
+    // (docs/SHARED_CALENDAR_SPEC.md R-OVR-01).
     expect(day.windows).toEqual([
       { start: at(date, '09:00'), end: at(date, '12:00'), typeId: ids.viewStudio, typeName: 'Studio', source: 'override', sourceId: date },
     ]);
@@ -536,7 +550,7 @@ describe('date overrides and one-off windows (routes 11–14)', () => {
     });
 
     const day = await dayOf(adminToken, date);
-    // Not merged in `windows` (T11).
+    // Not merged in `windows` (docs/SHARED_CALENDAR_SPEC.md decision T11).
     expect(day.windows).toEqual([
       ...mondayWindows(date),
       { start: at(date, '12:00'), end: at(date, '13:00'), typeId: ids.viewStudio, typeName: 'Studio', source: 'one_off', sourceId: windowIds.ac08 },
@@ -586,7 +600,7 @@ describe('date overrides and one-off windows (routes 11–14)', () => {
     });
     const day = await dayOf(adminToken, date);
     expect(day.hasOverride).toBe(true);
-    // R-ONE-01, R-OVR-03: the one-off window applies on the closed day.
+    // The one-off window applies on the closed day (docs/SHARED_CALENDAR_SPEC.md R-ONE-01 and R-OVR-03).
     expect(day.windows).toEqual([
       { start: at(date, '09:00'), end: at(date, '10:00'), typeId: ids.pool, typeName: 'GYM', source: 'one_off', sourceId: added.body?.windowId },
     ]);
@@ -614,7 +628,8 @@ describe('date overrides and one-off windows (routes 11–14)', () => {
   it('date_in_past: yesterday is 409 on all four routes; today is accepted', async () => {
     const yesterday = addDays(today(), -1);
     const window = { start: '22:00', end: '23:00', typeId: ids.pool };
-    // A one-off window dated yesterday cannot come from the API: written directly (spec v8, point 1).
+    // A one-off window dated yesterday cannot come from the API, which refuses a past date
+    // (docs/SHARED_CALENDAR_SPEC.md R-AV-02): written directly.
     const pastId = ulid();
     await putCalendarItem({ PK: 'WINDOW', SK: `${yesterday}#${pastId}`, date: yesterday, ...window, createdAt: new Date().toISOString(), createdBy: { username: 'admin', role: 'admin' } });
     for (const res of [
@@ -655,8 +670,10 @@ describe('date overrides and one-off windows (routes 11–14)', () => {
   });
 });
 
+// Test names: R-… rules, AC-… scenarios and route numbers are those of docs/SHARED_CALENDAR_SPEC.md
+// (scenarios in its section 18.3, routes in its section 11.1).
 describe('booking (route 17)', () => {
-  // What the earlier journeys leave behind (read from the step 47 journeys above):
+  // What the earlier journeys leave behind (read from the override and one-off window journeys above):
   // - settings cancellationNoticeHours 48, minBookingNoticeHours 2, bookingHorizonDays 30,
   //   maxFutureAppointmentsPerUser null;
   // - types GYM (ids.pool) and Studio (ids.viewStudio);
@@ -668,7 +685,8 @@ describe('booking (route 17)', () => {
   // leftover ones at the end), and book on Wednesdays, which no earlier journey touches, at their
   // own two types with their own Wednesday pattern. W is the next Wednesday at least 8 days ahead,
   // W2 = W + 7; dates come from the real today, computed with the shared helpers. In the
-  // scenarios of 18.3, dave plays alice and erin plays bob (18.2).
+  // scenarios of docs/SHARED_CALENDAR_SPEC.md section 18.3, dave plays alice and erin plays bob
+  // (throw-away Users, as docs/SHARED_CALENDAR_SPEC.md section 18.2 explains).
   const ZONE = 'Europe/Rome';
   const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
   const HOUR_MS = 60 * 60 * 1000;
@@ -963,6 +981,8 @@ describe('booking (route 17)', () => {
   });
 });
 
+// Test names: AC-… scenarios and route numbers are those of docs/SHARED_CALENDAR_SPEC.md (scenarios
+// in its section 18.3, routes in its section 11.1).
 describe('listing, note and cancel (routes 16, 18, 19)', () => {
   // What the earlier journeys leave behind (read from the booking journeys above):
   // - settings cancellationNoticeHours 48, minBookingNoticeHours 2, bookingHorizonDays 30,
@@ -972,15 +992,19 @@ describe('listing, note and cancel (routes 16, 18, 19)', () => {
   //   override on a Monday; a one-off window dated yesterday;
   // - booked appointments on the Wednesdays W and W2 (W the next Wednesday at least 8 days ahead):
   //   five or four of the earlier `dave` (a deleted account, its own `sub`), two or three of the
-  //   earlier `erin` (AC-34's goes to whichever won). Both accounts were removed; their
-  //   appointments stay as history under the names `dave` and `erin`.
+  //   earlier `erin` (the concurrent booking of docs/SHARED_CALENDAR_SPEC.md AC-34 goes to
+  //   whichever won). Both accounts were removed; their appointments stay as history under the
+  //   names `dave` and `erin`.
   // These journeys rely on one part only: the earlier `dave` has booked appointments, which the
-  // Administrator's `username=dave` returns and the new `dave`'s own list does not (spec v10). They
-  // save their own settings (restoring the leftover ones at the end), create a new `dave` and
-  // `erin` (new `sub`s), and book on Thursdays, which no earlier journey touches, at their own type
-  // with their own Thursday pattern. T is the next Thursday at least 8 days ahead, T2 = T + 7. The
-  // ended appointment of AC-31 is written directly, dated yesterday. Dates come from the real
-  // today, computed with the shared helpers. In the scenarios of 18.3, dave plays alice and erin bob.
+  // Administrator's `username=dave` returns and the new `dave`'s own list does not
+  // (docs/SHARED_CALENDAR_SPEC.md section 11.1, the notes on route 16). They save their own
+  // settings (restoring the leftover ones at the end), create a new `dave` and `erin` (new
+  // `sub`s), and book on Thursdays, which no earlier journey touches, at their own type with
+  // their own Thursday pattern. T is the next Thursday at least 8 days ahead, and the second
+  // date is T + 7. The ended appointment that docs/SHARED_CALENDAR_SPEC.md AC-31 needs is
+  // written directly, dated yesterday. Dates come from the real today, computed with the shared
+  // helpers. In the scenarios of docs/SHARED_CALENDAR_SPEC.md section 18.3, dave plays alice and
+  // erin plays bob.
   const ZONE = 'Europe/Rome';
   const HOUR_MS = 60 * 60 * 1000;
   const today = () => localDateOf(new Date().toISOString(), ZONE);
@@ -1227,6 +1251,8 @@ describe('listing, note and cancel (routes 16, 18, 19)', () => {
   });
 });
 
+// Test names: R-… rules, AC-… scenarios and route numbers are those of docs/SHARED_CALENDAR_SPEC.md
+// (scenarios in its section 18.3, routes in its section 11.1).
 describe('change (route 20)', () => {
   // What the earlier journeys leave behind (read from the listing journeys above):
   // - settings cancellationNoticeHours 48, minBookingNoticeHours 2, bookingHorizonDays 30,
@@ -1242,7 +1268,7 @@ describe('change (route 20)', () => {
   // least 8 days ahead. One appointment of dave is changed step by step (d1 → c1 → … → c5); the
   // limit counts only booked appointments of the new dave with start > now, so the earlier
   // accounts' appointments do not matter. Dates come from the real today, computed with the shared
-  // helpers. In the scenarios of 18.3, dave plays alice and erin bob.
+  // helpers. In the scenarios of docs/SHARED_CALENDAR_SPEC.md section 18.3, dave plays alice and erin bob.
   const ZONE = 'Europe/Rome';
   const today = () => localDateOf(new Date().toISOString(), ZONE);
   const nextFriday = (from: string) => {
@@ -1439,23 +1465,28 @@ describe('change (route 20)', () => {
   });
 });
 
+// Test names: AC-… scenarios and route numbers are those of docs/SHARED_CALENDAR_SPEC.md (scenarios
+// in its section 18.3, routes in its section 11.1).
 describe('users (route 21, deletion)', () => {
   // What the earlier journeys leave behind (read from the change journeys above):
   // - settings cancellationNoticeHours 48, minBookingNoticeHours 2, bookingHorizonDays 30,
   //   maxFutureAppointmentsPerUser null (restored by the change journeys);
   // - the types and patterns of the earlier blocks (Monday, Sunday, Wednesday, Thursday, Friday;
-  //   the Tuesday pattern of the pattern journeys was deleted again in AC-28); an empty override on
-  //   a Monday; a one-off window dated yesterday;
+  //   the Tuesday pattern of the pattern journeys was deleted again in
+  //   docs/SHARED_CALENDAR_SPEC.md AC-28); an empty override on a Monday; a one-off window dated
+  //   yesterday;
   // - appointments on Wednesdays, Thursdays and Fridays and one ended yesterday, booked or
   //   cancelled, all under earlier `dave` and `erin` accounts (removed by removeUserIfPresent, which
   //   writes no marker; their own `sub`s).
   // These journeys rely on one part only: the earlier `dave` accounts have booked appointments not
-  // yet ended, which the deletion of the new `dave` must leave alone (it selects by `sub`, R-DEL-02).
+  // yet ended, which the deletion of the new `dave` must leave alone (it selects by `sub`,
+  // docs/SHARED_CALENDAR_SPEC.md R-DEL-02).
   // They save their own settings first (restoring the leftover ones at the end), create a new `dave`
   // and `erin`, and book on Tuesdays, which no earlier journey books on, at their own type with
   // their own Tuesday pattern 08:00–12:00. U is the next Tuesday at least 8 days ahead, U2 = U + 7.
   // The ended appointment and the one in progress are written directly. Dates come from the real
-  // today, computed with the shared helpers. In the scenarios of 18.3, dave plays alice, erin bob.
+  // today, computed with the shared helpers. In the scenarios of docs/SHARED_CALENDAR_SPEC.md
+  // section 18.3, dave plays alice and erin plays bob.
   const ZONE = 'Europe/Rome';
   const HOUR_MS = 60 * 60 * 1000;
   const today = () => localDateOf(new Date().toISOString(), ZONE);

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Creates the cost guard-rail of a deployed stack (architecture 9.2): a monthly COST budget
-# <stack>-monthly of 1 USD that e-mails the stack's AlertEmail when the actual or the forecast
-# spend of the account exceeds it. Not part of template.yaml: CloudFormation does not offer
+# Creates the cost guard-rail of a deployed stack (docs/ARCHITECTURE.md section 9.2): a monthly
+# COST budget <stack>-monthly of 1 USD that e-mails the stack's AlertEmail when the actual or the
+# forecast spend of the account exceeds it. Not part of template.yaml: CloudFormation does not offer
 # AWS::Budgets::Budget in every region (not in eu-north-1).
 #
 #   npm run budget <stack-name>                creates the budget if it does not exist yet

@@ -1,9 +1,12 @@
 import { toInstant } from '@shared-calendar/shared';
 import { cancellableUntilFor, checkCancel, checkNote, type Caller, type CheckedAppointment } from '../../../src/lib/calendarRules';
 
-// checkCancel (R-CAN-01..03, R-PERM-01) and checkNote (R-NOTE-01, R-PERM-01), pure, in the order of
-// spec 8.3 / 8.5 v10, on the exact dates of 18.3: Europe/Rome, the appointment 2026-11-16 09:00
-// local, now 2026-11-15T09:00 (AC-20) or 09:01 (AC-21) local.
+// checkCancel (docs/SHARED_CALENDAR_SPEC.md R-CAN-01 to R-CAN-03 and R-PERM-01) and checkNote
+// (docs/SHARED_CALENDAR_SPEC.md R-NOTE-01 and R-PERM-01), pure, in the order of
+// docs/SHARED_CALENDAR_SPEC.md sections 8.3 and 8.5, on the exact dates of
+// docs/SHARED_CALENDAR_SPEC.md section 18.3: Europe/Rome, the appointment 2026-11-16 09:00 local,
+// now 2026-11-15T09:00 (docs/SHARED_CALENDAR_SPEC.md AC-20) or 09:01 (docs/SHARED_CALENDAR_SPEC.md
+// AC-21) local.
 
 const ZONE = 'Europe/Rome';
 const START = toInstant('2026-11-16', '09:00', ZONE); // 08:00Z
@@ -18,6 +21,8 @@ const ADMIN: Caller = { role: 'admin', sub: 'sub-admin' };
 const appt = (more: Partial<CheckedAppointment> = {}): CheckedAppointment => ({ userId: 'sub-alice', start: START, end: END, status: 'booked', ...more });
 const at = (date: string, time: string) => toInstant(date, time, ZONE);
 
+// Test names: section numbers, R-… rules and AC-… scenarios are those of
+// docs/SHARED_CALENDAR_SPEC.md (scenarios in its section 18.3).
 describe('checkCancel', () => {
   it('pins the instants of 18.3 (Rome is UTC+1 in November)', () => {
     expect([START, AC20_NOW, AC21_NOW]).toEqual(['2026-11-16T08:00:00.000Z', '2026-11-15T08:00:00.000Z', '2026-11-15T08:01:00.000Z']);
@@ -40,7 +45,8 @@ describe('checkCancel', () => {
   it('the notice comes from the settings: 0 h lets a User cancel until the start itself', () => {
     expect(checkCancel(appt(), ALICE, { cancellationNoticeHours: 0 }, START)).toBeNull();
     expect(checkCancel(appt(), ALICE, { cancellationNoticeHours: 0 }, '2026-11-16T08:00:00.001Z')).toMatchObject({ error: 'cancellation_notice_too_short' });
-    // 720 real hours across the end of summer time: 10:00 local on 2026-10-17 (UTC+2), not 09:00 (A2).
+    // 720 real hours across the end of summer time: 10:00 local on 2026-10-17 (UTC+2), not 09:00,
+    // because notice counts real hours (docs/SHARED_CALENDAR_SPEC.md section 22, assumption A2).
     expect(checkCancel(appt(), ALICE, { cancellationNoticeHours: 720 }, at('2026-10-17', '10:00'))).toBeNull();
     expect(checkCancel(appt(), ALICE, { cancellationNoticeHours: 720 }, at('2026-10-17', '10:01'))).toMatchObject({ error: 'cancellation_notice_too_short' });
   });
@@ -89,6 +95,7 @@ describe('checkCancel', () => {
   });
 });
 
+// Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('checkNote', () => {
   const noted = (more: Partial<CheckedAppointment & { note: string | null }> = {}) => ({ ...appt(), note: 'old', ...more });
 
@@ -123,7 +130,8 @@ describe('checkNote', () => {
   });
 });
 
-describe('cancellableUntilFor (8.1, 11.5 v10)', () => {
+// Test names: section numbers are those of docs/SHARED_CALENDAR_SPEC.md.
+describe('cancellableUntilFor (8.1, 11.5)', () => {
   it('a User on a booked appointment: start − notice, also once that moment has passed', () => {
     expect(cancellableUntilFor({ start: START, status: 'booked' }, 'user', NOTICE)).toBe('2026-11-15T08:00:00.000Z');
   });

@@ -1,16 +1,20 @@
 import type { Role } from '../roles';
 import type { OneOffWindowBody, PatternBody, WindowBody } from './schemas';
 
-// The calendar's response types (docs/SHARED_CALENDAR_SPEC.md 11.5, 11.6) and its event types
-// (section 15). Types only: the bodies they extend are inferred from the schemas in schemas.ts.
-// Dates are local `YYYY-MM-DD`; every other time is an instant in the toISOString form.
+// The calendar's response types (docs/SHARED_CALENDAR_SPEC.md sections 11.5 and 11.6) and its event
+// types (docs/SHARED_CALENDAR_SPEC.md section 15). Types only: the bodies they extend are inferred
+// from the schemas in schemas.ts. Dates are local `YYYY-MM-DD`; every other time is an instant in
+// the toISOString form.
 
 /** Who did something: the caller's username and role at that moment. */
 export type Actor = { username: string; role: Role };
 
 // ── Settings and availability ───────────────────────────────────────────────────────────────
 
-/** 200 of GET and PUT /calendar/settings. Until the first save: the defaults, `updatedAt: null` (R-SET-01). */
+/**
+ * 200 of GET and PUT /calendar/settings. Until the first save: the defaults, `updatedAt: null`
+ * (docs/SHARED_CALENDAR_SPEC.md R-SET-01).
+ */
 export type CalendarSettings = {
   timeZone: string; // the deployment parameter CalendarTimeZone, read-only
   cancellationNoticeHours: number;
@@ -36,7 +40,10 @@ export type OneOffWindow = OneOffWindowBody & { windowId: string; createdAt: str
 // ── Appointments ────────────────────────────────────────────────────────────────────────────
 
 export type AppointmentStatus = 'booked' | 'cancelled';
-/** Why an appointment was cancelled: an explicit cancel, replaced by a change, or its User deleted (D19). */
+/**
+ * Why an appointment was cancelled: an explicit cancel, replaced by a change, or its User deleted
+ * (docs/SHARED_CALENDAR_SPEC.md decision D19).
+ */
 export type CancelReason = 'cancelled' | 'changed' | 'user_deleted';
 
 export type Appointment = {
@@ -58,7 +65,8 @@ export type Appointment = {
   cancelReason: CancelReason | null;
   replaces: string | null;
   replacedBy: string | null;
-  cancellableUntil: string | null; // User callers only (rules.ts cancellableUntil); null for the Administrator
+  // User callers only (rules.ts cancellableUntil); null for the Administrator.
+  cancellableUntil: string | null;
 };
 
 /** 200 of GET /calendar/appointments, sorted by start. */
@@ -66,7 +74,7 @@ export type ListAppointmentsResponse = { appointments: Appointment[] };
 /** 201 of POST /calendar/appointments/{appointmentId}/change. */
 export type ChangeAppointmentResponse = { cancelled: Appointment; booked: Appointment };
 
-// ── The calendar view (GET /calendar, 11.6) ─────────────────────────────────────────────────
+// ── The calendar view (GET /calendar) ───────────────────────────────────────────────────────
 
 /** Where a defined window comes from. `sourceId` is the patternId, the override's date, or the windowId. */
 export type WindowSource = 'pattern' | 'override' | 'one_off';
@@ -85,8 +93,10 @@ export type Interval = { start: string; end: string };
 export type CalendarDay = {
   date: string;
   weekday: number;
-  windows: CalendarWindow[]; // the defined windows (6.5), as instants, sorted; not merged
-  slots: Slot[]; // free slots bookable by the caller (R-SLOT-03 / R-SLOT-04)
+  // The defined windows (docs/SHARED_CALENDAR_SPEC.md section 6.5): sorted instants, not merged.
+  windows: CalendarWindow[];
+  // Free slots bookable by the caller (docs/SHARED_CALENDAR_SPEC.md R-SLOT-03, R-SLOT-04).
+  slots: Slot[];
   busy: Interval[]; // users only: other people's active appointments, no names; [] for the Administrator
   hasOverride?: boolean; // admin only
 };
@@ -100,7 +110,7 @@ export type CalendarView = {
   appointments: Appointment[]; // active appointments starting in the range: all (admin) or own (user)
 };
 
-// ── Events (section 15) ─────────────────────────────────────────────────────────────────────
+// ── Events ──────────────────────────────────────────────────────────────────────────────────
 
 /** The `type` of an event item, written in the same transaction as the change it records. */
 export type CalendarEventType =

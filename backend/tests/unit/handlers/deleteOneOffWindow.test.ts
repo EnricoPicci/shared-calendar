@@ -41,13 +41,15 @@ const onWindows = (fromToday: object[], all: object[] = fromToday) => {
 
 beforeEach(async () => {
   reset();
-  // The AC-04 pattern, Mon 08:00–12:00 Studio, and the AC-08 window 12:00–13:00 Studio on 2026-11-16.
+  // The pattern of docs/SHARED_CALENDAR_SPEC.md AC-04 (Mon 08:00–12:00 Studio) and the window of
+  // docs/SHARED_CALENDAR_SPEC.md AC-08 (12:00–13:00 Studio on 2026-11-16).
   onPartition('PATTERN', [patternItem(P1)]);
   onWindows([windowItem(W1, MONDAY, '12:00', '13:00', STUDIO)]);
   handler = await load();
 });
 afterEach(cleanUp);
 
+// Test names: section numbers and R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('deleteOneOffWindow handler', () => {
   it('deletes the window and answers 204 with no body', async () => {
     expect(await del(W1)).toEqual({ statusCode: 204 });
@@ -61,7 +63,7 @@ describe('deleteOneOffWindow handler', () => {
     expect(transactions()).toHaveLength(0);
   });
 
-  describe('date_in_past (spec v8), inside the locked attempt', () => {
+  describe('date_in_past, inside the locked attempt', () => {
     it('refuses a window dated yesterday with 409', async () => {
       onWindows([], [windowItem(W2, YESTERDAY, '09:00', '10:00', STUDIO)]);
       const response = await del(W2);
@@ -143,6 +145,8 @@ describe('deleteOneOffWindow handler', () => {
   });
 });
 
+// Test names: AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in its section
+// 18.3).
 describe('deleteOneOffWindow handler logging (AC-36)', () => {
   it('writes one info line with the windowId and the lock attempts', async () => {
     await del(W1);

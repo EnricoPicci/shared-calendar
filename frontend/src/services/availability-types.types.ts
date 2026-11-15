@@ -1,8 +1,10 @@
 import type { ApiErrorCode, AvailabilityType } from '@shared-calendar/shared';
 import type { ApiFailure, TransportFailureReason } from './api';
 
-// docs/FRONTEND_SERVICES.md section 16.3. Routes 3–6; their codes are architecture section 4's.
-// `type_not_found` is one reason for its 404 (path) and its 409 (body) alike (decision 32).
+// The result and state types of AvailabilityTypesService (docs/FRONTEND_SERVICES.md section 16.3),
+// for docs/SHARED_CALENDAR_SPEC.md section 11.1, routes 3–6, with the error codes of
+// docs/ARCHITECTURE.md section 4. `type_not_found` is one reason for both its 404 (an id in the
+// path) and its 409 (an id in the body) (docs/FRONTEND_SERVICES.md section 8, decision 32).
 
 // GET /calendar/types, both roles.
 type LoadCode = Extract<ApiErrorCode, 'forbidden' | 'internal_error'>;

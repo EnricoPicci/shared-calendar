@@ -8,8 +8,9 @@ import { error, ok, parseJsonBody, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 import { validate } from '../lib/validation';
 
-// The default text of each refusal (spec 11.3); a refusal's own message (an overlap names the date
-// and both windows, a conflict counts the appointments) replaces it.
+// The default text of each refusal (docs/SHARED_CALENDAR_SPEC.md section 11.3); a refusal's own
+// message (an overlap names the date and both windows, a conflict counts the appointments)
+// replaces it.
 const REFUSALS = {
   type_not_found: 'No availability type with this id',
   limit_reached: 'The calendar already has the maximum number of weekly patterns',
@@ -17,13 +18,15 @@ const REFUSALS = {
   availability_conflict: 'Appointments would fall outside the availability',
 } as const;
 
-// POST /calendar/patterns (docs/SHARED_CALENDAR_SPEC.md 11.1, route 8): the Administrator only.
-// Creates a weekly pattern under the calendar lock, checked against the rest of the calendar
-// (R-PAT-04, R-AV-01..05). One log line with the new patternId and the lock attempts, never the
-// body or the conflicts (14.5).
+// POST /calendar/patterns (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 8): the Administrator
+// only. Creates a weekly pattern under the calendar lock, at most 50 patterns, checked against the
+// rest of the calendar (docs/SHARED_CALENDAR_SPEC.md R-PAT-04, R-AV-01..05). One log line with the
+// new patternId and the lock attempts, never the body or the conflicts
+// (docs/SHARED_CALENDAR_SPEC.md section 14.5).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
-  // "Now" is read once per request; "today" is its local date in the calendar's zone (R-TIME-04).
+  // "Now" is read once per request; "today" is its local date in the calendar's zone
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-04).
   const now = new Date(started).toISOString();
   const requestId = event.requestContext?.requestId ?? 'unknown';
   const route = event.routeKey;
@@ -37,7 +40,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   if (!claims.ok) return done('unauthorized', claims.response);
   const caller = { username: claims.value.username, role: resolveRole(claims.value.groups) };
 
-  // A broken CalendarTimeZone answers 500 to every request, whatever the role (R-TIME-01).
+  // A broken CalendarTimeZone answers 500 to every request, whatever the role
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-01).
   let config: CalendarConfig;
   try {
     config = calendarConfig();

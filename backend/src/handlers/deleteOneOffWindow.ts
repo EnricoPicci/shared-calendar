@@ -7,9 +7,10 @@ import { error, noContent, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 import { validate } from '../lib/validation';
 
-// The status and default text of each refusal (spec 11.3). A delete brings in no type, adds no
-// window and cannot create an overlap: only window_not_found, date_in_past and
-// availability_conflict happen here; the others are listed because the shared check's type names them.
+// The status and default text of each refusal (docs/SHARED_CALENDAR_SPEC.md section 11.3). A
+// delete brings in no type, adds no window and cannot create an overlap: only window_not_found,
+// date_in_past and availability_conflict happen here; the others are listed because the shared
+// check's type names them.
 const REFUSALS = {
   window_not_found: [404, 'No one-off window with this id'],
   date_in_past: [409, 'The window is dated in the past'],
@@ -19,14 +20,16 @@ const REFUSALS = {
   availability_conflict: [409, 'Appointments would fall outside the availability'],
 } as const;
 
-// DELETE /calendar/windows/{windowId} (docs/SHARED_CALENDAR_SPEC.md 11.1, route 14): the
+// DELETE /calendar/windows/{windowId} (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 14): the
 // Administrator only. Removes a one-off window under the calendar lock unless an appointment that
-// has not ended would fall outside the availability (R-AV-03). The path names only the id, so
-// date_in_past (a window dated before today, spec v8) is known only once the window is found, inside
-// the locked attempt. One log line with the windowId and the lock attempts, never the conflicts (14.5).
+// has not ended would fall outside the availability (docs/SHARED_CALENDAR_SPEC.md R-AV-03). The path
+// names only the id, so date_in_past (a window dated before today) is known only once the window is
+// found, inside the locked attempt. One log line with the windowId and the lock attempts, never the
+// conflicts (docs/SHARED_CALENDAR_SPEC.md section 14.5).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
-  // "Now" is read once per request; "today" is its local date in the calendar's zone (R-TIME-04).
+  // "Now" is read once per request; "today" is its local date in the calendar's zone
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-04).
   const now = new Date(started).toISOString();
   const requestId = event.requestContext?.requestId ?? 'unknown';
   const route = event.routeKey;
@@ -40,7 +43,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   if (!claims.ok) return done('unauthorized', claims.response);
   const caller = { username: claims.value.username, role: resolveRole(claims.value.groups) };
 
-  // A broken CalendarTimeZone answers 500 to every request, whatever the role (R-TIME-01).
+  // A broken CalendarTimeZone answers 500 to every request, whatever the role
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-01).
   let config: CalendarConfig;
   try {
     config = calendarConfig();

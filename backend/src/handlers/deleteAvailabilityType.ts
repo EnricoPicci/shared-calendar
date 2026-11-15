@@ -7,18 +7,21 @@ import { error, noContent, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 import { validate } from '../lib/validation';
 
-// The status of each refusal (spec 11.3): the type in the path is a 404.
+// The status of each refusal (docs/SHARED_CALENDAR_SPEC.md section 11.3): the type in the path is
+// a 404.
 const REFUSALS = {
   type_not_found: [404, 'No availability type with this id'],
   type_in_use: [409, 'The type is still used by availability or by appointments that have not ended'],
 } as const;
 
-// DELETE /calendar/types/{typeId} (docs/SHARED_CALENDAR_SPEC.md 11.1, route 6): the Administrator
-// only. Deletes a type under the calendar lock unless something current refers to it (R-TYPE-03).
-// One log line with the typeId and the lock attempts (14.5).
+// DELETE /calendar/types/{typeId} (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 6): the
+// Administrator only. Deletes a type under the calendar lock unless something current refers to it
+// (docs/SHARED_CALENDAR_SPEC.md R-TYPE-03). One log line with the typeId and the lock attempts
+// (docs/SHARED_CALENDAR_SPEC.md section 14.5).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
-  // "Now" is read once per request; "today" is its local date in the calendar's zone (R-TIME-04).
+  // "Now" is read once per request; "today" is its local date in the calendar's zone
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-04).
   const now = new Date(started).toISOString();
   const requestId = event.requestContext?.requestId ?? 'unknown';
   const route = event.routeKey;
@@ -32,7 +35,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   if (!claims.ok) return done('unauthorized', claims.response);
   const caller = { username: claims.value.username, role: resolveRole(claims.value.groups) };
 
-  // A broken CalendarTimeZone answers 500 to every request, whatever the role (R-TIME-01).
+  // A broken CalendarTimeZone answers 500 to every request, whatever the role
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-01).
   let config: CalendarConfig;
   try {
     config = calendarConfig();

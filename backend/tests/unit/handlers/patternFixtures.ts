@@ -2,7 +2,7 @@ import { TransactionCanceledException } from '@aws-sdk/client-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 
 // Shared by the pattern write handlers' tests (createPattern, updatePattern, deletePattern).
-// AC-04: now 2026-11-10T09:00Z (Tuesday), Europe/Rome.
+// The scenario of docs/SHARED_CALENDAR_SPEC.md AC-04: now 2026-11-10T09:00Z (Tuesday), Europe/Rome.
 
 export const NOW = '2026-11-10T09:00:00.000Z';
 export const EARLIER = '2026-11-01T08:00:00.000Z';
@@ -12,7 +12,10 @@ export const P1 = '01JC00000000000000000000P1';
 export const UNKNOWN = '01JC0000000000000000000099';
 export const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
-/** Pattern Mon 08:00–12:00 Studio from 2026-11-01, no end (AC-04): a valid PatternBody. */
+/**
+ * Pattern Mon 08:00–12:00 Studio from 2026-11-01, no end (docs/SHARED_CALENDAR_SPEC.md AC-04): a
+ * valid PatternBody.
+ */
 export const AC04 = { weekday: 1, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-11-01', validUntil: null };
 
 export const typeItems = [
@@ -27,7 +30,10 @@ export const patternItem = (patternId: string, more: object = {}) => ({
   updatedAt: EARLIER,
   ...more,
 });
-/** Alice's appointment, Monday 2026-11-16 09:00–10:00 local (AC-10), as stored. */
+/**
+ * Alice's appointment, Monday 2026-11-16 09:00–10:00 local (docs/SHARED_CALENDAR_SPEC.md AC-10), as
+ * stored.
+ */
 export const aliceItem = {
   PK: 'APPT',
   SK: '2026-11-16T08:00:00.000Z#A1',

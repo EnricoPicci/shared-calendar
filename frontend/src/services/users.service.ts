@@ -12,11 +12,12 @@ import type {
   ListUsersState,
 } from './users.types';
 
-// docs/FRONTEND_SERVICES.md section 13. The administrator's three calls, POST /users,
-// DELETE /users/{username} and GET /users (v6): three pairs of streams, independent of each other.
+// The administrator's three calls (docs/FRONTEND_SERVICES.md section 13): POST /users,
+// DELETE /users/{username} and GET /users, three pairs of streams, independent of each other.
 
 const CREATE_CODES = ['forbidden', 'invalid_json', 'invalid_request', 'user_exists', 'internal_error'] as const satisfies readonly ApiErrorCode[];
-// concurrent_update since plan step 51: the deletion cancels the User's appointments under the calendar lock.
+// concurrent_update: the deletion cancels the User's appointments under the calendar lock, which can
+// be busy (docs/FRONTEND_SERVICES.md section 8, decision 37).
 const DELETE_CODES = [
   'forbidden',
   'invalid_request',
@@ -44,7 +45,7 @@ export class UsersService {
   readonly deleteUserState$: Observable<DeleteUserState> = this.deleteStateSubject.asObservable();
   private pendingDelete?: Subscription;
 
-  // Pair 3: list (v6).
+  // Pair 3: list.
   private readonly listUsersResultSubject = new ReplaySubject<ListUsersResult>(1);
   readonly listUsersResult$: Observable<ListUsersResult> = this.listUsersResultSubject.asObservable();
   private readonly listUsersStateSubject = new BehaviorSubject<ListUsersState>({ status: 'idle' });
@@ -69,7 +70,8 @@ export class UsersService {
 
     this.pendingCreate = call
       .pipe(tap((result) => this.createStateSubject.next(result)))
-      // Forward `next` only: a completed subject would ignore every later call (section 3.2).
+      // Forward `next` only: a completed subject would ignore every later call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
       .subscribe((result) => this.createResultSubject.next(result));
   }
 
@@ -87,7 +89,8 @@ export class UsersService {
 
     this.pendingDelete = call
       .pipe(tap((result) => this.deleteStateSubject.next(result)))
-      // Forward `next` only: a completed subject would ignore every later call (section 3.2).
+      // Forward `next` only: a completed subject would ignore every later call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
       .subscribe((result) => this.deleteResultSubject.next(result));
   }
 
@@ -100,12 +103,15 @@ export class UsersService {
         map((answer): ListUsersResult => (answer.status === 'ok' ? toListResult(answer) : answer)),
         tap((result) => this.listUsersStateSubject.next(result)),
       )
-      // Forward `next` only: a completed subject would ignore every later call (section 3.2).
+      // Forward `next` only: a completed subject would ignore every later call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
       .subscribe((result) => this.listUsersResultSubject.next(result));
   }
 }
 
-// Section 13.5. The generated password is kept in the success value only (rule 6, exception).
+// A 201 must carry `username` and `password` strings (docs/FRONTEND_SERVICES.md section 13.5). The
+// generated password is kept in the success value only, the one exception to
+// docs/FRONTEND_SERVICES.md section 2, rule 6.
 function toCreateResult(answer: ApiOk): CreateUserResult {
   const body = (answer.body ?? {}) as { username?: unknown; password?: unknown };
   if (answer.httpStatus === 201 && typeof body.username === 'string' && typeof body.password === 'string') {
@@ -119,7 +125,8 @@ function toDeleteResult(answer: ApiOk, username: string): DeleteUserResult {
   return transportFailure('unexpected', `API answered ${answer.httpStatus} with an unexpected body`);
 }
 
-// Section 13.5 (v6): the status, the array under `users` and each element's `username`.
+// A success is checked for its status, the array under `users` and each element's `username`
+// (docs/FRONTEND_SERVICES.md section 13.5).
 function toListResult(answer: ApiOk): ListUsersResult {
   const body = answer.body as { users?: unknown } | undefined;
   if (answer.httpStatus === 200 && Array.isArray(body?.users) && body.users.every((u) => hasString(u, 'username'))) {

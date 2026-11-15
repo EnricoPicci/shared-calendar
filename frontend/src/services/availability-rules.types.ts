@@ -9,10 +9,13 @@ import type {
 } from '@shared-calendar/shared';
 import type { ApiFailure, TransportFailureReason } from './api';
 
-// docs/FRONTEND_SERVICES.md section 17.3. Routes 7–14, admin only; their codes are architecture
-// section 4's (decision 32): updatePattern has no `limit_reached` (as spec v14), deletePattern no
-// `availability_overlap` (spec 11.1 lists it; footnote 1: never answered). A failure with `availability_conflict`
-// carries `conflicts` (section 10.2).
+// The result and state types of AvailabilityRulesService (docs/FRONTEND_SERVICES.md section 17.3),
+// for docs/SHARED_CALENDAR_SPEC.md section 11.1, routes 7–14, all admin only. The error codes are
+// those of docs/ARCHITECTURE.md section 4 (docs/FRONTEND_SERVICES.md section 8, decision 32):
+// updatePattern has no `limit_reached`, because an update never adds a pattern, and deletePattern
+// has no `availability_overlap`, because removing a pattern cannot create an overlap
+// (docs/SHARED_CALENDAR_SPEC.md section 11.1, footnote 1). A failure with `availability_conflict`
+// carries `conflicts` (docs/FRONTEND_SERVICES.md section 10.2).
 
 type Common = 'forbidden' | 'internal_error';
 type Write = Common | 'invalid_request' | 'concurrent_update';

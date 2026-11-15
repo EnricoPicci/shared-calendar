@@ -1,5 +1,6 @@
-// Spec section 9 (R-SET-01): the settings that apply until the Administrator first saves them.
-// `timeZone` is not here: it is the deployment parameter CalendarTimeZone (R-TIME-01).
+// The settings that apply until the Administrator first saves them (docs/SHARED_CALENDAR_SPEC.md
+// section 9, R-SET-01). `timeZone` is not among them: it is the deployment parameter
+// CalendarTimeZone (docs/SHARED_CALENDAR_SPEC.md R-TIME-01).
 export const DEFAULT_TIME_ZONE = 'Europe/Rome';
 
 export const DEFAULT_SETTINGS = {
@@ -9,7 +10,8 @@ export const DEFAULT_SETTINGS = {
   maxFutureAppointmentsPerUser: null,
 } as const;
 
-// Spec assumption A5 (count limits), section 6.1 (type name) and R-BOOK-11 (note).
+// The count limits of docs/SHARED_CALENDAR_SPEC.md assumption A5, the type name length of section
+// 6.1 and the note length of R-BOOK-11.
 export const CALENDAR_LIMITS = {
   types: 20,
   patterns: 50,
@@ -21,8 +23,9 @@ export const CALENDAR_LIMITS = {
   noteLength: 500,
 } as const;
 
-// Spec section 9: the range of each editable setting, inclusive; all are integers.
-// `maxFutureAppointmentsPerUser` may also be null (unlimited). UpdateSettingsBody reads these.
+// The range of each editable setting, inclusive; all are integers (docs/SHARED_CALENDAR_SPEC.md
+// section 9). `maxFutureAppointmentsPerUser` may also be null (unlimited). UpdateSettingsBody reads
+// these.
 export const SETTINGS_RANGES = {
   cancellationNoticeHours: { min: 0, max: 720 },
   minBookingNoticeHours: { min: 0, max: 720 },

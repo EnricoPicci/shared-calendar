@@ -8,8 +8,8 @@ import { error, noContent, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 import { validate } from '../lib/validation';
 
-// DELETE /users/{username} (architecture section 6.4; docs/SHARED_CALENDAR_SPEC.md 10.2 v12). In
-// this order, the first failure decides:
+// DELETE /users/{username} (docs/ARCHITECTURE.md section 6.4; docs/SHARED_CALENDAR_SPEC.md section
+// 10.2). In this order, the first failure decides:
 //   1. claims, the admin role (403), the path (400);
 //   2. AdminListGroupsForUser: unknown (404 user_not_found), in group admin (403 cannot_delete_admin);
 //      a target in no group is deletable. No calendar write ever happens for an administrator;
@@ -17,11 +17,13 @@ import { validate } from '../lib/validation';
 //   4. AdminGetUser: the target's `sub`;
 //   5. under the lock, the deleted-user marker and the cancellation of every active appointment not
 //      yet ended (calendarDb.markUserDeleted, chunks of 40). A failure answers before any Cognito
-//      change (R-DEL-01): three lost locks 409 concurrent_update, anything else 500. Repeating the
-//      delete is safe: the marker is written again, cancelled appointments are skipped;
+//      change (docs/SHARED_CALENDAR_SPEC.md R-DEL-01): three lost locks 409 concurrent_update,
+//      anything else 500. Repeating the delete is safe: the marker is written again, cancelled
+//      appointments are skipped;
 //   6. the global sign-out (skipped locally, SKIP_GLOBAL_SIGN_OUT) and AdminDeleteUser; 204.
-// One log line (section 11): "username" is the caller, "target" the account being deleted (logged
-// once the path is valid), cancelledCount and lockAttempts on success; never the target's `sub`.
+// One log line (docs/ARCHITECTURE.md section 11): "username" is the caller, "target" the account
+// being deleted (logged once the path is valid), cancelledCount and lockAttempts on success; never
+// the target's `sub`.
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
   // "Now" is read once per request: the marker's deletedAt and every cancellation compare with it.

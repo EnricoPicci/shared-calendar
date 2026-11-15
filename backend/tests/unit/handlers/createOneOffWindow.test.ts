@@ -36,18 +36,20 @@ async function load(timeZone = 'Europe/Rome'): Promise<Handler> {
   return (await import('../../../src/handlers/createOneOffWindow')).handler;
 }
 
-/** AC-08: 2026-11-16 12:00–13:00 Studio. */
+/** The window of docs/SHARED_CALENDAR_SPEC.md AC-08: 2026-11-16 12:00–13:00 Studio. */
 const AC08 = { date: MONDAY, start: '12:00', end: '13:00', typeId: STUDIO };
 const post = (body: unknown = AC08, claims = admin) => handler(eventAt(ROUTE, claims, undefined, typeof body === 'string' ? body : JSON.stringify(body)));
 
 beforeEach(async () => {
   reset();
-  // The AC-04 pattern, Mon 08:00–12:00 Studio from 2026-11-01.
+  // The pattern of docs/SHARED_CALENDAR_SPEC.md AC-04, Mon 08:00–12:00 Studio from 2026-11-01.
   onPartition('PATTERN', [patternItem(P1)]);
   handler = await load();
 });
 afterEach(cleanUp);
 
+// Test names: section numbers, R-… rules and AC-… scenarios are those of
+// docs/SHARED_CALENDAR_SPEC.md (scenarios in its section 18.3).
 describe('createOneOffWindow handler', () => {
   it('AC-08: creates the window with a new ULID and answers 201 with the OneOffWindow, no createdBy', async () => {
     const response = await post();
@@ -201,6 +203,8 @@ describe('createOneOffWindow handler', () => {
   });
 });
 
+// Test names: AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in its section
+// 18.3).
 describe('createOneOffWindow handler logging (AC-36)', () => {
   it('writes one info line with the new windowId, its date and the lock attempts, never the times or the type', async () => {
     const response = await post();

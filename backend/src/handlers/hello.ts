@@ -11,8 +11,8 @@ const MESSAGES: Record<Role, (username: string) => string> = {
   user: (username) => `Hello World, I am ${username}`,
 };
 
-// Architecture section 6.5. The authorizer logs nothing when it allows a request, so this
-// handler writes the one log line per request (architecture section 11).
+// The flow of docs/ARCHITECTURE.md section 6.5. The authorizer logs nothing when it allows a
+// request, so this handler writes the one log line per request (docs/ARCHITECTURE.md section 11).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
   const requestId = event.requestContext?.requestId ?? 'unknown';

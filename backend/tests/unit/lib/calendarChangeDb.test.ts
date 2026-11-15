@@ -4,10 +4,12 @@ import { mockClient } from 'aws-sdk-client-mock';
 import type { AppointmentSnapshot } from '../../../src/lib/calendarEvents';
 import type { CalendarState } from '../../../src/lib/calendarRules';
 
-// calendarDb.changeAppointment (plan step 50; spec 8.4, 13.4, 15.2 v11): the reads inside the locked
-// attempt, the six-item transaction, the marker, the retry. AC-22: now 2026-11-10T09:00Z; alice
-// moves Monday 2026-11-16 09:00 local (08:00Z) to 10:00 local (09:00Z). The module reads its
-// configuration once per container, so every test imports a fresh copy.
+// calendarDb.changeAppointment (docs/SHARED_CALENDAR_SPEC.md section 8.4): the reads inside the
+// locked attempt, the six-item transaction (docs/SHARED_CALENDAR_SPEC.md section 13.4), the marker,
+// the event's `previous` (docs/SHARED_CALENDAR_SPEC.md section 15.2), the retry. The scenario of
+// docs/SHARED_CALENDAR_SPEC.md AC-22: now 2026-11-10T09:00Z; alice moves Monday 2026-11-16 09:00
+// local (08:00Z) to 10:00 local (09:00Z). The module reads its configuration once per container, so
+// every test imports a fresh copy.
 type CalendarDb = typeof import('../../../src/lib/calendarDb');
 let db: CalendarDb;
 
@@ -149,7 +151,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('changeAppointment (8.4, 13.4 v11)', () => {
+// Test names: section numbers and R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
+describe('changeAppointment (8.4, 13.4)', () => {
   it('reads inside the attempt, consistently: the lock, the settings, the pointer, the old APPT, and the state', async () => {
     await db.changeAppointment(change(), TODAY, NOW, studio);
     expect(gets().map((g) => [g.Key, g.ConsistentRead])).toEqual([
@@ -158,7 +161,8 @@ describe('changeAppointment (8.4, 13.4 v11)', () => {
       [{ PK: `APPTID#${OLD_ID}`, SK: 'APPTID' }, true],
       [{ PK: 'APPT', SK: OLD_SK }, true],
     ]);
-    // The availability state of 13.2: TYPE, PATTERN whole; OVERRIDE, WINDOW from today; APPT from now − 24 h.
+    // The availability state (docs/SHARED_CALENDAR_SPEC.md section 13.2): TYPE, PATTERN whole;
+    // OVERRIDE, WINDOW from today; APPT from now − 24 h.
     expect(queries().map((q) => [q.ExpressionAttributeValues, q.ConsistentRead])).toEqual([
       [{ ':pk': 'TYPE' }, true],
       [{ ':pk': 'PATTERN' }, true],

@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "eslint .",
+    "lint": "eslint . && node scripts/check-doc-references.mjs",
     "test:unit": "npm run test:unit --workspaces --if-present",
     "verify": "npm run verify --workspaces --if-present"
   },

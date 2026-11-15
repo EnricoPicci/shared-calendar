@@ -8,7 +8,7 @@ import { FetchError } from 'aws-jwt-verify/error';
 import { SimpleJwksCache } from 'aws-jwt-verify/jwk';
 import { log } from '../lib/logger';
 
-// The claims of a Cognito access token this authorizer reads (architecture section 4).
+// The claims of a Cognito access token this authorizer reads (docs/ARCHITECTURE.md section 4).
 type AccessTokenPayload = {
   sub: string;
   username?: unknown;
@@ -90,7 +90,7 @@ export const handler = async (event: APIGatewayRequestAuthorizerEventV2): Promis
     payload = (await verifier.verify(token)) as AccessTokenPayload;
   } catch (err) {
     // The signing keys could not be downloaded: not the caller's fault. Crash so that the
-    // client gets a 500 and the authorizer Errors alarm fires (architecture section 11).
+    // client gets a 500 and the authorizer Errors alarm fires (docs/ARCHITECTURE.md section 11).
     if (err instanceof FetchError) {
       log('error', { requestId, msg: 'authorizer could not download the signing keys', reason: err });
       throw err;

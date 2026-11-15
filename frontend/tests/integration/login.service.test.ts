@@ -6,7 +6,7 @@ import { API, current, PASSWORDS, signIn } from './local';
 // docs/FRONTEND_SERVICES.md sections 7 and 9.9, against the back end's local stack:
 // `DYNAMODB_PORT=8002 npm run local:up -w backend` (cognito-local on 9229, writes env.local.json)
 // and `npm run local:api -w backend` (the API on 3000). Runs only with RUN_INTEGRATION=1.
-// v4: the session, with its tokens, is read from the SessionStore; the outcome carries none.
+// The session, with its tokens, is read from the SessionStore; the outcome carries none.
 
 let aliceSession: Session | null = null;
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Post-deploy smoke test (architecture 9.3): journeys 3, 4, 6 and 11 of plan step 9 with a
-# throw-away user smoke-<timestamp>, and the calendar journey of spec 18.4 between journeys 3
-# and 11. Prints PASS or FAIL per check; exits 1 if any check failed.
+# Post-deploy smoke test (docs/ARCHITECTURE.md section 9.3): docs/IMPLEMENTATION_PLAN.md step 9,
+# journeys 3, 4, 6 and 11, with a throw-away user smoke-<timestamp>, and between journeys 3 and 11
+# the calendar journey of docs/SHARED_CALENDAR_SPEC.md section 18.4. Prints PASS or FAIL per check;
+# exits 1 if any check failed.
 #
 #   npm run smoke <stack-name>   the deployed stack, your AWS login (run after every deploy)
 #   npm run smoke local          the local stack (local:up + local:api; pass DYNAMODB_PORT)
@@ -21,7 +22,8 @@
 # or Ctrl-C, the calendar journey's appointment is cancelled and its window and type deleted, and
 # the throw-away user is deleted. What stays, by design, as history: the user's message row, and
 # in the calendar table the cancelled appointment (username and type name smoke-<timestamp>), its
-# pointer, its booked and cancelled events, and the deleted-user marker journey 11 writes.
+# pointer, its booked and cancelled events, and the deleted-user marker that the user's deletion
+# (docs/IMPLEMENTATION_PLAN.md step 9, journey 11) writes.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/target.sh
@@ -30,7 +32,8 @@ source scripts/target.sh
 load_target "$1"
 
 SMOKE_USER="smoke-$(date +%s)"
-# The booking's note: AC-36 searches the logs for "must never reach a log". Never printed.
+# The booking's note: the log search of docs/SHARED_CALENDAR_SPEC.md AC-36 looks for "must never
+# reach a log". Never printed.
 SMOKE_NOTE="smoke-test note ${SMOKE_USER#smoke-}, must never reach a log"
 failures=0
 created=false # POST /users was sent: the user may exist
@@ -210,7 +213,8 @@ calendar_resolve_pending() {
 }
 
 # Removes what the calendar journey created, through the API as the Administrator: cancels the
-# appointment, then deletes the window, then the type (R-TYPE-03, R-AV-03). Safe to run twice.
+# appointment, then deletes the window, then the type, the order docs/SHARED_CALENDAR_SPEC.md
+# R-TYPE-03 and R-AV-03 require. Safe to run twice.
 calendar_cleanup() {
   [[ -n "${admin_token:-}" ]] || return 0
   [[ -z "$cal_pending" ]] || calendar_resolve_pending
@@ -243,14 +247,15 @@ calendar_cleanup() {
   fi
 }
 
-# cal_fail <check>: a failed calendar check; what was created so far is removed at once, so
-# journey 11 still runs on a clean calendar.
+# cal_fail <check>: a failed calendar check; what was created so far is removed at once, so the
+# user's deletion still runs on a clean calendar.
 cal_fail() {
   fail "calendar: $*"
   calendar_cleanup
 }
 
-# The calendar journey of spec 18.4 (v13). Stops at the first failed check.
+# The calendar journey of docs/SHARED_CALENDAR_SPEC.md section 18.4. Stops at the first failed
+# check.
 calendar_journey() {
   local plan zone notice from to earliest pick status
   api GET /calendar/settings "$admin_token"
@@ -377,7 +382,7 @@ else
 fi
 unset admin_password
 
-# Journey 4: /hello as the Administrator.
+# docs/IMPLEMENTATION_PLAN.md step 9, journey 4: /hello as the Administrator.
 api POST /hello "$admin_token"
 admin_message_id=$(hello_message_id admin "Hello World, the Administrator is speaking")
 if [[ "$STATUS" == 201 && -n "$admin_message_id" ]]; then
@@ -386,7 +391,8 @@ else
   fail "journey 4: /hello as $ADMIN_USERNAME -> $STATUS $BODY"
 fi
 
-# Journey 6: create the throw-away user, sign in as it, /hello as it (journey 3).
+# docs/IMPLEMENTATION_PLAN.md step 9, journey 6: create the throw-away user, sign in as it,
+# /hello as it (journey 3 of the same step).
 created=true
 api POST /users "$admin_token" "{\"username\": \"$SMOKE_USER\"}"
 user_password=""
@@ -419,7 +425,7 @@ if [[ -n "$user_token" ]]; then
   fi
 fi
 
-# Both rows in DynamoDB (architecture 9.3).
+# Both rows in DynamoDB (docs/ARCHITECTURE.md section 9.3).
 if [[ -n "$admin_message_id" ]]; then
   if check_row "$admin_message_id" "$ADMIN_USERNAME" admin; then
     pass "row $admin_message_id in $TABLE_NAME ($ADMIN_USERNAME, admin)"
@@ -435,10 +441,11 @@ if [[ -n "$user_message_id" ]]; then
   fi
 fi
 
-# The calendar journey (spec 18.4), before journey 11 deletes the user.
+# The calendar journey (docs/SHARED_CALENDAR_SPEC.md section 18.4), before the user is deleted.
 if [[ -n "$user_token" ]]; then calendar_journey; fi
 
-# Journey 11: delete the throw-away user; it can no longer sign in; its message row stays.
+# docs/IMPLEMENTATION_PLAN.md step 9, journey 11: delete the throw-away user; it can no longer
+# sign in; its message row stays.
 api DELETE "/users/$SMOKE_USER" "$admin_token"
 if [[ "$STATUS" == 204 ]]; then
   deleted=true

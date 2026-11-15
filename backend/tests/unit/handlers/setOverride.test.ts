@@ -37,19 +37,21 @@ async function load(timeZone = 'Europe/Rome'): Promise<Handler> {
 }
 
 const w = (start: string, end: string, typeId = STUDIO) => ({ start, end, typeId });
-/** AC-06: 2026-11-16 [09:00–12:00 Studio]. */
+/** The override of docs/SHARED_CALENDAR_SPEC.md AC-06: 2026-11-16 [09:00–12:00 Studio]. */
 const AC06 = { windows: [w('09:00', '12:00')] };
 const put = (date: string, body: unknown = AC06, claims = admin) =>
   handler(eventAt(ROUTE, claims, { date }, typeof body === 'string' ? body : JSON.stringify(body)));
 
 beforeEach(async () => {
   reset();
-  // The AC-04 pattern, Mon 08:00–12:00 Studio from 2026-11-01.
+  // The pattern of docs/SHARED_CALENDAR_SPEC.md AC-04, Mon 08:00–12:00 Studio from 2026-11-01.
   onPartition('PATTERN', [patternItem(P1)]);
   handler = await load();
 });
 afterEach(cleanUp);
 
+// Test names: section numbers, R-… rules and AC-… scenarios are those of
+// docs/SHARED_CALENDAR_SPEC.md (scenarios in its section 18.3).
 describe('setOverride handler', () => {
   it('AC-06: sets the override and answers 200 with the DateOverride, no updatedBy', async () => {
     const response = await put(MONDAY);
@@ -64,7 +66,7 @@ describe('setOverride handler', () => {
     });
   });
 
-  it('stores and answers the windows sorted by start, whatever the body’s order (spec v8)', async () => {
+  it('stores and answers the windows sorted by start, whatever the body’s order', async () => {
     const response = await put(MONDAY, { windows: [w('14:00', '18:00', POOL), w('09:00', '12:00')] });
     expect(bodyOf(response).windows).toEqual([w('09:00', '12:00'), w('14:00', '18:00', POOL)]);
   });
@@ -119,7 +121,7 @@ describe('setOverride handler', () => {
   });
 
   describe('overlap (6.5, "set an override")', () => {
-    it('refuses two of its own windows that overlap, 409 with the date and both windows (spec v8)', async () => {
+    it('refuses two of its own windows that overlap, 409 with the date and both windows', async () => {
       const response = await put(MONDAY, { windows: [w('10:00', '12:00', POOL), w('09:00', '11:00')] });
       expect(response.statusCode).toBe(409);
       expect(bodyOf(response)).toEqual({
@@ -268,6 +270,8 @@ describe('setOverride handler', () => {
   });
 });
 
+// Test names: AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in its section
+// 18.3).
 describe('setOverride handler logging (AC-36)', () => {
   it('writes one info line with the date and the lock attempts, never the windows', async () => {
     await put(MONDAY);

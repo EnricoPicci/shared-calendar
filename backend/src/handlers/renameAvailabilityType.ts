@@ -7,18 +7,20 @@ import { error, ok, parseJsonBody, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 import { validate } from '../lib/validation';
 
-// The status of each refusal (spec 11.3): the type in the path is a 404.
+// The status of each refusal (docs/SHARED_CALENDAR_SPEC.md section 11.3): the type in the path is
+// a 404.
 const REFUSALS = {
   type_not_found: [404, 'No availability type with this id'],
   type_name_exists: [409, 'A type with this name already exists'],
 } as const;
 
-// PUT /calendar/types/{typeId} (docs/SHARED_CALENDAR_SPEC.md 11.1, route 5): the Administrator
-// only. Renames a type under the calendar lock (R-TYPE-02). One log line with the typeId and the
-// lock attempts, never the body or the name (14.5).
+// PUT /calendar/types/{typeId} (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 5): the
+// Administrator only. Renames a type under the calendar lock (docs/SHARED_CALENDAR_SPEC.md
+// R-TYPE-02). One log line with the typeId and the lock attempts, never the body or the name
+// (docs/SHARED_CALENDAR_SPEC.md section 14.5).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
-  // "Now" is read once per request (R-TIME-04).
+  // "Now" is read once per request (docs/SHARED_CALENDAR_SPEC.md R-TIME-04).
   const now = new Date(started).toISOString();
   const requestId = event.requestContext?.requestId ?? 'unknown';
   const route = event.routeKey;
@@ -32,7 +34,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   if (!claims.ok) return done('unauthorized', claims.response);
   const caller = { username: claims.value.username, role: resolveRole(claims.value.groups) };
 
-  // A broken CalendarTimeZone answers 500 to every request, whatever the role (R-TIME-01).
+  // A broken CalendarTimeZone answers 500 to every request, whatever the role
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-01).
   try {
     calendarConfig();
   } catch (err) {

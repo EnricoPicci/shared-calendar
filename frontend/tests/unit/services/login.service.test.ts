@@ -2,13 +2,14 @@ import { LoginService, type LoginConfig } from '../../../src/services/login.serv
 import type { LoginResult, LoginState, Session } from '../../../src/services/login.types';
 import { SessionStore } from '../../../src/services/session.store';
 
-// docs/FRONTEND_SERVICES.md sections 6 and 9.8 (v4: the session goes to the store; the outcome
-// carries no token). The global fetch is a stub answering with real Response
-// objects, so fromFetch runs unchanged. Every test subscribes first, then calls login.
+// The unit tests of LoginService (docs/FRONTEND_SERVICES.md sections 6 and 9.8): the session goes
+// to the store, and the outcome carries no token. The global fetch is a stub answering with real
+// Response objects, so fromFetch runs unchanged. Every test subscribes first, then calls login.
 
 const CONFIG: LoginConfig = { cognitoUrl: 'http://cognito.test/', clientId: 'client-123' };
 const PASSWORD = 'Secret-Pass-1!';
-// 15 minutes ahead, in seconds since the epoch: the store arms its expiry timer on it (section 9.3).
+// 15 minutes ahead, in seconds since the epoch: the store arms its expiry timer on it
+// (docs/FRONTEND_SERVICES.md section 9.3).
 const EXP = Math.floor(Date.now() / 1000) + 900;
 
 function b64url(text: string): string {

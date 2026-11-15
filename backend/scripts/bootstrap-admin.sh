@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Sets or rotates the Administrator's password (architecture 6.1), the only way to do so: the API
-# never touches admin accounts. It only sets the password; it never creates a user or changes a
-# group.
+# Sets or rotates the Administrator's password (docs/ARCHITECTURE.md section 6.1), the only way to
+# do so: the API never touches admin accounts. It only sets the password; it never creates a user
+# or changes a group.
 #
 #   npm run bootstrap-admin <stack-name>   the deployed stack (user AdminUsername), your AWS login
 #   npm run bootstrap-admin local          cognito-local (user admin)

@@ -121,6 +121,7 @@ const sent = () => cognito.calls().map((call) => (call.args[0] as object).constr
 const transactions = () => ddb.commandCalls(TransactWriteCommand).map((call) => call.args[0].input);
 const FULL_ORDER = ['AdminListGroupsForUser', 'AdminGetUser', 'GetItem', 'Query', 'TransactWriteItems', 'AdminUserGlobalSignOut', 'AdminDeleteUser'];
 
+// Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('deleteUser handler', () => {
   it('checks the groups, reads the sub, writes the calendar under the lock, signs the user out, deletes them: 204 without a body', async () => {
     const response = await handler(asAdmin());

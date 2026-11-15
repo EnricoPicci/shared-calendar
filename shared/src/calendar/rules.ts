@@ -1,40 +1,44 @@
 import { localTimeOf, toInstant, weekdayOf } from './time';
 import type { DateOverride, OneOffWindow, Slot, WeeklyPattern, WindowSource } from './types';
 
-// The pure calendar rules both sides use (docs/SHARED_CALENDAR_SPEC.md 6.5, 6.6, 7, R-BOOK-02,
-// R-CAN-03, section 12). Plain data in, plain data out: no clock (`now` and the zone are
-// arguments), no I/O. The inputs are the fields the API returns, so a stored item with extra
+// The pure calendar rules both sides use (docs/SHARED_CALENDAR_SPEC.md sections 6.5, 6.6 and 7,
+// R-BOOK-02, R-CAN-03 and section 12). Plain data in, plain data out: no clock (`now` and the zone
+// are arguments), no I/O. The inputs are the fields the API returns, so a stored item with extra
 // attributes (PK, SK, createdAt, …) can be passed as it is. Inputs are assumed valid (the schemas
-// checked them on the way in). The back end decides with these; the front end only validates
-// before sending and presents (section 12).
+// checked them on the way in). The back end decides with these; the front end only validates before
+// sending and presents (docs/SHARED_CALENDAR_SPEC.md section 12).
 
 const MINUTE_MS = 60_000;
 const HOUR_MS = 60 * MINUTE_MS;
-const SLOT_MS = HOUR_MS; // a slot is 60 real minutes (R-SLOT-01, R-TIME-03)
+// A slot is 60 real minutes (docs/SHARED_CALENDAR_SPEC.md R-SLOT-01, R-TIME-03).
+const SLOT_MS = HOUR_MS;
 
 export type PatternInput = Pick<WeeklyPattern, 'patternId' | 'weekday' | 'start' | 'end' | 'typeId' | 'validFrom' | 'validUntil'>;
 export type OverrideInput = Pick<DateOverride, 'date' | 'windows'>;
 export type OneOffInput = Pick<OneOffWindow, 'windowId' | 'date' | 'start' | 'end' | 'typeId'>;
 
 /**
- * A defined window with its origin (11.6: the Administrator's view shows both). `start` and `end`
- * are local times from definedWindows, or instants after toInstantWindows.
+ * A defined window with its origin (the Administrator's view shows both,
+ * docs/SHARED_CALENDAR_SPEC.md section 11.6). `start` and `end` are local times from
+ * definedWindows, or instants after toInstantWindows.
  */
 export type SourcedWindow = { start: string; end: string; typeId: string; source: WindowSource; sourceId: string };
-/** An effective window (6.6): instants, merged. */
+/** An effective window (docs/SHARED_CALENDAR_SPEC.md section 6.6): instants, merged. */
 export type EffectiveWindow = { start: string; end: string; typeId: string };
 
 // Local times and instants both sort as strings. Array.prototype.sort is stable: windows with the
-// same start (only in data that breaks R-AV-01) keep their order.
+// same start (only in data that breaks docs/SHARED_CALENDAR_SPEC.md R-AV-01) keep their order.
 function byStart(a: { start: string }, b: { start: string }): number {
   return a.start < b.start ? -1 : a.start > b.start ? 1 : 0;
 }
 
 /**
- * The defined windows of `date` (6.5), in local times, sorted by start:
- * base(date) = the override's windows if `date` has one (R-OVR-01, also when empty), otherwise the
- * windows of the patterns valid on `date` (R-PAT-01: same weekday, validFrom ≤ date ≤ validUntil,
- * no upper bound when null); then the one-off windows of `date` on top (R-ONE-01).
+ * The defined windows of `date` (docs/SHARED_CALENDAR_SPEC.md section 6.5), in local times, sorted
+ * by start. base(date) is the override's windows if `date` has one, also when empty
+ * (docs/SHARED_CALENDAR_SPEC.md R-OVR-01); otherwise the windows of the patterns valid on `date`:
+ * same weekday, validFrom ≤ date ≤ validUntil, no upper bound when null
+ * (docs/SHARED_CALENDAR_SPEC.md R-PAT-01). The one-off windows of `date` are added on top
+ * (docs/SHARED_CALENDAR_SPEC.md R-ONE-01).
  * `override` is the date's override or null; an override or a one-off window of another date is ignored.
  */
 export function definedWindows(
@@ -56,10 +60,11 @@ export function definedWindows(
 }
 
 /**
- * Windows of `date` in local times, as instants in `zone` (R-TIME-03), sorted by start: what the
- * calendar view shows (11.6, not merged), and the input of effectiveWindows. On the night clocks go
- * forward, a window that starts in the skipped hour and ends at or just after it holds no real time
- * (02:30–03:00 becomes 01:30Z–01:00Z); effectiveWindows drops it.
+ * Windows of `date` in local times, as instants in `zone` (docs/SHARED_CALENDAR_SPEC.md R-TIME-03),
+ * sorted by start. They are what the calendar view shows, not merged (docs/SHARED_CALENDAR_SPEC.md
+ * section 11.6), and the input of effectiveWindows. On the night clocks go forward, a window that
+ * starts in the skipped hour and ends at or just after it holds no real time (02:30–03:00 becomes
+ * 01:30Z–01:00Z); effectiveWindows drops it.
  */
 export function toInstantWindows(date: string, windows: readonly SourcedWindow[], zone: string): SourcedWindow[] {
   return windows
@@ -68,9 +73,9 @@ export function toInstantWindows(date: string, windows: readonly SourcedWindow[]
 }
 
 /**
- * The effective windows (6.6) of windows given as instants: sorted by start, those holding no real
- * time dropped, and adjacent windows of the same type merged (one ends exactly where the next
- * starts). Touching windows of different types stay separate.
+ * The effective windows (docs/SHARED_CALENDAR_SPEC.md section 6.6) of windows given as instants:
+ * sorted by start, those holding no real time dropped, and adjacent windows of the same type merged
+ * (one ends exactly where the next starts). Touching windows of different types stay separate.
  */
 export function effectiveWindows(windows: readonly { start: string; end: string; typeId: string }[]): EffectiveWindow[] {
   const merged: EffectiveWindow[] = [];
@@ -84,11 +89,12 @@ export function effectiveWindows(windows: readonly { start: string; end: string;
 }
 
 /**
- * The slots of one effective window (R-SLOT-01): every `[s, s + 60 real minutes)` inside it whose
- * start is a whole hour on the local clock of `zone`. Free or bookable is decided elsewhere
- * (R-SLOT-02/03/04). Around a clock change the local hours are followed, not UTC's: on the night
- * clocks go forward the window 01:00–04:00 gives 01:00 (ending at local 03:00) and 03:00; on the
- * night they go back it gives four slots, two of them at local 02:00 (one per offset).
+ * The slots of one effective window (docs/SHARED_CALENDAR_SPEC.md R-SLOT-01): every
+ * `[s, s + 60 real minutes)` inside it whose start is a whole hour on the local clock of `zone`.
+ * Whether a slot is free or bookable is decided elsewhere (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02,
+ * R-SLOT-03, R-SLOT-04). Around a clock change the local hours are followed, not UTC's: on the
+ * night clocks go forward the window 01:00–04:00 gives 01:00 (ending at local 03:00) and 03:00; on
+ * the night they go back it gives four slots, two of them at local 02:00 (one per offset).
  */
 export function slotsOf(window: EffectiveWindow, zone: string): Slot[] {
   const slots: Slot[] = [];
@@ -108,9 +114,10 @@ export function slotsOf(window: EffectiveWindow, zone: string): Slot[] {
 }
 
 /**
- * Whether `[a.start, a.end)` and `[b.start, b.end)` overlap (R-SLOT-02, R-AV-01): `a < d` and
- * `c < b`, so touching intervals do not. Both must be of the same kind: instants in the toISOString
- * form, or local times of the same date (`24:00` sorts last); both compare as strings.
+ * Whether `[a.start, a.end)` and `[b.start, b.end)` overlap (docs/SHARED_CALENDAR_SPEC.md
+ * R-SLOT-02, R-AV-01): `a < d` and `c < b`, so touching intervals do not. Both must be of the same
+ * kind: instants in the toISOString form, or local times of the same date (`24:00` sorts last);
+ * both compare as strings.
  */
 export function overlaps(a: { start: string; end: string }, b: { start: string; end: string }): boolean {
   return a.start < b.end && b.start < a.end;
@@ -122,20 +129,26 @@ function localMinute(instant: string, zone: string): number {
   return Number(localTimeOf(instant, zone).slice(3, 5));
 }
 
-/** Whether `instant` is a whole hour (`hh:00`) on the local clock of `zone`: a User's start (R-BOOK-02). */
+/**
+ * Whether `instant` is a whole hour (`hh:00`) on the local clock of `zone`: a User's start
+ * (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02).
+ */
 export function isWholeLocalHour(instant: string, zone: string): boolean {
   return localMinute(instant, zone) === 0;
 }
 
-/** Whether `instant` is on the local 15-minute grid of `zone`: the Administrator's times (R-BOOK-02). */
+/**
+ * Whether `instant` is on the local 15-minute grid of `zone`: the Administrator's times
+ * (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02).
+ */
 export function isOnQuarterGrid(instant: string, zone: string): boolean {
   return localMinute(instant, zone) % 15 === 0;
 }
 
 /**
- * The last instant at which a User may still cancel or change the appointment (R-CAN-03, 8.1):
- * `start − cancellationNoticeHours`, in real hours. Whether it is sent (User) or null
- * (Administrator) is the handler's decision.
+ * The last instant at which a User may still cancel or change the appointment
+ * (docs/SHARED_CALENDAR_SPEC.md R-CAN-03, section 8.1): `start − cancellationNoticeHours`, in real
+ * hours. Whether it is sent (User) or null (Administrator) is the handler's decision.
  */
 export function cancellableUntil(
   appointment: { start: string },

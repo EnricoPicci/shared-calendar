@@ -73,6 +73,8 @@ const logLines = () => output.map((line) => JSON.parse(line) as Record<string, u
 const body = (response: Awaited<ReturnType<Handler>>) => JSON.parse(response.body ?? '') as Record<string, unknown>;
 const transactions = () => ddb.commandCalls(TransactWriteCommand).map((call) => call.args[0].input);
 
+// Test names: AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in its section
+// 18.3).
 describe('createAvailabilityType handler', () => {
   it('creates the type with a new ULID, the trimmed name and "now", and answers 201', async () => {
     const response = await handler(asAdmin());

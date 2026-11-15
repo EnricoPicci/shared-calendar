@@ -22,7 +22,9 @@ import {
 type Handler = typeof import('../../../src/handlers/cancelAppointment').handler;
 let handler: Handler;
 
-// Spec 8.3 v10, route 19; AC-20, AC-21, AC-30, AC-31 on the exact instants of 18.3.
+// Cancelling an appointment (docs/SHARED_CALENDAR_SPEC.md section 8.3; docs/SHARED_CALENDAR_SPEC.md
+// section 11.1, route 19): the scenarios docs/SHARED_CALENDAR_SPEC.md AC-20, AC-21, AC-30 and AC-31
+// on the exact instants of docs/SHARED_CALENDAR_SPEC.md section 18.3.
 const ROUTE = 'POST /calendar/appointments/{appointmentId}/cancel';
 const { ddb, reset, logLines, transactions, output } = harness();
 const alice = claimsOf('alice', ['user']);
@@ -47,6 +49,8 @@ beforeEach(async () => {
 });
 afterEach(cleanUp);
 
+// Test names: AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in its section
+// 18.3).
 describe('cancelAppointment handler', () => {
   it('AC-20: alice cancels exactly 24 h before: 200 with the cancelled appointment, cancellableUntil null', async () => {
     const response = await cancel();

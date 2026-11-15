@@ -4,17 +4,20 @@ import { fromFetch } from 'rxjs/fetch';
 import { decodeClaims } from './jwt';
 import type { Session } from './login.types';
 
-// docs/FRONTEND_SERVICES.md section 10.1. What LoginService and RefreshService share: the
-// InitiateAuth request, the mapping of Cognito's answer (section 4.5) and toSession.
+// What LoginService and RefreshService share (docs/FRONTEND_SERVICES.md section 10.1): the
+// InitiateAuth request, the mapping of Cognito's answer (docs/FRONTEND_SERVICES.md section 4.5)
+// and toSession.
 
 export type CognitoConfig = {
   cognitoUrl: string; // 'https://cognito-idp.eu-north-1.amazonaws.com/' or 'http://localhost:9229/'
   clientId: string; // UserPoolClientId output of the back-end stack, or CLIENT_ID of env.local.json
 };
 
-// Cognito's failures before a service names them for its view (decision 15).
+// Cognito's failures in neutral terms; each service renames them for its view, e.g.
+// `not_authorized` is a wrong password for a login (docs/FRONTEND_SERVICES.md section 8, decision 15).
 export type AuthFailureReason =
-  | 'not_authorized' // NotAuthorizedException, UserNotFoundException, InvalidPasswordException (cognito-local)
+  // NotAuthorizedException, UserNotFoundException, InvalidPasswordException (cognito-local).
+  | 'not_authorized'
   | 'too_many_attempts' // TooManyRequestsException, LimitExceededException
   | 'password_reset_required' // PasswordResetRequiredException
   | 'challenge' // 200 without AuthenticationResult
@@ -23,7 +26,7 @@ export type AuthFailureReason =
   | 'unexpected'; // any other __type; an access token whose claims cannot be read
 
 // Internal to the two Cognito services: the session in a success goes straight to the store,
-// and only a token-free outcome reaches a subject (rule 9).
+// and only a token-free outcome reaches a subject (docs/FRONTEND_SERVICES.md section 2, rule 9).
 export type AuthOutcome =
   | { status: 'success'; session: Session }
   | { status: 'failure'; reason: AuthFailureReason; message: string };
@@ -51,7 +54,7 @@ export function describe(err: unknown): string {
   return err instanceof Error ? `${err.name}: ${err.message}` : String(err);
 }
 
-// The two bodies Cognito can answer with (section 4.1).
+// The two bodies Cognito can answer with (docs/FRONTEND_SERVICES.md section 4.1).
 type AuthenticationResult = { AccessToken?: string; IdToken?: string; RefreshToken?: string; ExpiresIn?: number };
 type InitiateAuthResponse = { AuthenticationResult?: AuthenticationResult; ChallengeName?: string };
 type CognitoError = { __type?: string; message?: string };
@@ -70,8 +73,10 @@ const REASON_BY_TYPE: Record<string, AuthFailureReason> = {
   PasswordResetRequiredException: 'password_reset_required',
 };
 
-// The mapping of section 4.5. `refreshToken` is kept when the answer carries none (the refresh
-// flow, decision 21); without it, a missing RefreshToken is `unexpected`, as for the login.
+// Maps Cognito's answer as in docs/FRONTEND_SERVICES.md section 4.5. A refresh passes the
+// `refreshToken` it already has, which is kept when the answer carries none
+// (docs/FRONTEND_SERVICES.md section 8, decision 21); a login passes none, so a missing
+// RefreshToken is `unexpected`.
 export function toAuthOutcome(status: number, text: string, refreshToken?: string): AuthOutcome {
   let parsed: unknown;
   try {
@@ -108,7 +113,7 @@ function toSession(auth: AuthenticationResult & { AccessToken: string }, keptRef
   if (typeof username !== 'string' || typeof exp !== 'number') {
     return failure('unexpected', 'The access token has no username or expiry');
   }
-  // A rotated refresh token wins over the kept one (decision 21).
+  // A rotated refresh token wins over the kept one (docs/FRONTEND_SERVICES.md section 8, decision 21).
   const refreshToken = auth.RefreshToken ?? keptRefreshToken;
   // Without them the session could not be shown as complete, nor refreshed later.
   if (!auth.IdToken || !refreshToken) {

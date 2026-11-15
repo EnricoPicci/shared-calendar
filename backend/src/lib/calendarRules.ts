@@ -30,16 +30,17 @@ import {
   type EffectiveWindow,
 } from '@shared-calendar/shared';
 
-// The calendar's server-side checks (docs/SHARED_CALENDAR_SPEC.md 14.2): pure functions over what
-// calendarDb read inside the locked attempt, with "today", "now" and the zone passed in (R-TIME-04).
-// No AWS, no clock, no item layout. A failed check names the contract's error code; the handler maps
-// it to the status of spec 11.3. calendarDb runs these as the `check` of its locked writes.
+// The calendar's server-side checks (docs/SHARED_CALENDAR_SPEC.md section 14.2): pure functions
+// over what calendarDb read inside the locked attempt, with "today", "now" and the zone passed in
+// (docs/SHARED_CALENDAR_SPEC.md R-TIME-04). No AWS, no clock, no item layout. A failed check names
+// the contract's error code; the handler maps it to the status of docs/SHARED_CALENDAR_SPEC.md
+// section 11.3. calendarDb runs these as the `check` of its locked writes.
 
 /**
  * A failed check: the error code to answer with, and what only the check can say. `message`, when
  * set, replaces the handler's default text (an overlap names the date and both windows);
- * `conflicts` is set with `availability_conflict` only (R-AV-03) and goes to the response body,
- * never to the log line. Nothing is written.
+ * `conflicts` is set with `availability_conflict` only (docs/SHARED_CALENDAR_SPEC.md R-AV-03) and
+ * goes to the response body, never to the log line. Nothing is written.
  */
 export type Refusal<C extends ApiErrorCode = ApiErrorCode> = { error: C; message?: string; conflicts?: AppointmentConflict[] };
 
@@ -49,19 +50,21 @@ const refuse = <C extends ApiErrorCode>(error: C, message?: string): Refusal<C> 
 // ── The calendar as the checks see it ──────────────────────────────────────────────────────────
 
 /**
- * What a check needs of an appointment (8.1); `appointmentId`, `username` only for `conflicts`.
- * `userId` (the owner's Cognito `sub`) is internal: the limit of R-BOOK-09 counts on it, never on
- * the username, which a later User could be given.
+ * What a check needs of an appointment (docs/SHARED_CALENDAR_SPEC.md section 8.1); `appointmentId`,
+ * `username` only for `conflicts`. `userId` (the owner's Cognito `sub`) is internal: the limit of
+ * docs/SHARED_CALENDAR_SPEC.md R-BOOK-09 counts on it, never on the username, which a later User
+ * could be given.
  */
 export type StateAppointment = Pick<Appointment, 'appointmentId' | 'username' | 'start' | 'end' | 'date' | 'typeId' | 'status'> & {
   userId: string;
 };
 
 /**
- * The availability state calendarDb reads inside a locked attempt (13.2 access patterns): every
- * type and every pattern; the overrides and one-off windows dated today or later; the appointments
- * that started at most 24 h ago. Nothing earlier can still matter: an appointment lies inside one
- * date, so one that has not ended is dated today or later (R-AV-02 for the rest).
+ * The availability state calendarDb reads inside a locked attempt (the access patterns of
+ * docs/SHARED_CALENDAR_SPEC.md section 13.2): every type and every pattern; the overrides and
+ * one-off windows dated today or later; the appointments that started at most 24 h ago. Nothing
+ * earlier can still matter: an appointment lies inside one date, so one that has not ended is dated
+ * today or later (docs/SHARED_CALENDAR_SPEC.md R-AV-02 for the rest).
  */
 export type CalendarState = {
   types: readonly { typeId: string }[];
@@ -71,12 +74,13 @@ export type CalendarState = {
   appointments: readonly StateAppointment[];
 };
 
-// ── Availability types (spec 6.1) ────────────────────────────────────────────────────────────
+// ── Availability types (docs/SHARED_CALENDAR_SPEC.md section 6.1) ───────────────────────────
 
 /**
- * The key two type names are compared by (spec 6.1, "compared case-insensitively"): the name,
- * already trimmed by the TypeName schema, lower-cased without a locale. Stored as `nameKey`
- * (13.2), and the order of GET /calendar/types.
+ * The key two type names are compared by (docs/SHARED_CALENDAR_SPEC.md section 6.1, "compared
+ * case-insensitively"): the name, already trimmed by the TypeName schema, lower-cased without a
+ * locale. Stored as `nameKey` (docs/SHARED_CALENDAR_SPEC.md section 13.2), and the order of
+ * GET /calendar/types.
  */
 export function typeNameKey(name: string): string {
   return name.toLowerCase();
@@ -86,10 +90,11 @@ export function typeNameKey(name: string): string {
 export type NamedType = { typeId: string; nameKey: string };
 
 /**
- * R-TYPE-01 (create) and R-TYPE-02 (rename): the name must be unique among all types, and a
- * create must not make more than CALENDAR_LIMITS.types. `renaming` is the id of the type being
- * renamed: its own name never counts as taken, so a rename that keeps its name, or changes only
- * its case, is allowed. A rename never changes the count, so the limit applies to a create only.
+ * docs/SHARED_CALENDAR_SPEC.md R-TYPE-01 (create) and R-TYPE-02 (rename): the name must be unique
+ * among all types, and a create must not make more than CALENDAR_LIMITS.types. `renaming` is the id
+ * of the type being renamed: its own name never counts as taken, so a rename that keeps its name, or
+ * changes only its case, is allowed. A rename never changes the count, so the limit applies to a
+ * create only.
  */
 export function checkTypeName(name: string, types: readonly NamedType[]): Refusal<'type_name_exists' | 'limit_reached'> | null;
 export function checkTypeName(name: string, types: readonly NamedType[], renaming: string): Refusal<'type_name_exists'> | null;
@@ -116,11 +121,11 @@ export type TypeReferences = {
 };
 
 /**
- * R-TYPE-03: a type cannot be deleted while a weekly pattern refers to it (whatever its
- * validity), an override or one-off window dated today or later, or a booked appointment that has
- * not ended (`end > now`; one in progress counts). Past references do not block: an appointment
- * keeps a snapshot of the type name. `today` is a local date, `now` an instant; both compare as
- * strings (R-TIME-02).
+ * docs/SHARED_CALENDAR_SPEC.md R-TYPE-03: a type cannot be deleted while a weekly pattern refers to
+ * it (whatever its validity), an override or one-off window dated today or later, or a booked
+ * appointment that has not ended (`end > now`; one in progress counts). Past references do not
+ * block: an appointment keeps a snapshot of the type name. `today` is a local date, `now` an
+ * instant; both compare as strings (docs/SHARED_CALENDAR_SPEC.md R-TIME-02).
  */
 export function checkTypeDelete(
   typeId: string,
@@ -136,7 +141,7 @@ export function checkTypeDelete(
   return inUse ? refuse('type_in_use') : null;
 }
 
-// ── Availability writes (spec 6.5, 6.7) ──────────────────────────────────────────────────────
+// ── Availability writes (docs/SHARED_CALENDAR_SPEC.md sections 6.5 and 6.7) ─────────────────
 
 /**
  * One write to availability: the item it touches and its new value, or `null` to delete it.
@@ -150,7 +155,8 @@ export type AvailabilityWrite =
 
 export type AvailabilityRefusal = Refusal<'type_not_found' | 'limit_reached' | 'availability_overlap' | 'availability_conflict'>;
 
-// The state with the write applied: what the calendar would be after it (R-AV-03).
+// The state with the write applied: what the calendar would be after it
+// (docs/SHARED_CALENDAR_SPEC.md R-AV-03).
 function applyWrite(state: CalendarState, write: AvailabilityWrite): CalendarState {
   switch (write.kind) {
     case 'pattern': {
@@ -168,7 +174,7 @@ function applyWrite(state: CalendarState, write: AvailabilityWrite): CalendarSta
   }
 }
 
-// The windows the write brings in (their types must exist, R-TYPE-04).
+// The windows the write brings in (their types must exist, docs/SHARED_CALENDAR_SPEC.md R-TYPE-04).
 function newWindows(write: AvailabilityWrite): readonly { typeId: string }[] {
   if (write.kind === 'pattern') return write.pattern ? [write.pattern] : [];
   if (write.kind === 'override') return write.windows ?? [];
@@ -179,8 +185,9 @@ const span = (w: { start: string; end: string }) => `${w.start}–${w.end}`;
 const overlapMessage = (date: string, a: { start: string; end: string }, b: { start: string; end: string }) =>
   `On ${date} the window ${span(a)} would overlap the window ${span(b)}`;
 
-// The first two windows of one date that overlap, compared as local times (R-AV-01; touching is
-// fine). The windows come sorted by start from definedWindows.
+// The first two windows of one date that overlap, compared as local times
+// (docs/SHARED_CALENDAR_SPEC.md R-AV-01; touching is fine). The windows come sorted by start from
+// definedWindows.
 function firstOverlap(windows: readonly SourcedWindow[]): [SourcedWindow, SourcedWindow] | null {
   for (let i = 0; i < windows.length; i++) {
     for (let j = i + 1; j < windows.length; j++) {
@@ -199,11 +206,14 @@ function firstSharedDate(a: PatternInput, b: PatternInput): string | null {
   return until === undefined || date <= until ? date : null;
 }
 
-/** R-AV-01 and R-AV-02 for one write, on the state after it. The message names the date and both windows. */
+/**
+ * docs/SHARED_CALENDAR_SPEC.md R-AV-01 and R-AV-02 for one write, on the state after it. The message
+ * names the date and both windows.
+ */
 function checkOverlap(write: AvailabilityWrite, after: CalendarState, today: string): AvailabilityRefusal | null {
   const overrideOf = (date: string) => after.overrides.find((o) => o.date === date) ?? null;
   const futureOneOffs = after.oneOffs.filter((w) => w.date >= today);
-  // The defined windows of one date (6.5) never overlap.
+  // The defined windows of one date (docs/SHARED_CALENDAR_SPEC.md section 6.5) never overlap.
   const onDate = (date: string): AvailabilityRefusal | null => {
     const pair = firstOverlap(definedWindows(date, after.patterns, overrideOf(date), futureOneOffs));
     return pair ? refuse('availability_overlap', overlapMessage(date, pair[0], pair[1])) : null;
@@ -211,7 +221,8 @@ function checkOverlap(write: AvailabilityWrite, after: CalendarState, today: str
 
   if (write.kind === 'pattern') {
     const pattern = write.pattern;
-    // Deleting a pattern cannot create an overlap (11.1, note 1).
+    // Deleting a pattern cannot create an overlap (docs/SHARED_CALENDAR_SPEC.md section 11.1,
+    // footnote 1).
     if (!pattern) return null;
     // Against every other pattern with the same weekday and a date in common, past dates
     // included: "an overlap on any date is an overlap".
@@ -230,7 +241,7 @@ function checkOverlap(write: AvailabilityWrite, after: CalendarState, today: str
     return null;
   }
   // An override set or deleted, or a one-off window created or deleted, changes one date only.
-  // A date in the past is refused before (date_in_past, step 47); its one-offs are ignored here.
+  // A date in the past is refused before (date_in_past); its one-offs are ignored here.
   const date = write.kind === 'override' ? write.date : (write.window?.date ?? null);
   return date === null ? null : onDate(date);
 }
@@ -249,9 +260,10 @@ function touches(write: AvailabilityWrite, before: CalendarState): (date: string
 }
 
 /**
- * R-AV-03, R-AV-04: every booked appointment that has not ended (one in progress included), on a
- * date the write touches, must lie entirely inside one effective window of its own type in the
- * calendar after the write. Compared as instants (R-TIME-03). Listed by start.
+ * docs/SHARED_CALENDAR_SPEC.md R-AV-03 and R-AV-04: every booked appointment that has not ended (one
+ * in progress included), on a date the write touches, must lie entirely inside one effective window
+ * of its own type in the calendar after the write. Compared as instants
+ * (docs/SHARED_CALENDAR_SPEC.md R-TIME-03). Listed by start.
  */
 function checkConflicts(
   write: AvailabilityWrite,
@@ -276,11 +288,12 @@ function checkConflicts(
 }
 
 /**
- * The checks of one availability write (6.5, 6.7, R-TYPE-04, R-PAT-04, R-ONE-03), on the state read
- * inside the locked attempt, in this order: `type_not_found` (a type in the body that does not
- * exist), `limit_reached` (a 51st pattern, an 11th one-off window on a date), `availability_overlap`
- * (local times), `availability_conflict` with `conflicts` (instants). `today` is the local date of
- * `now` in `zone`. The item the write replaces or deletes must exist; calendarDb checks that first.
+ * The checks of one availability write (docs/SHARED_CALENDAR_SPEC.md sections 6.5 and 6.7,
+ * R-TYPE-04, R-PAT-04, R-ONE-03), on the state read inside the locked attempt, in this order:
+ * `type_not_found` (a type in the body that does not exist), `limit_reached` (a 51st pattern, an
+ * 11th one-off window on a date), `availability_overlap` (local times), `availability_conflict`
+ * with `conflicts` (instants). `today` is the local date of `now` in `zone`. The item the write
+ * replaces or deletes must exist; calendarDb checks that first.
  */
 export function checkAvailabilityWrite(
   write: AvailabilityWrite,
@@ -304,16 +317,18 @@ export function checkAvailabilityWrite(
   return checkOverlap(write, after, today) ?? checkConflicts(write, state, after, now, zone);
 }
 
-// ── Booking (spec 8.2) ───────────────────────────────────────────────────────────────────────
+// ── Booking (docs/SHARED_CALENDAR_SPEC.md section 8.2) ──────────────────────────────────────
 
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
-const SLOT_MS = HOUR_MS; // a slot, and a User's appointment, is 60 real minutes (R-SLOT-01)
+// A slot and a User's appointment: 60 real minutes (docs/SHARED_CALENDAR_SPEC.md R-SLOT-01).
+const SLOT_MS = HOUR_MS;
 const QUARTER_MS = 15 * MINUTE_MS;
 
 /**
- * R-BOOK-02, the times for the caller's role, from the body alone (the zone is the only other
- * input): `400 invalid_request` before Cognito and the lock (8.2 order, v9). A User's `start` is a
+ * docs/SHARED_CALENDAR_SPEC.md R-BOOK-02, the times for the caller's role, from the body alone (the
+ * zone is the only other input): `400 invalid_request` before Cognito and the lock
+ * (docs/SHARED_CALENDAR_SPEC.md section 8.2, step 3 of its order). A User's `start` is a
  * whole local hour and `end` absent or `start + 60 min`; the Administrator's `start` and `end` lie
  * on the local 15-minute grid, `end` defaults to `start + 60 min`, and lasts at least 15 minutes.
  * The schema has already checked the exact instant form and `end > start`. Answers the times to
@@ -343,7 +358,7 @@ export type BookingRefusal = Refusal<
 >;
 
 export type BookingInput = {
-  /** The times R-BOOK-02 accepted, `end` filled in. */
+  /** The times docs/SHARED_CALENDAR_SPEC.md R-BOOK-02 accepted, `end` filled in. */
   start: string;
   end: string;
   role: Role;
@@ -357,18 +372,24 @@ export type BookingInput = {
 };
 
 /**
- * The booking rules that need the calendar (8.2, the order of v9 step 5), on the settings and the
- * state read inside the locked attempt, in table order; the first that fails decides:
- * - R-BOOK-03 `start > now`: `booking_in_past`;
- * - R-BOOK-04 `start − now ≥ minBookingNoticeHours` (a User only): `booking_notice_too_short`;
- * - R-BOOK-05 `localDateOf(start) ≤ today + bookingHorizonDays` (a User only): `booking_beyond_horizon`;
- * - R-BOOK-06 inside one effective window (6.6: merged across sources) of the start's local date, a
- *   window whose type no longer exists left out as in the view: `outside_availability`;
- * - R-BOOK-07 no booked appointment overlaps, compared as instants (R-SLOT-02): `slot_taken`;
- * - R-BOOK-09 (a User only) the User's booked appointments with `start > now`, by `userId`, are
- *   fewer than `maxFutureAppointmentsPerUser` when it is not null: `appointment_limit_reached`. One
- *   in progress or ended does not count.
- * R-BOOK-08 needs no check here: R-BOOK-02 already allowed the Administrator's custom times.
+ * The booking rules that need the calendar (docs/SHARED_CALENDAR_SPEC.md section 8.2, step 5 of its
+ * order), on the settings and the state read inside the locked attempt, in table order; the first
+ * that fails decides:
+ * - docs/SHARED_CALENDAR_SPEC.md R-BOOK-03 `start > now`: `booking_in_past`;
+ * - docs/SHARED_CALENDAR_SPEC.md R-BOOK-04 `start − now ≥ minBookingNoticeHours` (a User only):
+ *   `booking_notice_too_short`;
+ * - docs/SHARED_CALENDAR_SPEC.md R-BOOK-05 `localDateOf(start) ≤ today + bookingHorizonDays` (a User
+ *   only): `booking_beyond_horizon`;
+ * - docs/SHARED_CALENDAR_SPEC.md R-BOOK-06 inside one effective window (docs/SHARED_CALENDAR_SPEC.md
+ *   section 6.6: merged across sources) of the start's local date, a window whose type no longer
+ *   exists left out as in the view: `outside_availability`;
+ * - docs/SHARED_CALENDAR_SPEC.md R-BOOK-07 no booked appointment overlaps, compared as instants
+ *   (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02): `slot_taken`;
+ * - docs/SHARED_CALENDAR_SPEC.md R-BOOK-09 (a User only) the User's booked appointments with
+ *   `start > now`, by `userId`, are fewer than `maxFutureAppointmentsPerUser` when it is not null:
+ *   `appointment_limit_reached`. One in progress or ended does not count.
+ * docs/SHARED_CALENDAR_SPEC.md R-BOOK-08 needs no check here: R-BOOK-02 already allowed the
+ * Administrator's custom times.
  * Answers the effective window that holds the appointment: its type is the appointment's.
  */
 export function checkBooking(input: BookingInput): { window: EffectiveWindow } | BookingRefusal {
@@ -396,13 +417,14 @@ export function checkBooking(input: BookingInput): { window: EffectiveWindow } |
   return { window };
 }
 
-// ── Cancelling and the note (spec 8.3, 8.5, v10) ─────────────────────────────────────────────
+// ── Cancelling and the note (docs/SHARED_CALENDAR_SPEC.md sections 8.3 and 8.5) ─────────────
 
 /**
- * `cancellableUntil` of an appointment in a response (8.1, 11.5, v10): for a User caller on a
- * `booked` appointment, `start − cancellationNoticeHours` (already in the past once that moment has
- * passed, ended appointments included); `null` on a `cancelled` one and in every answer to the
- * Administrator. It depends on the stored status only, never on the clock.
+ * `cancellableUntil` of an appointment in a response (docs/SHARED_CALENDAR_SPEC.md sections 8.1 and
+ * 11.5): for a User caller on a `booked` appointment, `start − cancellationNoticeHours` (already in
+ * the past once that moment has passed, ended appointments included); `null` on a `cancelled` one
+ * and in every answer to the Administrator. It depends on the stored status only, never on the
+ * clock.
  */
 export function cancellableUntilFor(
   appointment: { start: string; status: AppointmentStatus },
@@ -421,9 +443,11 @@ export type CheckedAppointment = { userId: string; start: string; end: string; s
 export type NoteRefusal = Refusal<'appointment_not_found' | 'appointment_not_active'>;
 export type CancelRefusal = Refusal<'appointment_not_found' | 'appointment_not_active' | 'cancellation_notice_too_short'>;
 
-// The two checks routes 18 and 19 share, in the order of 8.3 (v10): R-CAN-01 / R-PERM-01, absent or
-// (for a User) not theirs by `sub`, is 404, before anything that would tell its status; then
-// R-CAN-02 / R-NOTE-01, `status = booked` and `end > now`, else 409.
+// The two checks that docs/SHARED_CALENDAR_SPEC.md section 11.1, routes 18 and 19 share, in the
+// order of docs/SHARED_CALENDAR_SPEC.md section 8.3. First docs/SHARED_CALENDAR_SPEC.md R-CAN-01 and
+// R-PERM-01: absent or (for a User) not theirs by `sub` is 404, before anything that would tell its
+// status. Then docs/SHARED_CALENDAR_SPEC.md R-CAN-02 and R-NOTE-01: `status = booked` and
+// `end > now`, else 409.
 function checkVisibleAndActive(appointment: CheckedAppointment | null, caller: Caller, now: string): NoteRefusal | null {
   if (!appointment || (caller.role !== 'admin' && appointment.userId !== caller.sub)) {
     return refuse('appointment_not_found', 'No appointment with this id');
@@ -435,15 +459,18 @@ function checkVisibleAndActive(appointment: CheckedAppointment | null, caller: C
 }
 
 /**
- * The cancel checks (8.3, the order of v10), on the appointment read inside the locked attempt (or
- * `null` if there is none) and the settings read with it; the first that fails decides:
- * - R-CAN-01 / R-PERM-01: absent, or a User caller whose `sub` is not its `userId`:
- *   `appointment_not_found` (404, never 403, so ids cannot be probed);
- * - R-CAN-02: `status = booked` and `end > now`: `appointment_not_active`;
- * - R-CAN-03 (a User only): `now ≤ start − cancellationNoticeHours`, the response's
- *   `cancellableUntil`, compared to the millisecond: `cancellation_notice_too_short`. Exactly the notice
- *   before the start is allowed; an appointment in progress is refused here, not by R-CAN-02. The
- *   Administrator is exempt and may cancel one in progress.
+ * The cancel checks (docs/SHARED_CALENDAR_SPEC.md section 8.3, in its order), on the appointment read
+ * inside the locked attempt (or `null` if there is none) and the settings read with it; the first
+ * that fails decides:
+ * - docs/SHARED_CALENDAR_SPEC.md R-CAN-01 / R-PERM-01: absent, or a User caller whose `sub` is not
+ *   its `userId`: `appointment_not_found` (404, never 403, so ids cannot be probed);
+ * - docs/SHARED_CALENDAR_SPEC.md R-CAN-02: `status = booked` and `end > now`:
+ *   `appointment_not_active`;
+ * - docs/SHARED_CALENDAR_SPEC.md R-CAN-03 (a User only): `now ≤ start − cancellationNoticeHours`, the
+ *   response's `cancellableUntil`, compared to the millisecond: `cancellation_notice_too_short`.
+ *   Exactly the notice before the start is allowed; an appointment in progress is refused here, not
+ *   by docs/SHARED_CALENDAR_SPEC.md R-CAN-02. The Administrator is exempt and may cancel one in
+ *   progress.
  * Answers null when the cancel may be written.
  */
 export function checkCancel(
@@ -461,11 +488,12 @@ export function checkCancel(
 }
 
 /**
- * The note checks (R-NOTE-01, 8.5 v10), on the appointment read inside the locked attempt (or
- * `null`): R-PERM-01 (`appointment_not_found`), then active and not ended
- * (`appointment_not_active`); no notice applies. `note` is the new note, already trimmed with an
- * empty one made `null` (R-BOOK-11). Answers whether it equals the stored one: then nothing is
- * written, no event either (v10).
+ * The note checks (docs/SHARED_CALENDAR_SPEC.md R-NOTE-01 and section 8.5), on the appointment read
+ * inside the locked attempt (or `null`): docs/SHARED_CALENDAR_SPEC.md R-PERM-01
+ * (`appointment_not_found`), then active and not ended (`appointment_not_active`); no notice
+ * applies. `note` is the new note, already trimmed with an empty one made `null`
+ * (docs/SHARED_CALENDAR_SPEC.md R-BOOK-11). Answers whether it equals the stored one: then nothing is
+ * written, no event either.
  */
 export function checkNote(
   appointment: (CheckedAppointment & { note: string | null }) | null,
@@ -476,7 +504,7 @@ export function checkNote(
   return checkVisibleAndActive(appointment, caller, now) ?? { unchanged: appointment!.note === note };
 }
 
-// ── Changing (spec 8.4, v11) ─────────────────────────────────────────────────────────────────
+// ── Changing (docs/SHARED_CALENDAR_SPEC.md section 8.4) ─────────────────────────────────────
 
 export type ChangeRefusal = CancelRefusal | BookingRefusal;
 
@@ -484,7 +512,7 @@ export type ChangeInput = {
   /** The old appointment read inside the locked attempt, or null when there is none. */
   appointment: (CheckedAppointment & { appointmentId: string }) | null;
   caller: Caller;
-  /** The new times R-BOOK-02 accepted for the caller's role, `end` filled in. */
+  /** The new times docs/SHARED_CALENDAR_SPEC.md R-BOOK-02 accepted for the caller's role, `end` filled in. */
   start: string;
   end: string;
   settings: Pick<CalendarSettings, 'cancellationNoticeHours' | 'minBookingNoticeHours' | 'bookingHorizonDays' | 'maxFutureAppointmentsPerUser'>;
@@ -495,16 +523,17 @@ export type ChangeInput = {
 };
 
 /**
- * The change checks (8.4, the order of v11), on what calendarDb read inside the locked attempt; the
- * first that fails decides:
- * - the old appointment, as a cancel (checkCancel): R-CAN-01 / R-PERM-01 (`appointment_not_found`),
- *   R-CAN-02 (`appointment_not_active`, also for one already changed), for a User R-CAN-03
- *   (`cancellation_notice_too_short`, with a change's wording);
- * - the new one, as a booking (checkBooking) for the old appointment's User (R-BOOK-01: its
- *   `userId`), on the state with the old appointment left out by id: that is both adjustments of
- *   R-CHG-01, R-BOOK-07 ignores it and R-BOOK-09 does not count it.
- * R-BOOK-10 is not here: the marker is a condition of the transaction. Answers the effective window
- * that holds the new appointment: its type is the new appointment's.
+ * The change checks (docs/SHARED_CALENDAR_SPEC.md section 8.4, in its order), on what calendarDb read
+ * inside the locked attempt; the first that fails decides:
+ * - the old appointment, as a cancel (checkCancel): docs/SHARED_CALENDAR_SPEC.md R-CAN-01 / R-PERM-01
+ *   (`appointment_not_found`), R-CAN-02 (`appointment_not_active`, also for one already changed),
+ *   for a User R-CAN-03 (`cancellation_notice_too_short`, with a change's wording);
+ * - the new one, as a booking (checkBooking) for the old appointment's User
+ *   (docs/SHARED_CALENDAR_SPEC.md R-BOOK-01: its `userId`), on the state with the old appointment
+ *   left out by id: that is both adjustments of docs/SHARED_CALENDAR_SPEC.md R-CHG-01, R-BOOK-07
+ *   ignores it and R-BOOK-09 does not count it.
+ * docs/SHARED_CALENDAR_SPEC.md R-BOOK-10 is not here: the marker is a condition of the transaction.
+ * Answers the effective window that holds the new appointment: its type is the new appointment's.
  */
 export function checkChange(input: ChangeInput): { window: EffectiveWindow } | ChangeRefusal {
   const { appointment, caller, start, end, settings, state, now, today, zone } = input;
@@ -517,7 +546,7 @@ export function checkChange(input: ChangeInput): { window: EffectiveWindow } | C
   return checkBooking({ start, end, role: caller.role, userId: old.userId, settings, state: others, now, today, zone });
 }
 
-// ── The calendar view (spec 11.6, 7, 8.6, 17) ────────────────────────────────────────────────
+// ── The calendar view (docs/SHARED_CALENDAR_SPEC.md sections 11.6, 7, 8.6 and 17) ───────────
 
 /**
  * An appointment as calendarDb reads it for the view: the response fields (typeName already the
@@ -546,8 +575,9 @@ export type CalendarViewInput = {
   appointments: readonly ViewAppointment[];
 };
 
-// The appointment as a response (11.5), field by field in the contract's order, so nothing stored
-// beside it can reach the body. `cancellableUntil` for a User; null for the Administrator.
+// The appointment as a response (docs/SHARED_CALENDAR_SPEC.md section 11.5), field by field in the
+// contract's order, so nothing stored beside it can reach the body. `cancellableUntil` for a User;
+// null for the Administrator.
 export function toResponse(a: Omit<Appointment, 'cancellableUntil'>, until: string | null): Appointment {
   return {
     appointmentId: a.appointmentId,
@@ -579,18 +609,22 @@ function byInstant(a: string, b: string): number {
 }
 
 /**
- * The calendar view of `from`..`to` for one caller (11.6), pure: "now" and the zone passed in,
- * "today" = localDateOf(now, zone) (R-TIME-04). Per date:
- * - `windows`: the defined windows (6.5) as instants, sorted, not merged (T11); `source`,
- *   `sourceId` for the Administrator only. A window whose type no longer exists is left out (it can
- *   only lie in the past, R-TYPE-03; R-VIEW-03, spec v7), and so is one that holds no real time
- *   (it starts in the hour skipped when clocks go forward and ends at or just after it);
- * - `slots`: the slots (R-SLOT-01) of the effective windows (6.6), minus every slot that overlaps
- *   a booked appointment, the caller's own included (R-SLOT-02). A User gets those that pass
- *   R-SLOT-03 (`start > now`, the minimum notice, the horizon); the Administrator those with
- *   `start > now` (R-SLOT-04). A past date has windows and no slots (R-VIEW-03);
+ * The calendar view of `from`..`to` for one caller (docs/SHARED_CALENDAR_SPEC.md section 11.6), pure:
+ * "now" and the zone passed in, "today" = localDateOf(now, zone) (docs/SHARED_CALENDAR_SPEC.md
+ * R-TIME-04). Per date:
+ * - `windows`: the defined windows (docs/SHARED_CALENDAR_SPEC.md section 6.5) as instants, sorted,
+ *   not merged (docs/SHARED_CALENDAR_SPEC.md decision T11); `source`, `sourceId` for the
+ *   Administrator only. A window whose type no longer exists is left out (it can only lie in the
+ *   past: docs/SHARED_CALENDAR_SPEC.md R-TYPE-03 and R-VIEW-03), and so is one that holds no real
+ *   time (it starts in the hour skipped when clocks go forward and ends at or just after it);
+ * - `slots`: the slots (docs/SHARED_CALENDAR_SPEC.md R-SLOT-01) of the effective windows
+ *   (docs/SHARED_CALENDAR_SPEC.md section 6.6), minus every slot that overlaps a booked appointment,
+ *   the caller's own included (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02). A User gets those that pass
+ *   docs/SHARED_CALENDAR_SPEC.md R-SLOT-03 (`start > now`, the minimum notice, the horizon); the
+ *   Administrator those with `start > now` (docs/SHARED_CALENDAR_SPEC.md R-SLOT-04). A past date has
+ *   windows and no slots (docs/SHARED_CALENDAR_SPEC.md R-VIEW-03);
  * - `busy`: for a User, the other Users' booked appointments of that date as bare intervals,
- *   sorted (section 17); `[]` for the Administrator;
+ *   sorted (docs/SHARED_CALENDAR_SPEC.md section 17); `[]` for the Administrator;
  * - `hasOverride`: for the Administrator only, also for an override with no windows.
  * A field that is "admin only" is absent for a User. `appointments`: the booked ones (active, an
  * ended one included) starting in the range, by start: all for the Administrator with
@@ -609,7 +643,8 @@ export function calendarView(input: CalendarViewInput): CalendarView {
     .filter((a) => a.appointment.status === 'booked' && from <= a.appointment.date && a.appointment.date <= to)
     .sort(byStartThenId);
 
-  // R-SLOT-03 for a User, R-SLOT-04 for the Administrator; R-SLOT-02 for both.
+  // docs/SHARED_CALENDAR_SPEC.md R-SLOT-03 for a User, R-SLOT-04 for the Administrator, and R-SLOT-02
+  // for both.
   const offered = (slot: Slot): boolean => {
     const ahead = Date.parse(slot.start) - nowMs;
     if (ahead <= 0) return false;

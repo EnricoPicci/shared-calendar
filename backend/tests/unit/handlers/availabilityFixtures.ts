@@ -4,8 +4,9 @@ import { mockClient } from 'aws-sdk-client-mock';
 import { aliceItem, claimsOf, NOW, typeItems } from './patternFixtures';
 
 // Shared by the override and one-off window handlers' tests (setOverride, deleteOverride,
-// createOneOffWindow, deleteOneOffWindow). The dates of spec 18.3: now 2026-11-10T09:00Z, a
-// Tuesday, Europe/Rome (UTC+1 in November); the AC-04 pattern Mon 08:00–12:00 Studio.
+// createOneOffWindow, deleteOneOffWindow). The dates of docs/SHARED_CALENDAR_SPEC.md section 18.3:
+// now 2026-11-10T09:00Z, a Tuesday, Europe/Rome (UTC+1 in November); the pattern of
+// docs/SHARED_CALENDAR_SPEC.md AC-04, Mon 08:00–12:00 Studio.
 
 export * from './patternFixtures';
 

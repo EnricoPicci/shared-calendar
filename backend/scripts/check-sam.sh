@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Refuses to build with a SAM CLI older than 1.171.0 (docs/FOLDER_STRUCTURE.md 4.3).
+# Refuses to build with a SAM CLI older than 1.171.0 (docs/FOLDER_STRUCTURE.md section 4.3).
 #
 # The monorepo build relies on SAM's npm-workspaces support (SAM_CLI_BETA_NODEJS_MONOREPO=1), which
 # arrived in SAM CLI 1.171.0. An older SAM ignores the variable without a word and runs
 # `npm update --omit dev` once per function, in parallel: that strips the dev tools from the root
-# node_modules (repair: `npm ci` at the root) or fails with ENOTEMPTY. Found 2026-11-14 on a machine
-# with 1.170.0. Called by `npm run build` and scripts/local-api.sh before `sam build`.
+# node_modules (repair: `npm ci` at the root) or fails with ENOTEMPTY, as SAM CLI 1.170.0 does.
+# Called by `npm run build` and scripts/local-api.sh before `sam build`.
 # Portable: bash 3.2 and BSD tools (macOS) as well as Linux.
 set -euo pipefail
 

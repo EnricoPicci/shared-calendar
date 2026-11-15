@@ -42,6 +42,7 @@ describe('initiateAuth', () => {
   });
 });
 
+// Test names: decisions are those of docs/FRONTEND_SERVICES.md section 8.
 describe('toAuthOutcome', () => {
   it('refresh answer without RefreshToken: the session keeps the refresh token passed in', async () => {
     const outcome = await outcomeOf(cognitoTokens({ AccessToken: jwt(ALICE), IdToken: 'id-2' }), 'kept');

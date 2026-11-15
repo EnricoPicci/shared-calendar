@@ -9,22 +9,27 @@ import { error, ok, parseJsonBody, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 import { validate } from '../lib/validation';
 
-// POST /calendar/appointments (docs/SHARED_CALENDAR_SPEC.md 11.1, route 17; 8.2): the Administrator
-// and Users. The checks run in the order of 8.2 (v9), the first failure decides:
+// POST /calendar/appointments (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 17): the
+// Administrator and Users. The checks run in the order of docs/SHARED_CALENDAR_SPEC.md section 8.2,
+// after the claims, configuration and role, and the first failure decides:
 //   1. claims, the calendar's configuration (500), the role (403);
-//   2. the body: JSON, BookBody with the note (R-BOOK-11) and the exact instant form (400);
-//   3. R-BOOK-01 from the body: a User naming someone else (403), the Administrator without a
-//      `username` (400);
-//   4. R-BOOK-02, the times for the role (400);
+//   2. the body: JSON, BookBody with the note (docs/SHARED_CALENDAR_SPEC.md R-BOOK-11) and the
+//      exact instant form (400);
+//   3. docs/SHARED_CALENDAR_SPEC.md R-BOOK-01 from the body: a User naming someone else (403), the
+//      Administrator without a `username` (400);
+//   4. docs/SHARED_CALENDAR_SPEC.md R-BOOK-02, the times for the role (400);
 //   5. the Administrator's target through Cognito, before the lock: unknown (404), not a plain User
 //      (409 target_not_user). A User books for themself, on the `sub` of their token;
-//   6. under the lock, on the data read inside the attempt: R-BOOK-03..07 and 09 (409);
-//   7. R-BOOK-10 in the transaction: a deleted-user marker for the `sub` (404).
+//   6. under the lock, on the data read inside the attempt: docs/SHARED_CALENDAR_SPEC.md
+//      R-BOOK-03..07 and 09 (409);
+//   7. docs/SHARED_CALENDAR_SPEC.md R-BOOK-10 in the transaction: a deleted-user marker for the
+//      `sub` (404).
 // One log line with the appointmentId on success and the lock attempts. Never the note, the body,
-// or the target's `sub` (14.5, AC-36).
+// or the target's `sub` (docs/SHARED_CALENDAR_SPEC.md section 14.5 and AC-36).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
-  // "Now" is read once per request; "today" is its local date in the calendar's zone (R-TIME-04).
+  // "Now" is read once per request; "today" is its local date in the calendar's zone
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-04).
   const now = new Date(started).toISOString();
   const requestId = event.requestContext?.requestId ?? 'unknown';
   const route = event.routeKey;
@@ -39,7 +44,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   const role = resolveRole(claims.value.groups);
   const caller = { username: claims.value.username, role };
 
-  // A broken CalendarTimeZone answers 500 to every request, whatever the role (R-TIME-01).
+  // A broken CalendarTimeZone answers 500 to every request, whatever the role
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-01).
   let config: CalendarConfig;
   try {
     config = calendarConfig();
@@ -56,8 +62,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   const body = validate(BookBody, json.value);
   if (!body.ok) return done('invalid_request', body.response, caller);
 
-  // R-BOOK-01, the part the body and the caller decide: a User books for themself only; the
-  // Administrator names the User.
+  // The part of docs/SHARED_CALENDAR_SPEC.md R-BOOK-01 that the body and the caller decide: a User
+  // books for themself only, and the Administrator names the User.
   const named = body.value.username;
   if (role === 'user' && named !== undefined && named !== claims.value.username) {
     return done('forbidden', error(403, 'forbidden', 'A User can book only for themself'), caller);
@@ -66,7 +72,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
     return done('invalid_request', error(400, 'invalid_request', 'Invalid input: username'), caller);
   }
 
-  // R-BOOK-02: needs only the body and the zone.
+  // The times for the role (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02): needs only the body and
+  // the zone.
   const times = checkBookingTimes(body.value.start, body.value.end, role, timeZone);
   if ('error' in times) return done('invalid_request', error(400, times.error, times.message!), caller);
 

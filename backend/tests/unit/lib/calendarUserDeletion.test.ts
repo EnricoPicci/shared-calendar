@@ -2,10 +2,10 @@ import { TransactionCanceledException } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { mockClient } from 'aws-sdk-client-mock';
 
-// calendarDb's part of a user deletion (plan step 51; spec 10.2 v12, 13.2, 13.4): the deleted-user
-// marker and the cancellation of the User's active appointments not yet ended, in chunks of 40,
-// each under the lock. The module reads its configuration once per container, so every test
-// imports a fresh copy.
+// calendarDb's part of a user deletion (docs/SHARED_CALENDAR_SPEC.md section 10.2): the
+// deleted-user marker and the cancellation of the User's active appointments not yet ended, in
+// chunks of 40, each under the lock (docs/SHARED_CALENDAR_SPEC.md sections 13.2 and 13.4). The
+// module reads its configuration once per container, so every test imports a fresh copy.
 type CalendarDb = typeof import('../../../src/lib/calendarDb');
 let db: CalendarDb;
 
@@ -36,7 +36,8 @@ async function load(): Promise<CalendarDb> {
 
 // Ids sort as their number, so the SK order is the order of `n`.
 const idOf = (n: number) => `01M70NR5E0Q7R2C9T5XH3K${String(n).padStart(4, '0')}`;
-// An appointment item with every attribute of architecture 5.3; n-th hour from 2026-11-15T06:00Z.
+// An appointment item with every attribute of docs/ARCHITECTURE.md section 5.3; n-th hour from
+// 2026-11-15T06:00Z.
 const apptItem = (n: number, more: Record<string, unknown> = {}) => {
   const start = new Date(Date.parse('2026-11-15T06:00:00.000Z') + n * 3_600_000).toISOString();
   const end = (more.end as string | undefined) ?? new Date(Date.parse(start) + 3_600_000).toISOString();
@@ -101,6 +102,7 @@ const marker = {
   },
 };
 
+// Test names: section numbers are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('markUserDeleted (10.2, 13.4)', () => {
   it('no appointment: one transaction of two items, the lock update and the marker (a plain Put, no condition)', async () => {
     const result = await db.markUserDeleted(USER, ADMIN, NOW, newEventId);
@@ -134,7 +136,8 @@ describe('markUserDeleted (10.2, 13.4)', () => {
         apptItem(1, { end: '2026-11-15T08:00:00.000Z' }), // ends exactly now: ended
         apptItem(2, { end: '2026-11-15T09:00:00.000Z' }), // in progress (08:00–09:00)
         apptItem(3, { status: 'cancelled', cancelReason: 'cancelled' }),
-        apptItem(4, { userId: 'sub-earlier-dave' }), // an earlier account named dave (R-DEL-02)
+        // An earlier account named dave (docs/SHARED_CALENDAR_SPEC.md R-DEL-02).
+        apptItem(4, { userId: 'sub-earlier-dave' }),
         apptItem(5),
       ],
     });

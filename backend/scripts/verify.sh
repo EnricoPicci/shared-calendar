@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# The deploy gate (architecture 8.1): every local check, in order, stopping at the first failure.
+# The deploy gate (docs/ARCHITECTURE.md section 8.1): every local check, in order, stopping at the
+# first failure.
 #
 #   typecheck, lint, audit, sam validate --lint, unit tests, integration tests
 #

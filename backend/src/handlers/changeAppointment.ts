@@ -8,7 +8,8 @@ import { error, ok, parseJsonBody, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 import { validate } from '../lib/validation';
 
-// The status of each refusal (spec 11.3); the message is the check's.
+// The status of each refusal (docs/SHARED_CALENDAR_SPEC.md section 11.3); the message is the
+// check's.
 const STATUS = {
   appointment_not_found: 404,
   user_not_found: 404,
@@ -23,23 +24,30 @@ const STATUS = {
 } as const;
 const OUTCOME = { 404: 'not_found', 409: 'conflict', 403: 'too_late' } as const;
 
-// POST /calendar/appointments/{appointmentId}/change (docs/SHARED_CALENDAR_SPEC.md 11.1, route 20;
-// 8.4 v11): the Administrator and the appointment's User. In this order, the first failure decides:
+// POST /calendar/appointments/{appointmentId}/change (docs/SHARED_CALENDAR_SPEC.md section 11.1,
+// route 20): the Administrator and the appointment's User. The checks run in the order of
+// docs/SHARED_CALENDAR_SPEC.md section 8.4, after the claims, configuration and role, and the first
+// failure decides:
 //   1. claims, the calendar's configuration (500), the role (403);
 //   2. the path id, a ULID (400);
-//   3. the body: JSON, ChangeBody with the note (R-BOOK-11) and the exact instant form (400);
-//   4. R-BOOK-02, the new times for the role (400), before the lock;
+//   3. the body: JSON, ChangeBody with the note (docs/SHARED_CALENDAR_SPEC.md R-BOOK-11) and the
+//      exact instant form (400);
+//   4. docs/SHARED_CALENDAR_SPEC.md R-BOOK-02, the new times for the role (400), before the lock;
 //   5. under the lock, on the data read inside the attempt (checkChange): the old appointment as a
 //      cancel (404, 409, 403 for a User), then the new one as a booking for the old one's User
-//      (409), the old appointment left out of the overlap and the limit (R-CHG-01);
-//   6. R-BOOK-10 in the transaction: a deleted-user marker for the old appointment's `sub` (404).
-// No Cognito call: the User is the old appointment's (8.4). The note: absent keeps the old one,
-// null clears it (R-CHG-03). One log line with `appointmentId` (the old one, from the path),
-// `newAppointmentId` on success, the outcome and the lock attempts. Never the note, the body or a
-// `sub` (14.5, AC-36).
+//      (409), the old appointment left out of the overlap and the limit
+//      (docs/SHARED_CALENDAR_SPEC.md R-CHG-01);
+//   6. docs/SHARED_CALENDAR_SPEC.md R-BOOK-10 in the transaction: a deleted-user marker for the old
+//      appointment's `sub` (404).
+// No Cognito call: the User is the old appointment's (docs/SHARED_CALENDAR_SPEC.md section 8.4).
+// The note: absent keeps the old one, null clears it (docs/SHARED_CALENDAR_SPEC.md R-CHG-03). One
+// log line with `appointmentId` (the old one, from the path), `newAppointmentId` on success, the
+// outcome and the lock attempts. Never the note, the body or a `sub` (docs/SHARED_CALENDAR_SPEC.md
+// section 14.5 and AC-36).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
-  // "Now" is read once per request; "today" is its local date in the calendar's zone (R-TIME-04).
+  // "Now" is read once per request; "today" is its local date in the calendar's zone
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-04).
   const now = new Date(started).toISOString();
   const requestId = event.requestContext?.requestId ?? 'unknown';
   const route = event.routeKey;
@@ -54,7 +62,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   const role = resolveRole(claims.value.groups);
   const caller = { username: claims.value.username, role };
 
-  // A broken CalendarTimeZone answers 500 to every request, whatever the role (R-TIME-01).
+  // A broken CalendarTimeZone answers 500 to every request, whatever the role
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-01).
   let config: CalendarConfig;
   try {
     config = calendarConfig();
@@ -76,7 +85,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   const body = validate(ChangeBody, json.value);
   if (!body.ok) return done('invalid_request', body.response, fields);
 
-  // R-BOOK-02: needs only the body and the zone.
+  // The times for the role (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02): needs only the body and
+  // the zone.
   const times = checkBookingTimes(body.value.start, body.value.end, role, timeZone);
   if ('error' in times) return done('invalid_request', error(400, times.error, times.message!), fields);
 

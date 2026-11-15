@@ -16,9 +16,10 @@ export function noContent(): HttpResponse {
   return { statusCode: 204 };
 }
 
-// Error body shape of architecture section 4: { error, message }. Never pass AWS error details here.
-// The codes are the contract's (ApiErrorCode); a new one starts in @shared-calendar/shared.
-// `conflicts` only with availability_conflict (spec 11.3); it goes to the body, never to a log line.
+// Error body shape of docs/ARCHITECTURE.md section 4: { error, message }. Never pass AWS error
+// details here. The codes are the contract's (ApiErrorCode); a new one starts in
+// @shared-calendar/shared. `conflicts` only with availability_conflict
+// (docs/SHARED_CALENDAR_SPEC.md section 11.3); it goes to the body, never to a log line.
 export function error(status: number, code: ApiErrorCode, message: string, conflicts?: AppointmentConflict[]): HttpResponse {
   return ok(status, (conflicts ? { error: code, message, conflicts } : { error: code, message }) satisfies ApiErrorBody);
 }
@@ -35,10 +36,11 @@ export function parseJsonBody(event: Pick<APIGatewayProxyEventV2, 'body' | 'isBa
   }
 }
 
-// The query string as the object a `.strict()` query schema checks (spec 11.2): one string per
-// parameter. A request without a query string gives `{}`, so the schema answers 400 for the
-// missing fields. API Gateway (payload 2.0) joins a repeated parameter with commas (`a,b`), so it
-// arrives as one value and fails the schema's format. Nothing here can fail; the schema decides.
+// The query string as the object a `.strict()` query schema checks (docs/SHARED_CALENDAR_SPEC.md
+// section 11.2): one string per parameter. A request without a query string gives `{}`, so the
+// schema answers 400 for the missing fields. API Gateway (payload format 2.0) joins a repeated
+// parameter with commas (`a,b`), so it arrives as one value and fails the schema's format. Nothing
+// here can fail; the schema decides.
 export function parseQuery(event: Pick<APIGatewayProxyEventV2, 'queryStringParameters'>): Record<string, string> {
   const params: Record<string, string> = {};
   for (const [key, value] of Object.entries(event.queryStringParameters ?? {})) {

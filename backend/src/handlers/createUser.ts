@@ -7,9 +7,9 @@ import { log } from '../lib/logger';
 import { generatePassword } from '../lib/password';
 import { validate } from '../lib/validation';
 
-// Architecture section 6.3, including the rollback. One log line per request (section 11):
-// "username" is the caller, "target" the account being created. The response body carries
-// the password, so it is never passed to the logger.
+// The flow of docs/ARCHITECTURE.md section 6.3, including the rollback. One log line per request
+// (docs/ARCHITECTURE.md section 11): "username" is the caller, "target" the account being created.
+// The response body carries the password, so it is never passed to the logger.
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
   const requestId = event.requestContext?.requestId ?? 'unknown';

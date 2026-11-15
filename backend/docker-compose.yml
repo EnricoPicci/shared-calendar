@@ -1,4 +1,4 @@
-# Local emulators for development and integration tests (architecture section 8).
+# Local emulators for development and integration tests (docs/ARCHITECTURE.md section 8).
 # Start with `npm run local:up`, stop with `npm run local:down`.
 #
 # Ports are bound to 127.0.0.1 only, so nothing is reachable from the local network.

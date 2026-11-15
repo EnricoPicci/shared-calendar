@@ -26,9 +26,12 @@ import {
 type Handler = typeof import('../../../src/handlers/changeAppointment').handler;
 let handler: Handler;
 
-// Spec 8.4 v11, route 20; AC-22, AC-23, AC-24 on the dates of 18.3: Europe/Rome, the AC-04 pattern
-// Mon 08:00–12:00 Studio, alice holds Monday 2026-11-16 09:00–10:00 local (08:00Z–09:00Z). Now is
-// 2026-11-10T09:00Z (enough notice) unless a test says otherwise; AC-21's now for the notice.
+// Changing an appointment (docs/SHARED_CALENDAR_SPEC.md section 8.4; docs/SHARED_CALENDAR_SPEC.md
+// section 11.1, route 20): the scenarios docs/SHARED_CALENDAR_SPEC.md AC-22, AC-23 and AC-24 on the
+// dates of docs/SHARED_CALENDAR_SPEC.md section 18.3: Europe/Rome, the pattern of
+// docs/SHARED_CALENDAR_SPEC.md AC-04 (Mon 08:00–12:00 Studio), alice holds Monday 2026-11-16
+// 09:00–10:00 local (08:00Z–09:00Z). Now is 2026-11-10T09:00Z (enough notice) unless a test says
+// otherwise; the notice tests use the now of docs/SHARED_CALENDAR_SPEC.md AC-21.
 const ROUTE = 'POST /calendar/appointments/{appointmentId}/change';
 const { ddb, reset, onPartition, logLines, transactions, output } = harness();
 const alice = claimsOf('alice', ['user']);
@@ -64,6 +67,8 @@ beforeEach(async () => {
 });
 afterEach(cleanUp);
 
+// Test names: R-… rules and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in
+// its section 18.3).
 describe('changeAppointment handler', () => {
   it('AC-22: alice moves 09:00 to 10:00: 201 { cancelled, booked }, cancellableUntil per status, no userId or version', async () => {
     const response = await post({ start: H1000 });
@@ -164,7 +169,7 @@ describe('changeAppointment handler', () => {
     expect(cancelled).toMatchObject({ cancelledBy: ADMIN_ACTOR, cancelReason: 'changed', cancellableUntil: null });
   });
 
-  it('the Administrator’s end absent is start + 60 min (v11), not the old duration', async () => {
+  it('the Administrator’s end absent is start + 60 min, not the old duration', async () => {
     storeAppointment(ddb, storedItem({ end: H1030 }));
     const response = await post({ start: H1000 }, admin);
     expect((bodyOf(response).booked as Record<string, unknown>).end).toBe(H1100);

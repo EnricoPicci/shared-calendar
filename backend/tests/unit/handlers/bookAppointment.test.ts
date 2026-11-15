@@ -12,8 +12,9 @@ import { admin, bodyOf, claimsOf, cleanUp, eventAt, harness, lockBusy, NOW, P1, 
 type Handler = typeof import('../../../src/handlers/bookAppointment').handler;
 let handler: Handler;
 
-// Spec 18.3: now 2026-11-10T09:00Z (Tuesday), Europe/Rome; the AC-04 pattern Mon 08:00–12:00 Studio,
-// so Monday 2026-11-16 09:00 local is 08:00Z. claimsOf gives `sub-<username>`.
+// The dates of docs/SHARED_CALENDAR_SPEC.md section 18.3: now 2026-11-10T09:00Z (Tuesday),
+// Europe/Rome; the pattern of docs/SHARED_CALENDAR_SPEC.md AC-04, Mon 08:00–12:00 Studio, so Monday
+// 2026-11-16 09:00 local is 08:00Z. claimsOf gives `sub-<username>`.
 const ROUTE = 'POST /calendar/appointments';
 const { ddb, reset, onPartition, logLines, transactions, output } = harness();
 const cognito = mockClient(CognitoIdentityProviderClient);
@@ -35,7 +36,7 @@ async function load(timeZone = 'Europe/Rome'): Promise<Handler> {
 const post = (body: unknown, claims: Record<string, string> = alice) =>
   handler(eventAt(ROUTE, claims, undefined, typeof body === 'string' ? body : JSON.stringify(body)));
 
-/** A stored appointment item of another User on the AC-04 Monday. */
+/** A stored appointment item of another User on the Monday of docs/SHARED_CALENDAR_SPEC.md AC-04. */
 const apptItem = (start: string, end: string, more: object = {}) => ({
   PK: 'APPT',
   SK: `${start}#01M70NR5E0Q7R2C9T5XH3KD8B0`,
@@ -65,6 +66,8 @@ beforeEach(async () => {
 });
 afterEach(cleanUp);
 
+// Test names: R-… rules and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in
+// its section 18.3).
 describe('bookAppointment handler', () => {
   describe('a User books for themself', () => {
     it('AC-10: 201 with the Appointment: end + 60 min, typeName, cancellableUntil, no userId', async () => {
@@ -357,6 +360,8 @@ describe('bookAppointment handler', () => {
   });
 });
 
+// Test names: AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in its section
+// 18.3).
 describe('bookAppointment handler logging (AC-36)', () => {
   it('a User’s booking: one info line with the appointmentId and the lock attempts; no note, body or sub', async () => {
     const response = await post({ start: START, note: NOTE });

@@ -9,7 +9,8 @@ import { API, cognito, current, signedIn, signIn } from './local';
 // docs/FRONTEND_SERVICES.md section 14.2: the services against the back end's local stack, in
 // order. Every service gets its token from a real SessionStore that a real LoginService filled.
 // Runs only with RUN_INTEGRATION=1. The throw-away user `fe-journey` is removed before and after
-// (decision 26). Its generated password stays in a variable; assertions look at its presence only.
+// (docs/FRONTEND_SERVICES.md section 8, decision 26). Its generated password stays in a variable;
+// assertions look at its presence only.
 
 const THROWAWAY = 'fe-journey';
 
@@ -48,7 +49,8 @@ function track(store: SessionStore): SessionStore {
   return store;
 }
 
-// A run that failed half-way leaves fe-journey behind; journey 4 would then get user_exists.
+// A run that failed half-way leaves fe-journey behind, and creating it again would then answer
+// user_exists (docs/FRONTEND_SERVICES.md section 14.2, journey 4).
 async function removeThrowaway(): Promise<void> {
   const store = await signedIn('admin');
   const result = await deleteUser(store, THROWAWAY);

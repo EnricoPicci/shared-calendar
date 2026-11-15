@@ -8,22 +8,28 @@ import { error, ok, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 import { validate } from '../lib/validation';
 
-// The status of each refusal (spec 11.3); the message is the check's.
+// The status of each refusal (docs/SHARED_CALENDAR_SPEC.md section 11.3); the message is the
+// check's.
 const STATUS = { appointment_not_found: 404, appointment_not_active: 409, cancellation_notice_too_short: 403 } as const;
 const OUTCOME = { 404: 'not_found', 409: 'conflict', 403: 'too_late' } as const;
 
-// POST /calendar/appointments/{appointmentId}/cancel (docs/SHARED_CALENDAR_SPEC.md 11.1, route 19;
-// 8.3 v10): the Administrator and the appointment's User. In this order, the first failure decides:
+// POST /calendar/appointments/{appointmentId}/cancel (docs/SHARED_CALENDAR_SPEC.md section 11.1,
+// route 19): the Administrator and the appointment's User. The checks run in the order of
+// docs/SHARED_CALENDAR_SPEC.md section 8.3, after the claims, configuration and role, and the first
+// failure decides:
 //   1. claims, the calendar's configuration (500), the role (403);
 //   2. the path id, a ULID (400);
 //   3. under the lock, on the appointment and settings read inside the attempt (checkCancel):
-//      R-CAN-01 / R-PERM-01 (404, also for someone else's), R-CAN-02 (409), R-CAN-03 for a User (403).
+//      docs/SHARED_CALENDAR_SPEC.md R-CAN-01 / R-PERM-01 (404, also for someone else's), R-CAN-02
+//      (409), R-CAN-03 for a User (403).
 // The appointment is kept, cancelled; the `appointment.cancelled` event is written with it. The
-// answer's `cancellableUntil` is null (cancelled, v10). One log line with the appointmentId, the
-// outcome and the lock attempts; never the note or a `sub` (14.5).
+// answer's `cancellableUntil` is null, since the appointment is cancelled. One log line with the
+// appointmentId, the outcome and the lock attempts; never the note or a `sub`
+// (docs/SHARED_CALENDAR_SPEC.md section 14.5).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
-  // "Now" is read once per request (R-TIME-04): R-CAN-02 and R-CAN-03 compare with it.
+  // "Now" is read once per request (docs/SHARED_CALENDAR_SPEC.md R-TIME-04): R-CAN-02 and R-CAN-03
+  // of docs/SHARED_CALENDAR_SPEC.md compare with it.
   const now = new Date(started).toISOString();
   const requestId = event.requestContext?.requestId ?? 'unknown';
   const route = event.routeKey;
@@ -38,7 +44,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   const role = resolveRole(claims.value.groups);
   const caller = { username: claims.value.username, role };
 
-  // A broken CalendarTimeZone answers 500 to every request, whatever the role (R-TIME-01).
+  // A broken CalendarTimeZone answers 500 to every request, whatever the role
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-01).
   try {
     calendarConfig();
   } catch (err) {

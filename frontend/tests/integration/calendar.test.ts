@@ -17,9 +17,10 @@ import { SessionStore } from '../../src/services/session.store';
 import { UsersService } from '../../src/services/users.service';
 import { API, outcome, signedIn, signIn } from './local';
 
-// docs/FRONTEND_SERVICES.md section 14.4 (v6): the calendar services of plan step 53 against the
-// back end's local stack. Runs only with RUN_INTEGRATION=1, never at the same time as the back
-// end's journeys. The local calendar is shared with them and with the smoke test, so this file:
+// The calendar journeys of docs/FRONTEND_SERVICES.md section 14.4: the settings, types and
+// availability-rules services, and listUsers, against the back end's local stack. Runs only with
+// RUN_INTEGRATION=1, never at the same time as the back end's journeys. The local calendar is
+// shared with them and with the smoke test, so this file:
 // - never resets the table and never deletes or changes what it did not create;
 // - creates only types named `fe-calendar …` and items on dates about a year ahead (from today
 //   + 330 days, a band of 31 days), each on a date that has no window and no override yet;
@@ -28,14 +29,16 @@ import { API, outcome, signedIn, signIn } from './local';
 //   written back, so a run killed in between (no afterAll) is repaired by the next run;
 // - removes what an earlier failed run left (one-off windows, overrides, patterns of its types,
 //   then the types) before and after, and the throw-away User `fe-calendar` before and after.
-// `availability_conflict` needs a booked appointment: step 54.
+// `availability_conflict` is not covered here: it needs a booked appointment, which only the
+// AppointmentsService of docs/IMPLEMENTATION_PLAN.md step 54 can make.
 
 const USER = 'fe-calendar';
 const PREFIX = 'fe-calendar ';
 const BAND_OFFSET = 330;
 const BAND_DAYS = CALENDAR_LIMITS.calendarViewDays; // one GET /calendar covers the band
 const UNKNOWN_ID = '01JCZZZZZZZZZZZZZZZZZZZZZZ'; // a ULID no server will generate (its time is 2024)
-// The settings read before the test changes them, until they are written back (decision 35).
+// The settings read before the test changes them, kept until they are written back
+// (docs/FRONTEND_SERVICES.md section 8, decision 35).
 // `*.local.json` is git-ignored; the file exists only while the settings are not the ones read.
 const SAVED_SETTINGS = new URL('./fe-calendar-settings.local.json', import.meta.url);
 
@@ -92,7 +95,8 @@ function editable(s: CalendarSettings): UpdateSettingsBody {
   };
 }
 
-// The Administrator's view of the band, through apiCall (CalendarService is step 54's).
+// The Administrator's view of the band, through apiCall directly: CalendarService comes with
+// docs/IMPLEMENTATION_PLAN.md step 54.
 async function bandView(): Promise<CalendarView> {
   const from = addDays(today, BAND_OFFSET);
   const answer = await outcome(
@@ -205,7 +209,7 @@ afterAll(async () => {
   }
 }, 180_000);
 
-// ── Settings (routes 1, 2) ───────────────────────────────────────────────────────────────────
+// ── Settings (docs/SHARED_CALENDAR_SPEC.md section 11.1, routes 1 and 2) ─────────────────────
 
 describe('settings', () => {
   it('admin reads, writes other values, and writes the values read back', async () => {
@@ -221,7 +225,7 @@ describe('settings', () => {
     const saved = ok(await updateSettings(admin, changed), 'update').settings;
     expect(saved).toMatchObject({ ...changed, timeZone: before.timeZone, updatedBy: { username: 'admin', role: 'admin' } });
 
-    // Both roles read them (route 1).
+    // Both roles read them (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 1).
     expect(ok(await loadSettings(user), 'load as user').settings).toMatchObject(changed);
 
     const back = ok(await updateSettings(admin, original), 'write back').settings;
@@ -242,7 +246,7 @@ describe('settings', () => {
   });
 });
 
-// ── Types (routes 3–6) ───────────────────────────────────────────────────────────────────────
+// ── Types (docs/SHARED_CALENDAR_SPEC.md section 11.1, routes 3–6) ────────────────────────────
 
 describe('types', () => {
   it('create (trimmed), duplicate name, rename, list as a User, remove, remove again', async () => {
@@ -255,7 +259,7 @@ describe('types', () => {
     const renamed = ok(await outcome(s.renameResult$, () => s.rename(created.typeId, `${PREFIX}Studio B`)), 'rename').type;
     expect(renamed).toMatchObject({ typeId: created.typeId, name: `${PREFIX}Studio B` });
 
-    const listed = ok(await loadTypes(user), 'load as user').types; // route 3 is both roles'
+    const listed = ok(await loadTypes(user), 'load as user').types; // both roles may read the types
     expect(listed.find((t) => t.typeId === created.typeId)?.name).toBe(`${PREFIX}Studio B`);
 
     expect(await removeType(admin, created.typeId)).toEqual({ status: 'success', typeId: created.typeId });
@@ -276,7 +280,7 @@ describe('types', () => {
   });
 });
 
-// ── Weekly patterns (routes 7–10) ────────────────────────────────────────────────────────────
+// ── Weekly patterns (docs/SHARED_CALENDAR_SPEC.md section 11.1, routes 7–10) ─────────────────
 
 describe('patterns', () => {
   it('create, list, overlap refused, update, type in use, delete, delete again', async () => {
@@ -323,7 +327,7 @@ describe('patterns', () => {
   });
 });
 
-// ── Date overrides (routes 11, 12) ───────────────────────────────────────────────────────────
+// ── Date overrides (docs/SHARED_CALENDAR_SPEC.md section 11.1, routes 11 and 12) ─────────────
 
 describe('overrides', () => {
   it('set (sorted by start), overlap refused, delete, delete again', async () => {
@@ -355,7 +359,7 @@ describe('overrides', () => {
   });
 });
 
-// ── One-off windows (routes 13, 14) ──────────────────────────────────────────────────────────
+// ── One-off windows (docs/SHARED_CALENDAR_SPEC.md section 11.1, routes 13 and 14) ────────────
 
 describe('one-off windows', () => {
   it('create, overlap refused, type in use, delete, delete again', async () => {
@@ -392,7 +396,7 @@ describe('one-off windows', () => {
   });
 });
 
-// ── Users (route 21) ─────────────────────────────────────────────────────────────────────────
+// ── Users (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 21) ──────────────────────────────
 
 describe('users', () => {
   it(`admin lists the plain Users: ${USER} and alice, never admin`, async () => {

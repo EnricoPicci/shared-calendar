@@ -8,9 +8,10 @@ import { error, ok, parseJsonBody, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 import { validate } from '../lib/validation';
 
-// The default text of each refusal (spec 11.3); a refusal's own message (an overlap names the date
-// and both windows) replaces it. A new window only adds availability, so availability_conflict
-// cannot happen (R-AV-04); it is listed because the shared check's type names it.
+// The default text of each refusal (docs/SHARED_CALENDAR_SPEC.md section 11.3); a refusal's own
+// message (an overlap names the date and both windows) replaces it. A new window only adds
+// availability, so availability_conflict cannot happen (docs/SHARED_CALENDAR_SPEC.md R-AV-04); it
+// is listed because the shared check's type names it.
 const REFUSALS = {
   type_not_found: 'No availability type with this id',
   limit_reached: 'The date already has the maximum number of one-off windows',
@@ -18,13 +19,15 @@ const REFUSALS = {
   availability_conflict: 'Appointments would fall outside the availability',
 } as const;
 
-// POST /calendar/windows (docs/SHARED_CALENDAR_SPEC.md 11.1, route 13): the Administrator only.
-// Adds a one-off window on a date under the calendar lock (R-ONE-01/03), checked against the
-// date's other windows (R-AV-01). One log line with the new windowId, its date and the lock
-// attempts, never the window's times or type (14.5).
+// POST /calendar/windows (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 13): the Administrator
+// only. Adds a one-off window on a date under the calendar lock, at most 10 per date
+// (docs/SHARED_CALENDAR_SPEC.md R-ONE-01 and R-ONE-03), checked against the date's other windows
+// (docs/SHARED_CALENDAR_SPEC.md R-AV-01). One log line with the new windowId, its date and the lock
+// attempts, never the window's times or type (docs/SHARED_CALENDAR_SPEC.md section 14.5).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
-  // "Now" is read once per request; "today" is its local date in the calendar's zone (R-TIME-04).
+  // "Now" is read once per request; "today" is its local date in the calendar's zone
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-04).
   const now = new Date(started).toISOString();
   const requestId = event.requestContext?.requestId ?? 'unknown';
   const route = event.routeKey;
@@ -38,7 +41,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   if (!claims.ok) return done('unauthorized', claims.response);
   const caller = { username: claims.value.username, role: resolveRole(claims.value.groups) };
 
-  // A broken CalendarTimeZone answers 500 to every request, whatever the role (R-TIME-01).
+  // A broken CalendarTimeZone answers 500 to every request, whatever the role
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-01).
   let config: CalendarConfig;
   try {
     config = calendarConfig();
@@ -58,7 +62,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   const { date } = body.value;
 
   // Needs only the body and the clock, so it is answered before the lock: a one-off window cannot
-  // be dated before today; today is accepted (R-AV-02).
+  // be dated before today, and today is accepted (docs/SHARED_CALENDAR_SPEC.md R-AV-02).
   if (date < today) {
     return done('conflict', error(409, 'date_in_past', 'The date is in the past'), { ...caller, date });
   }

@@ -13,12 +13,13 @@ const REFUSALS = {
   limit_reached: 'The calendar already has the maximum number of types',
 } as const;
 
-// POST /calendar/types (docs/SHARED_CALENDAR_SPEC.md 11.1, route 4): the Administrator only.
-// Creates a type under the calendar lock (R-TYPE-01: unique name, at most 20 types). One log line
-// with the new typeId and the lock attempts, never the body or the name (14.5).
+// POST /calendar/types (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 4): the Administrator
+// only. Creates a type under the calendar lock with a unique name, at most 20 types
+// (docs/SHARED_CALENDAR_SPEC.md R-TYPE-01). One log line with the new typeId and the lock attempts,
+// never the body or the name (docs/SHARED_CALENDAR_SPEC.md section 14.5).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
-  // "Now" is read once per request (R-TIME-04).
+  // "Now" is read once per request (docs/SHARED_CALENDAR_SPEC.md R-TIME-04).
   const now = new Date(started).toISOString();
   const requestId = event.requestContext?.requestId ?? 'unknown';
   const route = event.routeKey;
@@ -32,7 +33,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   if (!claims.ok) return done('unauthorized', claims.response);
   const caller = { username: claims.value.username, role: resolveRole(claims.value.groups) };
 
-  // A broken CalendarTimeZone answers 500 to every request, whatever the role (R-TIME-01).
+  // A broken CalendarTimeZone answers 500 to every request, whatever the role
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-01).
   try {
     calendarConfig();
   } catch (err) {

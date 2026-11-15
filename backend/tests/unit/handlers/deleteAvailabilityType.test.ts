@@ -9,7 +9,7 @@ let handler: Handler;
 
 const ddb = mockClient(DynamoDBDocumentClient);
 const ROUTE = 'DELETE /calendar/types/{typeId}';
-// AC-28's day: Monday 2026-11-16, 10:30 in Europe/Rome.
+// The tests of docs/SHARED_CALENDAR_SPEC.md AC-28 run on Monday 2026-11-16, 10:30 in Europe/Rome.
 const NOW = '2026-11-16T09:30:00.000Z';
 const STUDIO = '01JC0000000000000000000001';
 const UNKNOWN = '01JC0000000000000000000009';
@@ -75,6 +75,8 @@ const queryBound = (pk: string) =>
     .map((call) => call.args[0].input)
     .find((q) => q.ExpressionAttributeValues![':pk'] === pk)!.ExpressionAttributeValues![':from'];
 
+// Test names: AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in its section
+// 18.3).
 describe('deleteAvailabilityType handler', () => {
   it('deletes an unused type and answers 204 with no body', async () => {
     const response = await handler(asAdmin());

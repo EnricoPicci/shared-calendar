@@ -14,8 +14,9 @@ import type {
 } from './availability-types.types';
 import type { SessionStore } from './session.store';
 
-// docs/FRONTEND_SERVICES.md section 16. The availability types, routes 3–6: load (both roles),
-// create, rename and remove (admin only). One pair of streams per method, independent.
+// The availability types (docs/FRONTEND_SERVICES.md section 16), docs/SHARED_CALENDAR_SPEC.md
+// section 11.1, routes 3–6: load (both roles), create, rename and remove (admin only). One pair of
+// streams per method, each independent of the others.
 
 const LOAD_CODES = ['forbidden', 'internal_error'] as const satisfies readonly ApiErrorCode[];
 const CREATE_CODES = [
@@ -88,7 +89,8 @@ export class AvailabilityTypesService {
         map((answer): TypesResult => (answer.status === 'ok' ? toTypesResult(answer) : answer)),
         tap((result) => this.typesStateSubject.next(result)),
       )
-      // Forward `next` only: a completed subject would ignore every later call (section 3.2).
+      // Forward `next` only: a completed subject would ignore every later call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
       .subscribe((result) => this.typesResultSubject.next(result));
   }
 
@@ -96,7 +98,8 @@ export class AvailabilityTypesService {
     this.pendingCreate?.unsubscribe(); // cancels a pending create only
     this.createStateSubject.next({ status: 'pending', name });
 
-    // The shared schema; its output (the trimmed name) is what is sent (section 16.4).
+    // Checked with the shared schema, and its parsed output (the trimmed name) is what is sent
+    // (docs/FRONTEND_SERVICES.md section 16.4).
     const body = TypeBody.safeParse({ name });
     const call: Observable<CreateTypeResult> = body.success
       ? apiCall(this.config, this.store, { method: 'POST', path: '/calendar/types', body: body.data, codes: CREATE_CODES }).pipe(
@@ -106,7 +109,9 @@ export class AvailabilityTypesService {
 
     this.pendingCreate = call
       .pipe(tap((result) => this.createStateSubject.next(result)))
-      .subscribe((result) => this.createResultSubject.next(result)); // next only: section 3.2
+      // Feed the subject with `next` only, so it stays open for the next call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
+      .subscribe((result) => this.createResultSubject.next(result));
   }
 
   rename(typeId: string, name: string): void {
@@ -129,7 +134,9 @@ export class AvailabilityTypesService {
 
     this.pendingRename = call
       .pipe(tap((result) => this.renameStateSubject.next(result)))
-      .subscribe((result) => this.renameResultSubject.next(result)); // next only: section 3.2
+      // Feed the subject with `next` only, so it stays open for the next call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
+      .subscribe((result) => this.renameResultSubject.next(result));
   }
 
   remove(typeId: string): void {
@@ -151,11 +158,14 @@ export class AvailabilityTypesService {
 
     this.pendingRemove = call
       .pipe(tap((result) => this.removeStateSubject.next(result)))
-      .subscribe((result) => this.removeResultSubject.next(result)); // next only: section 3.2
+      // Feed the subject with `next` only, so it stays open for the next call
+      // (docs/FRONTEND_SERVICES.md section 3.2).
+      .subscribe((result) => this.removeResultSubject.next(result));
   }
 }
 
-// Section 16.5: the status, the array under `types` and each element's `typeId`.
+// A success is checked for its status, the array under `types` and each element's `typeId`
+// (docs/FRONTEND_SERVICES.md section 16.5).
 function toTypesResult(answer: ApiOk): TypesResult {
   const body = answer.body as { types?: unknown } | undefined;
   if (answer.httpStatus === 200 && Array.isArray(body?.types) && body.types.every((t) => hasString(t, 'typeId'))) {

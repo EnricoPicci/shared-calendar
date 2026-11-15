@@ -1,6 +1,6 @@
 import type { Role } from '@shared-calendar/shared';
 
-// docs/FRONTEND_SERVICES.md section 4.3.
+// The types of LoginService and the Session (docs/FRONTEND_SERVICES.md section 4.3).
 
 // What a signed-in user is, for the whole front end.
 export type Session = {
@@ -22,7 +22,8 @@ export type LoginFailureReason =
   | 'server' // HTTP 5xx, or a body that is not JSON
   | 'unexpected'; // any other __type, or an access token whose claims cannot be read
 
-// The success carries no token: the Session goes to the SessionStore only (rule 9, decision 28).
+// The success carries no token: the Session goes to the SessionStore only
+// (docs/FRONTEND_SERVICES.md section 2, rule 9, and docs/FRONTEND_SERVICES.md section 8, decision 28).
 export type LoginResult =
   | { status: 'success'; username: string; role: Role; expiresAt: Date }
   // message: human text for the view, never the password.

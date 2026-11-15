@@ -54,6 +54,8 @@ const body = (response: Awaited<ReturnType<Handler>>) => JSON.parse(response.bod
 const transactions = () => ddb.commandCalls(TransactWriteCommand).map((call) => call.args[0].input);
 const ALICE_CONFLICT = { appointmentId: 'A1', username: 'alice', start: aliceItem.start, end: aliceItem.end };
 
+// Test names: AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in its section
+// 18.3).
 describe('updatePattern handler', () => {
   it('replaces every field, keeps createdAt, sets updatedAt to "now", and answers 200 (AC-27: extended)', async () => {
     onPartition('APPT', [aliceItem]);

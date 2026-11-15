@@ -7,10 +7,10 @@ import { error, ok, parseJsonBody, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 import { validate } from '../lib/validation';
 
-// The default text of each refusal (spec 11.3); a refusal's own message (an overlap names the date
-// and both windows, a conflict counts the appointments) replaces it. An override is not counted
-// against a limit (at most 10 windows is the body's 400); the code is listed because the shared
-// check's type names it.
+// The default text of each refusal (docs/SHARED_CALENDAR_SPEC.md section 11.3); a refusal's own
+// message (an overlap names the date and both windows, a conflict counts the appointments)
+// replaces it. An override is not counted against a limit (at most 10 windows is the body's 400);
+// the code is listed because the shared check's type names it.
 const REFUSALS = {
   type_not_found: 'No availability type with this id',
   limit_reached: 'A count limit was reached',
@@ -18,13 +18,15 @@ const REFUSALS = {
   availability_conflict: 'Appointments would fall outside the availability',
 } as const;
 
-// PUT /calendar/overrides/{date} (docs/SHARED_CALENDAR_SPEC.md 11.1, route 11): the Administrator
-// only. Sets or replaces the override of a date under the calendar lock (R-OVR-01/02), checked
-// against the rest of the calendar (R-AV-01..05). One log line with the date and the lock attempts,
-// never the windows or the conflicts (14.5).
+// PUT /calendar/overrides/{date} (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 11): the
+// Administrator only. Sets or replaces the override of a date under the calendar lock
+// (docs/SHARED_CALENDAR_SPEC.md R-OVR-01, R-OVR-02), checked against the rest of the calendar
+// (docs/SHARED_CALENDAR_SPEC.md R-AV-01..05). One log line with the date and the lock attempts,
+// never the windows or the conflicts (docs/SHARED_CALENDAR_SPEC.md section 14.5).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
-  // "Now" is read once per request; "today" is its local date in the calendar's zone (R-TIME-04).
+  // "Now" is read once per request; "today" is its local date in the calendar's zone
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-04).
   const now = new Date(started).toISOString();
   const requestId = event.requestContext?.requestId ?? 'unknown';
   const route = event.routeKey;
@@ -38,7 +40,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   if (!claims.ok) return done('unauthorized', claims.response);
   const caller = { username: claims.value.username, role: resolveRole(claims.value.groups) };
 
-  // A broken CalendarTimeZone answers 500 to every request, whatever the role (R-TIME-01).
+  // A broken CalendarTimeZone answers 500 to every request, whatever the role
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-01).
   let config: CalendarConfig;
   try {
     config = calendarConfig();
@@ -61,7 +64,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   if (!body.ok) return done('invalid_request', body.response, { ...caller, date });
 
   // Needs only the path and the clock, so it is answered before the lock: an override cannot be
-  // set on a date before today; today is accepted (R-AV-02).
+  // set on a date before today, and today is accepted (docs/SHARED_CALENDAR_SPEC.md R-AV-02).
   if (date < today) {
     return done('conflict', error(409, 'date_in_past', 'The date is in the past'), { ...caller, date });
   }

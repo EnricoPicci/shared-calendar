@@ -11,7 +11,8 @@ import { call, cognitoError, cognitoTokens, json, jwt, session } from './fixture
 const CONFIG: RefreshConfig = { cognitoUrl: 'http://cognito.test/', clientId: 'client-123' };
 const MINUTE = 60_000;
 
-// A Cognito refresh answer: new access and id tokens, no refresh token (section 11.1).
+// A Cognito refresh answer: new access and id tokens, no refresh token
+// (docs/FRONTEND_SERVICES.md section 11.1).
 function refreshed(minutes = 15, claims: Record<string, unknown> = {}, extra: Record<string, unknown> = {}): Response {
   const exp = Math.floor((Date.now() + minutes * MINUTE) / 1000);
   const access = jwt({ username: 'alice', 'cognito:groups': ['user'], exp, ...claims });

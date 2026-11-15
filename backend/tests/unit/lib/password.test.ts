@@ -1,6 +1,6 @@
 import { generatePassword, PASSWORD_LENGTH } from '../../../src/lib/password';
 
-// The user pool policy (architecture section 5.1) plus the length the API promises.
+// The user pool policy (docs/ARCHITECTURE.md section 5.1) plus the length the API promises.
 function satisfiesPolicy(password: string): boolean {
   return (
     password.length === 16 &&

@@ -5,11 +5,11 @@ import { listPlainUsers } from '../lib/cognito';
 import { error, ok, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 
-// GET /users (docs/SHARED_CALENDAR_SPEC.md 10.1, route 21): the Administrator only. The plain Users
-// (in group user, not in admin), sorted by username, for the "book for a User" choice. It reads
-// Cognito only: no calendar data, so no calendar configuration check (spec v12). No query
-// parameter and no paging of the answer (≤ 10 users, N6). One log line with the number of users,
-// never their names.
+// GET /users (docs/SHARED_CALENDAR_SPEC.md section 10.1; docs/SHARED_CALENDAR_SPEC.md section 11.1,
+// route 21): the Administrator only. The plain Users (in group user, not in admin), sorted by
+// username, for the "book for a User" choice. It reads Cognito only: no calendar data, so no
+// calendar configuration check. No query parameter and no paging of the answer (≤ 10 users,
+// docs/ARCHITECTURE.md N6). One log line with the number of users, never their names.
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
   const requestId = event.requestContext?.requestId ?? 'unknown';

@@ -2,10 +2,11 @@ import { GetCommand } from '@aws-sdk/lib-dynamodb';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { STUDIO, type harness } from './availabilityFixtures';
 
-// Shared by the handlers of plan step 49 (listAppointments, updateAppointmentNote,
-// cancelAppointment). The dates of spec 18.3: Europe/Rome (UTC+1 in November); alice holds
-// 2026-11-16 09:00–10:00 local (08:00Z–09:00Z) at the Studio; AC-20's now is 2026-11-15T09:00 local,
-// AC-21's 09:01.
+// Shared by the tests of listAppointments, updateAppointmentNote and cancelAppointment. The dates
+// of docs/SHARED_CALENDAR_SPEC.md section 18.3: Europe/Rome (UTC+1 in November); alice holds
+// 2026-11-16 09:00–10:00 local (08:00Z–09:00Z) at the Studio; the now of
+// docs/SHARED_CALENDAR_SPEC.md AC-20 is 2026-11-15T09:00 local, the now of
+// docs/SHARED_CALENDAR_SPEC.md AC-21 is 09:01.
 
 export * from './availabilityFixtures';
 
@@ -20,7 +21,10 @@ export const NOTE = 'private note, never logged';
 
 const ALICE_ACTOR = { username: 'alice', role: 'user' } as const;
 
-/** Alice's appointment item with every attribute (architecture 5.3), as a booking writes it. */
+/**
+ * Alice's appointment item with every attribute (docs/ARCHITECTURE.md section 5.3), as a booking
+ * writes it.
+ */
 export const storedItem = (more: Record<string, unknown> = {}) => ({
   PK: 'APPT',
   SK,
@@ -53,7 +57,10 @@ export function storeAppointment(ddb: ReturnType<typeof harness>['ddb'], item: R
   ddb.on(GetCommand, { Key: { PK: 'TYPE', SK: STUDIO } }).resolves({ Item: { PK: 'TYPE', SK: STUDIO, name: 'Studio', nameKey: 'studio' } });
 }
 
-/** An event with a query string (route 16). `query` undefined: no query string at all. */
+/**
+ * An event with a query string (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 16). `query`
+ * undefined: no query string at all.
+ */
 export function queryEvent(route: string, lambda: Record<string, string> | undefined, query?: Record<string, string>): APIGatewayProxyEventV2 {
   return {
     routeKey: route,

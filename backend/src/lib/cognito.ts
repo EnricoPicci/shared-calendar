@@ -83,9 +83,10 @@ export async function listGroups(username: string): Promise<string[]> {
   return (result.Groups ?? []).flatMap((group) => (group.GroupName ? [group.GroupName] : []));
 }
 
-// The account's Cognito `sub`, the id the calendar stores as `userId` (spec 8.1, 15.4). Every
-// account has one (Cognito and cognito-local set it at AdminCreateUser); an answer without it is
-// a broken directory, not a missing user, so it is an ordinary error (a 500).
+// The account's Cognito `sub`, the id the calendar stores as `userId`
+// (docs/SHARED_CALENDAR_SPEC.md sections 8.1 and 15.4). Every account has one (Cognito and
+// cognito-local set it at AdminCreateUser); an answer without it is a broken directory, not a
+// missing user, so it is an ordinary error (a 500).
 export async function getUserSub(username: string): Promise<string> {
   const result = await cognitoClient
     .send(new AdminGetUserCommand({ UserPoolId: userPoolId(), Username: username }))
@@ -95,8 +96,9 @@ export async function getUserSub(username: string): Promise<string> {
   return sub;
 }
 
-// A plain User: in group 'user' and not in 'admin' (admin wins, architecture section 3). An account
-// in neither group is not one either (spec R-BOOK-01, v9). An unknown username is UserNotFoundError.
+// A plain User: in group 'user' and not in 'admin' (admin wins, docs/ARCHITECTURE.md section 3).
+// An account in neither group is not one either (docs/SHARED_CALENDAR_SPEC.md R-BOOK-01). An
+// unknown username is UserNotFoundError.
 export async function isPlainUser(username: string): Promise<boolean> {
   const groups = await listGroups(username);
   return groups.includes('user') && !groups.includes('admin');
@@ -115,9 +117,10 @@ async function membersOf(group: 'user' | 'admin'): Promise<UserType[]> {
   return members;
 }
 
-// The plain Users for GET /users (spec 10.1, route 21): the members of 'user' that are not in
-// 'admin' (admin wins, architecture section 3); an account in no group is not one. Sorted by
-// username in UTF-16 code-unit order (spec v12), `createdAt` from UserCreateDate as an ISO instant.
+// The plain Users for GET /users (docs/SHARED_CALENDAR_SPEC.md section 10.1 and section 11.1,
+// route 21): the members of 'user' that are not in 'admin' (admin wins, docs/ARCHITECTURE.md section 3);
+// an account in no group is not one. Sorted by username in UTF-16 code-unit order
+// (docs/SHARED_CALENDAR_SPEC.md section 10.1), `createdAt` from UserCreateDate as an ISO instant.
 // A member without a username or a creation date is a broken directory: an ordinary error (500).
 export async function listPlainUsers(): Promise<UserSummary[]> {
   const [users, admins] = await Promise.all([membersOf('user'), membersOf('admin')]);

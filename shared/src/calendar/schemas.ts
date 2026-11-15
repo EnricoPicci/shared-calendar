@@ -3,10 +3,12 @@ import { Username } from '../username';
 import { CALENDAR_LIMITS, SETTINGS_RANGES } from './defaults';
 import { addDays } from './time';
 
-// The primitive schemas of the calendar contract (spec R-TIME-02, 6.1, R-BOOK-11, 11.2, 11.4).
-// Lengths are JavaScript string lengths (UTF-16 code units, what a textarea's maxlength counts):
-// most emoji count as two. Checked with s.length, not zod's .min/.max, which count code points.
-// Below them: the request bodies (11.4) and the path and query parameters (11.2).
+// The primitive schemas of the calendar contract (docs/SHARED_CALENDAR_SPEC.md R-TIME-02,
+// section 6.1, R-BOOK-11, sections 11.2 and 11.4). Lengths are JavaScript string lengths (UTF-16
+// code units, what a textarea's maxlength counts): most emoji count as two. Checked with s.length,
+// not zod's .min/.max, which count code points. Below them come the request bodies
+// (docs/SHARED_CALENDAR_SPEC.md section 11.4) and the path and query parameters
+// (docs/SHARED_CALENDAR_SPEC.md section 11.2).
 
 // Whether y-m-d is a real date of the (proleptic) Gregorian calendar.
 function isRealDate(y: number, m: number, d: number): boolean {
@@ -26,7 +28,10 @@ export type LocalDate = z.infer<typeof LocalDate>;
 export const LocalTime = z.string().regex(/^([01]\d|2[0-3]):(00|15|30|45)$/, 'expected HH:mm on the 15-minute grid');
 export type LocalTime = z.infer<typeof LocalTime>;
 
-/** A local time that may end a window: the grid of LocalTime, plus `24:00` (midnight at the end of the date). */
+/**
+ * A local time that may end a window: the grid of LocalTime, plus `24:00` (midnight at the end of
+ * the date).
+ */
 export const LocalEndTime = z.union([LocalTime, z.literal('24:00')]);
 export type LocalEndTime = z.infer<typeof LocalEndTime>;
 
@@ -35,8 +40,9 @@ export const Weekday = z.number().int().min(1).max(7);
 export type Weekday = z.infer<typeof Weekday>;
 
 /**
- * An instant in a request (spec 11.4): exactly the toISOString form, seconds and milliseconds zero,
- * a real moment. Server-written timestamps (createdAt, …) keep their seconds and are not checked here.
+ * An instant in a request (docs/SHARED_CALENDAR_SPEC.md section 11.4): exactly the toISOString
+ * form, seconds and milliseconds zero, a real moment. Server-written timestamps (createdAt, …) keep
+ * their seconds and are not checked here.
  */
 export const Instant = z
   .string()
@@ -47,13 +53,13 @@ export const Instant = z
   }, 'not a real instant');
 export type Instant = z.infer<typeof Instant>;
 
-/** A ULID (spec 11.2): 26 characters of Crockford base32. */
+/** A ULID (docs/SHARED_CALENDAR_SPEC.md section 11.2): 26 characters of Crockford base32. */
 export const Ulid = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/, 'expected a ULID');
 export type Ulid = z.infer<typeof Ulid>;
 
 /**
- * An appointment note (R-BOOK-11): trimmed; empty → null; at most 500 characters; no control
- * characters except line feed. Accepts null (no note).
+ * An appointment note (docs/SHARED_CALENDAR_SPEC.md R-BOOK-11): trimmed; empty → null; at most 500
+ * characters; no control characters except line feed. Accepts null (no note).
  */
 export const Note = z
   .string()
@@ -64,7 +70,10 @@ export const Note = z
   .nullable();
 export type Note = z.infer<typeof Note>;
 
-/** An availability type's name (spec 6.1): 1–40 characters after trimming, no control characters. */
+/**
+ * An availability type's name (docs/SHARED_CALENDAR_SPEC.md section 6.1): 1–40 characters after
+ * trimming, no control characters.
+ */
 export const TypeName = z
   .string()
   .trim()
@@ -72,13 +81,15 @@ export const TypeName = z
   .refine((s) => !/\p{Cc}/u.test(s), 'no control characters');
 export type TypeName = z.infer<typeof TypeName>;
 
-// ── Request bodies, path and query parameters (spec 11.2, 11.4) ─────────────────────────────
+// ── Request bodies, path and query parameters ───────────────────────────────────────────────
 //
-// Every object is .strict(): an unknown field is a 400 (spec 11). A schema decides only what is
+// The schemas of docs/SHARED_CALENDAR_SPEC.md sections 11.2 and 11.4. Every object is .strict(): an
+// unknown field is a 400 (docs/SHARED_CALENDAR_SPEC.md section 11). A schema decides only what is
 // malformed by itself. It knows no time zone, no "now", no settings and no stored data, so these
-// are not here: the 15-minute and whole-hour grid of an instant and which one applies (R-BOOK-02:
-// isOnQuarterGrid / isWholeLocalHour in rules.ts, per role, in the handler); overlap among an
-// override's windows (409 availability_overlap); date_in_past; an unknown typeId; count limits.
+// are not here: the 15-minute and whole-hour grid of an instant and which one applies
+// (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02, checked per role in the handler with isOnQuarterGrid /
+// isWholeLocalHour from rules.ts); overlap among an override's windows (409 availability_overlap);
+// date_in_past; an unknown typeId; count limits.
 //
 // The cross-field rules run only on an object whose fields are valid (`when`): a malformed field
 // is reported once, by its own schema, without a second message about the order.
@@ -92,12 +103,15 @@ function onField(field: string, message: string) {
 const endAfterStart = (w: { start: string; end?: string }) => w.end === undefined || w.start < w.end;
 const END_AFTER_START = 'end must be after start';
 
-// An integer setting in its range of spec section 9.
+// An integer setting in its range (docs/SHARED_CALENDAR_SPEC.md section 9).
 function setting(range: { min: number; max: number }) {
   return z.number().int().min(range.min).max(range.max);
 }
 
-/** PUT /calendar/settings: the four editable settings, all required (R-SET-02). */
+/**
+ * PUT /calendar/settings: the four editable settings, all required
+ * (docs/SHARED_CALENDAR_SPEC.md R-SET-02).
+ */
 export const UpdateSettingsBody = z
   .object({
     cancellationNoticeHours: setting(SETTINGS_RANGES.cancellationNoticeHours),
@@ -118,7 +132,10 @@ const windowFields = { start: LocalTime, end: LocalEndTime, typeId: Ulid };
 export const WindowBody = z.object(windowFields).strict().refine(endAfterStart, onField('end', END_AFTER_START));
 export type WindowBody = z.infer<typeof WindowBody>;
 
-/** POST /calendar/patterns, PUT /calendar/patterns/{patternId}: one window per week (R-PAT-02). */
+/**
+ * POST /calendar/patterns, PUT /calendar/patterns/{patternId}: one window per week
+ * (docs/SHARED_CALENDAR_SPEC.md R-PAT-02).
+ */
 export const PatternBody = z
   .object({ ...windowFields, weekday: Weekday, validFrom: LocalDate, validUntil: LocalDate.nullable() })
   .strict()
@@ -126,7 +143,10 @@ export const PatternBody = z
   .refine((p) => p.validUntil === null || p.validFrom <= p.validUntil, onField('validUntil', 'validUntil must not be before validFrom'));
 export type PatternBody = z.infer<typeof PatternBody>;
 
-/** PUT /calendar/overrides/{date}: 0–10 windows; an empty list means "no pattern availability" (R-OVR-01). */
+/**
+ * PUT /calendar/overrides/{date}: 0–10 windows; an empty list means "no pattern availability"
+ * (docs/SHARED_CALENDAR_SPEC.md R-OVR-01).
+ */
 export const OverrideBody = z
   .object({ windows: z.array(WindowBody).max(CALENDAR_LIMITS.overrideWindowsPerDate) })
   .strict();
@@ -140,7 +160,7 @@ export const OneOffWindowBody = z
 export type OneOffWindowBody = z.infer<typeof OneOffWindowBody>;
 
 // Instants; `end` absent means start + 60 minutes. `note` absent and `note: null` differ in a
-// change (R-CHG-03: absent keeps the old note, null clears it).
+// change: absent keeps the old note, null clears it (docs/SHARED_CALENDAR_SPEC.md R-CHG-03).
 const appointmentFields = { start: Instant, end: Instant.optional(), note: Note.optional() };
 
 /** POST /calendar/appointments. Whether `username` and a custom `end` are allowed depends on the role. */
@@ -150,7 +170,10 @@ export const BookBody = z
   .refine(endAfterStart, onField('end', END_AFTER_START));
 export type BookBody = z.infer<typeof BookBody>;
 
-/** POST /calendar/appointments/{appointmentId}/change: the User stays the same (8.4). */
+/**
+ * POST /calendar/appointments/{appointmentId}/change: the User stays the same
+ * (docs/SHARED_CALENDAR_SPEC.md section 8.4).
+ */
 export const ChangeBody = z.object(appointmentFields).strict().refine(endAfterStart, onField('end', END_AFTER_START));
 export type ChangeBody = z.infer<typeof ChangeBody>;
 

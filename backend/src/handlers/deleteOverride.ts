@@ -7,10 +7,11 @@ import { error, noContent, type HttpResponse } from '../lib/http';
 import { log } from '../lib/logger';
 import { validate } from '../lib/validation';
 
-// The status and default text of each refusal (spec 11.3). A delete brings in no type and adds no
-// window: only override_not_found, availability_overlap (the patterns that apply again against the
-// date's one-off windows, 6.5) and availability_conflict happen here; the others are listed because
-// the shared check's type names them.
+// The status and default text of each refusal (docs/SHARED_CALENDAR_SPEC.md section 11.3). A
+// delete brings in no type and adds no window: only override_not_found, availability_overlap (the
+// patterns that apply again against the date's one-off windows, docs/SHARED_CALENDAR_SPEC.md
+// section 6.5) and availability_conflict happen here; the others are listed because the shared
+// check's type names them.
 const REFUSALS = {
   override_not_found: [404, 'No override on this date'],
   type_not_found: [409, 'No availability type with this id'],
@@ -19,14 +20,16 @@ const REFUSALS = {
   availability_conflict: [409, 'Appointments would fall outside the availability'],
 } as const;
 
-// DELETE /calendar/overrides/{date} (docs/SHARED_CALENDAR_SPEC.md 11.1, route 12): the
+// DELETE /calendar/overrides/{date} (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 12): the
 // Administrator only. Removes the override of a date under the calendar lock, so the weekly
-// patterns apply again (R-OVR-02), unless they would overlap a one-off window of the date (R-AV-01)
-// or an appointment that has not ended would fall outside the availability (R-AV-03). One log line
-// with the date and the lock attempts, never the conflicts (14.5).
+// patterns apply again (docs/SHARED_CALENDAR_SPEC.md R-OVR-02), unless they would overlap a one-off
+// window of the date (docs/SHARED_CALENDAR_SPEC.md R-AV-01) or an appointment that has not ended
+// would fall outside the availability (docs/SHARED_CALENDAR_SPEC.md R-AV-03). One log line with the
+// date and the lock attempts, never the conflicts (docs/SHARED_CALENDAR_SPEC.md section 14.5).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
-  // "Now" is read once per request; "today" is its local date in the calendar's zone (R-TIME-04).
+  // "Now" is read once per request; "today" is its local date in the calendar's zone
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-04).
   const now = new Date(started).toISOString();
   const requestId = event.requestContext?.requestId ?? 'unknown';
   const route = event.routeKey;
@@ -40,7 +43,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   if (!claims.ok) return done('unauthorized', claims.response);
   const caller = { username: claims.value.username, role: resolveRole(claims.value.groups) };
 
-  // A broken CalendarTimeZone answers 500 to every request, whatever the role (R-TIME-01).
+  // A broken CalendarTimeZone answers 500 to every request, whatever the role
+  // (docs/SHARED_CALENDAR_SPEC.md R-TIME-01).
   let config: CalendarConfig;
   try {
     config = calendarConfig();
@@ -58,7 +62,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   const { date } = param.value;
 
   // Needs only the path and the clock, so it is answered before the lock, and before looking for
-  // the override: a date before today answers date_in_past whether it has one or not (R-AV-02).
+  // the override: a date before today answers date_in_past whether it has one or not
+  // (docs/SHARED_CALENDAR_SPEC.md R-AV-02).
   if (date < today) {
     return done('conflict', error(409, 'date_in_past', 'The date is in the past'), { ...caller, date });
   }

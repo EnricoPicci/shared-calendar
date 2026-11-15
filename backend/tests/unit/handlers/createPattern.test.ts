@@ -53,6 +53,8 @@ const bound = (pk: string) =>
     .map((call) => call.args[0].input)
     .find((q) => q.ExpressionAttributeValues![':pk'] === pk)!.ExpressionAttributeValues![':from'];
 
+// Test names: AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in its section
+// 18.3).
 describe('createPattern handler', () => {
   it('creates the pattern with a new ULID and "now", and answers 201 with it', async () => {
     const response = await handler(asAdmin());

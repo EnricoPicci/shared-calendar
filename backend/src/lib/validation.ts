@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import { error, type Outcome } from './http';
 
-// The schemas (the username rule of architecture section 4) live in @shared-calendar/shared,
+// The schemas (the username rule of docs/ARCHITECTURE.md section 4) live in @shared-calendar/shared,
 // where the front end uses them too; this turns a rejection into the API's 400 answer.
 export function validate<T>(schema: z.ZodType<T>, value: unknown): Outcome<T> {
   const result = schema.safeParse(value);

@@ -43,6 +43,7 @@ stays at the root.
 ├── package-lock.json            # the ONE lock file of the repository
 ├── tsconfig.base.json           # TypeScript strictness shared by every package (each extends it)
 ├── eslint.config.js             # lint rules for every package
+├── scripts/                     # repository-wide checks: the comment rule of CLAUDE.md ("Comments")
 ├── .nvmrc  .editorconfig  .gitignore
 ├── CLAUDE.md                    # guidance for Claude Code (repository-wide)
 ├── README.md                    # written by plan step 12
@@ -114,6 +115,7 @@ three folders the extra level would add nesting without adding information.
 | A type that only one side uses (a DynamoDB item, an authorizer context, a React prop type) | That side's `src` | Putting it in `shared/` would suggest a contract that does not exist |
 | A document about one component | `docs/` with the component in the file name (`FRONTEND_ARCHITECTURE.md`) | Section 8 |
 | A tool configuration every package needs (lint rule, TypeScript strictness, Node version) | The root | One setting, one place |
+| A check that runs over every package (the comment check of CLAUDE.md, "Comments") | `scripts/` at the root | It reads every package's files; `npm run lint` (root and `-w backend`) runs it |
 | A tool configuration one package needs (Vite, SAM, vitest coverage thresholds) | That package | Each package owns its build |
 
 Two rules carried over from the architecture, unchanged by the move:

@@ -55,6 +55,39 @@ Read both documents before changing anything.
 - The API can never create an administrator, delete one, or set its password.
 - Role resolution: `admin` wins over `user`; a token in neither group gets 403.
 
+## Comments
+
+Applies to every comment in every file: TypeScript, JavaScript, shell, `template.yaml`, the config files.
+
+- A comment says in plain words what the code does or why, so that it can be read without
+  opening a document. A reference to the documentation backs up the comment, it does not replace it.
+- A reference names the document by its path, in the same sentence as the item it points at,
+  every time: `docs/FRONTEND_SERVICES.md section 10.2`, `docs/FRONTEND_SERVICES.md section 8,
+  decision 30`, `docs/FRONTEND_SERVICES.md section 2, rule 9`, `docs/SHARED_CALENDAR_SPEC.md
+  section 8.4`, `docs/SHARED_CALENDAR_SPEC.md R-BOOK-02`, `docs/SHARED_CALENDAR_SPEC.md decision D7`,
+  `docs/SHARED_CALENDAR_SPEC.md AC-36`, `docs/SHARED_CALENDAR_SPEC.md section 11.1, route 16`,
+  `docs/ARCHITECTURE.md section 4`, `docs/IMPLEMENTATION_PLAN.md step 9`. The labelled items count
+  too: requirements `F…` and `N…` (`docs/ARCHITECTURE.md N6`), assumptions `A…` and open points
+  `O…` (`docs/SHARED_CALENDAR_SPEC.md section 22, assumption A5`), approved changes `P…`
+  (`docs/IMPLEMENTATION_PLAN.md`), decisions `D…` and `T…`. Never a nickname
+  ("spec 8.4", "architecture 5.3", "plan step 9") or a bare item ("section 9.4", "(13.2)",
+  "decision 30", "R-BOOK-02"). The reference must exist in that document and say what the comment
+  claims.
+- No history in comments: no version tags ("v6", "spec v14"), no "brief 54", no "since step 51",
+  no "revised", "formerly", "now". A comment describes the code as it is; when it changed is in git
+  and in the documents' change logs.
+- Test names (`describe`, `it`, `test`) are exempt from the path rule: they keep their short
+  references (`'checkChange (8.4, R-CHG-01)'`, `'AC-22: …'`). Instead, each outermost `describe`
+  whose names hold one gets a one-line comment above it naming the document(s), not the items:
+  `// Test names: section numbers, R-… rules and AC-… scenarios are those of
+  // docs/SHARED_CALENDAR_SPEC.md (scenarios in its section 18.3).` History tags are refused in
+  test names too.
+- Enforced by `npm run lint` (root and `-w backend`, so also by `verify`): the ESLint rule
+  `local/doc-references` (`scripts/eslint-doc-references.mjs`) on TypeScript and JavaScript, and
+  `scripts/check-doc-references.mjs` on the `#` comments of shell, YAML and TOML files. Both use
+  `scripts/doc-references.mjs`. The check finds references it cannot follow, an unknown document
+  and history tags; whether a comment is clear stays a matter for review.
+
 ## Cloud safety
 
 - Never run `sam deploy`, `sam delete`, or any `aws` command that creates, changes or
@@ -87,7 +120,10 @@ form works the same. Paths below without a folder are relative to `backend/`.
   `backend` and `frontend`), each with its own coverage threshold.
 - `npm run typecheck -w backend`: `tsc --noEmit` over `src/`, `tests/` and the config files
   (`-w @shared-calendar/shared` for the shared package, which has no Node types).
-- `npm run lint -w backend`: ESLint with the root flat config (`typescript-eslint` recommended).
+- `npm run lint -w backend`: ESLint with the root flat config (`typescript-eslint` recommended, plus
+  the comment rule `local/doc-references`), then `scripts/check-doc-references.mjs` on the `#`
+  comments under `backend/` (section "Comments"). The root `npm run lint` does the same over the
+  whole repository.
 - `npm run test:unit -w backend`: vitest project `unit`, no Docker needed. Runs with v8 coverage and
   fails below 100 % line coverage on `src/lib` (HTML report in `coverage/`, git-ignored).
   `shared/` has the same 100 % threshold on `shared/src`.
@@ -229,7 +265,8 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
 
 - Root: `package.json` (workspaces `shared`, `backend`, `frontend`; delegating scripts; shared dev tools),
   the one `package-lock.json`, `tsconfig.base.json` (strictness every package extends),
-  `eslint.config.js`, `.nvmrc`, `docs/`, `prompts/`.
+  `eslint.config.js`, `.nvmrc`, `docs/`, `prompts/`, and `scripts/` (the comment check:
+  `doc-references.mjs`, `eslint-doc-references.mjs`, `check-doc-references.mjs`; section "Comments").
 - `backend/`: the API. `package.json` (name `backend`, scripts), `template.yaml`,
   `samconfig.toml`, `docker-compose.yml`, `tsconfig.json`, `vitest.config.ts`, and:
   - `src/handlers/`: one Lambda entry point per file.

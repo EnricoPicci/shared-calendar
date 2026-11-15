@@ -9,7 +9,7 @@ export type Claims = {
   groups: string[];
 };
 
-// The context the authorizer (step 5) attaches to every request it allows.
+// The context the authorizer (src/handlers/authorizer.ts) attaches to every request it allows.
 // API Gateway only carries strings, so the groups arrive as a JSON array string.
 const AuthorizerContext = z.object({
   sub: z.string().min(1),
@@ -43,7 +43,7 @@ export function getClaims(event: EventWithAuthorizer): Outcome<Claims> {
   return { ok: true, value: { sub: context.data.sub, username: context.data.username, groups: parsedGroups.data } };
 }
 
-// Role and resolveRole (architecture section 3) live in @shared-calendar/shared.
+// Role and resolveRole (docs/ARCHITECTURE.md section 3) live in @shared-calendar/shared.
 
 // Returns the 403 response to send, or undefined when the caller is in the group.
 export function requireGroup(claims: Claims, group: Role): HttpResponse | undefined {

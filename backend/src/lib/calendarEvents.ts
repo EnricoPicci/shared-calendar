@@ -1,14 +1,16 @@
 import type { Actor, AppointmentStatus, CalendarEventType, CancelReason } from '@shared-calendar/shared';
 
-// The calendar's event items (docs/SHARED_CALENDAR_SPEC.md 15.2; attribute names in architecture
-// 5.3), pure: the ids and the instant are passed in, nothing is read or written here. calendarDb
-// puts the item in the same transaction as the change it records (the transactional outbox of
-// section 15), so either both exist or neither does. Events are never updated or deleted.
+// The calendar's event items (docs/SHARED_CALENDAR_SPEC.md section 15.2; attribute names in
+// docs/ARCHITECTURE.md section 5.3), pure: the ids and the instant are passed in, nothing is read or
+// written here. calendarDb puts the item in the same transaction as the change it records (the
+// transactional outbox of docs/SHARED_CALENDAR_SPEC.md section 15), so either both exist or neither
+// does. Events are never updated or deleted.
 
 /**
- * An appointment as stored (spec 8.1, v9 13.2): the `APPT` item's attributes without its keys, and
- * with `appointmentId`, which the item keeps only in its `SK`. This is the event's `appointment`
- * snapshot. `typeName` and `cancellableUntil` are not stored: they are worked out per response.
+ * An appointment as stored (docs/SHARED_CALENDAR_SPEC.md sections 8.1 and 13.2): the `APPT` item's
+ * attributes without its keys, and with `appointmentId`, which the item keeps only in its `SK`. This
+ * is the event's `appointment` snapshot. `typeName` and `cancellableUntil` are not stored: they are
+ * worked out per response.
  */
 export type AppointmentSnapshot = {
   appointmentId: string;
@@ -33,7 +35,7 @@ export type AppointmentSnapshot = {
   version: number;
 };
 
-/** The event types written so far (step 50 added `appointment.changed`, with `previous`). */
+/** The event types the calendar writes (`appointment.changed` is the one with `previous`). */
 export type WrittenEventType = Extract<
   CalendarEventType,
   'appointment.booked' | 'appointment.cancelled' | 'appointment.changed' | 'appointment.note_updated'
@@ -57,8 +59,9 @@ type EventBase = {
 };
 
 /**
- * An event item (15.2). `previous` exists on `appointment.changed` only (v11): the old appointment
- * as stored after the change (cancelled, `replacedBy` set). The other types have no such key.
+ * An event item (docs/SHARED_CALENDAR_SPEC.md section 15.2). `previous` exists on
+ * `appointment.changed` only: the old appointment as stored after the change (cancelled,
+ * `replacedBy` set). The other types have no such key.
  */
 export type EventItem =
   | (EventBase & { type: SingleEventType })
@@ -102,12 +105,13 @@ function snapshot(a: AppointmentSnapshot): AppointmentSnapshot {
 }
 
 /**
- * The event item of one appointment change (15.2): `PK` `EVENT`, `SK` `<occurredAt>#<eventId>`.
+ * The event item of one appointment change (docs/SHARED_CALENDAR_SPEC.md section 15.2): `PK`
+ * `EVENT`, `SK` `<occurredAt>#<eventId>`.
  * `eventId` is a ULID the caller generates once per request (a lock retry writes the same event);
  * `occurredAt` is the request's "now". The recipients are the appointment's User and the
  * Administrator (a change keeps the User, so `previous` has the same one). The note appears only
  * inside the snapshots. `appointment.changed` adds `previous` after `appointment`; the other types
- * are built exactly as before, without the key.
+ * have no such key.
  */
 export function appointmentEvent(input: EventInput): EventItem {
   const { eventId, occurredAt, appointment } = input;

@@ -57,6 +57,8 @@ afterEach(() => {
 const logLines = () => output.map((line) => JSON.parse(line) as Record<string, unknown>);
 const body = (response: Awaited<ReturnType<Handler>>) => JSON.parse(response.body ?? '') as Record<string, unknown>;
 
+// Test names: R-… rules and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in
+// its section 18.3).
 describe('getCalendarSettings handler', () => {
   it.each([
     { groups: ['user'], role: 'user' },

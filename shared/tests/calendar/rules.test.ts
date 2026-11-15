@@ -14,9 +14,10 @@ import {
   type PatternInput,
 } from '../../src/index';
 
-// Spec 6.5, 6.6, 7, R-BOOK-02, R-CAN-03, and the acceptance scenarios AC-04, AC-07, AC-08 and
-// AC-35 (18.3) at the level of the pure functions. Every expectation is a fixed UTC string, so the
-// tests also run under TZ=America/New_York and TZ=Asia/Kathmandu.
+// docs/SHARED_CALENDAR_SPEC.md sections 6.5, 6.6 and 7, R-BOOK-02, R-CAN-03, and the acceptance
+// scenarios AC-04, AC-07, AC-08 and AC-35 of its section 18.3, at the level of the pure functions.
+// Every expectation is a fixed UTC string, so the tests also run under TZ=America/New_York and
+// TZ=Asia/Kathmandu.
 
 const ROME = 'Europe/Rome';
 const KATHMANDU = 'Asia/Kathmandu'; // +05:45, no daylight-saving time
@@ -26,7 +27,7 @@ const P1 = '01JC00000000000000000PAT01';
 const W1 = '01JC00000000000000000WND01';
 const W2 = '01JC00000000000000000WND02';
 
-// AC-04: every Monday 08:00–12:00 Studio, from 2026-11-01, no end.
+// docs/SHARED_CALENDAR_SPEC.md AC-04: every Monday 08:00–12:00 Studio, from 2026-11-01, no end.
 const MONDAY_STUDIO: PatternInput = { patternId: P1, weekday: 1, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-11-01', validUntil: null };
 
 // definedWindows → toInstantWindows → effectiveWindows → slotsOf: what the back end will do per date.
@@ -47,6 +48,8 @@ function windowOf(date: string, start: string, end: string, zone = ROME) {
   return nth(effectiveOf(date, [], { date, windows: [{ start, end, typeId: STUDIO }] }, [], zone));
 }
 
+// Test names: section numbers, R-… rules and AC-… scenarios are those of
+// docs/SHARED_CALENDAR_SPEC.md (scenarios in its section 18.3).
 describe('definedWindows (6.5)', () => {
   describe('pattern validity (R-PAT-01)', () => {
     it.each([
@@ -117,6 +120,8 @@ describe('definedWindows (6.5)', () => {
   });
 });
 
+// Test names: AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in its section
+// 18.3).
 describe('toInstantWindows', () => {
   it('AC-04: the window of 2026-11-16 is 07:00Z–11:00Z, with its source', () => {
     expect(toInstantWindows('2026-11-16', definedWindows('2026-11-16', [MONDAY_STUDIO], null, []), ROME)).toEqual([
@@ -146,6 +151,8 @@ describe('toInstantWindows', () => {
   });
 });
 
+// Test names: section numbers and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md
+// (scenarios in its section 18.3).
 describe('effectiveWindows (6.6)', () => {
   it('AC-08: a one-off window 12:00–13:00 Studio merges into one window 08:00–13:00 local', () => {
     const oneOff: OneOffInput = { windowId: W1, date: '2026-11-16', start: '12:00', end: '13:00', typeId: STUDIO };
@@ -214,6 +221,8 @@ describe('effectiveWindows (6.6)', () => {
   });
 });
 
+// Test names: R-… rules and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in
+// its section 18.3).
 describe('slotsOf (R-SLOT-01)', () => {
   it('AC-04: the window 08:00–12:00 on 2026-11-16 gives the slots 07, 08, 09, 10Z', () => {
     expect(slotsOf(windowOf('2026-11-16', '08:00', '12:00'), ROME)).toEqual(
@@ -261,7 +270,8 @@ describe('slotsOf (R-SLOT-01)', () => {
       '2026-10-25T02:00:00.000Z', // 03:00 +01:00
     ]);
     expect(slots.map((s) => localTimeOf(s.start, ROME))).toEqual(['01:00', '02:00', '02:00', '03:00']);
-    expect(overlaps(nth(slots, 1), nth(slots, 2))).toBe(false); // the two 02:00 slots cannot hold the same booking
+    // The two 02:00 slots cannot hold the same booking.
+    expect(overlaps(nth(slots, 1), nth(slots, 2))).toBe(false);
   });
 
   it('Asia/Kathmandu (+05:45): a whole local hour is not a whole UTC hour', () => {
@@ -274,6 +284,7 @@ describe('slotsOf (R-SLOT-01)', () => {
   });
 });
 
+// Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('overlaps (R-SLOT-02, R-AV-01)', () => {
   const at = (start: string, end: string) => ({ start: `2026-11-16T${start}:00.000Z`, end: `2026-11-16T${end}:00.000Z` });
 
@@ -295,6 +306,7 @@ describe('overlaps (R-SLOT-02, R-AV-01)', () => {
   });
 });
 
+// Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('isWholeLocalHour and isOnQuarterGrid (R-BOOK-02)', () => {
   it.each([
     ['2026-11-16T08:00:00.000Z', ROME, true, true], // 09:00
@@ -312,6 +324,7 @@ describe('isWholeLocalHour and isOnQuarterGrid (R-BOOK-02)', () => {
   });
 });
 
+// Test names: section numbers and R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('cancellableUntil (R-CAN-03)', () => {
   it('11.7: 24 h before 2026-11-16T09:00Z is 2026-11-15T09:00Z', () => {
     expect(cancellableUntil({ start: '2026-11-16T09:00:00.000Z' }, { cancellationNoticeHours: 24 })).toBe('2026-11-15T09:00:00.000Z');

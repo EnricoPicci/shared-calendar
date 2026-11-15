@@ -7,9 +7,11 @@ import {
   type StateAppointment,
 } from '../../../src/lib/calendarRules';
 
-// The booking rules of spec 8.2, pure. The dates of 18.3: now 2026-11-10T09:00Z (Tuesday, 10:00
-// local), Europe/Rome (UTC+1 in November); pattern Mon 08:00–12:00 Studio from 2026-11-01 (AC-04),
-// so Monday 2026-11-16 has the window 07:00Z–11:00Z and "09:00 local" is 08:00Z.
+// The booking rules of docs/SHARED_CALENDAR_SPEC.md section 8.2, pure. The dates of
+// docs/SHARED_CALENDAR_SPEC.md section 18.3: now 2026-11-10T09:00Z (Tuesday, 10:00 local),
+// Europe/Rome (UTC+1 in November); pattern Mon 08:00–12:00 Studio from 2026-11-01
+// (docs/SHARED_CALENDAR_SPEC.md AC-04), so Monday 2026-11-16 has the window 07:00Z–11:00Z and
+// "09:00 local" is 08:00Z.
 
 const ZONE = 'Europe/Rome';
 const NOW = '2026-11-10T09:00:00.000Z';
@@ -67,6 +69,8 @@ const MON_1100 = '2026-11-16T10:00:00.000Z';
 const MON_1200 = '2026-11-16T11:00:00.000Z';
 const MON_1300 = '2026-11-16T12:00:00.000Z';
 
+// Test names: R-… rules and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in
+// its section 18.3).
 describe('checkBookingTimes (R-BOOK-02)', () => {
   describe('a User', () => {
     it('accepts a whole local hour and fills in end = start + 60 min', () => {
@@ -144,6 +148,8 @@ describe('checkBookingTimes (R-BOOK-02)', () => {
   });
 });
 
+// Test names: section numbers, R-… rules and AC-… scenarios are those of
+// docs/SHARED_CALENDAR_SPEC.md (scenarios in its section 18.3).
 describe('checkBooking (R-BOOK-03..09)', () => {
   describe('the acceptance scenarios (18.3)', () => {
     it('AC-10: alice books Monday 09:00 local: inside the Studio window', () => {

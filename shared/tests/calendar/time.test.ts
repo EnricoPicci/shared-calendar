@@ -1,8 +1,8 @@
 import { addDays, isValidTimeZone, localDateOf, localTimeOf, toInstant, weekdayOf } from '../../src/index';
 
-// Spec R-TIME-02, R-TIME-03, R-TIME-06. Every expectation is a fixed UTC string, so the tests
-// prove the helpers do not depend on the machine's zone: they also run under TZ=America/New_York
-// and TZ=Asia/Kathmandu (plan step 41).
+// The time helpers of docs/SHARED_CALENDAR_SPEC.md R-TIME-02, R-TIME-03 and R-TIME-06. Every
+// expectation is a fixed UTC string, so the tests prove the helpers do not depend on the machine's
+// zone: they also run under TZ=America/New_York and TZ=Asia/Kathmandu.
 
 const ROME = 'Europe/Rome';
 const MINUTE_MS = 60_000;
@@ -11,6 +11,8 @@ function plusMinutes(instant: string, minutes: number): string {
   return new Date(Date.parse(instant) + minutes * MINUTE_MS).toISOString();
 }
 
+// Test names: AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in its section
+// 18.3).
 describe('toInstant', () => {
   it.each([
     ['2026-11-12', '09:00', '2026-11-12T08:00:00.000Z'], // winter, +01:00
@@ -79,7 +81,8 @@ describe('toInstant', () => {
     ['America/New_York', '2026-03-08', '02:30', '2026-03-08T07:30:00.000Z'], // gap: 03:30 EDT
     ['America/New_York', '2026-11-01', '01:30', '2026-11-01T05:30:00.000Z'], // twice: 01:30 EDT
     ['Australia/Lord_Howe', '2026-10-04', '02:15', '2026-10-03T15:45:00.000Z'], // 30-minute gap: 02:45 +11:00
-    ['Australia/Lord_Howe', '2027-04-04', '01:45', '2027-04-03T14:45:00.000Z'], // 30-minute repeat: the earlier, +11:00
+    // 30-minute repeat: the earlier, +11:00.
+    ['Australia/Lord_Howe', '2027-04-04', '01:45', '2027-04-03T14:45:00.000Z'],
     ['UTC', '2027-03-28', '02:30', '2027-03-28T02:30:00.000Z'],
   ])('applies the same rule in %s: %s %s is %s', (zone, date, time, instant) => {
     expect(toInstant(date, time, zone)).toBe(instant);

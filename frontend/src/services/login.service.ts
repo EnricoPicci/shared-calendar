@@ -4,8 +4,9 @@ import { describe, initiateAuth, toAuthOutcome, type AuthOutcome, type CognitoCo
 import type { LoginFailureReason, LoginResult, LoginState } from './login.types';
 import type { SessionStore } from './session.store';
 
-// docs/FRONTEND_SERVICES.md sections 4 and 10.1. Sign-in is a direct call to Cognito's InitiateAuth
-// with USER_PASSWORD_AUTH (architecture sections 3.1 and 6.2); there is no login endpoint in the API.
+// Signs in (docs/FRONTEND_SERVICES.md sections 4 and 10.1) by a direct call to Cognito's
+// InitiateAuth with USER_PASSWORD_AUTH, as in docs/ARCHITECTURE.md sections 3.1 and 6.2; there is
+// no login endpoint in the API.
 
 export type LoginConfig = CognitoConfig;
 
@@ -43,8 +44,8 @@ export class LoginService {
       .subscribe((result) => this.resultSubject.next(result));
   }
 
-  // Writes the session to the store first (section 9.4), then returns the outcome for the
-  // streams, without any token (rule 9).
+  // Writes the session to the store first (docs/FRONTEND_SERVICES.md section 9.4), then returns the
+  // outcome for the streams, without any token (docs/FRONTEND_SERVICES.md section 2, rule 9).
   private settle(outcome: AuthOutcome): LoginResult {
     if (outcome.status === 'success') {
       const { username, role, expiresAt } = outcome.session;

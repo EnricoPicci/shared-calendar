@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// Architecture section 4: 3 to 32 characters, lowercase, starting with a letter or digit.
+// 3 to 32 characters, lowercase, starting with a letter or digit (docs/ARCHITECTURE.md section 4).
 export const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,31}$/;
 export const Username = z.string().regex(USERNAME_PATTERN, 'invalid username');
 

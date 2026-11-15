@@ -5,14 +5,16 @@ import type { Session } from './login.types';
 import type { RefreshFailureReason, RefreshResult, RefreshState } from './refresh.types';
 import type { SessionStore } from './session.store';
 
-// docs/FRONTEND_SERVICES.md section 11. Replaces the session in the store with a fresh access
-// token, by InitiateAuth with REFRESH_TOKEN_AUTH; on demand (refresh) or on a schedule (start).
+// Replaces the session in the store with a fresh access token, by InitiateAuth with
+// REFRESH_TOKEN_AUTH, on demand (refresh) or on a schedule (start) (docs/FRONTEND_SERVICES.md
+// section 11).
 
 export type RefreshConfig = CognitoConfig; // the same values as LoginConfig
 
 const REFRESH_LEAD_MS = 60_000; // refresh one minute before the access token expires
 
-// Section 11.5. Cognito's "not authorized" is a dead refresh token here, not a wrong password.
+// For a refresh, Cognito's "not authorized" is a dead refresh token, not a wrong password
+// (docs/FRONTEND_SERVICES.md section 11.5).
 const REASON: Record<AuthFailureReason, RefreshFailureReason> = {
   not_authorized: 'session_rejected',
   no_role: 'no_role',
@@ -46,7 +48,7 @@ export class RefreshService {
 
     this.pending = this.store.session$
       .pipe(
-        take(1), // the refresh token of the current session, read now (section 9.5)
+        take(1), // the refresh token of the current session, read at the moment of the call
         switchMap((session) =>
           session
             ? initiateAuth(this.config, 'REFRESH_TOKEN_AUTH', { REFRESH_TOKEN: session.refreshToken }).pipe(
@@ -63,7 +65,8 @@ export class RefreshService {
   }
 
   // Automatic refresh: 60 s before each session's expiry, re-armed by every new session and
-  // disarmed by null. One attempt per session, no retry (decision 22).
+  // disarmed by null. One attempt per session, no retry (docs/FRONTEND_SERVICES.md section 8,
+  // decision 22).
   start(): void {
     this.stop();
     this.schedule = this.store.session$
@@ -77,8 +80,9 @@ export class RefreshService {
     this.schedule = undefined;
   }
 
-  // Writes the store first (guarded, section 9.2), then returns the outcome for the streams,
-  // without any token (rule 9).
+  // Writes the store first, with the guarded replace or clear of docs/FRONTEND_SERVICES.md
+  // section 9.2, then returns the outcome for the streams, without any token
+  // (docs/FRONTEND_SERVICES.md section 2, rule 9).
   private settle(started: Session, outcome: AuthOutcome): RefreshResult {
     if (outcome.status === 'success') {
       this.store.replace(started, outcome.session);

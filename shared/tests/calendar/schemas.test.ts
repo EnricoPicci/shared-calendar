@@ -26,8 +26,9 @@ import {
 } from '../../src/index';
 import type { z } from 'zod';
 
-// Spec R-TIME-02, 6.1, R-BOOK-11, 11.2, 11.4: every bound of the primitive schemas, then of the
-// request bodies and the path and query parameters built on them.
+// Every bound of the primitive schemas, then of the request bodies and the path and query
+// parameters built on them (docs/SHARED_CALENDAR_SPEC.md R-TIME-02, section 6.1, R-BOOK-11,
+// sections 11.2 and 11.4).
 
 describe('LocalDate', () => {
   it.each(['2026-11-12', '2028-02-29', '2000-02-29', '2026-12-31', '2027-01-01', '2026-04-30'])('accepts %s', (date) => {
@@ -86,6 +87,7 @@ describe('Weekday', () => {
   });
 });
 
+// Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('Instant', () => {
   it.each(['2026-11-16T08:00:00.000Z', '2026-11-16T08:15:00.000Z', '2028-02-29T23:59:00.000Z'])('accepts %s', (instant) => {
     expect(Instant.safeParse(instant)).toEqual({ success: true, data: instant });
@@ -200,6 +202,7 @@ function rejectedPaths(schema: z.ZodType, input: unknown): string[] {
   return [...new Set(result.error.issues.map((issue) => (issue.path.length === 0 ? '(root)' : issue.path.join('.'))))];
 }
 
+// Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('UpdateSettingsBody', () => {
   const valid = { cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: null };
 
@@ -310,6 +313,7 @@ describe('PatternBody', () => {
   });
 });
 
+// Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('OverrideBody', () => {
   const window = (hour: number) => ({ start: `${String(hour).padStart(2, '0')}:00`, end: `${String(hour).padStart(2, '0')}:30`, typeId: STUDIO });
   const windows = (count: number) => Array.from({ length: count }, (_, i) => window(i + 8));
@@ -358,6 +362,7 @@ describe('OneOffWindowBody', () => {
   });
 });
 
+// Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('BookBody and ChangeBody', () => {
   const start = '2026-11-16T08:00:00.000Z';
 

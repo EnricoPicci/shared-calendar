@@ -4,7 +4,8 @@ import type { Session } from '../../../src/services/login.types';
 import { SessionStore } from '../../../src/services/session.store';
 import { call, json, session } from './fixtures';
 
-// The unit tests every API method gets (docs/FRONTEND_SERVICES.md 15.8, 16.8, 17.8; spec 16.6),
+// The unit tests every API method gets (docs/FRONTEND_SERVICES.md sections 15.8, 16.8 and 17.8;
+// docs/SHARED_CALENDAR_SPEC.md section 16.6),
 // written once and run per method. Not a test file: the unit project selects *.test.ts only.
 // A real SessionStore; fetch stubbed with real Responses; every test subscribes first, then calls.
 
@@ -17,12 +18,13 @@ export type MethodSpec<S> = {
   result$: (service: S) => Observable<Outcome>;
   state$: (service: S) => Observable<unknown>;
   call: (service: S) => void; // a valid call
-  pending: Record<string, unknown>; // the expected pending state (decision 31)
+  // The expected pending state (docs/FRONTEND_SERVICES.md section 8, decision 31).
+  pending: Record<string, unknown>;
   request: { method: string; path: string; body?: unknown }; // body: what is sent (zod's output)
   ok: () => Response;
   success: Record<string, unknown>;
   wrong: [string, () => Response][]; // answers outside the contract: unexpected
-  codes: readonly ApiErrorCode[]; // architecture section 4's row
+  codes: readonly ApiErrorCode[]; // the route's error codes in docs/ARCHITECTURE.md section 4
   notCodes?: readonly ApiErrorCode[]; // codes of other routes that must stay unexpected here
   invalid?: [string, (service: S) => void, string][]; // inputs refused before any request, with the message
 };

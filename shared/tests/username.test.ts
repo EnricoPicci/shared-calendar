@@ -40,6 +40,7 @@ describe('UsernameParam', () => {
   });
 });
 
+// Test names: the architecture is docs/ARCHITECTURE.md, and its section 4 is the API contract.
 describe('USERNAME_PATTERN', () => {
   it('is the pattern of architecture section 4', () => {
     expect(USERNAME_PATTERN.source).toBe('^[a-z0-9][a-z0-9._-]{2,31}$');

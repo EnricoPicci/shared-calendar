@@ -95,7 +95,9 @@ const updatePattern: MethodSpec<S> = {
     'concurrent_update',
     'internal_error',
   ],
-  notCodes: ['limit_reached'], // architecture section 4: an update never adds a pattern (decision 32)
+  // An update never adds a pattern, so docs/ARCHITECTURE.md section 4 lists no limit_reached here
+  // (docs/FRONTEND_SERVICES.md section 8, decision 32).
+  notCodes: ['limit_reached'],
   invalid: [
     ['patternId not a ULID', (s) => s.updatePattern('p1', PATTERN), 'patternId: expected a ULID'],
     ['a bad body', (s) => s.updatePattern(PATTERN_ID, { ...PATTERN, validFrom: '2027-02-30' }), 'validFrom: not a real date'],
@@ -113,7 +115,10 @@ const deletePattern: MethodSpec<S> = {
   success: { status: 'success', patternId: PATTERN_ID },
   wrong: [['200 with the pattern', () => json(200, STORED_PATTERN)]],
   codes: ['forbidden', 'invalid_request', 'pattern_not_found', 'availability_conflict', 'concurrent_update', 'internal_error'],
-  notCodes: ['availability_overlap', 'invalid_json'], // spec 11.1 footnote 1: never answered (decision 32)
+  // Removing a pattern cannot create an overlap (docs/SHARED_CALENDAR_SPEC.md section 11.1,
+  // footnote 1; docs/FRONTEND_SERVICES.md section 8, decision 32), and a delete reads no body, so
+  // invalid_json cannot happen either.
+  notCodes: ['availability_overlap', 'invalid_json'],
   invalid: [['patternId not a ULID', (s) => s.deletePattern(''), 'patternId: expected a ULID']],
 };
 
@@ -197,9 +202,11 @@ const createWindow: MethodSpec<S> = {
     'concurrent_update',
     'internal_error',
   ],
-  notCodes: ['availability_conflict', 'window_not_found'], // a new window never conflicts (R-AV-04)
+  // A new window never conflicts (docs/SHARED_CALENDAR_SPEC.md R-AV-04).
+  notCodes: ['availability_conflict', 'window_not_found'],
   invalid: [
-    ['end 24:15', (s) => s.createWindow({ ...WINDOW, end: '24:15' }), 'end: expected HH:mm on the 15-minute grid'], // the union's first branch
+    // The union's first branch.
+    ['end 24:15', (s) => s.createWindow({ ...WINDOW, end: '24:15' }), 'end: expected HH:mm on the 15-minute grid'],
     ['start 24:00', (s) => s.createWindow({ ...WINDOW, start: '24:00' }), 'start: expected HH:mm on the 15-minute grid'],
     ['typeId missing', (s) => s.createWindow({ ...WINDOW, typeId: undefined } as never), 'typeId: Invalid input: expected string, received undefined'],
   ],
@@ -224,7 +231,8 @@ describe('AvailabilityRulesService', () => {
   const all = [loadPatterns, createPattern, updatePattern, deletePattern, setOverride, deleteOverride, createWindow, deleteWindow];
   all.forEach((spec, i) => describeMethod(make, spec, all[(i + 1) % all.length] as MethodSpec<S>));
 
-  // The routes that can answer availability_conflict hand its list to the view (spec 16.3).
+  // The routes that can answer availability_conflict hand its list to the view
+  // (docs/SHARED_CALENDAR_SPEC.md section 16.3).
   const CONFLICT = { appointmentId: '01JCZZZZZZZZZZZZZZZZZZZZZZ', username: 'alice', start: '2027-10-11T07:00:00.000Z', end: '2027-10-11T08:00:00.000Z' };
   it.each([createPattern, updatePattern, deletePattern, setOverride, deleteOverride, deleteWindow].map((spec) => [spec.name, spec]))(
     '%s: availability_conflict carries conflicts',

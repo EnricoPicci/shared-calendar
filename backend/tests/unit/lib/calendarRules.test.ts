@@ -10,7 +10,7 @@ import {
   type TypeReferences,
 } from '../../../src/lib/calendarRules';
 
-// Pure rules: no clock, no AWS. "Today" and "now" are passed in (R-TIME-04).
+// Pure rules: no clock, no AWS. "Today" and "now" are passed in (docs/SHARED_CALENDAR_SPEC.md R-TIME-04).
 
 const STUDIO = '01JC0000000000000000000001';
 const POOL = '01JC0000000000000000000002';
@@ -23,12 +23,14 @@ describe('typeNameKey', () => {
     expect(typeNameKey('Écoute')).toBe('écoute');
   });
 
-  // Not full Unicode case folding: recorded here so that a change is a decision (step 44 report).
+  // Not full Unicode case folding: recorded here so that changing it is a deliberate decision.
   it('keeps ß and SS apart, as toLowerCase does', () => {
     expect(typeNameKey('Straße')).not.toBe(typeNameKey('STRASSE'));
   });
 });
 
+// Test names: R-… rules and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in
+// its section 18.3).
 describe('checkTypeName on create (R-TYPE-01)', () => {
   it('allows a new name', () => {
     expect(checkTypeName('Pool', [named(STUDIO, 'Studio')])).toBeNull();
@@ -61,6 +63,7 @@ describe('checkTypeName on create (R-TYPE-01)', () => {
   });
 });
 
+// Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('checkTypeName on rename (R-TYPE-02)', () => {
   const existing = [named(STUDIO, 'Studio'), named(POOL, 'Pool')];
 
@@ -82,6 +85,8 @@ describe('checkTypeName on rename (R-TYPE-02)', () => {
   });
 });
 
+// Test names: R-… rules and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in
+// its section 18.3).
 describe('checkTypeDelete (R-TYPE-03)', () => {
   // Europe/Rome, 2026-11-16: today and now as the handler computes them.
   const TODAY = '2026-11-16';
@@ -127,10 +132,13 @@ describe('checkTypeDelete (R-TYPE-03)', () => {
   });
 });
 
-// ── Availability writes (spec 6.5, 6.7) ──────────────────────────────────────────────────────
+// ── Availability writes (docs/SHARED_CALENDAR_SPEC.md sections 6.5 and 6.7) ──────────────────────
 
+// Test names: section numbers, R-… rules and AC-… scenarios are those of
+// docs/SHARED_CALENDAR_SPEC.md (scenarios in its section 18.3).
 describe('checkAvailabilityWrite', () => {
-  // AC-04: now 2026-11-10 (a Tuesday), Europe/Rome (UTC+1 in November).
+  // The scenario of docs/SHARED_CALENDAR_SPEC.md AC-04: now 2026-11-10 (a Tuesday), Europe/Rome
+  // (UTC+1 in November).
   const ZONE = 'Europe/Rome';
   const TODAY = '2026-11-10';
   const NOW = '2026-11-10T09:00:00.000Z';
@@ -138,7 +146,7 @@ describe('checkAvailabilityWrite', () => {
   const P2 = '01JC00000000000000000000P2';
   const W1 = '01JC00000000000000000000W1';
   const W2 = '01JC00000000000000000000W2';
-  // Pattern Mon 08:00–12:00 Studio from 2026-11-01, no end (AC-04).
+  // Pattern Mon 08:00–12:00 Studio from 2026-11-01, no end (docs/SHARED_CALENDAR_SPEC.md AC-04).
   const ac04 = { patternId: P1, weekday: 1, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-11-01', validUntil: null };
   const state = (more: Partial<CalendarState> = {}): CalendarState => ({
     types: [{ typeId: STUDIO }, { typeId: POOL }],
@@ -152,7 +160,7 @@ describe('checkAvailabilityWrite', () => {
     checkAvailabilityWrite(write, s, today, now, ZONE);
   const pattern = (more: object = {}, patternId = P2) => ({ kind: 'pattern' as const, patternId, pattern: { ...ac04, patternId, ...more } });
   const oneOff = (date: string, start: string, end: string, typeId = POOL, windowId = W1) => ({ windowId, date, start, end, typeId });
-  // Monday 2026-11-16, 09:00–10:00 local = 08:00Z–09:00Z (AC-10).
+  // Monday 2026-11-16, 09:00–10:00 local = 08:00Z–09:00Z (docs/SHARED_CALENDAR_SPEC.md AC-10).
   const appt = (more: Partial<StateAppointment> = {}): StateAppointment => ({
     appointmentId: 'A1',
     userId: 'sub-alice',
@@ -436,14 +444,16 @@ describe('checkAvailabilityWrite', () => {
     });
 
     it('looks only at the dates the write touches', () => {
-      // An appointment on a Tuesday with no availability (not possible through the API) is not this write's business.
+      // An appointment on a Tuesday with no availability (not possible through the API) is not this
+      // write's business.
       const tuesday = appt({ start: '2026-11-17T08:00:00.000Z', end: '2026-11-17T09:00:00.000Z', date: '2026-11-17' });
       expect(check({ kind: 'pattern', patternId: P1, pattern: { ...ac04, start: '07:00' } }, state({ appointments: [tuesday] }))).toBeNull();
       expect(check({ kind: 'override', date: '2026-11-23', windows: [] }, state({ appointments: [appt()] }))).toBeNull();
     });
 
     it('an appointment inside merged windows of its type stays (pattern + one-off, 6.6)', () => {
-      // 11:00–13:00 local = 10:00Z–12:00Z, across the pattern (to 12:00) and a one-off window 12:00–13:00 Studio.
+      // 11:00–13:00 local = 10:00Z–12:00Z, across the pattern (to 12:00) and a one-off window
+      // 12:00–13:00 Studio.
       const across = appt({ start: '2026-11-16T10:00:00.000Z', end: '2026-11-16T12:00:00.000Z' });
       const s = state({ appointments: [across], oneOffs: [oneOff('2026-11-16', '12:00', '13:00', STUDIO)] });
       expect(check({ kind: 'pattern', patternId: P1, pattern: { ...ac04, start: '07:00' } }, s)).toBeNull();

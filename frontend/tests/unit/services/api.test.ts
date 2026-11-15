@@ -170,9 +170,10 @@ describe('apiCall', () => {
   });
 });
 
-// v6 (spec 16.1, decisions 29–30): the methods GET, PUT and PATCH, the query string, conflicts.
+// The methods GET, PUT and PATCH, the query string and the `conflicts` list of
+// docs/SHARED_CALENDAR_SPEC.md section 16.1 (docs/FRONTEND_SERVICES.md section 8, decisions 29 and 30).
 
-describe('apiCall, v6', () => {
+describe('apiCall: methods, query string and conflicts', () => {
   it.each([
     ['GET', undefined],
     ['PUT', { name: 'x' }],

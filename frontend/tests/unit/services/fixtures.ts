@@ -7,7 +7,8 @@ function b64url(text: string): string {
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-// An unsigned JWT with the given claims: the services decode, never verify (section 4.5).
+// An unsigned JWT with the given claims: the services decode, never verify
+// (docs/FRONTEND_SERVICES.md section 4.5).
 export function jwt(claims: Record<string, unknown>): string {
   return `${b64url('{"alg":"RS256"}')}.${b64url(JSON.stringify(claims))}.signature`;
 }
@@ -16,7 +17,7 @@ export function json(status: number, body: unknown, contentType = 'application/j
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': contentType } });
 }
 
-// A Cognito 200 with the given tokens (section 4.1).
+// A Cognito 200 with the given tokens (docs/FRONTEND_SERVICES.md section 4.1).
 export function cognitoTokens(result: Record<string, unknown>): Response {
   return json(200, { AuthenticationResult: { ExpiresIn: 900, TokenType: 'Bearer', ...result }, ChallengeParameters: {} }, 'application/x-amz-json-1.1');
 }

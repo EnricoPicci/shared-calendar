@@ -1,10 +1,11 @@
 import { DEFAULT_SETTINGS, toInstant } from '@shared-calendar/shared';
 import { checkChange, type CalendarState, type Caller, type ChangeInput, type StateAppointment } from '../../../src/lib/calendarRules';
 
-// checkChange (spec 8.4 v11, R-CHG-01), pure, on the exact dates of 18.3: Europe/Rome (UTC+1 in
-// November), the pattern Mon 08:00–12:00 Studio from 2026-11-01 (AC-04), alice holds Monday
+// checkChange (docs/SHARED_CALENDAR_SPEC.md section 8.4, R-CHG-01), pure, on the exact dates of
+// docs/SHARED_CALENDAR_SPEC.md section 18.3: Europe/Rome (UTC+1 in November), the pattern Mon
+// 08:00–12:00 Studio from 2026-11-01 (docs/SHARED_CALENDAR_SPEC.md AC-04), alice holds Monday
 // 2026-11-16 09:00 local. "Enough notice" is now 2026-11-10T09:00Z; the notice case is now
-// 2026-11-15T09:01 local (AC-21).
+// 2026-11-15T09:01 local (docs/SHARED_CALENDAR_SPEC.md AC-21).
 
 const ZONE = 'Europe/Rome';
 const NOW = '2026-11-10T09:00:00.000Z';
@@ -65,6 +66,8 @@ const change = (start: string, end: string, more: Request = {}) =>
 const studio = { window: { start: at('08:00'), end: at('12:00'), typeId: STUDIO } };
 const refused = (error: string) => expect.objectContaining({ error });
 
+// Test names: section numbers, R-… rules and AC-… scenarios are those of
+// docs/SHARED_CALENDAR_SPEC.md (scenarios in its section 18.3).
 describe('checkChange (8.4, R-CHG-01)', () => {
   it('AC-22: alice moves 09:00 to 10:00 the same day: allowed, the window is Studio', () => {
     expect(change(H1000, H1100)).toEqual(studio);
@@ -84,7 +87,7 @@ describe('checkChange (8.4, R-CHG-01)', () => {
     expect(change(H0900, H1030, { caller: ADMIN, state: state({ appointments: [OLD, twin] }) })).toEqual(refused('slot_taken'));
   });
 
-  it('a change to exactly the old times is allowed (v11)', () => {
+  it('a change to exactly the old times is allowed', () => {
     expect(change(H0900, H1000)).toEqual(studio);
   });
 
@@ -158,7 +161,7 @@ describe('checkChange (8.4, R-CHG-01)', () => {
     });
   });
 
-  describe('the order (8.4 v11): the old appointment’s code wins', () => {
+  describe('the order (8.4): the old appointment’s code wins', () => {
     const taken = state({ appointments: [OLD, stateAppt(OTHER_ID, H1000, H1100, { userId: 'sub-bob' })] });
 
     it('someone else’s appointment and a taken slot: 404, not 409', () => {

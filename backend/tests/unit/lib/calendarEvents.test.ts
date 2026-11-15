@@ -1,6 +1,6 @@
 import { appointmentEvent, EVENT_SCHEMA_VERSION, type AppointmentSnapshot } from '../../../src/lib/calendarEvents';
 
-// Pure: the ids and the instant are passed in (spec 15.2).
+// Pure: the ids and the instant are passed in (the event item of docs/SHARED_CALENDAR_SPEC.md section 15.2).
 
 const NOW = '2026-11-10T09:00:00.000Z';
 const EVENT_ID = '01M70NR5E0Q7R2C9T5XH3KD8EV';
@@ -29,6 +29,7 @@ const stored: AppointmentSnapshot = {
   version: 1,
 };
 
+// Test names: section numbers are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('appointmentEvent (spec 15.2)', () => {
   it('builds the exact appointment.booked item', () => {
     expect(appointmentEvent({ type: 'appointment.booked', eventId: EVENT_ID, occurredAt: NOW, actor: ADMIN, appointment: stored })).toEqual({
@@ -72,7 +73,7 @@ describe('appointmentEvent (spec 15.2)', () => {
     });
   });
 
-  // Step 49: the cancel and the note write their own types through the same builder, unchanged.
+  // The cancel and the note write their own types through the same builder, unchanged.
   const ALICE = { username: 'alice', role: 'user' } as const;
   const LATER = '2026-11-15T08:00:00.000Z';
 
@@ -119,8 +120,9 @@ describe('appointmentEvent (spec 15.2)', () => {
     expect(JSON.stringify(rest)).not.toContain('Bring shoes');
   });
 
-  // Step 50: appointment.changed carries the new appointment and, in `previous`, the old one as
-  // stored after the change (v11). The three earlier types keep their exact items above, no previous.
+  // appointment.changed carries the new appointment and, in `previous`, the old one as stored after
+  // the change (docs/SHARED_CALENDAR_SPEC.md section 15.2). The three earlier types keep their
+  // exact items above, no previous.
   const NEW_ID = '01M70NR5E0Q7R2C9T5XH3KD8NW';
   const old: AppointmentSnapshot = {
     ...stored,
