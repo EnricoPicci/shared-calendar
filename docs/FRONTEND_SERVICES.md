@@ -1,11 +1,11 @@
-# Front end — The services layer: login, session, refresh, Hello World, users, calendar settings and availability
+# Front end — The services layer: login, session, refresh, Hello World, users and the shared calendar
 
 | | |
 |---|---|
-| Status | v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13); `CalendarService` and `AppointmentsService` follow in plan step 54. v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). Logout is not designed yet |
-| Date | 2026-11-05; v6 2026-11-15 |
-| Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows) |
-| Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), since v6 v12 (sections 3 and 4: the calendar routes as implemented); `docs/SHARED_CALENDAR_SPEC.md` v15 section 16 (v13 when v6 was written); `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/` |
+| Status | v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); **the services layer is complete** for every route of the API. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). Logout is not designed yet |
+| Date | 2026-11-05; v6 and v7 2026-11-15 |
+| Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows); since v7 the calendar view and the appointments |
+| Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), since v6 v12 (sections 3 and 4: the calendar routes as implemented); `docs/SHARED_CALENDAR_SPEC.md` v15 section 16 (v13 when v6 was written), and for v7 sections 8, 11.1 (routes 15–20), 11.2, 11.5, 11.6; `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/` |
 
 ### Change log
 
@@ -17,6 +17,7 @@
 | v4 | 2026-11-05 | Design of the remaining services (brief 32, part A). **Correction:** an expired or invalid token is answered by API Gateway with **403** and its own body `{ "message" }`, not 401 (architecture section 4); 401 means the header is missing. The store is cleared on 401 and on a 403 without an `error` field, and left alone on a handler's 403 (`forbidden`, `cannot_delete_admin`) and on API Gateway's 500 (authorizer outage): sections 9.1, 9.3, 9.4, 9.7, decision 12. The store gains `replace(previous, next)` and `clear(only?)`, so that a late answer cannot overwrite or clear a newer session (section 9.2). Rule 6 gains its one exception: the password `POST /users` generates. New sections, appended so that cited numbers stay valid: 10, the shared building blocks (`cognito.ts`, used by `LoginService` and `RefreshService`; `api.ts`, used by `HelloService` and `UsersService`), with the **known gap** that the API has no CORS configuration (10.3); 11, `RefreshService` (cognito-local implements `REFRESH_TOKEN_AUTH`, checked 2026-11-05); 12, `HelloService`; 13, `UsersService`; 14, the integration journeys. Section 4.8 becomes pointers; decisions 14 to 27. **Tokens live only in the `SessionStore`** (rule 9, decision 28): a login success no longer carries the `Session` but `{ username, role, expiresAt }`, like a refresh success; `LoginService` writes the session to the store and emits the token-free outcome (sections 4.3, 4.6, 4.7, 6, 9.4, 9.7, 10.1; decision 4 revised). This changes `LoginService`'s public result, so its success tests change with it. |
 | v6 | 2026-11-15 | Implemented (brief 54, plan step 53, from `docs/SHARED_CALENDAR_SPEC.md` v13 section 16). `api.ts` (section 10.2): `ApiRequest` is a union, `GET`/`DELETE` without a body and `POST`/`PUT`/`PATCH` with one; `query` encoded with `URLSearchParams`; `ApiFailure.conflicts` with `availability_conflict` only, well-formed entries kept; three helpers for the services, `invalidRequest` (the first schema issue with its field), `unexpectedAnswer` and `hasString`. New services, appended after section 14 so that cited numbers stay valid: 15 `CalendarSettingsService`, 16 `AvailabilityTypesService`, 17 `AvailabilityRulesService`. `UsersService` gains `listUsers()` (`GET /users`), and `deleteUser` the reason `concurrent_update`, which the API answers since plan step 51 (section 13). The journeys file `frontend/tests/integration/calendar.test.ts` with the throw-away User `fe-calendar` (section 14.2). Error codes per route are architecture section 4's; spec 11.1 differed on routes 9 and 10, and its v14 corrects route 9 (decision 32). The journeys keep the settings they read in a git-ignored file until they are written back, so even a killed run is repaired by the next one (decision 35). Decisions 29–37. The unit tests share one per-method suite, `tests/unit/services/suite.ts` (section 14.1). No change to the existing services' behaviour but `deleteUser`'s new reason; no existing test changed. |
 | v5 | 2026-11-05 | Implemented (brief 32, part B); acceptance in section 14.3. What the code fixed that the sketches left open: `api.ts` has two failure builders, `apiFailure(code, …)` for a route's code (and `UsersService`'s check before any request) and `transportFailure(reason, …)` for the five transport reasons, typed `ApiFailure<never>` so that it fits every route (the sketches' `failure<C>`); `toApiAnswer` reads an empty non-2xx body as `{}`, so a 403 without body is also `session_rejected`; `RefreshService` maps Cognito's reasons with a complete `Record<AuthFailureReason, RefreshFailureReason>` (section 11.5 as a table in code). Tests: the store rows "login writes" and "login failure" of section 9.8 live in `login.service.test.ts`, with the service they exercise; the unit tests share `tests/unit/services/fixtures.ts` (unsigned JWTs, `Response` builders, a session factory); RxJS's `timer` schedules with `setInterval`, so tests that fake timers must fake it (the schedule tests fake `setTimeout`, `setInterval` and `Date` only, and flush fetch promises with the real `setImmediate`); a test session must expire within 24.8 days of the clock, or the store's `setTimeout` overflows and fires at once. Section 5 points at section 14.1 for the tree. No design change. |
+| v7 | 2026-11-15 | Implemented (brief 56, plan step 54, from `docs/SHARED_CALENDAR_SPEC.md` v15 section 16). New sections, appended: 18 `CalendarService` (`load(from, to)`, `reload()`, route 15) and 19 `AppointmentsService` (`list`, `book`, `cancel`, `change`, `updateNote`, routes 16–20). **The services layer is complete.** `pending` carries every argument under the contract's names (decision 38); `reload()` re-runs the last `load`'s range, answers `invalid_request` before any load, and shares one pending call with `load` (decision 39). Two stream names differ from spec 16.2, which is not edited: `appointmentsResult$` (spec: `listResult$`) and `updateNoteResult$` (spec: `noteResult$`), by decision 31 (decision 40). Success values and their checks (decision 41); validation with the shared schemas only, nothing that depends on the role or on the server's data (decision 42). Error codes of architecture section 4, which agrees with spec 11.1 on routes 15–20 (decision 44). Journeys (section 14.4): the calendar view, booking, note, change, cancel, `upcoming` and `availability_conflict` end to end; a second throw-away User `fe-calendar-b` for the anonymous `busy` (decided with the user); the appointment blocks set the settings for their run and write them back; the Users are removed before the clean-up; the cancelled appointments, their events and the two deleted-user markers stay as history (decision 43). `suite.ts`: `other` is optional, for a service whose methods share one pending call (decision 45); no existing test changed. Acceptance in section 14.6. |
 
 ---
 
@@ -34,8 +35,8 @@ This document fixes the rules of the services layer, the pattern every service f
 designs the first service, **login** (sections 1 to 8). The later building blocks are added as
 sections of their own, following the same pattern: the session store (9), the shared request
 helpers (10), token refresh (11), Hello World (12), and user administration (13); since v6 the
-calendar settings (15), the availability types (16) and the availability rules (17). The calendar
-view and the appointments follow (plan step 54).
+calendar settings (15), the availability types (16) and the availability rules (17); since v7 the
+calendar view (18) and the appointments (19), which complete the services layer.
 
 The services layer is implemented in `frontend/src/services/` (v2). It was created ahead of the
 front-end architecture document, as the one exception of `docs/FOLDER_STRUCTURE.md` section 7:
@@ -553,6 +554,14 @@ unexpected`).
 | 35 | The calendar journeys (`calendar.test.ts`) never reset the table and never delete or change what they did not create: throw-away User `fe-calendar`; types `fe-calendar …`; dates in a 31-day band from today + 330, each block on a date with no window and no override; a clean-up of windows, overrides and patterns of its types, then its types, before and after; settings written back (also in `afterAll`), and kept until then in `fe-calendar-settings.local.json` (git-ignored) so that the next run writes them back after a killed one; a limit filled by others' data fails with a clear message. `availability_conflict` end to end waits for step 54 | Brief 54, point 6 (plan "How these steps are run": the front-end journeys create only their own items). A free date makes the overlap checks independent of the back-end journeys' patterns. The settings file (added on review of step 53): a run killed during the settings test (no `afterAll`) left the test's values, and nothing in the table says what the earlier values were, so the next run wrote those back (seen in the acceptance, section 14.5). Now the values read are written to the file before the first write and removed after the write-back; `beforeAll` and `afterAll` write back whatever the file holds and remove it. The name matches the repository's `*.local.json` ignore rule. |
 | 36 | `CalendarSettingsService` and `AvailabilityTypesService` serve both roles (routes 1 and 3 are both roles'; their writes answer a User `forbidden`); `AvailabilityRulesService` and `UsersService` are the Administrator's (every route admin only), and `listUsers` joins `UsersService` | Brief 54's open questions. One service per resource, not per role: the API is the authority on roles (section 13.6), and a User needs the settings and the type names for the calendar. |
 | 37 | `deleteUser` accepts `concurrent_update` | Since plan step 51 the delete cancels the User's appointments under the calendar lock, which can be busy (architecture section 4); without the code the answer was `unexpected`. The view may offer "try again". |
+| 38 | `pending` carries every argument of the call under the API contract's names: `load(from, to)` → `{ from, to }`, `reload()` → the `{ from, to }` it reloads, `list(query)` → `{ query }`, `book(booking)` → `{ booking }`, `cancel(appointmentId)` → `{ appointmentId }`, `change(appointmentId, change)` → `{ appointmentId, change }`, `updateNote(appointmentId, note)` → `{ appointmentId, note }`. The arguments as given, not zod's output | Brief 56, design point 1, from decision 31. `cancelState$` and `changeState$` carrying the id is also what spec 16.3 asks. |
+| 39 | `reload()` re-runs the last `load` with the `from` and `to` that load was given, whether it succeeded, failed or was refused before sending (then the same refusal comes again). Before any `load` it answers `invalid_request` "nothing loaded yet" with no request, through `idle` → `pending` → failure (decision 23); that `pending` carries nothing, since there is no range: `CalendarState` has both `{ status: 'pending'; from; to }` and `{ status: 'pending' }`. `load` and `reload` share one pair of streams and one pending call: a new call of either cancels the other's | Brief 56, design point 4. The view calls `reload()` after a write (spec 16.3) without keeping the range itself. One pending call, because both fill the same streams: two answers racing into one `calendarResult$` would let an older range land last. The range-less `pending` was not in the brief; it is the only shape that is honest when no range exists. |
+| 40 | Stream names follow decision 31, not spec 16.2: `calendarResult$`/`calendarState$` (as the spec); `appointmentsResult$`/`appointmentsState$` for `list` (spec: `listResult$`; a load is named after what it loads); `bookResult$`, `cancelResult$`, `changeResult$` (as the spec); `updateNoteResult$`/`updateNoteState$` for `updateNote` (spec: `noteResult$`; a write is named after its method). The spec is not edited | Brief 56, design point 3, decided with the user. Spec 16 is historical for these services once this document has them (decision 32). |
+| 41 | Success values: `{ status: 'success', calendar }`, `{ appointments }`, `{ appointment }` (book, cancel, note), `{ cancelled, booked }` (change). Checked by hand: the status (200; 201 for book and change); the top-level shape (an object; the arrays `days` and `appointments` of the view; the array under `appointments` of the list; both objects of a change); the ids (`timeZone`, `from`, `to` of the view; `appointmentId` of an appointment, of each listed one, of both halves of a change). The rest is trusted to the contract; anything else is `unexpected` | Brief 56, design point 2; decision 34 applied to routes 15–20. The view is the server's answer for the caller's role (spec 11.6): the service does not reshape or re-check it per role. |
+| 42 | Validation before sending with the shared schemas only (decision 33): `CalendarQuery`, `AppointmentsQuery`, `BookBody`, `ChangeBody`, `AppointmentIdParam` then `NoteBody` (path first). What is sent is zod's parsed output: `status=booked` added by `AppointmentsQuery`'s default, the trimmed note (a blank note sent as `null`), no absent query key. Not checked, though the session knows the role: a User's whole-hour times and `end`, the Administrator's missing `username` (the API answers `invalid_request`, a route code); nor what only the server knows (notice, horizon, availability, taken slots, limits, ownership, a past start) | Brief 56, design point 5. A role-dependent check in the front end would be a second copy of R-BOOK-01/02 that can drift; the API is the authority on roles (section 13.6). |
+| 43 | The appointment journeys: each appointment block sets the settings for its own run in its `beforeAll` (`bookingHorizonDays` 365, `minBookingNoticeHours` 0, `maxFutureAppointmentsPerUser` `null`, `cancellationNoticeHours` as read) and writes the values read back in its `afterAll`, with the settings file of decision 35. A second throw-away User, `fe-calendar-b`, created and removed with `fe-calendar`, is booked only by the Administrator, so that `fe-calendar`'s view has another User's appointment to show as `busy`. Both Users are removed **before** the clean-up of types and availability, in `beforeAll` and in `afterAll`. Appointments cannot be deleted through the API: the cancelled appointments, their events and the two Users' deleted-user markers stay in the local table as history | Brief 56, design point 6 (a User must book about a year ahead, the band of decision 35). `fe-calendar-b`: decided with the user during step 54; `busy` holds only *other* Users' appointments, so one User cannot prove "busy without names". The order: a booked appointment blocks deleting its pattern (`availability_conflict`) and its type (R-TYPE-03), and deleting a User cancels its future appointments first (architecture section 4), so after a failed run only that order clears everything. |
+| 44 | The error codes of routes 15–20 are architecture section 4's; they agree with spec 11.1 (checked in step 54, no difference). `concurrent_update` is a normal reason of book, cancel, change and note (spec 16.3). `user_not_found` is one reason for both of its 404s, an unknown target of the Administrator's booking and a deleted User (R-BOOK-10, also on a change). `cancel` has no `invalid_json` (the route reads no body, none is sent); `list` and the view have none either (a `GET`) | Brief 56, "The step". One reason per meaning for the view, as decision 32 did for `type_not_found`. |
+| 45 | `describeMethod`'s `other` is optional; without it the cancel test proves only that a second call aborts the first. The suite runs for `reload` on a service whose last range is primed without a request (`Reflect.set` of the private `last`), so its counts start clean | Step 54: `load` and `reload` share one pending call (decision 39), so the suite's "another method stays pending" does not apply to `CalendarService`; the shared-call behaviour has its own tests (section 18.8). The change keeps every existing call of the suite as it was. |
 
 ---
 
@@ -1666,13 +1675,18 @@ frontend/src/services/
 ├── availability-types.service.ts  # AvailabilityTypesService (16, v6)
 ├── availability-types.types.ts    # Types / CreateType / RenameType / RemoveType …
 ├── availability-rules.service.ts  # AvailabilityRulesService (17, v6)
-└── availability-rules.types.ts    # Patterns / CreatePattern / … / DeleteWindow …
+├── availability-rules.types.ts    # Patterns / CreatePattern / … / DeleteWindow …
+├── calendar.service.ts            # CalendarService (18, v7)
+├── calendar.types.ts              # CalendarFailureReason, CalendarResult, CalendarState
+├── appointments.service.ts        # AppointmentsService (19, v7)
+└── appointments.types.ts          # Appointments / Book / Cancel / Change / UpdateNote …
 
 frontend/tests/
 ├── unit/services/        # one file per source file: session.store, cognito, api, jwt,
 │                         # login.service, refresh.service, hello.service, users.service,
 │                         # calendar-settings.service, availability-types.service,
-│                         # availability-rules.service (v6);
+│                         # availability-rules.service (v6); calendar.service,
+│                         # appointments.service (v7);
 │                         # plus fixtures.ts (v5): JWT, Response and session builders,
 │                         # and suite.ts (v6): the per-method suite of the API services
 └── integration/
@@ -1680,7 +1694,7 @@ frontend/tests/
     │                      # since v6 also `outcome()`, used by calendar.test.ts
     ├── login.service.test.ts  # the same journeys; tokens read from the store (section 9.9)
     ├── journeys.test.ts   # sections 11.9, 12.9, 13.9, in order
-    └── calendar.test.ts   # v6: sections 13.9 (listUsers), 15.9, 16.9, 17.9 (section 14.4)
+    └── calendar.test.ts   # v6: sections 13.9 (listUsers), 15.9, 16.9, 17.9; v7: 18.9, 19.9 (section 14.4)
 ```
 
 `local.ts` and `suite.ts` are helpers, not tests (both projects select `*.test.ts` only). Nothing
@@ -1699,7 +1713,9 @@ codes → `unexpected`; the wrong answers → `unexpected`; `session_rejected` (
 network then success; **cancel**: a second call aborts the first, while a pending call of `other`
 (another method of the same service) is not aborted; late subscriber; no token in any value.
 Behaviour that only some methods have (the conflicts list, `deleteUser`'s v5 tests) stays in the
-service's own test file.
+service's own test file. Since v7 `other` is optional: `CalendarService`'s `load` and `reload` share
+one pending call, so there is no other method to leave pending, and without `other` the cancel test
+checks that the second call aborts the first (decision 45).
 
 ### 14.2 The journeys
 
@@ -1751,27 +1767,45 @@ Journey 13 needs the `REFRESH_TOKEN_AUTH` of cognito-local, checked in section 1
 3. `DYNAMODB_PORT=8002 npm run verify -w backend`: PASSED, with the back end's 13 journeys after
    the front end's; `git status` shows no change in `backend/` or `shared/`.
 
-### 14.4 The calendar journeys (v6)
+### 14.4 The calendar journeys (v6, v7)
 
-`frontend/tests/integration/calendar.test.ts` (plan step 53; step 54 adds the calendar view and
-the appointments). The local `calendar` table is shared with the back end's journeys, which empty
+`frontend/tests/integration/calendar.test.ts` (plan step 53; since v7, plan step 54, also the
+calendar view and the appointments). The local `calendar` table is shared with the back end's journeys, which empty
 it at their start and leave their data at their end, and with the smoke test (spec 18.2, 18.4).
 So this file, unlike the back end's, **never resets the table**, and never deletes or changes what
 it did not create (decision 35):
 
-- **Its throw-away User** is `fe-calendar`, created and removed through `UsersService` as admin,
-  before (accepting `user_not_found`) and after, as `fe-journey` in section 14.2.
+- **Its throw-away Users** are `fe-calendar` and, since v7, `fe-calendar-b`, created and removed
+  through `UsersService` as admin, before (accepting `user_not_found`) and after, as `fe-journey` in
+  section 14.2. `fe-calendar` signs in and books as a real User; `fe-calendar-b` never signs in: the
+  Administrator books for it, so that `fe-calendar` has another User's appointment to see as `busy`
+  (decision 43). The journeys book only for these two.
 - **Its types** are named `fe-calendar …`. Its patterns, overrides and one-off windows use only
   those types.
 - **Its dates** lie in a band of 31 days from today + 330 (today in the calendar's zone, from the
   settings), far from the smoke test's 50–80 days and from the back-end journeys' dates. Each block
   takes a date of the band that has **no window and no override** in the Administrator's view
-  (`GET /calendar` through `apiCall`, since `CalendarService` is step 54's), so nothing it does not
+  (`GET /calendar` through `CalendarService`), so nothing it does not
   own can overlap there. A pattern has `validFrom` = `validUntil` = that date and its weekday.
-- **Clean-up**, in `beforeAll` and `afterAll`: the one-off windows of its types on the band, the
-  band's overrides whose windows are all of its types (it never sets an empty override, which it
-  could not tell apart from someone else's), the patterns of its types, then its types (R-TYPE-03
-  needs the references gone first). A run that failed half-way is repeated without a manual step.
+- **Clean-up**, in `beforeAll` and `afterAll`, in this order: first the two Users (v7: deleting a
+  User cancels its future appointments, architecture section 4, `DELETE /users/{username}`; a booked
+  appointment would block deleting its pattern with `availability_conflict` and its type by
+  R-TYPE-03); then the one-off windows of its types on the band, the band's overrides whose windows
+  are all of its types (it never sets an empty override, which it could not tell apart from someone
+  else's), the patterns of its types, then its types (R-TYPE-03 needs the references gone first).
+  `afterAll` writes the settings back first, then removes the Users, then cleans up. A run that
+  failed half-way is repeated without a manual step.
+- **Settings for booking** (v7, decision 43): each appointment block (`calendar view`,
+  `appointments`, `availability conflict`) reads the settings in its `beforeAll`, keeps them in the
+  settings file below, and sets `bookingHorizonDays` 365, `minBookingNoticeHours` 0 and
+  `maxFutureAppointmentsPerUser` `null` (`cancellationNoticeHours` keeps the value read: the body
+  needs all four, and at most 720 hours cannot block a cancel 330 days ahead); its `afterAll` writes
+  the values read back. Each block's test makes its own type and a pattern 08:00–12:00 local on a
+  free date, books, and cancels and removes everything at its end.
+- **What stays behind** (v7): appointments cannot be deleted through the API. The cancelled
+  appointments (`cancelled`, `changed`, and `user_deleted` after a failed run), their events and the
+  deleted-user markers of `fe-calendar` and `fe-calendar-b` stay in the local table as history, as
+  the smoke test's do. Nothing booked, no type, pattern, override or window of the journeys stays.
 - **Settings**: read first, written with other values, read back as a User, then written back with
   the values read; `afterAll` writes them back too when a failure came between. `updatedAt` and
   `updatedBy` stay changed, which is acceptable locally. The values read are kept in
@@ -1804,10 +1838,16 @@ it did not create (decision 35):
 | | create on yesterday | `date_in_past` |
 | | create with `end` before `start` | `invalid_request`, `end: end must be after start`; no request sent |
 | users | admin lists; `fe-calendar` lists | the list has `fe-calendar` and `alice`, not `admin`; `forbidden` |
+| calendar view (v7) | admin books 08:00 for `fe-calendar` and 10:00 for `fe-calendar-b` (with a note); admin loads the week; `fe-calendar` loads it; admin cancels `fe-calendar-b`'s; `fe-calendar` reloads | admin: 7 days, the window with `source` `pattern` and its `patternId`, `hasOverride: false`, `busy: []`, both appointments with their usernames and `cancellableUntil: null`. User: the window without `source`/`sourceId`, no `hasOverride`, slots 09:00 and 11:00, `busy` one bare `{ start, end }` at 10:00, only its own appointment (with `cancellableUntil`), and nowhere `fe-calendar-b`, its appointment id or its note. After the reload: `busy: []`, slots 09:00, 10:00, 11:00 |
+| | load 32 days; `reload()` on a new service | `invalid_request`, `to: the range spans more than 31 days`; `invalid_request`, `nothing loaded yet`; no request sent |
+| appointments (v7) | `fe-calendar` books 08:00; admin books 08:00 for `fe-calendar-b`; admin books 10:00–10:30 for `fe-calendar`; `fe-calendar` sets the note `  Bring shoes  `, changes to 09:00, changes the old one again; `upcoming` as the User and as admin with `username=fe-calendar`; the date with `status=all`; `fe-calendar` cancels, cancels again; admin cancels the other | `success` (`createdBy` the User, `cancellableUntil` set); `slot_taken`; `success` (custom end, `createdBy` admin); `success`, note trimmed; `success`, `cancelled` with `cancelReason: changed` and `replacedBy`, `booked` with `replaces` and the note kept; `appointment_not_active`; both lists the two booked ones (the User's with `cancellableUntil`, the admin's with `null`); old cancelled, two booked; `success` `cancelled` by the User; `appointment_not_active`; `upcoming` empty on that date |
+| | `fe-calendar` books at 08:15 | `invalid_request` from the API: one request sent (decision 42) |
+| | `fe-calendar` lists with `username=fe-calendar-b`; cancels an unknown ULID; sets a 501-character note | `forbidden`; `appointment_not_found`; `invalid_request`, `note: at most 500 characters`, no request sent |
+| availability conflict (v7) | `fe-calendar` books 08:00; admin sets an override with only 10:00–12:00; admin deletes the pattern; then `fe-calendar` cancels and the pattern and type are removed | `availability_conflict` with `conflicts: [{ appointmentId, username: 'fe-calendar', start, end }]`, twice; the date still has no override; the removals succeed (a cancelled appointment blocks nothing) |
 
-`availability_conflict` needs a booked appointment, which only step 54's `AppointmentsService`
-makes: its end-to-end proof waits for step 54; here the unit tests prove the mapping and
-`conflicts` (sections 10.4 and 17.8).
+`availability_conflict` end to end (v7): the block "availability conflict" above, with the booked
+appointment that `AppointmentsService` makes; the unit tests prove the mapping and `conflicts`
+(sections 10.4 and 17.8).
 
 ### 14.5 Acceptance check (v6, plan step 53)
 
@@ -1839,6 +1879,45 @@ makes: its end-to-end proof waits for step 54; here the unit tests prove the map
    variant, repeated with the file: `afterAll` wrote them back and removed it; snapshot identical.
 4. Root `DYNAMODB_PORT=8002 npm run verify`: PASSED (back end 1087 unit + 90 integration, `shared`
    377, front end 450); `git status` shows no change in `backend/` or `shared/`.
+
+### 14.6 Acceptance check (v7, plan step 54)
+
+1. `npm run verify -w frontend` green with 100 % line coverage on `frontend/src`.
+2. `RUN_INTEGRATION=1 npm run test:integration -w frontend` green twice in a row, and again after
+   `RUN_INTEGRATION=1 DYNAMODB_PORT=8002 npm run test:integration -w backend` (never at the same
+   time); after the runs the calendar holds nothing of the journeys but the history of section
+   14.4, and the settings are as before.
+3. A run that fails in the middle of an appointment block, with the settings changed and an
+   appointment booked, then a normal run that passes.
+4. The root `DYNAMODB_PORT=8002 npm run verify` green; no diff in `backend/` or `shared/`.
+
+**As run (2026-11-15, v7):**
+
+1. `npm run verify -w frontend`: typecheck, lint, 639 unit tests in 13 files (450 before; none of
+   them changed, `suite.ts` gained the optional `other` of decision 45), 100 % lines (branches
+   99.65 %: the one of v5, in `cognito.ts`).
+2. Integration (`calendar.test.ts`: 27 tests; with the two v5 files 46): green twice in a row, then
+   green after the back end's 90 journeys. A read-only snapshot through the API as admin (settings
+   without `updatedAt`, type names, pattern ids, the band's windows and overrides, `GET /users`, the
+   booked `upcoming` appointments of `fe-calendar` and `fe-calendar-b`) was identical before and
+   after each time. A read-only scan of DynamoDB Local after the run that followed the back end's
+   journeys: items naming the journeys' Users were 6 cancelled `APPT`, their 12 events (5 booked, 5
+   cancelled, 1 changed, 1 note updated) and the 2 deleted-user markers; no type, pattern, override
+   or window.
+3. Forced failures, each from a temporary untracked copy of the file in
+   `frontend/tests/integration/` (so that it shares the settings file), removed after the run;
+   the committed test was never edited. **Thrown** right after the `slot_taken` check of the
+   "appointments" block (settings at 48 / 0 / 365 / `null`, one appointment booked): `afterAll` wrote
+   the settings back, removed both Users (the appointment cancelled `user_deleted`) and cleaned
+   up; the next normal run passed, snapshot identical. **Killed** (`SIGKILL` of the test worker at
+   the same point, so no `afterAll`): it left the settings at 48 / 0 / 365 / `null`, the settings
+   file, the type `fe-calendar Appointments`, its pattern, both Users and a booked appointment; the
+   next normal run wrote the file's values back, removed the Users (cancelling the appointment),
+   the pattern and the type, and passed; snapshot identical. The first run of the new file also
+   failed in that block, unforced (a check that the next fix narrowed to the test's own ids): it
+   left nothing either.
+4. Root `DYNAMODB_PORT=8002 npm run verify`: PASSED (back end 1087 unit + 90 integration, `shared`
+   377, front end 639); `git status` shows no change in `backend/` or `shared/`.
 
 ---
 
@@ -2125,3 +2204,214 @@ unknown field, ids that are not ULIDs, `2027-02-29`, a date with a time, 11 wind
 
 Section 14.4, blocks "patterns", "overrides" and "one-off windows". `availability_conflict` end to
 end waits for step 54.
+
+---
+
+## 18. `CalendarService` (v7)
+
+### 18.1 The remote call
+
+| Call | Request | Success | Errors (architecture section 4) |
+|---|---|---|---|
+| `load(from, to)` | `GET /calendar?from=…&to=…`, no body; **both roles** | `200` `CalendarView` | 400 `invalid_request`, 403 `forbidden` (neither group), 500 `internal_error` |
+| `reload()` | the same request with the last `load`'s `from` and `to` | the same | the same; before any `load`, `invalid_request` without a request |
+
+`from` and `to` are local dates, inclusive, at most 31 days (spec 11.2). The view is built by the
+server for the caller's role (spec 11.6): the Administrator's windows carry `source` and `sourceId`
+and each day `hasOverride`, its `appointments` are everyone's with names and `busy` is `[]`; a
+User's windows carry neither, its `appointments` are its own (with `cancellableUntil`) and `busy`
+holds the others' as bare intervals. The service passes the view on as received.
+
+### 18.2 Configuration
+
+As section 15.2.
+
+### 18.3 Types (`calendar.types.ts`)
+
+```ts
+type CalendarCode = Extract<ApiErrorCode, 'forbidden' | 'invalid_request' | 'internal_error'>;
+export type CalendarFailureReason = CalendarCode | TransportFailureReason;
+export type CalendarResult = { status: 'success'; calendar: CalendarView } | ApiFailure<CalendarCode>;
+export type CalendarState =
+  | { status: 'idle' }
+  | { status: 'pending'; from: string; to: string }
+  | { status: 'pending' } // reload() before any load: no range (decision 39)
+  | CalendarResult;
+```
+
+### 18.4 The class
+
+One pair, `calendarResult$` / `calendarState$`, for both methods (decision 40), and one pending
+call: a new `load` or `reload` cancels the pending one of either (decision 39).
+
+- `load(from, to)` remembers `{ from, to }` as given, then parses `{ from, to }` with the shared
+  `CalendarQuery` (decision 42). On failure it answers `invalid_request` with the field
+  (`to: from must not be after to`, `to: the range spans more than 31 days`, `from: not a real
+  date`), with no request sent; on success it sends the parsed `from` and `to` as the query.
+  `pending` carries `{ from, to }`.
+- `reload()` runs the remembered range again, whatever the last load's outcome (decision 39); its
+  `pending` carries that range. Before any `load`: `pending` without a range, then
+  `invalid_request` `nothing loaded yet`, no request.
+
+The service does not check what the view depends on (the role, the calendar's "today"); nor does
+it refresh itself after a write: the view calls `reload()` (spec 16.3).
+
+### 18.5 Mapping the answer
+
+| Answer | Result |
+|---|---|
+| the range fails `CalendarQuery`; or `reload()` before any `load` | `invalid_request`, no request |
+| `200` with an object whose `timeZone`, `from`, `to` are strings and whose `days` and `appointments` are arrays | `success`, `calendar` |
+| any other 2xx | `unexpected` |
+| an `error` code of the route | that code |
+| everything else | section 10.2 |
+
+### 18.6 Use from the view layer
+
+```ts
+const calendar = new CalendarService({ apiUrl }, store);
+calendar.calendarState$.subscribe((s) => {
+  spinner.hidden = s.status !== 'pending';
+  if (s.status === 'success') week.render(s.calendar); // times in s.calendar.timeZone (spec 16.8)
+});
+calendar.load(monday, sunday);
+appointments.bookResult$.subscribe((r) => { if (r.status === 'success') calendar.reload(); });
+```
+
+A week is seven dates (`from` a Monday, `to` + 6, with `addDays` from `shared/`). After a write
+that failed with `network` or `server`, the view reloads too: the server may have applied it
+(spec 16.3).
+
+### 18.7 Security notes
+
+A User's view carries the User's own notes and appointment ids, and other Users' appointments only
+as anonymous `busy` intervals (spec 17); the Administrator's carries everyone's usernames and notes,
+personal data: never logged (rule 6, spec 16.5). The token rules are those of section 10.2.
+
+### 18.8 Unit tests (`calendar.service.test.ts`)
+
+The per-method suite of section 14.1 for `load` and for `reload`, without `other` (decision 45):
+`load` with `GET /calendar?from=…&to=…`, its three codes, `invalid_json` and `concurrent_update`
+→ `unexpected`, wrong answers (a 201, `timeZone`, `from` or `to` missing or not a string, `days` or
+`appointments` missing or not an array, an empty 200), invalid ranges (from after to, 32 days,
+`2027-02-29`, `to` missing); `reload` on a service primed with that range. Then: `reload()` before
+any `load` (pending without a range, `invalid_request`, no fetch); after a successful load, after a
+failed load and after a load refused before sending (the same range, or the same refusal); the
+newest load's range wins; a `load` cancels a pending `reload` and a `reload` a pending `load`, one
+result each.
+
+### 18.9 Integration checks
+
+Section 14.4, block "calendar view".
+
+---
+
+## 19. `AppointmentsService` (v7)
+
+### 19.1 The remote calls
+
+Both roles; `cancel`, `change` and `updateNote` act on the caller's own appointment, or on any for
+the Administrator (someone else's is `appointment_not_found`, spec R-PERM-01). Codes from
+architecture section 4, which agrees with spec 11.1 on these routes (decision 44).
+
+| Call | Request | Success | Errors besides 403 `forbidden`, 500 `internal_error` |
+|---|---|---|---|
+| `list(query)` | `GET /calendar/appointments?…`, `AppointmentsQuery` | `200` `{ appointments: Appointment[] }` by start | 400 `invalid_request` · 403 `forbidden` also for a User naming another `username` |
+| `book(booking)` | `POST /calendar/appointments`, `BookBody` | `201` `Appointment` | 400 `invalid_json` / `invalid_request` · 404 `user_not_found` · 409 `target_not_user`, `booking_in_past`, `booking_notice_too_short`, `booking_beyond_horizon`, `outside_availability`, `slot_taken`, `appointment_limit_reached`, `concurrent_update` |
+| `cancel(appointmentId)` | `POST /calendar/appointments/{appointmentId}/cancel`, no body | `200` `Appointment` (cancelled) | 400 `invalid_request` · 403 `cancellation_notice_too_short` · 404 `appointment_not_found` · 409 `appointment_not_active`, `concurrent_update` |
+| `change(appointmentId, change)` | `POST /calendar/appointments/{appointmentId}/change`, `ChangeBody` | `201` `{ cancelled, booked }` | 400 `invalid_json` / `invalid_request` · 403 `cancellation_notice_too_short` · 404 `appointment_not_found`, `user_not_found` · 409 `appointment_not_active`, the six booking codes of `book`, `concurrent_update` |
+| `updateNote(appointmentId, note)` | `PATCH /calendar/appointments/{appointmentId}`, `{ note }` | `200` `Appointment` | 400 `invalid_json` / `invalid_request` · 404 `appointment_not_found` · 409 `appointment_not_active`, `concurrent_update` |
+
+`user_not_found` is one reason for both of its 404s: an unknown target of the Administrator's
+booking, and a User deleted meanwhile (R-BOOK-10, on `book` and `change`). `concurrent_update` is a
+normal reason: the view may offer "try again" (spec 16.3).
+
+### 19.2 Configuration
+
+As section 15.2.
+
+### 19.3 Types (`appointments.types.ts`)
+
+One `…FailureReason`, `…Result` and `…State` per method. Success values (decision 41): `{
+appointments }`, `{ appointment }` (book, cancel, note), `{ cancelled, booked }` (change). `pending`
+(decision 38): `{ query }`, `{ booking }`, `{ appointmentId }`, `{ appointmentId, change }`, `{
+appointmentId, note }`, the arguments as given. `list` takes an `AppointmentsQueryInput`, the
+shared `AppointmentsQuery` with `status` optional (the schema's default fills it).
+
+### 19.4 The class
+
+Five pairs (decision 40): `appointmentsResult$` / `appointmentsState$` for `list`, `bookResult$` /
+`bookState$`, `cancelResult$` / `cancelState$`, `changeResult$` / `changeState$`,
+`updateNoteResult$` / `updateNoteState$`, each cancelling only its own pending call. Validation
+before sending (decision 42), path first, then body:
+
+| Method | Schemas | Sent |
+|---|---|---|
+| `list` | `AppointmentsQuery` | the parsed query without absent keys, in the schema's order: `status=booked` when the caller left it out |
+| `book` | `BookBody` | the parsed body (the note trimmed, a blank one `null`) |
+| `cancel` | `AppointmentIdParam` | no body |
+| `change` | `AppointmentIdParam`, then `ChangeBody` | the parsed body; no `note` key keeps the old note, `null` clears it (R-CHG-03) |
+| `updateNote` | `AppointmentIdParam`, then `NoteBody` | `{ note }` parsed |
+
+The messages name the field: `upcoming: expected either from and to, or upcoming=true`, `to: the
+range spans more than 92 days`, `end: end must be after start`, `note: at most 500 characters`,
+`appointmentId: expected a ULID`. What depends on the role (a User's whole hours and fixed `end`,
+the Administrator's required `username`) is sent and answered by the API (`invalid_request`, a
+route code); what only the server knows (notice, horizon, availability, taken slots, limits,
+ownership, a start in the past) likewise.
+
+### 19.5 Mapping the answer
+
+| Answer | Result |
+|---|---|
+| the input fails its schema | `invalid_request` with the field, no request |
+| `list`: `200` with an array `appointments`, every element with a string `appointmentId` | `success`, `appointments` |
+| `book` `201`, `cancel` `200`, `updateNote` `200`: an object with a string `appointmentId` | `success`, `appointment` |
+| `change` `201`: `cancelled` and `booked`, each an object with a string `appointmentId` | `success`, `cancelled`, `booked` |
+| any other 2xx | `unexpected` |
+| an `error` code of the route | that code |
+| everything else | section 10.2 |
+
+### 19.6 Use from the view layer
+
+The book dialog, the appointment detail and "my appointments" of spec 16.8:
+
+```ts
+const appts = new AppointmentsService({ apiUrl }, store);
+appts.appointmentsState$.subscribe((s) => { if (s.status === 'success') myList.render(s.appointments); });
+appts.list({ upcoming: 'true' }); // a User's next appointments; status=booked by default
+appts.cancelState$.subscribe((s) => {
+  if (s.status === 'pending') detail.busy(s.appointmentId);
+  if (s.status === 'failure' && s.reason === 'cancellation_notice_too_short') detail.explain(s.message);
+  if (s.status === 'success') calendar.reload(); // no service refreshes another (spec 16.3)
+});
+detail.onCancel = (id) => appts.cancel(id);
+```
+
+The detail enables cancel and change while `now ≤ cancellableUntil` for a User (`null` for the
+Administrator, who has no notice), and the note while the appointment is booked and not ended.
+
+### 19.7 Security notes
+
+Notes and usernames are personal data (spec 16.5): never logged, never put in a URL but the
+Administrator's `username` filter of `list`, which is a query parameter the contract defines. The
+token rules are those of section 10.2.
+
+### 19.8 Unit tests (`appointments.service.test.ts`)
+
+The per-method suite of section 14.1 for the five methods, each paired with the next one for the
+cancel test. Per route its codes, and as `unexpected` codes of neighbouring routes (`invalid_json`
+and `appointment_not_found` for `list`; the cancel and conflict codes for `book`; `invalid_json`,
+`user_not_found`, `slot_taken` for `cancel`; `target_not_user` for `change`;
+`cancellation_notice_too_short`, `slot_taken` for `updateNote`). Invalid inputs: neither or both
+selections, `from` alone, 93 days, an unknown status, a bad username; an instant with seconds, end
+before start, a 501-character note, a tab in the note, an unknown field; ids that are not ULIDs (for
+`change` with a bad body too: the path's message), a `username` in a change, `start` or `note`
+missing. Plus what is sent: `status=booked` added while `pending` keeps the query as given, an empty
+list as a success, a blank note sent as `null`, a change without `note` sending none, and four
+bookings sent rather than refused (a User's 08:15, no `username`, a custom `end`, a start in the
+past), and a cancel with no body.
+
+### 19.9 Integration checks
+
+Section 14.4, blocks "calendar view", "appointments" and "availability conflict".

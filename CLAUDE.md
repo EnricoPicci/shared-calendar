@@ -134,15 +134,21 @@ form works the same. Paths below without a folder are relative to `backend/`.
   (`login.service.test.ts`, `journeys.test.ts` and, since step 53, `calendar.test.ts`: the
   services against cognito-local on 9229 and the API on 3000, `docs/FRONTEND_SERVICES.md`
   section 14). Needs `local:up` + `local:api` running and the Codespaces iptables rule below.
-  Creates and removes the throw-away users `fe-journey` and `fe-calendar` (removed first too, so
-  it can be rerun after a failed run). `calendar.test.ts` **never resets the local `calendar`
-  table**: it works on top of what the back-end journeys and the smoke test leave, creates only
-  types named `fe-calendar …` and items of those types on free dates from today + 330 days,
-  removes them (and an earlier failed run's) before and after, and writes the settings back to the
-  values it read (`updatedAt`/`updatedBy` stay changed); until then it keeps them in
+  Creates and removes the throw-away users `fe-journey`, `fe-calendar` and `fe-calendar-b` (removed
+  first too, so it can be rerun after a failed run). `calendar.test.ts` **never resets the local
+  `calendar` table**: it works on top of what the back-end journeys and the smoke test leave, creates
+  only types named `fe-calendar …` and items of those types on free dates from today + 330 days,
+  books only for `fe-calendar` and `fe-calendar-b`, removes it all (and an earlier failed run's)
+  before and after (the two users first: deleting a user cancels its future appointments, which
+  would otherwise block deleting their pattern and type), and writes the settings back to the
+  values it read (`updatedAt`/`updatedBy` stay changed). Its appointment blocks set the settings for
+  their run (`bookingHorizonDays` 365, `minBookingNoticeHours` 0, no limit) to book about a year
+  ahead. Until the write-back it keeps the values read in
   `frontend/tests/integration/fe-calendar-settings.local.json` (git-ignored), which the next run
-  writes back first if a run was killed in between (section 14.4). Without `RUN_INTEGRATION=1` it runs
-  nothing and exits 0, like the back end's.
+  writes back first if a run was killed in between (`docs/FRONTEND_SERVICES.md` section 14.4).
+  Appointments cannot be deleted through the API: the cancelled ones, their events and the two
+  users' deleted-user markers stay in the local table as history, like the smoke test's. Without
+  `RUN_INTEGRATION=1` it runs nothing and exits 0, like the back end's.
 - `RUN_INTEGRATION=1 npm run test:integration -w backend`: the journeys of plan step 9
   (`journeys.test.ts`) and the calendar's (`calendar.test.ts`) against the running `local:up` +
   `local:api` stack. Pass the same `DYNAMODB_PORT` as `local:up` (here `DYNAMODB_PORT=8002`).
@@ -349,15 +355,22 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   building blocks the services share (`api.ts`: methods `GET`/`POST`/`PUT`/`PATCH`/`DELETE`,
   `query`, `conflicts` on `availability_conflict`, and the helpers `invalidRequest`,
   `unexpectedAnswer`, `hasString`); `login`, `refresh`, `hello`, `users` (with `listUsers`),
-  `calendar-settings`, `availability-types`, `availability-rules` as `<name>.service.ts` +
+  `calendar-settings`, `availability-types`, `availability-rules`, `calendar`, `appointments` as
+  `<name>.service.ts` +
   `<name>.types.ts`; `jwt.ts`), `tests/unit/services/` mirroring `src/` (plus `fixtures.ts`, and
-  `suite.ts`: `describeMethod`, the unit tests every API method gets), `tests/integration/`
+  `suite.ts`: `describeMethod`, the unit tests every API method gets; its `other` is optional, for
+  a service whose methods share one pending call), `tests/integration/`
   (`local.ts` helper with `outcome()`, `login.service.test.ts`, `journeys.test.ts`,
-  `calendar.test.ts`). Calendar services (plan step 53; step 54 adds `calendar` and
-  `appointments`): one result/state pair per method; `pending` carries the call's arguments under
-  the contract's names; input checked with the shared schemas before sending (`invalid_request`
-  with the field, no request), zod's parsed output sent; codes per route from architecture
-  section 4. `src/`
+  `calendar.test.ts`). Calendar services (plan steps 53–54; the services layer is complete):
+  `calendar-settings`, `availability-types`, `availability-rules`, `calendar` (`CalendarService`:
+  `load(from, to)` and `reload()`, which re-runs the last load's range, one pair of streams and one
+  pending call for both) and `appointments` (`AppointmentsService`: `list`, `book`, `cancel`,
+  `change`, `updateNote`; streams `appointmentsResult$` and `updateNoteResult$`, not the spec's
+  `listResult$`/`noteResult$`, `docs/FRONTEND_SERVICES.md` section 8, decision 40). One result/state
+  pair per method; `pending` carries the call's arguments under the contract's names; input checked
+  with the shared schemas before sending (`invalid_request` with the field, no request), zod's
+  parsed output sent; nothing checked that depends on the role or on the server's data; codes per
+  route from `docs/ARCHITECTURE.md` section 4. `src/`
   imports only `rxjs`, `rxjs/fetch`, `rxjs/operators` and `@shared-calendar/shared`; configuration
   comes through the constructor, the `SessionStore` as the second argument. Tokens live only in
   the `SessionStore` (rule 9): no result, state or service field holds one.

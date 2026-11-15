@@ -39,8 +39,9 @@ type Harness<S> = {
   sessions: (Session | null)[];
 };
 
-// `other` is another method of the same service: its pending call must survive this one's.
-export function describeMethod<S>(make: (store: SessionStore) => S, spec: MethodSpec<S>, other: MethodSpec<S>): void {
+// `other` is another method of the same service: its pending call must survive this one's. Without
+// it (a service whose methods share one pending call) the cancel test checks this method alone.
+export function describeMethod<S>(make: (store: SessionStore) => S, spec: MethodSpec<S>, other?: MethodSpec<S>): void {
   describe(spec.name, () => {
     const h = {} as Harness<S>;
     beforeEach(() => {
@@ -134,19 +135,22 @@ export function describeMethod<S>(make: (store: SessionStore) => S, spec: Method
       expect(await once(spec.ok())).toEqual(spec.success);
     });
 
-    it(`cancel: a second ${spec.name} aborts the first, not a pending ${other.name}; one result`, async () => {
+    it(`cancel: a second ${spec.name} aborts the first${other ? `, not a pending ${other.name}` : ''}; one result`, async () => {
       const signals: (AbortSignal | undefined)[] = [];
       const pendingForever = (_url: string, init: RequestInit) => {
         signals.push(init.signal ?? undefined);
         return new Promise<Response>(() => {});
       };
-      h.fetchMock.mockImplementationOnce(pendingForever).mockImplementationOnce(pendingForever);
-      other.call(h.service);
+      if (other) {
+        h.fetchMock.mockImplementationOnce(pendingForever);
+        other.call(h.service);
+      }
+      h.fetchMock.mockImplementationOnce(pendingForever);
       spec.call(h.service);
       await once(spec.ok());
-      expect(signals).toHaveLength(2);
-      expect(signals[0]?.aborted).toBe(false); // the other method's call
-      expect(signals[1]?.aborted).toBe(true); // this method's first call
+      expect(signals).toHaveLength(other ? 2 : 1);
+      if (other) expect(signals[0]?.aborted).toBe(false); // the other method's call
+      expect(signals.at(-1)?.aborted).toBe(true); // this method's first call
       expect(h.results).toHaveLength(1);
     });
 

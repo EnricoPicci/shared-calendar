@@ -3,36 +3,45 @@ import {
   addDays,
   CALENDAR_LIMITS,
   localDateOf,
+  toInstant,
   weekdayOf,
   type AvailabilityType,
   type CalendarSettings,
   type CalendarView,
+  type WeeklyPattern,
   UpdateSettingsBody,
 } from '@shared-calendar/shared';
-import { apiCall } from '../../src/services/api';
+import { AppointmentsService } from '../../src/services/appointments.service';
 import { AvailabilityRulesService } from '../../src/services/availability-rules.service';
 import { AvailabilityTypesService } from '../../src/services/availability-types.service';
+import { CalendarService } from '../../src/services/calendar.service';
 import { CalendarSettingsService } from '../../src/services/calendar-settings.service';
 import { SessionStore } from '../../src/services/session.store';
 import { UsersService } from '../../src/services/users.service';
 import { API, outcome, signedIn, signIn } from './local';
 
-// The calendar journeys of docs/FRONTEND_SERVICES.md section 14.4: the settings, types and
-// availability-rules services, and listUsers, against the back end's local stack. Runs only with
-// RUN_INTEGRATION=1, never at the same time as the back end's journeys. The local calendar is
-// shared with them and with the smoke test, so this file:
+// The calendar journeys of docs/FRONTEND_SERVICES.md section 14.4: every calendar service and
+// listUsers, against the back end's local stack. Runs only with RUN_INTEGRATION=1, never at the
+// same time as the back end's journeys. The local calendar is shared with them and with the smoke
+// test, so this file:
 // - never resets the table and never deletes or changes what it did not create;
 // - creates only types named `fe-calendar …` and items on dates about a year ahead (from today
 //   + 330 days, a band of 31 days), each on a date that has no window and no override yet;
+// - books only for its throw-away Users `fe-calendar` and `fe-calendar-b`. Appointments cannot be
+//   deleted through the API: the cancelled ones, their events and the deleted-user markers of the
+//   two Users stay in the table as history;
 // - writes the settings back to the values it read (updatedAt/updatedBy stay changed). Those
 //   values are kept in SAVED_SETTINGS (git-ignored) from before the first write until they are
-//   written back, so a run killed in between (no afterAll) is repaired by the next run;
-// - removes what an earlier failed run left (one-off windows, overrides, patterns of its types,
-//   then the types) before and after, and the throw-away User `fe-calendar` before and after.
-// `availability_conflict` is not covered here: it needs a booked appointment, which only the
-// AppointmentsService of docs/IMPLEMENTATION_PLAN.md step 54 can make.
+//   written back, so a run killed in between (no afterAll) is repaired by the next run. The
+//   appointment blocks set them for their run too, to book about a year ahead;
+// - removes what an earlier failed run left, before and after: first the two Users (deleting a
+//   User cancels its future appointments, which would otherwise block deleting their pattern and
+//   type), then the one-off windows, overrides and patterns of its types, then the types.
 
 const USER = 'fe-calendar';
+// A second plain User, booked only by the Administrator: its appointments are what `fe-calendar`
+// sees as anonymous `busy` intervals (docs/FRONTEND_SERVICES.md section 8, decision 43).
+const USER_B = 'fe-calendar-b';
 const PREFIX = 'fe-calendar ';
 const BAND_OFFSET = 330;
 const BAND_DAYS = CALENDAR_LIMITS.calendarViewDays; // one GET /calendar covers the band
@@ -45,6 +54,7 @@ const SAVED_SETTINGS = new URL('./fe-calendar-settings.local.json', import.meta.
 let admin: SessionStore;
 let user: SessionStore; // fe-calendar, a plain User
 let today: string;
+let zone: string; // the calendar's time zone, from the settings
 const stores: SessionStore[] = [];
 
 // ── Calls through the services, one fresh service per call ───────────────────────────────────
@@ -85,6 +95,12 @@ function ok<T extends { status: string }>(result: T, what: string): Extract<T, {
   return result as Extract<T, { status: 'success' }>;
 }
 
+// The first element, failing the test when there is none.
+function first<T>(items: T[]): T {
+  if (items.length === 0) throw new Error('expected at least one element');
+  return items[0] as T;
+}
+
 // The four editable values of a settings object.
 function editable(s: CalendarSettings): UpdateSettingsBody {
   return {
@@ -95,16 +111,18 @@ function editable(s: CalendarSettings): UpdateSettingsBody {
   };
 }
 
-// The Administrator's view of the band, through apiCall directly: CalendarService comes with
-// docs/IMPLEMENTATION_PLAN.md step 54.
+function loadCalendar(store: SessionStore, from: string, to: string) {
+  const s = new CalendarService(API, store);
+  return outcome(s.calendarResult$, () => s.load(from, to));
+}
+function appointments(store: SessionStore) {
+  return new AppointmentsService(API, store);
+}
+
+// The Administrator's view of the band.
 async function bandView(): Promise<CalendarView> {
   const from = addDays(today, BAND_OFFSET);
-  const answer = await outcome(
-    apiCall(API, admin, { method: 'GET', path: '/calendar', query: { from, to: addDays(from, BAND_DAYS - 1) }, codes: [] }),
-    () => {},
-  );
-  if (answer.status !== 'ok') throw new Error(`GET /calendar: ${JSON.stringify(answer)}`);
-  return answer.body as CalendarView;
+  return ok(await loadCalendar(admin, from, addDays(from, BAND_DAYS - 1)), 'load the band').calendar;
 }
 
 // A date of the band with no window and no override: nothing of anyone else can overlap there.
@@ -165,10 +183,14 @@ async function cleanUp(): Promise<void> {
   for (const t of mine) ok(await removeType(admin, t.typeId), `remove type ${t.name}`);
 }
 
-async function removeUser(): Promise<void> {
+// Deleting a User cancels its future appointments first (docs/ARCHITECTURE.md section 4,
+// DELETE /users/{username}), so this comes before cleanUp().
+async function removeUsers(): Promise<void> {
   const s = users(admin);
-  const result = await outcome(s.deleteUserResult$, () => s.deleteUser(USER));
-  if (result.status === 'failure' && result.reason !== 'user_not_found') throw new Error(`could not remove ${USER}: ${result.reason}`);
+  for (const username of [USER, USER_B]) {
+    const result = await outcome(s.deleteUserResult$, () => s.deleteUser(username));
+    if (result.status === 'failure' && result.reason !== 'user_not_found') throw new Error(`could not remove ${username}: ${result.reason}`);
+  }
 }
 
 // Runs `fn` with a fetch spy and checks that no request left.
@@ -188,10 +210,12 @@ beforeAll(async () => {
   stores.push(admin);
   await restoreSettings(); // an earlier run was killed between its write and its write-back
   const settings = ok(await loadSettings(admin), 'load settings').settings;
-  today = localDateOf(new Date().toISOString(), settings.timeZone);
-  await removeUser();
+  zone = settings.timeZone;
+  today = localDateOf(new Date().toISOString(), zone);
+  await removeUsers();
   await cleanUp();
   const s = users(admin);
+  ok(await outcome(s.createUserResult$, () => s.createUser(USER_B)), `create ${USER_B}`);
   const password = ok(await outcome(s.createUserResult$, () => s.createUser(USER)), `create ${USER}`).user.password;
   const signed = await signIn(USER, password);
   ok(signed.result, `${USER} signs in`);
@@ -202,8 +226,8 @@ beforeAll(async () => {
 afterAll(async () => {
   try {
     await restoreSettings(); // a failure came between the write and the write-back
+    await removeUsers();
     await cleanUp();
-    await removeUser();
   } finally {
     for (const store of stores) store.clear(); // stops the expiry timers
   }
@@ -393,6 +417,241 @@ describe('one-off windows', () => {
       reason: 'invalid_request',
       message: 'end: end must be after start',
     });
+  });
+});
+
+// ── Appointments: the helpers of the three blocks below ──────────────────────────────────────
+
+// Registers, in the calling block, the settings it books under: a horizon of 365 days, no minimum
+// notice and no limit, so that a User can book on the band about a year ahead. The cancellation
+// notice keeps the value read (the body needs all four; at most 720 hours cannot block a cancel
+// 330 days ahead). The values read are kept in SAVED_SETTINGS until afterAll writes them back
+// (docs/FRONTEND_SERVICES.md section 8, decision 43).
+function bookingSettings(): void {
+  beforeAll(async () => {
+    await restoreSettings(); // never overwrite values read that are not yet written back
+    const read = editable(ok(await loadSettings(admin), 'load settings').settings);
+    saveSettings(read); // before the write
+    const bookable = { ...read, bookingHorizonDays: 365, minBookingNoticeHours: 0, maxFutureAppointmentsPerUser: null };
+    ok(await updateSettings(admin, bookable), 'settings for booking');
+  }, 60_000);
+  afterAll(restoreSettings, 60_000);
+}
+
+type Bookable = { type: AvailabilityType; date: string; pattern: WeeklyPattern; at: (time: string) => string };
+
+// A free date of the band with one window of a new type, 08:00–12:00 local, from a pattern valid on
+// that date only. `at` turns a local time of that date into the instant the API wants.
+async function bookableDate(label: string): Promise<Bookable> {
+  const type = await ownType(label);
+  const date = await freeDate();
+  const r = rules(admin);
+  const foreign = ok(await outcome(r.patternsResult$, () => r.loadPatterns()), 'load patterns').patterns.length;
+  if (foreign >= CALENDAR_LIMITS.patterns) throw new Error(`${foreign} patterns exist that this test does not own: no room under the limit`);
+  const body = { weekday: weekdayOf(date), start: '08:00', end: '12:00', typeId: type.typeId, validFrom: date, validUntil: date };
+  const pattern = ok(await outcome(r.createPatternResult$, () => r.createPattern(body)), 'create pattern').pattern;
+  return { type, date, pattern, at: (time) => toInstant(date, time, zone) };
+}
+
+// Removes the pattern and the type of bookableDate, once no booked appointment lies in them.
+async function release({ type, pattern }: Bookable): Promise<void> {
+  const r = rules(admin);
+  ok(await outcome(r.deletePatternResult$, () => r.deletePattern(pattern.patternId)), 'delete pattern');
+  ok(await removeType(admin, type.typeId), 'remove type');
+}
+
+function book(store: SessionStore, booking: Parameters<AppointmentsService['book']>[0]) {
+  const s = appointments(store);
+  return outcome(s.bookResult$, () => s.book(booking));
+}
+function cancel(store: SessionStore, appointmentId: string) {
+  const s = appointments(store);
+  return outcome(s.cancelResult$, () => s.cancel(appointmentId));
+}
+function list(store: SessionStore, query: Parameters<AppointmentsService['list']>[0]) {
+  const s = appointments(store);
+  return outcome(s.appointmentsResult$, () => s.list(query));
+}
+
+// ── The calendar view (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 15) ──────────────────
+
+describe('calendar view', () => {
+  bookingSettings();
+
+  it(`a week: the Administrator sees sources and names; ${USER} its own appointment and ${USER_B}'s as busy`, async () => {
+    const bookable = await bookableDate('View');
+    const { type, date, pattern, at } = bookable;
+    const mine = ok(await book(admin, { start: at('08:00'), username: USER }), `book for ${USER}`).appointment;
+    const other = ok(await book(admin, { start: at('10:00'), username: USER_B, note: 'private note' }), `book for ${USER_B}`).appointment;
+    const to = addDays(date, 6);
+    const window = { start: at('08:00'), end: at('12:00'), typeId: type.typeId, typeName: type.name };
+
+    const adminView = ok(await loadCalendar(admin, date, to), 'admin view').calendar;
+    expect(adminView).toMatchObject({ timeZone: zone, from: date, to });
+    expect(adminView.days.map((d) => d.date)).toEqual([0, 1, 2, 3, 4, 5, 6].map((n) => addDays(date, n)));
+    const adminDay = first(adminView.days);
+    expect(adminDay).toMatchObject({ date, weekday: weekdayOf(date), hasOverride: false, busy: [] });
+    expect(adminDay.windows).toEqual([{ ...window, source: 'pattern', sourceId: pattern.patternId }]);
+    const adminAppointments = adminView.appointments.filter((a) => a.date === date);
+    expect(adminAppointments.map((a) => [a.appointmentId, a.username, a.cancellableUntil])).toEqual([
+      [mine.appointmentId, USER, null],
+      [other.appointmentId, USER_B, null],
+    ]);
+
+    // The User's view keeps the same service for reload (docs/SHARED_CALENDAR_SPEC.md section 16.3).
+    const calendar = new CalendarService(API, user);
+    const userView = ok(await outcome(calendar.calendarResult$, () => calendar.load(date, to)), 'user view').calendar;
+    const day = first(userView.days);
+    expect(day.windows).toEqual([window]); // no source, no sourceId
+    expect(day).not.toHaveProperty('hasOverride');
+    expect(day.slots).toEqual([
+      { start: at('09:00'), end: at('10:00'), typeId: type.typeId },
+      { start: at('11:00'), end: at('12:00'), typeId: type.typeId },
+    ]);
+    expect(day.busy).toEqual([{ start: at('10:00'), end: at('11:00') }]); // start and end only
+    expect(userView.appointments.map((a) => a.appointmentId)).toEqual([mine.appointmentId]);
+    expect(first(userView.appointments).cancellableUntil).toEqual(expect.any(String));
+    const seen = JSON.stringify(userView);
+    for (const hidden of [USER_B, other.appointmentId, 'private note']) expect(seen).not.toContain(hidden);
+
+    ok(await cancel(admin, other.appointmentId), `cancel ${USER_B}'s`);
+    const reloaded = ok(await outcome(calendar.calendarResult$, () => calendar.reload()), 'reload').calendar;
+    expect(first(reloaded.days).busy).toEqual([]);
+    expect(first(reloaded.days).slots.map((slot) => slot.start)).toEqual([at('09:00'), at('10:00'), at('11:00')]);
+
+    ok(await cancel(admin, mine.appointmentId), `cancel ${USER}'s`);
+    await release(bookable);
+  });
+
+  it('a range of 32 days: invalid_request with the field, no request sent', async () => {
+    const from = addDays(today, BAND_OFFSET);
+    expect(await noRequest(() => loadCalendar(user, from, addDays(from, 31)))).toMatchObject({
+      reason: 'invalid_request',
+      message: 'to: the range spans more than 31 days',
+    });
+  });
+
+  it('reload before any load: invalid_request, no request sent', async () => {
+    const calendar = new CalendarService(API, user);
+    expect(await noRequest(() => outcome(calendar.calendarResult$, () => calendar.reload()))).toMatchObject({
+      reason: 'invalid_request',
+      message: 'nothing loaded yet',
+    });
+  });
+});
+
+// ── Appointments (docs/SHARED_CALENDAR_SPEC.md section 11.1, routes 16–20) ───────────────────
+
+describe('appointments', () => {
+  bookingSettings();
+
+  it(`book, slot taken, book for ${USER}, note, change, upcoming, cancel`, async () => {
+    const bookable = await bookableDate('Appointments');
+    const { type, date, at } = bookable;
+    const a = appointments(user);
+
+    // fe-calendar books a free slot for itself.
+    const booked = ok(await outcome(a.bookResult$, () => a.book({ start: at('08:00') })), 'book').appointment;
+    expect(booked).toMatchObject({ username: USER, start: at('08:00'), end: at('09:00'), date, typeId: type.typeId, status: 'booked', note: null });
+    expect(booked.createdBy).toEqual({ username: USER, role: 'user' });
+    expect(booked.cancellableUntil).toEqual(expect.any(String));
+
+    expect(await book(admin, { start: at('08:00'), username: USER_B })).toMatchObject({ status: 'failure', reason: 'slot_taken' });
+
+    // The Administrator books for fe-calendar, with a custom end only an Administrator may set.
+    const forUser = ok(await book(admin, { start: at('10:00'), end: at('10:30'), username: USER }), 'book for the User').appointment;
+    expect(forUser).toMatchObject({ username: USER, end: at('10:30'), createdBy: { username: 'admin', role: 'admin' }, cancellableUntil: null });
+
+    const noted = ok(await outcome(a.updateNoteResult$, () => a.updateNote(booked.appointmentId, '  Bring shoes  ')), 'note').appointment;
+    expect(noted).toMatchObject({ appointmentId: booked.appointmentId, note: 'Bring shoes' });
+
+    // The change keeps the note (docs/SHARED_CALENDAR_SPEC.md R-CHG-03).
+    const changed = ok(await outcome(a.changeResult$, () => a.change(booked.appointmentId, { start: at('09:00') })), 'change');
+    expect(changed.cancelled).toMatchObject({
+      appointmentId: booked.appointmentId,
+      status: 'cancelled',
+      cancelReason: 'changed',
+      replacedBy: changed.booked.appointmentId,
+    });
+    expect(changed.booked).toMatchObject({ start: at('09:00'), status: 'booked', note: 'Bring shoes', replaces: booked.appointmentId });
+    expect(await outcome(a.changeResult$, () => a.change(booked.appointmentId, { start: at('11:00') }))).toMatchObject({
+      reason: 'appointment_not_active',
+    });
+
+    // upcoming: the User's own list, and the Administrator's for fe-calendar; status=booked by default.
+    const expected = [changed.booked.appointmentId, forUser.appointmentId];
+    const mine = ok(await list(user, { upcoming: 'true' }), 'upcoming as the User').appointments;
+    expect(mine.filter((x) => x.date === date).map((x) => x.appointmentId)).toEqual(expected);
+    expect(mine.every((x) => x.username === USER && x.status === 'booked' && x.cancellableUntil !== null)).toBe(true);
+    const theirs = ok(await list(admin, { upcoming: 'true', username: USER }), 'upcoming for the User').appointments;
+    expect(theirs.filter((x) => x.date === date).map((x) => x.appointmentId)).toEqual(expected);
+    expect(theirs.every((x) => x.cancellableUntil === null)).toBe(true);
+    // Every status of the date; an earlier block may have left a cancelled one there.
+    const ids = [booked.appointmentId, ...expected];
+    const history = ok(await list(user, { from: date, to: date, status: 'all' }), 'the date, every status').appointments;
+    expect(history.filter((x) => ids.includes(x.appointmentId)).map((x) => [x.appointmentId, x.status])).toEqual([
+      [booked.appointmentId, 'cancelled'],
+      [changed.booked.appointmentId, 'booked'],
+      [forUser.appointmentId, 'booked'],
+    ]);
+
+    const cancelled = ok(await outcome(a.cancelResult$, () => a.cancel(changed.booked.appointmentId)), 'cancel').appointment;
+    expect(cancelled).toMatchObject({ status: 'cancelled', cancelReason: 'cancelled', cancelledBy: { username: USER, role: 'user' } });
+    expect(await outcome(a.cancelResult$, () => a.cancel(changed.booked.appointmentId))).toMatchObject({ reason: 'appointment_not_active' });
+    ok(await cancel(admin, forUser.appointmentId), 'cancel as the Administrator');
+    expect(ok(await list(user, { upcoming: 'true' }), 'upcoming').appointments.filter((x) => x.date === date)).toEqual([]);
+
+    await release(bookable);
+  });
+
+  it(`${USER} starts off the whole hour: the API answers invalid_request (the service sends it)`, async () => {
+    const spy = vi.spyOn(globalThis, 'fetch');
+    try {
+      const start = toInstant(addDays(today, BAND_OFFSET), '08:15', zone);
+      expect(await book(user, { start })).toMatchObject({ status: 'failure', reason: 'invalid_request' });
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it(`${USER} lists ${USER_B}'s appointments: forbidden`, async () => {
+    expect(await list(user, { upcoming: 'true', username: USER_B })).toMatchObject({ status: 'failure', reason: 'forbidden' });
+  });
+
+  it('cancel an unknown appointment: appointment_not_found', async () => {
+    expect(await cancel(user, UNKNOWN_ID)).toMatchObject({ status: 'failure', reason: 'appointment_not_found' });
+  });
+
+  it('a note of 501 characters: invalid_request with the field, no request sent', async () => {
+    const a = appointments(user);
+    expect(await noRequest(() => outcome(a.updateNoteResult$, () => a.updateNote(UNKNOWN_ID, 'x'.repeat(501))))).toMatchObject({
+      reason: 'invalid_request',
+      message: 'note: at most 500 characters',
+    });
+  });
+});
+
+// ── availability_conflict end to end (docs/SHARED_CALENDAR_SPEC.md section 6.7) ─────────────
+
+describe('availability conflict', () => {
+  bookingSettings();
+
+  it('an override and a pattern delete that would strand a booked appointment: refused, with conflicts', async () => {
+    const bookable = await bookableDate('Conflict');
+    const { type, date, pattern, at } = bookable;
+    const booked = ok(await book(user, { start: at('08:00') }), 'book').appointment;
+    const conflict = { appointmentId: booked.appointmentId, username: USER, start: at('08:00'), end: at('09:00') };
+    const r = rules(admin);
+
+    const override = await outcome(r.setOverrideResult$, () => r.setOverride(date, [{ start: '10:00', end: '12:00', typeId: type.typeId }]));
+    expect(override).toEqual({ status: 'failure', reason: 'availability_conflict', message: expect.any(String), conflicts: [conflict] });
+    const removal = await outcome(r.deletePatternResult$, () => r.deletePattern(pattern.patternId));
+    expect(removal).toMatchObject({ reason: 'availability_conflict', conflicts: [conflict] });
+    expect(first(ok(await loadCalendar(admin, date, date), 'view').calendar.days).hasOverride).toBe(false); // nothing written
+
+    ok(await cancel(user, booked.appointmentId), 'cancel');
+    await release(bookable); // a cancelled appointment blocks nothing
   });
 });
 
