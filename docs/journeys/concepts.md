@@ -4,9 +4,6 @@ The journey pages (`docs/journeys/README.md`) link here for the ideas that sever
 Each section explains one idea in simple words and names the part of `docs/SHARED_CALENDAR_SPEC.md`
 that defines it. On any conflict, the specification wins.
 
-Sections about the back end's stored items and the calendar lock are added with the first
-back-end page.
-
 ## The people of the local stack
 
 | Name | What it is | Made by |
@@ -35,6 +32,131 @@ All journeys and the smoke test use the same local `calendar` table. They treat 
 
 Appointments cannot be deleted through the API, only cancelled. So cancelled appointments, their
 events and the deleted-user markers of removed Users stay in the table as history.
+
+## The `calendar` table and its items
+
+The whole calendar lives in one DynamoDB table, `calendar` (`docs/SHARED_CALENDAR_SPEC.md`
+sections 13.1 and 13.2). Every item has two keys:
+
+- `PK`, the partition: which kind of item it is, such as `APPT` for every appointment;
+- `SK`, the sort key: which one it is. The items of one partition come back sorted by `SK`.
+
+The back end's journeys read the items directly, next to the API answers, with the helpers of
+`backend/tests/integration/setup.ts`: `getCalendarItem(PK, SK)` for one item,
+`queryCalendarPartition(PK)` for a whole partition. Only `backend/src/lib/calendarDb.ts` knows this
+layout in the code; the handlers never see it.
+
+| Item | `PK` | `SK` | What it holds |
+|---|---|---|---|
+| Calendar lock | `LOCK` | `LOCK` | `version`, a number ([the calendar lock](#the-calendar-lock)) |
+| Settings | `SETTINGS` | `SETTINGS` | the four settings, `updatedAt`, `updatedBy`. Absent until the first save: until then the defaults apply (`docs/SHARED_CALENDAR_SPEC.md` R-SET-01) |
+| Availability type | `TYPE` | `<typeId>` | `name`, `nameKey` (the lower-case name, for uniqueness) |
+| Weekly pattern | `PATTERN` | `<patternId>` | the pattern's fields |
+| Date override | `OVERRIDE` | `<date>` | `windows`, `updatedAt`, `updatedBy` |
+| One-off window | `WINDOW` | `<date>#<windowId>` | the window's fields, `createdBy` |
+| Appointment | `APPT` | `<start>#<appointmentId>` | the appointment ([below](#the-appointment-item)) |
+| Appointment pointer | `APPTID#<appointmentId>` | `APPTID` | `sk`: the `SK` of the appointment |
+| Event | `EVENT` | `<occurredAt>#<eventId>` | one change of one appointment ([the event log](#the-event-log)) |
+| Deleted-user marker | `DELETEDUSER#<sub>` | `DELETEDUSER` | `username`, `deletedAt`, `deletedBy` ([below](#the-deleted-user-marker)) |
+
+### The appointment item
+
+All appointments share the partition `APPT`, and their `SK` starts with the start instant. So
+they are sorted by start time, and "every appointment between two instants" is one query on the
+sort key. That is what the overlap check and the calendar view need. The appointment's id is the
+part of the `SK` after `#`; it is not stored again.
+
+The item holds what the API answers, with three differences (`docs/SHARED_CALENDAR_SPEC.md`
+section 8.1):
+
+- `userId`: the User's Cognito `sub`. It is stored, never answered. The limit per User and the
+  ownership of an appointment are decided on it, not on the username, which a later account could
+  be given again.
+- `typeNameAtBooking`: the type's name when the appointment was booked. Answers carry `typeName`,
+  the type's current name, and fall back on the snapshot only once the type is gone.
+- `version`: an internal counter, 1 at booking. `cancellableUntil` is not stored: it is worked out
+  for each answer, from the caller's role and the settings.
+
+### Why a pointer item
+
+The routes that take an appointment id (cancel, change, note) must find the appointment, but its
+key starts with the start time, which the caller does not send. So every booking also writes a
+small **pointer** item, `APPTID#<id>`, holding the appointment's `SK`: one read of the pointer,
+then one read of the appointment.
+
+A secondary index on the id would do the same without a second item, but DynamoDB's indexes are
+only *eventually* consistent: just after a booking, the index could still miss it and the route
+would answer 404 for a moment. The pointer is written in the same transaction as the appointment
+and read consistently, so it is there as soon as the booking is (`docs/SHARED_CALENDAR_SPEC.md`
+section 13.3).
+
+### The deleted-user marker
+
+Deleting a User (`DELETE /users/{username}`) first writes the marker `DELETEDUSER#<sub>`, then
+cancels the User's future appointments, and only then deletes the account in Cognito
+(`docs/SHARED_CALENDAR_SPEC.md` section 10.2). An access token stays valid for some minutes after
+the account is gone. The marker closes that gap: every booking transaction checks that no marker
+exists for the User's `sub`, and is refused with `404 user_not_found` if one does
+(`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-10).
+
+The marker is keyed by the `sub`, not the username. A new account made later with the same name
+gets a new `sub`, so the marker does not affect it (`docs/SHARED_CALENDAR_SPEC.md` R-DEL-02).
+
+## The calendar lock
+
+Several rules compare a write with the rest of the calendar: no two appointments on the same time,
+no overlapping windows, no appointment left outside its window, the limit per User. If two writes
+arrive at the same moment, each could check against a calendar the other is changing, and both
+would pass. The lock prevents that (`docs/SHARED_CALENDAR_SPEC.md` section 13.4).
+
+There is **one lock for the whole calendar**: the item `LOCK`/`LOCK` with a number, `version`.
+Every calendar write (settings, types, patterns, overrides, one-off windows, appointments) goes
+through it, in the code `withCalendarLock()` in `backend/src/lib/calendarDb.ts`:
+
+1. read `version` (0 if the item does not exist yet);
+2. read what the rules need, and check them. If a rule fails, answer its error; nothing is
+   written;
+3. write everything in **one transaction**: "set `version` to `version + 1`, *but only if it is
+   still* the value read in step 1", together with the operation's own items. DynamoDB writes all
+   of them or none.
+
+If another write moved the version on between steps 1 and 3, the condition fails and the whole
+transaction is cancelled. The write waits a random 50 to 150 ms and starts again from step 1, so it
+re-reads the calendar and re-checks its rules against the new state. After 3 attempts in all, it
+gives up and answers **`409 concurrent_update`**; the client may simply try again.
+
+So calendar writes take turns: each one sees the result of the one before. With a handful of
+people who almost never act at the same moment, that costs nothing. Reads (the calendar view, the
+lists) take no lock.
+
+Each write moves `version` on by one, so the settings journey can see the lock item appear at
+version 1 and move to 2.
+
+## The event log
+
+Every change to an appointment writes one **event** item, in the same transaction as the change
+itself (`docs/SHARED_CALENDAR_SPEC.md` sections 15 and 15.2). Either both are written or neither
+is.
+
+| Event `type` | Written by |
+|---|---|
+| `appointment.booked` | a booking |
+| `appointment.cancelled` | a cancel, and each appointment cancelled by a User's deletion |
+| `appointment.changed` | a change (one event for the old and the new appointment, with `previous`) |
+| `appointment.note_updated` | a new note |
+
+An event holds `eventId`, `type`, `occurredAt`, the `actor` who did it (`{ username, role }`), the
+`recipients` (the appointment's User, by `userId` and `username`, and `administrator: true`), a
+copy of the `appointment` as stored after the change, and `schemaVersion` 1. Events are never
+updated or deleted. Changes to availability and settings write no event: they can never touch an
+appointment ([booked appointments keep their window](#booked-appointments-keep-their-window)).
+
+**Why it exists.** The calendar sends no e-mail yet. A later feature will tell people about their
+appointments, and it will need to know, exactly once, everything that happened, even if a function
+crashes just after a write. Writing the event in the same transaction as the change (the
+"transactional outbox" pattern) guarantees that. The later notifier only has to follow the new `EVENT`
+items as they are written (through DynamoDB Streams); the items, the API and the handlers stay as
+they are (`docs/SHARED_CALENDAR_SPEC.md` section 15.3).
 
 ## The settings
 

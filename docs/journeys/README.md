@@ -31,22 +31,37 @@ test file name adds nothing (`frontend/calendar-view.md` for the block `calendar
 ## The format of a page
 
 1. **Title**: "The «block» journey, in simple words".
-2. **A header table**: the test file, the `describe` block, its tests (`it` names, in order) and
-   the stack it runs against.
+2. **A header table**: the test file, the `describe` block, its tests (`it` names, numbered, in
+   order) and the stack it runs against. The numbers are the tests' names on the page: the story's
+   headings are "Test N: …" (with the scenario, if the test names one: "Test 2 (AC-10): …"), and
+   one test refers to another as "test N".
 3. **What this block proves**: two to four lines naming the rules and scenarios it covers, each with
    its document (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-02, AC-12).
 4. **Who takes part**: the actors and what each one is for.
 5. **Before the block starts**: the state the file's and the block's `beforeAll` set up.
-6. **The story**: one subsection per test, in order. A test that tells a story gets numbered steps,
-   a small table of the state where it helps (for example the slots of a day), and a Mermaid sequence
-   diagram when three or more actors take part. Each "the test checks" bullet matches an `expect` in
-   the test.
-7. **If the block fails halfway**: what the `afterAll` and the next run's `beforeAll` clean up, and
+6. **The story**: one subsection per test, in order, in one of two forms.
+   - **The short form**, for a test that sends one request and checks its answer: one paragraph
+     saying the request, what the test checks, and the rule behind it.
+   - **The full form**, for a test that tells a story: numbered steps, a small table of the state
+     where it helps (for example the slots of a day), and a Mermaid sequence diagram when three or
+     more actors take part.
+
+   Each "the test checks" bullet matches an `expect` in the test. The checks on the API's answers
+   come first. The checks on stored items, which a test reads directly in a table, follow in their
+   own group, "In the table, the test checks that:" (in the short form, one sentence starting "In
+   the table, …"). Something the server does that no `expect` checks may be told too, but as the
+   server's behaviour, never as a check.
+7. **What the block leaves**: what is in the local tables and in Cognito when the block ends, for
+   the blocks after it and for the next run. A table where several items are left (for example the
+   appointments of a day, with who booked them); one sentence when nothing is.
+8. **If the block fails halfway**: what the `afterAll` and the next run's `beforeAll` clean up, and
    what stays in the local tables as history.
-8. **Where in the code**: the services or routes called, the helpers, the file's constants. By name,
+9. **Where in the code**: the services or routes called, the helpers, the file's constants. By name,
    never by line number.
-9. **Background** (optional): only what belongs to this block alone. Anything another journey
-   could use goes into `concepts.md`.
+10. **Background** (optional), each section headed "Background: …": only what belongs to this block
+    alone. Anything another journey could use goes into `concepts.md`. A block that covers a
+    numbered set of rules may end with "Background: which test proves which rule", a table of the
+    rules in the order the server checks them, with the error and the test of each.
 
 ## Writing rules
 
@@ -76,4 +91,6 @@ The pages written so far. Which pages are still to come, and in which order, is 
 
 ### Back end
 
-None yet.
+| Page | Explains |
+|---|---|
+| [`backend/calendar-booking.md`](backend/calendar-booking.md) | `backend/tests/integration/calendar.test.ts`, `booking (route 17)` |

@@ -80,7 +80,7 @@ The helper `bookableDate('View')` creates the test's own availability type, name
 `fe-calendar View`. It then picks a date about a year ahead that has no window and no override
 yet (the helper `freeDate()`), so that nobody else's data is in the way. On that date it opens one
 window, **08:00–12:00**, of the new type, through a weekly pattern valid on that date only (see
-"The helper `bookableDate()`" below).
+"Background: the helper `bookableDate()`" below).
 
 That gives four one-hour slots: 08:00, 09:00, 10:00 and 11:00.
 
@@ -166,6 +166,14 @@ A brand-new `CalendarService` for `fe-calendar` is asked to `reload()`. It has n
 The test checks the answer `invalid_request` with the message `nothing loaded yet`, again with no
 request sent.
 
+## What the block leaves
+
+Nothing for the blocks after it. The type and the pattern are deleted in test 1, and the block's
+`afterAll` writes the settings back to the values it read, then removes
+`fe-calendar-settings.local.json`. The two Users stay until the file's `afterAll`. Only history
+remains in the local `calendar` table: the two cancelled appointments, each with its
+`appointment.booked` and `appointment.cancelled` events ([the event log](../concepts.md#the-event-log)).
+
 ## If the block fails halfway
 
 The file's `afterAll` (and the next run's `beforeAll`) clean up whatever is left:
@@ -187,7 +195,7 @@ So a failed run leaves nothing booked behind, and the test can simply be run aga
 | Settings | `bookingSettings()`, `saveSettings()`, `restoreSettings()`, the file `fe-calendar-settings.local.json` |
 | Constants | `USER` (`fe-calendar`), `USER_B` (`fe-calendar-b`), `PREFIX` (`fe-calendar `), `BAND_OFFSET` (330 days) |
 
-## The helper `bookableDate()`
+## Background: the helper `bookableDate()`
 
 It is shared by this block, "appointments" and "availability conflict". It creates a type and a
 pattern:

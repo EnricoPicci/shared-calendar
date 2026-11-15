@@ -59,7 +59,7 @@ About two agents per page, so eight to ten per batch.
 | # | Session | Pages (in `docs/journeys/`) | Explains | Status |
 |---|---|---|---|---|
 | 1 | By hand | `frontend/calendar-view.md` | `frontend/tests/integration/calendar.test.ts`, `calendar view` | done |
-| 2 | By hand | `backend/calendar-booking.md`; adds the stored items and the calendar lock to `concepts.md` | `backend/tests/integration/calendar.test.ts`, `booking (route 17)` | planned |
+| 2 | By hand | `backend/calendar-booking.md`; adds the stored items and the calendar lock to `concepts.md` | `backend/tests/integration/calendar.test.ts`, `booking (route 17)` | done |
 | 3 | By hand | `frontend/calendar-appointments.md` | `frontend/tests/integration/calendar.test.ts`, `appointments` | planned |
 | 4 | Skill | `.claude/skills/explain-journey/SKILL.md`, from sessions 1–3 | — | planned |
 | 5 | Batch 1: back-end availability | `backend/calendar-settings.md`, `backend/calendar-availability-types.md`, `backend/calendar-weekly-patterns.md`, `backend/calendar-view.md`, `backend/calendar-overrides-and-one-off-windows.md` | `backend/tests/integration/calendar.test.ts`: `calendar settings (routes 1 and 2)`, `availability types (routes 3–6)`, `weekly patterns (routes 7–10)`, `calendar view (route 15)`, `date overrides and one-off windows (routes 11–14)` | planned |

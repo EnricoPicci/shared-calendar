@@ -670,6 +670,7 @@ describe('date overrides and one-off windows (routes 11–14)', () => {
   });
 });
 
+// Explained in simple words in docs/journeys/backend/calendar-booking.md.
 // Test names: R-… rules, AC-… scenarios and route numbers are those of docs/SHARED_CALENDAR_SPEC.md
 // (scenarios in its section 18.3, routes in its section 11.1).
 describe('booking (route 17)', () => {
