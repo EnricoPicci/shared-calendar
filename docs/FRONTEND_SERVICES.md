@@ -1,11 +1,11 @@
-# Front end — The services layer: login, session, refresh, Hello World, users
+# Front end — The services layer: login, session, refresh, Hello World, users, calendar settings and availability
 
 | | |
 |---|---|
-| Status | v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). Logout is not designed yet |
-| Date | 2026-11-05 |
-| Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration |
-| Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/` |
+| Status | v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13); `CalendarService` and `AppointmentsService` follow in plan step 54. v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). Logout is not designed yet |
+| Date | 2026-11-05; v6 2026-11-15 |
+| Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows) |
+| Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), since v6 v12 (sections 3 and 4: the calendar routes as implemented); `docs/SHARED_CALENDAR_SPEC.md` v14 section 16 (v13 when v6 was written); `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/` |
 
 ### Change log
 
@@ -15,6 +15,7 @@
 | v2 | 2026-11-05 | Implemented (brief 31). Details the implementation fixed: an access token that cannot be decoded, or lacks `username` or `exp`, and a 200 without `IdToken` or `RefreshToken`, are `failure unexpected` (section 4.5); a JSON body that is not an object is read as `{}`; `decodeClaims` decodes the payload as UTF-8 (`atob` + `TextDecoder`). Found against cognito-local: it answers a wrong password with `InvalidPasswordException` (real Cognito: `NotAuthorizedException`), now also mapped to `invalid_credentials`; it issues 24-hour access tokens without `ExpiresIn`, so the 15-minute expiry is checked only in the cloud (section 7). `frontend/` exists ahead of the front-end architecture, for the services layer only (decision 8 revised; `docs/FOLDER_STRUCTURE.md` section 7). Section 5: the integration test and the tooling as built, including an ESLint guard against Node imports and globals in `frontend/src`. Section 7: the acceptance as run. |
 | v3 | 2026-11-05 | Design of `SessionStore` (section 9): the one in-memory holder of the signed-in `Session`, written by `LoginService` on success, read by the API services, cleared at `expiresAt`, on logout and on an API 401. `LoginService` gains the store as a second constructor argument (section 9.4). Sections 4.6 and 4.8 point at it; decisions 9 to 13. Added as section 9 rather than inserted, so that the section numbers cited by the code and by briefs 30 and 31 stay valid. |
 | v4 | 2026-11-05 | Design of the remaining services (brief 32, part A). **Correction:** an expired or invalid token is answered by API Gateway with **403** and its own body `{ "message" }`, not 401 (architecture section 4); 401 means the header is missing. The store is cleared on 401 and on a 403 without an `error` field, and left alone on a handler's 403 (`forbidden`, `cannot_delete_admin`) and on API Gateway's 500 (authorizer outage): sections 9.1, 9.3, 9.4, 9.7, decision 12. The store gains `replace(previous, next)` and `clear(only?)`, so that a late answer cannot overwrite or clear a newer session (section 9.2). Rule 6 gains its one exception: the password `POST /users` generates. New sections, appended so that cited numbers stay valid: 10, the shared building blocks (`cognito.ts`, used by `LoginService` and `RefreshService`; `api.ts`, used by `HelloService` and `UsersService`), with the **known gap** that the API has no CORS configuration (10.3); 11, `RefreshService` (cognito-local implements `REFRESH_TOKEN_AUTH`, checked 2026-11-05); 12, `HelloService`; 13, `UsersService`; 14, the integration journeys. Section 4.8 becomes pointers; decisions 14 to 27. **Tokens live only in the `SessionStore`** (rule 9, decision 28): a login success no longer carries the `Session` but `{ username, role, expiresAt }`, like a refresh success; `LoginService` writes the session to the store and emits the token-free outcome (sections 4.3, 4.6, 4.7, 6, 9.4, 9.7, 10.1; decision 4 revised). This changes `LoginService`'s public result, so its success tests change with it. |
+| v6 | 2026-11-15 | Implemented (brief 54, plan step 53, from `docs/SHARED_CALENDAR_SPEC.md` v13 section 16). `api.ts` (section 10.2): `ApiRequest` is a union, `GET`/`DELETE` without a body and `POST`/`PUT`/`PATCH` with one; `query` encoded with `URLSearchParams`; `ApiFailure.conflicts` with `availability_conflict` only, well-formed entries kept; three helpers for the services, `invalidRequest` (the first schema issue with its field), `unexpectedAnswer` and `hasString`. New services, appended after section 14 so that cited numbers stay valid: 15 `CalendarSettingsService`, 16 `AvailabilityTypesService`, 17 `AvailabilityRulesService`. `UsersService` gains `listUsers()` (`GET /users`), and `deleteUser` the reason `concurrent_update`, which the API answers since plan step 51 (section 13). The journeys file `frontend/tests/integration/calendar.test.ts` with the throw-away User `fe-calendar` (section 14.2). Error codes per route are architecture section 4's; spec 11.1 differed on routes 9 and 10, and its v14 corrects route 9 (decision 32). The journeys keep the settings they read in a git-ignored file until they are written back, so even a killed run is repaired by the next one (decision 35). Decisions 29–37. The unit tests share one per-method suite, `tests/unit/services/suite.ts` (section 14.1). No change to the existing services' behaviour but `deleteUser`'s new reason; no existing test changed. |
 | v5 | 2026-11-05 | Implemented (brief 32, part B); acceptance in section 14.3. What the code fixed that the sketches left open: `api.ts` has two failure builders, `apiFailure(code, …)` for a route's code (and `UsersService`'s check before any request) and `transportFailure(reason, …)` for the five transport reasons, typed `ApiFailure<never>` so that it fits every route (the sketches' `failure<C>`); `toApiAnswer` reads an empty non-2xx body as `{}`, so a 403 without body is also `session_rejected`; `RefreshService` maps Cognito's reasons with a complete `Record<AuthFailureReason, RefreshFailureReason>` (section 11.5 as a table in code). Tests: the store rows "login writes" and "login failure" of section 9.8 live in `login.service.test.ts`, with the service they exercise; the unit tests share `tests/unit/services/fixtures.ts` (unsigned JWTs, `Response` builders, a session factory); RxJS's `timer` schedules with `setInterval`, so tests that fake timers must fake it (the schedule tests fake `setTimeout`, `setInterval` and `Date` only, and flush fetch promises with the real `setImmediate`); a test session must expire within 24.8 days of the clock, or the store's `setTimeout` overflows and fires at once. Section 5 points at section 14.1 for the tree. No design change. |
 
 ---
@@ -32,7 +33,9 @@ The browser front end has two layers (brief `prompts/30-design-first-service-cla
 This document fixes the rules of the services layer, the pattern every service follows, and
 designs the first service, **login** (sections 1 to 8). The later building blocks are added as
 sections of their own, following the same pattern: the session store (9), the shared request
-helpers (10), token refresh (11), Hello World (12), and user administration (13).
+helpers (10), token refresh (11), Hello World (12), and user administration (13); since v6 the
+calendar settings (15), the availability types (16) and the availability rules (17). The calendar
+view and the appointments follow (plan step 54).
 
 The services layer is implemented in `frontend/src/services/` (v2). It was created ahead of the
 front-end architecture document, as the one exception of `docs/FOLDER_STRUCTURE.md` section 7:
@@ -541,6 +544,15 @@ unexpected`).
 | 26 | Integration: one ordered journeys file (`journeys.test.ts`) next to the login file; a fixed throw-away user `fe-journey`, removed before and after through `UsersService` itself | Mirrors the back end's journeys. No AWS SDK in `frontend/` tests; a fixed name with removal at both ends survives a crashed run (section 14). |
 | 28 | The `SessionStore` is the only place that holds tokens (rule 9); no result, state or service field carries one | The user's decision on reviewing v4 part A. One holder means one place to clear: after logout or expiry no replayed stream still holds a token. It changes `LoginService`'s success (decision 4). |
 | 27 | The missing CORS configuration of the API is recorded as a known gap, not fixed | Brief 32, correction 2. It belongs to the front-end architecture (hosting); the tests run in Node, which does not apply CORS (section 10.3). |
+| 29 | `ApiRequest` is a union: `GET` and `DELETE` take no `body` (`body?: never`), `POST`, `PUT` and `PATCH` may; `query?: Record<string, string>` encoded with `URLSearchParams`, keys in the order given, no `?` when absent or empty | Brief 54, point 1 (spec 16.1). The compiler refuses a body where fetch would refuse it (`GET`) or the API reads none (`DELETE`). `query` is added now for step 54's routes 15 and 16; `api.test.ts` proves it. |
+| 30 | `ApiFailure.conflicts` is set only with `availability_conflict` (a route code); the service keeps the entries whose `appointmentId`, `username`, `start`, `end` are strings, copied field by field; a missing or non-array list gives `[]`; the reason stays `availability_conflict` in every case | Brief 54, point 1. The view can always list what it got, and a malformed answer does not turn a known refusal into `unexpected`. Copying the four fields keeps anything else the server might add out of the view (section 17.7). |
+| 31 | `pending` carries **every argument of the call under the API contract's names** from `shared/` (`typeId`, `patternId`, `windowId`, `date`, `name`, `windows`); a whole-object argument is named after its object (`settings`, `pattern`, `window`); a load with no argument carries nothing. A load's streams are named after what it loads (`settingsResult$`, `typesResult$`, `patternsResult$`, `listUsersResult$`), every other method's after the method (`updateResult$`, `createResult$`, `renameResult$`, `removeResult$`, `createPatternResult$`, …), each with its `…State$` | Brief 54, point 2; step 54 copies it. Generalises `deleteUserState$`'s `username` (decision 24) so that a view can show what is pending without keeping its own copy. The names follow spec 16.2. |
+| 32 | The error codes of each route are architecture section 4's, which governs where it describes a route (architecture v12). Spec 11.1 v13 differed on two routes: route 9 (`PUT /calendar/patterns/{patternId}`) has no `limit_reached` (v13 wrote "as #8"; **spec v14 writes the list out without it**), route 10 (`DELETE /calendar/patterns/{patternId}`) no `availability_overlap` (spec footnote 1: never answered); if either arrived it would be `unexpected`. `forbidden`, `invalid_json` and `internal_error` are normal reasons. `type_not_found` is one reason for its 404 (path) and its 409 (body) | Brief 54, point 4; route 9 found while implementing, corrected in spec v14 on review. Route 10 stays as the spec's footnote explains it; section 16 of the spec is historical for these services once this document has them. One reason per meaning: the view's text is the same for both `type_not_found` statuses. |
+| 33 | Validation before sending: each method parses its input with the shared schema (path first, then body, the handler's order) and on failure answers `invalid_request` with no request sent; the `message` is the first zod issue with its field, `end: end must be after start` (path joined with `.`; without a path the message alone), built by `invalidRequest` in `api.ts`; on success the service sends **zod's parsed output** (the trimmed name), not the caller's input. Nothing that only the server knows is checked (`date_in_past`, overlaps, conflicts, limits, unknown types) | Brief 54, point 5 (spec 16.4). As `UsersService` with `Username`: the front end refuses exactly what the API refuses, by construction. Sending the parsed output means the request is the one the schema accepted. `invalidRequest` takes the error's shape, so `frontend/src` still imports no `zod` (no new allowed import). |
+| 34 | A success is checked by hand: the expected status (200, 201 or 204), the top-level shape (an object; the array under `types`, `patterns`, `users`) and the object's id (`typeId`, `patternId`, `windowId`, `date`; `timeZone` for the settings; each listed element's id). The rest is trusted to the contract; anything else is `unexpected`. Success values: `{ settings }`, `{ types }`, `{ type }`, `{ patterns }`, `{ pattern }`, `{ override }`, `{ window }`, `{ users }`; a delete carries the id of the call (`typeId`, `patternId`, `date`, `windowId`). No response schemas in `shared/` | Brief 54, point 3. The same depth as `UsersService`: enough to catch a wrong `apiUrl` or route, without a second, hand-kept copy of every response type. `shared/` keeps TypeScript types only for responses. |
+| 35 | The calendar journeys (`calendar.test.ts`) never reset the table and never delete or change what they did not create: throw-away User `fe-calendar`; types `fe-calendar …`; dates in a 31-day band from today + 330, each block on a date with no window and no override; a clean-up of windows, overrides and patterns of its types, then its types, before and after; settings written back (also in `afterAll`), and kept until then in `fe-calendar-settings.local.json` (git-ignored) so that the next run writes them back after a killed one; a limit filled by others' data fails with a clear message. `availability_conflict` end to end waits for step 54 | Brief 54, point 6 (plan "How these steps are run": the front-end journeys create only their own items). A free date makes the overlap checks independent of the back-end journeys' patterns. The settings file (added on review of step 53): a run killed during the settings test (no `afterAll`) left the test's values, and nothing in the table says what the earlier values were, so the next run wrote those back (seen in the acceptance, section 14.5). Now the values read are written to the file before the first write and removed after the write-back; `beforeAll` and `afterAll` write back whatever the file holds and remove it. The name matches the repository's `*.local.json` ignore rule. |
+| 36 | `CalendarSettingsService` and `AvailabilityTypesService` serve both roles (routes 1 and 3 are both roles'; their writes answer a User `forbidden`); `AvailabilityRulesService` and `UsersService` are the Administrator's (every route admin only), and `listUsers` joins `UsersService` | Brief 54's open questions. One service per resource, not per role: the API is the authority on roles (section 13.6), and a User needs the settings and the type names for the calendar. |
+| 37 | `deleteUser` accepts `concurrent_update` | Since plan step 51 the delete cancels the User's appointments under the calendar lock, which can be busy (architecture section 4); without the code the answer was `unexpected`. The view may offer "try again". |
 
 ---
 
@@ -914,17 +926,26 @@ export type ApiFailure<C extends ApiErrorCode> = {
   status: 'failure';
   reason: C | TransportFailureReason;
   message: string; // the API's own text when there is one; never a token
+  // Only with `availability_conflict` (v6): the body's well-formed entries, [] when it has none.
+  conflicts?: AppointmentConflict[];
 };
 // A 2xx. `body` is the parsed JSON, or undefined when the body is empty (the 204 of a delete).
 export type ApiOk = { status: 'ok'; httpStatus: number; body: unknown };
 
-export type ApiRequest<C extends ApiErrorCode> = {
-  method: 'POST' | 'DELETE';
-  path: string;         // '/hello', '/users', '/users/<encoded username>'
-  body?: unknown;       // sent as JSON
-  codes: readonly C[];  // the route's error codes (architecture section 4)
+// A union (v6, decision 29): the compiler refuses a body where fetch would (GET) or the API reads none (DELETE).
+type ApiRequestBase<C extends ApiErrorCode> = {
+  path: string;                    // '/hello', '/users', '/calendar/types/<encoded typeId>'
+  query?: Record<string, string>;  // URLSearchParams, keys in the order given; no '?' when absent or empty
+  codes: readonly C[];             // the route's error codes (architecture section 4)
 };
+export type ApiRequest<C extends ApiErrorCode> =
+  | (ApiRequestBase<C> & { method: 'GET' | 'DELETE'; body?: never })
+  | (ApiRequestBase<C> & { method: 'POST' | 'PUT' | 'PATCH'; body?: unknown }); // body sent as JSON
 ```
+
+`AppointmentConflict` is the shared type of spec 6.7 (`{ appointmentId, username, start, end }`,
+all strings). v5 had `method: 'POST' | 'DELETE'` and neither `query` nor `conflicts`; the services
+of v5 needed no edit for the change.
 
 **The function**
 
@@ -941,7 +962,8 @@ export function apiCall<C extends ApiErrorCode>(
     switchMap((session) => {
       if (!session) return of(failure<C>('not_signed_in', 'Nobody is signed in'));
       const hasBody = request.body !== undefined;
-      return fromFetch(config.apiUrl + request.path, {
+      const query = new URLSearchParams(request.query).toString(); // v6
+      return fromFetch(config.apiUrl + request.path + (query === '' ? '' : `?${query}`), {
         method: request.method,
         headers: {
           Authorization: `Bearer ${session.accessToken}`,
@@ -975,7 +997,8 @@ export function apiCall<C extends ApiErrorCode>(
 | 2xx, JSON body | `ok`, the parsed body (the service checks its shape) | unchanged |
 | any status, non-empty body that is not JSON | `server`, `API answered 502 without JSON` | unchanged |
 | 403 without a string `error` field | `session_rejected` (API Gateway: token expired or invalid) | `clear(used)` |
-| any status, `error` is one of `request.codes` | that code, with the body's `message` (403 `forbidden`, 403 `cannot_delete_admin`, 400 `invalid_request`, 404 `user_not_found`, 409 `user_exists`, 500 `internal_error`, …) | unchanged |
+| any status, `error` is `availability_conflict` and in `request.codes` (v6) | `availability_conflict` with `conflicts`: the entries of the body's `conflicts` whose four fields are strings, copied field by field (nothing else of an entry); `[]` when `conflicts` is missing or not an array | unchanged |
+| any status, `error` is one of `request.codes` | that code, with the body's `message` (403 `forbidden`, 403 `cannot_delete_admin`, 400 `invalid_request`, 404 `user_not_found`, 409 `user_exists`, 500 `internal_error`, …); no `conflicts` field, even when the body has one | unchanged |
 | any status, `error` not in `request.codes` | `unexpected` | unchanged |
 | 5xx without `error` (API Gateway's 500 at an authorizer outage; 502, 503, 504) | `server` | unchanged |
 | 429 without `error` (stage throttling, 5 req/s) | `server` | unchanged |
@@ -987,12 +1010,22 @@ body that is not an object is read as `{}`, as in section 4.5.
 The handlers' 401 `unauthorized` (claims missing in the authorizer's context, which cannot happen
 behind API Gateway) is caught by the 401 row first: every 401 means the token cannot be used.
 
+**Helpers for the services** (v6). Three small exports that every calendar service uses, so the
+services keep only their subjects, their pipelines and their shape checks:
+
+| Export | What it does |
+|---|---|
+| `invalidRequest(error)` | The failure of a check made before any request (decision 33): `invalid_request` with the first issue of a shared schema's error, `<field>: <message>`, the field path joined with `.` (`windows.1.end: end must be after start`); an issue without a path gives its message alone (`Unrecognized key: "timeZone"`). It takes the error's shape (`{ issues: { path, message }[] }`), not zod's type: `frontend/src` may not import `zod` (section 5). |
+| `unexpectedAnswer(answer)` | `unexpected`, `API answered <status> with an unexpected body`: a 2xx that fails a service's shape check (decision 34). `HelloService` and `UsersService`' create and delete keep their own identical lines (v5). |
+| `hasString(value, key)` | Whether a parsed body is an object with a string `key`: the shape checks of decision 34. |
+
 **Security notes**
 
 - The token is read from the store at the moment of the call and goes only into the
   `Authorization` header: never into the URL, the outcome or a message.
 - A path parameter is passed through `encodeURIComponent` by the caller (section 13), after the
-  shared `Username` schema has accepted it.
+  shared schema has accepted it (`Username`; since v6 `TypeIdParam`, `PatternIdParam`,
+  `WindowIdParam`, `DateParam`). Query values go through `URLSearchParams`, which encodes them.
 - Nothing is logged.
 
 ### 10.3 Known gap: the API has no CORS configuration
@@ -1047,6 +1080,12 @@ section 6, which stays unchanged):
 | offline | fetch rejects | `network`; the session stays |
 | stale rejection | first request pending; `set(c)`; the first answers 403 without `error` | `session_rejected`, and `session$` still gives `c` |
 | no leak | all of the above | no outcome contains the access token |
+| `GET`, `PUT`, `PATCH` (v6) | 200 | that method; a body only for `PUT`/`PATCH` when given |
+| no body on `GET`/`DELETE` (v6) | — | `// @ts-expect-error` on both: the compiler refuses them |
+| query (v6) | 200 | absent and `{}`: no `?`; two keys in the order given; values encoded (`a b&c=d` → `a+b%26c%3Dd`) |
+| conflicts (v6) | 409 `availability_conflict` | the list; malformed entries dropped and extra fields not copied; missing, `null` or not an array → `[]` |
+| no conflicts elsewhere (v6) | 409 `availability_overlap` with a `conflicts` field | no `conflicts` on the failure; `availability_conflict` outside the route list → `unexpected`, no `conflicts` |
+| helpers (v6) | — | `invalidRequest` with a path, without a path, with no issue; `hasString` on objects and non-objects; `unexpectedAnswer` names the status |
 
 ---
 
@@ -1397,9 +1436,14 @@ gives `null`.
 | Call | Request | Success | Errors (architecture section 4) |
 |---|---|---|---|
 | `createUser(username)` | `POST /users`, body `{ "username": "…" }` | `201` `CreateUserResponse` `{ username, password }` | 400 `invalid_json` / `invalid_request`, 403 `forbidden`, 409 `user_exists`, 500 `internal_error` |
-| `deleteUser(username)` | `DELETE /users/{username}`, no body | `204`, no body | 400 `invalid_request`, 403 `forbidden` / `cannot_delete_admin`, 404 `user_not_found`, 500 `internal_error` |
+| `deleteUser(username)` | `DELETE /users/{username}`, no body | `204`, no body | 400 `invalid_request`, 403 `forbidden` / `cannot_delete_admin`, 404 `user_not_found`, 409 `concurrent_update` (v6), 500 `internal_error` |
+| `listUsers()` (v6) | `GET /users`, no body | `200` `ListUsersResponse` `{ users: UserSummary[] }`, the plain Users sorted by username, never an administrator (spec 10.1) | 403 `forbidden`, 500 `internal_error` |
 
-Both through `apiCall` (section 10.2), so the token rules of section 9.4 apply.
+All through `apiCall` (section 10.2), so the token rules of section 9.4 apply. Since plan step 51
+a delete first cancels the User's future appointments under the calendar lock (architecture
+section 4), which can be busy: `409 concurrent_update`, before any Cognito change; the view may
+offer "try again" (v6, decision 37). Every route of this section is admin only, so `UsersService`
+stays the Administrator's service; `listUsers` feeds the "book for a User" choice (spec 16.8).
 
 ### 13.2 Configuration
 
@@ -1415,7 +1459,7 @@ export type CreateUserFailureReason =
   | Extract<ApiErrorCode, 'forbidden' | 'invalid_json' | 'invalid_request' | 'user_exists' | 'internal_error'>
   | TransportFailureReason;
 export type DeleteUserFailureReason =
-  | Extract<ApiErrorCode, 'forbidden' | 'invalid_request' | 'cannot_delete_admin' | 'user_not_found' | 'internal_error'>
+  | Extract<ApiErrorCode, 'forbidden' | 'invalid_request' | 'cannot_delete_admin' | 'user_not_found' | 'concurrent_update' | 'internal_error'>
   | TransportFailureReason;
 
 // The success carries the generated password: the one exception of rule 6 (section 13.7).
@@ -1429,7 +1473,16 @@ export type DeleteUserResult =
   | { status: 'success'; username: string }
   | { status: 'failure'; reason: DeleteUserFailureReason; message: string };
 export type DeleteUserState = { status: 'idle' } | { status: 'pending'; username: string } | DeleteUserResult;
+
+// GET /users (v6): the plain Users, never an administrator (spec 10.1).
+type ListUsersCode = Extract<ApiErrorCode, 'forbidden' | 'internal_error'>;
+export type ListUsersFailureReason = ListUsersCode | TransportFailureReason;
+export type ListUsersResult = { status: 'success'; users: UserSummary[] } | ApiFailure<ListUsersCode>;
+export type ListUsersState = { status: 'idle' } | { status: 'pending' } | ListUsersResult;
 ```
+
+The v6 types write a failure as `ApiFailure<Code>` rather than spelling out its fields: the same
+object `apiCall` produces, so the result types cannot drift from it (sections 15–17 do the same).
 
 `invalid_request` is both the API's code and the outcome of the check made before any request
 (section 13.4): the same name, because it is the same rule (the shared `Username` schema).
@@ -1440,7 +1493,8 @@ export type DeleteUserState = { status: 'idle' } | { status: 'pending'; username
 import { Username, type ApiErrorCode } from '@shared-calendar/shared';
 
 const CREATE_CODES = ['forbidden', 'invalid_json', 'invalid_request', 'user_exists', 'internal_error'] as const satisfies readonly ApiErrorCode[];
-const DELETE_CODES = ['forbidden', 'invalid_request', 'cannot_delete_admin', 'user_not_found', 'internal_error'] as const satisfies readonly ApiErrorCode[];
+const DELETE_CODES = ['forbidden', 'invalid_request', 'cannot_delete_admin', 'user_not_found', 'concurrent_update', 'internal_error'] as const satisfies readonly ApiErrorCode[];
+const LIST_CODES = ['forbidden', 'internal_error'] as const satisfies readonly ApiErrorCode[]; // v6
 const INVALID_USERNAME =
   'A username has 3 to 32 characters: lowercase letters, digits, ".", "_" or "-", starting with a letter or a digit';
 
@@ -1497,7 +1551,10 @@ export class UsersService {
 - `Username` comes from `@shared-calendar/shared`, never from `zod` directly (the ESLint guard of
   section 5 would reject `zod`). So the front end rejects exactly what the API rejects, and
   `Bob` never leaves the browser.
-- The two pairs are independent: a create and a delete can be pending together.
+- The pairs are independent: a create, a delete and a list can be pending together.
+- **`listUsers()`** (v6) is the third pair, `listUsersResult$` / `listUsersState$`, in the shape
+  of `HelloService.hello()`: no argument, so its `pending` carries nothing (decision 31); it
+  cancels a pending list only. Its success is `{ status: 'success', users }`.
 
 ### 13.5 Mapping the answer
 
@@ -1506,8 +1563,9 @@ export class UsersService {
 | the username fails `Username` | `invalid_request`, no request | `invalid_request`, no request |
 | `201` with `username` and `password` strings | `success`, `user: { username, password }` | — |
 | `204` | — | `success`, `username` of the call |
+| `200` with an array `users` whose every element has a string `username` (v6) | `listUsers`: `success`, `users` | |
 | any other 2xx | `unexpected` | `unexpected` |
-| an `error` code of the route | that code (`user_exists`, `forbidden`, …) | that code (`user_not_found`, `cannot_delete_admin`, …) |
+| an `error` code of the route | that code (`user_exists`, `forbidden`, …) | that code (`user_not_found`, `cannot_delete_admin`, `concurrent_update` (v6), …) |
 | everything else | the transport rows of section 10.2 | the transport rows of section 10.2 |
 
 `forbidden` and `cannot_delete_admin` are handler 403s with an `error` field: the session stays
@@ -1569,6 +1627,8 @@ answers `forbidden` otherwise.
 | cancel | create pending, `createUser` again | the first signal is aborted; one create result |
 | retry after failure | 409, then 201 | two results, the second `success` |
 | password only where allowed | create success | the password appears in the create success value only: not in the delete streams, not in the store |
+| delete, busy lock (v6) | 409 `{ error: 'concurrent_update' }` | `failure concurrent_update` with the message; the session stays |
+| `listUsers` (v6) | 200 `{ users }` and the rest | the per-method suite of section 14.1 (`suite.ts`): success, request shape (`GET /users`, no body), both route codes, `user_not_found` → `unexpected`, wrong answers (no `users`, an element without `username`, a 201), `session_rejected`, `not_signed_in`, network then success, cancel (a pending `deleteUser` survives), late subscriber, no leak |
 
 ### 13.9 Integration checks
 
@@ -1577,6 +1637,9 @@ As admin (section 14): create `fe-journey` → `success` with a password; `fe-jo
 request sent; delete `admin` → `cannot_delete_admin`; delete `fe-journey` → `success`, after which
 its sign-in is `invalid_credentials`; delete it again → `user_not_found`. As alice: create →
 `forbidden`, and `session$` still gives her session.
+
+`listUsers` (v6, `calendar.test.ts`): as admin, the list contains `fe-calendar` and `alice`, never
+`admin`; as `fe-calendar`, `forbidden`.
 
 ---
 
@@ -1596,21 +1659,47 @@ frontend/src/services/
 ├── refresh.types.ts      # RefreshFailureReason, RefreshResult, RefreshState
 ├── hello.service.ts      # HelloService (12)
 ├── hello.types.ts        # HelloFailureReason, HelloResult, HelloState
-├── users.service.ts      # UsersService (13)
-└── users.types.ts        # Create/DeleteUser FailureReason, Result, State
+├── users.service.ts      # UsersService (13; listUsers since v6)
+├── users.types.ts        # Create/Delete/ListUsers FailureReason, Result, State
+├── calendar-settings.service.ts   # CalendarSettingsService (15, v6)
+├── calendar-settings.types.ts     # Settings / UpdateSettings FailureReason, Result, State
+├── availability-types.service.ts  # AvailabilityTypesService (16, v6)
+├── availability-types.types.ts    # Types / CreateType / RenameType / RemoveType …
+├── availability-rules.service.ts  # AvailabilityRulesService (17, v6)
+└── availability-rules.types.ts    # Patterns / CreatePattern / … / DeleteWindow …
 
 frontend/tests/
 ├── unit/services/        # one file per source file: session.store, cognito, api, jwt,
-│                         # login.service, refresh.service, hello.service, users.service;
-│                         # plus fixtures.ts (v5): JWT, Response and session builders
+│                         # login.service, refresh.service, hello.service, users.service,
+│                         # calendar-settings.service, availability-types.service,
+│                         # availability-rules.service (v6);
+│                         # plus fixtures.ts (v5): JWT, Response and session builders,
+│                         # and suite.ts (v6): the per-method suite of the API services
 └── integration/
-    ├── local.ts           # the local stack's URLs and client id (reads backend/env.local.json)
+    ├── local.ts           # the local stack's URLs and client id (reads backend/env.local.json);
+    │                      # since v6 also `outcome()`, used by calendar.test.ts
     ├── login.service.test.ts  # the same journeys; tokens read from the store (section 9.9)
-    └── journeys.test.ts   # sections 11.9, 12.9, 13.9, in order
+    ├── journeys.test.ts   # sections 11.9, 12.9, 13.9, in order
+    └── calendar.test.ts   # v6: sections 13.9 (listUsers), 15.9, 16.9, 17.9 (section 14.4)
 ```
 
-`local.ts` is a helper, not a test (the integration project selects `*.test.ts` only). Nothing
-new in `package.json`, `tsconfig.json`, `vitest.config.ts` or the ESLint guard.
+`local.ts` and `suite.ts` are helpers, not tests (both projects select `*.test.ts` only). Nothing
+new in `package.json`, `tsconfig.json`, `vitest.config.ts` or the ESLint guard (v6 included).
+
+**`suite.ts`** (v6). Every API method of sections 13 (`listUsers`), 15, 16 and 17 is tested by one
+function, `describeMethod(make, spec, other)`, so that the list of spec 16.6 is the same for each
+method and cannot be forgotten for one. A `MethodSpec` names the method's streams, a valid call,
+the expected `pending`, the request (method, path, body as sent), a success stub and value, the
+answers outside the contract, the route's codes (architecture section 4), codes of other routes
+that must stay `unexpected`, and the inputs refused before any request with their messages. The
+suite runs, per method: success (states `idle` → `pending` with the arguments → the same success
+object); request shape; **every route code** (`it.each`), the session kept; the other routes'
+codes → `unexpected`; the wrong answers → `unexpected`; `session_rejected` (the store cleared);
+`not_signed_in` (no fetch); each invalid input → `invalid_request` with the field, no fetch;
+network then success; **cancel**: a second call aborts the first, while a pending call of `other`
+(another method of the same service) is not aborted; late subscriber; no token in any value.
+Behaviour that only some methods have (the conflicts list, `deleteUser`'s v5 tests) stays in the
+service's own test file.
 
 ### 14.2 The journeys
 
@@ -1661,3 +1750,378 @@ Journey 13 needs the `REFRESH_TOKEN_AUTH` of cognito-local, checked in section 1
    `fe-journey` at both ends makes it rerunnable).
 3. `DYNAMODB_PORT=8002 npm run verify -w backend`: PASSED, with the back end's 13 journeys after
    the front end's; `git status` shows no change in `backend/` or `shared/`.
+
+### 14.4 The calendar journeys (v6)
+
+`frontend/tests/integration/calendar.test.ts` (plan step 53; step 54 adds the calendar view and
+the appointments). The local `calendar` table is shared with the back end's journeys, which empty
+it at their start and leave their data at their end, and with the smoke test (spec 18.2, 18.4).
+So this file, unlike the back end's, **never resets the table**, and never deletes or changes what
+it did not create (decision 35):
+
+- **Its throw-away User** is `fe-calendar`, created and removed through `UsersService` as admin,
+  before (accepting `user_not_found`) and after, as `fe-journey` in section 14.2.
+- **Its types** are named `fe-calendar …`. Its patterns, overrides and one-off windows use only
+  those types.
+- **Its dates** lie in a band of 31 days from today + 330 (today in the calendar's zone, from the
+  settings), far from the smoke test's 50–80 days and from the back-end journeys' dates. Each block
+  takes a date of the band that has **no window and no override** in the Administrator's view
+  (`GET /calendar` through `apiCall`, since `CalendarService` is step 54's), so nothing it does not
+  own can overlap there. A pattern has `validFrom` = `validUntil` = that date and its weekday.
+- **Clean-up**, in `beforeAll` and `afterAll`: the one-off windows of its types on the band, the
+  band's overrides whose windows are all of its types (it never sets an empty override, which it
+  could not tell apart from someone else's), the patterns of its types, then its types (R-TYPE-03
+  needs the references gone first). A run that failed half-way is repeated without a manual step.
+- **Settings**: read first, written with other values, read back as a User, then written back with
+  the values read; `afterAll` writes them back too when a failure came between. `updatedAt` and
+  `updatedBy` stay changed, which is acceptable locally. The values read are kept in
+  `frontend/tests/integration/fe-calendar-settings.local.json` (git-ignored by `*.local.json`)
+  from before the first write until the write-back; `beforeAll` and `afterAll` write back whatever
+  that file holds and remove it, so a run **killed** in that test (no `afterAll`) is repaired by
+  the next run. The file exists only while the settings are not the ones read.
+- **Limits**: before creating a type or a pattern it counts those it does not own; if they fill the
+  limit (20 types, 50 patterns) the test fails with a message that says so. A free date has no
+  one-off window, so the limit of 10 per date cannot be reached by others' data.
+- Every `describe` block creates the state it needs; the file does not rely on the order of the
+  files. Runs only with `RUN_INTEGRATION=1`, never at the same time as the back end's journeys.
+
+| Block | Journey | Expect |
+|---|---|---|
+| settings | admin loads, updates to other values, `fe-calendar` loads, admin writes the read values back | `success` each time; the update's `updatedBy` is the admin; the User reads the new values; the four values are back |
+| | `fe-calendar` updates | `forbidden`; the settings unchanged |
+| | admin updates with `bookingHorizonDays: 0` | `invalid_request`, `bookingHorizonDays: …`; no request sent |
+| types | create `  fe-calendar Studio  `, create `fe-calendar STUDIO`, rename, load as `fe-calendar`, remove, remove again | `success` with the trimmed name; `type_name_exists`; `success`; the User's list has the new name; `success` with the `typeId`; `type_not_found` |
+| | rename an unknown ULID | `type_not_found` (404) |
+| | `fe-calendar` creates a type | `forbidden` |
+| | create `   ` | `invalid_request`, `name: 1 to 40 characters`; no request sent |
+| patterns | create on a free date, load, create an overlapping one, update, remove the type, delete, delete again | `success`; listed; `availability_overlap`; `success`; `type_in_use`; `success` with the `patternId`; `pattern_not_found` |
+| | create with an unknown `typeId` | `type_not_found` (409) |
+| | `fe-calendar` loads the patterns | `forbidden` |
+| overrides | set two windows in reverse order, set two overlapping ones, delete, delete again | `success`, windows sorted by start; `availability_overlap`; `success` with the date; `override_not_found` |
+| | set on yesterday | `date_in_past` |
+| | `fe-calendar` sets one | `forbidden` |
+| one-off windows | create, create an overlapping one, remove the type, delete, delete again | `success`; `availability_overlap`; `type_in_use`; `success` with the `windowId`; `window_not_found` |
+| | create on yesterday | `date_in_past` |
+| | create with `end` before `start` | `invalid_request`, `end: end must be after start`; no request sent |
+| users | admin lists; `fe-calendar` lists | the list has `fe-calendar` and `alice`, not `admin`; `forbidden` |
+
+`availability_conflict` needs a booked appointment, which only step 54's `AppointmentsService`
+makes: its end-to-end proof waits for step 54; here the unit tests prove the mapping and
+`conflicts` (sections 10.4 and 17.8).
+
+### 14.5 Acceptance check (v6, plan step 53)
+
+1. `npm run verify -w frontend` green with 100 % line coverage on `frontend/src`.
+2. `RUN_INTEGRATION=1 npm run test:integration -w frontend` green twice in a row, and again after
+   `RUN_INTEGRATION=1 DYNAMODB_PORT=8002 npm run test:integration -w backend` (never at the same
+   time); after the runs the calendar holds nothing of `fe-calendar` and the settings are as before.
+3. A run with a forced failure in the middle of `calendar.test.ts`, then a normal run that passes.
+4. The root `DYNAMODB_PORT=8002 npm run verify` green; no diff in `backend/` or `shared/`.
+
+**As run (2026-11-15, v6):**
+
+1. `npm run verify -w frontend`: typecheck, lint, 450 unit tests in 11 files (129 before; none of
+   them changed), 100 % lines (branches 99.58 %: the one of v5, in `cognito.ts`).
+2. Integration (`calendar.test.ts`: 18 tests; with the two v5 files 37): green twice in a row, then
+   green after the back end's 90 journeys. A read-only snapshot through the API (settings, types,
+   patterns, the band's view, `GET /users`) taken before and after was identical each time.
+3. Forced failure, from a temporary copy of the file outside the repository (with its own vitest
+   configuration), never by editing the committed test. **Thrown**: after the settings update the
+   copy makes a type, a pattern, an override, two one-off windows (one on the override's date), and
+   throws: `afterAll` wrote the settings back and removed everything; the next normal run passed,
+   snapshot identical. **Killed** (`SIGKILL` of the test worker at the same point, so no `afterAll`):
+   the next normal run removed the type, the pattern, the override, both windows and `fe-calendar`,
+   and passed; the **settings stayed at the copy's values**, which the next run took as "the values
+   read". They were put back by hand (`PUT /calendar/settings` with the values of the snapshot).
+   Hence the settings file (decision 35). **Killed again, with the file**: the file held the values
+   read (48 / 2 / 30 / `null`) and the settings the copy's (700 / 7 / 300 / 77); the next normal run
+   wrote the file's values back, removed the file and passed; snapshot identical. The thrown
+   variant, repeated with the file: `afterAll` wrote them back and removed it; snapshot identical.
+4. Root `DYNAMODB_PORT=8002 npm run verify`: PASSED (back end 1087 unit + 90 integration, `shared`
+   377, front end 450); `git status` shows no change in `backend/` or `shared/`.
+
+---
+
+## 15. `CalendarSettingsService` (v6)
+
+### 15.1 The remote calls
+
+| Call | Request | Success | Errors (architecture section 4) |
+|---|---|---|---|
+| `load()` | `GET /calendar/settings`, no body; **both roles** | `200` `CalendarSettings` | 403 `forbidden` (neither group), 500 `internal_error` |
+| `update(settings)` | `PUT /calendar/settings`, body `UpdateSettingsBody` (all four values); **admin only** | `200` `CalendarSettings` | 400 `invalid_json` / `invalid_request`, 403 `forbidden`, 409 `concurrent_update`, 500 `internal_error` |
+
+`CalendarSettings` and `UpdateSettingsBody` are the shared types (spec 9, 11.4, 11.5). Both roles
+use the one service (decision 36): a User needs the settings to explain the rules (notice,
+horizon), and calling `update` as a User is answered `forbidden` by the API, as any admin route.
+
+### 15.2 Configuration
+
+`ApiConfig = { apiUrl }`, plus the `SessionStore` as the second argument, as for `HelloService`.
+
+### 15.3 Types (`calendar-settings.types.ts`)
+
+```ts
+type LoadCode = Extract<ApiErrorCode, 'forbidden' | 'internal_error'>;
+export type SettingsFailureReason = LoadCode | TransportFailureReason;
+export type SettingsResult = { status: 'success'; settings: CalendarSettings } | ApiFailure<LoadCode>;
+export type SettingsState = { status: 'idle' } | { status: 'pending' } | SettingsResult;
+
+type UpdateCode = Extract<ApiErrorCode, 'forbidden' | 'invalid_json' | 'invalid_request' | 'concurrent_update' | 'internal_error'>;
+export type UpdateSettingsFailureReason = UpdateCode | TransportFailureReason;
+export type UpdateSettingsResult = { status: 'success'; settings: CalendarSettings } | ApiFailure<UpdateCode>;
+export type UpdateSettingsState = { status: 'idle' } | { status: 'pending'; settings: UpdateSettingsBody } | UpdateSettingsResult;
+```
+
+### 15.4 The class
+
+Two pairs, in the shape of `UsersService` (section 13.4): `settingsResult$` / `settingsState$`
+for `load()`, `updateResult$` / `updateState$` for `update(settings)` (decision 31 for the names).
+Each method cancels its own pending call only.
+
+- `load()` has no argument: `pending` carries nothing.
+- `update(settings)`: `pending` carries `{ settings }`, the argument as given. The service parses
+  it with the shared `UpdateSettingsBody`; on failure it answers `invalid_request` with
+  `invalidRequest` (section 10.2: `bookingHorizonDays: Too big: expected number to be <=365`, or
+  `Unrecognized key: "timeZone"` for a field the body may not carry), with no request sent. On
+  success it sends zod's parsed output (decision 33).
+
+### 15.5 Mapping the answer
+
+| Answer | `load` | `update` |
+|---|---|---|
+| the input fails `UpdateSettingsBody` | — | `invalid_request` with the field, no request |
+| `200` with an object whose `timeZone` is a string | `success`, `settings` | `success`, `settings` |
+| any other 2xx | `unexpected` | `unexpected` |
+| an `error` code of the route | that code | that code (`concurrent_update`, …) |
+| everything else | the transport rows of section 10.2 | the same |
+
+What is checked is the status and the object's identifying field, `timeZone` (decision 34); the
+other fields are trusted to the contract.
+
+### 15.6 Use from the view layer
+
+```ts
+const settings = new CalendarSettingsService({ apiUrl }, store);
+settings.settingsState$.subscribe((s) => { if (s.status === 'success') form.fill(s.settings); });
+settings.updateState$.subscribe((s) => {
+  saveButton.disabled = s.status === 'pending';
+  if (s.status === 'failure') formError.textContent = s.message; // concurrent_update: offer "try again"
+});
+settings.load();
+saveButton.onclick = () => settings.update(form.values());
+```
+
+After a write fails with `network` or `server` the server may still have applied it (spec 16.3):
+the view loads again before showing the outcome as certain.
+
+### 15.7 Security notes
+
+No secret: settings are not personal data. The token rules are those of section 10.2.
+
+### 15.8 Unit tests (`calendar-settings.service.test.ts`)
+
+The per-method suite of section 14.1 for both methods. `load`: `GET /calendar/settings`, no body;
+codes `forbidden`, `internal_error`; `concurrent_update` and `invalid_request` → `unexpected`;
+wrong answers (no `timeZone`, a 201, an empty 200). `update`: `PUT` with the JSON body; its five
+codes; `type_not_found` → `unexpected`; wrong answers (`timeZone` a number, a 204); invalid inputs
+with their messages: out of range, not an integer, a missing field, an unknown field (no path).
+
+### 15.9 Integration checks
+
+Section 14.4, block "settings".
+
+---
+
+## 16. `AvailabilityTypesService` (v6)
+
+### 16.1 The remote calls
+
+| Call | Request | Success | Errors (architecture section 4) |
+|---|---|---|---|
+| `load()` | `GET /calendar/types`; **both roles** | `200` `{ types: AvailabilityType[] }`, by name | 403 `forbidden`, 500 `internal_error` |
+| `create(name)` | `POST /calendar/types`, `{ name }`; admin | `201` `AvailabilityType` | 400 `invalid_json` / `invalid_request`, 403 `forbidden`, 409 `type_name_exists`, `limit_reached`, `concurrent_update`, 500 |
+| `rename(typeId, name)` | `PUT /calendar/types/{typeId}`, `{ name }`; admin | `200` `AvailabilityType` | 400 `invalid_json` / `invalid_request`, 403 `forbidden`, 404 `type_not_found`, 409 `type_name_exists`, `concurrent_update`, 500 |
+| `remove(typeId)` | `DELETE /calendar/types/{typeId}`, no body; admin | `204` | 400 `invalid_request`, 403 `forbidden`, 404 `type_not_found`, 409 `type_in_use`, `concurrent_update`, 500 |
+
+A User reads the types through this service too (route 3 is both roles'; decision 36): the view
+needs their names for the calendar's legend. The three writes are the Administrator's; a User gets
+`forbidden`.
+
+### 16.2 Configuration
+
+As section 15.2.
+
+### 16.3 Types (`availability-types.types.ts`)
+
+One `…FailureReason`, `…Result` and `…State` per method, as in section 15.3: `TypesResult`
+(`{ status: 'success', types }`), `CreateTypeResult` and `RenameTypeResult` (`{ …, type }`),
+`RemoveTypeResult` (`{ …, typeId }`, the id of the call). `pending`: nothing, `{ name }`,
+`{ typeId, name }`, `{ typeId }`. `type_not_found` is one reason for its 404 (a path id) and its
+409 (a body id, route 8 and later): the view says "this type no longer exists" in both cases
+(decision 32).
+
+### 16.4 The class
+
+Four pairs, `typesResult$` / `typesState$`, `createResult$` / `createState$`, `renameResult$` /
+`renameState$`, `removeResult$` / `removeState$`, each cancelling only its own pending call.
+Validation before sending (decision 33): `create` parses `{ name }` with `TypeBody` and sends the
+parsed output, so `'  Studio  '` goes out as `'Studio'` while `pending` keeps the argument as
+given; `rename` parses `TypeIdParam` first, then `TypeBody` (the handler's order: path, then
+body); `remove` parses `TypeIdParam`. A failure answers `invalid_request` (`name: 1 to 40
+characters`, `typeId: expected a ULID`), with no request sent. The id goes into the path through
+`encodeURIComponent`. The service does not check the name's uniqueness or the limit of 20: only the
+server knows the stored types.
+
+### 16.5 Mapping the answer
+
+| Answer | `load` | `create` / `rename` | `remove` |
+|---|---|---|---|
+| the input fails the schema | — | `invalid_request`, no request | `invalid_request`, no request |
+| the expected status (`200`, `201` / `200`, `204`) and shape | `success`, `types`: an array whose every element has a string `typeId` | `success`, `type`: an object with a string `typeId` | `success`, `typeId` of the call |
+| any other 2xx | `unexpected` | `unexpected` | `unexpected` |
+| an `error` code of the route | that code | that code | that code (`type_in_use`, …) |
+| everything else | section 10.2 | section 10.2 | section 10.2 |
+
+### 16.6 Use from the view layer
+
+```ts
+const types = new AvailabilityTypesService({ apiUrl }, store);
+types.typesState$.subscribe((s) => { if (s.status === 'success') typeList.render(s.types); });
+types.removeResult$.subscribe((r) => {
+  if (r.status === 'success') types.load(); // no service refreshes another, nor itself (spec 16.3)
+  if (r.status === 'failure' && r.reason === 'type_in_use') alert.show('Remove its windows first');
+});
+types.load();
+```
+
+### 16.7 Security notes
+
+No secret, no personal data. The token rules are those of section 10.2.
+
+### 16.8 Unit tests (`availability-types.service.test.ts`)
+
+The per-method suite of section 14.1 for the four methods, each with its route's codes and, as
+`unexpected`, codes of the neighbouring routes (`type_not_found` and `type_in_use` for `create`,
+`limit_reached` for `rename`, `invalid_json` for `remove`). Invalid inputs: an empty name after
+trimming, 41 characters, a control character; a `typeId` that is not a ULID (`../types`, lower
+case), and for `rename` with both wrong the path's message. Wrong answers: a missing or
+non-array `types`, an element without `typeId` or `null`, a 200 where a 201 is due and back, a 200
+for a delete.
+
+### 16.9 Integration checks
+
+Section 14.4, block "types".
+
+---
+
+## 17. `AvailabilityRulesService` (v6)
+
+### 17.1 The remote calls
+
+All admin only (a User gets `forbidden`). Codes from architecture section 4 (decision 32).
+
+| Call | Request | Success | Errors besides 403 `forbidden`, 500 `internal_error` |
+|---|---|---|---|
+| `loadPatterns()` | `GET /calendar/patterns` | `200` `{ patterns: WeeklyPattern[] }` | — |
+| `createPattern(pattern)` | `POST /calendar/patterns`, `PatternBody` | `201` `WeeklyPattern` | 400 `invalid_json` / `invalid_request` · 409 `type_not_found`, `limit_reached`, `availability_overlap`, `availability_conflict`, `concurrent_update` |
+| `updatePattern(patternId, pattern)` | `PUT /calendar/patterns/{patternId}`, `PatternBody` | `200` `WeeklyPattern` | 400 `invalid_json` / `invalid_request` · 404 `pattern_not_found` · 409 `type_not_found`, `availability_overlap`, `availability_conflict`, `concurrent_update` |
+| `deletePattern(patternId)` | `DELETE /calendar/patterns/{patternId}` | `204` | 400 `invalid_request` · 404 `pattern_not_found` · 409 `availability_conflict`, `concurrent_update` |
+| `setOverride(date, windows)` | `PUT /calendar/overrides/{date}`, `{ windows }` | `200` `DateOverride` | 400 `invalid_json` / `invalid_request` · 409 `date_in_past`, `type_not_found`, `availability_overlap`, `availability_conflict`, `concurrent_update` |
+| `deleteOverride(date)` | `DELETE /calendar/overrides/{date}` | `204` | 400 `invalid_request` · 404 `override_not_found` · 409 `date_in_past`, `availability_overlap`, `availability_conflict`, `concurrent_update` |
+| `createWindow(window)` | `POST /calendar/windows`, `OneOffWindowBody` | `201` `OneOffWindow` | 400 `invalid_json` / `invalid_request` · 409 `date_in_past`, `type_not_found`, `limit_reached`, `availability_overlap`, `concurrent_update` |
+| `deleteWindow(windowId)` | `DELETE /calendar/windows/{windowId}` | `204` | 400 `invalid_request` · 404 `window_not_found` · 409 `date_in_past`, `availability_conflict`, `concurrent_update` |
+
+Architecture section 4 governs. `updatePattern` has no `limit_reached` (an update never adds a
+pattern; spec v14 says so, v13 wrote "as #8") and `deletePattern` no `availability_overlap` (spec
+11.1 lists it, with footnote 1: it never happens). Either code, if it ever arrived, would
+be `unexpected`. Overrides and one-off windows have no list route: the Administrator's calendar
+view (route 15, `CalendarService`, step 54) carries them with their source and id (spec 11.1).
+
+### 17.2 Configuration
+
+As section 15.2.
+
+### 17.3 Types (`availability-rules.types.ts`)
+
+One `…FailureReason`, `…Result` and `…State` per method. Success values: `{ patterns }`,
+`{ pattern }` (create and update), `{ override }`, `{ window }`, and for the deletes the id of the
+call: `{ patternId }`, `{ date }`, `{ windowId }`. `pending` (decision 31): nothing, `{ pattern }`,
+`{ patternId, pattern }`, `{ patternId }`, `{ date, windows }`, `{ date }`, `{ window }`,
+`{ windowId }`. A failure is `ApiFailure<Code>`, so on the six routes that can answer
+`availability_conflict` the view finds `conflicts` on it (section 10.2):
+
+```ts
+rules.deleteWindowResult$.subscribe((r) => {
+  if (r.status === 'failure' && r.reason === 'availability_conflict') conflictList.render(r.conflicts ?? []);
+});
+```
+
+### 17.4 The class
+
+Eight pairs named after their methods (`patternsResult$` / `patternsState$` for the load,
+`createPatternResult$` / `createPatternState$`, …, `deleteWindowResult$` / `deleteWindowState$`),
+each cancelling only its own pending call. Validation before sending (decision 33), path first,
+then body:
+
+| Method | Schemas |
+|---|---|
+| `createPattern` | `PatternBody` |
+| `updatePattern` | `PatternIdParam`, then `PatternBody` |
+| `deletePattern` | `PatternIdParam` |
+| `setOverride` | `DateParam`, then `OverrideBody` (`{ windows }`) |
+| `deleteOverride` | `DateParam` |
+| `createWindow` | `OneOffWindowBody` |
+| `deleteWindow` | `WindowIdParam` |
+
+The messages name the field: `end: end must be after start`, `windows.1.end: end must be after
+start`, `validUntil: validUntil must not be before validFrom`, `date: not a real date`. The
+schemas decide only what is malformed by itself (`shared/src/calendar/schemas.ts`); the service
+does not check what only the server knows (`date_in_past`, which needs the calendar's "today";
+overlaps, conflicts, limits, unknown types).
+
+### 17.5 Mapping the answer
+
+| Answer | Result |
+|---|---|
+| the input fails its schema | `invalid_request` with the field, no request |
+| `loadPatterns`: `200` with an array `patterns`, every element with a string `patternId` | `success`, `patterns` |
+| `createPattern` `201`, `updatePattern` `200`: an object with a string `patternId` | `success`, `pattern` |
+| `setOverride` `200`: an object with a string `date` | `success`, `override` |
+| `createWindow` `201`: an object with a string `windowId` | `success`, `window` |
+| a delete's `204` | `success` with the id of the call |
+| any other 2xx | `unexpected` |
+| `availability_conflict` (routes that list it) | that reason, with `conflicts` |
+| another `error` code of the route | that code |
+| everything else | section 10.2 |
+
+### 17.6 Use from the view layer
+
+The availability-management screens of spec 16.8: a patterns list grouped by weekday from
+`patternsState$`, per-date editors that call `setOverride` / `deleteOverride` and
+`createWindow` / `deleteWindow`, and the conflicts list when a change is refused. To change a
+pattern "from next month on", the view calls `updatePattern` (setting `validUntil`) and then
+`createPattern` (spec 6.2); to "edit" a one-off window, `deleteWindow` then `createWindow`
+(R-ONE-02). After a success the view reloads the calendar view (spec 16.3).
+
+### 17.7 Security notes
+
+`conflicts` carries usernames and appointment times, personal data: never logged (rule 6), and
+only the Administrator receives it (spec 6.7). `toConflicts` copies the four contract fields of
+each entry and nothing else, so an unexpected field of the server's answer does not reach the view.
+
+### 17.8 Unit tests (`availability-rules.service.test.ts`)
+
+The per-method suite of section 14.1 for the eight methods, each paired with the next one for the
+cancel test. Per route its codes, and as `unexpected` the codes of neighbouring routes, among them
+`limit_reached` for `updatePattern` and `availability_overlap` for `deletePattern` (decision 32),
+and `availability_conflict` for `createWindow` (R-AV-04: a new window never conflicts). Invalid
+inputs per method (end before start, off the grid, weekday 8, `validUntil` before `validFrom`, an
+unknown field, ids that are not ULIDs, `2027-02-29`, a date with a time, 11 windows, `end`
+`24:15`, `start` `24:00`, a missing `typeId`). Plus, for the six routes that list it, a 409
+`availability_conflict` with a `conflicts` list: the failure carries the list.
+
+### 17.9 Integration checks
+
+Section 14.4, blocks "patterns", "overrides" and "one-off windows". `availability_conflict` end to
+end waits for step 54.

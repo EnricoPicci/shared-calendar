@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v13 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
-| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10, v11, v12 and v13 2026-11-14 |
+| Status | v14 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–56) |
+| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10, v11, v12 and v13 2026-11-14; v14 2026-11-15 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
@@ -25,6 +25,7 @@
 | v11 | 2026-11-14 | Brief 51 (plan step 50). Change: the order of the checks, the old appointment before the new one; R-BOOK-01 is the old appointment's User, with no Cognito call, and a deleted one answers `404 user_not_found`; `end` absent is `start + 60 min`; a change to the same times is written; an appointment in progress can only be moved to a future start; the old appointment is left out of the state for R-BOOK-07 and R-BOOK-09; `replaces`/`replacedBy` are never followed (8.4). Route 20's errors listed explicitly instead of "union of #17 and #19" (11.1). The change's six items, in order (13.4). `previous` is the old appointment as stored after the change (15.2). |
 | v12 | 2026-11-14 | Brief 52 (plan step 51). User deletion: the order of the checks and their answers, the time-zone check after the Cognito checks, a busy lock `409 concurrent_update`, a target in no group marked and cancelled too (10.2); an appointment in progress is cancelled too (10.2, AC-29); the marker is written in the first chunk as a plain `Put`, so a repeated deletion writes it again (10.2, 13.4); one event id per appointment, kept across retries and chunks (10.2). `GET /users` sorted by UTF-16 code units, an account in no group not listed (10.1). `DeleteUserFunction` declares the three calendar variables (14.1, 14.3). A notifier cannot look up a deleted User's address through Cognito (15.1). |
 | v13 | 2026-11-14 | Brief 53 (plan step 52). The smoke test's calendar journey made independent of the settings and of the real calendar: it reads both first and searches a free 03:00–04:00 instead of assuming one; the Administrator's booking makes only `cancellationNoticeHours` matter; DST days skipped; a recognisable note for the AC-36 log search; the check lines, the clean-up on every exit and what stays as history (18.4, now "local and cloud"). |
+| v14 | 2026-11-15 | Brief 54 review (plan step 53). Route 9's errors written out instead of "as #8": `limit_reached` removed, since an update replaces a pattern and never adds one (R-PAT-04); architecture section 4 and the handler never had it (11.1). |
 
 ---
 
@@ -715,7 +716,7 @@ are validated the same way.
 | 6 | `DELETE /calendar/types/{typeId}` | admin | — | `204` | 400 · 404 `type_not_found` · 409 `type_in_use`, `concurrent_update` |
 | 7 | `GET /calendar/patterns` | admin | — | `200` `{ patterns: WeeklyPattern[] }` (by weekday, start) | — |
 | 8 | `POST /calendar/patterns` | admin | `PatternBody` | `201` `WeeklyPattern` | 400 · 409 `type_not_found`, `availability_overlap`, `availability_conflict`, `limit_reached`, `concurrent_update` |
-| 9 | `PUT /calendar/patterns/{patternId}` | admin | `PatternBody` | `200` `WeeklyPattern` | 400 · 404 `pattern_not_found` · 409 as #8 |
+| 9 | `PUT /calendar/patterns/{patternId}` | admin | `PatternBody` | `200` `WeeklyPattern` | 400 · 404 `pattern_not_found` · 409 `type_not_found`, `availability_overlap`, `availability_conflict`, `concurrent_update` (v14: no `limit_reached`, an update never adds a pattern) |
 | 10 | `DELETE /calendar/patterns/{patternId}` | admin | — | `204` | 400 · 404 `pattern_not_found` · 409 `availability_overlap`¹, `availability_conflict`, `concurrent_update` |
 | 11 | `PUT /calendar/overrides/{date}` | admin | `{ windows: WindowBody[] }` | `200` `DateOverride` | 400 · 409 `date_in_past`, `type_not_found`, `availability_overlap`, `availability_conflict`, `concurrent_update` |
 | 12 | `DELETE /calendar/overrides/{date}` | admin | — | `204` | 400 · 404 `override_not_found` · 409 `date_in_past`, `availability_overlap`, `availability_conflict`, `concurrent_update` |

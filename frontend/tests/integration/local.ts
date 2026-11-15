@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, type Observable } from 'rxjs';
 import { filter, skip } from 'rxjs/operators';
 import type { ApiConfig } from '../../src/services/api';
 import type { CognitoConfig } from '../../src/services/cognito';
@@ -44,4 +44,16 @@ export async function signedIn(username: keyof typeof PASSWORDS): Promise<Sessio
   const { result, store } = await signIn(username, PASSWORDS[username]);
   if (result.status !== 'success') throw new Error(`${username} could not sign in: ${result.status === 'failure' ? result.reason : ''}`);
   return store;
+}
+
+// Subscribe first, then call, then wait for the one new outcome (the ReplaySubject replays the
+// previous one at once, which is counted before the call). Used by calendar.test.ts.
+export async function outcome<T>(result$: Observable<T>, trigger: () => void): Promise<T> {
+  const values: T[] = [];
+  const subscription = result$.subscribe((v) => values.push(v));
+  const before = values.length;
+  trigger();
+  await vi.waitFor(() => expect(values).toHaveLength(before + 1), { timeout: 30_000, interval: 50 });
+  subscription.unsubscribe();
+  return values.at(-1) as T;
 }

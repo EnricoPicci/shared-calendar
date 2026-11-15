@@ -3,6 +3,7 @@ import { SessionStore } from '../../../src/services/session.store';
 import { UsersService } from '../../../src/services/users.service';
 import type { CreateUserResult, CreateUserState, DeleteUserResult, DeleteUserState } from '../../../src/services/users.types';
 import { call, json, session } from './fixtures';
+import { CONFIG, describeMethod, type MethodSpec } from './suite';
 
 // docs/FRONTEND_SERVICES.md section 13.8. A real SessionStore; fetch stubbed with real Responses;
 // every test subscribes first, then calls.
@@ -203,3 +204,41 @@ describe('UsersService, both pairs', () => {
     expect(JSON.stringify([created, createStates, deleted, deleteStates])).not.toContain(admin.accessToken);
   });
 });
+
+// v6: deleteUser's concurrent_update (plan step 51), and listUsers through the per-method suite.
+
+describe('UsersService.deleteUser, the calendar lock', () => {
+  it('busy lock: failure concurrent_update with the message; the session stays', async () => {
+    expect(await deleteOnce(json(409, { error: 'concurrent_update', message: 'The calendar is busy, try again' }))).toEqual({
+      status: 'failure',
+      reason: 'concurrent_update',
+      message: 'The calendar is busy, try again',
+    });
+    expect(sessions.at(-1)).toBe(admin);
+  });
+});
+
+const USERS = [
+  { username: 'alice', createdAt: '2026-11-01T09:00:00.000Z' },
+  { username: 'fe-calendar', createdAt: '2026-11-15T09:00:00.000Z' },
+];
+const listUsers: MethodSpec<UsersService> = {
+  name: 'listUsers',
+  result$: (s) => s.listUsersResult$,
+  state$: (s) => s.listUsersState$,
+  call: (s) => s.listUsers(),
+  pending: { status: 'pending' },
+  request: { method: 'GET', path: '/users' },
+  ok: () => json(200, { users: USERS }),
+  success: { status: 'success', users: USERS },
+  wrong: [
+    ['200 without users', () => json(200, {})],
+    ['an element without username', () => json(200, { users: [{ createdAt: 'x' }] })],
+    ['201', () => json(201, { users: USERS })],
+  ],
+  codes: ['forbidden', 'internal_error'],
+  notCodes: ['user_not_found'],
+};
+const deleteForCancel: MethodSpec<UsersService> = { ...listUsers, name: 'deleteUser', call: (s) => s.deleteUser('carol') };
+
+describeMethod((store) => new UsersService(CONFIG, store), listUsers, deleteForCancel);

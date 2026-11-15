@@ -95,11 +95,18 @@ form works the same. Paths below without a folder are relative to `backend/`.
   (100 % line coverage on `frontend/src`), `npm run verify -w frontend` (the three in order, stops
   at the first failure; no Docker). The root `npm run verify` runs the back end's, then this.
 - `RUN_INTEGRATION=1 npm run test:integration -w frontend`: runs `frontend/tests/integration`
-  (`login.service.test.ts`, and `journeys.test.ts`: the services against cognito-local on 9229
-  and the API on 3000, `docs/FRONTEND_SERVICES.md` section 14). Needs `local:up` + `local:api`
-  running and the Codespaces iptables rule below. Creates and removes the throw-away user
-  `fe-journey` (removed first too, so it can be rerun after a failed run). Without
-  `RUN_INTEGRATION=1` it runs nothing and exits 0, like the back end's.
+  (`login.service.test.ts`, `journeys.test.ts` and, since step 53, `calendar.test.ts`: the
+  services against cognito-local on 9229 and the API on 3000, `docs/FRONTEND_SERVICES.md`
+  section 14). Needs `local:up` + `local:api` running and the Codespaces iptables rule below.
+  Creates and removes the throw-away users `fe-journey` and `fe-calendar` (removed first too, so
+  it can be rerun after a failed run). `calendar.test.ts` **never resets the local `calendar`
+  table**: it works on top of what the back-end journeys and the smoke test leave, creates only
+  types named `fe-calendar …` and items of those types on free dates from today + 330 days,
+  removes them (and an earlier failed run's) before and after, and writes the settings back to the
+  values it read (`updatedAt`/`updatedBy` stay changed); until then it keeps them in
+  `frontend/tests/integration/fe-calendar-settings.local.json` (git-ignored), which the next run
+  writes back first if a run was killed in between (section 14.4). Without `RUN_INTEGRATION=1` it runs
+  nothing and exits 0, like the back end's.
 - `RUN_INTEGRATION=1 npm run test:integration -w backend`: the journeys of plan step 9
   (`journeys.test.ts`) and the calendar's (`calendar.test.ts`) against the running `local:up` +
   `local:api` stack. Pass the same `DYNAMODB_PORT` as `local:up` (here `DYNAMODB_PORT=8002`).
@@ -302,9 +309,18 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   section 7). `package.json` (deps `rxjs`, `@shared-calendar/shared`; scripts `typecheck`, `lint`,
   `test:unit`, `verify`; no `dev`/`build`/`deploy` yet), `tsconfig.json` (ES2022 + DOM, no node
   types), `vitest.config.ts`, `src/services/` (`session.store.ts`; `cognito.ts` and `api.ts`, the
-  building blocks the services share; `login`, `refresh`, `hello`, `users` as `<name>.service.ts`
-  + `<name>.types.ts`; `jwt.ts`), `tests/unit/services/` mirroring `src/` (plus `fixtures.ts`),
-  `tests/integration/` (`local.ts` helper, `login.service.test.ts`, `journeys.test.ts`). `src/`
+  building blocks the services share (`api.ts`: methods `GET`/`POST`/`PUT`/`PATCH`/`DELETE`,
+  `query`, `conflicts` on `availability_conflict`, and the helpers `invalidRequest`,
+  `unexpectedAnswer`, `hasString`); `login`, `refresh`, `hello`, `users` (with `listUsers`),
+  `calendar-settings`, `availability-types`, `availability-rules` as `<name>.service.ts` +
+  `<name>.types.ts`; `jwt.ts`), `tests/unit/services/` mirroring `src/` (plus `fixtures.ts`, and
+  `suite.ts`: `describeMethod`, the unit tests every API method gets), `tests/integration/`
+  (`local.ts` helper with `outcome()`, `login.service.test.ts`, `journeys.test.ts`,
+  `calendar.test.ts`). Calendar services (plan step 53; step 54 adds `calendar` and
+  `appointments`): one result/state pair per method; `pending` carries the call's arguments under
+  the contract's names; input checked with the shared schemas before sending (`invalid_request`
+  with the field, no request), zod's parsed output sent; codes per route from architecture
+  section 4. `src/`
   imports only `rxjs`, `rxjs/fetch`, `rxjs/operators` and `@shared-calendar/shared`; configuration
   comes through the constructor, the `SessionStore` as the second argument. Tokens live only in
   the `SessionStore` (rule 9): no result, state or service field holds one.

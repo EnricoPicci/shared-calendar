@@ -1,6 +1,6 @@
 import type { ApiErrorCode } from '@shared-calendar/shared';
 import { firstValueFrom } from 'rxjs';
-import { apiCall, type ApiConfig, type ApiFailure, type ApiOk, type ApiRequest } from '../../../src/services/api';
+import { apiCall, hasString, invalidRequest, unexpectedAnswer, type ApiConfig, type ApiFailure, type ApiOk, type ApiRequest } from '../../../src/services/api';
 import type { Session } from '../../../src/services/login.types';
 import { SessionStore } from '../../../src/services/session.store';
 import { call, json, session } from './fixtures';
@@ -167,5 +167,119 @@ describe('apiCall', () => {
       outcomes.push(await answer(stub));
     }
     expect(JSON.stringify(outcomes)).not.toContain(alice.accessToken);
+  });
+});
+
+// v6 (spec 16.1, decisions 29–30): the methods GET, PUT and PATCH, the query string, conflicts.
+
+describe('apiCall, v6', () => {
+  it.each([
+    ['GET', undefined],
+    ['PUT', { name: 'x' }],
+    ['PATCH', { note: null }],
+  ] as const)('%s: that method; a body only when given', async (method, body) => {
+    const request = { method, path: '/calendar/types', codes: [], ...(body === undefined ? {} : { body }) } as ApiRequest<never>;
+    await answer(json(200, {}), request);
+    const [, init] = call(fetchMock);
+    expect(init.method).toBe(method);
+    expect(init.body === undefined ? undefined : JSON.parse(init.body as string)).toEqual(body);
+  });
+
+  it('the compiler refuses a body on GET and DELETE', () => {
+    // @ts-expect-error GET takes no body
+    const get: ApiRequest<never> = { method: 'GET', path: '/x', body: {}, codes: [] };
+    // @ts-expect-error DELETE takes no body
+    const del: ApiRequest<never> = { method: 'DELETE', path: '/x', body: {}, codes: [] };
+    expect([get.method, del.method]).toEqual(['GET', 'DELETE']);
+  });
+
+  it.each([
+    ['absent', undefined, 'http://api.test/calendar'],
+    ['empty', {}, 'http://api.test/calendar'],
+    ['two keys, in the order given', { to: '2026-11-22', from: '2026-11-16' }, 'http://api.test/calendar?to=2026-11-22&from=2026-11-16'],
+    ['encoded', { username: 'a b&c=d', note: 'é/?' }, 'http://api.test/calendar?username=a+b%26c%3Dd&note=%C3%A9%2F%3F'],
+  ])('query %s: %s', async (_name, query, url) => {
+    await answer(json(200, {}), { method: 'GET', path: '/calendar', query, codes: [] });
+    expect(call(fetchMock)[0]).toBe(url);
+  });
+
+  const CONFLICT = { appointmentId: '01JCZZZZZZZZZZZZZZZZZZZZZZ', username: 'alice', start: '2026-11-16T08:00:00.000Z', end: '2026-11-16T09:00:00.000Z' };
+  const CONFLICT_ROUTE: ApiRequest<'availability_conflict' | 'availability_overlap'> = {
+    method: 'DELETE',
+    path: '/calendar/windows/x',
+    codes: ['availability_conflict', 'availability_overlap'],
+  };
+  function conflict(conflicts: unknown) {
+    return answer(json(409, { error: 'availability_conflict', message: 'm', conflicts }), CONFLICT_ROUTE);
+  }
+
+  it('availability_conflict: the conflicts list', async () => {
+    expect(await conflict([CONFLICT])).toEqual({ status: 'failure', reason: 'availability_conflict', message: 'm', conflicts: [CONFLICT] });
+  });
+
+  it('availability_conflict: malformed entries dropped, extra fields not copied', async () => {
+    const outcome = await conflict([
+      { ...CONFLICT, note: 'private' },
+      { ...CONFLICT, end: 1 },
+      { appointmentId: 'x', username: 'y', start: 'z' },
+      null,
+      'alice',
+    ]);
+    expect(outcome).toMatchObject({ reason: 'availability_conflict', conflicts: [CONFLICT] });
+  });
+
+  it.each([
+    ['missing', undefined],
+    ['not an array', { 0: CONFLICT }],
+    ['null', null],
+  ])('availability_conflict, conflicts %s: []', async (_name, conflicts) => {
+    expect(await conflict(conflicts)).toMatchObject({ reason: 'availability_conflict', conflicts: [] });
+  });
+
+  it('another code: no conflicts field, even when the body has one', async () => {
+    const outcome = await answer(json(409, { error: 'availability_overlap', message: 'm', conflicts: [CONFLICT] }), CONFLICT_ROUTE);
+    expect(outcome).toEqual({ status: 'failure', reason: 'availability_overlap', message: 'm' });
+  });
+
+  it('availability_conflict outside the route list: unexpected, no conflicts', async () => {
+    const outcome = await answer(json(409, { error: 'availability_conflict', message: 'm', conflicts: [CONFLICT] }));
+    expect(outcome).toEqual({ status: 'failure', reason: 'unexpected', message: 'm' });
+  });
+});
+
+describe('invalidRequest, hasString, unexpectedAnswer', () => {
+  it('the first issue with its field path joined by "."', () => {
+    expect(invalidRequest({ issues: [{ path: ['windows', 1, 'end'], message: 'end must be after start' }, { path: ['x'], message: 'y' }] })).toEqual({
+      status: 'failure',
+      reason: 'invalid_request',
+      message: 'windows.1.end: end must be after start',
+    });
+  });
+
+  it('without a path: the message alone', () => {
+    expect(invalidRequest({ issues: [{ path: [], message: 'Unrecognized key: "x"' }] }).message).toBe('Unrecognized key: "x"');
+  });
+
+  it('no issue at all (never from zod): a generic message', () => {
+    expect(invalidRequest({ issues: [] }).message).toBe('invalid input');
+  });
+
+  it.each([
+    [{ id: 'a' }, true],
+    [{ id: 1 }, false],
+    [{}, false],
+    [null, false],
+    ['id', false],
+    [undefined, false],
+  ])('hasString(%j, "id"): %s', (value, expected) => {
+    expect(hasString(value, 'id')).toBe(expected);
+  });
+
+  it('unexpectedAnswer names the status', () => {
+    expect(unexpectedAnswer({ status: 'ok', httpStatus: 202, body: {} })).toEqual({
+      status: 'failure',
+      reason: 'unexpected',
+      message: 'API answered 202 with an unexpected body',
+    });
   });
 });
