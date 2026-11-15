@@ -71,7 +71,43 @@ Inside a batch the pages are independent: none needs another page of the same ba
 needs an idea another batch adds to `concepts.md` comes after it, which is why the back-end
 batches come before the front-end ones.
 
-## 5. After the plan
+## 5. Notes for the skill
+
+What the sessions by hand learned, kept here for session 4, which turns them into the skill. Each
+session adds its own.
+
+**Session 1** (`frontend/calendar-view.md`): the first page set the format of
+`docs/journeys/README.md`.
+
+**Session 2** (`backend/calendar-booking.md`):
+
+- **What took longest: the state at each test.** In a block whose tests share state, a test's
+  answer depends on everything before it: how many appointments a User holds at a limit check,
+  which appointments an availability change would strand, a slot that exists only because an
+  earlier test widened a window. Draft a running table of the state (per test: what it adds,
+  changes or removes) before writing the story, and check each test against it.
+- **Sources needed beyond the block and the code it calls:** the Cognito module (who is a plain
+  User), the shared schemas (what the body's validation already changes, such as a trimmed note),
+  the vitest configuration (whether a failure stops the block: it does not), and the **opening
+  comment of the next block**, which lists what it expects this one to leave: the best cross-check
+  of "What the block leaves".
+- **Hard to verify: claims no `expect` checks.** The code often decides more than the test checks
+  (a conflicts list that holds every appointment of the weekday, while the test checks one). Such a
+  claim is checked against the code and written as the server's behaviour, never as "the test
+  checks".
+- **Look for what a failure skips.** Settings put back at the end of a test, or only in the last
+  test, are skipped when an earlier check fails; a `finally` is not. "If the block fails halfway"
+  says which.
+- **How Users are removed matters.** A helper that deletes a User straight in cognito-local writes
+  no deleted-user marker and cancels nothing; `DELETE /users` does both. Say which one the block
+  uses.
+- **Neutral wording for the test Users.** The tests' comments may say "his" for `dave`; the pages
+  use the names or "they", "themself".
+- **Read the tests as consumers of one table.** The back end's journeys empty the `calendar` table
+  first, so a page can count items exactly; the front end's do not, so a page must say why a count
+  or a free date can be trusted.
+
+## 6. After the plan
 
 Once every page is done, this plan has no more work and stays as the record of how the pages were
 made. New and changed journeys use the skill: the page changes in the same commit as the test.
