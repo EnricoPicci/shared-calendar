@@ -1,0 +1,9 @@
+{
+  "name": "view-prototypes",
+  "private": true,
+  "type": "module",
+  "description": "Throw-away comparison of two ways to write the views. Not a workspace of the repository.",
+  "dependencies": {
+    "lit-html": "^3.3.3"
+  }
+}

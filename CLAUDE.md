@@ -13,8 +13,8 @@ with AWS SAM.
 The repository is an npm-workspaces monorepo: the back end in `backend/`, the code it shares
 with the browser front end (the API contract types, `Role`/`resolveRole`, the username schemas)
 in `shared/` (package `@shared-calendar/shared`), and in `frontend/` only the browser's services
-layer (`docs/FRONTEND_SERVICES.md`; the rest of the front end waits for its architecture
-document). Layout and placement rules: `docs/FOLDER_STRUCTURE.md`.
+layer (`docs/FRONTEND_SERVICES.md`; the views are designed in `docs/FRONTEND_ARCHITECTURE.md`
+and not written yet). Layout and placement rules: `docs/FOLDER_STRUCTURE.md`.
 
 ## Where the truth lives
 
@@ -27,6 +27,11 @@ document). Layout and placement rules: `docs/FOLDER_STRUCTURE.md`.
 - `docs/SHARED_CALENDAR_SPEC.md` specifies the shared calendar (agreed with the Product Owner,
   brief 40, not yet implemented). It is the input for the calendar's plan steps; once merged into
   `ARCHITECTURE.md` (spec section 19), the architecture wins as usual.
+- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (decided, brief 81, not yet
+  implemented): plain HTML and CSS with one TypeScript module script, the layers (services, logic,
+  views, shell) and the rules of a view. Hosting, CORS, the bundle command and the dev server are
+  its open points (section 10). `docs/FRONTEND_SERVICES.md` stays the truth for the services;
+  `docs/FRONTEND_VIEW_OPTIONS.md` is the record of why this option, not a source of truth.
 - `docs/RENAME_PLAN.md` plans the move from the "hello-world" names to "shared-calendar" (plan
   steps 56–58: repository, new stack `shared-calendar-api`, retirement of `hello-world-api`), with
   the way back at every stage. The repository uses the new names (step 56) and the stack in use
@@ -394,7 +399,9 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   imports only `rxjs`, `rxjs/fetch`, `rxjs/operators` and `@shared-calendar/shared`; configuration
   comes through the constructor, the `SessionStore` as the second argument. Tokens live only in
   the `SessionStore` (rule 9): no result, state or service field holds one.
-  No framework, Vite, `index.html`, `template.yaml` or `dist/` until `docs/FRONTEND_ARCHITECTURE.md`.
+  No view, `index.html`, bundler, `template.yaml` or `dist/` yet: the views follow
+  `docs/FRONTEND_ARCHITECTURE.md` (no framework; folders in its section 9), and the build and the
+  hosting wait for its open points (section 10).
 - `shared/`: package `@shared-calendar/shared`, no build step (`exports` points at
   `src/index.ts`; each consumer bundles it). `src/api.ts` (response and error body types,
   `ApiErrorCode`), `src/roles.ts` (`Role`, `resolveRole`), `src/username.ts` (the username

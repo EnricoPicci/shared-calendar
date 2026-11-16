@@ -276,8 +276,10 @@ the logger, the password generator (server-side secret handling), and everything
 ## 7. The front-end folder, reserved
 
 The front end is a browser single-page application in TypeScript built to static files
-(decided 2026-11-04; framework not chosen yet). Its own architecture document will fix the
-framework, the hosting and the sign-in flow. This section only fixes what the folder must look
+(decided 2026-11-04). Its own architecture document, `docs/FRONTEND_ARCHITECTURE.md`, fixes the
+view layer (2026-11-16: plain HTML and CSS with one TypeScript module script, no framework; the
+folders for the views in its section 9) and will fix the hosting and the build, which are its
+open points. This section only fixes what the folder must look
 like so that it fits the repository on day one:
 
 - `frontend/package.json`, name `frontend`, depends on `@shared-calendar/shared`; scripts
@@ -302,7 +304,8 @@ the services layer exists since 2026-11-05** (brief `prompts/31-implement-login-
 design `docs/FRONTEND_SERVICES.md`): plain TypeScript with `rxjs` and `shared/`, which depends on
 nothing the architecture will choose. Hence a minimal package (`package.json`, `tsconfig.json`,
 `vitest.config.ts`, `src/services/`, `tests/`) with `typecheck`, `lint`, `test:unit` and `verify`.
-Everything else still waits for the architecture document: no framework, no Vite, no
+Everything else waits for the views to be written and for the open points of
+`docs/FRONTEND_ARCHITECTURE.md` section 10: no bundler, no
 `index.html`, no `template.yaml`, no `dist/`, and no `dev`, `build` or `deploy` script (the root
 scripts use `--if-present`, so their absence is not an error).
 
