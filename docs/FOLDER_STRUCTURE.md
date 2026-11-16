@@ -8,7 +8,7 @@
 | Brief | `prompts/20-org-folders-for-client-and-server.md` (decision), `prompts/21-step-20-implementation.md` (move) |
 
 This repository holds every part of the application: the back end that exists today (the
-Hello World API, `docs/ARCHITECTURE.md`), the browser front end that will follow, and the
+shared calendar's API, with its Hello World route, `docs/ARCHITECTURE.md`), the browser front end that will follow, and the
 code both of them share. This document fixes **which folder holds what**, so that a reader
 can tell the three apart at a glance, and the rules for putting a new file in the right place.
 It is written for a reader who knows TypeScript but is not an expert in monorepo tooling:
@@ -229,9 +229,9 @@ npm run local:up -w backend
 npm run local:api -w backend
 DYNAMODB_PORT=8002 npm run verify -w backend
 npm run deploy -w backend -- --parameter-overrides AlertEmail=<address>   # first deploy only
-npm run bootstrap-admin -w backend -- hello-world-api
-npm run smoke -w backend -- hello-world-api
-npm run budget -w backend -- hello-world-api
+npm run bootstrap-admin -w backend -- shared-calendar-api
+npm run smoke -w backend -- shared-calendar-api
+npm run budget -w backend -- shared-calendar-api
 ```
 
 `cd backend && npm run <script> …` is the same thing (drop `-w backend` and the `--` before the
@@ -286,7 +286,7 @@ like so that it fits the repository on day one:
 - Builds to `frontend/dist/` (git-ignored). Nothing in `backend/` is touched by a front-end
   build or deploy, and the other way round.
 - Its hosting (an S3 bucket behind CloudFront, or equivalent) is a **separate** SAM template
-  and stack, `frontend/template.yaml`, so that the back-end stack `hello-world-api` is never
+  and stack, `frontend/template.yaml`, so that the back-end stack `shared-calendar-api` is never
   changed by a UI release. The front end reads the back end's `ApiUrl`, `UserPoolId` and
   `UserPoolClientId` from the back-end stack outputs at build time (the way
   `backend/scripts/target.sh` does), never from a file committed in the repository.

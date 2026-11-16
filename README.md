@@ -1,6 +1,9 @@
-# Hello World API
+# Shared Calendar
 
-A small serverless back end on AWS. Signed-in users call `POST /hello` and get a message
+The back end of a shared calendar, serverless on AWS. The calendar's routes are described in
+`docs/SHARED_CALENDAR_SPEC.md` (this README gains its calendar sections in
+`docs/IMPLEMENTATION_PLAN.md` step 59). The part below is the base the calendar is built on, and
+its Hello World route proves that the whole chain works. Signed-in users call `POST /hello` and get a message
 back that is also stored in a database; an administrator creates and deletes users. Two roles:
 **user** (may call Hello World) and **admin** (may also create and delete users). Three routes:
 `POST /hello`, `POST /users`, `DELETE /users/{username}`. TypeScript on AWS Lambda behind an
@@ -51,6 +54,12 @@ sudo iptables-legacy -I FORWARD -i br-+ -o br-+ -j ACCEPT
 
 ## The deployed stack
 
+The stack is moving from `hello-world-api` to `shared-calendar-api` (`docs/RENAME_PLAN.md`). Until
+`docs/IMPLEMENTATION_PLAN.md` step 57 has created the new stack, the table below is the old
+stack's, reached with the old profile `hello-admin`; step 57 replaces the ids and names with the
+new stack's (tables `shared-calendar-api-calendar` and `shared-calendar-api-hello-messages`).
+The commands elsewhere in this README already name the new stack and profile.
+
 | | |
 |---|---|
 | Stack | `hello-world-api` |
@@ -77,7 +86,7 @@ in `backend/` (from inside `backend/`, drop `-w backend` and the `--` before arg
 | `npm run local:api -w backend` | Builds the functions and serves the API on `http://127.0.0.1:3000` (foreground; wait for `Running on http://127.0.0.1:3000`) |
 | `DYNAMODB_PORT=8002 npm run verify -w backend` | The deploy gate: typecheck, lint, audit, template lint, unit tests (of `backend` and `shared`), integration tests against the running local stack. On success writes `backend/.verify-ok` |
 | `npm run deploy -w backend` | Refuses unless `backend/.verify-ok` is younger than 30 minutes, names the current commit and says `clean`, and the tree is still clean. Then `sam build` and `sam deploy` (asks to confirm the change set). Uses your real AWS login |
-| `npm run smoke -w backend -- hello-world-api` | After every deploy: creates a throw-away user, runs the journeys against the real API, deletes the user. Prompts for the admin password. `npm run smoke -w backend -- local` runs the same against the local stack |
+| `npm run smoke -w backend -- shared-calendar-api` | After every deploy: creates a throw-away user, runs the journeys against the real API, deletes the user. Prompts for the admin password. `npm run smoke -w backend -- local` runs the same against the local stack |
 | `npm run local:down -w backend` | Stops the Docker stack. The table is in memory and is lost; Cognito data survives in `backend/.cognito/` |
 
 `npm run typecheck`, `npm run lint` and `npm run test:unit` at the root cover every package.
@@ -116,7 +125,7 @@ TOKEN=$(aws cognito-idp initiate-auth --endpoint-url http://localhost:9229 \
 API=http://127.0.0.1:3000
 ```
 
-Cloud (same command, real pool; `AWS_PROFILE=hello-admin` exported as above):
+Cloud (same command, real pool; `AWS_PROFILE=shared-calendar-admin` exported as in `docs/RUNBOOK.md` section 1):
 
 ```bash
 read -rs -p "Password for admin: " PASSWORD; echo
@@ -178,15 +187,15 @@ The API can never create an administrator, delete one, or set its password.
 
 - **Locally:** the table in a browser at `http://localhost:8001` (dynamodb-admin); the
   functions' log lines in the `npm run local:api -w backend` terminal.
-- **Cloud:** DynamoDB → `hello-messages` → Explore items, in the console (region
-  `eu-north-1`). Logs in CloudWatch: `/aws/lambda/hello-world-api-<function>` for
-  `authorizer`, `hello`, `createUser`, `deleteUser`, and `/aws/apigateway/hello-world-api-access`
+- **Cloud:** DynamoDB → `shared-calendar-api-hello-messages` → Explore items, in the console
+  (region `eu-north-1`). Logs in CloudWatch: `/aws/lambda/shared-calendar-api-<function>` for
+  `authorizer`, `hello`, `createUser`, `deleteUser`, and `/aws/apigateway/shared-calendar-api-access`
   for one line per request. Each function writes one structured JSON line per request with the
   request id, route, username, role, outcome and duration, never a token or a password.
 
 ## The administrator's password
 
-`npm run bootstrap-admin -w backend -- hello-world-api` sets or rotates the admin password of the deployed
+`npm run bootstrap-admin -w backend -- shared-calendar-api` sets or rotates the admin password of the deployed
 stack (typed twice, hidden; checked against the pool policy: 12+ characters with upper, lower,
 digit and symbol). It is the only way to set it: the API never touches admin accounts.
 `npm run bootstrap-admin -w backend -- local` does the same against the emulator; after that,

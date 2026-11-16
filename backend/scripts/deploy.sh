@@ -17,6 +17,19 @@ cd "$(dirname "$0")/.."
 STAMP=.verify-ok
 MAX_AGE_SECONDS=1800
 
+# The old stack hello-world-api must never receive this template: its tables are named after the
+# stack, so CloudFormation would try to replace the old stack's tables, data included
+# (docs/RENAME_PLAN.md section 4.2). samconfig.toml names the new stack; this refuses an argument
+# that points the deploy back at the old one (--stack-name hello-world-api or =hello-world-api).
+OLD_STACK=hello-world-api
+for arg in "$@"; do
+  if [[ "$arg" == "$OLD_STACK" || "$arg" == *"=$OLD_STACK" ]]; then
+    echo "Deploy refused: this template must not be deployed to the old stack $OLD_STACK." >&2
+    echo "It is kept unchanged as the way back until it is retired (docs/RENAME_PLAN.md section 6.3)." >&2
+    exit 1
+  fi
+done
+
 refuse() {
   echo "Deploy refused: $*" >&2
   echo "Run npm run verify (local stack up) on a clean, committed tree, then deploy within 30 minutes." >&2

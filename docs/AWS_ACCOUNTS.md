@@ -5,8 +5,9 @@ The step-by-step operator tasks are in `docs/RUNBOOK.md`; this document explains
 when you do them.
 
 This repository is public. Account ids, e-mail addresses and the access portal URL are
-deliberately not written here. Find them in `~/.aws/config` (profile `hello-admin`, section
-`sso-session hello`) or in the console.
+deliberately not written here. Find them in `~/.aws/config` (profile `shared-calendar-admin`, section
+`sso-session shared-calendar`; until `docs/IMPLEMENTATION_PLAN.md` step 58 also the old
+`hello-admin` / `sso-session hello`, same values) or in the console.
 
 ---
 
@@ -16,7 +17,7 @@ Three different identities can sign in to AWS, and only one is meant for everyda
 
 | Identity | What it is | Signs in with | Use it for |
 |---|---|---|---|
-| **IAM Identity Center user** | A user managed by IAM Identity Center, with its own "plus" e-mail address | The **access portal URL** (`https://ssoins-….portal.us-east-1.app.aws`) | **Everything in daily work**: console and CLI (`hello-admin`) |
+| **IAM Identity Center user** | A user managed by IAM Identity Center, with its own "plus" e-mail address | The **access portal URL** (`https://ssoins-….portal.us-east-1.app.aws`) | **Everything in daily work**: console and CLI (`shared-calendar-admin`) |
 | **Root user** | Owner of the **management account** (the account created at sign-up), with unlimited power | The normal AWS sign-in page, choosing **root**, using the sign-up e-mail | **Rare root tasks only** (section 4) |
 | **AWS Builder ID** | A personal AWS profile that uses the **same e-mail** as root | The same sign-in page, choosing **Builder ID** | Nothing in this project. **Keep it; do not delete it** (section 5) |
 
@@ -27,7 +28,7 @@ The console's multi-account setup created an AWS Organization with three account
 | Account | Contains | Who signs in there |
 |---|---|---|
 | Management account | Billing, the Organization, IAM Identity Center (home region `us-east-1`). **Not the stack.** | Root, rarely |
-| **"Identity Delegated Admin"** | **The stack `hello-world-api`** in `eu-north-1`: Lambda functions, HTTP API, Cognito user pool, DynamoDB table, alarms | Identity Center user, role `AdministratorAccess` |
+| **"Identity Delegated Admin"** | **The stack `shared-calendar-api`** (and, until `docs/IMPLEMENTATION_PLAN.md` step 58, the old `hello-world-api`) in `eu-north-1`: Lambda functions, HTTP API, Cognito user pool, DynamoDB table, alarms | Identity Center user, role `AdministratorAccess` |
 | "Side Quest Accepted" | Nothing | Nobody |
 
 How the daily login reaches the stack:
@@ -42,7 +43,7 @@ permission set "AdministratorAccess"
 account "Identity Delegated Admin"
    │  region eu-north-1
    ▼
-stack hello-world-api
+stack shared-calendar-api
 ```
 
 The organization policy allows regional services only in `eu-north-1`. In any other region the
@@ -69,11 +70,11 @@ Cognito users, the table and costs.
 ### CLI (Codespace or laptop)
 
 ```bash
-export AWS_PROFILE=hello-admin
+export AWS_PROFILE=shared-calendar-admin
 aws sts get-caller-identity          # must show the AdministratorAccess role in the
                                      # "Identity Delegated Admin" account
 # when it fails because the session expired:
-aws sso login --profile hello-admin --use-device-code
+aws sso login --profile shared-calendar-admin --use-device-code
 ```
 
 - **Device code:** in the Codespace, use `--use-device-code`. The browser-callback login does not
@@ -91,7 +92,7 @@ aws sso login --profile hello-admin --use-device-code
 | The sign-in page asks "Builder ID or root?" | Wrong page: use the access portal URL |
 | Lambda/Cognito/DynamoDB pages are empty | Wrong region (use `eu-north-1`) or wrong account (you are in the management account as root) |
 | "explicit deny in a service control policy" | A region other than `eu-north-1` |
-| CLI: "Token has expired" / "SSO session … expired" | Run `aws sso login --profile hello-admin --use-device-code` again |
+| CLI: "Token has expired" / "SSO session … expired" | Run `aws sso login --profile shared-calendar-admin --use-device-code` again |
 
 ---
 
@@ -139,7 +140,7 @@ Trying to delete it was refused (2026-11-02) with:
 > AWS application. To delete this profile, you must first close the account …
 
 So the AWS account was created through a Builder ID sign-up, and the Builder ID is tied to it.
-Most likely that is the management account itself. This is not confirmed: the `hello-admin`
+Most likely that is the management account itself. This is not confirmed: the `shared-calendar-admin`
 profile cannot look into the management account. Deleting the Builder ID would therefore mean
 closing that account and losing the Organization and the stack.
 

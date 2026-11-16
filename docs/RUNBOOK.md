@@ -7,17 +7,18 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
 
 | | |
 |---|---|
-| Stack | `hello-world-api` |
+| Stack | `shared-calendar-api` |
 | Region | `eu-north-1` (the only region the AWS organization allows for regional services) |
-| CLI profile | `hello-admin` (IAM Identity Center, role `AdministratorAccess`) |
+| CLI profile | `shared-calendar-admin` (IAM Identity Center, role `AdministratorAccess`) |
 | Alerts to | the `AlertEmail` stack parameter |
+| Old stack | `hello-world-api` (profile `hello-admin`): until `docs/IMPLEMENTATION_PLAN.md` step 57 has created `shared-calendar-api` it is still the deployed one; then it stays, untouched, as the way back until step 58 (`docs/RENAME_PLAN.md`). Never deploy to it: `deploy.sh` refuses |
 
 ---
 
 ## 1. Every working session
 
 1. **Codespace only, after every Codespace start** (lost on restart): let containers on the
-   Docker network `hello-local` talk to each other. Without it the authorizer times out reaching
+   Docker network `shared-calendar-local` talk to each other. Without it the authorizer times out reaching
    cognito-local and the integration tests get 502s.
 
    ```bash
@@ -30,9 +31,9 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
 3. In every terminal that talks to AWS:
 
    ```bash
-   export AWS_PROFILE=hello-admin
+   export AWS_PROFILE=shared-calendar-admin
    aws sts get-caller-identity          # fails when the login expired, then:
-   aws sso login --profile hello-admin --use-device-code
+   aws sso login --profile shared-calendar-admin --use-device-code
    ```
 
    The device code is needed in the Codespace: the normal login waits for a browser callback
@@ -65,7 +66,7 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
    `script -q -c "npm run deploy -w backend" /tmp/deploy.txt`: the prompt stays interactive.
    Never `> out.txt` inside the repository: the new file makes the tree dirty and the deploy
    refuses, and the change set and its prompt would go to the file instead of the screen.
-5. `npm run smoke -w backend -- hello-world-api` (asks for the admin password; `-w backend` is
+5. `npm run smoke -w backend -- shared-calendar-api` (asks for the admin password; `-w backend` is
    needed, the root has no `smoke` script): all 19 lines must say PASS (10 Hello World checks,
    9 calendar checks: section 2.1). `script -q -c "…" /tmp/smoke.txt` works here too; the
    password prompt does not echo, so the password does not reach the file.
@@ -150,7 +151,7 @@ REPORT, and INIT_START on a cold start), so 15 over the three log groups above.
 
 Plan step 11 has the full list; in short:
 
-0. Region check, read-only: `aws cloudformation describe-stacks --stack-name hello-world-api
+0. Region check, read-only: `aws cloudformation describe-stacks --stack-name shared-calendar-api
    --region eu-north-1` must answer "does not exist", not `AccessDenied … explicit deny in a
    service control policy`. In another account, check its organization's allowed region first and
    put it in `backend/samconfig.toml` (both `region` lines) and the profile.
@@ -162,12 +163,12 @@ Plan step 11 has the full list; in short:
    Without the flag the deploy stops before creating anything: `AlertEmail` must have a value.
    Avoid `--guided`; if you use it, answer N to "Save arguments to configuration file", or SAM
    writes the address into `backend/samconfig.toml`.
-3. `npm run bootstrap-admin -w backend -- hello-world-api`: sets the admin password. Until then the admin
+3. `npm run bootstrap-admin -w backend -- shared-calendar-api`: sets the admin password. Until then the admin
    status is `FORCE_CHANGE_PASSWORD` and the smoke test cannot sign in.
-4. `npm run smoke -w backend -- hello-world-api`: 19 PASS (section 2.1). On a new stack the
+4. `npm run smoke -w backend -- shared-calendar-api`: 19 PASS (section 2.1). On a new stack the
    calendar is empty, so the first date searched is free.
-5. `npm run budget -w backend -- hello-world-api --dry-run`, then
-   `npm run budget -w backend -- hello-world-api`. The
+5. `npm run budget -w backend -- shared-calendar-api --dry-run`, then
+   `npm run budget -w backend -- shared-calendar-api`. The
    budget is **not** in the template (CloudFormation has no `AWS::Budgets::Budget` in
    `eu-north-1`), so a new stack has no budget until this runs.
 6. Click the link in the "AWS Notification - Subscription Confirmation" e-mail sent to
@@ -176,24 +177,26 @@ Plan step 11 has the full list; in short:
    back. Check, and re-subscribe if the list is empty (then confirm the new e-mail):
 
    ```bash
-   topic=$(aws cloudformation describe-stack-resources --stack-name hello-world-api \
+   topic=$(aws cloudformation describe-stack-resources --stack-name shared-calendar-api \
      --query "StackResources[?ResourceType=='AWS::SNS::Topic'].PhysicalResourceId" --output text)
    aws sns list-subscriptions-by-topic --topic-arn "$topic"   # ARN = confirmed
    aws sns subscribe --topic-arn "$topic" --protocol email --notification-endpoint <AlertEmail>
    ```
-7. Console checks: Billing → Budgets shows `hello-world-api-monthly` (1 USD); DynamoDB →
-   `hello-messages` → Explore items shows the smoke rows; `calendar` shows the smoke test's cancelled
+7. Console checks: Billing → Budgets shows `shared-calendar-api-monthly` (1 USD); DynamoDB →
+   `shared-calendar-api-hello-messages` → Explore items shows the smoke rows;
+   `shared-calendar-api-calendar` shows the smoke test's cancelled
    appointment, its two events and the deleted-user marker (section 2.1).
 
 If the first create fails: CloudFormation rolls back, but cannot delete the three protected
-resources (the tables `hello-messages` and `calendar`, and the user pool), so the stack may end in
+resources (the tables `<stack>-hello-messages` and `<stack>-calendar`, and the user pool), so the stack may end in
 `ROLLBACK_FAILED` or `ROLLBACK_COMPLETE`. Read the first `CREATE_FAILED` in
-`aws cloudformation describe-stack-events --stack-name hello-world-api` before changing
+`aws cloudformation describe-stack-events --stack-name shared-calendar-api` before changing
 anything. Cleaning up means deleting the stack while keeping those resources
 (`--retain-resources MessagesTable CalendarTable UserPool`), then switching off their deletion
-protection and deleting them by hand; the fixed table names would otherwise block the next deploy.
+protection and deleting them by hand; the table names, fixed for a given stack name, would
+otherwise block the next deploy under that name.
 The same holds for removing the stack on purpose: the calendar's appointments and history are lost
-with the `calendar` table, so export what must be kept first.
+with the `<stack>-calendar` table, so export what must be kept first.
 
 A failed change set (for example an unknown resource type) creates nothing: the stack stays in
 `REVIEW_IN_PROGRESS` with 0 resources, and the next deploy simply reuses it.
@@ -207,7 +210,7 @@ A failed change set (for example an unknown resource type) creates nothing: the 
 | Account | Use |
 |---|---|
 | Management account (root user = the sign-up e-mail) | billing and emergencies only; IAM Identity Center lives here (home region `us-east-1`) |
-| "Identity Delegated Admin" | where the stack is deployed and where `hello-admin` signs in |
+| "Identity Delegated Admin" | where the stack is deployed and where `shared-calendar-admin` signs in |
 | "Side Quest Accepted" | unused |
 
 The organization policy `AdvancedModeRegionRestrictionSecurityControlPolicy` applies to all
@@ -229,9 +232,9 @@ member accounts: regional services only in `eu-north-1`; in `us-east-1` only glo
 
 ```bash
 aws configure sso --use-device-code
-#   SSO session name: hello      start URL: the portal URL      SSO region: us-east-1
+#   SSO session name: shared-calendar      start URL: the portal URL      SSO region: us-east-1
 #   scopes: Enter                account/role: AdministratorAccess
-#   default client region: eu-north-1   output: json   profile name: hello-admin
+#   default client region: eu-north-1   output: json   profile name: shared-calendar-admin
 ```
 
 The SSO region (`us-east-1`, where Identity Center lives) and the client region (`eu-north-1`,
@@ -315,3 +318,10 @@ with `npm run deploy -w backend` and no extra argument.
       `DeleteUserFunction` and `DeleteUserRole` also got their calendar part (section 5.2).
 - [x] Plan step 52 (2026-11-14): the smoke test gains the calendar journey (section 2.1); 19/19
       PASS locally, and in the cloud with plan step 55 (section 5.2).
+
+### 5.4 The rename to shared-calendar (`docs/RENAME_PLAN.md`)
+
+- Plan step 56 (2026-11-16): the repository uses the new names (stack `shared-calendar-api`,
+  tables named after the stack, profile `shared-calendar-admin`, Docker network
+  `shared-calendar-local`); `deploy.sh` refuses the old stack's name. No cloud change: the
+  deployed stack is still `hello-world-api`, as recorded in section 5.2.

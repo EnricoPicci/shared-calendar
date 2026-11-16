@@ -1,10 +1,11 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Hello World API (docs/ARCHITECTURE.md). Cognito user pool for identities and roles,
-  HTTP API with a Lambda authorizer, three business Lambdas, one DynamoDB table; and the shared
-  calendar (docs/SHARED_CALENDAR_SPEC.md, being built in plan steps 41-59): its table, its
-  shared permission sets, one function per calendar route, and GET /users.
+  Shared calendar back end (docs/ARCHITECTURE.md). Cognito user pool for identities and roles,
+  HTTP API with a Lambda authorizer; user administration and the Hello World route, which proves
+  the chain API - authorizer - Lambda - DynamoDB works, with its table; and the shared calendar
+  (docs/SHARED_CALENDAR_SPEC.md, being built in plan steps 41-59): its table, its shared
+  permission sets, one function per calendar route, and GET /users.
 
 # Values given at deploy time: samconfig.toml holds all but AlertEmail, which the first deploy
 # passes on the command line (public repository) and CloudFormation then keeps.
@@ -147,10 +148,13 @@ Resources:
   # One row per Hello World call. Fixed capacity of 1 read / 1 write per second stays inside
   # the always-free tier and cannot scale into cost. Encrypted at rest with an AWS-owned key
   # (the default, free). Deletion protection blocks deleting the table, even by sam delete.
+  # Named after the stack (shared-calendar-api-hello-messages), so that two stacks can live in one
+  # account side by side (docs/RENAME_PLAN.md decision R2). Locally the table is plain
+  # hello-messages: env.local.json gives the functions that name.
   MessagesTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: hello-messages
+      TableName: !Sub ${AWS::StackName}-hello-messages
       BillingMode: PROVISIONED
       AttributeDefinitions:
         - AttributeName: messageId
@@ -170,11 +174,12 @@ Resources:
   # (docs/SHARED_CALENDAR_SPEC.md section 13.4). Fixed capacity of 10 reads / 10 writes per second
   # (11/11 with the messages table, inside the always-free 25/25). Same encryption and deletion
   # protection as the messages table; no TTL (history is kept) and no stream (planned for
-  # notifications, docs/SHARED_CALENDAR_SPEC.md section 15).
+  # notifications, docs/SHARED_CALENDAR_SPEC.md section 15). Named after the stack, like the
+  # messages table (shared-calendar-api-calendar; locally plain calendar).
   CalendarTable:
     Type: AWS::DynamoDB::Table
     Properties:
-      TableName: calendar
+      TableName: !Sub ${AWS::StackName}-calendar
       BillingMode: PROVISIONED
       AttributeDefinitions:
         - AttributeName: PK

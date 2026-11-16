@@ -5,7 +5,7 @@
 # DYNAMODB_PORT changes the host port of DynamoDB Local (default 8000) when another
 # project already uses 8000; inside Docker it is always dynamodb:8000.
 
-name: hello-world-api
+name: shared-calendar
 
 services:
   # DynamoDB emulator. In memory: the table and its rows disappear on `local:down`.
@@ -15,7 +15,7 @@ services:
     ports:
       - 127.0.0.1:${DYNAMODB_PORT:-8000}:8000
     networks:
-      - hello-local
+      - shared-calendar-local
 
   # Web UI to browse the tables: http://localhost:8001
   dynamodb-admin:
@@ -27,7 +27,7 @@ services:
     depends_on:
       - dynamodb
     networks:
-      - hello-local
+      - shared-calendar-local
 
   # Cognito emulator. Users, groups and pools are kept in ./.cognito across restarts.
   # `npm run local:up` first copies docker/cognito-local-config.json to .cognito/config.json
@@ -43,10 +43,10 @@ services:
     volumes:
       - ./.cognito:/app/.cognito
     networks:
-      - hello-local
+      - shared-calendar-local
 
-# Fixed name (not prefixed by the project) so `sam local start-api --docker-network hello-local`
+# Fixed name (not prefixed by the project) so `sam local start-api --docker-network shared-calendar-local`
 # can attach the Lambda containers to it and reach the services above by name.
 networks:
-  hello-local:
-    name: hello-local
+  shared-calendar-local:
+    name: shared-calendar-local

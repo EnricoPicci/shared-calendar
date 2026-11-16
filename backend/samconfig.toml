@@ -3,7 +3,7 @@
 version = 0.1
 
 [default.global.parameters]
-stack_name = "hello-world-api"
+stack_name = "shared-calendar-api"
 region = "eu-north-1"
 
 # Monorepo build (docs/FOLDER_STRUCTURE.md section 4.3). esbuild runs inside backend/
@@ -29,7 +29,7 @@ region = "eu-north-1"
 capabilities = "CAPABILITY_IAM"
 resolve_s3 = true
 confirm_changeset = true
-s3_prefix = "hello-world-api"
+s3_prefix = "shared-calendar-api"
 parameter_overrides = "AdminUsername=\"admin\" FunctionArchitecture=\"arm64\""
 image_repositories = []
 
@@ -43,7 +43,7 @@ build_in_source = true
 # AlertEmail has no default; only the alarms use it, and they do not run locally.
 parameter_overrides = "AlertEmail=local@example.invalid"
 env_vars = "env.local.json"
-docker_network = "hello-local"
+docker_network = "shared-calendar-local"
 warm_containers = "EAGER"
 # No registry lookup per container (they ran in parallel without a timeout and could hang the
 # start-up); scripts/local-api.sh pulls the Lambda base image once before starting instead.

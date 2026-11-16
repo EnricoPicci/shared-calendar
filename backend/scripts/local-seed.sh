@@ -40,7 +40,7 @@ wait_for() {
   exit 1
 }
 
-# Makes sure localhost:<port> really is this project's container, attached to hello-local.
+# Makes sure localhost:<port> really is this project's container, attached to shared-calendar-local.
 # When another project already holds the port, Docker can leave our container running with
 # no port and no network: the seed would then fill the other project's emulator, and the
 # Lambda containers could not reach ours by name.
@@ -53,7 +53,7 @@ check_service() {
   fi
   published=$(docker compose port "$service" "$container_port" 2>/dev/null || true)
   networks=$(docker inspect "$id" --format '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}')
-  if [[ "$published" != "127.0.0.1:$host_port" || " $networks" != *" hello-local "* ]]; then
+  if [[ "$published" != "127.0.0.1:$host_port" || " $networks" != *" shared-calendar-local "* ]]; then
     echo "ERROR: localhost:$host_port is not this project's $service container" >&2
     networks=${networks% }
     echo "       (published: '${published:-none}', networks: '${networks:-none}')." >&2

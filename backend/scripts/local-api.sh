@@ -79,7 +79,7 @@ fi
 # containers on this project's network: the emulators and other projects' containers are untouched.
 remove_lambda_containers() {
   local ids
-  ids=$(docker ps -aq --filter label=sam.cli.container.type=lambda --filter network=hello-local) || return 0
+  ids=$(docker ps -aq --filter label=sam.cli.container.type=lambda --filter network=shared-calendar-local) || return 0
   if [[ -n "$ids" ]]; then
     echo "Removing $(echo "$ids" | wc -l | tr -d ' ') Lambda container(s) left by sam local"
     # One id per line; unquoted on purpose so that each becomes an argument (no xargs -r on macOS).

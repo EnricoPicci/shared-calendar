@@ -104,7 +104,7 @@ This is why step 58 waits until the new stack has been in use for a while (secti
 | `README.md` | title; the stack name, the log group names, the `smoke` / `bootstrap-admin` / `budget` examples; the profile. The ids (`ApiUrl`, `UserPoolId`, `UserPoolClientId`) only in step 57, when they exist. |
 | `docs/ARCHITECTURE.md` | title; sections 5.2 and 5.3: the physical table names `<stack>-hello-messages` / `<stack>-calendar` (locally `hello-messages` / `calendar`); the bootstrap diagram's stack name (section 6); section 9's example stacks (`shared-calendar-dev`, `shared-calendar-prod`); a change-log entry. |
 | `docs/SHARED_CALENDAR_SPEC.md` | section 13.1 and decision D21: the table's physical name follows the stack (`<stack>-calendar`); a change-log entry. |
-| `docs/IMPLEMENTATION_PLAN.md` | title; the stack name in steps 11 and 55 stays (history); status line. |
+| `docs/IMPLEMENTATION_PLAN.md` | title; status line. The text of completed steps (2, 3, 11, 55: `samconfig.toml`, the network, the first deploy) keeps the old names: it is history. |
 | `docs/RUNBOOK.md` | header table (stack, profile); sections 1–4: the new names and commands; section 3 (deploying from scratch) is what step 57 follows; section 5 keeps its records and gets a 5.4 for the rename. |
 | `docs/FOLDER_STRUCTURE.md` | the project's description, the example commands, the front-end stack sentence. |
 | `docs/AWS_ACCOUNTS.md`, `docs/NEW_ACCOUNT.md` | stack, profile and SSO session names; the optional account alias example → `shared-calendar`; the root plus-address example → `you+aws-shared-calendar-root@gmail.com`. |
@@ -113,8 +113,11 @@ This is why step 58 waits until the new stack has been in use for a while (secti
 ### 5.2 Acceptance of step 56
 
 - `git grep -n -i -E 'hello-world-api|hello-local|hello-admin|Hello World API|aws-hello-root|hello-(dev|prod)'`
-  outside `prompts/` finds only history (change logs, `docs/RUNBOOK.md` section 5, steps 11 and
-  55 of the plan) and the retirement and revert instructions of this document.
+  outside `prompts/` finds only history (change logs, `docs/RUNBOOK.md` section 5, the text of
+  completed plan steps), the retirement and revert instructions (this document, plan step 58), the
+  `deploy.sh` guard, and the notes that name the old stack and profile while they still exist
+  (`CLAUDE.md`, `README.md`'s deployed-stack table until step 57, `docs/RUNBOOK.md` and
+  `docs/AWS_ACCOUNTS.md`).
 - `sam validate --lint`: the template is valid; `TableName` uses `!Sub`.
 - The local stack restarted under the new names (section 5.3), then the root
   `DYNAMODB_PORT=<port> npm run verify` green.

@@ -4,9 +4,11 @@ Guidance for Claude Code when working in this repository.
 
 ## What this project is
 
-A small serverless back end on AWS: a "Hello World" API for registered users and an
-administrative API to create and delete users. TypeScript, AWS Lambda, API Gateway
-(HTTP API), Amazon Cognito, DynamoDB, deployed with AWS SAM.
+A shared calendar on AWS, serverless: an Administrator publishes availability, users book, cancel
+and change appointments (`docs/SHARED_CALENDAR_SPEC.md`); an administrative API creates and deletes
+users; a "Hello World" route for registered users proves the chain API, authorizer, Lambda,
+DynamoDB works. TypeScript, AWS Lambda, API Gateway (HTTP API), Amazon Cognito, DynamoDB, deployed
+with AWS SAM.
 
 The repository is an npm-workspaces monorepo: the back end in `backend/`, the code it shares
 with the browser front end (the API contract types, `Role`/`resolveRole`, the username schemas)
@@ -27,7 +29,10 @@ document). Layout and placement rules: `docs/FOLDER_STRUCTURE.md`.
   `ARCHITECTURE.md` (spec section 19), the architecture wins as usual.
 - `docs/RENAME_PLAN.md` plans the move from the "hello-world" names to "shared-calendar" (plan
   steps 56–58: repository, new stack `shared-calendar-api`, retirement of `hello-world-api`), with
-  the way back at every stage. Until step 58 the deployed stack in use is still `hello-world-api`.
+  the way back at every stage. The repository uses the new names (step 56); until step 57 has
+  created `shared-calendar-api`, the deployed stack is still `hello-world-api` (profile
+  `hello-admin`), which stays untouched as the way back until step 58. The Hello World feature
+  (`/hello`, its table `…hello-messages`) keeps its name: it proves the Lambda chain works.
 - `docs/journeys/` explains the integration journeys in simple words, one page per `describe`
   block, for a new developer (format, rules and the list of pages in `docs/journeys/README.md`;
   the pages still to write, in sessions and batches, in `docs/journeys/PLAN.md`).
@@ -197,7 +202,7 @@ form works the same. Paths below without a folder are relative to `backend/`.
 - The local functions run on the machine's CPU type: `local-api.sh` passes
   `FunctionArchitecture=x86_64` on x86 machines (the cloud stays `arm64`, the template default).
 - GitHub Codespaces: the legacy iptables `FORWARD` chain drops traffic between containers on
-  `hello-local` (the authorizer then times out fetching `http://cognito:9229/…/jwks.json`). After
+  `shared-calendar-local` (the authorizer then times out fetching `http://cognito:9229/…/jwks.json`). After
   each Codespace start, before `local:api`: `sudo iptables-legacy -I FORWARD -i br-+ -o br-+ -j ACCEPT`.
 - `npm run local:down -w backend`: stops the stack. The table is in memory and is lost; Cognito
   data survives in `backend/.cognito/`.
@@ -209,9 +214,9 @@ form works the same. Paths below without a folder are relative to `backend/`.
   containers pick up the rebuilt code on their own.
 - `sam local` (`warm_containers = "EAGER"`) starts extra Lambda containers besides its warm ones
   and leaves them running when it stops. `local-api.sh` removes every container labelled
-  `sam.cli.container.type=lambda` on the `hello-local` network when it exits (Ctrl-C included); the
+  `sam.cli.container.type=lambda` on the `shared-calendar-local` network when it exits (Ctrl-C included); the
   emulators are untouched. After a `kill -9` or a closed terminal, remove them by hand:
-  `docker rm -f $(docker ps -aq --filter label=sam.cli.container.type=lambda --filter network=hello-local)`.
+  `docker rm -f $(docker ps -aq --filter label=sam.cli.container.type=lambda --filter network=shared-calendar-local)`.
   Local weight with 10 functions (step 44): about 0.75 GB for the whole stack, ready in about 14 s;
   with 15 calendar functions (step 47): about 1.1 GB (26 containers after the journeys; start-up not timed);
   with 25 functions (step 51): about 1.5 GB (36 containers after both packages' journeys, emulators
@@ -241,7 +246,8 @@ form works the same. Paths below without a folder are relative to `backend/`.
   and `sam deploy` with the default config env. Extra arguments go to `sam deploy`
   (first deploy of a stack: `npm run deploy -w backend -- --parameter-overrides AlertEmail=<address>`; later
   deploys reuse the stored value). Never put an e-mail address in `samconfig.toml`: the repo is
-  public. Real cloud action: only when explicitly asked.
+  public. Refuses any argument naming the old stack `hello-world-api` (`docs/RENAME_PLAN.md`
+  section 4.2: its tables would be replaced). Real cloud action: only when explicitly asked.
 - `npm run bootstrap-admin -w backend -- <stack|local>`: sets the admin password (hidden prompt, twice,
   pool policy checked first). Only sets the password. Reads stdin, so
   `printf '%s\n%s\n' "$pw" "$pw" | npm run bootstrap-admin -w backend -- local` works in tests.
@@ -260,11 +266,14 @@ form works the same. Paths below without a folder are relative to `backend/`.
   `samconfig.toml`'s region unless `AWS_REGION` is set. `local` uses `env.local.json` and
   dummy credentials. After `bootstrap-admin local`, rerun `local:up` to restore
   `Admin-Local-Pass-1!`, or the integration tests fail.
-- Cloud: stack `hello-world-api` in `eu-north-1` (the organization's policy blocks regional
-  services in every other region). The operator signs in with IAM Identity Center:
-  `export AWS_PROFILE=hello-admin`, and when the session expires
-  `aws sso login --profile hello-admin --use-device-code` (device code: the Codespace has no
-  local browser callback).
+- Cloud: stack `shared-calendar-api` in `eu-north-1` (the organization's policy blocks regional
+  services in every other region); its tables are `shared-calendar-api-calendar` and
+  `shared-calendar-api-hello-messages` (locally plain `calendar` and `hello-messages`). The old
+  stack `hello-world-api` stays until `docs/IMPLEMENTATION_PLAN.md` step 58. The operator signs in
+  with IAM Identity Center: `export AWS_PROFILE=shared-calendar-admin`, and when the session
+  expires `aws sso login --profile shared-calendar-admin --use-device-code` (device code: the
+  Codespace has no local browser callback). The old profile `hello-admin` (SSO session `hello`)
+  stays beside it until step 58.
 - Passwords and tokens in these scripts never go into a command-line argument (visible in
   `ps`) or a file: the two Cognito calls carrying a password go through
   `scripts/cognito.mjs` (AWS SDK, password on stdin), API calls pass the token to curl with

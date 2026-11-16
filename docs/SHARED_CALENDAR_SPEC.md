@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v15 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–59) |
-| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10, v11, v12 and v13 2026-11-14; v14 and v15 2026-11-15 |
+| Status | v16 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–59) |
+| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10, v11, v12 and v13 2026-11-14; v14 and v15 2026-11-15; v16 2026-11-16 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
@@ -27,6 +27,7 @@
 | v13 | 2026-11-14 | Brief 53 (plan step 52). The smoke test's calendar journey made independent of the settings and of the real calendar: it reads both first and searches a free 03:00–04:00 instead of assuming one; the Administrator's booking makes only `cancellationNoticeHours` matter; DST days skipped; a recognisable note for the AC-36 log search; the check lines, the clean-up on every exit and what stays as history (18.4, now "local and cloud"). |
 | v14 | 2026-11-15 | Brief 54 review (plan step 53). Route 9's errors written out instead of "as #8": `limit_reached` removed, since an update replaces a pattern and never adds one (R-PAT-04); architecture section 4 and the handler never had it (11.1). |
 | v15 | 2026-11-15 | Error codes of the timing rules renamed after the rule they break and its setting (user's decision, before plan step 54): `booking_too_soon` split into `booking_in_past` (R-BOOK-03) and `booking_notice_too_short` (R-BOOK-04, `minBookingNoticeHours`); `booking_too_far` → `booking_beyond_horizon` (R-BOOK-05, `bookingHorizonDays`); `cancellation_too_late` → `cancellation_notice_too_short` (R-CAN-03, `cancellationNoticeHours`). Statuses, order of the checks and messages unchanged (8.2, 8.3, 8.4, 11.1, 11.3, 18.3). |
+| v16 | 2026-11-16 | Brief 71 (`docs/RENAME_PLAN.md`, plan step 56): the table's physical name in the cloud follows the stack, `<stack>-calendar`; locally it stays `calendar` (13.1). The plan's calendar steps run 41–59. |
 
 ---
 
@@ -1005,7 +1006,7 @@ kinds of item (single-table design). This is the reason `hello-messages`, with i
 
 | Setting | Value | Why |
 |---|---|---|
-| Name | `calendar` (logical id `CalendarTable`) | |
+| Name | `calendar` (logical id `CalendarTable`); in the cloud named after the stack, `<stack>-calendar` (`docs/RENAME_PLAN.md` decision R2) | two stacks can then share one account |
 | Keys | partition key `PK` (S), sort key `SK` (S) | |
 | Secondary indexes | **none** | Every query the feature needs is served by the keys below with strongly consistent reads, which the concurrency design relies on (13.4). Indexes are only eventually consistent. |
 | Capacity | provisioned 10 RCU / 10 WCU | A transaction costs 2 WCU per item; a booking writes ~5 items. With `hello-messages` (1/1) the total stays inside the always-free 25/25. Provisioned capacity cannot scale into cost (architecture section 10). |
