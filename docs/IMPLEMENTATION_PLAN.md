@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v4 (2026-10-28). **Steps 1–12 done** (step 12 on 2026-11-04, tag `v1.0.0`); step 20, monorepo move, done 2026-11-04. **Shared calendar: steps 41–56 planned** (2026-11-10, brief 41, from `docs/SHARED_CALENDAR_SPEC.md` v2); step 41 done 2026-11-12 (brief 42); step 42 done 2026-11-12 (brief 43); step 43 done 2026-11-12 (brief 44); step 44 done 2026-11-12 (brief 45; O2 checked, PO confirmed T2); step 45 done 2026-11-12 (brief 46); step 46 done 2026-11-13 (brief 47; spec v7); step 47 done 2026-11-13 (brief 48; spec v8; availability complete); step 48 done 2026-11-14 (brief 49; spec v9; booking and the event log); step 49 done 2026-11-14 (brief 50; spec v10; listing, note and cancel); step 50 done 2026-11-14 (brief 51; spec v11; change; appointments complete); step 51 done 2026-11-14 (brief 52; spec v12; `GET /users`, user deletion with appointments); step 52 done 2026-11-14 (brief 53; spec v13; smoke test's calendar journey, AC-36 locally): **back end complete**; step 53 done 2026-11-15 (brief 54; `FRONTEND_SERVICES.md` v6; spec v14; `api.ts`, settings, types and availability-rules services, `listUsers`); step 54 done 2026-11-15 (brief 56; `FRONTEND_SERVICES.md` v7; `CalendarService`, `AppointmentsService`): **services layer complete**; step 55 done 2026-11-16 (brief 70; commit `340d9b0` deployed to `hello-world-api`, smoke test 19/19 PASS in the cloud, `docs/RUNBOOK.md` section 5.2): **shared calendar deployed** |
+| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v4 (2026-10-28). **Steps 1–12 done** (step 12 on 2026-11-04, tag `v1.0.0`); step 20, monorepo move, done 2026-11-04. **Shared calendar: steps 41–59 planned** (2026-11-10, brief 41, from `docs/SHARED_CALENDAR_SPEC.md` v2); step 41 done 2026-11-12 (brief 42); step 42 done 2026-11-12 (brief 43); step 43 done 2026-11-12 (brief 44); step 44 done 2026-11-12 (brief 45; O2 checked, PO confirmed T2); step 45 done 2026-11-12 (brief 46); step 46 done 2026-11-13 (brief 47; spec v7); step 47 done 2026-11-13 (brief 48; spec v8; availability complete); step 48 done 2026-11-14 (brief 49; spec v9; booking and the event log); step 49 done 2026-11-14 (brief 50; spec v10; listing, note and cancel); step 50 done 2026-11-14 (brief 51; spec v11; change; appointments complete); step 51 done 2026-11-14 (brief 52; spec v12; `GET /users`, user deletion with appointments); step 52 done 2026-11-14 (brief 53; spec v13; smoke test's calendar journey, AC-36 locally): **back end complete**; step 53 done 2026-11-15 (brief 54; `FRONTEND_SERVICES.md` v6; spec v14; `api.ts`, settings, types and availability-rules services, `listUsers`); step 54 done 2026-11-15 (brief 56; `FRONTEND_SERVICES.md` v7; `CalendarService`, `AppointmentsService`): **services layer complete**; step 55 done 2026-11-16 (brief 70; commit `340d9b0` deployed to `hello-world-api`, smoke test 19/19 PASS in the cloud, `docs/RUNBOOK.md` section 5.2): **shared calendar deployed**; 2026-11-16: rename to "shared-calendar" planned as steps 56–58 (`docs/RENAME_PLAN.md`), documentation and hand-over renumbered 56 → 59 |
 | Date | 2026-10-28; calendar steps added 2026-11-10 |
-| Scope | Everything needed to go from an empty repository to a deployed, smoke-tested v1; then the shared calendar (steps 41–56), from its specification to a deployed, smoke-tested feature |
+| Scope | Everything needed to go from an empty repository to a deployed, smoke-tested v1; then the shared calendar (steps 41–59), from its specification to a deployed, smoke-tested feature |
 
 ---
 
@@ -18,7 +18,7 @@ Conventions used throughout:
 - "Unit" tests run with `vitest` and no Docker. "Integration" tests need the local Docker stack (architecture section 8).
 - Effort figures are indicative, for a developer who knows TypeScript but is new to SAM. Total: roughly 3 working days.
 - The architecture document is the source of truth for behaviour. Where this plan quotes a value (token lifetime, password policy, IAM action), the architecture wins if they ever differ.
-- The shared calendar (steps 41–56) has its own conventions, paths from the repository root, and the rule for which document governs while it is built: section 3, "Shared calendar".
+- The shared calendar (steps 41–59) has its own conventions, paths from the repository root, and the rule for which document governs while it is built: section 3, "Shared calendar".
 
 ### 1.1 Requirement traceability
 
@@ -35,7 +35,7 @@ Conventions used throughout:
 | N5 Local tests gate the deployment | 3, 9, 10 |
 | N6 Minimal load | 2 (throttling, memory sizing) |
 
-#### Shared calendar (steps 41–56)
+#### Shared calendar (steps 41–59)
 
 Every id of `docs/SHARED_CALENDAR_SPEC.md` v2 and the step that delivers it. "Unit" means proven
 by unit tests with a fixed clock; the journeys prove the same scenario on dates relative to today.
@@ -415,7 +415,7 @@ Test cases (`tests/integration/journeys.test.ts`), in order:
 
 ---
 
-### Shared calendar (steps 41–56)
+### Shared calendar (steps 41–59)
 
 Planned 2026-11-10 (brief 41) from `docs/SHARED_CALENDAR_SPEC.md` v2. Numbered from 41 like the
 spec's outline (section 21). The PO confirmed assumptions A1–A8 before planning. The spec changes
@@ -458,7 +458,7 @@ approved during planning are in its change log (v2).
 #### Where the truth lives while the calendar is built
 
 **Decision: the spec merges into `docs/ARCHITECTURE.md` one part per step.** Each step merges the
-part of spec section 19 that it implements, in the same change as the code. Steps 41 and 56 open and
+part of spec section 19 that it implements, in the same change as the code. Steps 41 and 59 open and
 close the merge.
 
 - *Why not merge first.* The architecture would describe 21 routes that do not exist, and its
@@ -472,14 +472,14 @@ close the merge.
   together, and a finding is fixed where it belongs.
 
 **What governs in the meantime.** Step 41 opens version v12 of the architecture's change log with
-this rule: *the shared calendar (F5) is being implemented in plan steps 41–56; a calendar matter
+this rule: *the shared calendar (F5) is being implemented in plan steps 41–59; a calendar matter
 that the architecture does not yet describe is governed by `docs/SHARED_CALENDAR_SPEC.md`;
 whatever the architecture already describes, including everything Hello World does, is governed by
 the architecture.* A step that changes existing behaviour (43: IAM pattern and cost; 51:
 `deleteUser`) merges that change in the same step, so the code never contradicts the architecture.
 When a step proves the spec wrong, the CLAUDE.md working rhythm applies: say so, propose the
 change, and edit the spec and the architecture only after approval. Each merging step adds its
-sentence to the v12 change-log entry. Step 56 closes v12 and marks the spec as historical.
+sentence to the v12 change-log entry. Step 59 closes v12 and marks the spec as historical.
 
 Spec section 19, row by row:
 
@@ -492,8 +492,8 @@ Spec section 19, row by row:
 | | Section 6 "book" diagram; 7.1 `CalendarBookPolicy` and Cognito row; section 8 note on cognito-local `AdminGetUser` | 48 |
 | | Section 6 "change" diagram | 50 |
 | | Section 6.4 "delete user with appointments"; 7.1 `DeleteUserRole`; 7.3 residual risk (marker); section 8 `ListUsersInGroup` note | 51 |
-| | Section 14 assumptions A1–A8 (confirmed); status line; v12 closed; anything the implementation proved different | 56 |
-| `docs/IMPLEMENTATION_PLAN.md` | These steps (brief 41); the status line after each step | 41–56 |
+| | Section 14 assumptions A1–A8 (confirmed); status line; v12 closed; anything the implementation proved different | 59 |
+| `docs/IMPLEMENTATION_PLAN.md` | These steps (brief 41); the status line after each step | 41–59 |
 | `docs/FRONTEND_SERVICES.md` | `api.ts` changes (16.1); settings, types and availability-rules services; `listUsers` | 53 |
 | | `CalendarService`, `AppointmentsService`; behaviour of 16.3 | 54 |
 | `docs/FOLDER_STRUCTURE.md` | `shared/src/calendar/` | 41 |
@@ -502,8 +502,8 @@ Spec section 19, row by row:
 | | Deployment record | 55 |
 | `CLAUDE.md` | Local notes: `calendar` table, journeys reset the table, `CALENDAR_*` variables | 43 |
 | | Local-stack weight and its fallback, if one is applied | 51 |
-| | "Where the truth lives" (spec merged), folder map, commands | 56 |
-| `README.md` | New routes, curl examples, the `calendar` table | 56 |
+| | "Where the truth lives" (spec merged), folder map, commands | 59 |
+| `README.md` | New routes, curl examples, the `calendar` table | 59 |
 | `shared/src/api.ts` | Error codes, `conflicts`, `UserSummary` (11.3) | 42 |
 | `backend/src/handlers/deleteUser.ts` | 10.2 | 51 |
 | `backend/template.yaml` | Table, parameter, policies and functions, per route step | 43–51 |
@@ -523,7 +523,7 @@ Spec section 19, row by row:
 | 47 `GET /users` + `deleteUser` | **51**, unchanged, plus the second local-weight measurement | It must follow booking: AC-29 needs appointments. |
 | 48 integration journeys + smoke | journeys spread over 43–51; what remains is **52** | Each step proves itself, and `verify` re-proves everything (see above). |
 | 49 front-end services · 50 front-end journeys | **53** `api.ts` + settings, types, rules, users · **54** calendar + appointments, each with its journeys | Five services are too big for one review. A service step without its journeys would end untested against the real API. |
-| 51 docs + deployment | **55** deployment · **56** documents and hand-over | Most documents are merged per step. Deployment needs explicit instruction and has an acceptance of its own (smoke in the cloud). The final documents record what deployment found, as steps 11 and 12 did. |
+| 51 docs + deployment | **55** deployment · **59** documents and hand-over (after the rename, steps 56–58, `docs/RENAME_PLAN.md`) | Most documents are merged per step. Deployment needs explicit instruction and has an acceptance of its own (smoke in the cloud). The final documents record what deployment found, as steps 11 and 12 did. |
 
 The back end comes before the front end. The contract can still move during steps 43–51 (the O2
 decision, findings), and the services should target a stable contract. The CORS gap
@@ -1018,7 +1018,48 @@ console checks of item 6. Checkpoint: deployed.
 
 ---
 
-### Step 56 — Documentation and hand-over (≈ 3 h)
+### Step 56 — Rename the repository to "shared-calendar" (≈ 2 h, no cloud change)
+
+What, why and how to go back: `docs/RENAME_PLAN.md` (decisions R1–R8, section 5). In short: the
+template names its tables after the stack, `samconfig.toml` names the new stack
+`shared-calendar-api`, the local Docker network and compose project, the AWS CLI profile and every
+document follow; `deploy.sh` refuses the old stack's name. The Hello World feature keeps its name.
+The operator stops the local stack before the change, adds the new profile beside the old one and
+restarts the local stack after it (`docs/RENAME_PLAN.md` section 5.3).
+
+**Acceptance:** `docs/RENAME_PLAN.md` section 5.2.
+
+---
+
+### Step 57 — Deploy the new stack `shared-calendar-api` (≈ 2 h, needs explicit instruction)
+
+**Needs explicit instruction from the PO**, like step 55: the first deploy of a new stack (with
+`AlertEmail`), `bootstrap-admin`, `budget`, `smoke`. The old stack is not touched. Run it soon after
+step 56: in between, the repository names a stack that does not exist yet.
+
+The procedure is `docs/RENAME_PLAN.md` section 6.1 (which follows `docs/RUNBOOK.md` section 3).
+
+**Acceptance:** change set only Add; stack `CREATE_COMPLETE` with five outputs; subscription
+confirmed the same day; budget `shared-calendar-api-monthly`; smoke test 19/19 PASS; the read-only
+checks of step 55 on the new stack; `README.md` ids and `docs/RUNBOOK.md` record updated.
+
+---
+
+### Step 58 — Retire the old stack `hello-world-api` (≈ 1 h, needs explicit instruction)
+
+**When the PO decides**, after the new stack has run without problems for a while (one week as a
+minimum). After this step there is no way back to the old stack (`docs/RENAME_PLAN.md`
+section 4.3). Every cloud command needs its own go: lifting deletion protection on `hello-messages`,
+`calendar` and the user pool, deleting the stack, deleting the budget `hello-world-api-monthly`.
+The procedure is `docs/RENAME_PLAN.md` section 6.3.
+
+**Acceptance:** `describe-stacks --stack-name hello-world-api` answers that the stack does not
+exist; the budget is gone; the new stack's smoke test still passes; the old profile removed from
+`~/.aws/config`; `docs/RENAME_PLAN.md` status "done".
+
+---
+
+### Step 59 — Documentation and hand-over (≈ 3 h)
 
 - `docs/ARCHITECTURE.md`: close v12; status "v1 and shared calendar implemented"; section 14 with
   A1–A8 as confirmed; anything the implementation proved different.
@@ -1076,7 +1117,7 @@ Shared calendar:
 53 api.ts + management services ──► 54 calendar + appointments services
         │
         ▼
-55 cloud deployment (explicit instruction) ──► 56 documents + tag
+55 cloud deployment (explicit instruction) ──► 56–58 rename to shared-calendar ──► 59 documents + tag
 ```
 
 The order is strict: each step uses what the previous ones built. The back end comes first so the
@@ -1093,6 +1134,9 @@ Suggested calendar checkpoints to commit (and push, if wanted):
 | 52 | Back end complete, `verify` green twice |
 | 54 | Services layer complete |
 | 55 | Deployed (the deploy needs a clean, committed tree anyway) |
+| 56 | Repository renamed (`docs/RENAME_PLAN.md` section 5); the commit to revert to go back to stage 0 |
+| 57 | New stack `shared-calendar-api` deployed |
+| 58 | Old stack retired |
 
 ---
 
@@ -1107,7 +1151,7 @@ Suggested calendar checkpoints to commit (and push, if wanted):
 | `npm audit` fails the gate on a transitive advisory with no fix | medium | Gate uses `--audit-level=high`; a documented override requires a comment in `deploy.sh` with the advisory id and a date |
 | Docker network name clashes on the developer machine | low | Network name is configurable through `LOCAL_NETWORK` env in scripts |
 
-Shared calendar (steps 41–56):
+Shared calendar (steps 41–59):
 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
@@ -1133,7 +1177,7 @@ Shared calendar (steps 41–56):
 5. Listing a user's messages (`GET /messages`) with the `byUser` GSI.
 6. MFA and SRP sign-in, both pool-side switches.
 
-Shared calendar follow-ups (spec 21), not in steps 41–56:
+Shared calendar follow-ups (spec 21), not in steps 41–59:
 
 1. E-mail notifications (spec section 15.3): DynamoDB Streams on `calendar`, a notifier Lambda, Amazon SES. The event items written since step 48 are its input.
 2. Date-range closures as one operation.
@@ -1152,9 +1196,9 @@ Shared calendar follow-ups (spec 21), not in steps 41–56:
 - The stack is deployed, the smoke test passes, the alarm e-mail subscription is confirmed and the budget is visible in the Budgets console.
 - `docs/ARCHITECTURE.md` reflects what was built; commit tagged `v1.0.0`.
 
-Shared calendar (steps 41–56) is done when:
+Shared calendar (steps 41–59) is done when:
 
-- every acceptance check of steps 41–56 has passed, including the PO's T2 decision in step 44;
+- every acceptance check of steps 41–59 has passed, including the PO's T2 decision in step 44;
 - root `npm run verify` is green on a clean clone, with 100 % line coverage on `shared/src`, `backend/src/lib` and `frontend/src`, and the front-end journeys green with `RUN_INTEGRATION=1`;
 - the stack is deployed and the smoke test, with its calendar journey, passes in the cloud;
 - `docs/ARCHITECTURE.md` v12 describes the calendar, and the spec is marked historical; every row of the calendar traceability table (section 1.1) is delivered.

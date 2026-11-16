@@ -25,6 +25,9 @@ document). Layout and placement rules: `docs/FOLDER_STRUCTURE.md`.
 - `docs/SHARED_CALENDAR_SPEC.md` specifies the shared calendar (agreed with the Product Owner,
   brief 40, not yet implemented). It is the input for the calendar's plan steps; once merged into
   `ARCHITECTURE.md` (spec section 19), the architecture wins as usual.
+- `docs/RENAME_PLAN.md` plans the move from the "hello-world" names to "shared-calendar" (plan
+  steps 56–58: repository, new stack `shared-calendar-api`, retirement of `hello-world-api`), with
+  the way back at every stage. Until step 58 the deployed stack in use is still `hello-world-api`.
 - `docs/journeys/` explains the integration journeys in simple words, one page per `describe`
   block, for a new developer (format, rules and the list of pages in `docs/journeys/README.md`;
   the pages still to write, in sessions and batches, in `docs/journeys/PLAN.md`).

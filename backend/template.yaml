@@ -3,7 +3,7 @@ Transform: AWS::Serverless-2016-10-31
 Description: >
   Hello World API (docs/ARCHITECTURE.md). Cognito user pool for identities and roles,
   HTTP API with a Lambda authorizer, three business Lambdas, one DynamoDB table; and the shared
-  calendar (docs/SHARED_CALENDAR_SPEC.md, being built in plan steps 41-56): its table, its
+  calendar (docs/SHARED_CALENDAR_SPEC.md, being built in plan steps 41-59): its table, its
   shared permission sets, one function per calendar route, and GET /users.
 
 # Values given at deploy time: samconfig.toml holds all but AlertEmail, which the first deploy
