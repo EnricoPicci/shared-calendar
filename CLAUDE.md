@@ -32,6 +32,10 @@ and not written yet). Layout and placement rules: `docs/FOLDER_STRUCTURE.md`.
   views, shell) and the rules of a view. Hosting, CORS, the bundle command and the dev server are
   its open points (section 10). `docs/FRONTEND_SERVICES.md` stays the truth for the services;
   `docs/FRONTEND_VIEW_OPTIONS.md` is the record of why this option, not a source of truth.
+- `docs/FRONTEND_VIEW_PLAN.md` defines the order of work for the views (brief 82, planned, no step
+  started): steps 60–69, each with its acceptance check, ending with all the views running against
+  the local stack. It settles the open points O4 (esbuild), O6 (`happy-dom`, views at 100 % line
+  coverage) and O8 (English only), which step 60 writes into `docs/FRONTEND_ARCHITECTURE.md`.
 - `docs/RENAME_PLAN.md` plans the move from the "hello-world" names to "shared-calendar" (plan
   steps 56–58: repository, new stack `shared-calendar-api`, retirement of `hello-world-api`), with
   the way back at every stage. The repository uses the new names (step 56) and the stack in use
