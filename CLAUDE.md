@@ -29,9 +29,9 @@ document). Layout and placement rules: `docs/FOLDER_STRUCTURE.md`.
   `ARCHITECTURE.md` (spec section 19), the architecture wins as usual.
 - `docs/RENAME_PLAN.md` plans the move from the "hello-world" names to "shared-calendar" (plan
   steps 56–58: repository, new stack `shared-calendar-api`, retirement of `hello-world-api`), with
-  the way back at every stage. The repository uses the new names (step 56); until step 57 has
-  created `shared-calendar-api`, the deployed stack is still `hello-world-api` (profile
-  `hello-admin`), which stays untouched as the way back until step 58. The Hello World feature
+  the way back at every stage. The repository uses the new names (step 56) and the stack in use
+  is `shared-calendar-api` (step 57, 2026-11-16); the old stack `hello-world-api` (profile
+  `hello-admin`) stays untouched as the way back until step 58. The Hello World feature
   (`/hello`, its table `…hello-messages`) keeps its name: it proves the Lambda chain works.
 - `docs/journeys/` explains the integration journeys in simple words, one page per `describe`
   block, for a new developer (format, rules and the list of pages in `docs/journeys/README.md`;
@@ -267,9 +267,10 @@ form works the same. Paths below without a folder are relative to `backend/`.
   dummy credentials. After `bootstrap-admin local`, rerun `local:up` to restore
   `Admin-Local-Pass-1!`, or the integration tests fail.
 - Cloud: stack `shared-calendar-api` in `eu-north-1` (the organization's policy blocks regional
-  services in every other region); its tables are `shared-calendar-api-calendar` and
-  `shared-calendar-api-hello-messages` (locally plain `calendar` and `hello-messages`). The old
-  stack `hello-world-api` stays until `docs/IMPLEMENTATION_PLAN.md` step 58. The operator signs in
+  services in every other region), the one in use since plan step 57 (2026-11-16); its tables are
+  `shared-calendar-api-calendar` and `shared-calendar-api-hello-messages` (locally plain `calendar`
+  and `hello-messages`). The old stack `hello-world-api` stays, untouched, as the way back until
+  `docs/IMPLEMENTATION_PLAN.md` step 58: nothing is deployed to it. The operator signs in
   with IAM Identity Center: `export AWS_PROFILE=shared-calendar-admin`, and when the session
   expires `aws sso login --profile shared-calendar-admin --use-device-code` (device code: the
   Codespace has no local browser callback). The old profile `hello-admin` (SSO session `hello`)

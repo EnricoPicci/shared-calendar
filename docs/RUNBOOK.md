@@ -11,7 +11,7 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
 | Region | `eu-north-1` (the only region the AWS organization allows for regional services) |
 | CLI profile | `shared-calendar-admin` (IAM Identity Center, role `AdministratorAccess`) |
 | Alerts to | the `AlertEmail` stack parameter |
-| Old stack | `hello-world-api` (profile `hello-admin`): until `docs/IMPLEMENTATION_PLAN.md` step 57 has created `shared-calendar-api` it is still the deployed one; then it stays, untouched, as the way back until step 58 (`docs/RENAME_PLAN.md`). Never deploy to it: `deploy.sh` refuses |
+| Old stack | `hello-world-api` (profile `hello-admin`): replaced by `shared-calendar-api` in `docs/IMPLEMENTATION_PLAN.md` step 57 (2026-11-16); it stays, untouched, as the way back until step 58 (`docs/RENAME_PLAN.md` section 4.2). Never deploy to it: `deploy.sh` refuses |
 
 ---
 
@@ -156,10 +156,12 @@ Plan step 11 has the full list; in short:
    service control policy`. In another account, check its organization's allowed region first and
    put it in `backend/samconfig.toml` (both `region` lines) and the profile.
 1. Steps 1 to 3 of section 2 (commit, local stack, verify).
-2. `npm run deploy -w backend -- --parameter-overrides AlertEmail=<alert address>`.
-   `backend/samconfig.toml` already holds everything else (stack, region, capabilities, `AdminUsername` `admin`,
-   `FunctionArchitecture` `arm64`); the address is the one value it leaves out, because the
-   repository is public. CloudFormation stores it with the stack, so later deploys omit it.
+2. `npm run deploy -w backend -- --parameter-overrides AdminUsername="admin" FunctionArchitecture="arm64" AlertEmail=<alert address>`.
+   `backend/samconfig.toml` holds everything else (stack, region, capabilities); the address is
+   the one value it leaves out, because the repository is public. A `--parameter-overrides` on the
+   command line replaces the whole `parameter_overrides` line of `backend/samconfig.toml`, so the
+   command repeats `AdminUsername` and `FunctionArchitecture` (plan step 57 used exactly this
+   command). CloudFormation stores the address with the stack, so later deploys omit it.
    Without the flag the deploy stops before creating anything: `AlertEmail` must have a value.
    Avoid `--guided`; if you use it, answer N to "Save arguments to configuration file", or SAM
    writes the address into `backend/samconfig.toml`.
@@ -306,7 +308,9 @@ with `npm run deploy -w backend` and no extra argument.
       `v1.0.0`.
 - [ ] Cost Explorer forecast for the month. On 2026-11-16 the CLI and the budget still had no
       forecast ("Insufficient amount of historical data"); the month-to-date cost was 0 USD.
-      Check again in the console (Billing, Cost Explorer) in a few days.
+      Still so after plan step 57 (section 5.4), with both stacks live. Check again in the console
+      (Billing, Cost Explorer) in a few days; from then on the budget to watch is
+      `shared-calendar-api-monthly`.
 - [x] First deploy since `AlertEmail` left `backend/samconfig.toml` (plan step 55, 2026-11-16):
       SAM reused the stored value, the change set showed nothing for `AlarmTopic`, and the
       subscription stayed confirmed. Deploys need no `AlertEmail`.
@@ -325,3 +329,48 @@ with `npm run deploy -w backend` and no extra argument.
   tables named after the stack, profile `shared-calendar-admin`, Docker network
   `shared-calendar-local`); `deploy.sh` refuses the old stack's name. No cloud change: the
   deployed stack is still `hello-world-api`, as recorded in section 5.2.
+- Plan step 57 (2026-11-16): the new stack `shared-calendar-api`, created from scratch (section 3)
+  beside `hello-world-api`. Commit deployed: `4e22058` (the step's brief on top of `b752ea5`);
+  `verify` PASSED on the clean tree at 12:18 UTC (root `DYNAMODB_PORT=8002 npm run verify`); deploy
+  started at 12:25 UTC with `npm run deploy -w backend -- --parameter-overrides AdminUsername="admin"
+  FunctionArchitecture="arm64" AlertEmail=<address>`; stack `CREATE_COMPLETE` at 12:27:40 UTC.
+  - **A1:** `CalendarTimeZone` = `Europe/Rome` from the template default (nothing in
+    `backend/samconfig.toml` or on the command line); the 21 functions with `CALENDAR_TIME_ZONE`
+    have it. The smoke test's booking is the new calendar's first data, so it is now fixed.
+  - **Change set:** 118 Add, nothing else (25 functions, 25 roles, 25 permissions, 26 log groups,
+    4 managed policies, 2 tables, the user pool, its client, 2 groups, the admin user and its
+    group attachment, the API and its stage, `AlarmTopic`, 2 alarms). The deployed template names
+    nothing of `hello-world-api`. As in step 55, the operator answered `y` before the change set
+    had been read back in the session; the check (recorded output and `describe-change-set`) was
+    done right after and found nothing that would have meant N.
+  - **After the deploy:** five outputs: `ApiUrl` `https://kk32tyn1s4.execute-api.eu-north-1.amazonaws.com`,
+    `UserPoolId` `eu-north-1_mG58Opv7F`, `UserPoolClientId` `3gisesgktkagt34c3lentr5dmd`,
+    `CalendarTableName` `shared-calendar-api-calendar`, `MessagesTableName`
+    `shared-calendar-api-hello-messages`. Tables provisioned 10/10 and 1/1, deletion protection on,
+    empty. 25 functions, `arm64`, `nodejs22.x`. User pool deletion protection `ACTIVE`, `admin` in
+    `FORCE_CHANGE_PASSWORD` and in group `admin`. Both alarms `OK` (from `INSUFFICIENT_DATA` at
+    creation). Unauthenticated `GET /calendar/settings`, `GET /calendar/appointments` and
+    `POST /hello` answered 401.
+  - **Subscription:** already confirmed when first checked, minutes after the deploy (an ARN, not
+    `PendingConfirmation`); no re-subscribe needed.
+  - **Admin password** set with `bootstrap-admin` at 12:35 UTC; `admin` `CONFIRMED`.
+  - **Budget:** `shared-calendar-api-monthly`, 1 USD, actual and forecast at 100 %, e-mail to the
+    same address as `hello-world-api-monthly` (compared without printing it); the dry run first.
+  - **Smoke test:** 19/19 PASS at 12:40 UTC (user `smoke-1794832806`, the calendar journey on
+    2027-01-05 03:00-04:00 `Europe/Rome`, cancellation notice 24 h).
+  - **After the smoke test:** `shared-calendar-api-calendar` holds exactly the history of section
+    2.1 (the cancelled appointment, its `APPTID` pointer, its `appointment.booked` and
+    `appointment.cancelled` events, the `DELETEDUSER` marker) plus the `LOCK` item at version 7: 6
+    items, no type, no window, no `SETTINGS`. `shared-calendar-api-hello-messages` holds the run's
+    2 rows. AC-36: the Logs Insights queries of section 2.1 over the three log groups (15 records
+    scanned, after a first run that scanned 0) and over all 26 log groups of the stack (87 records)
+    returned no row for the note and none for `/eyJ/`; the 87 raw events read with
+    `aws logs filter-log-events` hold no note, token, password or error line (the access log's
+    `authorizerError` and `integrationError` are `-` throughout). Alarms not fired.
+  - **Old stack:** `hello-world-api` `UPDATE_COMPLETE`, `LastUpdatedTime` 2026-11-16 09:56:34 UTC
+    before and after (step 55), 118 resources; its alarms `OK` since 2026-10-30, its subscription
+    and budget unchanged; `calendar` 6 items, `hello-messages` 4 rows.
+  - **Cost:** month-to-date -0 USD; `aws ce get-cost-forecast` still answers
+    `DataUnavailableException: Insufficient amount of historical data` (not yet visible, section
+    5.3). The account's provisioned tables are now the two stacks' four: 22 read and 22 write
+    units, inside the free 25/25 (`docs/RENAME_PLAN.md` section 7).

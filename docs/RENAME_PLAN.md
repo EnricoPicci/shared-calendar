@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v1 — plan, agreed with the Product Owner on 2026-11-16; not started |
+| Status | v1 — plan, agreed with the Product Owner on 2026-11-16. Step 56 done 2026-11-16 (stage A); step 57 done 2026-11-16: `shared-calendar-api` created and in use, `hello-world-api` untouched (**stage B**, way back section 4.2; record in `docs/RUNBOOK.md` section 5.4). Next: step 58, when the PO decides |
 | Date | 2026-11-16 |
 | Scope | Every name that says "hello-world" (or "hello" for the project as a whole) becomes a "shared-calendar" name: the cloud stack, its tables, the local Docker names, the AWS CLI profile, the documents. The Hello World feature stays. |
 | Plan steps | `docs/IMPLEMENTATION_PLAN.md` steps 56 (repository), 57 (new stack), 58 (old stack retired); step 59 (documentation and hand-over) follows them |

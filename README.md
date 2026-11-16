@@ -54,25 +54,24 @@ sudo iptables-legacy -I FORWARD -i br-+ -o br-+ -j ACCEPT
 
 ## The deployed stack
 
-The stack is moving from `hello-world-api` to `shared-calendar-api` (`docs/RENAME_PLAN.md`). Until
-`docs/IMPLEMENTATION_PLAN.md` step 57 has created the new stack, the table below is the old
-stack's, reached with the old profile `hello-admin`; step 57 replaces the ids and names with the
-new stack's (tables `shared-calendar-api-calendar` and `shared-calendar-api-hello-messages`).
-The commands elsewhere in this README already name the new stack and profile.
+The stack in use is `shared-calendar-api`, created on 2026-11-16 by `docs/IMPLEMENTATION_PLAN.md`
+step 57. The old stack `hello-world-api` (profile `hello-admin`) stays, untouched, as the way back
+until step 58 retires it (`docs/RENAME_PLAN.md` section 4.2); its ids keep working until then, but
+nothing new goes there.
 
 | | |
 |---|---|
-| Stack | `hello-world-api` |
+| Stack | `shared-calendar-api` |
 | Region | `eu-north-1` (the only region the AWS organization allows for regional services) |
-| API | `https://nbari0mamc.execute-api.eu-north-1.amazonaws.com` |
-| User pool | `eu-north-1_1DOUiHwSk` |
-| App client | `2minh5iuva8dsk26pmdlljfmsd` |
-| Table | `hello-messages` |
-| CLI profile | `hello-admin` (IAM Identity Center) |
+| API | `https://kk32tyn1s4.execute-api.eu-north-1.amazonaws.com` |
+| User pool | `eu-north-1_mG58Opv7F` |
+| App client | `3gisesgktkagt34c3lentr5dmd` |
+| Tables | `shared-calendar-api-calendar`, `shared-calendar-api-hello-messages` |
+| CLI profile | `shared-calendar-admin` (IAM Identity Center) |
 
-The three ids are not secrets; they come from `sam list stack-outputs --stack-name hello-world-api`.
-To talk to the stack from the CLI: `export AWS_PROFILE=hello-admin`, and when the session has
-expired `aws sso login --profile hello-admin --use-device-code` (`docs/AWS_ACCOUNTS.md`).
+The three ids are not secrets; they come from `sam list stack-outputs --stack-name shared-calendar-api`.
+To talk to the stack from the CLI: `export AWS_PROFILE=shared-calendar-admin`, and when the session
+has expired `aws sso login --profile shared-calendar-admin --use-device-code` (`docs/AWS_ACCOUNTS.md`).
 
 ## Commands
 
@@ -130,10 +129,10 @@ Cloud (same command, real pool; `AWS_PROFILE=shared-calendar-admin` exported as 
 ```bash
 read -rs -p "Password for admin: " PASSWORD; echo
 TOKEN=$(aws cognito-idp initiate-auth --region eu-north-1 \
-  --client-id 2minh5iuva8dsk26pmdlljfmsd --auth-flow USER_PASSWORD_AUTH \
+  --client-id 3gisesgktkagt34c3lentr5dmd --auth-flow USER_PASSWORD_AUTH \
   --auth-parameters USERNAME=admin,PASSWORD="$PASSWORD" \
   --query AuthenticationResult.AccessToken --output text)
-API=https://nbari0mamc.execute-api.eu-north-1.amazonaws.com
+API=https://kk32tyn1s4.execute-api.eu-north-1.amazonaws.com
 ```
 
 The access token is valid for 15 minutes. Stricter alternative that never puts the password
