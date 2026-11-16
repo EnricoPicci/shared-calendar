@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v4 (2026-10-28). **Steps 1–12 done** (step 12 on 2026-11-04, tag `v1.0.0`); step 20, monorepo move, done 2026-11-04. **Shared calendar: steps 41–56 planned** (2026-11-10, brief 41, from `docs/SHARED_CALENDAR_SPEC.md` v2); step 41 done 2026-11-12 (brief 42); step 42 done 2026-11-12 (brief 43); step 43 done 2026-11-12 (brief 44); step 44 done 2026-11-12 (brief 45; O2 checked, PO confirmed T2); step 45 done 2026-11-12 (brief 46); step 46 done 2026-11-13 (brief 47; spec v7); step 47 done 2026-11-13 (brief 48; spec v8; availability complete); step 48 done 2026-11-14 (brief 49; spec v9; booking and the event log); step 49 done 2026-11-14 (brief 50; spec v10; listing, note and cancel); step 50 done 2026-11-14 (brief 51; spec v11; change; appointments complete); step 51 done 2026-11-14 (brief 52; spec v12; `GET /users`, user deletion with appointments); step 52 done 2026-11-14 (brief 53; spec v13; smoke test's calendar journey, AC-36 locally): **back end complete**; step 53 done 2026-11-15 (brief 54; `FRONTEND_SERVICES.md` v6; spec v14; `api.ts`, settings, types and availability-rules services, `listUsers`); step 54 done 2026-11-15 (brief 56; `FRONTEND_SERVICES.md` v7; `CalendarService`, `AppointmentsService`): **services layer complete** |
+| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v4 (2026-10-28). **Steps 1–12 done** (step 12 on 2026-11-04, tag `v1.0.0`); step 20, monorepo move, done 2026-11-04. **Shared calendar: steps 41–56 planned** (2026-11-10, brief 41, from `docs/SHARED_CALENDAR_SPEC.md` v2); step 41 done 2026-11-12 (brief 42); step 42 done 2026-11-12 (brief 43); step 43 done 2026-11-12 (brief 44); step 44 done 2026-11-12 (brief 45; O2 checked, PO confirmed T2); step 45 done 2026-11-12 (brief 46); step 46 done 2026-11-13 (brief 47; spec v7); step 47 done 2026-11-13 (brief 48; spec v8; availability complete); step 48 done 2026-11-14 (brief 49; spec v9; booking and the event log); step 49 done 2026-11-14 (brief 50; spec v10; listing, note and cancel); step 50 done 2026-11-14 (brief 51; spec v11; change; appointments complete); step 51 done 2026-11-14 (brief 52; spec v12; `GET /users`, user deletion with appointments); step 52 done 2026-11-14 (brief 53; spec v13; smoke test's calendar journey, AC-36 locally): **back end complete**; step 53 done 2026-11-15 (brief 54; `FRONTEND_SERVICES.md` v6; spec v14; `api.ts`, settings, types and availability-rules services, `listUsers`); step 54 done 2026-11-15 (brief 56; `FRONTEND_SERVICES.md` v7; `CalendarService`, `AppointmentsService`): **services layer complete**; step 55 done 2026-11-16 (brief 70; commit `340d9b0` deployed to `hello-world-api`, smoke test 19/19 PASS in the cloud, `docs/RUNBOOK.md` section 5.2): **shared calendar deployed** |
 | Date | 2026-10-28; calendar steps added 2026-11-10 |
 | Scope | Everything needed to go from an empty repository to a deployed, smoke-tested v1; then the shared calendar (steps 41–56), from its specification to a deployed, smoke-tested feature |
 
@@ -996,9 +996,10 @@ Read-only commands (`describe-stacks`, stack outputs, logs) need only an SSO ses
    fails on it, pass `--parameter-overrides AlertEmail=<address>` on the command line, never in
    `samconfig.toml`.
 4. Review the change set (RUNBOOK):
-   - *Add* for `CalendarTable`, the 21 functions with their roles, log groups and permissions, the
-     4 managed policies and the routes;
-   - *Modify* for `DeleteUserFunction`, `DeleteUserRole` and the API;
+   - *Add* for `CalendarTable`, the 21 functions with their roles, log groups and permissions, and
+     the 4 managed policies (89 resources);
+   - *Modify* for `DeleteUserFunction`, `DeleteUserRole`, the API (the routes are part of its
+     definition, not resources of their own) and the other three functions' code;
    - **any Remove or Replace of `MessagesTable`, `CalendarTable`, `UserPool` or `AdminUser`: answer
      N** and investigate.
 5. `npm run smoke -w backend -- hello-world-api`.

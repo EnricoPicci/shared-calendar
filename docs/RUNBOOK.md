@@ -55,13 +55,20 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
    From now on there are **30 minutes** to deploy, and no tracked file may change.
 4. `npm run deploy -w backend` (no `--guided`, no `AlertEmail`: the other answers are in
    `backend/samconfig.toml`,
-   and SAM reuses the alert address the stack already has).
+   and SAM reuses the alert address the stack already has; plan step 55 confirmed it). Run it in
+   a terminal set up as in section 1, item 3: without `AWS_PROFILE` the build succeeds and
+   `sam deploy` then stops with `Unable to locate credentials`, before anything reaches AWS.
    Read the change set before answering `y`. **Remove** or **Replace** on `UserPool`,
    `MessagesTable`, `CalendarTable` or `AdminUser` means data loss: answer N and investigate.
-   The first deploy with the shared calendar (plan step 55) shows `CalendarTable`, its policies
-   and functions as **Add**; that is expected.
-5. `npm run smoke -w backend -- hello-world-api` (asks for the admin password): all 19 lines must
-   say PASS (10 Hello World checks, 9 calendar checks: section 2.1).
+   The change set of plan step 55 (the shared calendar's first deploy) is in section 5.2.
+   To keep the output (the Codespace terminal cannot be copied from), record the session with
+   `script -q -c "npm run deploy -w backend" /tmp/deploy.txt`: the prompt stays interactive.
+   Never `> out.txt` inside the repository: the new file makes the tree dirty and the deploy
+   refuses, and the change set and its prompt would go to the file instead of the screen.
+5. `npm run smoke -w backend -- hello-world-api` (asks for the admin password; `-w backend` is
+   needed, the root has no `smoke` script): all 19 lines must say PASS (10 Hello World checks,
+   9 calendar checks: section 2.1). `script -q -c "…" /tmp/smoke.txt` works here too; the
+   password prompt does not echo, so the password does not reach the file.
 
 Rules:
 
@@ -100,7 +107,11 @@ starting with `calendar:`:
 `hello-messages`): per run, one cancelled appointment with username and type name
 `smoke-<epoch>` at 03:00 local about 50 days ahead, its pointer, its `appointment.booked` and
 `appointment.cancelled` events, and the `DELETEDUSER` marker that journey 11 writes for the user.
-No type and no window stay. A cancelled appointment blocks nothing.
+No type and no window stay. A cancelled appointment blocks nothing. Besides these, the table holds
+one `LOCK` item from the first calendar write on (the calendar lock, one item for the whole
+table); its `version` goes up by one per locked write, 7 per smoke run on an otherwise unused
+calendar. No `SETTINGS` item appears: the smoke test only reads the settings, and until an
+Administrator saves them the API answers the defaults.
 
 **When the calendar journey fails:**
 
@@ -127,7 +138,11 @@ Insights over the log groups of `BookAppointmentFunction`, `ListAppointmentsFunc
 fields @timestamp, @message | filter @message like /must never reach a log/
 ```
 
-must return no rows. The same query with `/eyJ/` (a token) must return none too.
+must return no rows. The same query with `/eyJ/` (a token) must return none too. Read the
+"records scanned" figure as well: in the first minutes after the smoke test Logs Insights may not
+have indexed the new events yet and scans 0 records, so 0 rows proves nothing. Wait a few minutes
+and rerun until it scans the run's events: 4 or 5 per function call (START, the one log line, END,
+REPORT, and INIT_START on a cold start), so 15 over the three log groups above.
 
 ---
 
@@ -228,26 +243,75 @@ where the stack lives) are different on purpose.
 
 ---
 
-## 5. Still open after plan step 11
+## 5. Deployment record and open items
+
+### 5.1 Plan step 11 (2026-11-02, first deploy)
 
 Done on 2026-11-02: admin password set (`CONFIRMED`), smoke test 10/10 PASS, budget
 `hello-world-api-monthly` created, SNS subscription confirmed (re-subscribed by hand: the first
 one had expired unconfirmed), smoke rows in `hello-messages`, logs checked. The alert address
 was taken out of `backend/samconfig.toml` (public repository); the stack keeps it.
 
+### 5.2 Plan step 55 (2026-11-16, the shared calendar)
+
+The first stack update since step 11, so also the first after the monorepo move and the first
+without `AlertEmail` in `backend/samconfig.toml`. Commit deployed: `340d9b0` (the step's brief
+on top of `61f729f`); `verify` PASSED on the clean tree at 09:34 UTC, deploy executed at 09:56 UTC
+with `npm run deploy -w backend` and no extra argument.
+
+- **A1:** `CalendarTimeZone` = `Europe/Rome` confirmed by the PO before the deploy; it comes from
+  the template default (nothing in `backend/samconfig.toml` or on the command line). The stack
+  now stores it; all 21 functions with `CALENDAR_TIME_ZONE` have `Europe/Rome`.
+- **Change set:** 89 Add (`CalendarTable`; `CalendarReadPolicy`, `CalendarWritePolicy`,
+  `CalendarDeletePolicy`, `CalendarBookPolicy`; 21 functions, the 20 calendar ones and
+  `ListUsersFunction`, each with its role, log group and permission), 6 Modify, all with
+  Replacement `False` (`AuthorizerFunction`, `HelloFunction`, `CreateUserFunction`,
+  `DeleteUserFunction`, `DeleteUserRole`, `HttpApi`: the routes are part of the API's
+  definition, not resources of their own), no Remove, no Replace. Nothing for `AlarmTopic`, the
+  alarms, the user pool and its client, groups and admin user, or `MessagesTable`; the stage was
+  not modified either. The list had been worked out beforehand from the template and the stack's
+  resources. The operator answered `y` before the change set had been read back in the session;
+  the check against the list was done right after, from the recorded output, and found nothing
+  that would have meant N. Next time: read it first.
+- **After the deploy:** stack `UPDATE_COMPLETE`, 118 resources, 25 functions (`arm64`,
+  `nodejs22.x`), five outputs (`CalendarTableName` = `calendar` added; `ApiUrl`, `UserPoolId`,
+  `UserPoolClientId` unchanged). Table `calendar`: provisioned 10/10, deletion protection on,
+  empty. An unauthenticated `GET /calendar/settings` and `GET /calendar/appointments` answered 401.
+- **Smoke test:** 19/19 PASS (user `smoke-1794823689`, the calendar journey on 2027-01-05
+  03:00-04:00 `Europe/Rome`, cancellation notice 24 h).
+- **After the smoke test:** `calendar` holds exactly the history of section 2.1 (the cancelled
+  appointment, its `APPTID` pointer, its `appointment.booked` and `appointment.cancelled` events,
+  the `DELETEDUSER` marker) plus the `LOCK` item at version 7; no type, no window, no `SETTINGS`.
+  `hello-messages` holds 4 rows, the 2 of step 11 and the 2 of this run. AC-36: the Logs Insights
+  queries of section 2.1 over the three log groups (15 records scanned) and over all 26 log
+  groups of the stack (82 and 84 records) returned no row for the note and none for `/eyJ/`; the
+  raw events of every log group, read with `aws logs filter-log-events`, hold no note, token,
+  password or error line. The calendar log lines carry the request fields of
+  `docs/SHARED_CALENDAR_SPEC.md` section 14.5, `appointmentId`, `lockAttempts` and plain
+  counters or filters (`target`, `count`, `cancelledCount`, `upcoming`, `listStatus`), never a
+  note, a body or a `conflicts` list. Alarms `OK`, unchanged since 2026-10-30, no
+  history entry. SNS subscription still confirmed (no re-subscribe needed). Budget
+  `hello-world-api-monthly` 1 USD, actual spend 0.0; month-to-date cost in Cost Explorer -0 USD.
+  `aws ce get-cost-forecast` answers `DataUnavailableException: Insufficient amount of historical
+  data`, and the budget's forecast is still "None": the forecast is not yet visible. Provisioned
+  capacity is 11 read and 11 write units, inside the free 25/25 (`docs/ARCHITECTURE.md` section 10).
+
+### 5.3 Open items
+
 - [x] Commit at the end of step 11 (`7e52743`).
 - [x] Step 12 (2026-11-04): `README.md` written, architecture marked "v1 implemented" (v9), tag
       `v1.0.0`.
-- [ ] Cost Explorer forecast for the month (console; can lag a day). The budget's own forecast
-      also shows "None" until AWS has a few days of cost data.
-- [ ] First deploy since `AlertEmail` left `backend/samconfig.toml`: the change set must show **no**
-      change to `AlarmTopic` (SAM should reuse the value stored with the stack; untested).
-      If it shows Modify or Replace, answer N and pass `--parameter-overrides AlertEmail=<address>`.
+- [ ] Cost Explorer forecast for the month. On 2026-11-16 the CLI and the budget still had no
+      forecast ("Insufficient amount of historical data"); the month-to-date cost was 0 USD.
+      Check again in the console (Billing, Cost Explorer) in a few days.
+- [x] First deploy since `AlertEmail` left `backend/samconfig.toml` (plan step 55, 2026-11-16):
+      SAM reused the stored value, the change set showed nothing for `AlarmTopic`, and the
+      subscription stayed confirmed. Deploys need no `AlertEmail`.
 - [x] Plan step 20 (2026-11-04): monorepo move, the back end now lives in `backend/`
       (`docs/FOLDER_STRUCTURE.md`). Commands take `-w backend`.
-- [ ] First deploy after the move: the change set must show the four functions' code and
-      nothing else (new bundles that now include `shared/`; no resource, role or parameter
-      change). The build uses SAM's beta monorepo support (`backend/samconfig.toml`); if a SAM
-      upgrade breaks it, `npm run build -w backend` fails before anything is deployed.
+- [x] First deploy after the move (plan step 55, 2026-11-16): the build with SAM's beta monorepo
+      support worked in the cloud; the four old functions got new bundles, Modify without
+      replacement. Their only template change besides the code was `CodeUri`, moved to `Globals`;
+      `DeleteUserFunction` and `DeleteUserRole` also got their calendar part (section 5.2).
 - [x] Plan step 52 (2026-11-14): the smoke test gains the calendar journey (section 2.1); 19/19
-      PASS locally. Not yet run against the stack (plan step 55; the 10/10 above was step 11's).
+      PASS locally, and in the cloud with plan step 55 (section 5.2).
