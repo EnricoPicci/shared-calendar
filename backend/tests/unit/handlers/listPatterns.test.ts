@@ -130,7 +130,9 @@ describe('listPatterns handler logging', () => {
         durationMs: expect.any(Number),
       },
     ]);
-    expect(output.join('')).not.toContain('12:00');
+    // Quoted, as a window time would be logged as a JSON value: the line's own timestamp holds
+    // the clock time unquoted, so the check cannot fail on the minute it happens to run.
+    expect(output.join('')).not.toContain('"12:00"');
   });
 
   it('logs a failure at error level with the reason', async () => {
