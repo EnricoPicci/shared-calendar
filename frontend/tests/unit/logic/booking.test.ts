@@ -1,5 +1,5 @@
-import { BookBody } from '@shared-calendar/shared';
-import { bookingFor, bookingText, timeChoice, userChoice, type BookingFields } from '../../../src/logic/booking';
+import { BookBody, ChangeBody } from '@shared-calendar/shared';
+import { bookingFor, bookingText, changeFor, timeChoice, userChoice, type BookingFields } from '../../../src/logic/booking';
 import { weekModel } from '../../../src/logic/week.model';
 import type { SlotBlock } from '../../../src/logic/week.model';
 import { STUDIO, view } from './fixtures';
@@ -208,6 +208,97 @@ describe('booking', () => {
         start: z('2027-10-31T00:15'),
         end: z('2027-10-31T00:45'),
       });
+    });
+  });
+  describe('changeFor, a User (R-CHG-01, R-CHG-03)', () => {
+    it('sends the slot\'s start and the note: no end, never a username', () => {
+      const body = changeFor(winter(), 'Europe/Rome', 'user', fields({ note: 'First lesson' }));
+      expect(body).toEqual({ start: z('2026-11-23T09:00'), note: 'First lesson' });
+      expect(Object.keys(body).sort()).toEqual(['note', 'start']);
+    });
+
+    it('whatever else the form holds is not sent', () => {
+      const body = changeFor(winter(), 'Europe/Rome', 'user', fields({ note: 'x', username: 'bob', start: '08:30', end: '12:00' }));
+      expect(body).toEqual({ start: z('2026-11-23T09:00'), note: 'x' });
+    });
+
+    it('the note is always there, as the field holds it: untouched, edited, emptied', () => {
+      const old = 'First lesson';
+      expect(changeFor(winter(), 'Europe/Rome', 'user', fields({ note: old }))).toHaveProperty('note', old);
+      expect(changeFor(winter(), 'Europe/Rome', 'user', fields({ note: 'Second lesson' }))).toHaveProperty('note', 'Second lesson');
+      expect(changeFor(winter(), 'Europe/Rome', 'user', fields({ note: '' }))).toHaveProperty('note', '');
+      expect(changeFor(winter(), 'Europe/Rome', 'user', fields({ note: '  \n ' }))).toHaveProperty('note', '  \n ');
+    });
+
+    it('the shared schema, which the service applies, trims the note and makes a blank one null, which clears it', () => {
+      const parsed = (note: string) => ChangeBody.parse(changeFor(winter(), 'Europe/Rome', 'user', fields({ note })));
+      expect(parsed('')).toEqual({ start: z('2026-11-23T09:00'), note: null });
+      expect(parsed('  \n ')).toEqual({ start: z('2026-11-23T09:00'), note: null });
+      expect(parsed('  Second lesson ')).toEqual({ start: z('2026-11-23T09:00'), note: 'Second lesson' });
+    });
+
+    it('each of the two slots at 02:00 of 2027-10-31 is its own instant', () => {
+      const second = slotOf('2027-10-31', ['2027-10-30T23:00', '2027-10-31T03:00'], ['2027-10-31T01:00', '2027-10-31T02:00']);
+      expect(changeFor(second, 'Europe/Rome', 'user', fields())).toEqual({ start: z('2027-10-31T01:00'), note: '' });
+    });
+  });
+
+  describe('changeFor, the Administrator', () => {
+    it('times not touched: the slot\'s own start and end, the note, and no username even when the form holds one', () => {
+      const slot = winter();
+      const body = changeFor(slot, 'Europe/Rome', 'admin', untouched(slot, 'Europe/Rome', { note: 'For Alice' }));
+      expect(body).toEqual({ start: z('2026-11-23T09:00'), end: z('2026-11-23T10:00'), note: 'For Alice' });
+      expect(body).not.toHaveProperty('username');
+    });
+
+    it('a custom start and end in Rome in winter: 10:15–10:45 local', () => {
+      const slot = winter();
+      expect(changeFor(slot, 'Europe/Rome', 'admin', untouched(slot, 'Europe/Rome', { start: '10:15', end: '10:45' }))).toEqual({
+        start: z('2026-11-23T09:15'),
+        end: z('2026-11-23T09:45'),
+        note: '',
+      });
+    });
+
+    it('a custom start and end in Rome in summer and in a half-hour zone', () => {
+      const summer = slotOf('2027-07-05', ['2027-07-05T07:00', '2027-07-05T10:00'], ['2027-07-05T08:00', '2027-07-05T09:00']);
+      expect(changeFor(summer, 'Europe/Rome', 'admin', untouched(summer, 'Europe/Rome', { start: '09:30', end: '10:15', note: 'n' }))).toEqual({
+        start: z('2027-07-05T07:30'),
+        end: z('2027-07-05T08:15'),
+        note: 'n',
+      });
+      const kolkata = slotOf('2026-11-23', ['2026-11-23T03:30', '2026-11-23T05:30'], ['2026-11-23T03:30', '2026-11-23T04:30'], 'Asia/Kolkata');
+      expect(changeFor(kolkata, 'Asia/Kolkata', 'admin', untouched(kolkata, 'Asia/Kolkata', { start: '09:15', end: '10:45' }))).toEqual({
+        start: z('2026-11-23T03:45'),
+        end: z('2026-11-23T05:15'),
+        note: '',
+      });
+    });
+
+    it('only one of the two changed: both are taken from the form', () => {
+      const slot = winter();
+      expect(changeFor(slot, 'Europe/Rome', 'admin', untouched(slot, 'Europe/Rome', { end: '12:00' }))).toMatchObject({ start: z('2026-11-23T09:00'), end: z('2026-11-23T11:00') });
+    });
+
+    it('the note untouched, edited and emptied: the key is always there', () => {
+      const slot = winter();
+      for (const note of ['First lesson', 'Second lesson', '']) {
+        expect(changeFor(slot, 'Europe/Rome', 'admin', untouched(slot, 'Europe/Rome', { note }))).toHaveProperty('note', note);
+      }
+    });
+
+    it('an end not after the start is handed over as chosen, and the shared schema refuses it', () => {
+      const slot = winter();
+      const parsed = ChangeBody.safeParse(changeFor(slot, 'Europe/Rome', 'admin', untouched(slot, 'Europe/Rome', { start: '11:00', end: '10:00' })));
+      expect(parsed.success).toBe(false);
+      expect(parsed.error!.issues.map((issue) => [issue.path.join('.'), issue.message])).toEqual([['end', 'end must be after start']]);
+      expect(ChangeBody.safeParse(changeFor(slot, 'Europe/Rome', 'admin', untouched(slot))).success).toBe(true);
+    });
+
+    it('what is handed over never fails the schema for a key it does not know', () => {
+      const slot = winter();
+      const body = changeFor(slot, 'Europe/Rome', 'admin', untouched(slot, 'Europe/Rome', { username: 'bob' }));
+      expect(ChangeBody.safeParse(body).success).toBe(true);
     });
   });
 });

@@ -30,11 +30,12 @@ follow `docs/FRONTEND_VIEW_PLAN.md`). Layout and placement rules:
 - `docs/SHARED_CALENDAR_SPEC.md` specifies the shared calendar (agreed with the Product Owner,
   brief 40, not yet implemented). It is the input for the calendar's plan steps; once merged into
   `ARCHITECTURE.md` (spec section 19), the architecture wins as usual.
-- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v4; the foundation, the
-  week, booking and cancelling implemented, plan steps 60 to 62): plain HTML and CSS with one
-  TypeScript module script, the layers (services, logic, views, shell), the rules of a view, the
-  shape of a dialog (its section 4), the logic layer as built (its section 5.1, with the reloads
-  of the week), the table of screens and the navigation by the hash (its section 6), and the
+- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v5; the foundation, the
+  week, booking, cancelling, the note and the change implemented, plan steps 60 to 63): plain
+  HTML and CSS with one TypeScript module script, the layers (services, logic, views, shell),
+  the rules of a view, the shape of a dialog (its section 4, with the book dialog's second mode
+  and the banner of a move), the logic layer as built (its section 5.1, with the reloads of the
+  week, the detail's three actions and the appointment being moved), the table of screens and the navigation by the hash (its section 6), and the
   tooling (its section 12: the bundle command, the dev server, the tests' environment). Hosting,
   CORS, the session across a reload, the hosting's Content-Security-Policy, logout and the size
   of the bundle are its open points (section 10).
@@ -43,9 +44,10 @@ follow `docs/FRONTEND_VIEW_PLAN.md`). Layout and placement rules:
 - `docs/FRONTEND_VIEW_PLAN.md` defines the order of work for the views (brief 82): steps 60–69,
   each with its acceptance check and its browser check, ending with all the views running against
   the local stack. Steps 60 (tooling, shell, login), 61 (the logic layer, the week calendar
-  read-only, the navigation, the local seed) and 62 (booking and cancelling, the week loaded
-  again after a write and when the tab becomes visible) are done (2026-11-19); next step 63,
-  editing the note and changing an appointment.
+  read-only, the navigation, the local seed), 62 (booking and cancelling, the week loaded
+  again after a write and when the tab becomes visible) and 63 (the note edited in the detail,
+  an appointment moved to another time) are done (2026-11-19); next step 64, "my
+  appointments".
 - `docs/RENAME_PLAN.md` plans the move from the "hello-world" names to "shared-calendar" (plan
   steps 56–58: repository, new stack `shared-calendar-api`, retirement of `hello-world-api`), with
   the way back at every stage. The repository uses the new names (step 56) and the stack in use
@@ -452,11 +454,16 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   The view layer (`docs/FRONTEND_ARCHITECTURE.md`; no framework): `index.html` (all the markup,
   everything `hidden`: the login `#login`; the frame `#app` with the header, an empty `nav`, the
   template of a navigation link and `main.screen`, which holds one element per screen: so far
-  `#week`, with the toolbar, the failure (`role="alert"`), the time zone's sentence, the legend,
-  the hours, the days, its two native dialogs `dialog.book` (a form: what is booked, the part
-  `.choices` for the Administrator with the lists `username`, `start` and `end`, the note with
-  `maxlength` 500, the failure) and `dialog.detail` (the fields, `.booked`, `.hint`, the failure,
-  "Cancel appointment"), and its eight templates `tpl-legend-item`, `tpl-hour`, `tpl-day`,
+  `#week`, with the toolbar, the failure (`role="alert"`), the banner `.moving` of an appointment
+  being moved (its words `.moving-what`, the button `.keep`), the time zone's sentence, the
+  legend, the hours, the days, its two native dialogs `dialog.book` (a form: what is booked, the
+  part `.choices` for the Administrator with the lists `username`, `start` and `end`, the note
+  with `maxlength` 500, the failure; in its second mode it confirms a change: the elements
+  marked `in-booking` are shown in the first mode only, the User's choice `.user` among them,
+  those marked `in-change` in the second only, the old time `.old` among them) and
+  `dialog.detail` (the fields, the note as a text in `.noted` or in the form `.note-form` with
+  "Save note", `.booked`, `.hint`, the failure, "Change", "Cancel appointment"), and its eight
+  templates `tpl-legend-item`, `tpl-hour`, `tpl-day`,
   `tpl-window`, `tpl-busy`, `tpl-slot` and `tpl-appointment` (both `<button type="button">`),
   `tpl-option`; one module script `app.js`, one style sheet, nothing inline), `style.css` (also
   the six type colours `type-0` … `type-5`, the lanes `lane-0-of-2`, `lane-1-of-2`, the dialogs
@@ -481,13 +488,17 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   address), `login.view.ts` (`mountLogin(root, login)`, with `LoginDeps`, the part of the service
   it uses; a failure is shown through `failureText(reason)`, never the service's `message`) and
   `week.view.ts` (`mountWeek(root, { screen, appointments, users, role })`, with `WeekDeps`: the
-  parts it uses of the `WeekScreen` (`week$`, the three moves, `detail`), of the
-  `AppointmentsService` (`book`, `cancel` and their state streams) and of the `UsersService`
-  (`listUsers` and its state stream), and the role; copies the templates, sets `top` and
-  `height` as properties and the lane and the type colour as classes, redraws the days only
-  when the week object changed; a slot opens the book dialog, an appointment its detail, which
-  can cancel it; what an open dialog is about and whether its action was asked for since it
-  opened are local variables, a result is shown only in the dialog that asked for it, an
+  parts it uses of the `WeekScreen` (`week$`, the three changes of week, `detail`, `move`,
+  `keep`), of the `AppointmentsService` (`book`, `cancel`, `change`, `updateNote` and their
+  state streams) and of the `UsersService` (`listUsers` and its state stream), and the role;
+  copies the templates, sets `top` and `height` as properties and the lane and the type colour
+  as classes, redraws the days only when the week object changed; a slot opens the book dialog,
+  an appointment its detail, in which the note is saved and which can cancel it or start its
+  move; while `week$` carries a move the banner shows, every appointment's button is disabled
+  and a slot opens the book dialog as the confirmation of the change, with no list of users
+  asked for; what an open dialog is about (for the book dialog also the move it confirms) and
+  whether its action was asked for since it opened are local variables, a result is shown only
+  in the dialog that asked for it and, in the book dialog, only in the mode that asked, an
   opening resets the form, a close only forgets, a week that arrives behind an open dialog
   leaves it as it is: `docs/FRONTEND_ARCHITECTURE.md` section 4; step 64 moves what a second
   screen shares out of this file). A view is
@@ -497,8 +508,10 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   `dateTimeText`, `weekLabel`, `offsetText`, `offsetChangesOn`, all through `shared/`'s time
   helpers and the zone given, never the browser's; `failureText(reason)`, the failure in plain
   words, with one general sentence for a reason it does not know: a new route's codes get their
-  sentences here; it has those of the login, of `GET /calendar`, of a booking, of a cancellation
-  and of the list of users), `week.model.ts` (pure:
+  sentences here; it has those of the login, of `GET /calendar`, of a booking, of a cancellation,
+  of a change, of a note and of the list of users; its optional second argument says what was
+  attempted, for the one reason whose words depend on it: `cancellation_notice_too_short`
+  after `'change'`), `week.model.ts` (pure:
   `weekModel(view, role)`, the week ready to draw: days of windows, slots, busy blocks and
   appointments, each with `top`, `height`, `time`, `lane` and `lanes`; a slot also with its
   `start`, `end`, `day`, `typeName` and the instants of its `window` (through `shared/`'s
@@ -510,16 +523,23 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   slot's window; `userChoice(state)`, the names, the message and "ready" from the state of
   `listUsers`; `bookingFor(slot, zone, role, fields)`, the argument of `book`: a User sends the
   start and the note only, the Administrator the User and both instants, the slot's own while
-  the times were not changed), `appointment.detail.ts` (pure:
-  `appointmentDetail(appointment, role, now, zone)`, the detail dialog's texts, `canCancel` and
-  the sentence under the button) and `week.screen.ts`
+  the times were not changed; `changeFor(slot, zone, role, fields)`, the argument of `change`
+  when the dialog confirms a move: the same times, never a `username`, and the note always, as
+  the field holds it), `appointment.detail.ts` (pure:
+  `appointmentDetail(appointment, role, now, zone)`, the detail dialog's texts, the note as a
+  text (`note`) and as a field's value (`noteValue`), `canEditNote`, `canChange`, `canCancel`
+  and the one sentence about changing and cancelling; `movingOf(detail, role)`, the `Moving`
+  copy in words of an appointment being moved: `appointmentId`, `when`, `what`, `note`) and
+  `week.screen.ts`
   (`WeekScreen(calendar, appointments, role, now, visible$)`: `week$` = label, loading, failure,
-  the last week loaded; `start()`, `previous()`, `next()`, `today()`, `detail(appointmentId)`;
+  the last week loaded, and `moving`, the appointment being moved or `null`; `start()`,
+  `previous()`, `next()`, `today()`, `detail(appointmentId)`, `move(appointmentId)`, `keep()`;
   "now" is passed in, and "today" for the week to open on is taken in `DEFAULT_TIME_ZONE`, the
   one place the default zone is used; between `start()` and the end of its subscription it
-  calls `calendar.reload()` at every result of `bookResult$` and `cancelResult$`, a failure
-  included, and at every notification of `visible$`, but not for a result that was already
-  there at `start()`). `scripts/` (Node, outside the browser's lint rules): `bundle.mjs` (the
+  calls `calendar.reload()` at every result of `bookResult$`, `cancelResult$`,
+  `updateNoteResult$` and `changeResult$`, a failure included, and at every notification of
+  `visible$`, but not for a result that was already there at `start()`; a move ends at a
+  change's success, at `keep()` and at the end of that subscription, never at a refusal). `scripts/` (Node, outside the browser's lint rules): `bundle.mjs` (the
   esbuild options the two share), `build.mjs`, `dev.mjs`, `seed-local.mjs`.
   `tests/unit/logic/` (project `unit`): `zone.ts`, `fixtures.ts`, `texts.test.ts`,
   `week.model.test.ts`, `booking.test.ts`, `appointment.detail.test.ts`, `week.screen.test.ts`. `tests/unit/views/` (project `views`): `page.ts`
@@ -573,7 +593,10 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   style sheet (use a `<template>`, as `pageAside()` does), and the native `<dialog>` has no Escape
   key, no inertness and no focus handling: those are for the browser check. A dialog's test
   calls `close()` for the Escape key; since a click passes through a modal dialog there, a test
-  can have both dialogs open, which a person cannot. An appointment id in a test that reaches a
+  can have both dialogs open, which a person cannot. A `disabled` button's `click()` does
+  nothing there, as in a browser. The fake `WeekScreen` of the view's test moves nothing by
+  itself: a test starts a move by sending a state with `moving` through `week$`. An
+  appointment id in a test that reaches a
   real service must be a ULID (the fixtures' `appt-…` ids are refused before any request). The
   shell's test of the tab becoming visible defines `visibilityState` on the document and sends
   `visibilitychange` itself, and removes the property after each test.

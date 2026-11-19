@@ -1,12 +1,14 @@
-import { localDateOf, localTimeOf, toInstant, type BookBody, type Role } from '@shared-calendar/shared';
+import { localDateOf, localTimeOf, toInstant, type BookBody, type ChangeBody, type Role } from '@shared-calendar/shared';
 import type { ListUsersState } from '../services/users.types';
 import { failureText } from './texts';
 import type { SlotBlock } from './week.model';
 
 // The book dialog's logic (docs/FRONTEND_ARCHITECTURE.md section 5): what is being booked in
 // words, the times and the Users the Administrator may choose, and the way from what the dialog
-// holds to the argument of AppointmentsService.book. Pure. Whether a booking is allowed is the
-// server's to say (docs/FRONTEND_SERVICES.md section 8, decision 42): nothing is checked here.
+// holds to the argument of AppointmentsService.book or, when the dialog confirms the move of an
+// appointment, of AppointmentsService.change. Pure. Whether a booking or a change is allowed is
+// the server's to say (docs/FRONTEND_SERVICES.md section 8, decision 42): nothing is checked
+// here.
 
 const DAY_MINUTES = 24 * 60;
 const GRID = 15; // the Administrator's times are on 15-minute steps (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02)
@@ -60,22 +62,36 @@ export function userChoice(state: ListUsersState): UserChoice {
 // What the dialog's form holds. For a User only the note counts.
 export type BookingFields = { note: string; username: string; start: string; end: string };
 
-// The argument of AppointmentsService.book. A blank note is left out.
-// A User sends the slot's start and nothing else about the time or the person
-// (docs/SHARED_CALENDAR_SPEC.md R-BOOK-01, R-BOOK-02). The Administrator sends the User and both
-// instants: the slot's own while the two times are the ones the dialog opened with, which names
-// the slot without ambiguity also in the hour repeated when the clocks go back; otherwise the
-// two chosen times on the slot's day, where a time in the repeated hour is its earlier
-// occurrence (docs/SHARED_CALENDAR_SPEC.md R-TIME-03).
+// The times of a booking or of a change. A User sends the slot's start and nothing else about
+// the time (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02). The Administrator sends both instants: the
+// slot's own while the two times are the ones the dialog opened with, which names the slot
+// without ambiguity also in the hour repeated when the clocks go back; otherwise the two chosen
+// times on the slot's day, where a time in the repeated hour is its earlier occurrence
+// (docs/SHARED_CALENDAR_SPEC.md R-TIME-03).
+function timesFor(slot: SlotBlock, zone: string, role: Role, fields: Pick<BookingFields, 'start' | 'end'>): { start: string; end?: string } {
+  if (role !== 'admin') return { start: slot.start };
+  const own = timeChoice(slot, zone);
+  if (fields.start === own.start && fields.end === own.end) return { start: slot.start, end: slot.end };
+  const date = localDateOf(slot.start, zone);
+  return { start: toInstant(date, fields.start, zone), end: toInstant(date, fields.end, zone) };
+}
+
+// The argument of AppointmentsService.book. A blank note is left out. A User sends nothing
+// about the person; the Administrator sends the User chosen
+// (docs/SHARED_CALENDAR_SPEC.md R-BOOK-01).
 export function bookingFor(slot: SlotBlock, zone: string, role: Role, fields: BookingFields): BookBody {
   const note = fields.note.trim();
   const noted = note === '' ? {} : { note };
-  if (role !== 'admin') return { start: slot.start, ...noted };
+  const times = timesFor(slot, zone, role, fields);
+  return role === 'admin' ? { ...times, username: fields.username, ...noted } : { ...times, ...noted };
+}
 
-  const own = timeChoice(slot, zone);
-  if (fields.start === own.start && fields.end === own.end) {
-    return { start: slot.start, end: slot.end, username: fields.username, ...noted };
-  }
-  const date = localDateOf(slot.start, zone);
-  return { start: toInstant(date, fields.start, zone), end: toInstant(date, fields.end, zone), username: fields.username, ...noted };
+// The argument of AppointmentsService.change, when the dialog confirms the move of an
+// appointment to `slot`. Never a User: the new appointment is for the User of the old one
+// (docs/SHARED_CALENDAR_SPEC.md section 8.4). The note is always sent, as the field holds it:
+// the field opens with the old appointment's note, so left alone it stays, edited it changes,
+// and emptied it is cleared, since the shared schema makes a blank note `null`
+// (docs/SHARED_CALENDAR_SPEC.md R-CHG-03).
+export function changeFor(slot: SlotBlock, zone: string, role: Role, fields: Pick<BookingFields, 'note' | 'start' | 'end'>): ChangeBody {
+  return { ...timesFor(slot, zone, role, fields), note: fields.note };
 }

@@ -93,4 +93,39 @@ describe('index.html', () => {
       expect(button.getAttribute('type'), button.className).toBe('button');
     }
   });
+  it('the detail starts with the note as a text, its form hidden, and neither "Change" nor "Cancel appointment"; its field is limited like the book dialog\'s', () => {
+    loadPage();
+    expect(document.querySelector<HTMLElement>('dialog.detail .note-form')!.hidden).toBe(true);
+    expect(document.querySelector<HTMLElement>('dialog.detail .noted')!.hidden).toBe(false);
+    expect(document.querySelector('dialog.detail textarea')!.getAttribute('maxlength')).toBe(String(CALENDAR_LIMITS.noteLength));
+    expect(document.querySelector<HTMLElement>('dialog.detail .change')!.hidden).toBe(true);
+    // The two actions of the detail that are not in its form do not send it.
+    expect(document.querySelector('dialog.detail .note-form')!.querySelectorAll('button')).toHaveLength(1);
+  });
+
+  it('the book dialog starts in its first mode: the texts of a booking shown, those of a change hidden, each mode with its title and its button', () => {
+    loadPage();
+    const texts = (selector: string) => [...document.querySelectorAll<HTMLElement>(`dialog.book ${selector}`)].map((element) => [element.textContent, element.hidden]);
+    expect(texts('h3 span')).toEqual([['Book an appointment', false], ['Change appointment', true]]);
+    expect(texts('.submit span')).toEqual([['Book', false], ['Change', true]]);
+    expect([...document.querySelectorAll<HTMLElement>('dialog.book .in-change')].every((element) => element.hidden)).toBe(true);
+    expect([...document.querySelectorAll<HTMLElement>('dialog.book .in-booking')].some((element) => element.hidden)).toBe(false);
+    // The choice of User is a booking's only.
+    expect(document.querySelector('dialog.book [name="username"]')!.closest('.in-booking')).not.toBeNull();
+    expect(document.querySelector('dialog.book [name="start"]')!.closest('.in-booking')).toBeNull();
+  });
+
+  it('the banner of a move starts hidden and empty, outside the region that is redrawn, with its fixed words and its button', () => {
+    loadPage();
+    const banner = document.querySelector<HTMLElement>('#week .moving')!;
+    expect(banner.hidden).toBe(true);
+    expect(banner.closest('.week')).toBeNull();
+    expect(banner.querySelector('p')!.textContent).toBe('Moving: . Choose a free time.');
+    expect(banner.querySelector('button')!.textContent).toBe('Keep the appointment as it is');
+  });
+
+  it('no class of the page holds the word "admin": the shell\'s test looks for that name in the whole document', () => {
+    const classes = [...pageAside().querySelectorAll('[class]')].flatMap((element) => [...element.classList]);
+    expect(classes.filter((name) => name.includes('admin'))).toEqual([]);
+  });
 });

@@ -2,12 +2,12 @@ import { BehaviorSubject, ReplaySubject, Subject } from 'rxjs';
 import { appointmentDetail } from '../../../src/logic/appointment.detail';
 import { weekModel } from '../../../src/logic/week.model';
 import { WeekScreen, type WeekCalendar, type WeekState } from '../../../src/logic/week.screen';
-import type { BookResult, CancelResult } from '../../../src/services/appointments.types';
+import type { BookResult, CancelResult, ChangeResult, UpdateNoteResult } from '../../../src/services/appointments.types';
 import type { CalendarState } from '../../../src/services/calendar.types';
 import { appointment, view, winterWeek } from './fixtures';
 import { useFarBrowserZone } from './zone';
 
-// A fake CalendarService (a subject and spies), a fake AppointmentsService (two result streams
+// A fake CalendarService (a subject and spies), a fake AppointmentsService (four result streams
 // that replay their last value, as the real ones do), a stream for the page becoming visible
 // and a fixed "now": no network, no DOM, no clock.
 
@@ -21,11 +21,18 @@ function screenAt(now = NOW, role: 'admin' | 'user' = 'user') {
   const reload = vi.fn<WeekCalendar['reload']>();
   const bookResult$ = new ReplaySubject<BookResult>(1);
   const cancelResult$ = new ReplaySubject<CancelResult>(1);
+  const updateNoteResult$ = new ReplaySubject<UpdateNoteResult>(1);
+  const changeResult$ = new ReplaySubject<ChangeResult>(1);
   const visible$ = new Subject<unknown>();
   const clock = { now };
   const screen = new WeekScreen(
     { calendarState$: state$.asObservable(), load, reload },
-    { bookResult$: bookResult$.asObservable(), cancelResult$: cancelResult$.asObservable() },
+    {
+      bookResult$: bookResult$.asObservable(),
+      cancelResult$: cancelResult$.asObservable(),
+      updateNoteResult$: updateNoteResult$.asObservable(),
+      changeResult$: changeResult$.asObservable(),
+    },
     role,
     () => new Date(clock.now),
     visible$,
@@ -35,7 +42,7 @@ function screenAt(now = NOW, role: 'admin' | 'user' = 'user') {
   const pending = () => state$.next({ status: 'pending', from: load.mock.lastCall![0], to: load.mock.lastCall![1] });
   const succeed = (calendar = winterWeek()) => state$.next({ status: 'success', calendar });
   const fail = (reason: 'network' | 'internal_error' | 'unexpected', message = 'TypeError: Failed to fetch') => state$.next({ status: 'failure', reason, message });
-  return { screen, state$, load, reload, bookResult$, cancelResult$, visible$, clock, states, view$, pending, succeed, fail, last: () => states.at(-1)! };
+  return { screen, state$, load, reload, bookResult$, cancelResult$, updateNoteResult$, changeResult$, visible$, clock, states, view$, pending, succeed, fail, last: () => states.at(-1)! };
 }
 
 const BOOKED: BookResult = { status: 'success', appointment: winterWeek().appointments[0]! };
@@ -49,13 +56,13 @@ describe('WeekScreen', () => {
       const { load, states, state$ } = screenAt();
       expect(load).not.toHaveBeenCalled();
       expect(state$.observed).toBe(false);
-      expect(states).toEqual([{ label: '16 Nov – 22 Nov 2026', loading: false, failure: null, week: null }]);
+      expect(states).toEqual([{ label: '16 Nov – 22 Nov 2026', loading: false, failure: null, week: null, moving: null }]);
     });
 
     it('a change of week changes the label and still loads nothing', () => {
       const { screen, load, last } = screenAt();
       screen.next();
-      expect(last()).toEqual({ label: '23 Nov – 29 Nov 2026', loading: false, failure: null, week: null });
+      expect(last()).toEqual({ label: '23 Nov – 29 Nov 2026', loading: false, failure: null, week: null, moving: null });
       expect(load).not.toHaveBeenCalled();
     });
   });
@@ -99,9 +106,9 @@ describe('WeekScreen', () => {
       const user = screenAt();
       user.screen.start();
       user.pending();
-      expect(user.last()).toEqual({ label: '16 Nov – 22 Nov 2026', loading: true, failure: null, week: null });
+      expect(user.last()).toEqual({ label: '16 Nov – 22 Nov 2026', loading: true, failure: null, week: null, moving: null });
       user.succeed();
-      expect(user.last()).toEqual({ label: '16 Nov – 22 Nov 2026', loading: false, failure: null, week: weekModel(winterWeek(), 'user') });
+      expect(user.last()).toEqual({ label: '16 Nov – 22 Nov 2026', loading: false, failure: null, week: weekModel(winterWeek(), 'user'), moving: null });
       expect(user.last().week!.days[0]!.appointments[0]!.who).toBe('You');
 
       const admin = screenAt(NOW, 'admin');
@@ -154,11 +161,11 @@ describe('WeekScreen', () => {
 
       screen.next();
       pending();
-      expect(states.slice(before)).toEqual([{ label: '23 Nov – 29 Nov 2026', loading: true, failure: null, week: first }]);
+      expect(states.slice(before)).toEqual([{ label: '23 Nov – 29 Nov 2026', loading: true, failure: null, week: first, moving: null }]);
 
       const second = view('2026-11-23');
       succeed(second);
-      expect(last()).toEqual({ label: '23 Nov – 29 Nov 2026', loading: false, failure: null, week: weekModel(second, 'user') });
+      expect(last()).toEqual({ label: '23 Nov – 29 Nov 2026', loading: false, failure: null, week: weekModel(second, 'user'), moving: null });
     });
 
     it('today returns to the week of "now", read again at that moment', () => {
@@ -188,7 +195,7 @@ describe('WeekScreen', () => {
       screen.start();
       pending();
       fail('network', 'TypeError: Failed to fetch');
-      expect(last()).toEqual({ label: '16 Nov – 22 Nov 2026', loading: false, failure: UNREACHABLE, week: null });
+      expect(last()).toEqual({ label: '16 Nov – 22 Nov 2026', loading: false, failure: UNREACHABLE, week: null, moving: null });
     });
 
     it('a failed load keeps the last week and carries the failure', () => {
@@ -204,6 +211,7 @@ describe('WeekScreen', () => {
         loading: false,
         failure: 'Something went wrong on the server. Please try again in a moment.',
         week,
+        moving: null,
       });
     });
 
@@ -225,7 +233,7 @@ describe('WeekScreen', () => {
       screen.today();
       pending();
       succeed();
-      expect(last()).toEqual({ label: '16 Nov – 22 Nov 2026', loading: false, failure: null, week: weekModel(winterWeek(), 'user') });
+      expect(last()).toEqual({ label: '16 Nov – 22 Nov 2026', loading: false, failure: null, week: weekModel(winterWeek(), 'user'), moving: null });
     });
   });
 
@@ -390,7 +398,7 @@ describe('WeekScreen', () => {
         who: 'You',
         note: 'First lesson',
         canCancel: true,
-        hint: 'It can be cancelled until Sun 15 Nov, 11:00.',
+        hint: 'It can be changed or cancelled until Sun 15 Nov, 11:00.',
       });
 
       const admin = screenAt(NOW, 'admin');
@@ -405,7 +413,7 @@ describe('WeekScreen', () => {
       succeed();
       expect(screen.detail(OWN.appointmentId)!.canCancel).toBe(true);
       clock.now = '2026-11-15T10:00:00.001Z'; // the page stayed open past cancellableUntil
-      expect(screen.detail(OWN.appointmentId)).toMatchObject({ canCancel: false, hint: 'It is too late to cancel this appointment.' });
+      expect(screen.detail(OWN.appointmentId)).toMatchObject({ canCancel: false, hint: 'It is too late to change or cancel this appointment.' });
     });
 
     it('the texts follow the zone the week names', () => {
@@ -455,5 +463,287 @@ describe('WeekScreen', () => {
     screen.week$.subscribe((s) => late.push(s));
     expect(late).toHaveLength(1);
     expect(late[0]!.week).not.toBeNull();
+  });
+  describe('the week is loaded again after a note saved or a change', () => {
+    const OWN = winterWeek().appointments[0]!;
+    const NOTED: UpdateNoteResult = { status: 'success', appointment: { ...OWN, note: 'Second lesson' } };
+    const CHANGED: ChangeResult = { status: 'success', cancelled: { ...OWN, status: 'cancelled', cancelReason: 'changed' }, booked: OWN };
+
+    it('a note saved reloads at its success and at its failure', () => {
+      const { screen, load, reload, updateNoteResult$ } = screenAt();
+      screen.start();
+      updateNoteResult$.next(NOTED);
+      expect(reload).toHaveBeenCalledTimes(1);
+      updateNoteResult$.next({ status: 'failure', reason: 'appointment_not_active', message: 'ended' });
+      expect(reload).toHaveBeenCalledTimes(2);
+      updateNoteResult$.next({ status: 'failure', reason: 'network', message: 'TypeError: Failed to fetch' });
+      expect(reload).toHaveBeenCalledTimes(3);
+      expect(load).toHaveBeenCalledTimes(1);
+    });
+
+    it('a change reloads at its success and at its failure', () => {
+      const { screen, load, reload, changeResult$ } = screenAt();
+      screen.start();
+      changeResult$.next(CHANGED);
+      expect(reload).toHaveBeenCalledTimes(1);
+      changeResult$.next({ status: 'failure', reason: 'slot_taken', message: 'taken' });
+      expect(reload).toHaveBeenCalledTimes(2);
+      changeResult$.next({ status: 'failure', reason: 'invalid_request', message: 'end: end must be after start' });
+      expect(reload).toHaveBeenCalledTimes(3);
+      expect(load).toHaveBeenCalledTimes(1);
+    });
+
+    it('before start() neither is listened to; a result that was already there at start() reloads nothing; the next one does', () => {
+      const { screen, reload, updateNoteResult$, changeResult$ } = screenAt();
+      expect([updateNoteResult$.observed, changeResult$.observed]).toEqual([false, false]);
+      updateNoteResult$.next(NOTED);
+      changeResult$.next(CHANGED);
+      screen.start();
+      expect(reload).not.toHaveBeenCalled();
+      updateNoteResult$.next(NOTED);
+      changeResult$.next(CHANGED);
+      expect(reload).toHaveBeenCalledTimes(2);
+    });
+
+    it('after the subscription of start() ends nothing is reloaded; started again, the old results still reload nothing', () => {
+      const { screen, reload, updateNoteResult$, changeResult$ } = screenAt();
+      const started = screen.start();
+      started.unsubscribe();
+      expect([updateNoteResult$.observed, changeResult$.observed]).toEqual([false, false]);
+      updateNoteResult$.next(NOTED);
+      changeResult$.next(CHANGED);
+      expect(reload).not.toHaveBeenCalled();
+      screen.start();
+      expect(reload).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('moving an appointment to another time', () => {
+    const OWN = winterWeek().appointments[0]!; // Monday 16 November, 11:00–12:00 in Rome, "First lesson"
+    const EARLY = '2026-11-14T10:00:00.000Z'; // Saturday: the appointment can still be changed
+    const MOVING = { appointmentId: OWN.appointmentId, when: 'Mon 16 Nov, 11:00–12:00', what: 'Mon 16 Nov, 11:00–12:00 · Studio', note: 'First lesson' };
+    const CHANGED: ChangeResult = { status: 'success', cancelled: { ...OWN, status: 'cancelled', cancelReason: 'changed' }, booked: OWN };
+    const refused = (reason: 'booking_notice_too_short' | 'slot_taken' | 'appointment_not_found' | 'appointment_not_active' | 'cancellation_notice_too_short' | 'user_not_found' | 'network'): ChangeResult => ({
+      status: 'failure',
+      reason,
+      message: 'for a developer',
+    });
+    // A screen started on the week of Monday 9 November with the winter week's data, and the
+    // appointment's move started.
+    const movingOwn = (role: 'admin' | 'user' = 'user') => {
+      const made = screenAt(EARLY, role);
+      const started = made.screen.start();
+      made.succeed();
+      made.screen.move(OWN.appointmentId);
+      return { ...made, started };
+    };
+
+    it('nothing is being moved at the start, nor after a week is loaded', () => {
+      const { screen, succeed, states } = screenAt(EARLY);
+      screen.start();
+      succeed();
+      expect(states.every((state) => state.moving === null)).toBe(true);
+    });
+
+    it('move() of an appointment of the week on screen: the stream names it in words, in one notification, and loads nothing', () => {
+      const { screen, load, reload, succeed, states, last } = screenAt(EARLY);
+      screen.start();
+      succeed();
+      const before = states.length;
+      const week = last().week;
+      screen.move(OWN.appointmentId);
+      expect(states).toHaveLength(before + 1);
+      expect(last()).toEqual({ label: '9 Nov – 15 Nov 2026', loading: false, failure: null, week, moving: MOVING });
+      expect(last().week).toBe(week); // the same week object: the view need not redraw
+      expect(load).toHaveBeenCalledTimes(1);
+      expect(reload).not.toHaveBeenCalled();
+    });
+
+    it('for the Administrator the words carry the User\'s name', () => {
+      const { last } = movingOwn('admin');
+      expect(last().moving).toEqual({ ...MOVING, what: 'Mon 16 Nov, 11:00–12:00 · Studio · alice' });
+    });
+
+    it('an appointment without a note is moved with an empty note', () => {
+      const { screen, succeed, last } = screenAt(EARLY);
+      screen.start();
+      succeed({ ...winterWeek(), appointments: [{ ...OWN, note: null }] });
+      screen.move(OWN.appointmentId);
+      expect(last().moving).toEqual({ ...MOVING, note: '' });
+    });
+
+    it('nothing starts for an unknown appointment, for one that cannot be changed at this moment, or before start()', () => {
+      const unknown = screenAt(EARLY);
+      unknown.screen.start();
+      unknown.succeed();
+      unknown.screen.move('01M6DMQ000000000000000NONE');
+      expect(unknown.last().moving).toBeNull();
+
+      const late = screenAt(EARLY);
+      late.screen.start();
+      late.succeed();
+      late.clock.now = '2026-11-15T10:00:00.001Z'; // one millisecond past cancellableUntil
+      const before = late.states.length;
+      late.screen.move(OWN.appointmentId);
+      expect(late.last().moving).toBeNull();
+      expect(late.states).toHaveLength(before);
+
+      const early = screenAt(EARLY);
+      early.screen.move(OWN.appointmentId);
+      expect(early.last().moving).toBeNull();
+      // Started, left and with its week still known: not started is not started.
+      const left = screenAt(EARLY);
+      const started = left.screen.start();
+      left.succeed();
+      started.unsubscribe();
+      left.screen.move(OWN.appointmentId);
+      expect(left.last().moving).toBeNull();
+    });
+
+    it('a change that succeeds ends the move and loads the week again', () => {
+      const { reload, changeResult$, states, last } = movingOwn();
+      const before = states.length;
+      changeResult$.next(CHANGED);
+      expect(last().moving).toBeNull();
+      expect(states).toHaveLength(before + 1);
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['booking_notice_too_short', 'about the new time'],
+      ['slot_taken', 'about the new time'],
+      ['appointment_not_found', 'about the old appointment'],
+      ['appointment_not_active', 'about the old appointment'],
+      ['cancellation_notice_too_short', 'about the old appointment'],
+      ['user_not_found', 'about the old appointment'],
+      ['network', 'about neither'],
+    ] as const)('a change refused with %s (%s) keeps the move, and loads the week again', (reason, _about) => {
+      const { reload, changeResult$, last } = movingOwn();
+      changeResult$.next(refused(reason));
+      expect(last().moving).toEqual(MOVING);
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('a refusal, then a success: the move ends at the success', () => {
+      const { changeResult$, last } = movingOwn();
+      changeResult$.next(refused('slot_taken'));
+      changeResult$.next(refused('slot_taken'));
+      expect(last().moving).toEqual(MOVING);
+      changeResult$.next(CHANGED);
+      expect(last().moving).toBeNull();
+    });
+
+    it('keep() ends the move, in one notification, and loads nothing; a second keep() notifies nothing', () => {
+      const { screen, load, reload, states, last } = movingOwn();
+      const week = last().week;
+      const before = states.length;
+      screen.keep();
+      expect(last()).toEqual({ label: '9 Nov – 15 Nov 2026', loading: false, failure: null, week, moving: null });
+      screen.keep();
+      expect(states).toHaveLength(before + 1);
+      expect(load).toHaveBeenCalledTimes(1);
+      expect(reload).not.toHaveBeenCalled();
+    });
+
+    it('keep() with nothing being moved notifies nothing', () => {
+      const { screen, succeed, states } = screenAt(EARLY);
+      screen.start();
+      succeed();
+      const before = states.length;
+      screen.keep();
+      expect(states).toHaveLength(before);
+    });
+
+    it('the end of the subscription of start() ends the move; started again, nothing is being moved', () => {
+      const { screen, started, last } = movingOwn();
+      started.unsubscribe();
+      expect(last().moving).toBeNull();
+      screen.start();
+      expect(last().moving).toBeNull();
+      const late: WeekState[] = [];
+      screen.week$.subscribe((state) => late.push(state));
+      expect(late[0]!.moving).toBeNull();
+    });
+
+    it('a change that succeeded before start() ends nothing: only a result that arrives while started does', () => {
+      const made = screenAt(EARLY);
+      made.changeResult$.next(CHANGED);
+      made.screen.start();
+      made.succeed();
+      made.screen.move(OWN.appointmentId);
+      expect(made.last().moving).toEqual(MOVING);
+    });
+
+    it('a reload keeps the move: while it is pending, at its success and at its failure', () => {
+      const { state$, bookResult$, pending, succeed, fail, last } = movingOwn();
+      bookResult$.next(BOOKED); // someone books meanwhile in this page: the week is loaded again
+      state$.next({ status: 'pending' });
+      expect(last()).toMatchObject({ loading: true, moving: MOVING });
+      succeed();
+      expect(last()).toMatchObject({ loading: false, moving: MOVING });
+      pending();
+      fail('network');
+      expect(last()).toMatchObject({ failure: UNREACHABLE, moving: MOVING });
+    });
+
+    it('a reload that no longer holds the appointment keeps the move, with the words of the copy', () => {
+      const { succeed, last } = movingOwn();
+      succeed({ ...winterWeek(), appointments: [] });
+      expect(last().moving).toEqual(MOVING);
+      succeed({ ...winterWeek(), timeZone: 'Asia/Kolkata', appointments: [{ ...OWN, note: 'Another note' }] });
+      expect(last().moving).toEqual(MOVING);
+    });
+
+    it('a notification of visible$ loads the week again and keeps the move', () => {
+      const { reload, visible$, succeed, last } = movingOwn();
+      visible$.next(undefined);
+      expect(reload).toHaveBeenCalledTimes(1);
+      succeed();
+      expect(last().moving).toEqual(MOVING);
+    });
+
+    it('the other writes\' results keep the move: a booking, a cancellation, a note saved', () => {
+      const { bookResult$, cancelResult$, updateNoteResult$, last } = movingOwn();
+      bookResult$.next(BOOKED);
+      cancelResult$.next(CANCELLED);
+      updateNoteResult$.next({ status: 'success', appointment: OWN });
+      expect(last().moving).toEqual(MOVING);
+    });
+
+    it('a move to another week and back keeps the move, and the words are still those of the copy', () => {
+      const { screen, load, pending, succeed, last } = movingOwn();
+      screen.next();
+      pending();
+      expect(last()).toMatchObject({ label: '16 Nov – 22 Nov 2026', loading: true, moving: MOVING });
+      succeed(view('2026-11-16')); // a week that does not hold the appointment
+      expect(last()).toMatchObject({ label: '16 Nov – 22 Nov 2026', loading: false, moving: MOVING });
+      expect(screen.detail(OWN.appointmentId)).toBeNull(); // the week on screen no longer has it
+      screen.next();
+      succeed(view('2026-11-23', { timeZone: 'Asia/Kolkata' }));
+      expect(last().moving).toEqual(MOVING);
+      screen.previous();
+      screen.previous();
+      screen.today();
+      succeed();
+      expect(load).toHaveBeenCalledTimes(6);
+      expect(last()).toMatchObject({ label: '9 Nov – 15 Nov 2026', moving: MOVING });
+    });
+
+    it('a change that succeeds while another week is on screen ends the move', () => {
+      const { screen, changeResult$, succeed, last } = movingOwn();
+      screen.next();
+      succeed(view('2026-11-16'));
+      changeResult$.next(CHANGED);
+      expect(last()).toMatchObject({ label: '16 Nov – 22 Nov 2026', moving: null });
+    });
+
+    it('after a move ended another can start, also of another appointment', () => {
+      const other = appointment({ start: '2026-11-17T09:00:00.000Z', end: '2026-11-17T10:00:00.000Z', date: '2026-11-17', cancellableUntil: '2026-11-16T09:00:00.000Z' });
+      const { screen, succeed, last } = movingOwn();
+      screen.keep();
+      succeed({ ...winterWeek(), appointments: [OWN, other] });
+      screen.move(other.appointmentId);
+      expect(last().moving).toEqual({ appointmentId: other.appointmentId, when: 'Tue 17 Nov, 10:00–11:00', what: 'Tue 17 Nov, 10:00–11:00 · Studio', note: '' });
+    });
   });
 });

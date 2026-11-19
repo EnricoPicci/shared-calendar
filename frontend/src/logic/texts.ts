@@ -94,11 +94,12 @@ const PLAIN_WORDS = new Map<string, string>([
   ['session_rejected', 'Your session has ended. Please sign in again.'],
   // GET /calendar (docs/FRONTEND_SERVICES.md section 18.1).
   ['forbidden', 'Your account is not allowed to do this.'],
-  ['invalid_request', 'The request was not accepted. Please try again.'],
+  ['invalid_request', 'The request was not accepted. Check what you entered and try again.'],
   ['internal_error', 'Something went wrong on the server. Please try again in a moment.'],
-  // Booking and cancelling (docs/FRONTEND_SERVICES.md section 19.1) and the list of users
-  // (docs/FRONTEND_SERVICES.md section 13.1). After a refused booking the week is loaded again
-  // (docs/FRONTEND_ARCHITECTURE.md section 5.1), which is what the sentence of `slot_taken` says.
+  // Booking, cancelling, changing and the note (docs/FRONTEND_SERVICES.md section 19.1) and the
+  // list of users (docs/FRONTEND_SERVICES.md section 13.1). After a refused booking or change
+  // the week is loaded again (docs/FRONTEND_ARCHITECTURE.md section 5.1), which is what the
+  // sentence of `slot_taken` says.
   ['invalid_json', 'The server could not read the request. Please try again.'],
   ['slot_taken', 'This time has just been taken. The calendar has been refreshed: please choose another time.'],
   ['booking_in_past', 'This time has already passed. Please choose a later one.'],
@@ -121,7 +122,14 @@ const PLAIN_WORDS = new Map<string, string>([
   ['no_role', 'Your account has no role yet, so it cannot use the calendar. Please ask the Administrator.'],
 ]);
 
-// A failure's `reason` as a sentence; a reason without a sentence of its own gets the general one.
-export function failureText(reason: string): string {
-  return PLAIN_WORDS.get(reason) ?? GENERAL;
+// What was being attempted when a call failed, where the same reason needs other words for it.
+export type Attempt = 'change';
+// A change is refused with the cancellation's reason when its appointment is too close to be
+// moved by a User (docs/SHARED_CALENDAR_SPEC.md section 8.4): nothing was being cancelled.
+const AFTER_A_CHANGE = new Map<string, string>([['cancellation_notice_too_short', 'It is too late to change this appointment.']]);
+
+// A failure's `reason` as a sentence; a reason without a sentence of its own gets the general
+// one. `attempt` says what was attempted, for the reasons whose sentence depends on it.
+export function failureText(reason: string, attempt?: Attempt): string {
+  return (attempt === 'change' ? AFTER_A_CHANGE.get(reason) : undefined) ?? PLAIN_WORDS.get(reason) ?? GENERAL;
 }

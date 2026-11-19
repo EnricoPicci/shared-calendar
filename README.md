@@ -114,8 +114,11 @@ Open the address (in a Codespace, the forwarded port 5173) and sign in as `alice
 the role, and the page shows the week of today, with "previous", "Today" and "next"; "Sign out"
 returns to the login. A click on a free slot opens the book dialog (a note; as `admin` also the
 User to book for and other times inside the slot's window); a click on an appointment opens its
-detail, where "Cancel appointment" is offered when the rules allow it. The week is loaded again
-after every booking or cancellation, and every time the browser's tab becomes visible again. A reload of the page signs out too: the session is kept in memory only. An edit to `frontend/src`, `frontend/index.html` or `frontend/style.css`
+detail, where the note is edited and saved, and "Change" and "Cancel appointment" are offered
+when the rules allow it. "Change" shows a banner over the week: the next free slot clicked, in
+any week, is the new time, confirmed in a dialog; "Keep the appointment as it is" gives up. The
+week is loaded again after every booking, cancellation, change or note saved, and every time
+the browser's tab becomes visible again. A reload of the page signs out too: the session is kept in memory only. An edit to `frontend/src`, `frontend/index.html` or `frontend/style.css`
 shows after a reload. The dev server passes the page's calls on to the local API and to
 cognito-local; it is for local work only, and the front end is not deployed anywhere yet.
 

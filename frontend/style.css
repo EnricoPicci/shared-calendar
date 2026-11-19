@@ -44,6 +44,9 @@ label { display: grid; gap: 0.25rem; font-size: 0.85rem; color: #52606d; }
 .toolbar h2 { font-size: 1.05rem; margin-left: 0.5rem; }
 .toolbar .loading { color: #52606d; font-size: 0.85rem; }
 .week-screen .failure { margin-top: 0.5rem; }
+/* The banner of an appointment being moved: it stays in sight while the week scrolls under it */
+.moving { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 1rem; margin-top: 0.5rem; padding: 0.5rem 0.75rem; border: 1px solid #1d5fd1; border-radius: 6px; background: #e8f0fd; }
+.moving p { margin: 0; min-width: 0; flex: 1 1 14rem; overflow-wrap: anywhere; }
 .zone { margin: 0.5rem 0 0.25rem; font-size: 0.8rem; color: #52606d; }
 .legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; list-style: none; margin: 0.25rem 0 0.5rem; padding: 0; font-size: 0.8rem; }
 .legend li { overflow-wrap: anywhere; }
@@ -95,7 +98,7 @@ button.block:focus-visible { outline-offset: 1px; z-index: 1; }
 /* The dialogs: as wide as a phone allows, scrolling inside when taller than the screen */
 dialog { width: min(24rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); box-sizing: border-box; overflow-y: auto; border: 0; border-radius: 10px; padding: 1.25rem; box-shadow: 0 8px 30px #0004; color: inherit; }
 dialog::backdrop { background: #1f293380; }
-dialog[open], dialog form, dialog .choices { display: grid; gap: 0.8rem; }
+dialog[open], dialog form, dialog .choices, dialog .user { display: grid; gap: 0.8rem; }
 dialog h3 { font-size: 1.05rem; }
 dialog p { margin: 0; }
 dialog p:empty { display: none; }
@@ -106,6 +109,10 @@ dialog textarea { resize: vertical; }
 dialog dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.3rem 1rem; margin: 0; }
 dialog dt { color: #52606d; font-size: 0.85rem; }
 dialog dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+/* The note as a text to read: one element to show and hide, its two parts still cells of the list */
+dialog .noted { display: contents; }
+dialog .note-form .submit { justify-self: end; }
+dialog .old { overflow-wrap: anywhere; }
 .actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 0.5rem; }
 
 /* A phone: the login takes the width, the header's parts get closer, the week shows one day */

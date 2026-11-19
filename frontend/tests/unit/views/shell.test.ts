@@ -543,7 +543,7 @@ describe('the navigation', () => {
 
       find('#week .appointment').click();
       expect(detail().open).toBe(true);
-      expect(find('#week dialog.detail .hint').textContent).toBe('It can be cancelled until Sun 15 Nov, 11:00.');
+      expect(find('#week dialog.detail .hint').textContent).toBe('It can be changed or cancelled until Sun 15 Nov, 11:00.');
       fetchMock.mockResolvedValueOnce(json(200, { ...OWN, status: 'cancelled' }));
       find('#week dialog.detail .cancel').click();
 
@@ -603,6 +603,216 @@ describe('the navigation', () => {
       expect(find<HTMLTextAreaElement>('#week dialog.book [name="note"]').value).toBe('');
       expect(find('#week dialog.book .choices').hidden).toBe(true);
       expect(find('#week dialog.book').textContent).not.toContain('carol');
+    });
+  });
+
+  // The note and the change with the real services of the session behind the stubbed fetch: the
+  // week screen loads the week again at every result, and holds the move, which ends with the
+  // person's session (docs/FRONTEND_ARCHITECTURE.md section 6, point 4).
+  describe('the note and the change', () => {
+    const ID = '01M6DMQ0000000000000000001';
+    const NEW_ID = '01M6DMQ0000000000000000002';
+    const OWN = { ...winterWeek().appointments[0]!, appointmentId: ID };
+    // Saturday 14 November: the week on screen is Monday 9 to Sunday 15, and the appointment of
+    // Monday 16 that the fixture answers can still be changed.
+    const WEEK_OF_14 = 'http://api.test/calendar?from=2026-11-09&to=2026-11-15';
+    const calls = () => (fetchMock.mock.calls as [string, RequestInit][]).filter(([url]) => url.startsWith(CONFIG.apiUrl));
+    const book = () => find<HTMLDialogElement>('#week dialog.book');
+    const detail = () => find<HTMLDialogElement>('#week dialog.detail');
+    const banner = () => find('#week .moving');
+    const noteField = () => find<HTMLTextAreaElement>('#week dialog.detail [name="note"]');
+    const week = (over: object = {}) => ({ ...winterWeek(), appointments: [OWN], ...over });
+    const entered = async (who = ALICE, answer: object = week()) => {
+      vi.setSystemTime(new Date('2026-11-14T10:00:00.000Z'));
+      fetchMock.mockResolvedValueOnce(json(200, answer));
+      const made = mounted(who);
+      await weekDrawn();
+      return made;
+    };
+
+    it('a note saved: the call, the dialog closed on its success, and the week loaded again', async () => {
+      await entered();
+      find('#week .appointment').click();
+      expect(noteField().value).toBe('First lesson');
+      noteField().value = ' Second lesson ';
+      fetchMock.mockResolvedValueOnce(json(200, { ...OWN, note: 'Second lesson' }));
+      fetchMock.mockResolvedValueOnce(json(200, week({ appointments: [{ ...OWN, note: 'Second lesson' }] })));
+      submit(find<HTMLFormElement>('#week dialog.detail .note-form'));
+      expect(find<HTMLButtonElement>('#week dialog.detail .note-form .submit').disabled).toBe(true);
+
+      await vi.waitFor(() => expect(detail().open).toBe(false));
+      const [url, init] = calls()[1]!;
+      expect([url, init.method]).toEqual([`http://api.test/calendar/appointments/${ID}`, 'PATCH']);
+      expect(JSON.parse(String(init.body))).toEqual({ note: 'Second lesson' });
+      expect(apiCalls()).toHaveLength(3);
+      expect(apiCalls()[2]).toEqual([WEEK_OF_14, 'Bearer access-token-alice']);
+      await vi.waitFor(() => expect(find('#week .appointment .note').textContent).toBe('Second lesson'));
+    });
+
+    it('an emptied note is sent as null; a note refused is said in the dialog, still open, and the week is loaded again all the same', async () => {
+      await entered();
+      find('#week .appointment').click();
+      noteField().value = '   ';
+      fetchMock.mockResolvedValueOnce(json(409, { error: 'appointment_not_active', message: 'the appointment was cancelled' }));
+      submit(find<HTMLFormElement>('#week dialog.detail .note-form'));
+
+      await vi.waitFor(() => expect(find('#week dialog.detail .error').textContent).toBe('This appointment has already been cancelled, or it has ended.'));
+      expect(JSON.parse(String(calls()[1]![1].body))).toEqual({ note: null });
+      expect(detail().open).toBe(true);
+      expect(noteField().value).toBe('   ');
+      expect(apiCalls()).toHaveLength(3);
+      expect(apiCalls()[2]![0]).toBe(WEEK_OF_14);
+      expect(html()).not.toContain('was cancelled');
+    });
+
+    it('a User changes an appointment: the banner, the confirmation, the call, the dialog closed, the move over and the week loaded again', async () => {
+      await entered();
+      find('#week .appointment').click();
+      find('#week dialog.detail .change').click();
+      expect(detail().open).toBe(false);
+      expect(banner().hidden).toBe(false);
+      expect(find('#week .moving p').textContent).toBe('Moving: Mon 16 Nov, 11:00–12:00 · Studio. Choose a free time.');
+      expect(find<HTMLButtonElement>('#week .appointment').disabled).toBe(true);
+      expect(apiCalls()).toHaveLength(1); // starting a move asks nothing of the server
+
+      find('#week .slot').click();
+      expect(book().open).toBe(true);
+      expect(find('#week dialog.book .old').textContent).toBe('Mon 16 Nov, 11:00–12:00');
+      expect(find('#week dialog.book .what').textContent).toBe('Mon 16 Nov, 08:00–09:00 · Studio');
+      expect(find<HTMLTextAreaElement>('#week dialog.book [name="note"]').value).toBe('First lesson');
+
+      const moved = { ...OWN, appointmentId: NEW_ID, start: '2026-11-16T07:00:00.000Z', end: '2026-11-16T08:00:00.000Z', replaces: ID };
+      fetchMock.mockResolvedValueOnce(json(201, { cancelled: { ...OWN, status: 'cancelled', cancelReason: 'changed', replacedBy: NEW_ID }, booked: moved }));
+      fetchMock.mockResolvedValueOnce(json(200, week({ appointments: [moved] })));
+      submit(find<HTMLFormElement>('#week dialog.book form'));
+      expect(find<HTMLButtonElement>('#week dialog.book .submit').disabled).toBe(true);
+
+      await vi.waitFor(() => expect(book().open).toBe(false));
+      const [url, init] = calls()[1]!;
+      expect([url, init.method]).toEqual([`http://api.test/calendar/appointments/${ID}/change`, 'POST']);
+      expect(JSON.parse(String(init.body))).toEqual({ start: '2026-11-16T07:00:00.000Z', note: 'First lesson' });
+      // The move is over because the week screen heard the result, and the week is asked again.
+      expect(banner().hidden).toBe(true);
+      expect(apiCalls()).toHaveLength(3);
+      expect(apiCalls()[2]).toEqual([WEEK_OF_14, 'Bearer access-token-alice']);
+      await vi.waitFor(() => expect(find('#week .appointment .time').textContent).toBe('08:00–09:00'));
+      expect(find<HTMLButtonElement>('#week .appointment').disabled).toBe(false);
+      expect(apiCalls().some(([address]) => address!.includes('/users'))).toBe(false);
+    });
+
+    it('a change that is refused: the sentence in the confirmation, the week loaded again, and the banner still there after closing', async () => {
+      await entered();
+      find('#week .appointment').click();
+      find('#week dialog.detail .change').click();
+      find('#week .slot').click();
+
+      fetchMock.mockResolvedValueOnce(json(403, { error: 'cancellation_notice_too_short', message: 'Too late to change this appointment' }));
+      fetchMock.mockResolvedValueOnce(json(200, week()));
+      submit(find<HTMLFormElement>('#week dialog.book form'));
+      await vi.waitFor(() => expect(find('#week dialog.book .error').textContent).toBe('It is too late to change this appointment.'));
+      expect(book().open).toBe(true);
+      expect(apiCalls()).toHaveLength(3);
+      expect(apiCalls()[2]![0]).toBe(WEEK_OF_14);
+
+      await vi.waitFor(() => expect(find('#week .loading').hidden).toBe(true));
+      expect(book().open).toBe(true);
+      book().close();
+      expect(banner().hidden).toBe(false);
+      // The week drawn again behind the dialog has its appointment disabled: the move goes on.
+      expect(find<HTMLButtonElement>('#week .appointment').disabled).toBe(true);
+
+      find('#week .keep').click();
+      expect(banner().hidden).toBe(true);
+      expect(find<HTMLButtonElement>('#week .appointment').disabled).toBe(false);
+      expect(apiCalls()).toHaveLength(3); // giving up asks nothing of the server
+    });
+
+    it('the Administrator changes a User\'s appointment: no list of users is asked for, and no username is sent', async () => {
+      await entered(ADMIN, week({ appointments: [{ ...OWN, username: 'bob', cancellableUntil: null }] }));
+      find('#week .appointment').click();
+      find('#week dialog.detail .change').click();
+      expect(find('#week .moving p').textContent).toBe('Moving: Mon 16 Nov, 11:00–12:00 · Studio · bob. Choose a free time.');
+      find('#week .slot').click();
+      expect(find('#week dialog.book .user').hidden).toBe(true);
+      expect(apiCalls()).toHaveLength(1);
+
+      fetchMock.mockResolvedValueOnce(json(201, { cancelled: OWN, booked: { ...OWN, appointmentId: NEW_ID } }));
+      submit(find<HTMLFormElement>('#week dialog.book form'));
+      await vi.waitFor(() => expect(book().open).toBe(false));
+      expect(JSON.parse(String(calls()[1]![1].body))).toEqual({ start: '2026-11-16T07:00:00.000Z', end: '2026-11-16T08:00:00.000Z', note: 'First lesson' });
+      expect(apiCalls().some(([address]) => address!.includes('/users'))).toBe(false);
+    });
+
+    it('while moving, the tab hidden and shown again loads the week again and leaves the banner and the open confirmation as they are', async () => {
+      await entered();
+      find('#week .appointment').click();
+      find('#week dialog.detail .change').click();
+      find('#week .slot').click();
+      find<HTMLTextAreaElement>('#week dialog.book [name="note"]').value = 'Typed';
+
+      fetchMock.mockResolvedValueOnce(json(200, week({ days: winterWeek().days.map((day) => ({ ...day, slots: [] })) })));
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+      document.dispatchEvent(new Event('visibilitychange'));
+      delete (document as { visibilityState?: string }).visibilityState;
+      await vi.waitFor(() => expect(document.querySelectorAll('#week .slot')).toHaveLength(0));
+      expect(apiCalls()).toHaveLength(2);
+      expect(banner().hidden).toBe(false);
+      expect(book().open).toBe(true);
+      expect(find<HTMLTextAreaElement>('#week dialog.book [name="note"]').value).toBe('Typed');
+      expect(find<HTMLButtonElement>('#week .appointment').disabled).toBe(true);
+    });
+
+    it('signing out while an appointment is being moved leaves nothing: no banner, no dialog, no note, the page as before anyone signed in; the next person moves nothing', async () => {
+      vi.setSystemTime(new Date('2026-11-14T10:00:00.000Z'));
+      fetchMock.mockResolvedValueOnce(json(200, week({ appointments: [{ ...OWN, username: 'bob', note: 'Bob\'s note', cancellableUntil: null }] })));
+      const { store, signOut } = mounted();
+      const before = html();
+      store.set(ADMIN);
+      await weekDrawn();
+
+      find('#week .appointment').click();
+      find<HTMLTextAreaElement>('#week dialog.detail [name="note"]').value = 'Typed in the detail';
+      find('#week dialog.detail .change').click();
+      find('#week .slot').click();
+      expect(find<HTMLTextAreaElement>('#week dialog.book [name="note"]').value).toBe('Bob\'s note');
+      find<HTMLTextAreaElement>('#week dialog.book [name="note"]').value = 'A private note';
+      expect([banner().hidden, book().open]).toEqual([false, true]);
+      expect(html()).toContain('· bob');
+
+      signOut.click();
+      expect([banner().hidden, book().open, detail().open]).toEqual([true, false, false]);
+      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map((field) => field.value);
+      expect(fields.every((value) => value === '')).toBe(true);
+      for (const gone of ['bob', 'Bob\'s note', 'A private note', 'Typed in the detail', 'Mon 16 Nov', 'Studio']) expect(html()).not.toContain(gone);
+      expect(html()).toBe(before);
+
+      // The next person: no banner, every appointment enabled, and a slot opens a booking.
+      fetchMock.mockResolvedValueOnce(json(200, week()));
+      store.set(ALICE);
+      await weekDrawn();
+      expect(banner().hidden).toBe(true);
+      expect(find<HTMLButtonElement>('#week .appointment').disabled).toBe(false);
+      find('#week .slot').click();
+      expect(find('#week dialog.book .old').textContent).toBe('');
+      expect(find<HTMLTextAreaElement>('#week dialog.book [name="note"]').value).toBe('');
+      expect([...document.querySelectorAll<HTMLElement>('#week dialog.book .in-change')].every((element) => element.hidden)).toBe(true);
+      find('#week dialog.book .close').click();
+      find('#week .appointment').click();
+      expect(noteField().value).toBe('First lesson');
+    });
+
+    it('the same person signing in again after a move left half-way moves nothing: the session\'s objects were dropped', async () => {
+      const { store, signOut } = await entered();
+      find('#week .appointment').click();
+      find('#week dialog.detail .change').click();
+      expect(banner().hidden).toBe(false);
+      signOut.click();
+
+      fetchMock.mockResolvedValueOnce(json(200, week()));
+      store.set(ALICE);
+      await weekDrawn();
+      expect(banner().hidden).toBe(true);
+      expect(find<HTMLButtonElement>('#week .appointment').disabled).toBe(false);
     });
   });
 

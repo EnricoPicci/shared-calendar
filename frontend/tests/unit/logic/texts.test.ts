@@ -148,7 +148,7 @@ describe('texts', () => {
     });
 
     it('every reason but "unexpected" has a sentence of its own', () => {
-      const own = REASONS.filter((reason) => reason !== 'unexpected').map(failureText);
+      const own = REASONS.filter((reason) => reason !== 'unexpected').map((reason) => failureText(reason));
       expect(new Set(own).size).toBe(own.length);
       expect(own).not.toContain(failureText('unexpected'));
     });
@@ -167,6 +167,37 @@ describe('texts', () => {
 
     it('says the same for a wrong password and an unknown user: both are invalid_credentials', () => {
       expect(failureText('invalid_credentials')).toBe('The username or the password is not correct.');
+    });
+  });
+  describe('failureText, after what was attempted', () => {
+    it('cancellation_notice_too_short after a change says that it is too late to change', () => {
+      expect(failureText('cancellation_notice_too_short', 'change')).toBe('It is too late to change this appointment.');
+    });
+
+    it('without the second argument, after a cancellation, it stays as it is', () => {
+      expect(failureText('cancellation_notice_too_short')).toBe('It is too late to cancel this appointment.');
+      expect(failureText('cancellation_notice_too_short', undefined)).toBe('It is too late to cancel this appointment.');
+    });
+
+    it('invalid_request says to check what was entered, whatever was attempted', () => {
+      const sentence = 'The request was not accepted. Check what you entered and try again.';
+      expect(failureText('invalid_request')).toBe(sentence);
+      expect(failureText('invalid_request', 'change')).toBe(sentence);
+    });
+
+    it('every other reason has the same sentence after a change, an unknown one the general sentence', () => {
+      const others = [
+        'network', 'server', 'unexpected', 'not_signed_in', 'session_rejected', 'forbidden', 'invalid_request', 'internal_error', 'invalid_json',
+        'slot_taken', 'booking_in_past', 'booking_notice_too_short', 'booking_beyond_horizon', 'outside_availability', 'appointment_limit_reached',
+        'user_not_found', 'concurrent_update', 'appointment_not_found', 'appointment_not_active', 'type_in_use', '', 'constructor',
+      ];
+      for (const reason of others) expect(failureText(reason, 'change'), reason).toBe(failureText(reason));
+    });
+
+    it('the sentence after a change is a sentence like the others', () => {
+      const text = failureText('cancellation_notice_too_short', 'change');
+      expect(text).toMatch(/^[A-Z].*\.$/);
+      expect(text).not.toMatch(/_|fetch|TypeError|HTTP|API|JSON|token|\d{3}/);
     });
   });
 });

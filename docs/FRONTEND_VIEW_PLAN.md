@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v3 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`). Step 62 done on 2026-11-19 (brief `prompts/85-step-62-implementation.md`), waiting for review; next step 63 |
+| Status | v4 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`). Step 62 done on 2026-11-19 (brief `prompts/85-step-62-implementation.md`). Step 63 done on 2026-11-19 (brief `prompts/86-step-63-implementation.md`), waiting for review; next step 64 |
 | Scope | Everything needed to go from the services layer that exists to **all the views written, tested and running in a browser against the local stack**: the tooling, the shell, the logic layer and one view per screen. Steps 60 to 69 |
 | Not in scope | Hosting, the CORS configuration, the Content-Security-Policy of the hosting, logout as a designed service, the session across a reload, the cloud deployment of the front end. They are the open points O1, O2, O3, O5 and O7 of `docs/FRONTEND_ARCHITECTURE.md` section 10 and get their own plan |
 | Governed by | `docs/FRONTEND_ARCHITECTURE.md` (the rules of the view layer), `docs/FRONTEND_SERVICES.md` (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/ARCHITECTURE.md` section 4 (the API). On any conflict with this plan, they win |
@@ -14,6 +14,7 @@
 | v1 | 2026-11-16 | First version: steps 60 to 69. |
 | v2 | 2026-11-19 | Step 61, decided before its implementation: "today", for the week the screen opens on, is taken in the default time zone (`DEFAULT_TIME_ZONE` of `shared/`), not in the zone the settings give; the week screen makes no request for the settings. The limit this accepts is in `docs/FRONTEND_ARCHITECTURE.md` section 5.1. Step 61's bullet on "today" and its line on the seed (which also books a few appointments for `alice`) are corrected. |
 | v3 | 2026-11-19 | Step 62 gains a reload of the week every time the browser's tab becomes visible again, so that a booking made by someone else is seen without a sign-out. No change to the back end: the API has no way to push, and a WebSocket connection would be a feature of its own, outside this plan (section 8, decision 11). |
+| v4 | 2026-11-19 | Step 63: how a change is made on the screen is decided, with the Product Owner, before the step's implementation, and no longer "to settle first". The step's text says the interaction as decided: the banner, any week while moving, what ends a move and what does not, the book dialog as the confirmation, the note always sent, and the known limit of a move inside a full window. Section 8, decision 10 says so for step 63; step 68's interaction is still to propose. |
 
 ---
 
@@ -256,24 +257,41 @@ is open stays as it is.
 
 **Goal:** the appointment detail is complete: note and change, enabled according to the rules.
 
-To settle first, before any code, and to propose for approval: **how a change is made on the
-screen.** The service takes the appointment's id and the new appointment's fields, the same as a booking's
-(`AppointmentsService.change`). The
-proposed direction: "Change" in the detail closes the dialog and puts the week in a "choose the
-new slot" state, shown by a banner with "Keep the appointment as it is"; the next free slot
-clicked is the new time, confirmed in a dialog that shows the old and the new one. Which
-appointment is being moved is state of the logic layer, not of the view.
+**How a change is made on the screen**, decided with the Product Owner before any code (brief
+`prompts/86-step-63-implementation.md`; the reasons are in `docs/FRONTEND_ARCHITECTURE.md`
+section 11, decisions 43 to 49). The service takes the appointment's id and the new
+appointment's fields, the same as a booking's without the User (`AppointmentsService.change`).
+
+- "Change" in the detail closes the dialog and puts the week in a "choose the new time" state,
+  shown by a banner that names the appointment and holds "Keep the appointment as it is".
+  Which appointment is being moved is state of the logic layer (the week screen), not of the
+  view.
+- Previous, next and "Today" work while moving: the new time may be in any week, and the banner
+  still names the appointment.
+- While moving only free slots can be clicked; an appointment's button does nothing.
+- The next free slot clicked is the new time, confirmed in the book dialog in a second mode:
+  "Change appointment", the old time and the new one, for the Administrator the custom start
+  and end and no choice of User, the note filled with the old one and always sent, "Change".
+- The move ends at a successful change, at "Keep the appointment as it is" and when the screen
+  is left; a refused change, whatever its reason, leaves the banner, and so does closing the
+  confirmation.
+- Known limit: the Administrator shifts an appointment inside its own time by clicking a free
+  slot of the same window; when the window has none, the appointment is cancelled and booked
+  again.
 
 Logic: which actions the detail offers (the status, the end, the role, `cancellableUntil`); the
-"moving an appointment" state of the week screen; the reload after a note or a change.
+"moving an appointment" state of the week screen; the reload after a note or a change; the
+argument of the change from what the confirmation holds.
 
 View: the note edited in the detail dialog's own fixed form
-(`docs/FRONTEND_ARCHITECTURE.md` section 3, rule 4); the change as approved.
+(`docs/FRONTEND_ARCHITECTURE.md` section 3, rule 4); the banner; the book dialog's second mode.
 
 **Browser check:** edit a note, empty it, leave it unchanged; change an appointment to another
-slot and see the old one gone; a change refused (the new slot too close, the old one too late to
-change) says why and leaves the old appointment; giving up the change leaves everything as it
-was; as `admin`, change another person's appointment.
+slot, also in a later week, and see the old one gone; a change refused (the new slot too close,
+taken in the meantime) says why and leaves the old appointment and the banner; an appointment
+too late to change says so and still lets its note be edited; giving up the change leaves
+everything as it was; as `admin`, change another person's appointment, also with a custom start
+and end; signing out while moving leaves nothing.
 
 **Acceptance:** the common check.
 
@@ -445,7 +463,7 @@ step 68 (everything the Administrator does), after step 69.
 | `happy-dom` does not behave like a browser for something the views use (the native `<dialog>` is the likely place) | Step 60 tries `showModal()`, `close()` and the Escape key in the test environment first, and reports what must be checked in the browser only |
 | The changes of a step break an earlier screen | The earlier steps' checks are run again in short at every step (section 4), and all of them at step 69 |
 | The local calendar is emptied by the back end's journeys while a browser check is under way | Known (`CLAUDE.md`): the seed of step 61 is run again; never run the journeys during a browser check |
-| The screens' design is decided while coding | Steps 63 and 68 name the interaction to approve before any code; any other screen whose shape is not obvious gets the same treatment in its step |
+| The screens' design is decided while coding | Steps 63 and 68 name the interaction to approve before any code (step 63's is decided); any other screen whose shape is not obvious gets the same treatment in its step |
 
 ## 8. Decisions and assumptions
 
@@ -460,5 +478,5 @@ step 68 (everything the Administrator does), after step 69.
 | 7 | No screen for Hello World | Not among the screens of `docs/SHARED_CALENDAR_SPEC.md` section 16.8; the route proves the back end's chain, which the calendar's screens also exercise |
 | 8 | A local seed for the calendar is part of step 61 | A week needs availability to show; the local table starts empty and the back end's journeys empty it |
 | 9 | "Sign out" clears the session store only, and a reload signs out | Open points O7 and O3 of `docs/FRONTEND_ARCHITECTURE.md` section 10, outside this plan |
-| 10 | The interactions for "change" (step 63) and for a date's override (step 68) are proposed in their step and approved before code | They are choices about the screens that no document has made yet |
+| 10 | The interactions for "change" (step 63) and for a date's override (step 68) are proposed in their step and approved before code. Step 63's was decided with the Product Owner on 2026-11-19 and is written in the step | They are choices about the screens that no document has made yet |
 | 11 | The week is loaded again when the tab becomes visible (step 62); nothing is pushed by the server and nothing is asked on a timer | The API is request and answer only. A reload on coming back to the tab shows other people's bookings at the moment someone looks, with no change to the back end and no call while nobody is looking. Real-time updates over a WebSocket need a second API, a table of connections and a stand-in for the local stack: a feature with its own specification, not a step of this plan |

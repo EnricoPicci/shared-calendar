@@ -45,6 +45,12 @@
             <span class="loading" role="status" hidden>Loading…</span>
           </div>
           <p class="error failure" role="alert" hidden></p>
+          <!-- Shown while an appointment is being moved to another time: the next free slot
+               clicked is the new time. Outside the region the script redraws. -->
+          <div class="moving" hidden>
+            <p role="status">Moving: <span class="moving-what"></span>. Choose a free time.</p>
+            <button type="button" class="keep">Keep the appointment as it is</button>
+          </div>
           <p class="zone" hidden>Times are in the calendar's time zone, <span class="zone-name"></span>.</p>
           <ul class="legend"></ul>
 
@@ -55,14 +61,19 @@
 
           <!-- The book dialog: a free slot of the week, a note; for the Administrator also the
                User to book for and other times inside the slot's window. Outside the region
-               the script redraws. -->
+               the script redraws. It has a second mode, in which it confirms the move of an
+               appointment to the slot: the parts marked in-booking are shown in the first mode
+               only, those marked in-change in the second only. -->
           <dialog class="book" aria-labelledby="book-title">
             <form>
-              <h3 id="book-title">Book an appointment</h3>
-              <p class="what"></p>
+              <h3 id="book-title"><span class="in-booking">Book an appointment</span><span class="in-change" hidden>Change appointment</span></h3>
+              <p class="in-change" hidden>From: <span class="old"></span></p>
+              <p><span class="in-change" hidden>To: </span><span class="what"></span></p>
               <div class="choices" hidden>
-                <label>For <select name="username"></select></label>
-                <p class="users-message" role="status"></p>
+                <div class="user in-booking">
+                  <label>For <select name="username"></select></label>
+                  <p class="users-message" role="status"></p>
+                </div>
                 <div class="times">
                   <label>From <select name="start"></select></label>
                   <label>To <select name="end"></select></label>
@@ -72,12 +83,13 @@
               <p class="error" role="alert"></p>
               <div class="actions">
                 <button type="button" class="close">Close</button>
-                <button class="primary submit">Book</button>
+                <button class="primary submit"><span class="in-booking">Book</span><span class="in-change" hidden>Change</span></button>
               </div>
             </form>
           </dialog>
 
-          <!-- The detail of one appointment, with what can be done to it -->
+          <!-- The detail of one appointment, with what can be done to it. The note is a text to
+               read (the part .noted) or, while it can be edited, the field of the form. -->
           <dialog class="detail" aria-labelledby="detail-title">
             <h3 id="detail-title">Appointment</h3>
             <dl>
@@ -87,14 +99,21 @@
               <dd class="typeName"></dd>
               <dt>For</dt>
               <dd class="who"></dd>
-              <dt>Note</dt>
-              <dd class="note"></dd>
+              <div class="noted">
+                <dt>Note</dt>
+                <dd class="note"></dd>
+              </div>
             </dl>
+            <form class="note-form" hidden>
+              <label>Note <textarea name="note" rows="3" maxlength="500"></textarea></label>
+              <button class="submit">Save note</button>
+            </form>
             <p class="booked"></p>
             <p class="hint"></p>
             <p class="error" role="alert"></p>
             <div class="actions">
               <button type="button" class="close">Close</button>
+              <button type="button" class="change" hidden>Change</button>
               <button type="button" class="danger cancel" hidden>Cancel appointment</button>
             </div>
           </dialog>
