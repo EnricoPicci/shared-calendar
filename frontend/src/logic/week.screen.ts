@@ -9,8 +9,9 @@ import { weekModel, type WeekModel } from './week.model';
 // The week screen (docs/FRONTEND_ARCHITECTURE.md section 5): which week is on screen, its load
 // at every change of week, the last week loaded kept while the next one loads or fails, the
 // same week loaded again after every write to an appointment and every time the page becomes
-// visible, and the appointment that is being moved to another time, if any. Shaped like a
-// service: one public stream, `void` methods, nothing started by the constructor.
+// visible, and the appointment that is being moved to another time, if any: one of the week on
+// screen, or one that another screen handed over. Shaped like a service: one public stream,
+// `void` methods, nothing started by the constructor.
 
 // What the week view shows. `week` is the last one loaded, whichever week `label` names;
 // `failure` is the last load's failure in plain words, until a load succeeds; `moving` is the
@@ -29,6 +30,9 @@ export class WeekScreen {
   private started = false;
   // The last calendar view loaded, as received: where `detail` finds an appointment.
   private view: CalendarView | null = null;
+  // An appointment another screen handed over to be moved, with the Monday of its week, until
+  // it is taken.
+  private handed: { moving: Moving; monday: string } | null = null;
   private readonly state: BehaviorSubject<WeekState>;
   readonly week$: Observable<WeekState>;
 
@@ -56,6 +60,8 @@ export class WeekScreen {
   // - every time the page becomes visible, so that what other people booked or cancelled in the
   //   meantime is shown.
   // A change that succeeds also ends the move; so does the end of the subscription.
+  // An appointment handed over since the screen was last on show is taken here: the week
+  // loaded is its week, and it is being moved.
   start(): Subscription {
     const subscription = this.calendar.calendarState$.subscribe((state) => {
       const shown = this.state.getValue();
@@ -71,6 +77,7 @@ export class WeekScreen {
       this.started = false;
       this.keep();
     });
+    this.take();
     this.load();
 
     // A result stream hands its last result to a new subscriber at once: that one came before
@@ -111,6 +118,18 @@ export class WeekScreen {
     if (detail?.canChange) this.state.next({ ...this.state.getValue(), moving: movingOf(detail, this.role) });
   }
 
+  // Another screen hands over an appointment to move to another time: `moving` is its copy in
+  // words, made by that screen, and `date` its local date. The week screen takes it at its next
+  // `start()`, or at once when it is started: it goes to the week of that date and is moving
+  // the appointment from then on, as after `move`. It is taken once: the move it starts ends
+  // like any other, and a later `start()` moves nothing.
+  handOver(moving: Moving, date: string): void {
+    this.handed = { moving, monday: mondayOf(date) };
+    if (!this.started) return;
+    this.take();
+    this.load();
+  }
+
   // Ends the move and leaves the appointment as it is.
   keep(): void {
     const shown = this.state.getValue();
@@ -133,6 +152,15 @@ export class WeekScreen {
   // (docs/FRONTEND_ARCHITECTURE.md section 5).
   private thisMonday(): string {
     return mondayOf(localDateOf(this.now().toISOString(), DEFAULT_TIME_ZONE));
+  }
+
+  // Takes what was handed over, if anything: its week becomes the one on screen, and the
+  // stream names the appointment being moved.
+  private take(): void {
+    if (this.handed === null) return;
+    this.monday = this.handed.monday;
+    this.state.next({ ...this.state.getValue(), label: this.label(), moving: this.handed.moving });
+    this.handed = null;
   }
 
   private label(): string {

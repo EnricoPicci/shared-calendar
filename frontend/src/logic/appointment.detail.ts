@@ -18,7 +18,7 @@ export type AppointmentDetail = {
   canEditNote: boolean;
   canChange: boolean;
   canCancel: boolean;
-  hint: string; // until when it can be changed or cancelled, or why it cannot; '' when there is nothing to say
+  hint: string; // what became of it, until when it can be changed or cancelled, or why it cannot; '' when there is nothing to say
 };
 
 // What the detail offers, decided at `now`; the server decides again when the call is made.
@@ -35,13 +35,7 @@ export function appointmentDetail(appointment: Appointment, role: Role, now: Dat
   const until = appointment.cancellableUntil;
   const active = appointment.status === 'booked' && now.getTime() < Date.parse(appointment.end);
   const canCancel = admin ? active : appointment.status === 'booked' && until !== null && now.getTime() <= Date.parse(until);
-  const hint = admin
-    ? canCancel
-      ? ''
-      : 'This appointment has ended.'
-    : canCancel
-      ? `It can be changed or cancelled until ${dateTimeText(until!, zone)}.`
-      : 'It is too late to change or cancel this appointment.';
+  const hint = sentence(appointment, admin, active, canCancel, zone);
   // A User books only for themselves: a booking made in the role User is the reader's own.
   const by = !admin && appointment.createdBy.role === 'user' ? 'you' : appointment.createdBy.username;
   return {
@@ -57,6 +51,22 @@ export function appointmentDetail(appointment: Appointment, role: Role, now: Dat
     canCancel,
     hint,
   };
+}
+
+// The detail's one sentence, by what the appointment is. One that was cancelled says so, and
+// one cancelled by a change says that it was moved (docs/SHARED_CALENDAR_SPEC.md decision D19);
+// a booked one whose end has passed has ended, for both roles. Of one still to end, a User
+// reads until when it can be changed or cancelled, or that it is too late; the Administrator,
+// who may do both until the end, reads nothing.
+function sentence(appointment: Appointment, admin: boolean, active: boolean, canCancel: boolean, zone: string): string {
+  if (appointment.status === 'cancelled') {
+    return appointment.cancelReason === 'changed' ? 'This appointment was moved to another time.' : 'This appointment was cancelled.';
+  }
+  if (!active) return 'This appointment has ended.';
+  if (admin) return '';
+  return canCancel
+    ? `It can be changed or cancelled until ${dateTimeText(appointment.cancellableUntil!, zone)}.`
+    : 'It is too late to change or cancel this appointment.';
 }
 
 // An appointment being moved to another time, as the week's banner and the confirmation name

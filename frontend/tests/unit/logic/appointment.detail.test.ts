@@ -106,9 +106,11 @@ describe('appointmentDetail', () => {
       });
     });
 
-    it('in progress or ended, it is too late', () => {
-      for (const now of ['2026-11-23T09:30:00.000Z', '2026-11-23T10:00:00.000Z', '2026-12-01T10:00:00.000Z']) {
-        expect(appointmentDetail(ALICES, 'user', at(now), 'Europe/Rome')).toMatchObject({ canCancel: false, hint: 'It is too late to change or cancel this appointment.' });
+    it('in progress, it is too late; ended, at its end and after, the sentence says that it has ended', () => {
+      expect(appointmentDetail(ALICES, 'user', at('2026-11-23T09:30:00.000Z'), 'Europe/Rome')).toMatchObject({ canCancel: false, hint: 'It is too late to change or cancel this appointment.' });
+      expect(appointmentDetail(ALICES, 'user', at('2026-11-23T09:59:59.999Z'), 'Europe/Rome')).toMatchObject({ canCancel: false, hint: 'It is too late to change or cancel this appointment.' });
+      for (const now of ['2026-11-23T10:00:00.000Z', '2026-12-01T10:00:00.000Z']) {
+        expect(appointmentDetail(ALICES, 'user', at(now), 'Europe/Rome')).toMatchObject({ canCancel: false, hint: 'This appointment has ended.' });
       }
     });
 
@@ -197,7 +199,7 @@ describe('appointmentDetail', () => {
     it('an appointment that has ended: nothing, for either role', () => {
       for (const now of ['2026-11-23T10:00:00.000Z', '2026-11-24T10:00:00.000Z']) {
         expect(offered(FOR_ADMIN, 'admin', now)).toEqual({ canEditNote: false, canChange: false, canCancel: false, hint: ENDED });
-        expect(offered(ALICES, 'user', now)).toEqual({ canEditNote: false, canChange: false, canCancel: false, hint: TOO_LATE });
+        expect(offered(ALICES, 'user', now)).toEqual({ canEditNote: false, canChange: false, canCancel: false, hint: ENDED });
       }
     });
 
@@ -207,6 +209,28 @@ describe('appointmentDetail', () => {
       expect(offered({ ...FOR_ADMIN, ...cancelled }, 'admin', '2026-11-20T08:00:00.000Z')).toMatchObject({ canEditNote: false, canChange: false, canCancel: false });
       // Even if a cancelled one still carried the instant, nothing would be offered.
       expect(offered({ ...ALICES, status: 'cancelled' }, 'user', '2026-11-20T08:00:00.000Z')).toMatchObject({ canChange: false, canCancel: false });
+    });
+
+    it('a cancelled appointment says that it was cancelled, to both roles, before its time and after it', () => {
+      const cancelled = { status: 'cancelled' as const, cancelReason: 'cancelled' as const, cancellableUntil: null };
+      for (const now of ['2026-11-20T08:00:00.000Z', '2026-11-23T09:30:00.000Z', '2026-12-01T10:00:00.000Z']) {
+        expect(offered({ ...ALICES, ...cancelled }, 'user', now)).toEqual({ canEditNote: false, canChange: false, canCancel: false, hint: 'This appointment was cancelled.' });
+        expect(offered({ ...FOR_ADMIN, ...cancelled }, 'admin', now)).toEqual({ canEditNote: false, canChange: false, canCancel: false, hint: 'This appointment was cancelled.' });
+      }
+    });
+
+    it('one cancelled by a change says that it was moved, to both roles', () => {
+      const changed = { status: 'cancelled' as const, cancelReason: 'changed' as const, cancellableUntil: null, replacedBy: '01M6DMQ0000000000000000002' };
+      for (const now of ['2026-11-20T08:00:00.000Z', '2026-12-01T10:00:00.000Z']) {
+        expect(offered({ ...ALICES, ...changed }, 'user', now)).toEqual({ canEditNote: false, canChange: false, canCancel: false, hint: 'This appointment was moved to another time.' });
+        expect(offered({ ...FOR_ADMIN, ...changed }, 'admin', now)).toEqual({ canEditNote: false, canChange: false, canCancel: false, hint: 'This appointment was moved to another time.' });
+      }
+    });
+
+    it('one cancelled because its User was deleted, or with no reason given, was cancelled', () => {
+      for (const cancelReason of ['user_deleted', null] as const) {
+        expect(offered({ ...FOR_ADMIN, status: 'cancelled', cancelReason }, 'admin', '2026-11-20T08:00:00.000Z').hint).toBe('This appointment was cancelled.');
+      }
     });
 
     it('"Change" is offered exactly when "Cancel appointment" is', () => {

@@ -35,7 +35,8 @@
       </template>
 
       <main class="screen">
-        <!-- The week (src/views/week.view.ts), at the address #/week -->
+        <!-- The week (src/views/week.view.ts), at the address #/week. An appointment opens the
+             detail dialog, which is after the screens. -->
         <section id="week" class="week-screen" hidden>
           <div class="toolbar">
             <button type="button" class="previous" aria-label="Previous week">‹</button>
@@ -88,36 +89,6 @@
             </form>
           </dialog>
 
-          <!-- The detail of one appointment, with what can be done to it. The note is a text to
-               read (the part .noted) or, while it can be edited, the field of the form. -->
-          <dialog class="detail" aria-labelledby="detail-title">
-            <h3 id="detail-title">Appointment</h3>
-            <dl>
-              <dt>When</dt>
-              <dd class="when"></dd>
-              <dt>Type</dt>
-              <dd class="typeName"></dd>
-              <dt>For</dt>
-              <dd class="who"></dd>
-              <div class="noted">
-                <dt>Note</dt>
-                <dd class="note"></dd>
-              </div>
-            </dl>
-            <form class="note-form" hidden>
-              <label>Note <textarea name="note" rows="3" maxlength="500"></textarea></label>
-              <button class="submit">Save note</button>
-            </form>
-            <p class="booked"></p>
-            <p class="hint"></p>
-            <p class="error" role="alert"></p>
-            <div class="actions">
-              <button type="button" class="close">Close</button>
-              <button type="button" class="change" hidden>Change</button>
-              <button type="button" class="danger cancel" hidden>Cancel appointment</button>
-            </div>
-          </dialog>
-
           <!-- The pieces the script copies to draw a week -->
           <template id="tpl-legend-item">
             <li></li>
@@ -148,7 +119,67 @@
             <option></option>
           </template>
         </section>
+
+        <!-- "My appointments" (src/views/appointments.view.ts), at the address #/appointments:
+             a User's upcoming appointments, or all those of a period. The period's form is
+             outside the list the script redraws. -->
+        <section id="appointments" class="appointments-screen" hidden>
+          <div class="toolbar">
+            <button type="button" class="upcoming" aria-pressed="false">Upcoming</button>
+            <button type="button" class="history" aria-pressed="false">History</button>
+            <span class="loading" role="status" hidden>Loading…</span>
+          </div>
+          <!-- novalidate: a date left empty or half typed is refused by the script, in words -->
+          <form class="period" novalidate hidden>
+            <label>From <input type="date" name="from" /></label>
+            <label>To <input type="date" name="to" /></label>
+            <button class="submit">Show</button>
+            <p class="error refusal" role="alert"></p>
+          </form>
+          <p class="error failure" role="alert" hidden></p>
+          <p class="empty" hidden></p>
+          <ul class="list"></ul>
+
+          <!-- A row of the list: one button, which opens the appointment's detail -->
+          <template id="tpl-appointment-row">
+            <li>
+              <button type="button" class="row"><span class="date"></span> <span class="time"></span> <span class="type-name"></span> <span class="note"></span> <span class="status"></span></button>
+            </li>
+          </template>
+        </section>
       </main>
+
+      <!-- The detail of one appointment, with what can be done to it
+           (src/views/detail.view.ts). It belongs to no screen: the week and "My appointments"
+           both open it, each while it is on show. The note is a text to read (the part .noted)
+           or, while it can be edited, the field of the form. -->
+      <dialog id="detail" class="detail" aria-labelledby="detail-title">
+        <h3 id="detail-title">Appointment</h3>
+        <dl>
+          <dt>When</dt>
+          <dd class="when"></dd>
+          <dt>Type</dt>
+          <dd class="typeName"></dd>
+          <dt>For</dt>
+          <dd class="who"></dd>
+          <div class="noted">
+            <dt>Note</dt>
+            <dd class="note"></dd>
+          </div>
+        </dl>
+        <form class="note-form" hidden>
+          <label>Note <textarea name="note" rows="3" maxlength="500"></textarea></label>
+          <button class="submit">Save note</button>
+        </form>
+        <p class="booked"></p>
+        <p class="hint"></p>
+        <p class="error" role="alert"></p>
+        <div class="actions">
+          <button type="button" class="close">Close</button>
+          <button type="button" class="change" hidden>Change</button>
+          <button type="button" class="danger cancel" hidden>Cancel appointment</button>
+        </div>
+      </dialog>
     </div>
   </body>
 </html>

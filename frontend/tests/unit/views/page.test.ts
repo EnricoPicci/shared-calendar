@@ -28,10 +28,10 @@ describe('index.html', () => {
   it('every screen of the frame has an id and starts hidden; the navigation and the lists start empty', () => {
     loadPage();
     const screens = [...document.querySelectorAll<HTMLElement>('#app main.screen > :not(template)')];
-    expect(screens.map((element) => element.id)).toEqual(['week']);
+    expect(screens.map((element) => element.id)).toEqual(['week', 'appointments']);
     expect(screens.every((element) => element.hidden)).toBe(true);
     expect(document.querySelector('#app .nav')!.children).toHaveLength(0);
-    for (const list of document.querySelectorAll('#week .legend, #week .hours, #week .days')) expect(list.children).toHaveLength(0);
+    for (const list of document.querySelectorAll('#week .legend, #week .hours, #week .days, #appointments .list')) expect(list.children).toHaveLength(0);
   });
 
   it('every <template> has an id of its own and holds exactly one element', () => {
@@ -46,6 +46,7 @@ describe('index.html', () => {
       'tpl-slot',
       'tpl-appointment',
       'tpl-option',
+      'tpl-appointment-row',
     ]);
     for (const template of templates) expect(template.content.children, template.id).toHaveLength(1);
   });
@@ -67,16 +68,22 @@ describe('index.html', () => {
     for (const template of templates) expect(template.content.querySelectorAll('input, select, textarea'), template.id).toHaveLength(0);
   });
 
-  it('the week has two dialogs, closed, outside the region that is redrawn, each named by its heading', () => {
+  it('the page has two dialogs, closed, each named by its heading: the book dialog is the week\'s, outside the region that is redrawn; the detail belongs to no screen', () => {
     loadPage();
     const dialogs = [...document.querySelectorAll<HTMLDialogElement>('dialog')];
     expect(dialogs.map((dialog) => dialog.className)).toEqual(['book', 'detail']);
     for (const dialog of dialogs) {
       expect(dialog.open, dialog.className).toBe(false);
-      expect(dialog.parentElement!.id, dialog.className).toBe('week');
-      expect(dialog.closest('.week'), dialog.className).toBeNull();
       expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)!.tagName, dialog.className).toBe('H3');
     }
+    const [book, detail] = dialogs as [HTMLDialogElement, HTMLDialogElement];
+    expect(book.parentElement!.id).toBe('week');
+    expect(book.closest('.week')).toBeNull();
+    // The detail is opened from two screens: it is in the frame, after the screens, with an id
+    // of its own for the views that mount it.
+    expect(detail.id).toBe('detail');
+    expect(detail.parentElement!.id).toBe('app');
+    expect(detail.closest('main')).toBeNull();
   });
 
   it('the book dialog starts with no choice in its lists and the Administrator\'s part hidden; the note is limited to 500 characters', () => {
@@ -127,5 +134,36 @@ describe('index.html', () => {
   it('no class of the page holds the word "admin": the shell\'s test looks for that name in the whole document', () => {
     const classes = [...pageAside().querySelectorAll('[class]')].flatMap((element) => [...element.classList]);
     expect(classes.filter((name) => name.includes('admin'))).toEqual([]);
+  });
+
+  it('"My appointments" starts on neither mode, with the period\'s form hidden and empty, outside the list that is redrawn, and nothing shown', () => {
+    loadPage();
+    const one = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector<T>(`#appointments ${selector}`)!;
+    expect([one('.upcoming'), one('.history')].map((button) => [button.textContent, button.getAttribute('aria-pressed')])).toEqual([
+      ['Upcoming', 'false'],
+      ['History', 'false'],
+    ]);
+    const period = one<HTMLFormElement>('.period');
+    expect(period.hidden).toBe(true);
+    expect(period.closest('.list')).toBeNull();
+    expect([...period.querySelectorAll('input')].map((field) => [field.type, field.name, field.value])).toEqual([
+      ['date', 'from', ''],
+      ['date', 'to', ''],
+    ]);
+    expect(period.querySelector('button')!.textContent).toBe('Show');
+    // The script says in words what is wrong with the dates: the browser's own check is off.
+    expect(period.noValidate).toBe(true);
+    expect([one('.loading').hidden, one('.failure').hidden, one('.empty').hidden]).toEqual([true, true, true]);
+    for (const alert of [one('.refusal'), one('.failure')]) expect([alert.getAttribute('role'), alert.textContent]).toEqual(['alert', '']);
+  });
+
+  it('a row of the list is one button of type "button" with its five texts, and nothing in it can be typed in', () => {
+    const row = pageAside().querySelector<HTMLTemplateElement>('#tpl-appointment-row')!.content.firstElementChild!;
+    expect(row.tagName).toBe('LI');
+    const buttons = row.querySelectorAll('button, a');
+    expect(buttons).toHaveLength(1);
+    expect([buttons[0]!.tagName, buttons[0]!.getAttribute('type')]).toEqual(['BUTTON', 'button']);
+    expect([...buttons[0]!.children].map((part) => part.className)).toEqual(['date', 'time', 'type-name', 'note', 'status']);
+    expect(row.querySelectorAll('input, select, textarea')).toHaveLength(0);
   });
 });

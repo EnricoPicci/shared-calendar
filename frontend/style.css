@@ -43,7 +43,7 @@ label { display: grid; gap: 0.25rem; font-size: 0.85rem; color: #52606d; }
 .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
 .toolbar h2 { font-size: 1.05rem; margin-left: 0.5rem; }
 .toolbar .loading { color: #52606d; font-size: 0.85rem; }
-.week-screen .failure { margin-top: 0.5rem; }
+.week-screen .failure, .appointments-screen .failure { margin-top: 0.5rem; }
 /* The banner of an appointment being moved: it stays in sight while the week scrolls under it */
 .moving { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 1rem; margin-top: 0.5rem; padding: 0.5rem 0.75rem; border: 1px solid #1d5fd1; border-radius: 6px; background: #e8f0fd; }
 .moving p { margin: 0; min-width: 0; flex: 1 1 14rem; overflow-wrap: anywhere; }
@@ -95,6 +95,27 @@ button.block.lane-0-of-2, button.block.lane-1-of-2 { width: calc(50% - 4px); }
 button.block:hover { filter: brightness(0.95); }
 button.block:focus-visible { outline-offset: 1px; z-index: 1; }
 
+/* "My appointments": the two modes, the period of the history, the list */
+.toolbar button[aria-pressed="true"] { background: #1f2933; border-color: #1f2933; color: #fff; }
+.period { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 0.5rem 0.75rem; margin-top: 0.75rem; }
+.period label { flex: 0 1 11rem; min-width: 0; }
+.period .refusal { flex-basis: 100%; }
+.period .refusal:empty { display: none; }
+.empty { margin: 1rem 0 0; color: #52606d; }
+.list { list-style: none; margin: 0.75rem 0 0; padding: 0; display: grid; gap: 0.4rem; transition: opacity 0.15s; }
+.list.stale { opacity: 0.5; }
+/* A row is one button: on a desktop its five texts are columns, the note taking what is left */
+.row { display: grid; grid-template-columns: 7rem 8rem minmax(4rem, 10rem) minmax(0, 1fr) 6rem; gap: 0.25rem 0.75rem; align-items: baseline; width: 100%; padding: 0.6rem 0.75rem; text-align: left; }
+.row span { min-width: 0; overflow-wrap: anywhere; }
+.row .date { font-weight: 600; }
+.row .note { color: #52606d; white-space: pre-wrap; }
+.row .status { justify-self: end; font-size: 0.8rem; font-weight: 600; color: #1d5fd1; }
+.row:hover { filter: brightness(0.97); }
+/* What is over is quieter than what is to come */
+.row.is-ended, .row.is-cancelled, .row.is-changed { background: #f3f5f8; }
+.row.is-ended .status, .row.is-changed .status { color: #52606d; }
+.row.is-cancelled .status { color: #b3261e; }
+
 /* The dialogs: as wide as a phone allows, scrolling inside when taller than the screen */
 dialog { width: min(24rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); box-sizing: border-box; overflow-y: auto; border: 0; border-radius: 10px; padding: 1.25rem; box-shadow: 0 8px 30px #0004; color: inherit; }
 dialog::backdrop { background: #1f293380; }
@@ -123,6 +144,12 @@ dialog .old { overflow-wrap: anywhere; }
   .bar .role { display: block; }
   .screen { padding: 0.75rem; }
   .toolbar h2 { flex-basis: 100%; margin-left: 0; order: 1; }
+  /* A row: the date, the time and the status on a first line, the type and the note below */
+  .row { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .row .status { grid-column: 3; grid-row: 1; }
+  .row .type-name { grid-column: 1 / -1; }
+  .row .note { grid-column: 1 / -1; }
+  .row .note:empty { display: none; }
   /* One day at a time, the others a swipe away */
   .days { grid-auto-columns: 82%; scroll-snap-type: x mandatory; }
   .day { scroll-snap-align: start; }

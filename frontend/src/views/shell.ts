@@ -1,15 +1,18 @@
 import type { Role } from '@shared-calendar/shared';
 import { fromEvent, Subscription } from 'rxjs';
 import { distinctUntilChanged, filter, map, startWith } from 'rxjs/operators';
+import { AppointmentsScreen } from '../logic/appointments.screen';
 import { WeekScreen } from '../logic/week.screen';
 import type { ApiConfig } from '../services/api';
 import { AppointmentsService } from '../services/appointments.service';
+import { CalendarSettingsService } from '../services/calendar-settings.service';
 import { CalendarService } from '../services/calendar.service';
 import type { CognitoConfig } from '../services/cognito';
 import { LoginService } from '../services/login.service';
 import { RefreshService } from '../services/refresh.service';
 import { SessionStore } from '../services/session.store';
 import { UsersService } from '../services/users.service';
+import { mountAppointments } from './appointments.view';
 import { mountLogin, type LoginDeps } from './login.view';
 import { mountWeek } from './week.view';
 
@@ -39,20 +42,26 @@ const ROLE_IN_WORDS: Record<Role, string> = { admin: 'Administrator', user: 'Use
 // What belongs to one person's session: the API services and the logic objects, created when
 // the person enters and dropped when the person leaves, so that nothing of one person's data
 // can be replayed to the next (docs/FRONTEND_ARCHITECTURE.md section 6, point 4).
-// The role is there for the views that show a part to one role only.
-export type SessionObjects = { role: Role; week: WeekScreen; appointments: AppointmentsService; users: UsersService };
+// The role is there for the views that show a part to one role only. `week` and `list` are the
+// logic objects of the two screens, the week and "My appointments".
+export type SessionObjects = { role: Role; week: WeekScreen; list: AppointmentsScreen; appointments: AppointmentsService; users: UsersService };
 
 function sessionObjects(config: ApiConfig, store: SessionStore, person: Person): SessionObjects {
   const calendar = new CalendarService(config, store);
   const appointments = new AppointmentsService(config, store);
   const users = new UsersService(config, store);
+  // The settings are read by the list screen only, for the calendar's time zone.
+  const settings = new CalendarSettingsService(config, store);
   // Notifies each time the page becomes visible again (the person comes back to the tab, or
-  // brings the window back up): the week screen then loads its week again, to show what other
-  // people booked or cancelled in the meantime. The API cannot push, and nothing is asked on a
-  // timer (docs/FRONTEND_VIEW_PLAN.md section 8, decision 11).
+  // brings the window back up): the screen on show then loads what it shows again, to show
+  // what other people booked or cancelled in the meantime. The API cannot push, and nothing is
+  // asked on a timer (docs/FRONTEND_VIEW_PLAN.md section 8, decision 11).
   const visible$ = fromEvent(document, 'visibilitychange').pipe(filter(() => document.visibilityState === 'visible'));
-  const week = new WeekScreen(calendar, appointments, person.role, () => new Date(), visible$);
-  return { role: person.role, week, appointments, users };
+  const now = () => new Date();
+  const week = new WeekScreen(calendar, appointments, person.role, now, visible$);
+  // The list screen hands an appointment to move over to the week screen.
+  const list = new AppointmentsScreen(settings, appointments, week, person.role, now, visible$);
+  return { role: person.role, week, list, appointments, users };
 }
 
 // A screen of the application: its address (the URL's hash), its name in the navigation, the
@@ -67,17 +76,35 @@ export type Screen = {
   show: (root: HTMLElement, objects: SessionObjects) => Subscription;
 };
 
+const WEEK_HASH = '#/week';
+
 // The table of screens, in the order of the navigation. A role's first screen is the one shown
 // for an empty, unknown or forbidden address.
 export const SCREENS: readonly Screen[] = [
   {
-    hash: '#/week',
+    hash: WEEK_HASH,
     label: 'Week',
     roles: ['admin', 'user'],
     element: '#week',
     show: (root, { week, appointments, users, role }) => {
       const subscription = mountWeek(root, { screen: week, appointments, users, role });
       subscription.add(week.start());
+      return subscription;
+    },
+  },
+  {
+    hash: '#/appointments',
+    label: 'My appointments',
+    roles: ['user'],
+    element: '#appointments',
+    show: (root, { list, appointments }) => {
+      // The view is handed the way to the week, for an appointment it sends there to be moved:
+      // a change of address, which the shell follows like any other.
+      const showWeek = () => {
+        window.location.hash = WEEK_HASH;
+      };
+      const subscription = mountAppointments(root, { screen: list, appointments, showWeek });
+      subscription.add(list.start());
       return subscription;
     },
   },

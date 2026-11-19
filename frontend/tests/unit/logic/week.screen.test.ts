@@ -746,4 +746,139 @@ describe('WeekScreen', () => {
       expect(last().moving).toEqual({ appointmentId: other.appointmentId, when: 'Tue 17 Nov, 10:00–11:00', what: 'Tue 17 Nov, 10:00–11:00 · Studio', note: '' });
     });
   });
+
+  describe('an appointment handed over by another screen', () => {
+    // An appointment of Monday 7 December, three weeks after the week of "now".
+    const HANDED = { appointmentId: '01M6DMQ0000000000000000009', when: 'Mon 7 Dec, 10:00–11:00', what: 'Mon 7 Dec, 10:00–11:00 · Studio', note: 'Handed over' };
+    const CHANGED: ChangeResult = { status: 'success', cancelled: { ...BOOKED.appointment, status: 'cancelled', cancelReason: 'changed' }, booked: BOOKED.appointment };
+
+    it('before start() it loads nothing and the stream says nothing of it', () => {
+      const { screen, load, states } = screenAt();
+      screen.handOver(HANDED, '2026-12-07');
+      expect(load).not.toHaveBeenCalled();
+      expect(states).toHaveLength(1);
+      expect(states[0]!.moving).toBeNull();
+    });
+
+    it('it is taken at the next start(): the week of the appointment is loaded, not the week of today, and the banner\'s words are those handed over', () => {
+      const { screen, load, pending, succeed, last } = screenAt();
+      screen.handOver(HANDED, '2026-12-07');
+      screen.start();
+      expect(load).toHaveBeenCalledTimes(1);
+      expect(load).toHaveBeenCalledWith('2026-12-07', '2026-12-13');
+      expect(last()).toEqual({ label: '7 Dec – 13 Dec 2026', loading: false, failure: null, week: null, moving: HANDED });
+      pending();
+      succeed(view('2026-12-07'));
+      expect(last()).toEqual({ label: '7 Dec – 13 Dec 2026', loading: false, failure: null, week: weekModel(view('2026-12-07'), 'user'), moving: HANDED });
+    });
+
+    it.each([
+      ['a Monday', '2026-12-07'],
+      ['a Thursday', '2026-12-10'],
+      ['a Sunday', '2026-12-13'],
+    ])('the week is the one that holds the date, %s', (_name, date) => {
+      const { screen, load } = screenAt();
+      screen.handOver(HANDED, date);
+      screen.start();
+      expect(load).toHaveBeenCalledWith('2026-12-07', '2026-12-13');
+    });
+
+    it('not the week it was left on either; the week shown meanwhile is the one the service last answered', () => {
+      const { screen, load, succeed, last } = screenAt();
+      const started = screen.start();
+      screen.previous();
+      succeed(view('2026-11-09'));
+      started.unsubscribe();
+
+      screen.handOver(HANDED, '2026-12-07');
+      screen.start();
+      expect(load).toHaveBeenLastCalledWith('2026-12-07', '2026-12-13');
+      expect(last()).toMatchObject({ label: '7 Dec – 13 Dec 2026', moving: HANDED });
+    });
+
+    it('it is taken once: after the screen is left, the next start() moves nothing and loads the week it was left on', () => {
+      const { screen, load, last } = screenAt();
+      screen.handOver(HANDED, '2026-12-07');
+      const started = screen.start();
+      started.unsubscribe();
+      expect(last().moving).toBeNull();
+
+      screen.start();
+      expect(last().moving).toBeNull();
+      expect(load).toHaveBeenLastCalledWith('2026-12-07', '2026-12-13');
+      expect(load).toHaveBeenCalledTimes(2);
+    });
+
+    it('made while the screen is started, it is taken at once: its week loaded, the appointment being moved', () => {
+      const { screen, load, succeed, states, last } = screenAt();
+      screen.start();
+      succeed();
+      const before = states.length;
+      screen.handOver(HANDED, '2026-12-07');
+      expect(load).toHaveBeenCalledTimes(2);
+      expect(load).toHaveBeenLastCalledWith('2026-12-07', '2026-12-13');
+      expect(states).toHaveLength(before + 1);
+      expect(last()).toMatchObject({ label: '7 Dec – 13 Dec 2026', moving: HANDED });
+      // And it is not taken a second time.
+      screen.keep();
+      screen.start().unsubscribe();
+      expect(last().moving).toBeNull();
+    });
+
+    it('a second hand-over before the start replaces the first', () => {
+      const { screen, load, last } = screenAt();
+      screen.handOver({ ...HANDED, appointmentId: 'first' }, '2026-11-30');
+      screen.handOver(HANDED, '2026-12-07');
+      screen.start();
+      expect(load).toHaveBeenCalledWith('2026-12-07', '2026-12-13');
+      expect(last().moving).toEqual(HANDED);
+    });
+
+    it('the move it starts is like any other: any week, a reload and a refusal keep it', () => {
+      const { screen, changeResult$, visible$, succeed, last } = screenAt();
+      screen.handOver(HANDED, '2026-12-07');
+      screen.start();
+      succeed(view('2026-12-07'));
+      screen.next();
+      screen.today();
+      succeed();
+      visible$.next(undefined);
+      changeResult$.next({ status: 'failure', reason: 'slot_taken', message: 'taken' });
+      expect(last()).toMatchObject({ label: '16 Nov – 22 Nov 2026', moving: HANDED });
+    });
+
+    it('it ends at a change that succeeds, which also loads the week again', () => {
+      const { screen, reload, changeResult$, last } = screenAt();
+      screen.handOver(HANDED, '2026-12-07');
+      screen.start();
+      changeResult$.next(CHANGED);
+      expect(last().moving).toBeNull();
+      expect(reload).toHaveBeenCalledTimes(1);
+    });
+
+    it('it ends at keep()', () => {
+      const { screen, last } = screenAt();
+      screen.handOver(HANDED, '2026-12-07');
+      screen.start();
+      screen.keep();
+      expect(last()).toMatchObject({ label: '7 Dec – 13 Dec 2026', moving: null });
+    });
+
+    it('it ends at the end of the subscription of start()', () => {
+      const { screen, last } = screenAt();
+      screen.handOver(HANDED, '2026-12-07');
+      screen.start().unsubscribe();
+      expect(last().moving).toBeNull();
+    });
+
+    it('it replaces a move started in the week', () => {
+      const { screen, succeed, last } = screenAt('2026-11-14T10:00:00.000Z');
+      screen.start();
+      succeed();
+      screen.move(winterWeek().appointments[0]!.appointmentId);
+      expect(last().moving).not.toBeNull();
+      screen.handOver(HANDED, '2026-12-07');
+      expect(last().moving).toEqual(HANDED);
+    });
+  });
 });

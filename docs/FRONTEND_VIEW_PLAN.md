@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v4 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`). Step 62 done on 2026-11-19 (brief `prompts/85-step-62-implementation.md`). Step 63 done on 2026-11-19 (brief `prompts/86-step-63-implementation.md`), waiting for review; next step 64 |
+| Status | v5 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`). Step 62 done on 2026-11-19 (brief `prompts/85-step-62-implementation.md`). Step 63 done on 2026-11-19 (brief `prompts/86-step-63-implementation.md`). Step 64 done on 2026-11-19 (brief `prompts/87-step-64-implementation.md`), waiting for review; next step 65 |
 | Scope | Everything needed to go from the services layer that exists to **all the views written, tested and running in a browser against the local stack**: the tooling, the shell, the logic layer and one view per screen. Steps 60 to 69 |
 | Not in scope | Hosting, the CORS configuration, the Content-Security-Policy of the hosting, logout as a designed service, the session across a reload, the cloud deployment of the front end. They are the open points O1, O2, O3, O5 and O7 of `docs/FRONTEND_ARCHITECTURE.md` section 10 and get their own plan |
 | Governed by | `docs/FRONTEND_ARCHITECTURE.md` (the rules of the view layer), `docs/FRONTEND_SERVICES.md` (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/ARCHITECTURE.md` section 4 (the API). On any conflict with this plan, they win |
@@ -15,6 +15,7 @@
 | v2 | 2026-11-19 | Step 61, decided before its implementation: "today", for the week the screen opens on, is taken in the default time zone (`DEFAULT_TIME_ZONE` of `shared/`), not in the zone the settings give; the week screen makes no request for the settings. The limit this accepts is in `docs/FRONTEND_ARCHITECTURE.md` section 5.1. Step 61's bullet on "today" and its line on the seed (which also books a few appointments for `alice`) are corrected. |
 | v3 | 2026-11-19 | Step 62 gains a reload of the week every time the browser's tab becomes visible again, so that a booking made by someone else is seen without a sign-out. No change to the back end: the API has no way to push, and a WebSocket connection would be a feature of its own, outside this plan (section 8, decision 11). |
 | v4 | 2026-11-19 | Step 63: how a change is made on the screen is decided, with the Product Owner, before the step's implementation, and no longer "to settle first". The step's text says the interaction as decided: the banner, any week while moving, what ends a move and what does not, the book dialog as the confirmation, the note always sent, and the known limit of a move inside a full window. Section 8, decision 10 says so for step 63; step 68's interaction is still to propose. |
+| v5 | 2026-11-19 | Step 64: three choices about the screen were made with the Product Owner before the step's implementation (brief `prompts/87-step-64-implementation.md`), and the step's text says them: the list's time zone is read from the settings; the history's period is chosen with two dates and opens on the 30 days that end today; "Change" from the list goes to the week, with step 63's banner and confirmation. The step's browser check is brought in line. |
 
 ---
 
@@ -299,22 +300,52 @@ and end; signing out while moving leaves nothing.
 
 ### Step 64 — My appointments (≈ 4 h)
 
-**Goal:** a User sees the list of their upcoming appointments and their history.
+**Goal:** a User sees the list of their upcoming appointments and their history, and opens an
+appointment's detail from it.
 
-Logic: the list ready to draw (date, time, type, note, status in words); the two modes, upcoming
-(`upcoming=true`) and history (`status=all` with a range), and the range's own checks.
+**Three choices about the screen**, made with the Product Owner before any code (brief
+`prompts/87-step-64-implementation.md`; the reasons are in `docs/FRONTEND_ARCHITECTURE.md`
+section 11, decisions 55, 59 and 60):
 
-View: `appointments.view.ts`, a list rebuilt at every notification, with no input field inside
-it; a row opens the detail dialog of steps 62 and 63, which is used from two screens: the step
-moves what the two share out of the week view, without changing what step 62 and 63 checked.
+- **The time zone comes from the settings.** The list's answer does not name the calendar's
+  zone, so the list screen reads `GET /calendar/settings` once each time it is shown, before
+  the first list, for the zone only. The week screen keeps opening without that request.
+- **Two modes, one list.** "Upcoming" (`upcoming=true`), the mode the screen opens in, and
+  "History" (`status=all` with a range), whose period is chosen with two native date fields and
+  "Show", in a fixed form outside the list. The history opens on the 30 days that end today,
+  loaded at once; a period may hold future dates. The mode and the period are kept while the
+  person is signed in.
+- **"Change" from the list goes to the week.** It closes the detail, hands the appointment over
+  to the week screen and changes the address: the week opens on the appointment's week with
+  step 63's banner, and everything from there is step 63's. Leaving the week still ends the
+  move; nothing brings the person back to the list after the change.
+
+Logic: the list ready to draw (date, time, type, note, status in words: "Booked", "Ended" for
+a booked appointment whose end has passed, "Cancelled", "Changed"); the list screen (the two
+modes, the period and its own checks before any call: a date missing, the first date after the
+last, more than the 92 days of `shared/`; the reload after a cancellation or a note saved and
+when the tab becomes visible); the detail's one sentence for a cancelled, a moved and an ended
+appointment; the hand-over to the week screen.
+
+View: `appointments.view.ts`, a list rebuilt when another list arrives, with no input field
+inside it; a row is a button that opens the detail dialog of steps 62 and 63. That dialog is
+used from two screens: its markup moves out of the week's element and its wiring out of the
+week view into `detail.view.ts`, which the view of the screen on show mounts, without changing
+what steps 62 and 63 checked.
 
 Shell: the second address, `#/appointments`, for the User only. This is the first step with two
 screens: the navigation, leaving a view and coming back to it are checked here.
 
-**Browser check:** the upcoming list; an empty list says so; the history over a range shows a
-cancelled and a changed appointment with their status; cancel from the list, and the list
-follows; go to the week and back, twice, and nothing is left over or doubled; as `admin`,
-`#/appointments` typed by hand shows the week.
+**Browser check:** the upcoming list, in the calendar's zone, after the settings and the list
+and no other request; an empty list says so; the history over the last 30 days at once, and
+over a period chosen, shows a cancelled, a changed and an ended appointment with their status;
+a period too long, with its dates swapped or with a date missing is refused in plain words
+with no request; a row opens the detail, with the right sentence and actions; a note saved and
+a cancellation from the list, and the list follows; "Change" from the list shows the week of
+the appointment with the banner, and going back to the list ends the move; go to the week and
+back, twice, by the links and by the back button, and nothing is left over or doubled; the tab
+shown again loads the same list again; as `admin`, `#/appointments` typed by hand shows the
+week; signing out on the list with the detail open leaves nothing.
 
 **Acceptance:** the common check.
 

@@ -87,9 +87,11 @@ stays at the root.
 │   │   │                        # login, refresh, hello, users, the calendar's; cognito.ts and api.ts
 │   │   ├── logic/               # between the services and the views, no DOM: texts.ts (dates, times,
 │   │   │                        # failures in plain words), week.model.ts, week.screen.ts,
-│   │   │                        # booking.ts, appointment.detail.ts
+│   │   │                        # booking.ts, appointment.detail.ts, appointments.model.ts,
+│   │   │                        # appointments.screen.ts
 │   │   └── views/               # shell.ts (with the table of screens) and one <name>.view.ts per
-│   │                            # view: login.view.ts, week.view.ts
+│   │                            # view: login.view.ts, week.view.ts, appointments.view.ts;
+│   │                            # detail.view.ts, the appointment's dialog that two views mount
 │   ├── tests/
 │   │   ├── unit/                # mirrors src/ (plus services/fixtures.ts, logic/zone.ts and
 │   │   │                        # logic/fixtures.ts, views/page.ts)
@@ -337,8 +339,14 @@ What exists:
   `src/logic/booking.ts` and `src/logic/appointment.detail.ts`, the two dialogs of the week (the
   book dialog and an appointment's detail) in `index.html` and `src/views/week.view.ts`, and in
   `src/views/shell.ts` the `AppointmentsService` and the `UsersService` of each session. No new
-  file outside those two, no new script and no new dependency. The other views come with the
-  following plan steps.
+  file outside those two, no new script and no new dependency.
+- **"My appointments", since 2026-11-19** (`docs/FRONTEND_VIEW_PLAN.md` step 64):
+  `src/logic/appointments.model.ts` and `src/logic/appointments.screen.ts`,
+  `src/views/appointments.view.ts`, and `src/views/detail.view.ts`: the appointment's detail,
+  moved out of `week.view.ts` because two views now mount it (its dialog is in `index.html`
+  after the screens, in none of them). In `src/views/shell.ts` the second entry of the table
+  of screens and the `CalendarSettingsService` of each session. No new script and no new
+  dependency. The other views come with the following plan steps.
 
 What still waits for the open points of `docs/FRONTEND_ARCHITECTURE.md` section 10: the hosting,
 so no `template.yaml` and no `deploy` script (the root scripts use `--if-present`, so their

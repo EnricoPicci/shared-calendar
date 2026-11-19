@@ -7,6 +7,7 @@ import type { AppointmentBlock, BusyBlock, DayModel, Placed, SlotBlock, WeekMode
 import type { WeekScreen } from '../logic/week.screen';
 import type { AppointmentsService } from '../services/appointments.service';
 import type { UsersService } from '../services/users.service';
+import { mountDetail } from './detail.view';
 
 // What the week view uses: of the WeekScreen its stream, the three changes of week, the detail
 // of an appointment, and the start and the end of an appointment's move to another time; of the
@@ -23,16 +24,13 @@ export type WeekDeps = {
   role: Role;
 };
 
-// The texts of the detail dialog: each is a field of the AppointmentDetail and the class of its
-// element.
-const DETAIL_TEXTS = ['when', 'typeName', 'who', 'note', 'booked', 'hint'] as const;
-
 // The week view (docs/FRONTEND_ARCHITECTURE.md sections 3 and 4): wires the element #week of
 // index.html. It draws what the logic layer hands over ready (places, times and names as text),
-// forwards three buttons, and opens two dialogs: a free slot opens the book dialog, an
-// appointment its detail, in which its note is edited and which can cancel it or start its
-// move to another time. While an appointment is being moved a banner says so, and a free slot
-// opens the book dialog in its second mode, as the confirmation of the change.
+// forwards three buttons, and opens two dialogs: a free slot opens the book dialog, which is
+// the week's own, and an appointment its detail, the frame's dialog, which this view mounts
+// while the week is on show (src/views/detail.view.ts) and whose "Change" starts the
+// appointment's move to another time. While an appointment is being moved a banner says so,
+// and a free slot opens the book dialog in its second mode, as the confirmation of the change.
 export function mountWeek(root: HTMLElement, { screen, appointments, users, role }: WeekDeps): Subscription {
   // 1. Find the elements, once.
   const find = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
@@ -68,20 +66,20 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
   const bookError = find('dialog.book .error');
   const bookSubmit = find<HTMLButtonElement>('dialog.book .submit');
 
-  const detail = find<HTMLDialogElement>('dialog.detail');
-  const detailTexts = DETAIL_TEXTS.map((field) => [field, find(`dialog.detail .${field}`)] as const);
-  const detailError = find('dialog.detail .error');
-  const detailChange = find<HTMLButtonElement>('dialog.detail .change');
-  const detailCancel = find<HTMLButtonElement>('dialog.detail .cancel');
-  const noted = find('dialog.detail .noted');
-  const noteForm = find<HTMLFormElement>('dialog.detail .note-form');
-  const noteField = find<HTMLTextAreaElement>('dialog.detail [name="note"]');
-  const noteSave = find<HTMLButtonElement>('dialog.detail .note-form .submit');
+  // The appointment detail is the frame's dialog, outside this view's element: mounted here for
+  // as long as the week is on show. It asks the week screen for an appointment's detail, and
+  // its "Change" tells the week screen, which holds the move from then on: the banner comes
+  // from its stream.
+  const detail = mountDetail(root.ownerDocument.querySelector<HTMLDialogElement>('#detail')!, {
+    detail: (appointmentId) => screen.detail(appointmentId),
+    appointments,
+    change: (appointmentId) => screen.move(appointmentId),
+  });
 
-  // 2. Pure view state (docs/FRONTEND_ARCHITECTURE.md section 3, rule 10): what each open dialog
-  // is about, and whether its action was asked for since it opened. A result is shown in a
-  // dialog only when that dialog asked for it: the state streams keep their last value, which
-  // may belong to an earlier opening.
+  // 2. Pure view state (docs/FRONTEND_ARCHITECTURE.md section 3, rule 10): what the open book
+  // dialog is about, and whether its action was asked for since it opened. A result is shown
+  // only when this opening asked for it: the state streams keep their last value, which may
+  // belong to an earlier opening.
   // The appointment being moved, as the week screen last said it: the logic layer holds it, the
   // view only remembers what the stream brought, to know what a click on a slot opens.
   let moving: Moving | null = null;
@@ -92,19 +90,10 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
   let bookPending = false;
   let changePending = false;
   let usersReady = false; // the Administrator has a User to choose
-  let shown: string | null = null; // the appointment of the open detail
-  let cancelAsked = false;
-  let cancelling: string | null = null; // the appointment whose cancellation is under way
-  let noteAsked = false;
-  let saving: string | null = null; // the appointment whose note is being saved
 
   // The confirmation of a change waits for a change under way only: it asks for no User.
   const enableBook = () => {
     bookSubmit.disabled = booking?.moving ? changePending : bookPending || (role === 'admin' && !usersReady);
-  };
-  const enableDetail = () => {
-    detailCancel.disabled = cancelling !== null && cancelling === shown;
-    noteSave.disabled = saving !== null && saving === shown;
   };
 
   // 3. Drawing a week: copies of the templates, filled with textContent. A place is set as a
@@ -140,7 +129,7 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
     element.querySelector('.time')!.textContent = block.time;
     element.querySelector('.who')!.textContent = block.who;
     element.querySelector('.note')!.textContent = block.note;
-    element.onclick = () => openDetail(block.appointmentId);
+    element.onclick = () => detail.open(block.appointmentId);
     return element;
   };
 
@@ -177,8 +166,8 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
     days.replaceChildren(...(model?.days ?? []).map((day) => dayFor(day, model!)));
   };
 
-  // 4. The dialogs. Opening one is a pure view action; at every opening it shows nothing of the
-  // time before: the form is reset and the failure emptied.
+  // 4. The book dialog. Opening it is a pure view action; at every opening it shows nothing of
+  // the time before: the form is reset and the failure emptied.
   // The choices of a list of the book dialog: one <option> per text.
   const choices = (select: HTMLElement, texts: readonly string[]) => select.replaceChildren(...texts.map((text) => itemFor('tpl-option', text)));
 
@@ -217,43 +206,20 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
     enableBook();
     book.showModal();
   };
-  const openDetail = (appointmentId: string) => {
-    const found = screen.detail(appointmentId);
-    if (found === null) return; // the week on screen no longer holds it
-    shown = appointmentId;
-    cancelAsked = false;
-    noteAsked = false;
-    for (const [field, element] of detailTexts) element.textContent = found[field];
-    // The note: a field while it can be edited, the text to read otherwise.
-    noteField.value = found.noteValue;
-    noteForm.hidden = !found.canEditNote;
-    noted.hidden = found.canEditNote;
-    detailError.textContent = '';
-    detailChange.hidden = !found.canChange;
-    detailCancel.hidden = !found.canCancel;
-    enableDetail();
-    detail.showModal();
-  };
   // Closing, by "Close", by the Escape key or after a success, only forgets what the dialog was
   // about.
   book.onclose = () => {
     booking = null;
     bookAsked = false;
   };
-  detail.onclose = () => {
-    shown = null;
-    cancelAsked = false;
-    noteAsked = false;
-  };
 
-  // 5. The user's actions become calls. "Book", "Change" in the confirmation, "Save note" and
-  // "Cancel appointment" only call the service, and the banner's button the week screen: what
-  // follows on screen comes from the streams.
+  // 5. The user's actions become calls. "Book" and "Change" in the confirmation only call the
+  // service, and the banner's button the week screen: what follows on screen comes from the
+  // streams.
   find('.previous').onclick = () => screen.previous();
   find('.today').onclick = () => screen.today();
   find('.next').onclick = () => screen.next();
   find('dialog.book .close').onclick = () => book.close();
-  find('dialog.detail .close').onclick = () => detail.close();
   // Without preventDefault the browser would send the form itself and load the page again.
   bookForm.onsubmit = (event) => {
     event.preventDefault();
@@ -265,25 +231,7 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
     if (moved) appointments.change(moved.appointmentId, changeFor(slot, timeZone, role, fields));
     else appointments.book(bookingFor(slot, timeZone, role, fields));
   };
-  // The note is sent as the field holds it: the shared schema, through the service, trims it
-  // and makes a blank one null, which clears it.
-  noteForm.onsubmit = (event) => {
-    event.preventDefault();
-    noteAsked = true;
-    appointments.updateNote(shown!, noteField.value);
-  };
-  // "Change" closes the detail, a pure view action, and tells the week screen, which holds the
-  // move from then on: the banner comes from its stream.
-  detailChange.onclick = () => {
-    const appointmentId = shown!;
-    detail.close();
-    screen.move(appointmentId);
-  };
   find('.keep').onclick = () => screen.keep();
-  detailCancel.onclick = () => {
-    cancelAsked = true;
-    appointments.cancel(shown!);
-  };
 
   // 6. The streams' notifications fill the elements.
   const subscription = screen.week$.subscribe((state) => {
@@ -323,27 +271,6 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
       if (state.status === 'success') book.close();
     }),
   );
-  // A cancellation, the same way; its button is disabled while the one under way is of the
-  // appointment shown.
-  subscription.add(
-    appointments.cancelState$.subscribe((state) => {
-      cancelling = state.status === 'pending' ? state.appointmentId : null;
-      enableDetail();
-      if (!cancelAsked) return;
-      detailError.textContent = state.status === 'failure' ? failureText(state.reason) : '';
-      if (state.status === 'success') detail.close();
-    }),
-  );
-  // A note saved, the same way, in the same dialog.
-  subscription.add(
-    appointments.updateNoteState$.subscribe((state) => {
-      saving = state.status === 'pending' ? state.appointmentId : null;
-      enableDetail();
-      if (!noteAsked) return;
-      detailError.textContent = state.status === 'failure' ? failureText(state.reason) : '';
-      if (state.status === 'success') detail.close();
-    }),
-  );
   // The list of Users, for the book dialog that asked for it: the picker's choices are rebuilt
   // when a list arrives, which is at opening, before anything can be chosen.
   subscription.add(
@@ -361,10 +288,11 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
 
   // 7. Leaving the view: the element stays in the page, only hidden, so one person's week,
   // notes and names are removed before the next person signs in
-  // (docs/FRONTEND_ARCHITECTURE.md section 3, rule 9).
+  // (docs/FRONTEND_ARCHITECTURE.md section 3, rule 9). The detail ends with the view, and
+  // cleans up after itself.
+  subscription.add(detail.subscription);
   subscription.add(() => {
     book.close();
-    detail.close();
     draw(null);
     label.textContent = '';
     loading.hidden = true;
@@ -375,16 +303,11 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
     banner.hidden = true;
 
     bookForm.reset();
-    noteForm.reset();
     bookMode(false);
     for (const list of [bookUser, bookStart, bookEnd]) list.replaceChildren();
-    for (const text of [bannerWhat, bookWhat, bookOld, bookUsersMessage, bookError, detailError]) text.textContent = '';
-    for (const [, element] of detailTexts) element.textContent = '';
+    for (const text of [bannerWhat, bookWhat, bookOld, bookUsersMessage, bookError]) text.textContent = '';
     bookChoices.hidden = true;
-    noteForm.hidden = true;
-    noted.hidden = false;
-    for (const button of [detailChange, detailCancel]) button.hidden = true;
-    for (const button of [bookSubmit, detailCancel, noteSave]) button.disabled = false;
+    bookSubmit.disabled = false;
   });
   return subscription;
 }

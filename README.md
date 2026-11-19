@@ -116,7 +116,10 @@ returns to the login. A click on a free slot opens the book dialog (a note; as `
 User to book for and other times inside the slot's window); a click on an appointment opens its
 detail, where the note is edited and saved, and "Change" and "Cancel appointment" are offered
 when the rules allow it. "Change" shows a banner over the week: the next free slot clicked, in
-any week, is the new time, confirmed in a dialog; "Keep the appointment as it is" gives up. The
+any week, is the new time, confirmed in a dialog; "Keep the appointment as it is" gives up. A
+User also has "My appointments" (`#/appointments`): the upcoming appointments, or, under
+"History", all those of a period chosen with two dates, each with its status; a row opens the
+same detail, whose "Change" goes to the week of that appointment. The
 week is loaded again after every booking, cancellation, change or note saved, and every time
 the browser's tab becomes visible again. A reload of the page signs out too: the session is kept in memory only. An edit to `frontend/src`, `frontend/index.html` or `frontend/style.css`
 shows after a reload. The dev server passes the page's calls on to the local API and to

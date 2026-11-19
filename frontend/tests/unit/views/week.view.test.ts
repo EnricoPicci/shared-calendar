@@ -343,10 +343,10 @@ describe('mountWeek', () => {
   const select = (name: string) => find<HTMLSelectElement>(`#week dialog.book [name="${name}"]`);
   const options = (name: string) => [...select(name).options].map((option) => option.value);
   const usersMessage = () => find('#week dialog.book .users-message');
-  const detail = () => find<HTMLDialogElement>('#week dialog.detail');
-  const detailError = () => find('#week dialog.detail .error');
-  const cancelButton = () => find<HTMLButtonElement>('#week dialog.detail .cancel');
-  const detailText = (field: string) => find(`#week dialog.detail .${field}`).textContent;
+  const detail = () => find<HTMLDialogElement>('dialog.detail');
+  const detailError = () => find('dialog.detail .error');
+  const cancelButton = () => find<HTMLButtonElement>('dialog.detail .cancel');
+  const detailText = (field: string) => find(`dialog.detail .${field}`).textContent;
 
   const ALICE_AND_BOB: ListUsersState = {
     status: 'success',
@@ -666,13 +666,17 @@ describe('mountWeek', () => {
     });
   });
 
-  describe('the appointment detail', () => {
-    it('a click on an appointment asks the screen for its detail and shows every field', () => {
+  // The appointment detail is the frame's dialog, mounted by this view while the week is on
+  // show: what the dialog itself does is in detail.view.test.ts, for the week and for the list.
+  // Here, what is the week's: which appointment it opens, and whose answers and calls it uses.
+  describe('the appointment detail, opened from the week', () => {
+    it('a click on an appointment asks the week screen for its detail and opens the dialog with it', () => {
       const { screen } = mounted(state({ week: WEEK }));
       find('#week .appointment').click();
       expect(screen.detail).toHaveBeenCalledWith(APPOINTMENT);
       expect(detail().open).toBe(true);
       expect(book().open).toBe(false);
+      expect(detail().closest('#week')).toBeNull(); // the frame's dialog, not the week's
       expect(['when', 'typeName', 'who', 'note', 'booked', 'hint'].map(detailText)).toEqual([
         'Mon 16 Nov, 11:00–12:15',
         'Studio',
@@ -681,21 +685,6 @@ describe('mountWeek', () => {
         'Booked by you on Thu 12 Nov, 13:24',
         'It can be cancelled until Sun 15 Nov, 11:00.',
       ]);
-      expect(detailError().textContent).toBe('');
-      expect(detailError().getAttribute('role')).toBe('alert');
-    });
-
-    it('"Cancel appointment" is shown when the logic layer offers it, hidden when it does not', () => {
-      const offered = mounted(state({ week: WEEK }));
-      find('#week .appointment').click();
-      expect(cancelButton().hidden).toBe(false);
-      expect(cancelButton().disabled).toBe(false);
-      offered.subscription.unsubscribe();
-
-      mounted(state({ week: WEEK }), 'user', [{ ...DETAIL, canCancel: false, hint: 'It is too late to cancel this appointment.' }]);
-      find('#week .appointment').click();
-      expect(cancelButton().hidden).toBe(true);
-      expect(detailText('hint')).toBe('It is too late to cancel this appointment.');
     });
 
     it('an appointment the week on screen no longer holds opens nothing', () => {
@@ -705,86 +694,14 @@ describe('mountWeek', () => {
       expect(detail().open).toBe(false);
     });
 
-    it('"Cancel appointment" calls cancel() with the id, once, with no second question, and changes nothing by itself', () => {
+    it('"Cancel appointment" and "Save note" call the service the week view was given', () => {
       const { appointments } = mounted(state({ week: WEEK }));
       find('#week .appointment').click();
       cancelButton().click();
-      expect(appointments.cancel).toHaveBeenCalledTimes(1);
       expect(appointments.cancel).toHaveBeenCalledWith(APPOINTMENT);
-      expect(detail().open).toBe(true);
-      expect(cancelButton().disabled).toBe(false);
-    });
-
-    it('cancelState$ pending for this appointment disables the button; for another one it does not', () => {
-      const { cancelState$ } = mounted(state({ week: WEEK }));
-      find('#week .appointment').click();
-      cancelState$.next({ status: 'pending', appointmentId: OTHER_APPOINTMENT });
-      expect(cancelButton().disabled).toBe(false);
-      cancelButton().click();
-      cancelState$.next({ status: 'pending', appointmentId: APPOINTMENT });
-      expect(cancelButton().disabled).toBe(true);
-      expect(detail().open).toBe(true);
-    });
-
-    it('cancelState$ success: the dialog closes', () => {
-      const { cancelState$ } = mounted(state({ week: WEEK }));
-      find('#week .appointment').click();
-      cancelButton().click();
-      cancelState$.next({ status: 'pending', appointmentId: APPOINTMENT });
-      cancelState$.next({ status: 'success', appointment: {} as never });
-      expect(detail().open).toBe(false);
-    });
-
-    it('cancelState$ failure: the sentence in plain words, the dialog still open, the button usable again', () => {
-      const { cancelState$ } = mounted(state({ week: WEEK }));
-      find('#week .appointment').click();
-      cancelButton().click();
-      cancelState$.next({ status: 'pending', appointmentId: APPOINTMENT });
-      cancelState$.next({ status: 'failure', reason: 'cancellation_notice_too_short', message: 'cancellation_notice_too_short: 23 h < 24 h' });
-      expect(detailError().textContent).toBe('It is too late to cancel this appointment.');
-      expect(detail().open).toBe(true);
-      expect(cancelButton().disabled).toBe(false);
-      expect(find('#week').textContent).not.toContain('23 h');
-    });
-
-    it('"Close" and the Escape key (close()) close it without a call', () => {
-      const { appointments } = mounted(state({ week: WEEK }));
-      find('#week .appointment').click();
-      find('#week dialog.detail .close').click();
-      expect(detail().open).toBe(false);
-      find('#week .appointment').click();
-      detail().close();
-      expect(detail().open).toBe(false);
-      expect(appointments.cancel).not.toHaveBeenCalled();
-    });
-
-    it('opened a second time after a failure it shows no failure; one already in the stream is not shown either', () => {
-      const { cancelState$ } = mounted(state({ week: WEEK }));
-      cancelState$.next({ status: 'failure', reason: 'network', message: 'x' });
-      find('#week .appointment').click();
-      expect(detailError().textContent).toBe('');
-      cancelButton().click();
-      cancelState$.next({ status: 'failure', reason: 'concurrent_update', message: 'x' });
-      expect(detailError().textContent).toBe('The calendar was being changed at the same moment. Please try again.');
-      detail().close();
-
-      find('#week .appointment').click();
-      expect(detailError().textContent).toBe('');
-    });
-
-    it('a cancellation still under way from an opening that was closed: disabled for the same appointment, and its result is neither shown nor closes the dialog', () => {
-      const { cancelState$ } = mounted(state({ week: WEEK }));
-      find('#week .appointment').click();
-      cancelButton().click();
-      cancelState$.next({ status: 'pending', appointmentId: APPOINTMENT });
-      detail().close();
-
-      find('#week .appointment').click();
-      expect(cancelButton().disabled).toBe(true);
-      cancelState$.next({ status: 'success', appointment: {} as never });
-      expect(detail().open).toBe(true);
-      expect(cancelButton().disabled).toBe(false);
-      expect(detailError().textContent).toBe('');
+      noteField().value = 'Second lesson';
+      submit(noteForm());
+      expect(appointments.updateNote).toHaveBeenCalledWith(APPOINTMENT, 'Second lesson');
     });
   });
 
@@ -806,7 +723,7 @@ describe('mountWeek', () => {
 
     find('#week .appointment').click();
     for (const field of ['when', 'typeName', 'who', 'note', 'booked', 'hint']) {
-      const element = find(`#week dialog.detail .${field}`);
+      const element = find(`dialog.detail .${field}`);
       expect(element.textContent, field).toBe(SCRIPT);
       expect(element.children, field).toHaveLength(0);
     }
@@ -897,7 +814,7 @@ describe('mountWeek', () => {
 
       subscription.unsubscribe();
       expect(detail().open).toBe(false);
-      expect(find('#week dialog.detail').textContent).not.toContain('First lesson');
+      expect(find('dialog.detail').textContent).not.toContain('First lesson');
       expect(cancelButton().hidden).toBe(true);
       expect(html()).not.toContain('First lesson');
       expect(html()).toBe(before);
@@ -954,11 +871,11 @@ describe('mountWeek', () => {
   });
   // The note's form and "Change" in the detail, the banner of a move, and the book dialog as
   // the confirmation of a change.
-  const noteForm = () => find<HTMLFormElement>('#week dialog.detail .note-form');
-  const noteField = () => find<HTMLTextAreaElement>('#week dialog.detail [name="note"]');
-  const noteSave = () => find<HTMLButtonElement>('#week dialog.detail .note-form .submit');
-  const noted = () => find('#week dialog.detail .noted');
-  const changeButton = () => find<HTMLButtonElement>('#week dialog.detail .change');
+  const noteForm = () => find<HTMLFormElement>('dialog.detail .note-form');
+  const noteField = () => find<HTMLTextAreaElement>('dialog.detail [name="note"]');
+  const noteSave = () => find<HTMLButtonElement>('dialog.detail .note-form .submit');
+  const noted = () => find('dialog.detail .noted');
+  const changeButton = () => find<HTMLButtonElement>('dialog.detail .change');
   const banner = () => find('#week .moving');
   const keep = () => find<HTMLButtonElement>('#week .keep');
   const appointmentButtons = () => all('.appointment') as HTMLButtonElement[];
@@ -968,15 +885,6 @@ describe('mountWeek', () => {
   const inBooking = () => all('dialog.book .in-booking').map((element) => element.hidden);
 
   const MOVING: Moving = { appointmentId: APPOINTMENT, when: 'Mon 16 Nov, 11:00–12:15', what: 'Mon 16 Nov, 11:00–12:15 · Studio', note: 'First lesson' };
-  const DETAIL_2: AppointmentDetail = {
-    ...DETAIL,
-    appointmentId: OTHER_APPOINTMENT,
-    when: 'Mon 16 Nov, 15:00–16:00',
-    typeName: 'Swimming Pool',
-    note: '—',
-    noteValue: '',
-    booked: 'Booked by admin on Fri 13 Nov, 09:00',
-  };
   // The week with a second appointment on Monday.
   const TWO: WeekModel = {
     ...WEEK,
@@ -985,224 +893,9 @@ describe('mountWeek', () => {
       ...WEEK.days.slice(1),
     ],
   };
-  const saved = (): UpdateNoteState => ({ status: 'success', appointment: {} as never });
   const changed = (): ChangeState => ({ status: 'success', cancelled: {} as never, booked: {} as never });
 
-  describe('the note in the appointment detail', () => {
-    it('while the note can be edited the field holds it, with "Save note"; the text to read is hidden', () => {
-      const { appointments } = mounted(state({ week: WEEK }));
-      find('#week .appointment').click();
-      expect(noteForm().hidden).toBe(false);
-      expect(noted().hidden).toBe(true);
-      expect(noteField().value).toBe('First lesson');
-      expect(noteField().maxLength).toBe(500);
-      expect(noteSave().textContent).toBe('Save note');
-      expect(noteSave().disabled).toBe(false);
-      expect(appointments.updateNote).not.toHaveBeenCalled();
-    });
-
-    it('an appointment without a note opens with an empty field, not with the dash', () => {
-      mounted(state({ week: TWO }), 'user', [DETAIL, DETAIL_2]);
-      appointmentButtons()[1]!.click();
-      expect(noteField().value).toBe('');
-      expect(noteForm().hidden).toBe(false);
-    });
-
-    it('when the note cannot be edited it is shown as text, and there is no field and no button', () => {
-      mounted(state({ week: WEEK }), 'user', [{ ...DETAIL, canEditNote: false, canChange: false, canCancel: false, hint: 'This appointment has ended.' }]);
-      find('#week .appointment').click();
-      expect(noteForm().hidden).toBe(true);
-      expect(noted().hidden).toBe(false);
-      expect(detailText('note')).toBe('First lesson');
-      expect([changeButton().hidden, cancelButton().hidden]).toEqual([true, true]);
-    });
-
-    it('the note stays editable when it is too late to change or cancel', () => {
-      mounted(state({ week: WEEK }), 'user', [{ ...DETAIL, canChange: false, canCancel: false, hint: 'It is too late to change or cancel this appointment.' }]);
-      find('#week .appointment').click();
-      expect(noteForm().hidden).toBe(false);
-      expect([changeButton().hidden, cancelButton().hidden]).toEqual([true, true]);
-      expect(detailText('hint')).toBe('It is too late to change or cancel this appointment.');
-    });
-
-    it('"Save note" calls updateNote() with the id and the text as typed, once, and changes nothing on screen by itself', () => {
-      const { appointments } = mounted(state({ week: WEEK }));
-      find('#week .appointment').click();
-      noteField().value = ' Second lesson ';
-      const { prevented } = submit(noteForm());
-      expect(prevented).toBe(true);
-      expect(appointments.updateNote).toHaveBeenCalledTimes(1);
-      expect(appointments.updateNote).toHaveBeenCalledWith(APPOINTMENT, ' Second lesson ');
-      expect(appointments.cancel).not.toHaveBeenCalled();
-      expect(detail().open).toBe(true);
-      expect(noteSave().disabled).toBe(false);
-      expect(noteField().value).toBe(' Second lesson ');
-    });
-
-    it('an emptied field is sent as it is, and an unchanged note is sent too', () => {
-      const { appointments } = mounted(state({ week: WEEK }));
-      find('#week .appointment').click();
-      submit(noteForm());
-      expect(appointments.updateNote).toHaveBeenLastCalledWith(APPOINTMENT, 'First lesson');
-      noteField().value = '';
-      submit(noteForm());
-      expect(appointments.updateNote).toHaveBeenLastCalledWith(APPOINTMENT, '');
-      expect(appointments.updateNote).toHaveBeenCalledTimes(2);
-    });
-
-    it('updateNoteState$ pending for this appointment disables "Save note"; for another one it does not', () => {
-      const { updateNoteState$ } = mounted(state({ week: WEEK }));
-      find('#week .appointment').click();
-      updateNoteState$.next({ status: 'pending', appointmentId: OTHER_APPOINTMENT, note: 'x' });
-      expect(noteSave().disabled).toBe(false);
-      noteField().value = 'Second lesson';
-      submit(noteForm());
-      updateNoteState$.next({ status: 'pending', appointmentId: APPOINTMENT, note: 'Second lesson' });
-      expect(noteSave().disabled).toBe(true);
-      expect(cancelButton().disabled).toBe(false);
-      expect(detail().open).toBe(true);
-      expect(noteField().value).toBe('Second lesson');
-      expect(detailError().textContent).toBe('');
-    });
-
-    it('updateNoteState$ success: the dialog closes', () => {
-      const { updateNoteState$ } = mounted(state({ week: WEEK }));
-      find('#week .appointment').click();
-      submit(noteForm());
-      updateNoteState$.next({ status: 'pending', appointmentId: APPOINTMENT, note: 'First lesson' });
-      updateNoteState$.next(saved());
-      expect(detail().open).toBe(false);
-      expect(noteSave().disabled).toBe(false);
-    });
-
-    it('updateNoteState$ failure: the sentence in plain words, the dialog still open with what was typed, "Save note" usable again', () => {
-      const { updateNoteState$ } = mounted(state({ week: WEEK }));
-      find('#week .appointment').click();
-      noteField().value = 'Second lesson';
-      submit(noteForm());
-      updateNoteState$.next({ status: 'pending', appointmentId: APPOINTMENT, note: 'Second lesson' });
-      updateNoteState$.next({ status: 'failure', reason: 'appointment_not_active', message: 'appointment_not_active: ended at 12:15' });
-      expect(detailError().textContent).toBe('This appointment has already been cancelled, or it has ended.');
-      expect(detail().open).toBe(true);
-      expect(noteField().value).toBe('Second lesson');
-      expect(noteSave().disabled).toBe(false);
-      expect(find('#week').textContent).not.toContain('ended at');
-    });
-
-    it('a note too long, refused before any request, says to check what was entered', () => {
-      const { updateNoteState$ } = mounted(state({ week: WEEK }));
-      find('#week .appointment').click();
-      submit(noteForm());
-      updateNoteState$.next({ status: 'failure', reason: 'invalid_request', message: 'note: at most 500 characters' });
-      expect(detailError().textContent).toBe('The request was not accepted. Check what you entered and try again.');
-    });
-
-    it('a failure that was already in the stream is not shown at opening; nor a success closes a dialog that did not ask', () => {
-      const { updateNoteState$ } = mounted(state({ week: WEEK }));
-      updateNoteState$.next({ status: 'failure', reason: 'network', message: 'x' });
-      find('#week .appointment').click();
-      expect(detailError().textContent).toBe('');
-      updateNoteState$.next(saved());
-      expect(detail().open).toBe(true);
-    });
-
-    it('a save still under way from an opening that was closed: disabled for the same appointment, and its result is neither shown nor closes the dialog', () => {
-      const { updateNoteState$ } = mounted(state({ week: WEEK }));
-      find('#week .appointment').click();
-      submit(noteForm());
-      updateNoteState$.next({ status: 'pending', appointmentId: APPOINTMENT, note: 'First lesson' });
-      detail().close();
-
-      find('#week .appointment').click();
-      expect(noteSave().disabled).toBe(true);
-      updateNoteState$.next({ status: 'failure', reason: 'network', message: 'x' });
-      expect(detailError().textContent).toBe('');
-      expect(noteSave().disabled).toBe(false);
-      expect(detail().open).toBe(true);
-    });
-
-    it('a cancellation\'s result is not shown as the note\'s, nor the note\'s as the cancellation\'s', () => {
-      const { updateNoteState$, cancelState$ } = mounted(state({ week: WEEK }));
-      find('#week .appointment').click();
-      submit(noteForm());
-      cancelState$.next({ status: 'failure', reason: 'cancellation_notice_too_short', message: 'x' });
-      expect(detailError().textContent).toBe('');
-      cancelState$.next({ status: 'success', appointment: {} as never });
-      expect(detail().open).toBe(true);
-      detail().close();
-
-      find('#week .appointment').click();
-      cancelButton().click();
-      updateNoteState$.next({ status: 'failure', reason: 'network', message: 'x' });
-      expect(detailError().textContent).toBe('');
-      updateNoteState$.next(saved());
-      expect(detail().open).toBe(true);
-    });
-
-    it('opened a second time, on another appointment, it shows nothing of the first: after a success', () => {
-      const { updateNoteState$ } = mounted(state({ week: TWO }), 'user', [DETAIL, DETAIL_2]);
-      find('#week .appointment').click();
-      noteField().value = 'Typed for the first';
-      submit(noteForm());
-      updateNoteState$.next(saved());
-      expect(detail().open).toBe(false);
-
-      appointmentButtons()[1]!.click();
-      expect(detail().open).toBe(true);
-      expect(noteField().value).toBe('');
-      expect(detailError().textContent).toBe('');
-      expect(['when', 'typeName', 'booked'].map(detailText)).toEqual(['Mon 16 Nov, 15:00–16:00', 'Swimming Pool', 'Booked by admin on Fri 13 Nov, 09:00']);
-      expect(find('#week dialog.detail').textContent).not.toContain('First lesson');
-      // And its "Save note" is the second one's.
-      const { appointments } = mounted(state({ week: TWO }), 'user', [DETAIL, DETAIL_2]);
-      appointmentButtons()[1]!.click();
-      submit(noteForm());
-      expect(appointments.updateNote).toHaveBeenCalledWith(OTHER_APPOINTMENT, '');
-    });
-
-    it('opened a second time, on another appointment, it shows nothing of the first: after a failure', () => {
-      const { updateNoteState$ } = mounted(state({ week: TWO }), 'user', [DETAIL, DETAIL_2]);
-      find('#week .appointment').click();
-      noteField().value = 'Typed for the first';
-      submit(noteForm());
-      updateNoteState$.next({ status: 'failure', reason: 'network', message: 'x' });
-      expect(detailError().textContent).toBe(FAILURE);
-      detail().close();
-
-      appointmentButtons()[1]!.click();
-      expect(noteField().value).toBe('');
-      expect(detailError().textContent).toBe('');
-      expect(noteSave().disabled).toBe(false);
-      // The first one, opened again, has its own note back, not what was typed.
-      detail().close();
-      find('#week .appointment').click();
-      expect(noteField().value).toBe('First lesson');
-    });
-
-    it('a note containing <script> is put in the field as text and shown as text', () => {
-      mounted(state({ week: WEEK }), 'user', [{ ...DETAIL, note: SCRIPT, noteValue: SCRIPT }]);
-      find('#week .appointment').click();
-      expect(noteField().value).toBe(SCRIPT);
-      expect(noteField().children).toHaveLength(0);
-      expect(find('#week dialog.detail .note').textContent).toBe(SCRIPT);
-      expect(find('#week dialog.detail .note').children).toHaveLength(0);
-      expect(document.querySelectorAll('script, b')).toHaveLength(0);
-    });
-  });
-
-  describe('"Change" in the appointment detail', () => {
-    it('is shown when the logic layer offers it, hidden when it does not', () => {
-      const offered = mounted(state({ week: WEEK }));
-      find('#week .appointment').click();
-      expect(changeButton().hidden).toBe(false);
-      expect(changeButton().textContent).toBe('Change');
-      offered.subscription.unsubscribe();
-
-      mounted(state({ week: WEEK }), 'user', [{ ...DETAIL, canChange: false }]);
-      find('#week .appointment').click();
-      expect(changeButton().hidden).toBe(true);
-    });
-
+  describe('"Change" in the appointment detail, opened from the week', () => {
     it('closes the dialog and calls move() with the id, once, and nothing else: no banner until the stream says so', () => {
       const { screen, appointments } = mounted(state({ week: WEEK }));
       find('#week .appointment').click();

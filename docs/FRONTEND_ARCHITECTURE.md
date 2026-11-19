@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v5 — **decided; the foundation, the week, booking, cancelling, the note and the change implemented** (2026-11-19, `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 63, briefs `prompts/83-step-60-implementation.md`, `prompts/84-step-61-implementation.md`, `prompts/85-step-62-implementation.md` and `prompts/86-step-63-implementation.md`): the build and dev-server commands, the tests' environment, the shell with its navigation, the login view, the logic layer (`frontend/src/logic/`) and the week calendar with its two dialogs (book, which also confirms a change, and an appointment's detail with its note, "Change" and "Cancel appointment") exist in `frontend/`. The other views follow, one plan step each |
+| Status | v6 — **decided; the foundation, the week, booking, cancelling, the note, the change and "My appointments" implemented** (2026-11-19, `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 64, briefs `prompts/83-step-60-implementation.md`, `prompts/84-step-61-implementation.md`, `prompts/85-step-62-implementation.md`, `prompts/86-step-63-implementation.md` and `prompts/87-step-64-implementation.md`): the build and dev-server commands, the tests' environment, the shell with its navigation between two screens, the login view, the logic layer (`frontend/src/logic/`), the week calendar with its book dialog (which also confirms a change), a User's list of appointments (upcoming and history), and an appointment's detail (its note, "Change" and "Cancel appointment"), one dialog opened from both screens, exist in `frontend/`. The other views follow, one plan step each |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders |
 | Not in scope yet | Hosting, the CORS gap, keeping the session across a reload, the Content-Security-Policy of the hosting, logout. They are the open points of section 10, for later versions of this document |
 | Depends on | `docs/FRONTEND_SERVICES.md` v7 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work) |
@@ -18,6 +18,8 @@
 
 | v5 | 2026-11-19 | Plan step 63: editing the note and changing an appointment. Section 4: the detail's fixed form for the note, two actions with their own "asked" in one dialog, the book dialog's second mode (the confirmation of a change) and how its two modes are kept apart, the banner. Section 5.1: the detail's three actions and its one sentence, the moving state of the week screen (what starts it, what ends it, what does not), the reloads after a note and a change, the argument of `change`, the known limit of a move inside a full window, the sentences of `failureText` that depend on what was attempted. Section 8: what the tests rely on for a disabled button, and what of the focus is the browser's only. Section 12.1: the size at step 63. Section 11: decisions 43 to 52. |
 | v4 | 2026-11-19 | Plan step 62: booking and cancelling. Section 4: a slot and an appointment are buttons; the shape of a dialog (what is local to the view, how a result is tied to the dialog that asked for it, what an opening and a close do). Section 5.1: five files (`booking.ts` and `appointment.detail.ts` are new), the week loaded again after every booking or cancellation and every time the page becomes visible, why nothing is pushed, "now" for the detail, the Administrator's custom times and their limit on the night the clocks go back, the new sentences of `failureText`. Section 6: what a session owns now, and the stream the shell builds from `visibilitychange`. Section 8: what the dialogs' tests rely on. Section 9: the tree. Section 12.1: the size at step 62. Section 11: decisions 32 to 42. |
+
+| v6 | 2026-11-19 | Plan step 64: "My appointments". Section 4: a dialog used from two views (the detail, moved out of the week's element and out of `week.view.ts`), the shape of the list. Section 5.1: seven files (`appointments.model.ts` and `appointments.screen.ts` are new), the list screen, the time zone read from the settings and what that leaves of decision 23, the period's own checks, the hand-over of an appointment to the week screen and what still ends a move, the detail's sentence by what the appointment is. Section 6: the second entry of the table, what a session owns, what the shell hands a view. Section 8: the detail's test run from three hosts, the native date field under `happy-dom`. Section 9: the tree. Section 12.1: the size at step 64. Section 11: decisions 53 to 65. |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
 TypeScript module script**. The markup of every screen is in one `index.html`; the script
@@ -240,8 +242,9 @@ week. The view redraws the days only when the stream brings another week object,
 notification: a change of label or of "Loading…" leaves the days as they are.
 
 **The shape of a dialog** (`docs/FRONTEND_VIEW_PLAN.md` step 62: the book dialog and the
-appointment detail, both native `<dialog>` elements inside `#week`, outside the region the view
-redraws):
+appointment detail, both native `<dialog>` elements outside the region a view redraws; the
+book dialog is inside `#week`, the detail belongs to no screen, see "A dialog used from two
+views" below):
 
 ```ts
 // What the open dialog is about; null while it is closed. And whether its action was asked for
@@ -341,6 +344,54 @@ appointments.bookState$.subscribe((state) => {
   dialog stays open with what was typed; closed, by "Close" or the Escape key, it leaves the
   banner, and another slot can be chosen.
 
+**A dialog used from two views** (`docs/FRONTEND_VIEW_PLAN.md` step 64). The appointment detail
+is opened from the week and from "My appointments". It is one element, `dialog#detail`, in the
+frame after the screens, and one file, `frontend/src/views/detail.view.ts`:
+
+```ts
+export type DetailDeps = {
+  detail: (appointmentId: string) => AppointmentDetail | null; // how this screen answers a detail
+  appointments: Pick<AppointmentsService, 'cancel' | 'cancelState$' | 'updateNote' | 'updateNoteState$'>;
+  change: (appointmentId: string) => void;                    // what "Change" does on this screen
+};
+export type DetailView = { subscription: Subscription; open: (appointmentId: string) => void };
+
+export function mountDetail(root: HTMLDialogElement, deps: DetailDeps): DetailView { … }
+```
+
+- **The view of the screen on show mounts it**, for as long as that screen is on show, and ends
+  it with its own subscription. Only one screen is on show at a time, so the dialog is mounted
+  once at a time and its handlers and streams are those of one screen and one session.
+- **It returns `open` beside the subscription**, because something must open it: the week view
+  calls it at a click on an appointment, the list's view at a click on a row. This is the one
+  mount function that does not return a `Subscription` alone (section 3, rule 7): it is a part
+  of a view, not a view with an element of the shell's.
+- **The view finds the dialog through its own element's document**
+  (`root.ownerDocument.querySelector('#detail')`): the dialog is outside every screen's element,
+  and the shell's code that shows a screen was not changed to hand it over.
+- **What it is handed** says what differs between the two screens, and nothing else does: the
+  detail of an appointment by its id (`screen.detail` of the `WeekScreen` or of the
+  `AppointmentsScreen`), and what "Change" does: in the week, `screen.move(appointmentId)`; in
+  the list, the hand-over to the week screen and the change of address (section 5.1). The note
+  and "Cancel appointment" call the service in both.
+- **Everything of the shape of a dialog above is unchanged**: what is local (the appointment
+  shown, an "asked" for each of the two actions), a result shown only in the opening that asked
+  for it, an opening that starts clean, a close that only forgets, and a teardown that closes
+  it and empties it.
+- The book dialog, with its second mode, stays the week's: only the week books and confirms.
+
+**The list's shape** (`#appointments`, `frontend/src/views/appointments.view.ts`): two buttons
+for the two modes, whose `aria-pressed` is set from the stream; the period's form, a fixed form
+outside the list (section 3, rule 4), with two native date fields and "Show", shown in the
+history only; the failure; the sentence of an empty list; and the list, whose rows are copies
+of `tpl-appointment-row`. A row is one `<button type="button">` holding the date, the time,
+the type, the note and the status, with a class for what the appointment is (`is-booked`,
+`is-ended`, `is-cancelled`, `is-changed`), as the logic layer says it. The rows are rebuilt
+only when the stream brings another list object, and the two dates are set only when it brings
+another period object, so a list that arrives while a date is being typed leaves the field
+alone. The form has `novalidate`: an empty or half-typed date is refused by the logic layer in
+words, beside the form, not by the browser's own bubble.
+
 ## 5. The logic layer
 
 Some of what the screens need may not be in a view (section 3, rule 1) and is not a remote call
@@ -348,7 +399,7 @@ either. It lives in the logic layer:
 
 | What | Example |
 |---|---|
-| State that is not the server's and not one view's | Which week is on screen, and its Monday; which appointment is being moved to another time |
+| State that is not the server's and not one view's | Which week is on screen, and its Monday; which appointment is being moved to another time; which list of "My appointments" is on show, and the period of its history |
 | When to call again | After a booking, a cancellation, a change or a note saved, whatever its outcome, load the calendar again (`docs/FRONTEND_SERVICES.md` section 18.6) |
 | A response made ready to draw | The week: per day, its windows, slots, busy blocks and appointments, each with its place in the day and its time as text |
 | What is offered | Whether the note can be edited and whether "Change" and "Cancel" are shown for an appointment (the status, the end, the role, `cancellableUntil`) |
@@ -372,9 +423,9 @@ Its rules:
 7. **Tested like the services**: unit tests with no network and no DOM, inside the 100 % line
    coverage of `frontend/src`.
 
-### 5.1 As built: five files
+### 5.1 As built: seven files
 
-`frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` steps 61 to 63), each with its test in
+`frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` steps 61 to 64), each with its test in
 `frontend/tests/unit/logic/`:
 
 | File | What it holds |
@@ -383,7 +434,9 @@ Its rules:
 | `week.model.ts` | Pure: `weekModel(view, role)`, a `CalendarView` in, the week ready to draw out |
 | `booking.ts` | Pure, for the book dialog: what is booked in words (`bookingText`), the times the Administrator may choose (`timeChoice`), the Users to choose from (`userChoice`), and from what the dialog holds to the argument of `AppointmentsService.book` (`bookingFor`) or, when it confirms a change, of `AppointmentsService.change` (`changeFor`) |
 | `appointment.detail.ts` | Pure: `appointmentDetail(appointment, role, now, zone)`, an `Appointment` in, what the detail dialog shows out, with which of its three actions are offered (the note, "Change", "Cancel appointment"), the note as a text and as a field's value, and the sentence about them; `movingOf(detail, role)`, an appointment being moved, in the words of the banner and of the confirmation |
-| `week.screen.ts` | The class `WeekScreen`: which week is on screen, its loads and reloads, the detail of one of its appointments, and the appointment being moved to another time |
+| `week.screen.ts` | The class `WeekScreen`: which week is on screen, its loads and reloads, the detail of one of its appointments, and the appointment being moved to another time, one of its own or one handed over by the list screen |
+| `appointments.model.ts` | Pure, for "My appointments": `appointmentRows(appointments, now, zone)`, the list ready to draw (date, time, type, note, and the status in words); the two sentences of an empty list (`emptyText`); the period the history opens on (`defaultPeriod`) and the period's own checks (`periodRefusal`) |
+| `appointments.screen.ts` | The class `AppointmentsScreen`: which of the two lists is on show, the period of the history, the time zone read from the settings, the loads and reloads, the detail of one of its appointments, and the hand-over of one to the week screen |
 
 **"Now" is passed in.** Nothing in `logic/` reads the clock by itself. `WeekScreen` receives a
 function `now: () => Date` through its constructor (the shell passes `() => new Date()`, a test a
@@ -464,6 +517,7 @@ export class WeekScreen {
   today(): void { … }         // loads again even when the week of today is on screen
   detail(appointmentId: string): AppointmentDetail | null { … }
   move(appointmentId: string): void { … } // starts the move of an appointment of the week on screen
+  handOver(moving: Moving, date: string): void { … } // another screen's appointment to move
   keep(): void { … }                      // ends it, leaving the appointment as it is
 }
 ```
@@ -509,12 +563,20 @@ in the view (`docs/SHARED_CALENDAR_SPEC.md` sections 8.3 to 8.5,
 | "Change" (`canChange`) and "Cancel appointment" (`canCancel`) | Always together: a change must pass the rules of a cancellation (`docs/SHARED_CALENDAR_SPEC.md` R-CHG-01). To the Administrator while the appointment is booked and has not ended; to a User while "now" is not after `cancellableUntil`, the instant the server computed (exactly at it they are still offered, one millisecond later they are not) |
 
 The detail carries the note twice: as a text to read (`note`, "—" when there is none) and as
-the value of the field (`noteValue`, empty when there is none). **One sentence** speaks of the
-other two actions: a User reads "It can be changed or cancelled until Mon 23 Nov, 09:00." or
-"It is too late to change or cancel this appointment." (the note's field is there all the same,
-and no words are added about it); the Administrator reads nothing while they are offered, and
-"This appointment has ended." when they are not. The server decides again when the call is
-made.
+the value of the field (`noteValue`, empty when there is none). **One sentence** says what the
+appointment is, for both roles and on both screens, in this order:
+
+| The appointment | The sentence |
+|---|---|
+| Cancelled with the reason `changed` | "This appointment was moved to another time." |
+| Cancelled otherwise (`cancelled`, `user_deleted`) | "This appointment was cancelled." |
+| Booked, and its end is not after "now" | "This appointment has ended." |
+| Booked and still to end, a User, "now" not after `cancellableUntil` | "It can be changed or cancelled until Mon 23 Nov, 09:00." |
+| Booked and still to end, a User, later than that | "It is too late to change or cancel this appointment." (the note's field is there all the same, and no words are added about it) |
+| Booked and still to end, the Administrator | Nothing: both actions are offered |
+
+The week holds booked appointments only, so the first two are met from the history of "My
+appointments". The server decides again when the call is made.
 
 **Moving an appointment to another time** (`docs/FRONTEND_VIEW_PLAN.md` step 63). Which
 appointment is being moved is state of the week screen, carried by `week$` as `moving`, so the
@@ -537,6 +599,104 @@ view keeps listening to one stream for the week.
   person gives up with the banner's button. Nor a reload of the week, the page becoming
   visible, another write's result, or the confirmation being closed.
 - **What can be clicked while moving** is the view's part (section 4): free slots only.
+
+**"My appointments": the list screen** (`docs/FRONTEND_VIEW_PLAN.md` step 64).
+
+```ts
+// `period` is the history's, null until the history is first chosen, and another object only
+// when another period is accepted. `rows` is the last list loaded for the mode and the period
+// on show, null until there is one. `refusal` says why the period typed was not asked for.
+export type ListState = {
+  mode: 'upcoming' | 'history'; period: { from: string; to: string } | null;
+  loading: boolean; failure: string | null; refusal: string | null;
+  rows: readonly AppointmentRow[] | null; empty: string | null;
+};
+
+export class AppointmentsScreen {
+  readonly list$: Observable<ListState>;
+
+  // `settings`: `load` and `settingsResult$` of the CalendarSettingsService.
+  // `appointments`: `list`, `appointmentsResult$`, `cancelResult$` and `updateNoteResult$`.
+  // `week`: `handOver` of the WeekScreen.
+  constructor(settings: ListSettings, appointments: ListAppointments, week: ListWeek, role: Role, now: () => Date, visible$: Observable<unknown>) { … }
+
+  start(): Subscription { … }            // the settings, then the list the screen is on
+  upcoming(): void { … }
+  history(): void { … }                  // over the period it was left on; the first time, the default one
+  show(from: string, to: string): void { … } // the history over the period typed, or why not
+  detail(appointmentId: string): AppointmentDetail | null { … }
+  move(appointmentId: string): void { … }    // hands the appointment over to the week screen
+}
+```
+
+- **The time zone comes from the settings.** The answer of `GET /calendar/appointments` does
+  not name the calendar's zone, and the list can be the first screen a User lands on. At each
+  `start()` the screen reads `GET /calendar/settings` once, through the
+  `CalendarSettingsService`, and only then asks for the list; every date and time of the list,
+  the detail it answers and "today" for the default period use that zone. While it is not known
+  nothing is listed and the stream says `loading`. A failed read is the failure shown in the
+  place of the list, and choosing a mode again reads again. The read is for the zone only: no
+  setting is shown or changed. Nothing here uses `DEFAULT_TIME_ZONE`. **The week screen keeps
+  opening without that request**: its limit around midnight (above) stands, and lifting it now
+  has a precedent.
+- **Two modes, one list.** Upcoming is `list({ upcoming: 'true' })`, which the service sends
+  with `status=booked`; the history is `list({ from, to, status: 'all' })`. They share the
+  service's one pair of streams, so a change of mode or of period while a load is under way
+  replaces it.
+- **The period.** The history opens on the 30 days that end today (`defaultPeriod`), today in
+  the calendar's zone, loaded at once. `show(from, to)` first checks the period
+  (`periodRefusal`): a date missing ("Choose both dates."), the first date after the last ("The
+  first date is after the last one."), or more days than one list may hold ("A period can be
+  at most 92 days long. Choose a shorter one.", the number being
+  `CALENDAR_LIMITS.appointmentListDays` of `shared/`). A refusal is carried by the stream as
+  `refusal`, no request is sent, and the list on screen stays. Everything else about a date is
+  the service's and the server's to say. A period may hold future dates. **Known consequence
+  of the default:** the list is selected by the appointment's own date, not by the day it was
+  cancelled, so an appointment cancelled or moved today that was to take place next week is
+  not in the 30 days that end today; a period that reaches forward shows it.
+- **What is kept, and what is not.** The mode and the period are state of the screen object,
+  which lives as long as the session (section 6): left and found again, the screen is on the
+  mode and the period it was left on. The zone and the list are forgotten when the
+  subscription of `start()` ends: the next `start()` reads the settings again, says `loading`
+  with no row, then lists. Another mode or another period also forgets the list on show, which
+  is not theirs; the same ones, loaded again, keep it meanwhile, and a load that fails keeps it
+  with the failure.
+- **A row** (`appointmentRows`): the date ("Mon 23 Nov"), the time in the calendar's zone, with
+  the offsets on a day the clocks change, the type, the note (empty when there is none) and the
+  status in words: "Booked"; "Ended" for a booked appointment whose end is not after "now"
+  (`docs/SHARED_CALENDAR_SPEC.md` section 8.1: derived from the clock, not stored);
+  "Cancelled"; "Changed" for one cancelled with the reason `changed`. The order is the
+  server's, by start. An empty list has one sentence per mode: "You have no upcoming
+  appointments." and "There are no appointments in this period." Nothing is paged: one list
+  holds at most 92 days. **Known limit:** a row's date has no year, like every date of the
+  week; a history across the end of a year does not say which year a row is in.
+- **The reloads.** Between `start()` and the end of its subscription the list on show is
+  loaded again at every result of `cancelResult$` and `updateNoteResult$`, a failure included,
+  and at every notification of `visible$`, the same stream the shell hands the week screen;
+  not for a result that was already there at `start()`. While the zone is not known, a reload
+  reads the settings again.
+- **The detail** of an appointment of the last list loaded is `appointmentDetail(…)` in the
+  zone of the settings, with `now()` read when the dialog opens, or `null`.
+
+**"Change" from the list goes to the week: the hand-over.** The new time is chosen where times
+are shown. `AppointmentsScreen.move(appointmentId)` makes the appointment's copy in words
+(`movingOf`, in the zone it knows) and calls `WeekScreen.handOver(moving, date)` with it and
+the appointment's local date; the list's view then asks the shell for the week (section 6).
+
+- **Taken at the next `start()`** of the week screen, or at once when it is started: the week
+  on screen becomes the one that holds the date, and `week$` carries the move, with the words
+  handed over. From there everything is a move started in the week: any week, a free slot, the
+  confirmation, "Keep the appointment as it is".
+- **Taken once.** Leaving the week still ends the move (the end of the subscription of
+  `start()`), and a later `start()` moves nothing: a User who goes back to the list while the
+  banner shows finds the list as usual, and the week, shown again, on the week it was left on
+  with no banner.
+- **Never taken** (the address did not change, the person signed out), it is dropped with the
+  session's objects.
+- Nothing is handed over for an appointment the list does not hold or that cannot be changed
+  at that moment.
+- After a change made this way the person is in the week, where the new appointment is.
+  Nothing brings them back to the list.
 
 **The change.** `changeFor(slot, zone, role, fields)` makes the argument of
 `AppointmentsService.change` from what the confirmation holds. The times are a booking's: a
@@ -581,7 +741,9 @@ Availability at night on those two nights is rare; neither is solved.
 knows the reasons a person can meet so far: the transport reasons every API service shares
 (`docs/FRONTEND_SERVICES.md` section 10.2), the codes of `GET /calendar`, the login's reasons,
 and the codes of a booking, of a cancellation, of a change, of a note and of the list of users
-(`docs/FRONTEND_SERVICES.md` sections 19.1 and 13.1). The sentence of `slot_taken` says that
+(`docs/FRONTEND_SERVICES.md` sections 19.1 and 13.1). The list of appointments and the read of
+the settings (`docs/FRONTEND_SERVICES.md` sections 19.1 and 15.1) brought no code without a
+sentence. The sentence of `slot_taken` says that
 the calendar has been refreshed, which the reload above makes true. `invalid_request` has one
 sentence for every case and every screen, "The request was not accepted. Check what you entered
 and try again.": an end not after the start has no sentence of its own, and the logic layer
@@ -624,12 +786,15 @@ API's configuration and the whole store because it creates the API services of e
    starts and dropped when it ends, so that nothing of one person's data can be replayed to the
    next (the services' result streams replay their last value). One function of the shell,
    `sessionObjects`, creates them when a person enters: today the `CalendarService`, the
-   `AppointmentsService`, the `UsersService` (for both roles; a User's view never calls it) and
-   the `WeekScreen`. They live as long as the person's session, not as long as a screen is on
+   `AppointmentsService`, the `UsersService` (for both roles; a User's view never calls it),
+   the `CalendarSettingsService` (read by the list screen only, for the time zone), the
+   `WeekScreen` and the `AppointmentsScreen`, which is given the `WeekScreen` for the hand-over
+   of section 5.1. They live as long as the person's session, not as long as a screen is on
    show: coming back to a screen finds its logic object as it was left. The same function builds
-   the stream the week screen reloads on (section 5.1): the document's `visibilitychange` event,
-   keeping the notifications at which `document.visibilityState` is `visible`. It ends with the
-   screen's subscription, so nothing is loaded at the login or after signing out.
+   the stream both screens reload on (section 5.1): the document's `visibilitychange` event,
+   keeping the notifications at which `document.visibilityState` is `visible`. Each screen
+   listens to it only while it is started, so the screen on show is the one that loads again,
+   and nothing is loaded at the login or after signing out.
 5. **Mounting.** To show a view the shell un-hides its element, calls its mount function, then
    starts its logic object and triggers its first loads. To leave it, the shell unsubscribes the
    one subscription that holds all of this and hides the element.
@@ -652,12 +817,18 @@ export type Screen = {
 };
 ```
 
-There is one entry so far, `#/week`, "Week", both roles; the two dialogs of the week are part of
-its view and have no address. A new screen is a new entry, its
-element in `index.html`, and its services and logic object in `sessionObjects`; the code that
-reads the address, fills the navigation and switches between screens does not change.
-`mountShell` takes the table as an optional dependency, which a test uses to bring a second
-entry.
+There are two entries so far: `#/week`, "Week", both roles, and `#/appointments`, "My
+appointments", the role `user` only. The dialogs have no address. A new screen is a new entry,
+its element in `index.html`, and its services and logic object in `sessionObjects`; the code
+that reads the address, fills the navigation and switches between screens does not change, and
+did not for the second entry. `mountShell` takes the table as an optional dependency, which a
+test uses to bring an entry whose mount is a spy.
+
+**What the shell hands a view** is in the entry's `show`: the logic object and the parts of the
+services, as before, and for the list's view a function, `showWeek`, which sets the address to
+the week's (`window.location.hash`). A view never knows an address: the list's view calls the
+function after "Change", the address changes, and the shell follows it like any other change
+of hash, leaving the list and mounting the week.
 
 - **The address is put right in place.** An empty, unknown or forbidden hash shows the role's
   first screen, and the address becomes that screen's with `history.replaceState`: no step is
@@ -761,6 +932,24 @@ detail and the appointment's button it would return to becomes disabled. In Chro
 is then on nothing, and the next Tab goes to the first slot after that appointment, since the
 browser continues from where the focus was.
 
+What the tests of the list and of the shared dialog rely on (plan step 64):
+
+- **The detail's test runs three times** (`detail.view.test.ts`, `describe.each`): the dialog
+  mounted alone, by the week view and by the list's view, each host opening it its own way (a
+  call of `open`, a click on an appointment, a click on a row). The same cases, with the same
+  assertions, hold for the three. The week's and the list's own tests keep what is theirs:
+  which appointment is opened, whose answers and calls are used, and what "Change" does.
+- **The native date field** (`<input type="date">`), as `happy-dom` 21 has it: its `value` is
+  set and read as the text `YYYY-MM-DD`, an empty field reads as an empty text, and
+  `form.reset()` empties it, all as in a browser. There is no picker and nothing typed: what a
+  person can and cannot type into the field, and the order of day and month it shows, are the
+  browser's only. The tests never rely on the field refusing a value.
+- **A change of address made by the script** (`window.location.hash = …`) sends `hashchange` a
+  moment later there, as in a browser: the shell's test waits for the address.
+- **The page's comments are in `outerHTML`.** A test that looks in the whole document for what
+  one person left behind looks for data (a note, a name, a date), not for fixed words of the
+  page, which a comment of `index.html` may hold.
+
 ## 9. Placement
 
 Inside `frontend/`, next to the services:
@@ -778,8 +967,10 @@ frontend/
 │   ├── main.ts                # the entry file of the bundle: the configuration, then the shell
 │   ├── services/              # docs/FRONTEND_SERVICES.md
 │   ├── logic/                 # the logic layer, no DOM (section 5.1): texts.ts, week.model.ts,
-│   │                          # booking.ts, appointment.detail.ts, week.screen.ts
-│   └── views/                 # shell.ts and one <name>.view.ts per view: login.view.ts, week.view.ts
+│   │                          # booking.ts, appointment.detail.ts, week.screen.ts,
+│   │                          # appointments.model.ts, appointments.screen.ts
+│   └── views/                 # shell.ts and one <name>.view.ts per view: login.view.ts, week.view.ts,
+│                              # appointments.view.ts; detail.view.ts, the dialog two views mount
 ├── tests/
 │   └── unit/
 │       ├── services/          # vitest project `unit`, in node
@@ -883,6 +1074,19 @@ than what the trial showed: these deserve the first look in a review.
 | 50 | Which of the three actions the detail offers is decided in `logic/appointment.detail.ts` with "now" read when the dialog opens; "Change" is offered exactly when "Cancel appointment" is, and one sentence speaks of both (section 5.1) | `docs/SHARED_CALENDAR_SPEC.md` R-CHG-01: a change passes the rules of a cancellation. The note has no notice (R-NOTE-01) and needs no words | Yes |
 | 51 | `failureText` takes what was attempted as a second, optional argument; `invalid_request` has one sentence everywhere, which says to check what was entered (section 5.1) | The server answers a change that is too late with the cancellation's code. One table of sentences stays, with the exceptions beside it. An end not after the start gets no sentence of its own and no check in the logic layer (`docs/FRONTEND_SERVICES.md` section 8, decision 42) | Yes |
 | 52 | The note, the banner and the confirmation stay in `week.view.ts` in plan step 63 (`docs/FRONTEND_VIEW_PLAN.md` step 64 moves what two screens share) | The view is 390 lines and listens to six streams; 55 of its lines look nodes up or copy a template, 29 of those for the dialogs and the banner. No condition of section 7 was met: no field in a redrawn region, the look-ups far shorter than the rest, and no helper that builds or updates nodes (`bookMode` shows and hides the fixed texts of the dialog's two modes) | |
+| 53 | The appointment detail is one dialog of the frame and one file, `detail.view.ts`; the view of the screen on show mounts it and ends it; `mountDetail` returns `open` beside the subscription (section 4) | Two screens open the same dialog: one markup, one wiring, and nothing of it differs but what it is handed. Something must open it, so the mount function returns that too | Yes: the one mount function that does not return a `Subscription` alone |
+| 54 | A view finds the frame's dialog through its own element's document (`root.ownerDocument`), by its id (section 4) | The shell's code that shows a screen stays as it is. The price: a view reaches one element outside its own | Yes |
+| 55 | The list screen reads the settings at each `start()` for the calendar's time zone, before the first list; the week screen still opens without that request (section 5.1) | Decided with the Product Owner (`docs/FRONTEND_VIEW_PLAN.md` step 64). The list's answer names no zone and the list can be the first screen. Decision 23 stands for the week, with its limit | |
+| 56 | The mode and the period are state of the `AppointmentsScreen` and last as long as the session; the zone and the list are forgotten when its subscription ends (section 5.1) | A screen left and found again is where it was left (decision 30), and what it shows is read again, not replayed: between two visits a change was perhaps made from the week | The second half, yes |
+| 57 | Another mode or another period forgets the list on show; the same ones, loaded again, keep it meanwhile (section 5.1) | A list of upcoming appointments under "History" would be read as the history. The week keeps its last week under the next label because both are weeks; here the two lists are not the same thing | Yes |
+| 58 | The period's own checks are in `logic/appointments.model.ts`, before any call, with the limit of `shared/`; the form has `novalidate` (sections 4 and 5.1) | A rule and date arithmetic: not a view's. The browser's own check would stop the form before the sentence could be shown, and says it in its own words | The `novalidate`, yes |
+| 59 | The history opens on the 30 days that end today (section 5.1) | Decided with the Product Owner. Its consequence was seen in the browser check: an appointment cancelled today for a later date is not in it. Whether the default should reach forward is for the review | |
+| 60 | "Change" from the list hands the appointment over to the `WeekScreen` (`handOver`), which takes it once, at its next `start()` or at once when started; leaving the week still ends the move (section 5.1) | Decided with the Product Owner. The new time is chosen in the week, with step 63's banner and confirmation and no second way to move. One thing crosses from a screen to another, through the logic layer, and step 63's rule (decision 45) holds without an exception | |
+| 61 | The list's view is handed `showWeek` by its entry of the table of screens; the code that follows the address did not change (section 6) | A view knows no address (the table does). The change of address is followed like one made by a link | Yes |
+| 62 | The detail's sentence says first what the appointment is (moved, cancelled, ended), for both roles; only for one still to end does it speak of changing and cancelling (section 5.1) | The history shows cancelled and ended appointments, for which "too late to change or cancel" was wrong. A changed case of step 63: a User's ended appointment now reads "This appointment has ended." | |
+| 63 | A row carries what the appointment is twice: in words (`status`) and as one of four names (`kind`), which the view applies as a class (section 4) | The style sheet says what a cancelled row looks like; the view decides nothing | Yes |
+| 64 | A date of the list has no year, like the dates of the week (section 5.1, known limit) | `texts.ts` was to grow only for a code without a sentence. At most 92 days are listed; across the end of a year the rows do not say which year | Yes |
+| 65 | No condition of section 7 was met at plan step 64 | `week.view.ts` went from 390 to 313 lines, `detail.view.ts` is 137 and `appointments.view.ts` 117; the lines that look a node up or copy a template are 46, 10 and 19. No field in a redrawn region; no helper that builds or updates nodes (`rowFor` copies a template and fills it, as the week's blocks do); sharing the dialog needed a mount function and its dependencies, nothing more | |
 
 ## 12. The tooling (open points O4, O6 and O8, decided)
 
@@ -918,7 +1122,8 @@ in other languages), which `shared/`'s schemas bring in with any import from
 `@shared-calendar/shared`; the services, `shared/`, the views and `rxjs` together are 36 kB.
 At plan step 61, with the logic layer and the week: `app.js` 504 kB, 110 kB compressed. At plan
 step 62, with booking and cancelling: 518 kB, 113 kB compressed. At plan step 63, with the note
-and the change: 520 kB, 114 kB compressed. What to do about `zod`'s share
+and the change: 520 kB, 114 kB compressed. At plan step 64, with "My appointments": 528 kB,
+115 kB compressed. What to do about `zod`'s share
 is open point O9 (section 10).
 
 ### 12.2 The dev server
@@ -961,8 +1166,9 @@ English only, with no translation mechanism. The fixed texts are written in `ind
 texts that depend on data are made by the logic layer (section 5.1, `frontend/src/logic/texts.ts`):
 dates, times, and a failure in plain words by its `reason`. The sentences that depend on a
 state are there too: the one about changing and cancelling in the detail
-(`appointment.detail.ts`) and those beside the User picker (`booking.ts`, section 11,
-decision 40). The words that name an appointment being moved come from the logic layer
+(`appointment.detail.ts`), those beside the User picker (`booking.ts`, section 11,
+decision 40), and those of "My appointments": the status of a row, the empty list and the
+period's refusals (`appointments.model.ts`). The words that name an appointment being moved come from the logic layer
 (`movingOf`); the fixed words around them ("Moving: … Choose a free time.", "From:", "To:") are
 in the page. No view shows the `message` of a
 service. The shell holds the two names of the roles.
