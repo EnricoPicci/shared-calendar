@@ -8,10 +8,14 @@ export default defineConfig({
   test: {
     // Without RUN_INTEGRATION the integration project selects no files; that is not a failure.
     passWithNoTests: !runIntegration,
-    // docs/FRONTEND_SERVICES.md rule 8: the services layer stays at 100 % line coverage.
+    // All of frontend/src stays at 100 % line coverage: the services (docs/FRONTEND_SERVICES.md
+    // section 2, rule 8) and the views (docs/FRONTEND_ARCHITECTURE.md section 12.3).
+    // The one file left out is the bundle's entry: one statement, which needs the three constants
+    // that only the bundle command defines.
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
+      exclude: ['src/main.ts'],
       reporter: ['text', 'html'],
       thresholds: { lines: 100 },
     },
@@ -22,6 +26,17 @@ export default defineConfig({
           globals: true,
           environment: 'node',
           include: ['tests/unit/**/*.test.ts'],
+          exclude: ['tests/unit/views/**'],
+        },
+      },
+      {
+        // The views' tests need a document (docs/FRONTEND_ARCHITECTURE.md section 8): happy-dom
+        // emulates one. The services' tests stay in node, where a DOM global is an error.
+        test: {
+          name: 'views',
+          globals: true,
+          environment: 'happy-dom',
+          include: ['tests/unit/views/**/*.test.ts'],
         },
       },
       {

@@ -12,10 +12,11 @@ template and fully testable on a laptop before anything reaches the cloud.
 
 This is v1 of the back end of a larger application. The repository is a monorepo: the back end
 in `backend/`, the code it shares with the browser front end that will follow (the API contract
-and the username rule) in `shared/`, and in `frontend/` the front end's services layer
-(session store, login, token refresh, Hello World, user administration;
-`docs/FRONTEND_SERVICES.md`); the rest of the front end waits for its
-architecture document.
+and the username rule) in `shared/`, and in `frontend/` the front end: its services layer
+(session store, login, token refresh, Hello World, user administration, the calendar;
+`docs/FRONTEND_SERVICES.md`) and the start of its pages (`docs/FRONTEND_ARCHITECTURE.md`): today
+a login page, which can be seen locally (see "The page, locally" below). The other screens
+follow `docs/FRONTEND_VIEW_PLAN.md`.
 
 Where the full story is:
 
@@ -93,6 +94,21 @@ Everything else (`bootstrap-admin`, `budget`, and the notes that go with each co
 listed in `CLAUDE.md`, "Everyday commands". The first deployment of a new stack is different
 (`npm run deploy -w backend -- --parameter-overrides AlertEmail=<address>`, then
 `bootstrap-admin`, `smoke`, `budget`): `docs/RUNBOOK.md` section 3.
+
+### The page, locally
+
+With the local stack running (`local:up`, then `local:api` in its own terminal):
+
+```sh
+npm run dev -w frontend        # http://localhost:5173, foreground; Ctrl-C stops it
+```
+
+Open the address (in a Codespace, the forwarded port 5173) and sign in as `alice` /
+`Alice-Local-Pass-1!` or `admin` / `Admin-Local-Pass-1!`. The header shows who is signed in and
+the role; "Sign out" returns to the login. A reload of the page signs out too: the session is
+kept in memory only. An edit to `frontend/src`, `frontend/index.html` or `frontend/style.css`
+shows after a reload. The dev server passes the page's calls on to the local API and to
+cognito-local; it is for local work only, and the front end is not deployed anywhere yet.
 
 Layout: `backend/` holds `src/handlers/` (one Lambda per file), `src/lib/` (the only code that
 touches the AWS SDK), `tests/`, `scripts/`, `template.yaml` and `docker-compose.yml`; `shared/src/`

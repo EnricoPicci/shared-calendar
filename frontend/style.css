@@ -1,0 +1,41 @@
+/* The one style sheet of the front end (docs/FRONTEND_ARCHITECTURE.md section 3, rule 13). */
+
+:root {
+  font-family: system-ui, sans-serif;
+  font-size: 15px;
+  color: #1f2933;
+  background: #f3f5f8;
+}
+body { margin: 0; }
+/* The switch between the views: an element with the attribute is never shown, whatever its class says. */
+[hidden] { display: none !important; }
+h1, h2, h3 { margin: 0; }
+
+button, input, select, textarea { font: inherit; }
+button { padding: 0.45rem 0.8rem; border: 1px solid #b6c0cc; border-radius: 6px; background: #fff; cursor: pointer; }
+button:disabled { opacity: 0.5; cursor: default; }
+button.primary { background: #1d5fd1; border-color: #1d5fd1; color: #fff; }
+input, select, textarea { padding: 0.45rem; border: 1px solid #b6c0cc; border-radius: 6px; width: 100%; box-sizing: border-box; }
+label { display: grid; gap: 0.25rem; font-size: 0.85rem; color: #52606d; }
+.error { color: #b3261e; margin: 0; min-height: 1.2em; overflow-wrap: anywhere; }
+
+/* The login */
+.login { max-width: 20rem; margin: 12vh auto 0; padding: 1.5rem; background: #fff; border-radius: 10px; box-shadow: 0 1px 4px #0002; }
+.login h1 { font-size: 1.4rem; }
+.login form { display: grid; gap: 0.9rem; margin-top: 1rem; }
+
+/* The frame: the header with who is signed in, the navigation, the screen */
+.bar { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 1rem; background: #1f2933; color: #fff; }
+.bar .who { margin-left: auto; min-width: 0; font-size: 0.85rem; text-align: right; overflow-wrap: anywhere; }
+.bar .role { opacity: 0.75; }
+.bar .sign-out { flex: none; }
+.nav:empty { display: none; }
+.screen { padding: 1rem; }
+
+/* A phone: the login takes the width, the header's parts get closer */
+@media (max-width: 40rem) {
+  .login { margin: 1rem; max-width: none; }
+  .bar { gap: 0.5rem; padding: 0.5rem 0.75rem; }
+  .bar .who { font-size: 0.8rem; }
+  .bar .role { display: block; }
+}

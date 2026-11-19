@@ -12,9 +12,11 @@ with AWS SAM.
 
 The repository is an npm-workspaces monorepo: the back end in `backend/`, the code it shares
 with the browser front end (the API contract types, `Role`/`resolveRole`, the username schemas)
-in `shared/` (package `@shared-calendar/shared`), and in `frontend/` only the browser's services
-layer (`docs/FRONTEND_SERVICES.md`; the views are designed in `docs/FRONTEND_ARCHITECTURE.md`
-and not written yet). Layout and placement rules: `docs/FOLDER_STRUCTURE.md`.
+in `shared/` (package `@shared-calendar/shared`), and in `frontend/` the browser's services
+layer (`docs/FRONTEND_SERVICES.md`) and the start of its view layer
+(`docs/FRONTEND_ARCHITECTURE.md`: the build and the dev server, the shell and the login; the
+other views follow `docs/FRONTEND_VIEW_PLAN.md`). Layout and placement rules:
+`docs/FOLDER_STRUCTURE.md`.
 
 ## Where the truth lives
 
@@ -27,15 +29,17 @@ and not written yet). Layout and placement rules: `docs/FOLDER_STRUCTURE.md`.
 - `docs/SHARED_CALENDAR_SPEC.md` specifies the shared calendar (agreed with the Product Owner,
   brief 40, not yet implemented). It is the input for the calendar's plan steps; once merged into
   `ARCHITECTURE.md` (spec section 19), the architecture wins as usual.
-- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (decided, brief 81, not yet
-  implemented): plain HTML and CSS with one TypeScript module script, the layers (services, logic,
-  views, shell) and the rules of a view. Hosting, CORS, the bundle command and the dev server are
-  its open points (section 10). `docs/FRONTEND_SERVICES.md` stays the truth for the services;
+- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v2; the foundation
+  implemented, plan step 60): plain HTML and CSS with one TypeScript module script, the layers
+  (services, logic, views, shell), the rules of a view, and the tooling (its section 12: the
+  bundle command, the dev server, the tests' environment). Hosting, CORS, the session across a
+  reload, the hosting's Content-Security-Policy and logout are its open points (section 10).
+  `docs/FRONTEND_SERVICES.md` stays the truth for the services;
   `docs/FRONTEND_VIEW_OPTIONS.md` is the record of why this option, not a source of truth.
-- `docs/FRONTEND_VIEW_PLAN.md` defines the order of work for the views (brief 82, planned, no step
-  started): steps 60–69, each with its acceptance check, ending with all the views running against
-  the local stack. It settles the open points O4 (esbuild), O6 (`happy-dom`, views at 100 % line
-  coverage) and O8 (English only), which step 60 writes into `docs/FRONTEND_ARCHITECTURE.md`.
+- `docs/FRONTEND_VIEW_PLAN.md` defines the order of work for the views (brief 82): steps 60–69,
+  each with its acceptance check and its browser check, ending with all the views running against
+  the local stack. Step 60 (tooling, shell, login) is done (2026-11-19); next step 61, the week
+  calendar.
 - `docs/RENAME_PLAN.md` plans the move from the "hello-world" names to "shared-calendar" (plan
   steps 56–58: repository, new stack `shared-calendar-api`, retirement of `hello-world-api`), with
   the way back at every stage. The repository uses the new names (step 56) and the stack in use
@@ -152,8 +156,30 @@ form works the same. Paths below without a folder are relative to `backend/`.
   fails below 100 % line coverage on `src/lib` (HTML report in `coverage/`, git-ignored).
   `shared/` has the same 100 % threshold on `shared/src`.
 - `npm run typecheck -w frontend`, `npm run lint -w frontend`, `npm run test:unit -w frontend`
-  (100 % line coverage on `frontend/src`), `npm run verify -w frontend` (the three in order, stops
-  at the first failure; no Docker). The root `npm run verify` runs the back end's, then this.
+  (the vitest projects `unit`, in node, and `views`, in `happy-dom`, with one coverage report:
+  100 % line coverage on `frontend/src`, only `src/main.ts` left out), `npm run verify -w frontend`
+  (the three in order, stops at the first failure; no Docker). The root `npm run verify` runs the
+  back end's, then this.
+- `npm run dev -w frontend` (`frontend/scripts/dev.mjs`; `-- <port>` for another port than 5173):
+  the page on http://localhost:5173 against the local stack, foreground, for local work only.
+  Needs `local:up` (it reads the client id from `backend/env.local.json` and says so when the file
+  is missing) and, to sign in, `local:api`. Serves `/`, `/style.css` and `/app.js` (bundled by
+  esbuild at every request: an edit shows after a reload of the page; an edit to `dev.mjs` itself
+  needs a restart), passes `/api/…` on to `http://127.0.0.1:3000` and `/cognito/…` to
+  `http://localhost:9229` so that the browser sees one origin (the API has no CORS), sends
+  `Content-Security-Policy: default-src 'self'` with the page, listens on `127.0.0.1` only and
+  never prints a request's body or headers. The console's one known report is `zod`'s `eval`
+  probe (`docs/FRONTEND_ARCHITECTURE.md` section 10, open point O5). A reload of the page signs
+  out (open point O3). In a Codespace, open the forwarded port 5173: the bundle's addresses have
+  no host, so any origin works.
+- `API_URL=… COGNITO_URL=… CLIENT_ID=… npm run build -w frontend` (`frontend/scripts/build.mjs`):
+  writes `frontend/dist/` (git-ignored, emptied first): `index.html`, `style.css`, `app.js`
+  (minified) and `app.js.map`, and prints their sizes. The three values come from the environment
+  only, never from a committed file; a missing one stops the build and is named. No deploy of the
+  front end exists (hosting is open point O1), and `backend`'s `build` is another thing
+  (`sam build`).
+- Stopping a background `dev` by name: `pkill -f 'node scripts/dev[.]mjs'`, in a command that
+  holds no other text matching it (a shell whose command line matches is killed too).
 - `RUN_INTEGRATION=1 npm run test:integration -w frontend`: runs `frontend/tests/integration`
   (`login.service.test.ts`, `journeys.test.ts` and, since step 53, `calendar.test.ts`: the
   services against cognito-local on 9229 and the API on 3000, `docs/FRONTEND_SERVICES.md`
@@ -377,10 +403,11 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`, `budget.sh`, `check-sam.sh`; `target.sh` is
     sourced by the last three; the first two of those call `cognito.mjs`).
   - `docker/`: files for the local stack (`cognito-local-config.json`).
-- `frontend/`: package `frontend`, the services layer only (exception in `docs/FOLDER_STRUCTURE.md`
-  section 7). `package.json` (deps `rxjs`, `@shared-calendar/shared`; scripts `typecheck`, `lint`,
-  `test:unit`, `verify`; no `dev`/`build`/`deploy` yet), `tsconfig.json` (ES2022 + DOM, no node
-  types), `vitest.config.ts`, `src/services/` (`session.store.ts`; `cognito.ts` and `api.ts`, the
+- `frontend/`: package `frontend`: the services layer and the view layer's foundation
+  (`docs/FOLDER_STRUCTURE.md` section 7). `package.json` (deps `rxjs`, `@shared-calendar/shared`;
+  dev dep `happy-dom`; scripts `dev`, `build`, `typecheck`, `lint`, `test:unit`,
+  `test:integration`, `verify`; no `deploy` yet), `tsconfig.json` (ES2022 + DOM + DOM.Iterable, no
+  node types), `vitest.config.ts`, `src/services/` (`session.store.ts`; `cognito.ts` and `api.ts`, the
   building blocks the services share (`api.ts`: methods `GET`/`POST`/`PUT`/`PATCH`/`DELETE`,
   `query`, `conflicts` on `availability_conflict`, and the helpers `invalidRequest`,
   `unexpectedAnswer`, `hasString`); `login`, `refresh`, `hello`, `users` (with `listUsers`),
@@ -403,9 +430,25 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   imports only `rxjs`, `rxjs/fetch`, `rxjs/operators` and `@shared-calendar/shared`; configuration
   comes through the constructor, the `SessionStore` as the second argument. Tokens live only in
   the `SessionStore` (rule 9): no result, state or service field holds one.
-  No view, `index.html`, bundler, `template.yaml` or `dist/` yet: the views follow
-  `docs/FRONTEND_ARCHITECTURE.md` (no framework; folders in its section 9), and the build and the
-  hosting wait for its open points (section 10).
+  The view layer (`docs/FRONTEND_ARCHITECTURE.md`; no framework): `index.html` (all the markup,
+  everything `hidden`: the login `#login`; the frame `#app` with the header, an empty `nav` and an
+  empty `main.screen`; one module script `app.js`, one style sheet, nothing inline), `style.css`,
+  `src/main.ts` (the bundle's entry, one statement: the only file that knows the three constants
+  `API_URL`, `COGNITO_URL`, `CLIENT_ID`, which esbuild's `define` puts in), `src/views/`:
+  `shell.ts` (`runShell(config)` creates the `SessionStore`, the `LoginService` and the
+  `RefreshService`, starts the refresh and calls `mountShell(root, { store, login })`, which
+  shows the login on `null` and the frame on a session, reduced to `Person` = username and role
+  before anything else sees it; `distinctUntilChanged` on the two, so a refresh mounts nothing;
+  `enter(person)` fills the header and returns the subscription that everything of one person's
+  session is added to, where the navigation and the screens go; "Sign out" only clears the store)
+  and `login.view.ts` (`mountLogin(root, login)`, with `LoginDeps`, the part of the service it
+  uses; shows the service's `message` as it is until the logic layer has the texts). A view is
+  `mount<Name>(root, deps): Subscription` with a teardown that wipes what it put in the page.
+  `src/logic/` does not exist yet (first needed by plan step 61). `scripts/` (Node, outside the
+  browser's lint rules): `bundle.mjs` (the esbuild options the two share), `build.mjs`, `dev.mjs`.
+  `tests/unit/views/` (project `views`): `page.ts` (`useRealPage()`, `find`, `submit`),
+  `page.test.ts`, `login.view.test.ts`, `shell.test.ts`. No `template.yaml` yet: the hosting
+  waits for the open points of `docs/FRONTEND_ARCHITECTURE.md` section 10.
 - `shared/`: package `@shared-calendar/shared`, no build step (`exports` points at
   `src/index.ts`; each consumer bundles it). `src/api.ts` (response and error body types,
   `ApiErrorCode`), `src/roles.ts` (`Role`, `resolveRole`), `src/username.ts` (the username
@@ -416,7 +459,8 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   `cancellableUntil`; `defaults.ts`, default settings, limits and settings ranges), `src/index.ts`
   (re-exports); `tests/` mirrors `src/`.
 - Generated, git-ignored: root `node_modules/`; in `backend/`: `env.local.json`, `.cognito/`,
-  `.aws-sam/`, `.verify-ok`, `coverage/`; `shared/coverage/`; `frontend/coverage/`.
+  `.aws-sam/`, `.verify-ok`, `coverage/`; `shared/coverage/`; `frontend/coverage/`,
+  `frontend/dist/`.
 
 ## Test conventions
 
@@ -429,8 +473,10 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   tests what it does with it (the 400 answer, the handlers).
 - Unit tests mock AWS with `aws-sdk-client-mock`, never real endpoints.
 - `frontend/vitest.config.ts`: projects `unit` and `integration` like the back end (integration
-  selects files only with `RUN_INTEGRATION=1`); `test:unit` runs `unit` with 100 % line coverage on
-  `src/`, `test:integration` runs `integration`, as in the back end.
+  selects files only with `RUN_INTEGRATION=1`), and `views` (`tests/unit/views/**`, environment
+  `happy-dom`; `unit` stays in node and does not select that folder); `test:unit` runs `unit` and
+  `views` with 100 % line coverage on `src/` (`src/main.ts` left out by name), `test:integration`
+  runs `integration`, as in the back end.
   Unit tests stub `fetch` with `vi.stubGlobal` and real `Response` objects, no network, and use a
   service as a consumer would: subscribe first, then call. Tests that fake timers must fake
   `setInterval` too (RxJS's `timer` uses it), and keep test sessions within 24.8 days of the clock
@@ -438,3 +484,19 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   so the compiler does not stop a Node import in `frontend/src`; ESLint does (root
   `eslint.config.js`: only `rxjs`, `rxjs/fetch`, `rxjs/operators`, `@shared-calendar/shared` and
   relative imports, no Node globals). A new allowed import there is a design change.
+- The views' tests (`docs/FRONTEND_ARCHITECTURE.md` sections 8 and 12.3): every file calls
+  `useRealPage()` (`tests/unit/views/page.ts`), which loads the `<body>` of the real
+  `frontend/index.html` before each test; no test writes markup of its own, so a selector that
+  does not match the page fails. The mount function gets fake services: plain objects typed with
+  the view's `…Deps`, whose streams are subjects the test controls and whose methods are `vi.fn`.
+  The shell's test uses the real `SessionStore` (memory only). Every view's test has: each state
+  of each stream, each action of the user and its call, a text with `<script>` shown as text, and
+  nothing left in the page after unsubscribing. Under `happy-dom`, `import.meta.url` is not a
+  `file:` URL (use `import.meta.dirname`), parsing a whole page with `DOMParser` tries to load its
+  style sheet (use a `<template>`, as `pageAside()` does), and the native `<dialog>` has no Escape
+  key, no inertness and no focus handling: those are for the browser check.
+- Two more ESLint rules on the front end (root `eslint.config.js`): no `innerHTML`, `outerHTML` or
+  `insertAdjacentHTML` anywhere in `frontend/src`; no global `document` or `window` in
+  `frontend/src/services` and `frontend/src/logic` (a parameter with that name is allowed). The
+  second block repeats the Node globals, because a later `no-restricted-globals` for the same
+  files replaces the earlier list.

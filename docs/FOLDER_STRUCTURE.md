@@ -70,17 +70,25 @@ stays at the root.
 │   ├── scripts/                 # operator scripts (local stack, verify, deploy, smoke, budget…)
 │   └── (generated, git-ignored) env.local.json  .cognito/  .aws-sam/  .verify-ok  coverage/
 │
-├── frontend/                    # ── the browser app (services layer only; section 7) ────
-│   ├── package.json             # name "frontend"; deps rxjs, shared; typecheck/lint/test:unit/verify
+├── frontend/                    # ── the browser app (section 7) ─────────────────────────
+│   ├── package.json             # name "frontend"; deps rxjs, shared; dev dep happy-dom;
+│   │                            # dev/build/typecheck/lint/test:unit/verify
 │   ├── tsconfig.json            # extends ../tsconfig.base.json; lib ES2022 + DOM, no node types
-│   ├── vitest.config.ts         # projects unit + integration; 100 % line coverage on src/
-│   ├── src/services/            # the services layer (docs/FRONTEND_SERVICES.md): session store,
-│   │                            # login, refresh, hello, users; shared cognito.ts and api.ts
+│   ├── vitest.config.ts         # projects unit (node) + views (happy-dom) + integration;
+│   │                            # 100 % line coverage on src/ (src/main.ts left out)
+│   ├── index.html               # all the markup of every view (docs/FRONTEND_ARCHITECTURE.md)
+│   ├── style.css                # the one style sheet
+│   ├── scripts/                 # Node scripts: bundle.mjs (shared esbuild options), build.mjs, dev.mjs
+│   ├── src/
+│   │   ├── main.ts              # the entry file of the bundle: the configuration, then the shell
+│   │   ├── services/            # the services layer (docs/FRONTEND_SERVICES.md): session store,
+│   │   │                        # login, refresh, hello, users, the calendar's; cognito.ts and api.ts
+│   │   └── views/               # shell.ts and one <name>.view.ts per view (later also ../logic/)
 │   ├── tests/
-│   │   ├── unit/                # mirrors src/ (plus fixtures.ts)
+│   │   ├── unit/                # mirrors src/ (plus services/fixtures.ts, views/page.ts)
 │   │   └── integration/         # login and the services' journeys against the local stack
-│   ├── (reserved, not yet) index.html  vite.config.ts  public/  template.yaml  scripts/
-│   └── (generated, git-ignored) coverage/   (later dist/)
+│   ├── (reserved, not yet) template.yaml
+│   └── (generated, git-ignored) coverage/  dist/
 │
 └── shared/                      # ── what both import ─────────────────────────────────────
     ├── package.json             # name "@shared-calendar/shared"; exports ./src/index.ts
@@ -118,7 +126,7 @@ three folders the extra level would add nesting without adding information.
 | A page that explains an integration journey | `docs/journeys/backend` or `docs/journeys/frontend`, format in `docs/journeys/README.md` | Section 8 |
 | A tool configuration every package needs (lint rule, TypeScript strictness, Node version) | The root | One setting, one place |
 | A check that runs over every package (the comment check of CLAUDE.md, "Comments") | `scripts/` at the root | It reads every package's files; `npm run lint` (root and `-w backend`) runs it |
-| A tool configuration one package needs (Vite, SAM, vitest coverage thresholds) | That package | Each package owns its build |
+| A tool configuration one package needs (SAM, vitest projects and coverage thresholds) | That package | Each package owns its build |
 
 Two rules carried over from the architecture, unchanged by the move:
 
@@ -146,13 +154,13 @@ with the package folder as the working directory, which is what the back-end scr
 
 Tooling that every package uses the same way (`typescript`, `eslint`, `vitest`, `esbuild`) is
 a devDependency of the **root**, so there is exactly one version of each in the repository.
-Tooling that only one package uses (`aws-sdk-client-mock`, `@types/aws-lambda`, Vite, a UI
-framework) is a devDependency of that package.
+Tooling that only one package uses (`aws-sdk-client-mock`, `@types/aws-lambda`, `happy-dom`) is
+a devDependency of that package.
 
 ### 4.2 The shared package has no build step
 
 `shared/package.json` points its `exports` straight at `./src/index.ts`. Every consumer
-already compiles TypeScript itself (esbuild through SAM for the Lambdas, Vite for the
+already compiles TypeScript itself (esbuild through SAM for the Lambdas, esbuild for the
 browser, vitest for the tests), so the shared code is bundled from source and there is no
 `dist/` to keep in sync and no "forgot to rebuild shared" class of bug. The price is that
 every consumer must be a bundler; a plain `node shared/src/x.ts` would not run, and that is
@@ -273,41 +281,50 @@ the logger, the password generator (server-side secret handling), and everything
 
 ---
 
-## 7. The front-end folder, reserved
+## 7. The front-end folder
 
 The front end is a browser single-page application in TypeScript built to static files
 (decided 2026-11-04). Its own architecture document, `docs/FRONTEND_ARCHITECTURE.md`, fixes the
 view layer (2026-11-16: plain HTML and CSS with one TypeScript module script, no framework; the
-folders for the views in its section 9) and will fix the hosting and the build, which are its
-open points. This section only fixes what the folder must look
-like so that it fits the repository on day one:
+folders for the views in its section 9; 2026-11-19: the build and the dev server, its section 12)
+and will fix the hosting, which is among its open points. This section only fixes what the folder
+must look like so that it fits the repository:
 
 - `frontend/package.json`, name `frontend`, depends on `@shared-calendar/shared`; scripts
   `dev`, `build`, `typecheck`, `lint`, `test:unit`, `verify`, `deploy`, so that the root
   scripts of section 5 pick it up with no change.
 - Builds to `frontend/dist/` (git-ignored). Nothing in `backend/` is touched by a front-end
-  build or deploy, and the other way round.
+  build or deploy, and the other way round. The build is `frontend/scripts/build.mjs` (esbuild,
+  already a development dependency of the root): no Vite, no configuration file of a tool. It
+  takes the API's URL, Cognito's URL and the client id from three environment variables
+  (`docs/FRONTEND_ARCHITECTURE.md` section 12.1).
 - Its hosting (an S3 bucket behind CloudFront, or equivalent) is a **separate** SAM template
   and stack, `frontend/template.yaml`, so that the back-end stack `shared-calendar-api` is never
   changed by a UI release. The front end reads the back end's `ApiUrl`, `UserPoolId` and
   `UserPoolClientId` from the back-end stack outputs at build time (the way
   `backend/scripts/target.sh` does), never from a file committed in the repository.
-- Local development: the front end's dev server points at `http://127.0.0.1:3000` (the local
-  API of `npm run local:api -w backend`) and `http://localhost:9229` (cognito-local), so the
-  whole application runs on the laptop, which keeps requirement N5 true for the UI too.
+- Local development: the front end's dev server (`npm run dev -w frontend`,
+  `frontend/scripts/dev.mjs`) passes `/api` on to `http://127.0.0.1:3000` (the local API of
+  `npm run local:api -w backend`) and `/cognito` to `http://localhost:9229` (cognito-local), and
+  reads the client id from `backend/env.local.json`, so the whole application runs on the laptop,
+  which keeps requirement N5 true for the UI too.
 - It validates input with the same `shared/` schemas the API uses, so a username the UI
   accepts is one the API accepts.
 
-Nothing else is created in `frontend/` until its architecture document exists; the folder is
-named here so that no one puts browser code anywhere else in the meantime. **The one exception:
-the services layer exists since 2026-11-05** (brief `prompts/31-implement-login-service.md`,
-design `docs/FRONTEND_SERVICES.md`): plain TypeScript with `rxjs` and `shared/`, which depends on
-nothing the architecture will choose. Hence a minimal package (`package.json`, `tsconfig.json`,
-`vitest.config.ts`, `src/services/`, `tests/`) with `typecheck`, `lint`, `test:unit` and `verify`.
-Everything else waits for the views to be written and for the open points of
-`docs/FRONTEND_ARCHITECTURE.md` section 10: no bundler, no
-`index.html`, no `template.yaml`, no `dist/`, and no `dev`, `build` or `deploy` script (the root
-scripts use `--if-present`, so their absence is not an error).
+What exists:
+
+- **The services layer, since 2026-11-05** (brief `prompts/31-implement-login-service.md`, design
+  `docs/FRONTEND_SERVICES.md`): plain TypeScript with `rxjs` and `shared/`, in `src/services/`,
+  with `typecheck`, `lint`, `test:unit` and `verify`.
+- **The foundation of the view layer, since 2026-11-19** (`docs/FRONTEND_VIEW_PLAN.md` step 60,
+  design `docs/FRONTEND_ARCHITECTURE.md`): `index.html`, `style.css`, `src/main.ts`, `src/views/`
+  (the shell and the login view), `scripts/` (the build and the dev server), the scripts `dev`
+  and `build`, and `happy-dom` for the views' tests, the package's one development dependency of
+  its own (section 4.1). The other views and `src/logic/` come with the following plan steps.
+
+What still waits for the open points of `docs/FRONTEND_ARCHITECTURE.md` section 10: the hosting,
+so no `template.yaml` and no `deploy` script (the root scripts use `--if-present`, so their
+absence is not an error).
 
 ---
 
@@ -346,7 +363,7 @@ depth and need no change. After the move the generated files appear here:
 | `backend/.aws-sam/` | backend | `sam build` |
 | `backend/.verify-ok` | backend | `verify.sh` |
 | `backend/coverage/`, `shared/coverage/`, `frontend/coverage/` | each package | vitest |
-| `frontend/dist/` (not yet: no build until the front-end architecture) | frontend | Vite |
+| `frontend/dist/` | frontend | esbuild (`npm run build -w frontend`, `frontend/scripts/build.mjs`) |
 
 ---
 

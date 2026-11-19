@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Status | v1 — **decided, not implemented** (2026-11-16, brief `prompts/81-frontend-architecture-view-layer.md`). No view exists yet in `frontend/` |
+| Status | v2 — **decided; the foundation implemented** (2026-11-19, `docs/FRONTEND_VIEW_PLAN.md` step 60, brief `prompts/83-step-60-implementation.md`): the build and dev-server commands, the tests' environment, the shell (without navigation) and the login view exist in `frontend/`. The logic layer and the other views follow, one plan step each |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders |
-| Not in scope yet | Hosting, the CORS gap, keeping the session across a reload, the bundle command and the dev server, the Content-Security-Policy of the hosting, logout, the language of the texts. They are the open points of section 10, for later versions of this document |
-| Depends on | `docs/FRONTEND_SERVICES.md` v7 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7 |
+| Not in scope yet | Hosting, the CORS gap, keeping the session across a reload, the Content-Security-Policy of the hosting, logout. They are the open points of section 10, for later versions of this document |
+| Depends on | `docs/FRONTEND_SERVICES.md` v7 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work) |
 | Why this choice | `docs/FRONTEND_VIEW_OPTIONS.md` v3: the options compared (plain HTML/CSS, `lit-html`, Lit, React, Angular, Svelte) and the reasons. Not repeated here |
 
 ### Change log
@@ -13,6 +13,7 @@
 | Version | Date | Change |
 |---|---|---|
 | v1 | 2026-11-16 | First version: the view layer. Plain HTML and CSS with one TypeScript module script; `lit-html` as the fallback for a single view. Everything else is an open point (section 10). |
+| v2 | 2026-11-19 | Plan step 60. The open points O4 (esbuild: the build and the dev server), O6 (`happy-dom`, the views inside the 100 % line coverage) and O8 (English only) are decided, with their details in the new section 12. Section 4: the login view takes the part of the `LoginService` it uses. Section 6: the shell's two functions, the header, "Sign out". Section 8: how the tests get their document, and what `happy-dom` does not emulate of the native `<dialog>`. Section 9: the tree as built, the two lint rules in place. Section 11: decisions 15 to 21. |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
 TypeScript module script**. The markup of every screen is in one `index.html`; the script
@@ -32,7 +33,7 @@ code of that view proves painful (section 7).
 - `docs/ARCHITECTURE.md` stays the source of truth for the API. On any conflict it wins.
 - `docs/FRONTEND_VIEW_OPTIONS.md` is the record of why this option was chosen. It is not a source
   of truth: where it differs from this document, this document is right.
-- The order of work belongs to `docs/IMPLEMENTATION_PLAN.md`, which has no step for the views yet.
+- The order of work belongs to `docs/FRONTEND_VIEW_PLAN.md` (steps 60 to 69).
 
 The choice was tried before it was made: the login view and the week calendar were written twice,
 in plain HTML/CSS and with `lit-html`, against the real services and the local stack. Several
@@ -138,7 +139,10 @@ The login view, complete. The markup, in `index.html`:
 The mount function:
 
 ```ts
-export function mountLogin(root: HTMLElement, login: LoginService): Subscription {
+// What the view uses of the service: one method and one stream.
+export type LoginDeps = Pick<LoginService, 'login' | 'loginState$'>;
+
+export function mountLogin(root: HTMLElement, login: LoginDeps): Subscription {
   // 1. Find the elements, once.
   const form = root.querySelector('form')!;
   const button = root.querySelector('button')!;
@@ -165,6 +169,10 @@ export function mountLogin(root: HTMLElement, login: LoginService): Subscription
   return subscription;
 }
 ```
+
+**What a view asks of a service** is the part it uses, named as a type (`Pick<…>`). A real
+service fits it, and so does the plain object a test passes (section 8); a class with private
+fields could not be replaced by one.
 
 **How the two meet.** The contract between the HTML and the TypeScript is the selectors: an `id`
 for a view's root and for each `<template>`, class names for the elements inside, `name`
@@ -256,16 +264,26 @@ The view subscribes to `week$` and forwards three buttons to `previous()`, `toda
 
 ## 6. The shell
 
-The shell is the start-up code, one function called by the entry file of the bundle.
+The shell is the start-up code, one function called by the entry file of the bundle:
+`runShell(config)`, in `frontend/src/views/shell.ts`. It creates what lives as long as the page
+(point 1) and calls `mountShell(root, { store, login })`, which does the rest and is what the
+shell's DOM test drives, with a store and a login of its own.
 
 1. **It creates the `SessionStore`, the `LoginService` and the `RefreshService` once**, with the
-   configuration (the API's URL, Cognito's URL, the client id). Where the configuration comes
-   from belongs to the bundle command (section 10, open point O4).
+   configuration (the API's URL, Cognito's URL, the client id), which it receives as one plain
+   object and never looks up itself (section 12.1). It starts the automatic refresh
+   (`docs/FRONTEND_SERVICES.md` section 11.6).
 2. **It subscribes to `store.session$`** (`docs/FRONTEND_SERVICES.md` section 9.5). `null` shows
    and mounts the login view. A session hides it and shows the application, with the navigation
-   its `role` allows.
+   its `role` allows. The application's frame is one element of `index.html` (`#app`): a header
+   with the username, the role in words ("Administrator" or "User") and "Sign out", the
+   navigation, and the main area where the screens are. The shell fills the header when a person
+   enters and empties it when that person leaves. "Sign out" clears the `SessionStore` and does
+   nothing else (section 10, open point O7): the screen changes because `session$` then notifies
+   `null`.
 3. **A refreshed session is the same person.** The shell reacts only when the username or the
-   role changes (`distinctUntilChanged`), so a token refresh leaves the screen as it is.
+   role changes (`distinctUntilChanged`), so a token refresh leaves the screen as it is. The session is
+   reduced to the username and the role before anything else sees it (section 3, rule 11).
 4. **New API services and logic objects for every session.** They are created when a session
    starts and dropped when it ends, so that nothing of one person's data can be replayed to the
    next (the services' result streams replay their last value).
@@ -329,56 +347,82 @@ services and the logic layer would not change.
 - **No test of a view needs the network.** The existing integration journeys of `frontend/`
   already cover the services against the local stack.
 
-The DOM emulation to use and whether the views are held to 100 % line coverage are open (section
-10, open point O6).
+The emulated document is `happy-dom`'s, and the views are inside the 100 % line coverage of
+`frontend/src` (section 12.3).
+
+**What `happy-dom` does not emulate of the native `<dialog>`** (tried with `happy-dom` 21, plan
+step 60). It does: `showModal()`, `close()`, the property and the attribute `open`,
+`returnValue`, the `close` event, and a `<form method="dialog">` closing its dialog. It does
+not, so these are checked in a browser only:
+
+- the Escape key does not close a dialog, and there is no `cancel` event;
+- a modal dialog does not make the rest of the page inert: a click on an element outside it
+  still arrives;
+- the focus does not move into the dialog when it opens, nor back when it closes;
+- `:modal` never matches, and there is no `requestClose()`;
+- the `close` event is sent at once, inside `close()`; a browser sends it a moment later.
+
+A view's test may therefore call `close()` to stand for the Escape key, and must not rely on the
+order between `close()` returning and the `close` event.
 
 ## 9. Placement
 
-Inside `frontend/`, next to what exists:
+Inside `frontend/`, next to the services:
 
 ```
 frontend/
 ├── index.html                 # all the markup: one element per view, the dialogs, the <template>s
 ├── style.css                  # the one style sheet
+├── scripts/                   # Node, not the browser: the bundle command and the dev server (section 12)
+│   ├── bundle.mjs             # what the two share: how src/main.ts becomes app.js
+│   ├── build.mjs              # npm run build -w frontend → dist/
+│   └── dev.mjs                # npm run dev -w frontend → http://localhost:5173
 ├── src/
-│   ├── main.ts                # the entry file of the bundle: calls the shell
-│   ├── services/              # exists (docs/FRONTEND_SERVICES.md)
-│   ├── logic/                 # the logic layer: <name>.ts, no DOM
+│   ├── main.ts                # the entry file of the bundle: the configuration, then the shell
+│   ├── services/              # docs/FRONTEND_SERVICES.md
+│   ├── logic/                 # the logic layer: <name>.ts, no DOM (created with the first screen that needs it)
 │   └── views/                 # shell.ts and one <name>.view.ts per view
-└── tests/
-    └── unit/
-        ├── services/          # exists
-        ├── logic/             # mirrors src/logic
-        └── views/             # mirrors src/views: the DOM tests
+├── tests/
+│   └── unit/
+│       ├── services/          # vitest project `unit`, in node
+│       ├── logic/             # mirrors src/logic; project `unit`
+│       └── views/             # mirrors src/views: the DOM tests, vitest project `views` (happy-dom);
+│                              # page.ts loads the real index.html
+└── dist/                      # generated, git-ignored: index.html, style.css, app.js, app.js.map
 ```
 
 - The lint rule on imports of `frontend/src` stays as it is (`rxjs`, `rxjs/fetch`,
   `rxjs/operators`, `@shared-calendar/shared`, relative paths): the views and the logic add no
   import.
-- Two lint rules are added with the first view: no `innerHTML`, `outerHTML` or
-  `insertAdjacentHTML` in `frontend/src` (section 3, rule 5), and no `document` or `window` in
-  `frontend/src/logic` and `frontend/src/services` (section 2).
-- Where the built files go and how `index.html` and `style.css` reach them belongs to the bundle
-  command (section 10, open point O4).
+- Two lint rules guard the layers (root `eslint.config.js`): no `innerHTML`, `outerHTML` or
+  `insertAdjacentHTML` in `frontend/src` (section 3, rule 5), and no global `document` or
+  `window` in `frontend/src/logic` and `frontend/src/services` (section 2). The second is on the
+  global: a parameter named `window` is not concerned.
+- `frontend/scripts/*.mjs` run in Node and are outside the rules for the browser's code; the
+  comment rule of `CLAUDE.md` applies to them.
+- `index.html` names its script and its style sheet `app.js` and `style.css`, the names the
+  build writes and the dev server answers to, so the same page is served by both.
 
-`docs/FOLDER_STRUCTURE.md` section 7 is updated when these files are created, not before.
 
 ## 10. Open points
 
 Not decided by this version. "Blocks" says what cannot be done before the point is settled.
+O4, O6 and O8 were decided with `docs/FRONTEND_VIEW_PLAN.md` (its section 2) and are no longer
+open: their rows say where the decision is written.
 
 | # | Point | Direction, where there is one | Blocks |
 |---|---|---|---|
 | O1 | **Hosting.** Static files on an S3 bucket behind CloudFront, or equivalent, in its own SAM template (`docs/FOLDER_STRUCTURE.md` section 7) | Fixed in principle there; the template, the domain and the deploy script are not designed | The first deployment |
-| O2 | **The CORS gap.** The API answers no cross-origin request (`docs/FRONTEND_SERVICES.md` section 10.3) | One origin for the page and the API (the hosting routes a path to the API), or a `CorsConfiguration` on the API naming the page's origin. Decided with O1. Locally, a dev server that passes the API's and Cognito's paths on gives one origin | The first deployment. The first run in a browser, unless the dev server of O4 gives one origin |
+| O2 | **The CORS gap.** The API answers no cross-origin request (`docs/FRONTEND_SERVICES.md` section 10.3) | One origin for the page and the API (the hosting routes a path to the API), or a `CorsConfiguration` on the API naming the page's origin. Decided with O1. Locally the dev server passes the API's and Cognito's paths on, which gives one origin (section 12.2): the gap does not bite there, and is not solved | The first deployment |
 | O3 | **The session across a reload.** In memory only: a reload means signing in again (`docs/FRONTEND_SERVICES.md` section 9.6) | `sessionStorage` is the candidate named there. Decided with O5 | Nothing: the application works without it |
-| O4 | **The bundle command and the dev server**, and with them where the configuration comes from and where the built files go | Any bundler that reads TypeScript. esbuild is already a development dependency of the repository and one command is enough for this choice; `docs/FOLDER_STRUCTURE.md` section 9 foresees Vite | The first run in a browser |
-| O5 | **The Content-Security-Policy of the hosting** | `default-src 'self'` worked in the trial. To settle: `zod` probes for `eval` when it starts, which such a policy reports in the console (it is caught, and harmless) | The first deployment |
-| O6 | **The DOM emulation for the views' tests** (`happy-dom` or `jsdom`, one development dependency) **and the coverage of the views**: `frontend/vitest.config.ts` holds all of `frontend/src` to 100 % lines | To decide: the views inside the threshold, or a threshold of their own | The first view |
+| O4 | **The bundle command and the dev server**, and with them where the configuration comes from and where the built files go | **Decided: esbuild**, two Node scripts. Sections 12.1 and 12.2 | Nothing any more |
+| O5 | **The Content-Security-Policy of the hosting** | `default-src 'self'` works: the dev server sends it (section 12.2). To settle: `zod` probes for `eval` when it starts, which such a policy reports in the console (it is caught, and harmless) | The first deployment |
+| O6 | **The DOM emulation for the views' tests and the coverage of the views** | **Decided: `happy-dom`, and the views inside the 100 % line coverage** of `frontend/src`. Section 12.3 | Nothing any more |
 | O7 | **Logout.** Not designed in the services layer (`docs/FRONTEND_SERVICES.md`, status line) | The shell needs it. Until then "Sign out" can only clear the `SessionStore`, which leaves the refresh token valid at Cognito | The first deployment |
-| O8 | **The language of the interface** and where its texts are kept | Not asked yet. The texts that depend on data are already in one place, the logic layer (section 5) | The first view, for the language; nothing else |
+| O8 | **The language of the interface** and where its texts are kept | **Decided: English only**, no translation mechanism. Section 12.4 | Nothing any more |
 
-The first view can be written once O6 is settled, and seen in a browser once O4 is.
+What is still open stands between the front end and its first deployment, not between it and
+the next view.
 
 ## 11. Decisions and assumptions
 
@@ -398,6 +442,87 @@ than what the trial showed: these deserve the first look in a review.
 | 9 | Navigation is the URL's hash, read as a stream; no router library (section 6, point 6) | A few screens, one page; the back button and a reloadable address for free | Sketched in the recommendation, not tried: the trial had one screen per role |
 | 10 | Every view has a DOM test against the real `index.html`, with fake services (section 8) | It is the answer to the selectors the compiler cannot check | Assumed in the recommendation, to be completed by O6. The trial had no automated test |
 | 11 | Editing never happens inline in a redrawn list (section 3, rule 4) | A constraint on the screens, accepted for simplicity; lifting it for a view is a trigger for the fallback | |
-| 12 | The folders of section 9: `src/logic/`, `src/views/`, `src/main.ts`, `index.html` and `style.css` in `frontend/` | Next to `src/services/`, one folder per layer; `index.html` where `docs/FOLDER_STRUCTURE.md` section 2 reserves it | Yes. The place of `style.css` may move with O4 |
-| 13 | Two lint rules are added with the first view: no `innerHTML` and its relatives; no DOM in `logic/` and `services/` (section 9) | A rule that lint can check is not left to review | The second one, yes |
+| 12 | The folders of section 9: `src/logic/`, `src/views/`, `src/main.ts`, `index.html` and `style.css` in `frontend/` | Next to `src/services/`, one folder per layer; `index.html` where `docs/FOLDER_STRUCTURE.md` section 2 reserves it | Yes |
+| 13 | Two lint rules, in place since the first view: no `innerHTML` and its relatives; no DOM in `logic/` and `services/` (section 9) | A rule that lint can check is not left to review | The second one, yes |
 | 14 | The logic layer is inside the 100 % line coverage of `frontend/src` (section 5, rule 7) | It is where the rules of the screens are; it needs no DOM to be tested | Yes |
+| 15 | esbuild bundles; two Node scripts, `build.mjs` and `dev.mjs`, and a third file, `bundle.mjs`, with the options they share (section 12.1) | Already a development dependency; no configuration file of a tool. The shared file keeps the dev server and the build from drifting apart (the target, the format, the constants) | The third file |
+| 16 | The configuration is three constants, `API_URL`, `COGNITO_URL` and `CLIENT_ID`, put in by esbuild's `define` and read in `src/main.ts` only (section 12.1) | `docs/FRONTEND_SERVICES.md` section 2, rule 3: nothing below the entry file knows where a value comes from; nothing about a stack is in a committed file | |
+| 17 | Under the dev server the two addresses have no host: `/api` and `/cognito/` (section 12.2) | The browser completes them with the origin the page came from, so the same bundle works on `localhost` and through a forwarded port of a Codespace, where the server cannot know its public name | Yes: "the dev server's own origin" was first meant as a full address |
+| 18 | The dev server listens on `127.0.0.1` only, and answers `/favicon.ico` with an empty 204 (section 12.2) | It passes requests on to the local stack: not for the network. A 404 for the icon would be an error in the browser's console at every load | Yes |
+| 19 | The views' tests run in a vitest project of their own, `views`, with `happy-dom`; the `unit` project stays in `node` (section 12.3) | A folder gets an environment through a project; the alternative vitest offers, a `@vitest-environment` comment, is per file and can be forgotten. In `node` a DOM global in a service or in the logic fails the test | |
+| 20 | `src/main.ts` is the one file left out of the coverage, by name (section 12.3) | One statement, which needs the three constants only the bundle command defines; the browser check runs it | |
+| 21 | English only; the fixed texts are in `index.html`, the texts that depend on data in the logic layer (section 12.4) | Decided with the plan. Until the logic layer exists, the login shows the service's `message` and the shell holds the two role names | The interim, yes |
+
+## 12. The tooling (open points O4, O6 and O8, decided)
+
+### 12.1 The bundle command
+
+`npm run build -w frontend` runs `frontend/scripts/build.mjs`, which writes `frontend/dist/`
+(git-ignored, emptied first):
+
+| File | What it is |
+|---|---|
+| `dist/index.html`, `dist/style.css` | Copies of `frontend/index.html` and `frontend/style.css`, unchanged |
+| `dist/app.js` | `src/main.ts` and everything it imports, as one minified module script (esbuild: `bundle`, format `esm`, target `es2022`) |
+| `dist/app.js.map` | The source map, a file of its own, named in the last line of `app.js` |
+
+**The configuration** reaches the bundle as three constants, which esbuild's `define` writes in
+place of their names:
+
+| Constant | What | In a build | Under the dev server |
+|---|---|---|---|
+| `API_URL` | The API's base address, no trailing slash | Environment variable `API_URL` | `/api` |
+| `COGNITO_URL` | Where `InitiateAuth` is posted | Environment variable `COGNITO_URL` | `/cognito/` |
+| `CLIENT_ID` | The app client of the user pool | Environment variable `CLIENT_ID` | `AuthorizerFunction.CLIENT_ID` of `backend/env.local.json` |
+
+They are declared and read in `frontend/src/main.ts` and nowhere else; it hands them to the shell
+as one plain object (`docs/FRONTEND_SERVICES.md` section 2, rule 3). A build with one of the
+three variables missing stops and names it. No value is written in a committed file
+(`docs/FOLDER_STRUCTURE.md` section 7). Which values a deployment uses, and the script that reads
+them from the stack's outputs, belong to the hosting (section 10, open point O1).
+
+The build prints the size of each file, as it is and compressed. At plan step 60, with the login
+only: `app.js` 490 kB, 105 kB compressed. Of the 490 kB, 454 are `zod` (264 of them its messages
+in other languages), which `shared/`'s schemas bring in with any import from
+`@shared-calendar/shared`; the services, `shared/`, the views and `rxjs` together are 36 kB.
+
+### 12.2 The dev server
+
+`npm run dev -w frontend` runs `frontend/scripts/dev.mjs`: Node's own HTTP server and esbuild,
+nothing else. For local work only; it needs `npm run local:up -w backend` (it reads the client
+id, and says so when the file is missing) and, to sign in, `npm run local:api -w backend`.
+
+- Port 5173, or the one given (`npm run dev -w frontend -- 5180`); it listens on this machine
+  only (`127.0.0.1`).
+- It answers `/` (`index.html`), `/style.css` and `/app.js`, and reads nothing else from the
+  disk. `/app.js` is bundled again at every request, with the source map inside it: an edit
+  shows after a reload of the page. When esbuild refuses the code the answer is a 500 with the
+  error, also printed in the terminal, and the page stays blank.
+- It passes `/api/…` on to `http://127.0.0.1:3000` and `/cognito/…` to `http://localhost:9229`,
+  so the browser sees **one origin** (section 10, open point O2). The two addresses in the
+  bundle have no host; the browser completes them with the page's origin.
+- It sends `Content-Security-Policy: default-src 'self'` with the page and
+  `cache-control: no-store` with every answer.
+- It never prints a request's body or headers: the login's body holds a password, and the API
+  calls carry a token.
+
+### 12.3 The tests' environment
+
+- `happy-dom` is a development dependency of `frontend`, the only one the view layer adds.
+- `frontend/vitest.config.ts` has a project `views` (`tests/unit/views/**/*.test.ts`,
+  environment `happy-dom`) beside `unit` (the services and the logic, environment `node`, which
+  no longer selects that folder). `npm run test:unit -w frontend` runs both, with one coverage
+  report.
+- `frontend/tests/unit/views/page.ts` loads the `<body>` of the real `index.html` into the
+  emulated document before each test (`useRealPage()`); no view test writes markup of its own.
+  `page.test.ts` checks the page itself: one module script and one style sheet, nothing inline,
+  everything hidden at the start.
+- All of `frontend/src` is held to 100 % lines, the views and the shell included. The one file
+  left out, by name, is `src/main.ts`.
+
+### 12.4 The language
+
+English only, with no translation mechanism. The fixed texts are written in `index.html`; the
+texts that depend on data are made by the logic layer (section 5). Until that layer has its
+texts (`docs/FRONTEND_VIEW_PLAN.md` step 61), the login view shows the `message` of the service
+as it is, and the shell holds the two names of the roles.

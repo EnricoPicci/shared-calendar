@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shared calendar</title>
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <!-- Everything starts hidden: the script shows the login or the frame (src/views/shell.ts). -->
+
+    <!-- The login view (src/views/login.view.ts) -->
+    <main id="login" class="login" hidden>
+      <h1>Shared calendar</h1>
+      <form>
+        <label>Username <input name="username" autocomplete="username" autocapitalize="none" required /></label>
+        <label>Password <input name="password" type="password" autocomplete="current-password" required /></label>
+        <button class="primary">Sign in</button>
+        <p class="error" role="alert"></p>
+      </form>
+    </main>
+
+    <!-- The frame of the application, for a signed-in person (src/views/shell.ts) -->
+    <div id="app" hidden>
+      <header class="bar">
+        <strong class="title">Shared calendar</strong>
+        <span class="who"><span class="username"></span> <span class="role"></span></span>
+        <button type="button" class="sign-out">Sign out</button>
+      </header>
+      <nav class="nav" aria-label="Screens"></nav>
+      <main class="screen"></main>
+    </div>
+  </body>
+</html>
