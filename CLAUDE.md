@@ -14,8 +14,9 @@ The repository is an npm-workspaces monorepo: the back end in `backend/`, the co
 with the browser front end (the API contract types, `Role`/`resolveRole`, the username schemas)
 in `shared/` (package `@shared-calendar/shared`), and in `frontend/` the browser's services
 layer (`docs/FRONTEND_SERVICES.md`) and the start of its view layer
-(`docs/FRONTEND_ARCHITECTURE.md`: the build and the dev server, the shell and the login; the
-other views follow `docs/FRONTEND_VIEW_PLAN.md`). Layout and placement rules:
+(`docs/FRONTEND_ARCHITECTURE.md`: the build and the dev server, the shell with its navigation,
+the login, the logic layer and the week calendar, read-only; the other views follow
+`docs/FRONTEND_VIEW_PLAN.md`). Layout and placement rules:
 `docs/FOLDER_STRUCTURE.md`.
 
 ## Where the truth lives
@@ -29,17 +30,20 @@ other views follow `docs/FRONTEND_VIEW_PLAN.md`). Layout and placement rules:
 - `docs/SHARED_CALENDAR_SPEC.md` specifies the shared calendar (agreed with the Product Owner,
   brief 40, not yet implemented). It is the input for the calendar's plan steps; once merged into
   `ARCHITECTURE.md` (spec section 19), the architecture wins as usual.
-- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v2; the foundation
-  implemented, plan step 60): plain HTML and CSS with one TypeScript module script, the layers
-  (services, logic, views, shell), the rules of a view, and the tooling (its section 12: the
-  bundle command, the dev server, the tests' environment). Hosting, CORS, the session across a
-  reload, the hosting's Content-Security-Policy and logout are its open points (section 10).
+- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v3; the foundation and the
+  week implemented, plan steps 60 and 61): plain HTML and CSS with one TypeScript module script,
+  the layers (services, logic, views, shell), the rules of a view, the logic layer as built (its
+  section 5.1), the table of screens and the navigation by the hash (its section 6), and the
+  tooling (its section 12: the bundle command, the dev server, the tests' environment). Hosting,
+  CORS, the session across a reload, the hosting's Content-Security-Policy, logout and the size
+  of the bundle are its open points (section 10).
   `docs/FRONTEND_SERVICES.md` stays the truth for the services;
   `docs/FRONTEND_VIEW_OPTIONS.md` is the record of why this option, not a source of truth.
 - `docs/FRONTEND_VIEW_PLAN.md` defines the order of work for the views (brief 82): steps 60–69,
   each with its acceptance check and its browser check, ending with all the views running against
-  the local stack. Step 60 (tooling, shell, login) is done (2026-11-19); next step 61, the week
-  calendar.
+  the local stack. Steps 60 (tooling, shell, login) and 61 (the logic layer, the week calendar
+  read-only, the navigation, the local seed) are done (2026-11-19); next step 62, booking and
+  cancelling.
 - `docs/RENAME_PLAN.md` plans the move from the "hello-world" names to "shared-calendar" (plan
   steps 56–58: repository, new stack `shared-calendar-api`, retirement of `hello-world-api`), with
   the way back at every stage. The repository uses the new names (step 56) and the stack in use
@@ -172,6 +176,19 @@ form works the same. Paths below without a folder are relative to `backend/`.
   probe (`docs/FRONTEND_ARCHITECTURE.md` section 10, open point O5). A reload of the page signs
   out (open point O3). In a Codespace, open the forwarded port 5173: the bundle's addresses have
   no host, so any origin works.
+- `npm run seed:local -w frontend` (`frontend/scripts/seed-local.mjs`): gives the local calendar
+  a week to look at, through the local API (needs `local:up` + `local:api`). As `admin`: the
+  types "Studio" and "Piscina" and 8 weekly patterns, valid for 60 days from today (today in the
+  calendar's zone, read from the settings), so the dates the front end's integration journeys
+  use (from today + 330 days) stay free. As `alice`, for herself: up to 5 appointments on free
+  slots of the week of today and of the next one, some with a note; she books only what her own
+  `GET /calendar` offers, so the current settings decide, and no setting is changed. It only
+  adds; it does nothing at all when the type "Studio" exists already; it refuses any address but
+  `localhost` and `127.0.0.1` (`SEED_API_URL`, `SEED_COGNITO_URL` for other local ports); it
+  prints what it created, never a token or a password. Appointments cannot be deleted through
+  the API: **after the back end's calendar journeys have emptied the table, run it again.** Its
+  date arithmetic imports `shared/src/calendar/time.ts` in node (Node ≥ 22.18, type stripping),
+  like the smoke test's.
 - `API_URL=… COGNITO_URL=… CLIENT_ID=… npm run build -w frontend` (`frontend/scripts/build.mjs`):
   writes `frontend/dist/` (git-ignored, emptied first): `index.html`, `style.css`, `app.js`
   (minified) and `app.js.map`, and prints their sizes. The three values come from the environment
@@ -405,7 +422,7 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   - `docker/`: files for the local stack (`cognito-local-config.json`).
 - `frontend/`: package `frontend`: the services layer and the view layer's foundation
   (`docs/FOLDER_STRUCTURE.md` section 7). `package.json` (deps `rxjs`, `@shared-calendar/shared`;
-  dev dep `happy-dom`; scripts `dev`, `build`, `typecheck`, `lint`, `test:unit`,
+  dev dep `happy-dom`; scripts `dev`, `build`, `seed:local`, `typecheck`, `lint`, `test:unit`,
   `test:integration`, `verify`; no `deploy` yet), `tsconfig.json` (ES2022 + DOM + DOM.Iterable, no
   node types), `vitest.config.ts`, `src/services/` (`session.store.ts`; `cognito.ts` and `api.ts`, the
   building blocks the services share (`api.ts`: methods `GET`/`POST`/`PUT`/`PATCH`/`DELETE`,
@@ -431,23 +448,54 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   comes through the constructor, the `SessionStore` as the second argument. Tokens live only in
   the `SessionStore` (rule 9): no result, state or service field holds one.
   The view layer (`docs/FRONTEND_ARCHITECTURE.md`; no framework): `index.html` (all the markup,
-  everything `hidden`: the login `#login`; the frame `#app` with the header, an empty `nav` and an
-  empty `main.screen`; one module script `app.js`, one style sheet, nothing inline), `style.css`,
+  everything `hidden`: the login `#login`; the frame `#app` with the header, an empty `nav`, the
+  template of a navigation link and `main.screen`, which holds one element per screen: so far
+  `#week`, with the toolbar, the failure (`role="alert"`), the time zone's sentence, the legend,
+  the hours, the days and its seven templates `tpl-legend-item`, `tpl-hour`, `tpl-day`,
+  `tpl-window`, `tpl-busy`, `tpl-slot`, `tpl-appointment`; one module script `app.js`, one style
+  sheet, nothing inline), `style.css` (also the six type colours `type-0` … `type-5` and the
+  lanes `lane-0-of-2`, `lane-1-of-2`),
   `src/main.ts` (the bundle's entry, one statement: the only file that knows the three constants
   `API_URL`, `COGNITO_URL`, `CLIENT_ID`, which esbuild's `define` puts in), `src/views/`:
   `shell.ts` (`runShell(config)` creates the `SessionStore`, the `LoginService` and the
-  `RefreshService`, starts the refresh and calls `mountShell(root, { store, login })`, which
-  shows the login on `null` and the frame on a session, reduced to `Person` = username and role
-  before anything else sees it; `distinctUntilChanged` on the two, so a refresh mounts nothing;
-  `enter(person)` fills the header and returns the subscription that everything of one person's
-  session is added to, where the navigation and the screens go; "Sign out" only clears the store)
-  and `login.view.ts` (`mountLogin(root, login)`, with `LoginDeps`, the part of the service it
-  uses; shows the service's `message` as it is until the logic layer has the texts). A view is
+  `RefreshService`, starts the refresh and calls `mountShell(root, { config, store, login })`,
+  which shows the login on `null` and the frame on a session, reduced to `Person` = username and
+  role before anything else sees it; `distinctUntilChanged` on the two, so a refresh mounts
+  nothing and loads nothing; `enter(person)` fills the header, creates the session's objects
+  (`sessionObjects`: a new `CalendarService` and `WeekScreen` per person, dropped when the person
+  leaves), fills the navigation from the table `SCREENS` (an entry: `hash`, `label`, `roles`,
+  `element`, `show`, which mounts the view and then starts its logic object; one entry so far,
+  `#/week`; `mountShell` takes another table as the optional `screens`, for its test) and
+  follows the URL's hash (`fromEvent(window, 'hashchange')` from the current hash): an empty,
+  unknown or forbidden hash shows the role's first screen and the address is put right with
+  `history.replaceState`, the link on show carries `aria-current="page"`, a change of hash
+  leaves one screen and mounts the next; "Sign out" only clears the store and leaves the
+  address), `login.view.ts` (`mountLogin(root, login)`, with `LoginDeps`, the part of the service
+  it uses; a failure is shown through `failureText(reason)`, never the service's `message`) and
+  `week.view.ts` (`mountWeek(root, screen)`, with `WeekDeps`, the part of `WeekScreen` it uses:
+  `week$` and the three moves; copies the templates, sets `top` and `height` as properties and
+  the lane and the type colour as classes, redraws the days only when the week object changed;
+  slots and appointments are plain elements that do nothing yet). A view is
   `mount<Name>(root, deps): Subscription` with a teardown that wipes what it put in the page.
-  `src/logic/` does not exist yet (first needed by plan step 61). `scripts/` (Node, outside the
-  browser's lint rules): `bundle.mjs` (the esbuild options the two share), `build.mjs`, `dev.mjs`.
-  `tests/unit/views/` (project `views`): `page.ts` (`useRealPage()`, `find`, `submit`),
-  `page.test.ts`, `login.view.test.ts`, `shell.test.ts`. No `template.yaml` yet: the hosting
+  The logic layer, `src/logic/` (`docs/FRONTEND_ARCHITECTURE.md` section 5.1; no DOM, lint
+  refuses `document` and `window` there): `texts.ts` (pure: `dateText`, `timeText`, `rangeText`,
+  `weekLabel`, `offsetText`, all through `shared/`'s time helpers and the zone given, never the
+  browser's; `failureText(reason)`, the failure in plain words, with one general sentence for a
+  reason it does not know: a new route's codes get their sentences here), `week.model.ts` (pure:
+  `weekModel(view, role)`, the week ready to draw: days of windows, slots, busy blocks and
+  appointments, each with `top`, `height`, `time`, `lane` and `lanes`; the hours shown, 08:00 to
+  18:00 widened to hold everything; the legend; `colourOf(typeId)`, 0 to 5; on a day whose UTC
+  offset changes every time carries its offset, and two blocks of one kind in the same place on
+  the clock get lanes 0 and 1 of 2) and `week.screen.ts` (`WeekScreen(calendar, role, now)`:
+  `week$` = label, loading, failure, the last week loaded; `start()`, `previous()`, `next()`,
+  `today()`; "now" is passed in, and "today" for the week to open on is taken in
+  `DEFAULT_TIME_ZONE`, the one place the default zone is used; it does not reload after a write
+  yet: plan step 62). `scripts/` (Node, outside the browser's lint rules): `bundle.mjs` (the
+  esbuild options the two share), `build.mjs`, `dev.mjs`, `seed-local.mjs`.
+  `tests/unit/logic/` (project `unit`): `zone.ts`, `fixtures.ts`, `texts.test.ts`,
+  `week.model.test.ts`, `week.screen.test.ts`. `tests/unit/views/` (project `views`): `page.ts`
+  (`useRealPage()`, `find`, `submit`), `page.test.ts`, `login.view.test.ts`,
+  `week.view.test.ts`, `shell.test.ts`. No `template.yaml` yet: the hosting
   waits for the open points of `docs/FRONTEND_ARCHITECTURE.md` section 10.
 - `shared/`: package `@shared-calendar/shared`, no build step (`exports` points at
   `src/index.ts`; each consumer bundles it). `src/api.ts` (response and error body types,
@@ -500,3 +548,19 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   `frontend/src/services` and `frontend/src/logic` (a parameter with that name is allowed). The
   second block repeats the Node globals, because a later `no-restricted-globals` for the same
   files replaces the earlier list.
+- The logic layer's tests (`frontend/tests/unit/logic/`, project `unit`, in node, no DOM): fake
+  services (plain objects: a subject for the stream, `vi.fn` for the methods) and a fixed "now"
+  handed to the object under test, never a faked clock. Every file calls `useFarBrowserZone()`
+  (`tests/unit/logic/zone.ts`) first: it sets `process.env.TZ` to `Pacific/Kiritimati` (UTC+14)
+  and adds a test that the setting took, so a date or a time read in the machine's own zone is a
+  wrong result. It relies on each test file running in a process of its own (vitest's default
+  pool, `forks`). Calendar views for these tests and for the shell's come from
+  `tests/unit/logic/fixtures.ts` (`view(monday, …)`, `appointment(…)`, `winterWeek()`). Cases to
+  keep when the model changes: Rome in winter and in summer, a half-hour zone, the weeks of
+  2027-10-31 (clocks back) and 2027-03-28 (forward), a window ending at 24:00, an empty week,
+  the hours widened, both roles.
+- The shell's test stubs the global `fetch` for the whole file (unanswered unless a test answers
+  it): entering the frame creates the real `CalendarService`, which loads the week. It resets
+  the emulated page's hash before each test. `happy-dom` sends a `hashchange` on
+  `history.replaceState` too, which a browser does not: harmless for the shell
+  (`distinctUntilChanged` on the screen), but do not build on it.

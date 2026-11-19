@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v1 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`), waiting for review; next step 61 |
+| Status | v2 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`), waiting for review; next step 62 |
 | Scope | Everything needed to go from the services layer that exists to **all the views written, tested and running in a browser against the local stack**: the tooling, the shell, the logic layer and one view per screen. Steps 60 to 69 |
 | Not in scope | Hosting, the CORS configuration, the Content-Security-Policy of the hosting, logout as a designed service, the session across a reload, the cloud deployment of the front end. They are the open points O1, O2, O3, O5 and O7 of `docs/FRONTEND_ARCHITECTURE.md` section 10 and get their own plan |
 | Governed by | `docs/FRONTEND_ARCHITECTURE.md` (the rules of the view layer), `docs/FRONTEND_SERVICES.md` (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/ARCHITECTURE.md` section 4 (the API). On any conflict with this plan, they win |
@@ -12,6 +12,7 @@
 | Version | Date | Change |
 |---|---|---|
 | v1 | 2026-11-16 | First version: steps 60 to 69. |
+| v2 | 2026-11-19 | Step 61, decided before its implementation: "today", for the week the screen opens on, is taken in the default time zone (`DEFAULT_TIME_ZONE` of `shared/`), not in the zone the settings give; the week screen makes no request for the settings. The limit this accepts is in `docs/FRONTEND_ARCHITECTURE.md` section 5.1. Step 61's bullet on "today" and its line on the seed (which also books a few appointments for `alice`) are corrected. |
 
 ---
 
@@ -186,8 +187,12 @@ Logic (`frontend/src/logic/`):
   with its place in the day, its time as text and its type's colour; the hours shown; the legend;
 - the week screen: which Monday is on screen, `previous`, `next`, `today`, the load at every
   change, the last week kept on screen while the next one loads;
-- **"today" in the calendar's time zone**, which the settings give (`GET /calendar/settings` is
-  open to both roles): the week screen starts from it, not from a default zone;
+- **"today" in the default time zone** (`DEFAULT_TIME_ZONE` of `shared/`, `Europe/Rome`): the
+  week the screen opens on, and the one "Today" returns to, is the week of "now" in that zone,
+  with no request for the settings, so the first week is loaded at once. Every date and time of
+  a loaded week is shown in the zone the server names in its answer, and the day marked as today
+  comes from that answer. The limit (a calendar deployed in another zone can open on the
+  neighbouring week around midnight) is in `docs/FRONTEND_ARCHITECTURE.md` section 5.1;
 - **the night the clocks go back**: two slots or appointments with the same local time an hour
   apart are told apart by their offset ("02:00 +02:00", "02:00 +01:00"), as
   `docs/SHARED_CALENDAR_SPEC.md` section 16.8 asks.
@@ -200,10 +205,10 @@ appointments are drawn but do nothing yet.
 Shell: the navigation by the URL's hash (`docs/FRONTEND_ARCHITECTURE.md` section 6, point 6),
 with its first address, `#/week`; an unknown hash shows the week.
 
-Also: `frontend/scripts/seed-local.mjs`, which gives an empty local calendar two types and a few
-patterns through the API, so that there is a week to look at. It only adds, and only on
-`localhost`. (The back end's calendar journeys empty the local table: the seed is run again after
-them.)
+Also: `frontend/scripts/seed-local.mjs` (`npm run seed:local -w frontend`), which gives an empty
+local calendar two types, a few patterns and a few appointments for `alice` through the API, so
+that there is a week to look at. It only adds, and only on `localhost`. (The back end's calendar
+journeys empty the local table: the seed is run again after them.)
 
 **Browser check:** the week of today with its windows, slots and the legend; previous, next and
 "Today"; "Loading…" and the dimmed week while loading; with the local API stopped, the failure in

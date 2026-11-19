@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs",
+    "seed:local": "node scripts/seed-local.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test:unit": "vitest run --project unit --project views --coverage",

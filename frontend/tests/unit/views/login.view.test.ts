@@ -45,14 +45,15 @@ describe('mountLogin', () => {
     expect([username.value, password.value]).toEqual(['alice', PASSWORD]);
   });
 
-  it('failure: the message is shown, the button is enabled again and the form is still usable', () => {
+  it('failure: the reason is shown in plain words, the button is enabled again and the form is still usable', () => {
     const { state$, login, form, username, password, button, error } = mounted();
     username.value = 'alice';
     password.value = 'wrong';
     state$.next({ status: 'pending', username: 'alice' });
     state$.next({ status: 'failure', reason: 'invalid_credentials', message: 'Incorrect username or password.' });
     expect(button.disabled).toBe(false);
-    expect(error.textContent).toBe('Incorrect username or password.');
+    // The sentence of the logic layer for the reason, not the service's message.
+    expect(error.textContent).toBe('The username or the password is not correct.');
     expect(error.getAttribute('role')).toBe('alert'); // announced to a screen reader
     expect(username.value).toBe('alice'); // the name is kept for the second try
 
@@ -63,7 +64,7 @@ describe('mountLogin', () => {
 
   it('a new attempt after a failure removes the message', () => {
     const { state$, error } = mounted({ status: 'failure', reason: 'network', message: 'TypeError: Failed to fetch' });
-    expect(error.textContent).toBe('TypeError: Failed to fetch');
+    expect(error.textContent).toBe('The server cannot be reached. Check the connection and try again.');
     state$.next({ status: 'pending', username: 'alice' });
     expect(error.textContent).toBe('');
   });
@@ -103,13 +104,14 @@ describe('mountLogin', () => {
     expect(button.disabled).toBe(false);
   });
 
-  it('a failure message containing <script> is shown as text', () => {
+  it('the service\'s message never reaches the page, with or without <script> in it', () => {
     const message = '<script>window.hacked = true</script><b>bold</b>';
     const { state$, error } = mounted();
     state$.next({ status: 'failure', reason: 'unexpected', message });
-    expect(error.textContent).toBe(message);
+    expect(error.textContent).toBe('Something went wrong. Please try again.');
     expect(error.children).toHaveLength(0);
     expect(document.querySelectorAll('script')).toHaveLength(0);
+    expect(document.documentElement.outerHTML).not.toContain('hacked');
   });
 
   it('the password never leaves the field: it is in no text and no attribute of the page', () => {

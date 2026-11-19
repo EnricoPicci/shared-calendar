@@ -23,4 +23,38 @@ describe('index.html', () => {
     expect(top.map((element) => element.id)).toEqual(['login', 'app']);
     expect(top.every((element) => (element as HTMLElement).hidden)).toBe(true);
   });
+
+  it('every screen of the frame has an id and starts hidden; the navigation and the lists start empty', () => {
+    loadPage();
+    const screens = [...document.querySelectorAll<HTMLElement>('#app main.screen > :not(template)')];
+    expect(screens.map((element) => element.id)).toEqual(['week']);
+    expect(screens.every((element) => element.hidden)).toBe(true);
+    expect(document.querySelector('#app .nav')!.children).toHaveLength(0);
+    for (const list of document.querySelectorAll('#week .legend, #week .hours, #week .days')) expect(list.children).toHaveLength(0);
+  });
+
+  it('every <template> has an id of its own and holds exactly one element', () => {
+    const templates = [...pageAside().querySelectorAll('template')];
+    expect(templates.map((template) => template.id)).toEqual([
+      'tpl-nav-link',
+      'tpl-legend-item',
+      'tpl-hour',
+      'tpl-day',
+      'tpl-window',
+      'tpl-busy',
+      'tpl-slot',
+      'tpl-appointment',
+    ]);
+    for (const template of templates) expect(template.content.children, template.id).toHaveLength(1);
+  });
+
+  it('no id is used twice', () => {
+    const ids = [...pageAside().querySelectorAll('[id]')].map((element) => element.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('the blocks of the week are plain elements: nothing in a template can be clicked or typed in', () => {
+    const templates = [...pageAside().querySelectorAll<HTMLTemplateElement>('#week template')];
+    for (const template of templates) expect(template.content.querySelectorAll('button, a, input, select, textarea'), template.id).toHaveLength(0);
+  });
 });

@@ -72,20 +72,25 @@ stays at the root.
 │
 ├── frontend/                    # ── the browser app (section 7) ─────────────────────────
 │   ├── package.json             # name "frontend"; deps rxjs, shared; dev dep happy-dom;
-│   │                            # dev/build/typecheck/lint/test:unit/verify
+│   │                            # dev/build/seed:local/typecheck/lint/test:unit/verify
 │   ├── tsconfig.json            # extends ../tsconfig.base.json; lib ES2022 + DOM, no node types
 │   ├── vitest.config.ts         # projects unit (node) + views (happy-dom) + integration;
 │   │                            # 100 % line coverage on src/ (src/main.ts left out)
 │   ├── index.html               # all the markup of every view (docs/FRONTEND_ARCHITECTURE.md)
 │   ├── style.css                # the one style sheet
-│   ├── scripts/                 # Node scripts: bundle.mjs (shared esbuild options), build.mjs, dev.mjs
+│   ├── scripts/                 # Node scripts: bundle.mjs (shared esbuild options), build.mjs, dev.mjs,
+│   │                            # seed-local.mjs (a week to look at, in the local calendar)
 │   ├── src/
 │   │   ├── main.ts              # the entry file of the bundle: the configuration, then the shell
 │   │   ├── services/            # the services layer (docs/FRONTEND_SERVICES.md): session store,
 │   │   │                        # login, refresh, hello, users, the calendar's; cognito.ts and api.ts
-│   │   └── views/               # shell.ts and one <name>.view.ts per view (later also ../logic/)
+│   │   ├── logic/               # between the services and the views, no DOM: texts.ts (dates, times,
+│   │   │                        # failures in plain words), week.model.ts, week.screen.ts
+│   │   └── views/               # shell.ts (with the table of screens) and one <name>.view.ts per
+│   │                            # view: login.view.ts, week.view.ts
 │   ├── tests/
-│   │   ├── unit/                # mirrors src/ (plus services/fixtures.ts, views/page.ts)
+│   │   ├── unit/                # mirrors src/ (plus services/fixtures.ts, logic/zone.ts and
+│   │   │                        # logic/fixtures.ts, views/page.ts)
 │   │   └── integration/         # login and the services' journeys against the local stack
 │   ├── (reserved, not yet) template.yaml
 │   └── (generated, git-ignored) coverage/  dist/
@@ -320,7 +325,13 @@ What exists:
   design `docs/FRONTEND_ARCHITECTURE.md`): `index.html`, `style.css`, `src/main.ts`, `src/views/`
   (the shell and the login view), `scripts/` (the build and the dev server), the scripts `dev`
   and `build`, and `happy-dom` for the views' tests, the package's one development dependency of
-  its own (section 4.1). The other views and `src/logic/` come with the following plan steps.
+  its own (section 4.1).
+- **The logic layer and the week calendar, since 2026-11-19** (`docs/FRONTEND_VIEW_PLAN.md` step
+  61): `src/logic/` (`texts.ts`, `week.model.ts`, `week.screen.ts`: plain TypeScript and RxJS,
+  no DOM), `src/views/week.view.ts`, the navigation by the URL's hash in `src/views/shell.ts`,
+  and `scripts/seed-local.mjs` with the script `seed:local`, which gives the local calendar two
+  types, a few weekly patterns and a few appointments through the local API. The other views
+  come with the following plan steps.
 
 What still waits for the open points of `docs/FRONTEND_ARCHITECTURE.md` section 10: the hosting,
 so no `template.yaml` and no `deploy` script (the root scripts use `--if-present`, so their

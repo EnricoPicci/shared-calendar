@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2 — **decided; the foundation implemented** (2026-11-19, `docs/FRONTEND_VIEW_PLAN.md` step 60, brief `prompts/83-step-60-implementation.md`): the build and dev-server commands, the tests' environment, the shell (without navigation) and the login view exist in `frontend/`. The logic layer and the other views follow, one plan step each |
+| Status | v3 — **decided; the foundation and the week implemented** (2026-11-19, `docs/FRONTEND_VIEW_PLAN.md` steps 60 and 61, briefs `prompts/83-step-60-implementation.md` and `prompts/84-step-61-implementation.md`): the build and dev-server commands, the tests' environment, the shell with its navigation, the login view, the logic layer (`frontend/src/logic/`) and the week calendar, read-only, exist in `frontend/`. The other views follow, one plan step each |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders |
 | Not in scope yet | Hosting, the CORS gap, keeping the session across a reload, the Content-Security-Policy of the hosting, logout. They are the open points of section 10, for later versions of this document |
 | Depends on | `docs/FRONTEND_SERVICES.md` v7 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work) |
@@ -14,6 +14,7 @@
 |---|---|---|
 | v1 | 2026-11-16 | First version: the view layer. Plain HTML and CSS with one TypeScript module script; `lit-html` as the fallback for a single view. Everything else is an open point (section 10). |
 | v2 | 2026-11-19 | Plan step 60. The open points O4 (esbuild: the build and the dev server), O6 (`happy-dom`, the views inside the 100 % line coverage) and O8 (English only) are decided, with their details in the new section 12. Section 4: the login view takes the part of the `LoginService` it uses. Section 6: the shell's two functions, the header, "Sign out". Section 8: how the tests get their document, and what `happy-dom` does not emulate of the native `<dialog>`. Section 9: the tree as built, the two lint rules in place. Section 11: decisions 15 to 21. |
+| v3 | 2026-11-19 | Plan step 61: the logic layer and the week calendar, read-only. Section 4: the login shows a failure in plain words; the week's templates as built (a slot is a plain element until it does something). Section 5: the logic layer as built: its three files, "now" passed in, "today" in the default time zone and the limit of that, the offset rule and the lanes for the night the clocks go back, the `WeekScreen` as it is. Section 6: the table of screens, the address read and put right, what a session owns. Section 8: the logic's tests run with a browser zone far from the calendar's. Section 9: the tree. Section 10: new open point O9, the size of the bundle. Section 12.1: the size at step 61. Section 12.4: the interim ended. Section 11: decisions 22 to 31. |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
 TypeScript module script**. The markup of every screen is in one `index.html`; the script
@@ -158,7 +159,8 @@ export function mountLogin(root: HTMLElement, login: LoginDeps): Subscription {
   // 3. The streams' notifications fill the elements.
   const subscription = login.loginState$.subscribe((state) => {
     button.disabled = state.status === 'pending';
-    error.textContent = state.status === 'failure' ? state.message : '';
+    // In plain words, by its reason (section 5): never the service's own message.
+    error.textContent = state.status === 'failure' ? failureText(state.reason) : '';
   });
 
   // 4. Leaving the view: what was typed is wiped.
@@ -196,22 +198,40 @@ const copy = <T extends HTMLElement = HTMLElement>(id: string) =>
 
 ```html
 <template id="tpl-slot">
-  <button type="button" class="block slot"><span class="time"></span> free</button>
+  <div class="block slot"><span class="time"></span> free</div>
 </template>
 ```
 
 ```ts
-const slotFor = (block: SlotBlock) => {
-  const element = copy<HTMLButtonElement>('tpl-slot');
+// A block's copy, put in its place and in its lane, with its type's colour when it has one.
+const place = (id: string, block: Placed, colour?: number) => {
+  const element = copy(id);
   element.style.top = block.top;        // computed by the logic layer, as a percentage
   element.style.height = block.height;
+  element.classList.add(`lane-${block.lane}-of-${block.lanes}`);
+  if (colour !== undefined) element.classList.add(`type-${colour}`);
+  return element;
+};
+const slotFor = (block: SlotBlock) => {
+  const element = place('tpl-slot', block, block.colour);
   element.querySelector('.time')!.textContent = block.time;
-  element.onclick = () => openBook(block);
   return element;
 };
 ```
 
-The view does no arithmetic here: `top`, `height` and `time` arrive ready from the logic layer.
+The view does no arithmetic here: `top`, `height`, `time`, the lane and the colour's number
+arrive ready from the logic layer, and the style sheet says what a lane and a colour look like
+(`.lane-1-of-2`, `.type-3`).
+
+**The week's templates, as built** (`docs/FRONTEND_VIEW_PLAN.md` step 61), all inside the week's
+element `#week`: `tpl-day` (a heading and the day's body), `tpl-window`, `tpl-busy`, `tpl-slot`,
+`tpl-appointment`, and two for the lists beside the days, `tpl-legend-item` and `tpl-hour`. The
+navigation's link has one too, `tpl-nav-link`, in the frame. A slot and an appointment are plain
+`<div>` elements: they become buttons in the step that gives them something to do
+(`docs/FRONTEND_VIEW_PLAN.md` step 62). The number of hours shown is set on each day's body as
+the custom property `--hours`, so nothing the script sets stays on an element that outlives the
+week. The view redraws the days only when the stream brings another week object, not at every
+notification: a change of label or of "Loading…" leaves the days as they are.
 
 ## 5. The logic layer
 
@@ -244,30 +264,114 @@ Its rules:
 7. **Tested like the services**: unit tests with no network and no DOM, inside the 100 % line
    coverage of `frontend/src`.
 
-The shape, for the week calendar:
+### 5.1 As built: three files
+
+`frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` step 61), each with its test in
+`frontend/tests/unit/logic/`:
+
+| File | What it holds |
+|---|---|
+| `texts.ts` | Pure functions: a date (`dateText`, "Mon 16 Nov"), a time (`timeText`, "09:00"), a range (`rangeText`, "09:00–10:00"), a week's label (`weekLabel`, "16 Nov – 22 Nov 2026"), a UTC offset (`offsetText`, "+02:00"), and a failure in plain words (`failureText`) |
+| `week.model.ts` | Pure: `weekModel(view, role)`, a `CalendarView` in, the week ready to draw out |
+| `week.screen.ts` | The class `WeekScreen`: which week is on screen and its loads |
+
+**"Now" is passed in.** Nothing in `logic/` reads the clock by itself. `WeekScreen` receives a
+function `now: () => Date` through its constructor (the shell passes `() => new Date()`, a test a
+fixed moment). Everything about one loaded week comes from the view's own `generatedAt`,
+including the day marked as today.
+
+**"Today" is taken in the default time zone, and only there.** The week on screen at the start,
+and the one "Today" returns to, is the week of `now()` in `DEFAULT_TIME_ZONE` (`Europe/Rome`,
+from `shared/`). The screen makes no request for the settings: the first week is loaded at once.
+This is the one place where the default zone stands for the calendar's. Every date and time of a
+loaded week is shown in the zone the server names (`view.timeZone`), and the day marked as today
+is the date of `generatedAt` in that zone. **Known limit:** with a calendar deployed in another
+time zone, around midnight the screen can open on the neighbouring week (the one that holds
+today in `Europe/Rome`, not in the calendar's zone). "Next" or "previous" reaches the right one.
+Lifting the limit means reading the calendar's zone before the first load.
+
+**Dates and times** go through `shared/`'s helpers only (`localDateOf`, `localTimeOf`, `addDays`,
+`weekdayOf`, `toInstant`). A date is turned into words with `Intl.DateTimeFormat` reading it as
+UTC and its parts put together by hand, so that neither the browser's zone nor its version of
+the locale data changes the text.
+
+**The UTC offset** of an instant is derived from those helpers: the local date and time read as
+if they were UTC, minus the instant, to the minute. `shared/` has no function for it and was not
+changed.
+
+**The night the clocks go back** (`docs/SHARED_CALENDAR_SPEC.md` R-SLOT-01 and section 16.8):
+
+- On a day in which the calendar zone's offset changes, in either direction, every time shown in
+  that day carries its offset ("02:00 +02:00 – 02:00 +01:00"); on every other day none does.
+- A block is placed by its local clock time. One that crosses the repeated hour and ends, on the
+  clock, no later than it starts gets its real length.
+- Two blocks **of the same kind** (two slots, two appointments, two busy blocks, two windows)
+  that the clock puts in the same place without their sharing a moment are drawn side by side,
+  each half the width, the earlier on the left: the model says `lane` 0 or 1 of `lanes` 2, the
+  view applies it as a class. Blocks of different kinds in that place are not moved apart: an
+  appointment in one of the two hours covers a free slot in the other.
+- The night the clocks go forward needs nothing: no block exists in the missing hour, and a slot
+  across it is two hours tall on the clock, as `docs/SHARED_CALENDAR_SPEC.md` R-TIME-03 has it.
+
+**The week model.** Per day: its date, its label, whether it is today; its windows (type name,
+colour), its free slots, its busy blocks, its appointments; each block with `top` and `height`
+as percentages of the hours shown, and its time as text. For the week: the time zone's name, one
+label per hour shown (08:00 to 18:00, widened to whole hours to hold everything in the week) and
+the legend (the types met in the week, by name). A type's colour is a number from 0 to 5 made
+from its id, the same in every week, applied as a class (`type-0` … `type-5`) that the style
+sheet defines: no colour is computed at run time. For the Administrator every appointment
+carries its User's name; for a User the own appointments say "You" and other people's time is a
+busy block with no name, which is what the server sends (`docs/SHARED_CALENDAR_SPEC.md` section
+11.6): the model adds nothing to it.
+
+**The week screen:**
 
 ```ts
+// The last week loaded stays in `week` while another loads or fails.
+export type WeekState = { label: string; loading: boolean; failure: string | null; week: WeekModel | null };
+
 export class WeekScreen {
-  readonly week$: Observable<WeekState>; // label, loading, error, the week ready to draw
+  readonly week$: Observable<WeekState>;
 
-  constructor(calendar: CalendarService, appointments: AppointmentsService, role: Role) { … }
+  // `calendar` is the part of the CalendarService the screen uses: `load` and `calendarState$`.
+  constructor(calendar: WeekCalendar, role: Role, now: () => Date) { … }
 
-  start(): Subscription { … } // loads the week; again at every change of week and after every booking or cancellation
+  start(): Subscription { … } // loads the week on screen, then every week the person moves to
   previous(): void { … }
   next(): void { … }
-  today(): void { … }
+  today(): void { … }         // loads again even when the week of today is on screen
 }
 ```
 
 The view subscribes to `week$` and forwards three buttons to `previous()`, `today()` and
-`next()`. It knows nothing of Mondays or reloads.
+`next()`. It knows nothing of Mondays or loads.
+
+- A change of week loads at once. While it loads, the last week stays, with `loading` true and
+  the new label, in one notification.
+- A failed load keeps the last week and carries the failure in plain words. A second failure
+  replaces the first; the failure stays while the next load is pending; a success removes it.
+- Before `start()` nothing is loaded, and nothing after its subscription ends: a move then
+  changes the label only.
+- It does not listen to bookings or cancellations yet: that reload comes with the screens that
+  write (`docs/FRONTEND_VIEW_PLAN.md` step 62), which is when the `AppointmentsService` joins the
+  constructor.
+
+**Failures in plain words.** `failureText(reason)` turns a failure's `reason` into a sentence. It
+knows the reasons a person can meet so far: the transport reasons every API service shares
+(`docs/FRONTEND_SERVICES.md` section 10.2), the codes of `GET /calendar` and the login's reasons.
+The raw technical text is never shown: a reason without a sentence gets one general sentence,
+never the service's `message`, which is written for a developer. The login view uses it too. A
+wrong password and an unknown user are one reason and get one sentence. Each later step adds the
+sentences of its routes' codes.
 
 ## 6. The shell
 
 The shell is the start-up code, one function called by the entry file of the bundle:
 `runShell(config)`, in `frontend/src/views/shell.ts`. It creates what lives as long as the page
-(point 1) and calls `mountShell(root, { store, login })`, which does the rest and is what the
-shell's DOM test drives, with a store and a login of its own.
+(point 1) and calls `mountShell(root, { config, store, login })`, which does the rest and is
+what the shell's DOM test drives, with a store and a login of its own. `mountShell` gets the
+API's configuration and the whole store because it creates the API services of each session
+(point 4), which read the token from the store at each call.
 
 1. **It creates the `SessionStore`, the `LoginService` and the `RefreshService` once**, with the
    configuration (the API's URL, Cognito's URL, the client id), which it receives as one plain
@@ -286,14 +390,48 @@ shell's DOM test drives, with a store and a login of its own.
    reduced to the username and the role before anything else sees it (section 3, rule 11).
 4. **New API services and logic objects for every session.** They are created when a session
    starts and dropped when it ends, so that nothing of one person's data can be replayed to the
-   next (the services' result streams replay their last value).
+   next (the services' result streams replay their last value). One function of the shell,
+   `sessionObjects`, creates them when a person enters: today the `CalendarService` and the
+   `WeekScreen`. They live as long as the person's session, not as long as a screen is on show:
+   coming back to a screen finds its logic object as it was left.
 5. **Mounting.** To show a view the shell un-hides its element, calls its mount function, then
    starts its logic object and triggers its first loads. To leave it, the shell unsubscribes the
    one subscription that holds all of this and hides the element.
 6. **Navigation between the screens is the URL's hash** (`#/week`, `#/settings`), read as a
-   stream (`fromEvent(window, 'hashchange')`). On each change the shell leaves the current view
-   and mounts the next. No router library. A hash the role may not see, or an unknown one, shows
-   the role's first screen.
+   stream (`fromEvent(window, 'hashchange')`, starting from the hash the page has). On each
+   change the shell leaves the current view and mounts the next. No router library. A hash the
+   role may not see, an unknown one or none shows the role's first screen.
+
+**The table of screens.** The screens are one table in `shell.ts`, `SCREENS`, in the order of
+the navigation. An entry is:
+
+```ts
+export type Screen = {
+  hash: string;             // '#/week'
+  label: string;            // 'Week', the link's text
+  roles: readonly Role[];   // who may see it
+  element: string;          // '#week', the screen's element inside main.screen
+  // Mounts the view on the element, then starts its logic object; the subscription holds both.
+  show: (root: HTMLElement, objects: SessionObjects) => Subscription;
+};
+```
+
+There is one entry so far, `#/week`, "Week", both roles. A new screen is a new entry, its
+element in `index.html`, and its services and logic object in `sessionObjects`; the code that
+reads the address, fills the navigation and switches between screens does not change.
+`mountShell` takes the table as an optional dependency, which a test uses to bring a second
+entry.
+
+- **The address is put right in place.** An empty, unknown or forbidden hash shows the role's
+  first screen, and the address becomes that screen's with `history.replaceState`: no step is
+  added to the browser's history, so the back button does not return to the wrong address.
+- **The navigation's links** are copies of a `<template>`, one per screen the role may see,
+  made when a person enters and removed when the person leaves. The link of the screen on show
+  carries `aria-current="page"`.
+- **A change of hash** leaves the screen on show (unsubscribe, hide) and mounts the next. An
+  address put right while its screen is on show changes nothing.
+- **Signing out leaves the address as it is.** The next person starts from it if it is theirs to
+  see, and from their role's first screen if it is not.
 
 The sequence when the page is loaded: the browser parses `index.html`, with every view hidden;
 the module script runs once the whole page is parsed (a module script is deferred), so every
@@ -343,7 +481,10 @@ services and the logic layer would not change.
   check the call and its arguments; unsubscribe and check that the view left nothing behind
   (section 3, rule 9).
 - **The logic layer is tested without a DOM** (section 5, rule 7), and that is where most of the
-  cases are: a view's test checks wiring, not rules.
+  cases are: a view's test checks wiring, not rules. Its test files run with the machine's time
+  zone set to `Pacific/Kiritimati`, 14 hours ahead of UTC (`tests/unit/logic/zone.ts`, with a
+  test that the setting took), so a date or a time read in the browser's own zone would be a
+  wrong result; "now" is a fixed moment handed to the object under test.
 - **No test of a view needs the network.** The existing integration journeys of `frontend/`
   already cover the services against the local stack.
 
@@ -376,16 +517,19 @@ frontend/
 ├── scripts/                   # Node, not the browser: the bundle command and the dev server (section 12)
 │   ├── bundle.mjs             # what the two share: how src/main.ts becomes app.js
 │   ├── build.mjs              # npm run build -w frontend → dist/
-│   └── dev.mjs                # npm run dev -w frontend → http://localhost:5173
+│   ├── dev.mjs                # npm run dev -w frontend → http://localhost:5173
+│   └── seed-local.mjs         # npm run seed:local -w frontend → a week to look at, in the local calendar
 ├── src/
 │   ├── main.ts                # the entry file of the bundle: the configuration, then the shell
 │   ├── services/              # docs/FRONTEND_SERVICES.md
-│   ├── logic/                 # the logic layer: <name>.ts, no DOM (created with the first screen that needs it)
-│   └── views/                 # shell.ts and one <name>.view.ts per view
+│   ├── logic/                 # the logic layer, no DOM (section 5.1): texts.ts, week.model.ts,
+│   │                          # week.screen.ts
+│   └── views/                 # shell.ts and one <name>.view.ts per view: login.view.ts, week.view.ts
 ├── tests/
 │   └── unit/
 │       ├── services/          # vitest project `unit`, in node
-│       ├── logic/             # mirrors src/logic; project `unit`
+│       ├── logic/             # mirrors src/logic; project `unit`; zone.ts (the browser's zone of
+│       │                      # the tests), fixtures.ts (calendar views)
 │       └── views/             # mirrors src/views: the DOM tests, vitest project `views` (happy-dom);
 │                              # page.ts loads the real index.html
 └── dist/                      # generated, git-ignored: index.html, style.css, app.js, app.js.map
@@ -420,6 +564,7 @@ open: their rows say where the decision is written.
 | O6 | **The DOM emulation for the views' tests and the coverage of the views** | **Decided: `happy-dom`, and the views inside the 100 % line coverage** of `frontend/src`. Section 12.3 | Nothing any more |
 | O7 | **Logout.** Not designed in the services layer (`docs/FRONTEND_SERVICES.md`, status line) | The shell needs it. Until then "Sign out" can only clear the `SessionStore`, which leaves the refresh token valid at Cognito | The first deployment |
 | O8 | **The language of the interface** and where its texts are kept | **Decided: English only**, no translation mechanism. Section 12.4 | Nothing any more |
+| O9 | **The size of the bundle.** Of the 490 kB of `app.js` at plan step 60, 454 are `zod`, and 264 of those are its messages in other languages, which the interface never shows (section 12.1) | Slimming it means changing how `shared/` brings `zod` in (which entry of `zod` its schemas import, or what `shared/` exports to the browser): a change to `shared/`, which the back end uses too, so a decision of its own | The first deployment. Nothing locally |
 
 What is still open stands between the front end and its first deployment, not between it and
 the next view.
@@ -451,7 +596,17 @@ than what the trial showed: these deserve the first look in a review.
 | 18 | The dev server listens on `127.0.0.1` only, and answers `/favicon.ico` with an empty 204 (section 12.2) | It passes requests on to the local stack: not for the network. A 404 for the icon would be an error in the browser's console at every load | Yes |
 | 19 | The views' tests run in a vitest project of their own, `views`, with `happy-dom`; the `unit` project stays in `node` (section 12.3) | A folder gets an environment through a project; the alternative vitest offers, a `@vitest-environment` comment, is per file and can be forgotten. In `node` a DOM global in a service or in the logic fails the test | |
 | 20 | `src/main.ts` is the one file left out of the coverage, by name (section 12.3) | One statement, which needs the three constants only the bundle command defines; the browser check runs it | |
-| 21 | English only; the fixed texts are in `index.html`, the texts that depend on data in the logic layer (section 12.4) | Decided with the plan. Until the logic layer exists, the login shows the service's `message` and the shell holds the two role names | The interim, yes |
+| 21 | English only; the fixed texts are in `index.html`, the texts that depend on data in the logic layer (section 12.4) | Decided with the plan. The shell holds the two role names | |
+| 22 | "Now" is passed in: `WeekScreen` receives `now: () => Date`; nothing in `logic/` reads the clock (section 5.1) | A test fixes the moment without faking the clock, and the rule "no hidden input" holds for time as it does for the services | Yes |
+| 23 | "Today", for the week to open on, is taken in `DEFAULT_TIME_ZONE`; no request for the settings before the first week (section 5.1) | The first week is loaded at once, and the week screen needs the `CalendarService` only. The price is the known limit around midnight for a calendar in another zone. `docs/FRONTEND_VIEW_PLAN.md` step 61 first said otherwise and was corrected | Yes |
+| 24 | The UTC offset is derived in `logic/texts.ts` from `shared/`'s `localDateOf` and `localTimeOf`; no new helper in `shared/` (section 5.1) | `shared/` is not changed by the view layer's plan. It held for whole-hour and half-hour zones and both nights of the clock change | Yes |
+| 25 | On a day whose offset changes every time carries its offset; two blocks of the same kind in the same place on the clock go side by side, by `lane` and `lanes` of the model (section 5.1) | `docs/SHARED_CALENDAR_SPEC.md` section 16.8 asks that the two be told apart. The model decides, the view applies a class. Blocks of different kinds are not moved apart: known, and rare (availability at night, on one night a year) | Yes |
+| 26 | A type's colour is a number from its id, applied as one of six classes of the style sheet (section 5.1) | The same colour in every week with nothing stored, and no colour computed at run time, so no inline style | |
+| 27 | A failure is shown by its `reason`, through `failureText`; the service's `message` never reaches the page, and an unknown reason gets one general sentence (section 5.1) | The message is a developer's text, and at times the server's own words. The login shows the same sentence for a wrong password and an unknown user | Yes |
+| 28 | The screens are a table in `shell.ts`; `mountShell` takes it as an optional dependency (section 6) | A new screen is an entry. The dependency is there for the shell's test: with one screen in the real table, a change of screen and a forbidden address could not be tested otherwise | The optional dependency, yes |
+| 29 | A wrong address is put right with `history.replaceState` (section 6) | No step added to the history, so the back button is not caught; it sends no `hashchange`, so the shell does not hear its own correction | Yes |
+| 30 | The session's services and logic objects are created when the person enters, not when a screen is shown (section 6, point 4) | A screen left and found again keeps its state (the week it was on) within one session, and nothing outlives the session | Yes |
+| 31 | The local seed books as `alice` herself, not as the Administrator for her (`frontend/scripts/seed-local.mjs`) | The server then offers and accepts only the slots the current settings allow, with no rule copied into a script. The types and the patterns are created as the Administrator | Yes |
 
 ## 12. The tooling (open points O4, O6 and O8, decided)
 
@@ -485,6 +640,8 @@ The build prints the size of each file, as it is and compressed. At plan step 60
 only: `app.js` 490 kB, 105 kB compressed. Of the 490 kB, 454 are `zod` (264 of them its messages
 in other languages), which `shared/`'s schemas bring in with any import from
 `@shared-calendar/shared`; the services, `shared/`, the views and `rxjs` together are 36 kB.
+At plan step 61, with the logic layer and the week: `app.js` 504 kB, 110 kB compressed. What to
+do about `zod`'s share is open point O9 (section 10).
 
 ### 12.2 The dev server
 
@@ -523,6 +680,6 @@ id, and says so when the file is missing) and, to sign in, `npm run local:api -w
 ### 12.4 The language
 
 English only, with no translation mechanism. The fixed texts are written in `index.html`; the
-texts that depend on data are made by the logic layer (section 5). Until that layer has its
-texts (`docs/FRONTEND_VIEW_PLAN.md` step 61), the login view shows the `message` of the service
-as it is, and the shell holds the two names of the roles.
+texts that depend on data are made by the logic layer (section 5.1, `frontend/src/logic/texts.ts`):
+dates, times, and a failure in plain words by its `reason`. No view shows the `message` of a
+service. The shell holds the two names of the roles.

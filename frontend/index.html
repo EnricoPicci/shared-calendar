@@ -29,7 +29,57 @@
         <button type="button" class="sign-out">Sign out</button>
       </header>
       <nav class="nav" aria-label="Screens"></nav>
-      <main class="screen"></main>
+      <!-- A link of the navigation: the shell copies it once per screen the person may see -->
+      <template id="tpl-nav-link">
+        <a class="nav-link"></a>
+      </template>
+
+      <main class="screen">
+        <!-- The week (src/views/week.view.ts), at the address #/week -->
+        <section id="week" class="week-screen" hidden>
+          <div class="toolbar">
+            <button type="button" class="previous" aria-label="Previous week">‹</button>
+            <button type="button" class="today">Today</button>
+            <button type="button" class="next" aria-label="Next week">›</button>
+            <h2 class="week-label"></h2>
+            <span class="loading" role="status" hidden>Loading…</span>
+          </div>
+          <p class="error failure" role="alert" hidden></p>
+          <p class="zone" hidden>Times are in the calendar's time zone, <span class="zone-name"></span>.</p>
+          <ul class="legend"></ul>
+
+          <div class="week">
+            <ol class="hours" aria-hidden="true"></ol>
+            <div class="days"></div>
+          </div>
+
+          <!-- The pieces the script copies to draw a week -->
+          <template id="tpl-legend-item">
+            <li></li>
+          </template>
+          <template id="tpl-hour">
+            <li></li>
+          </template>
+          <template id="tpl-day">
+            <section class="day">
+              <h3></h3>
+              <div class="day-body"></div>
+            </section>
+          </template>
+          <template id="tpl-window">
+            <div class="block window"><span class="type-name"></span></div>
+          </template>
+          <template id="tpl-busy">
+            <div class="block busy"><span class="time"></span> busy</div>
+          </template>
+          <template id="tpl-slot">
+            <div class="block slot"><span class="time"></span> free</div>
+          </template>
+          <template id="tpl-appointment">
+            <div class="block appointment"><span class="time"></span> <strong class="who"></strong> <span class="note"></span></div>
+          </template>
+        </section>
+      </main>
     </div>
   </body>
 </html>

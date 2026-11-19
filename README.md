@@ -15,8 +15,8 @@ in `backend/`, the code it shares with the browser front end that will follow (t
 and the username rule) in `shared/`, and in `frontend/` the front end: its services layer
 (session store, login, token refresh, Hello World, user administration, the calendar;
 `docs/FRONTEND_SERVICES.md`) and the start of its pages (`docs/FRONTEND_ARCHITECTURE.md`): today
-a login page, which can be seen locally (see "The page, locally" below). The other screens
-follow `docs/FRONTEND_VIEW_PLAN.md`.
+a login page and the week calendar, read-only, which can be seen locally (see "The page,
+locally" below). The other screens follow `docs/FRONTEND_VIEW_PLAN.md`.
 
 Where the full story is:
 
@@ -100,13 +100,19 @@ listed in `CLAUDE.md`, "Everyday commands". The first deployment of a new stack 
 With the local stack running (`local:up`, then `local:api` in its own terminal):
 
 ```sh
+npm run seed:local -w frontend # once, on an empty local calendar: something to look at
 npm run dev -w frontend        # http://localhost:5173, foreground; Ctrl-C stops it
 ```
 
+The seed creates two availability types ("Studio" and "Piscina"), a few weekly patterns valid
+for 60 days and a few appointments for `alice`, through the local API. It only adds, does
+nothing when "Studio" exists already, and is run again after the back end's calendar journeys,
+which empty the local table.
+
 Open the address (in a Codespace, the forwarded port 5173) and sign in as `alice` /
 `Alice-Local-Pass-1!` or `admin` / `Admin-Local-Pass-1!`. The header shows who is signed in and
-the role; "Sign out" returns to the login. A reload of the page signs out too: the session is
-kept in memory only. An edit to `frontend/src`, `frontend/index.html` or `frontend/style.css`
+the role, and the page shows the week of today, with "previous", "Today" and "next"; "Sign out"
+returns to the login. A reload of the page signs out too: the session is kept in memory only. An edit to `frontend/src`, `frontend/index.html` or `frontend/style.css`
 shows after a reload. The dev server passes the page's calls on to the local API and to
 cognito-local; it is for local work only, and the front end is not deployed anywhere yet.
 

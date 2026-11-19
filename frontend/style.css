@@ -29,13 +29,69 @@ label { display: grid; gap: 0.25rem; font-size: 0.85rem; color: #52606d; }
 .bar .who { margin-left: auto; min-width: 0; font-size: 0.85rem; text-align: right; overflow-wrap: anywhere; }
 .bar .role { opacity: 0.75; }
 .bar .sign-out { flex: none; }
+.nav { display: flex; gap: 0.25rem; padding: 0 1rem; background: #fff; border-bottom: 1px solid #d9dee5; overflow-x: auto; }
 .nav:empty { display: none; }
+.nav-link { padding: 0.6rem 0.75rem; color: #52606d; text-decoration: none; border-bottom: 2px solid transparent; white-space: nowrap; }
+.nav-link[aria-current="page"] { color: #1d5fd1; border-bottom-color: #1d5fd1; font-weight: 600; }
 .screen { padding: 1rem; }
 
-/* A phone: the login takes the width, the header's parts get closer */
+/* The week: the toolbar, the failure, the time zone, the legend */
+.week-screen { --hour: 3.25rem; /* the height of one hour in a day column */ }
+.toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+.toolbar h2 { font-size: 1.05rem; margin-left: 0.5rem; }
+.toolbar .loading { color: #52606d; font-size: 0.85rem; }
+.week-screen .failure { margin-top: 0.5rem; }
+.zone { margin: 0.5rem 0 0.25rem; font-size: 0.8rem; color: #52606d; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; list-style: none; margin: 0.25rem 0 0.5rem; padding: 0; font-size: 0.8rem; }
+.legend li { overflow-wrap: anywhere; }
+.legend li::before { content: ''; display: inline-block; width: 0.8em; height: 0.8em; margin-right: 0.35em; border-radius: 3px; background: hsl(var(--c)); }
+
+/* The colours of the availability types: the logic layer gives a type its number, 0 to 5 */
+.type-0 { --c: 215 70% 45%; }
+.type-1 { --c: 160 65% 32%; }
+.type-2 { --c: 28 85% 42%; }
+.type-3 { --c: 280 50% 48%; }
+.type-4 { --c: 345 65% 45%; }
+.type-5 { --c: 190 75% 33%; }
+
+/* The week itself: the hours on the left, then one column per day. min-width: 0 lets the days
+   scroll sideways inside the page instead of making the page wider. */
+.week { display: grid; grid-template-columns: 3.2rem minmax(0, 1fr); transition: opacity 0.15s; }
+.week.stale { opacity: 0.5; }
+.hours { list-style: none; margin: 2rem 0 0; padding: 0; }
+.hours li { height: var(--hour); box-sizing: border-box; padding-right: 0.4rem; text-align: right; font-size: 0.7rem; color: #7b8794; transform: translateY(-0.5em); }
+.days { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(7.5rem, 1fr); gap: 3px; overflow-x: auto; }
+.day h3 { height: 2rem; line-height: 2rem; font-size: 0.8rem; font-weight: 600; text-align: center; color: #52606d; }
+.day.today h3 { color: #1d5fd1; }
+/* --hours, the number of hours shown, is set on each day by the script. */
+.day-body {
+  position: relative;
+  height: calc(var(--hours) * var(--hour));
+  background: #fff repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--hour) - 1px), #e4e7eb calc(var(--hour) - 1px), #e4e7eb var(--hour));
+}
+.day.today .day-body { box-shadow: inset 0 2px 0 #1d5fd1; }
+
+/* A block of a day: its top and height are set by the script, as percentages of the day */
+.block { position: absolute; left: 0; right: 0; box-sizing: border-box; padding: 0.15rem 0.35rem; overflow: hidden; font-size: 0.72rem; line-height: 1.25; overflow-wrap: anywhere; }
+.window { background: hsl(var(--c) / 0.14); color: hsl(var(--c)); text-align: right; font-size: 0.65rem; }
+.busy, .slot, .appointment { left: 4px; right: 4px; border-radius: 5px; }
+.busy { color: #52606d; background: repeating-linear-gradient(135deg, #d9dee5 0 6px, #eceff3 6px 12px); }
+.slot { border: 1px dashed hsl(var(--c)); background: #fff; color: hsl(var(--c)); }
+.appointment { border: 1px solid #fff; background: hsl(var(--c)); color: #fff; }
+.appointment .note { opacity: 0.85; }
+/* Two blocks in the same place on the clock, the night the clocks go back: half the width each */
+.block.lane-0-of-2 { right: 50%; }
+.block.lane-1-of-2 { left: 50%; }
+
+/* A phone: the login takes the width, the header's parts get closer, the week shows one day */
 @media (max-width: 40rem) {
   .login { margin: 1rem; max-width: none; }
   .bar { gap: 0.5rem; padding: 0.5rem 0.75rem; }
   .bar .who { font-size: 0.8rem; }
   .bar .role { display: block; }
+  .screen { padding: 0.75rem; }
+  .toolbar h2 { flex-basis: 100%; margin-left: 0; order: 1; }
+  /* One day at a time, the others a swipe away */
+  .days { grid-auto-columns: 82%; scroll-snap-type: x mandatory; }
+  .day { scroll-snap-align: start; }
 }

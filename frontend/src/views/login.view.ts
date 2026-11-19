@@ -1,4 +1,5 @@
 import type { Subscription } from 'rxjs';
+import { failureText } from '../logic/texts';
 import type { LoginService } from '../services/login.service';
 
 // What the login view uses of the LoginService: one method and one stream.
@@ -21,10 +22,11 @@ export function mountLogin(root: HTMLElement, login: LoginDeps): Subscription {
     login.login(String(data.get('username')), String(data.get('password')));
   };
 
-  // 3. The stream's notifications fill the elements.
+  // 3. The stream's notifications fill the elements. A failure is shown in plain words, by its
+  // reason: the service's own message is written for a developer.
   const subscription = login.loginState$.subscribe((state) => {
     button.disabled = state.status === 'pending';
-    error.textContent = state.status === 'failure' ? state.message : '';
+    error.textContent = state.status === 'failure' ? failureText(state.reason) : '';
   });
 
   // 4. Leaving the view: the element stays in the page, only hidden, so what was typed and the
