@@ -15,6 +15,9 @@ button, input, select, textarea { font: inherit; }
 button { padding: 0.45rem 0.8rem; border: 1px solid #b6c0cc; border-radius: 6px; background: #fff; cursor: pointer; }
 button:disabled { opacity: 0.5; cursor: default; }
 button.primary { background: #1d5fd1; border-color: #1d5fd1; color: #fff; }
+button.danger { background: #fff; border-color: #b3261e; color: #b3261e; }
+/* Where the keyboard is: the same ring on every button and link */
+button:focus-visible, a:focus-visible { outline: 2px solid #1d5fd1; outline-offset: 2px; }
 input, select, textarea { padding: 0.45rem; border: 1px solid #b6c0cc; border-radius: 6px; width: 100%; box-sizing: border-box; }
 label { display: grid; gap: 0.25rem; font-size: 0.85rem; color: #52606d; }
 .error { color: #b3261e; margin: 0; min-height: 1.2em; overflow-wrap: anywhere; }
@@ -82,6 +85,28 @@ label { display: grid; gap: 0.25rem; font-size: 0.85rem; color: #52606d; }
 /* Two blocks in the same place on the clock, the night the clocks go back: half the width each */
 .block.lane-0-of-2 { right: 50%; }
 .block.lane-1-of-2 { left: 50%; }
+/* A slot and an appointment are buttons. A button does not stretch between left and right as a
+   plain element does, so its width is said; its text starts at the top left like the others'. */
+button.block { display: flex; flex-wrap: wrap; align-content: flex-start; column-gap: 0.3em; width: calc(100% - 8px); text-align: left; }
+button.block.lane-0-of-2, button.block.lane-1-of-2 { width: calc(50% - 4px); }
+button.block:hover { filter: brightness(0.95); }
+button.block:focus-visible { outline-offset: 1px; z-index: 1; }
+
+/* The dialogs: as wide as a phone allows, scrolling inside when taller than the screen */
+dialog { width: min(24rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); box-sizing: border-box; overflow-y: auto; border: 0; border-radius: 10px; padding: 1.25rem; box-shadow: 0 8px 30px #0004; color: inherit; }
+dialog::backdrop { background: #1f293380; }
+dialog[open], dialog form, dialog .choices { display: grid; gap: 0.8rem; }
+dialog h3 { font-size: 1.05rem; }
+dialog p { margin: 0; }
+dialog p:empty { display: none; }
+dialog .what { font-weight: 600; overflow-wrap: anywhere; }
+dialog .times { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+dialog .users-message, dialog .booked, dialog .hint { font-size: 0.85rem; color: #52606d; }
+dialog textarea { resize: vertical; }
+dialog dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.3rem 1rem; margin: 0; }
+dialog dt { color: #52606d; font-size: 0.85rem; }
+dialog dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 0.5rem; }
 
 /* A phone: the login takes the width, the header's parts get closer, the week shows one day */
 @media (max-width: 40rem) {

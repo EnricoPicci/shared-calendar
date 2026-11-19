@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v3 — **decided; the foundation and the week implemented** (2026-11-19, `docs/FRONTEND_VIEW_PLAN.md` steps 60 and 61, briefs `prompts/83-step-60-implementation.md` and `prompts/84-step-61-implementation.md`): the build and dev-server commands, the tests' environment, the shell with its navigation, the login view, the logic layer (`frontend/src/logic/`) and the week calendar, read-only, exist in `frontend/`. The other views follow, one plan step each |
+| Status | v4 — **decided; the foundation, the week, booking and cancelling implemented** (2026-11-19, `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 62, briefs `prompts/83-step-60-implementation.md`, `prompts/84-step-61-implementation.md` and `prompts/85-step-62-implementation.md`): the build and dev-server commands, the tests' environment, the shell with its navigation, the login view, the logic layer (`frontend/src/logic/`) and the week calendar with its two dialogs (book, and an appointment's detail with "Cancel appointment") exist in `frontend/`. The other views follow, one plan step each |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders |
 | Not in scope yet | Hosting, the CORS gap, keeping the session across a reload, the Content-Security-Policy of the hosting, logout. They are the open points of section 10, for later versions of this document |
 | Depends on | `docs/FRONTEND_SERVICES.md` v7 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work) |
@@ -15,6 +15,8 @@
 | v1 | 2026-11-16 | First version: the view layer. Plain HTML and CSS with one TypeScript module script; `lit-html` as the fallback for a single view. Everything else is an open point (section 10). |
 | v2 | 2026-11-19 | Plan step 60. The open points O4 (esbuild: the build and the dev server), O6 (`happy-dom`, the views inside the 100 % line coverage) and O8 (English only) are decided, with their details in the new section 12. Section 4: the login view takes the part of the `LoginService` it uses. Section 6: the shell's two functions, the header, "Sign out". Section 8: how the tests get their document, and what `happy-dom` does not emulate of the native `<dialog>`. Section 9: the tree as built, the two lint rules in place. Section 11: decisions 15 to 21. |
 | v3 | 2026-11-19 | Plan step 61: the logic layer and the week calendar, read-only. Section 4: the login shows a failure in plain words; the week's templates as built (a slot is a plain element until it does something). Section 5: the logic layer as built: its three files, "now" passed in, "today" in the default time zone and the limit of that, the offset rule and the lanes for the night the clocks go back, the `WeekScreen` as it is. Section 6: the table of screens, the address read and put right, what a session owns. Section 8: the logic's tests run with a browser zone far from the calendar's. Section 9: the tree. Section 10: new open point O9, the size of the bundle. Section 12.1: the size at step 61. Section 12.4: the interim ended. Section 11: decisions 22 to 31. |
+
+| v4 | 2026-11-19 | Plan step 62: booking and cancelling. Section 4: a slot and an appointment are buttons; the shape of a dialog (what is local to the view, how a result is tied to the dialog that asked for it, what an opening and a close do). Section 5.1: five files (`booking.ts` and `appointment.detail.ts` are new), the week loaded again after every booking or cancellation and every time the page becomes visible, why nothing is pushed, "now" for the detail, the Administrator's custom times and their limit on the night the clocks go back, the new sentences of `failureText`. Section 6: what a session owns now, and the stream the shell builds from `visibilitychange`. Section 8: what the dialogs' tests rely on. Section 9: the tree. Section 12.1: the size at step 62. Section 11: decisions 32 to 42. |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
 TypeScript module script**. The markup of every screen is in one `index.html`; the script
@@ -198,7 +200,7 @@ const copy = <T extends HTMLElement = HTMLElement>(id: string) =>
 
 ```html
 <template id="tpl-slot">
-  <div class="block slot"><span class="time"></span> free</div>
+  <button type="button" class="block slot"><span class="time"></span> free</button>
 </template>
 ```
 
@@ -212,9 +214,10 @@ const place = (id: string, block: Placed, colour?: number) => {
   if (colour !== undefined) element.classList.add(`type-${colour}`);
   return element;
 };
-const slotFor = (block: SlotBlock) => {
+const slotFor = (block: SlotBlock, timeZone: string) => {
   const element = place('tpl-slot', block, block.colour);
   element.querySelector('.time')!.textContent = block.time;
+  element.onclick = () => openBook(block, timeZone); // a click only opens a dialog
   return element;
 };
 ```
@@ -225,13 +228,76 @@ arrive ready from the logic layer, and the style sheet says what a lane and a co
 
 **The week's templates, as built** (`docs/FRONTEND_VIEW_PLAN.md` step 61), all inside the week's
 element `#week`: `tpl-day` (a heading and the day's body), `tpl-window`, `tpl-busy`, `tpl-slot`,
-`tpl-appointment`, and two for the lists beside the days, `tpl-legend-item` and `tpl-hour`. The
-navigation's link has one too, `tpl-nav-link`, in the frame. A slot and an appointment are plain
-`<div>` elements: they become buttons in the step that gives them something to do
-(`docs/FRONTEND_VIEW_PLAN.md` step 62). The number of hours shown is set on each day's body as
+`tpl-appointment`, two for the lists beside the days, `tpl-legend-item` and `tpl-hour`, and one
+for a choice of a list in the book dialog, `tpl-option`. The navigation's link has one too,
+`tpl-nav-link`, in the frame. A slot and an appointment are `<button type="button">` elements
+(`docs/FRONTEND_VIEW_PLAN.md` step 62): a keyboard reaches them, and a screen reader says their
+text, the time and "free" or the person. A window and a busy block stay plain elements. The
+number of hours shown is set on each day's body as
 the custom property `--hours`, so nothing the script sets stays on an element that outlives the
 week. The view redraws the days only when the stream brings another week object, not at every
 notification: a change of label or of "Loading…" leaves the days as they are.
+
+**The shape of a dialog** (`docs/FRONTEND_VIEW_PLAN.md` step 62: the book dialog and the
+appointment detail, both native `<dialog>` elements inside `#week`, outside the region the view
+redraws):
+
+```ts
+// What the open dialog is about; null while it is closed. And whether its action was asked for
+// since it opened.
+let booking: { slot: SlotBlock; zone: string } | null = null;
+let bookAsked = false;
+
+const openBook = (slot: SlotBlock, timeZone: string) => {
+  bookForm.reset();              // opened a second time, it shows nothing of the first
+  bookError.textContent = '';
+  booking = { slot, zone: timeZone };
+  bookAsked = false;
+  bookWhat.textContent = bookingText(slot);
+  book.showModal();
+};
+book.onclose = () => {           // "Close", the Escape key, or the close after a success
+  booking = null;
+  bookAsked = false;
+};
+bookForm.onsubmit = (event) => {
+  event.preventDefault();
+  bookAsked = true;
+  appointments.book(bookingFor(booking!.slot, booking!.zone, role, fields));
+};
+appointments.bookState$.subscribe((state) => {
+  bookSubmit.disabled = state.status === 'pending';
+  if (!bookAsked) return;        // not this opening's booking
+  bookError.textContent = state.status === 'failure' ? failureText(state.reason) : '';
+  if (state.status === 'success') book.close();
+});
+```
+
+- **What is local to the view** (section 3, rule 10): what the open dialog is about (the slot,
+  the appointment's id) and whether "Book" or "Cancel appointment" was pressed since it opened.
+  Nothing else: the texts come from the logic layer, the outcome from the stream.
+- **A result is tied to the dialog that asked for it.** A state stream keeps its last value, and
+  that value may belong to an earlier opening, or to a call still under way when the dialog was
+  closed. The view shows a failure, and closes on a success, only while "asked" is true: it is
+  set by the handler just before the call, and cleared at every opening and at every close.
+  The service cancels its pending call when a new one is made, so the next result is that
+  call's. A button is disabled from the state alone, asked or not: "Book" while any booking is
+  under way, "Cancel appointment" while the cancellation under way is of the appointment shown
+  (`pending` carries its id).
+- **An opening starts clean**: the form is reset and the failure emptied. **A close only
+  forgets** what the dialog was about. **Leaving the view** closes both dialogs, resets the
+  form, and empties the lists and every text (section 3, rule 9).
+- **A week that arrives while a dialog is open** redraws the days behind it and leaves the
+  dialog as it is: what was typed, a failure, and the slot the dialog books stay. The block that
+  opened the dialog is then a new element, so the focus does not return to it at the close.
+- **The Administrator's part** of the book dialog (the User, and two lists of times) is one
+  element, hidden for a User, whose view never asks for the list of users. The list is asked
+  for at every opening (`UsersService.listUsers()`); its states arrive through the stream and
+  are applied only while the dialog is open. The picker's choices are rebuilt when a list
+  arrives: the one place where a redrawn region holds a form control, accepted because it
+  happens at opening, before anything can be chosen, and nothing else in a session asks for
+  the list while the dialog is open.
+- **No second question** before a cancellation: one click on "Cancel appointment" cancels.
 
 ## 5. The logic layer
 
@@ -264,21 +330,25 @@ Its rules:
 7. **Tested like the services**: unit tests with no network and no DOM, inside the 100 % line
    coverage of `frontend/src`.
 
-### 5.1 As built: three files
+### 5.1 As built: five files
 
-`frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` step 61), each with its test in
+`frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` steps 61 and 62), each with its test in
 `frontend/tests/unit/logic/`:
 
 | File | What it holds |
 |---|---|
-| `texts.ts` | Pure functions: a date (`dateText`, "Mon 16 Nov"), a time (`timeText`, "09:00"), a range (`rangeText`, "09:00–10:00"), a week's label (`weekLabel`, "16 Nov – 22 Nov 2026"), a UTC offset (`offsetText`, "+02:00"), and a failure in plain words (`failureText`) |
+| `texts.ts` | Pure functions: a date (`dateText`, "Mon 16 Nov"), a time (`timeText`, "09:00"), a range (`rangeText`, "09:00–10:00"), a date with a time (`dateTimeText`, "Mon 23 Nov, 10:00"), a week's label (`weekLabel`, "16 Nov – 22 Nov 2026"), a UTC offset (`offsetText`, "+02:00"), whether a day's offset changes (`offsetChangesOn`), and a failure in plain words (`failureText`) |
 | `week.model.ts` | Pure: `weekModel(view, role)`, a `CalendarView` in, the week ready to draw out |
-| `week.screen.ts` | The class `WeekScreen`: which week is on screen and its loads |
+| `booking.ts` | Pure, for the book dialog: what is booked in words (`bookingText`), the times the Administrator may choose (`timeChoice`), the Users to choose from (`userChoice`), and from what the dialog holds to the argument of `AppointmentsService.book` (`bookingFor`) |
+| `appointment.detail.ts` | Pure: `appointmentDetail(appointment, role, now, zone)`, an `Appointment` in, what the detail dialog shows out, with whether "Cancel appointment" is offered and the sentence under it |
+| `week.screen.ts` | The class `WeekScreen`: which week is on screen, its loads and reloads, and the detail of one of its appointments |
 
 **"Now" is passed in.** Nothing in `logic/` reads the clock by itself. `WeekScreen` receives a
 function `now: () => Date` through its constructor (the shell passes `() => new Date()`, a test a
 fixed moment). Everything about one loaded week comes from the view's own `generatedAt`,
-including the day marked as today.
+including the day marked as today. What can be done to an appointment is another matter: the
+week may have been on screen for hours, so `detail(appointmentId)` reads `now()` at the moment
+the dialog opens.
 
 **"Today" is taken in the default time zone, and only there.** The week on screen at the start,
 and the one "Today" returns to, is the week of `now()` in `DEFAULT_TIME_ZONE` (`Europe/Rome`,
@@ -322,7 +392,11 @@ from its id, the same in every week, applied as a class (`type-0` … `type-5`) 
 sheet defines: no colour is computed at run time. For the Administrator every appointment
 carries its User's name; for a User the own appointments say "You" and other people's time is a
 busy block with no name, which is what the server sends (`docs/SHARED_CALENDAR_SPEC.md` section
-11.6): the model adds nothing to it.
+11.6): the model adds nothing to it. For the dialogs, a slot also carries its own `start` and
+`end` instants, its day's label, its type's name and the instants of the window that holds it;
+an appointment carries its `appointmentId`. The window is the whole stretch of the slot's type:
+two windows that touch and share a type count as one, through `shared/`'s `effectiveWindows`
+(`docs/SHARED_CALENDAR_SPEC.md` section 6.6).
 
 **The week screen:**
 
@@ -333,13 +407,17 @@ export type WeekState = { label: string; loading: boolean; failure: string | nul
 export class WeekScreen {
   readonly week$: Observable<WeekState>;
 
-  // `calendar` is the part of the CalendarService the screen uses: `load` and `calendarState$`.
-  constructor(calendar: WeekCalendar, role: Role, now: () => Date) { … }
+  // `calendar`: `load`, `reload` and `calendarState$` of the CalendarService.
+  // `appointments`: `bookResult$` and `cancelResult$` of the AppointmentsService.
+  // `visible$` notifies each time the page becomes visible again.
+  constructor(calendar: WeekCalendar, appointments: WeekAppointments, role: Role, now: () => Date, visible$: Observable<unknown>) { … }
 
-  start(): Subscription { … } // loads the week on screen, then every week the person moves to
+  start(): Subscription { … } // loads the week on screen, then every week the person moves to,
+                              // and the same week again after a write and when the page is back
   previous(): void { … }
   next(): void { … }
   today(): void { … }         // loads again even when the week of today is on screen
+  detail(appointmentId: string): AppointmentDetail | null { … }
 }
 ```
 
@@ -352,13 +430,64 @@ The view subscribes to `week$` and forwards three buttons to `previous()`, `toda
   replaces the first; the failure stays while the next load is pending; a success removes it.
 - Before `start()` nothing is loaded, and nothing after its subscription ends: a move then
   changes the label only.
-- It does not listen to bookings or cancellations yet: that reload comes with the screens that
-  write (`docs/FRONTEND_VIEW_PLAN.md` step 62), which is when the `AppointmentsService` joins the
-  constructor.
+
+**The week is loaded again after every booking and every cancellation, whatever its outcome.**
+The reload is the week screen's, not the view's: between `start()` and the end of its
+subscription it listens to `bookResult$` and `cancelResult$` and calls `calendar.reload()` at
+each result, a failure included and whatever the reason. After a write that failed the server
+may still have applied it (`docs/SHARED_CALENDAR_SPEC.md` section 16.3), and after a refusal
+such as `slot_taken` the week on screen is no longer true. A result stream hands its last result
+to a new subscriber at once: that one came before this `start()` and reloads nothing.
+
+**The week is loaded again every time the page becomes visible.** What other people booked or
+cancelled in the meantime is then shown when someone looks. The logic layer has no document to
+ask (section 5, rule 1), so `WeekScreen` receives a stream, `visible$`, as it receives "now",
+and calls `calendar.reload()` at each notification: the week on screen, whichever it is, and
+nothing while the screen is not started. **Nothing is pushed and nothing is asked on a timer**:
+the API is request and answer only, so there is no call while nobody is looking, and real-time
+updates would be a feature of their own (`docs/FRONTEND_VIEW_PLAN.md` section 8, decision 11). A
+reload that finds a dialog open leaves it as it is (section 4).
+
+**The detail of an appointment.** `detail(appointmentId)` finds the appointment in the last
+calendar view loaded, the one on screen, and returns `appointmentDetail(…)` of it, or `null`
+when that week does not hold it. Whether "Cancel appointment" is offered is decided there, not
+in the view (`docs/SHARED_CALENDAR_SPEC.md` section 8.3): to the Administrator while the
+appointment has not ended; to a User while "now" is not after `cancellableUntil`, the instant
+the server computed (exactly at it is still offered, one millisecond later it is not). Under the
+button, a User reads until when it can be cancelled, or that it is too late; the Administrator
+reads nothing while it can be cancelled, and that it has ended when it cannot. The server
+decides again when the call is made.
+
+**The booking.** `bookingFor(slot, zone, role, fields)` makes the argument of
+`AppointmentsService.book`. A User sends the slot's `start` and the note, nothing else
+(`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-01, R-BOOK-02). The Administrator sends the User chosen
+and both instants. A blank note is left out. Nothing is checked here: the shared schema, through
+the service, refuses an end that is not after the start (`invalid_request`, no request sent),
+and the server says the rest (`docs/FRONTEND_SERVICES.md` section 8, decision 42).
+
+**The Administrator's custom times** are two lists of local times on the 15-minute grid, from
+the start to the end of the window that holds the slot (`timeChoice`), set to the slot's own
+when the dialog opens. While the two are the ones the dialog opened with, the slot's own
+instants are sent; otherwise the two times become instants with `toInstant` on the slot's day in
+the calendar's zone. **Known limits, on the two nights of a clock change:**
+
+- the night the clocks go back, the slot's own instants name its hour without ambiguity, so
+  either of the two 02:00 slots is booked as it is, and the dialog shows the offsets as the week
+  does. A custom time chosen in the repeated hour is its **earlier** occurrence
+  (`docs/SHARED_CALENDAR_SPEC.md` R-TIME-03): from the later 02:00 slot, 02:15–02:45 books the
+  earlier half hour, and the later one cannot be chosen;
+- the night they go forward, the lists hold the times of the missing hour, which `toInstant`
+  moves forward by an hour (`docs/SHARED_CALENDAR_SPEC.md` R-TIME-03).
+
+Availability at night on those two nights is rare; neither is solved.
 
 **Failures in plain words.** `failureText(reason)` turns a failure's `reason` into a sentence. It
 knows the reasons a person can meet so far: the transport reasons every API service shares
-(`docs/FRONTEND_SERVICES.md` section 10.2), the codes of `GET /calendar` and the login's reasons.
+(`docs/FRONTEND_SERVICES.md` section 10.2), the codes of `GET /calendar`, the login's reasons,
+and the codes of a booking, of a cancellation and of the list of users
+(`docs/FRONTEND_SERVICES.md` sections 19.1 and 13.1). The sentence of `slot_taken` says that
+the calendar has been refreshed, which the reload above makes true. `invalid_request` has one
+sentence for every case.
 The raw technical text is never shown: a reason without a sentence gets one general sentence,
 never the service's `message`, which is written for a developer. The login view uses it too. A
 wrong password and an unknown user are one reason and get one sentence. Each later step adds the
@@ -391,9 +520,13 @@ API's configuration and the whole store because it creates the API services of e
 4. **New API services and logic objects for every session.** They are created when a session
    starts and dropped when it ends, so that nothing of one person's data can be replayed to the
    next (the services' result streams replay their last value). One function of the shell,
-   `sessionObjects`, creates them when a person enters: today the `CalendarService` and the
-   `WeekScreen`. They live as long as the person's session, not as long as a screen is on show:
-   coming back to a screen finds its logic object as it was left.
+   `sessionObjects`, creates them when a person enters: today the `CalendarService`, the
+   `AppointmentsService`, the `UsersService` (for both roles; a User's view never calls it) and
+   the `WeekScreen`. They live as long as the person's session, not as long as a screen is on
+   show: coming back to a screen finds its logic object as it was left. The same function builds
+   the stream the week screen reloads on (section 5.1): the document's `visibilitychange` event,
+   keeping the notifications at which `document.visibilityState` is `visible`. It ends with the
+   screen's subscription, so nothing is loaded at the login or after signing out.
 5. **Mounting.** To show a view the shell un-hides its element, calls its mount function, then
    starts its logic object and triggers its first loads. To leave it, the shell unsubscribes the
    one subscription that holds all of this and hides the element.
@@ -416,7 +549,8 @@ export type Screen = {
 };
 ```
 
-There is one entry so far, `#/week`, "Week", both roles. A new screen is a new entry, its
+There is one entry so far, `#/week`, "Week", both roles; the two dialogs of the week are part of
+its view and have no address. A new screen is a new entry, its
 element in `index.html`, and its services and logic object in `sessionObjects`; the code that
 reads the address, fills the navigation and switches between screens does not change.
 `mountShell` takes the table as an optional dependency, which a test uses to bring a second
@@ -506,13 +640,23 @@ not, so these are checked in a browser only:
 A view's test may therefore call `close()` to stand for the Escape key, and must not rely on the
 order between `close()` returning and the `close` event.
 
+What the dialogs' tests rely on (plan step 62), all of which `happy-dom` 21 does as a browser
+does: `form.reset()`, a `<select>` whose `value` is set and read, `FormData` reading a
+`<textarea>` and a `<select>`, an `<option>` whose value is its text, and `close()` on a dialog
+that is not open doing nothing. One difference: a list with no choice gives `FormData` an entry
+with an empty value there and no entry in a browser; the view reads both as an empty text. Since a click passes
+through a modal dialog there, a test can open both dialogs at once, which a person cannot: the
+shell's test uses it to sign out with both open. The document's `visibilityState` is always
+`visible` there: the shell's test defines the property on the document for the length of a test
+and sends the `visibilitychange` event itself.
+
 ## 9. Placement
 
 Inside `frontend/`, next to the services:
 
 ```
 frontend/
-├── index.html                 # all the markup: one element per view, the dialogs, the <template>s
+├── index.html                 # all the markup: one element per view, its dialogs, the <template>s
 ├── style.css                  # the one style sheet
 ├── scripts/                   # Node, not the browser: the bundle command and the dev server (section 12)
 │   ├── bundle.mjs             # what the two share: how src/main.ts becomes app.js
@@ -523,7 +667,7 @@ frontend/
 │   ├── main.ts                # the entry file of the bundle: the configuration, then the shell
 │   ├── services/              # docs/FRONTEND_SERVICES.md
 │   ├── logic/                 # the logic layer, no DOM (section 5.1): texts.ts, week.model.ts,
-│   │                          # week.screen.ts
+│   │                          # booking.ts, appointment.detail.ts, week.screen.ts
 │   └── views/                 # shell.ts and one <name>.view.ts per view: login.view.ts, week.view.ts
 ├── tests/
 │   └── unit/
@@ -607,6 +751,17 @@ than what the trial showed: these deserve the first look in a review.
 | 29 | A wrong address is put right with `history.replaceState` (section 6) | No step added to the history, so the back button is not caught; it sends no `hashchange`, so the shell does not hear its own correction | Yes |
 | 30 | The session's services and logic objects are created when the person enters, not when a screen is shown (section 6, point 4) | A screen left and found again keeps its state (the week it was on) within one session, and nothing outlives the session | Yes |
 | 31 | The local seed books as `alice` herself, not as the Administrator for her (`frontend/scripts/seed-local.mjs`) | The server then offers and accepts only the slots the current settings allow, with no rule copied into a script. The types and the patterns are created as the Administrator | Yes |
+| 32 | The reload after a write is the week screen's: it listens to `bookResult$` and `cancelResult$` and reloads at every result, a failure included (section 5.1) | `docs/SHARED_CALENDAR_SPEC.md` section 16.3: a failed write may have been applied, and after a refusal the week on screen is no longer true. In the logic layer it is tested without a DOM and cannot be forgotten by a second view | Yes: `docs/FRONTEND_SERVICES.md` section 18.6 shows the view doing it, on a success |
+| 33 | The week is loaded again every time the page becomes visible; `WeekScreen` receives the stream, the shell builds it from `visibilitychange`; no timer, nothing pushed (sections 5.1 and 6) | `docs/FRONTEND_VIEW_PLAN.md` section 8, decision 11. The logic layer keeps no DOM, and the stream is handed over like "now" | Yes |
+| 34 | A dialog shows a result only when it asked for it since it opened: a local "asked" of the view, beside what the dialog is about (section 4) | The state streams keep their last value; without it a failure of an earlier opening, or the result of a call left under way, would show in the next dialog | Yes |
+| 35 | A slot and an appointment are buttons; a click only opens a dialog; one click on "Cancel appointment" cancels, with no second question (section 4) | Reachable by keyboard with nothing of our own. A cancelled slot is free again and can be booked again, so a confirmation would cost every cancellation a click to protect the rare slip | The second, yes |
+| 36 | Whether "Cancel appointment" is offered, and the sentence under it, are decided in `logic/appointment.detail.ts` with "now" read when the dialog opens (section 5.1) | A rule and a comparison of times: not a view's (section 3, rule 1). The week's `generatedAt` may be hours old | Yes |
+| 37 | The Administrator's custom times are two native lists of local times, from the start to the end of the slot's window; left as they are, the slot's own instants are sent (section 5.1) | Native controls, nothing typed that could be off the grid. The slot's own instants name the repeated hour without ambiguity; a custom time in it is the earlier occurrence, and the lists of the night the clocks go forward hold the missing hour: known limits | Yes |
+| 38 | A slot of the week model carries the instants of its window, made with `shared/`'s `effectiveWindows` (section 5.1) | The dialog needs the window for the custom times, and the view may not work it out. The model was to gain only the slot's instants, its day and its type's name: this is one field more | Yes |
+| 39 | The list of users is asked for at every opening of the Administrator's book dialog and applied only while it is open; the picker is rebuilt when it arrives (section 4) | A user created meanwhile is there. It is the one redrawn region with a form control, accepted because it happens before anything can be chosen. If a later screen asks for the list while the dialog is open, this must be looked at again | Yes |
+| 40 | The messages beside the User picker ("Loading the users…", "There is no User to book for.") come from `logic/booking.ts`, with whether "Book" may be pressed (`userChoice`), not from `index.html` (section 5.1) | One function says the names, the message and "ready" for each state of the list, and is tested without a DOM. It departs from section 12.4, which puts fixed texts in the page | Yes |
+| 41 | The week view receives its dependencies as one object: the parts it uses of the `WeekScreen`, of the `AppointmentsService` and of the `UsersService`, and the role (section 4) | Three services' parts cannot be one `Pick<…>`. The role decides which part of the book dialog is shown (section 3, rule 11) | Yes |
+| 42 | Both dialogs stay in `week.view.ts` in this step; what a second screen shares is moved out when that screen comes (`docs/FRONTEND_VIEW_PLAN.md` step 64) | Nothing is shared yet. The view is 288 lines; 38 of them look nodes up, 16 of those for the two dialogs and their three streams: no condition of section 7 was met | |
 
 ## 12. The tooling (open points O4, O6 and O8, decided)
 
@@ -640,8 +795,9 @@ The build prints the size of each file, as it is and compressed. At plan step 60
 only: `app.js` 490 kB, 105 kB compressed. Of the 490 kB, 454 are `zod` (264 of them its messages
 in other languages), which `shared/`'s schemas bring in with any import from
 `@shared-calendar/shared`; the services, `shared/`, the views and `rxjs` together are 36 kB.
-At plan step 61, with the logic layer and the week: `app.js` 504 kB, 110 kB compressed. What to
-do about `zod`'s share is open point O9 (section 10).
+At plan step 61, with the logic layer and the week: `app.js` 504 kB, 110 kB compressed. At plan
+step 62, with booking and cancelling: 518 kB, 113 kB compressed. What to do about `zod`'s share
+is open point O9 (section 10).
 
 ### 12.2 The dev server
 
@@ -681,5 +837,7 @@ id, and says so when the file is missing) and, to sign in, `npm run local:api -w
 
 English only, with no translation mechanism. The fixed texts are written in `index.html`; the
 texts that depend on data are made by the logic layer (section 5.1, `frontend/src/logic/texts.ts`):
-dates, times, and a failure in plain words by its `reason`. No view shows the `message` of a
+dates, times, and a failure in plain words by its `reason`. The sentences that depend on a
+state are there too: those under "Cancel appointment" (`appointment.detail.ts`) and those
+beside the User picker (`booking.ts`, section 11, decision 40). No view shows the `message` of a
 service. The shell holds the two names of the roles.

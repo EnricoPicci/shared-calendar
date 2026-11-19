@@ -1,4 +1,4 @@
-import { dateText, failureText, offsetText, rangeText, timeText, weekLabel } from '../../../src/logic/texts';
+import { dateText, dateTimeText, failureText, offsetChangesOn, offsetText, rangeText, timeText, weekLabel } from '../../../src/logic/texts';
 import { useFarBrowserZone } from './zone';
 
 describe('texts', () => {
@@ -78,6 +78,38 @@ describe('texts', () => {
     });
   });
 
+  describe('offsetChangesOn', () => {
+    it.each([
+      ['2027-10-31', 'Europe/Rome', true], // the clocks go back
+      ['2027-03-28', 'Europe/Rome', true], // the clocks go forward
+      ['2027-10-30', 'Europe/Rome', false],
+      ['2027-11-01', 'Europe/Rome', false],
+      ['2027-10-31', 'Asia/Kolkata', false], // a zone without daylight saving time
+    ])('%s in %s: %s', (date, zone, changes) => {
+      expect(offsetChangesOn(date, zone)).toBe(changes);
+    });
+  });
+
+  describe('dateTimeText', () => {
+    it('is the day and the time on the clock of the zone given, whatever the browser\'s zone', () => {
+      expect(dateTimeText('2026-11-23T09:00:00.000Z', 'Europe/Rome')).toBe('Mon 23 Nov, 10:00');
+      expect(dateTimeText('2027-07-05T08:00:00.000Z', 'Europe/Rome')).toBe('Mon 5 Jul, 10:00');
+      expect(dateTimeText('2026-11-19T12:24:31.412Z', 'Europe/Rome')).toBe('Thu 19 Nov, 13:24');
+    });
+
+    it('the day is the one of the zone given: late evening in UTC is the next day in Kolkata', () => {
+      expect(dateTimeText('2026-11-22T23:00:00.000Z', 'Europe/Rome')).toBe('Mon 23 Nov, 00:00');
+      expect(dateTimeText('2026-11-22T20:00:00.000Z', 'Asia/Kolkata')).toBe('Mon 23 Nov, 01:30');
+      expect(dateTimeText('2026-11-22T20:00:00.000Z', 'Europe/Rome')).toBe('Sun 22 Nov, 21:00');
+    });
+
+    it('on a day whose offset changes the time carries its offset', () => {
+      expect(dateTimeText('2027-10-31T00:00:00.000Z', 'Europe/Rome')).toBe('Sun 31 Oct, 02:00 +02:00');
+      expect(dateTimeText('2027-10-31T01:00:00.000Z', 'Europe/Rome')).toBe('Sun 31 Oct, 02:00 +01:00');
+      expect(dateTimeText('2027-10-30T01:00:00.000Z', 'Europe/Rome')).toBe('Sat 30 Oct, 03:00');
+    });
+  });
+
   describe('failureText', () => {
     const REASONS = [
       'network',
@@ -93,6 +125,20 @@ describe('texts', () => {
       'password_reset_required',
       'challenge',
       'no_role',
+      // Booking, cancelling and the list of users.
+      'invalid_json',
+      'slot_taken',
+      'booking_in_past',
+      'booking_notice_too_short',
+      'booking_beyond_horizon',
+      'outside_availability',
+      'appointment_limit_reached',
+      'user_not_found',
+      'target_not_user',
+      'concurrent_update',
+      'appointment_not_found',
+      'appointment_not_active',
+      'cancellation_notice_too_short',
     ];
 
     it.each(REASONS)('%s has a sentence: a capital, a full stop, no code (no underscore) and no technical word', (reason) => {
@@ -109,10 +155,14 @@ describe('texts', () => {
 
     it('a reason without a sentence gets the general one, also when it is the name of something every object has', () => {
       const general = 'Something went wrong. Please try again.';
-      expect(failureText('slot_taken')).toBe(general);
+      expect(failureText('type_in_use')).toBe(general);
       expect(failureText('')).toBe(general);
       expect(failureText('constructor')).toBe(general);
       expect(failureText('unexpected')).toBe(general);
+    });
+
+    it('slot_taken says that the calendar has been refreshed', () => {
+      expect(failureText('slot_taken')).toBe('This time has just been taken. The calendar has been refreshed: please choose another time.');
     });
 
     it('says the same for a wrong password and an unknown user: both are invalid_credentials', () => {

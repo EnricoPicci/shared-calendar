@@ -482,6 +482,202 @@ describe('the navigation', () => {
     expect(window.location.hash).toBe('#/nothing');
   });
 
+  // Booking and cancelling with the real services of the session behind the stubbed fetch
+  // (docs/FRONTEND_ARCHITECTURE.md section 6, point 4): the week is loaded again by the week
+  // screen, at every result.
+  describe('booking and cancelling', () => {
+    const OWN = winterWeek().appointments[0]!;
+    const calls = () => (fetchMock.mock.calls as [string, RequestInit][]).filter(([url]) => url.startsWith(CONFIG.apiUrl));
+    const book = () => find<HTMLDialogElement>('#week dialog.book');
+    const detail = () => find<HTMLDialogElement>('#week dialog.detail');
+
+    it('a User books a slot: the call, the dialog closed on its success, and the week loaded again', async () => {
+      fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
+      mounted(ALICE);
+      await weekDrawn();
+
+      fetchMock.mockResolvedValueOnce(json(201, OWN));
+      find('#week .slot').click();
+      expect(book().open).toBe(true);
+      find<HTMLTextAreaElement>('#week dialog.book [name="note"]').value = 'First lesson';
+      submit(find<HTMLFormElement>('#week dialog.book form'));
+      expect(find<HTMLButtonElement>('#week dialog.book .submit').disabled).toBe(true);
+
+      await vi.waitFor(() => expect(book().open).toBe(false));
+      const [url, init] = calls()[1]!;
+      expect([url, init.method]).toEqual(['http://api.test/calendar/appointments', 'POST']);
+      expect(JSON.parse(String(init.body))).toEqual({ start: '2026-11-16T07:00:00.000Z', note: 'First lesson' });
+      // The third call is the same week again.
+      expect(apiCalls()).toHaveLength(3);
+      expect(apiCalls()[2]).toEqual([WEEK_URL, 'Bearer access-token-alice']);
+      // A User's view never asks for the list of users.
+      expect(apiCalls().some(([address]) => address!.includes('/users'))).toBe(false);
+    });
+
+    it('a booking that is refused: the sentence in the dialog, still open, and the week loaded again all the same', async () => {
+      fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
+      mounted(ALICE);
+      await weekDrawn();
+
+      fetchMock.mockResolvedValueOnce(json(409, { error: 'slot_taken', message: 'the slot overlaps another appointment' }));
+      fetchMock.mockResolvedValueOnce(json(200, { ...winterWeek(), days: winterWeek().days.map((day) => ({ ...day, slots: [] })) }));
+      find('#week .slot').click();
+      submit(find<HTMLFormElement>('#week dialog.book form'));
+
+      await vi.waitFor(() => expect(find('#week dialog.book .error').textContent).toBe('This time has just been taken. The calendar has been refreshed: please choose another time.'));
+      expect(book().open).toBe(true);
+      await vi.waitFor(() => expect(document.querySelectorAll('#week .slot')).toHaveLength(0));
+      expect(apiCalls()[2]).toEqual([WEEK_URL, 'Bearer access-token-alice']);
+      expect(book().open).toBe(true);
+      expect(html()).not.toContain('overlaps');
+    });
+
+    it('a User cancels an appointment from its detail: the call, the dialog closed, the week loaded again', async () => {
+      // 14 November: the appointment of Monday 16 can still be cancelled.
+      vi.setSystemTime(new Date('2026-11-14T10:00:00.000Z'));
+      const week = 'http://api.test/calendar?from=2026-11-09&to=2026-11-15';
+      const id = '01M6DMQ0000000000000000001';
+      fetchMock.mockResolvedValueOnce(json(200, { ...winterWeek(), appointments: [{ ...OWN, appointmentId: id }] }));
+      mounted(ALICE);
+      await weekDrawn();
+
+      find('#week .appointment').click();
+      expect(detail().open).toBe(true);
+      expect(find('#week dialog.detail .hint').textContent).toBe('It can be cancelled until Sun 15 Nov, 11:00.');
+      fetchMock.mockResolvedValueOnce(json(200, { ...OWN, status: 'cancelled' }));
+      find('#week dialog.detail .cancel').click();
+
+      await vi.waitFor(() => expect(detail().open).toBe(false));
+      const [url, init] = calls()[1]!;
+      expect([url, init.method, init.body]).toEqual([`http://api.test/calendar/appointments/${id}/cancel`, 'POST', undefined]);
+      expect(apiCalls()).toHaveLength(3);
+      expect(apiCalls()[2]![0]).toBe(week);
+    });
+
+    it('the Administrator\'s book dialog asks for the Users of the session\'s own service and books for the one chosen', async () => {
+      fetchMock.mockResolvedValueOnce(json(200, adminWeek()));
+      mounted(ADMIN);
+      await weekDrawn();
+
+      fetchMock.mockResolvedValueOnce(json(200, { users: [{ username: 'alice', createdAt: '2026-11-01T10:00:00.000Z' }, { username: 'bob', createdAt: '2026-11-02T10:00:00.000Z' }] }));
+      find('#week .slot').click();
+      expect(apiCalls()[1]).toEqual(['http://api.test/users', 'Bearer access-token-admin']);
+      const picker = find<HTMLSelectElement>('#week dialog.book [name="username"]');
+      await vi.waitFor(() => expect(picker.options).toHaveLength(2));
+
+      picker.value = 'bob';
+      fetchMock.mockResolvedValueOnce(json(201, { ...OWN, username: 'bob' }));
+      submit(find<HTMLFormElement>('#week dialog.book form'));
+      await vi.waitFor(() => expect(book().open).toBe(false));
+      expect(JSON.parse(String(calls()[2]![1].body))).toEqual({ start: '2026-11-16T07:00:00.000Z', end: '2026-11-16T08:00:00.000Z', username: 'bob' });
+      expect(apiCalls()[3]).toEqual([WEEK_URL, 'Bearer access-token-admin']);
+    });
+
+    it('signing out with a dialog open leaves nothing: both closed, no note, no name, the page as before anyone signed in', async () => {
+      fetchMock.mockResolvedValueOnce(json(200, adminWeek()));
+      const { store, signOut } = mounted();
+      const before = html();
+      store.set(ADMIN);
+      await weekDrawn();
+
+      fetchMock.mockResolvedValueOnce(json(200, { users: [{ username: 'carol', createdAt: '2026-11-01T10:00:00.000Z' }] }));
+      find('#week .slot').click();
+      await vi.waitFor(() => expect(find<HTMLSelectElement>('#week dialog.book [name="username"]').options).toHaveLength(1));
+      find<HTMLTextAreaElement>('#week dialog.book [name="note"]').value = 'A private note';
+      find('#week .appointment').click(); // the emulated page lets a click through a modal dialog
+      expect([book().open, detail().open]).toEqual([true, true]);
+      expect(html()).toContain('carol');
+      expect(find('#week dialog.detail .note').textContent).toBe('Bob\'s note');
+
+      signOut.click();
+      expect([book().open, detail().open]).toEqual([false, false]);
+      expect(find<HTMLTextAreaElement>('#week dialog.book [name="note"]').value).toBe('');
+      for (const gone of ['carol', 'bob', 'Bob\'s note', 'A private note', 'Studio']) expect(html()).not.toContain(gone);
+      expect(html()).toBe(before);
+
+      // The next person opens the same dialogs empty.
+      fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
+      store.set(ALICE);
+      await weekDrawn();
+      find('#week .slot').click();
+      expect(find<HTMLTextAreaElement>('#week dialog.book [name="note"]').value).toBe('');
+      expect(find('#week dialog.book .choices').hidden).toBe(true);
+      expect(find('#week dialog.book').textContent).not.toContain('carol');
+    });
+  });
+
+  // The page becoming visible again (docs/FRONTEND_ARCHITECTURE.md section 6): the shell turns
+  // the document's visibilitychange into the stream the week screen reloads on.
+  describe('the tab hidden and shown again', () => {
+    const becomes = (visibility: 'hidden' | 'visible') => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => visibility });
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+    afterEach(() => {
+      // Back to the emulated document's own property.
+      delete (document as { visibilityState?: string }).visibilityState;
+    });
+
+    it('hidden alone loads nothing; shown again, the week on screen is loaded once more', async () => {
+      fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
+      mounted(ALICE);
+      await weekDrawn();
+      find('#week .next').click();
+      expect(apiCalls()).toHaveLength(2);
+
+      becomes('hidden');
+      expect(apiCalls()).toHaveLength(2);
+      becomes('visible');
+      expect(apiCalls()).toHaveLength(3);
+      // The week on screen, not the week of today.
+      expect(apiCalls()[2]).toEqual(['http://api.test/calendar?from=2026-11-23&to=2026-11-29', 'Bearer access-token-alice']);
+      becomes('hidden');
+      becomes('visible');
+      expect(apiCalls()).toHaveLength(4);
+    });
+
+    it('with a dialog open the week is loaded again and the dialog stays as it is', async () => {
+      fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
+      mounted(ALICE);
+      await weekDrawn();
+      find('#week .slot').click();
+      find<HTMLTextAreaElement>('#week dialog.book [name="note"]').value = 'First lesson';
+
+      fetchMock.mockResolvedValueOnce(json(200, { ...winterWeek(), days: winterWeek().days.map((day) => ({ ...day, slots: [] })) }));
+      becomes('hidden');
+      becomes('visible');
+      await vi.waitFor(() => expect(document.querySelectorAll('#week .slot')).toHaveLength(0));
+      expect(find<HTMLDialogElement>('#week dialog.book').open).toBe(true);
+      expect(find<HTMLTextAreaElement>('#week dialog.book [name="note"]').value).toBe('First lesson');
+    });
+
+    it('nothing is loaded at the login, nor after signing out', async () => {
+      const { store, signOut } = mounted();
+      becomes('hidden');
+      becomes('visible');
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
+      store.set(ALICE);
+      await weekDrawn();
+      signOut.click();
+      becomes('hidden');
+      becomes('visible');
+      expect(apiCalls()).toHaveLength(1);
+    });
+
+    it('a second person\'s return to the tab loads that person\'s week only, once', async () => {
+      const { store, signOut } = mounted(ADMIN);
+      signOut.click();
+      store.set(ALICE);
+      expect(apiCalls()).toHaveLength(2);
+      becomes('hidden');
+      becomes('visible');
+      expect(apiCalls()).toHaveLength(3);
+      expect(apiCalls()[2]![1]).toBe('Bearer access-token-alice');
+    });
+  });
+
   // A table of two screens, to see what one screen cannot show: a change of screen, and an
   // address a role may not see. The second entry is shown on the week's element, since the page
   // has no other screen yet; its mount is a spy.

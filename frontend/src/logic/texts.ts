@@ -1,7 +1,8 @@
-import { localDateOf, localTimeOf } from '@shared-calendar/shared';
+import { localDateOf, localTimeOf, toInstant } from '@shared-calendar/shared';
 
 // The texts that depend on data (docs/FRONTEND_ARCHITECTURE.md section 5 and section 12.4): a
-// date, a time, a range, a week's label, a UTC offset, and a failure in plain words. Pure
+// date, a time, a range, a date with a time, a week's label, a UTC offset, and a failure in plain
+// words. Pure
 // functions. A time is read in the time zone given, through the helpers of shared/; a date is
 // turned into words reading it as UTC. The browser's own zone plays no part in either.
 
@@ -66,6 +67,20 @@ export function rangeText(start: string, end: string, zone: string, withOffset =
   return `${timeText(start, zone, true)} – ${endTime} ${offsetText(end, zone)}`;
 }
 
+// Whether the UTC offset of `zone` changes during the local date `date`: the day the clocks go
+// back or forward. Every time shown in such a day carries its offset
+// (docs/SHARED_CALENDAR_SPEC.md section 16.8).
+export function offsetChangesOn(date: string, zone: string): boolean {
+  return offsetText(toInstant(date, '00:00', zone), zone) !== offsetText(toInstant(date, '24:00', zone), zone);
+}
+
+// An instant as a day and a time on the clock of `zone`: "Mon 23 Nov, 10:00"; on a day whose
+// offset changes, "Sun 31 Oct, 02:00 +01:00".
+export function dateTimeText(instant: string, zone: string): string {
+  const date = localDateOf(instant, zone);
+  return `${dateText(date)}, ${timeText(instant, zone, offsetChangesOn(date, zone))}`;
+}
+
 // What went wrong, in words for the person in front of the screen. Never the service's own
 // `message`, which is written for a developer.
 const GENERAL = 'Something went wrong. Please try again.';
@@ -81,6 +96,22 @@ const PLAIN_WORDS = new Map<string, string>([
   ['forbidden', 'Your account is not allowed to do this.'],
   ['invalid_request', 'The request was not accepted. Please try again.'],
   ['internal_error', 'Something went wrong on the server. Please try again in a moment.'],
+  // Booking and cancelling (docs/FRONTEND_SERVICES.md section 19.1) and the list of users
+  // (docs/FRONTEND_SERVICES.md section 13.1). After a refused booking the week is loaded again
+  // (docs/FRONTEND_ARCHITECTURE.md section 5.1), which is what the sentence of `slot_taken` says.
+  ['invalid_json', 'The server could not read the request. Please try again.'],
+  ['slot_taken', 'This time has just been taken. The calendar has been refreshed: please choose another time.'],
+  ['booking_in_past', 'This time has already passed. Please choose a later one.'],
+  ['booking_notice_too_short', 'This time is too soon to be booked. Please choose a later one.'],
+  ['booking_beyond_horizon', 'This time is too far ahead to be booked yet. Please choose an earlier one.'],
+  ['outside_availability', 'This time is not within the hours open for booking. Please choose another time.'],
+  ['appointment_limit_reached', 'You have as many upcoming appointments as the calendar allows. Cancel one to book another.'],
+  ['user_not_found', 'This user no longer exists.'],
+  ['target_not_user', 'An appointment can be booked for a User only, not for an Administrator.'],
+  ['concurrent_update', 'The calendar was being changed at the same moment. Please try again.'],
+  ['appointment_not_found', 'This appointment cannot be found.'],
+  ['appointment_not_active', 'This appointment has already been cancelled, or it has ended.'],
+  ['cancellation_notice_too_short', 'It is too late to cancel this appointment.'],
   // The login (docs/FRONTEND_SERVICES.md section 4.3). A wrong password and an unknown user are
   // one reason, so that the sentence does not say which usernames exist.
   ['invalid_credentials', 'The username or the password is not correct.'],

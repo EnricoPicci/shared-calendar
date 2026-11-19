@@ -36,8 +36,30 @@ describe('weekModel', () => {
 
     it('places the free slots, each with its type\'s colour', () => {
       expect(monday.slots).toEqual([
-        { top: '0%', height: '10%', time: '08:00–09:00', ...FULL, colour: colourOf(STUDIO) },
-        { top: '60%', height: '10%', time: '14:00–15:00', ...FULL, colour: colourOf(POOL) },
+        {
+          top: '0%',
+          height: '10%',
+          time: '08:00–09:00',
+          ...FULL,
+          colour: colourOf(STUDIO),
+          start: z('2026-11-16T07:00'),
+          end: z('2026-11-16T08:00'),
+          day: 'Mon 16 Nov',
+          typeName: 'Studio',
+          window: { start: z('2026-11-16T07:00'), end: z('2026-11-16T11:00') },
+        },
+        {
+          top: '60%',
+          height: '10%',
+          time: '14:00–15:00',
+          ...FULL,
+          colour: colourOf(POOL),
+          start: z('2026-11-16T13:00'),
+          end: z('2026-11-16T14:00'),
+          day: 'Mon 16 Nov',
+          typeName: 'Swimming Pool',
+          window: { start: z('2026-11-16T13:00'), end: z('2026-11-16T17:00') },
+        },
       ]);
     });
 
@@ -47,7 +69,7 @@ describe('weekModel', () => {
 
     it('the User\'s own appointment says "You", with its type and its note', () => {
       expect(monday.appointments).toEqual([
-        { top: '30%', height: '10%', time: '11:00–12:00', ...FULL, who: 'You', typeName: 'Studio', note: 'First lesson', colour: colourOf(STUDIO) },
+        { top: '30%', height: '10%', time: '11:00–12:00', ...FULL, appointmentId: 'appt-2026-11-16T10:00:00.000Z', who: 'You', typeName: 'Studio', note: 'First lesson', colour: colourOf(STUDIO) },
       ]);
     });
 
@@ -273,6 +295,65 @@ describe('weekModel', () => {
     it('the blocks follow the clock, one under the other, each the whole width', () => {
       expect(sunday.slots[0]).toMatchObject({ top: '0%', height: percent(120, shown), ...FULL });
       expect(sunday.slots[1]).toMatchObject({ top: percent(120, shown), height: percent(60, shown), ...FULL });
+    });
+  });
+
+  describe('what the dialogs need', () => {
+    it('an appointment carries its id, for both roles', () => {
+      const a = appointment({ appointmentId: '01M6DMQ0000000000000000001', start: z('2026-11-16T08:00'), end: z('2026-11-16T09:00'), date: '2026-11-16' });
+      for (const role of ['admin', 'user'] as const) {
+        expect(weekModel(view('2026-11-16', { appointments: [a] }), role).days[0]!.appointments[0]!.appointmentId).toBe('01M6DMQ0000000000000000001');
+      }
+    });
+
+    it('a slot\'s window is the whole stretch of its type: two windows that touch are one (6.6)', () => {
+      // Studio 08:30–10:30 and 10:30–12:00 local, then Swimming Pool from 12:00: the slot
+      // 10:00–11:00 lies across the first two.
+      const week = view('2026-11-16', {}, [
+        {
+          date: '2026-11-16',
+          windows: [
+            { start: z('2026-11-16T07:30'), end: z('2026-11-16T09:30'), typeId: STUDIO, typeName: 'Studio' },
+            { start: z('2026-11-16T09:30'), end: z('2026-11-16T11:00'), typeId: STUDIO, typeName: 'Studio' },
+            { start: z('2026-11-16T11:00'), end: z('2026-11-16T13:00'), typeId: POOL, typeName: 'Swimming Pool' },
+          ],
+          slots: [
+            { start: z('2026-11-16T09:00'), end: z('2026-11-16T10:00'), typeId: STUDIO },
+            { start: z('2026-11-16T11:00'), end: z('2026-11-16T12:00'), typeId: POOL },
+          ],
+        },
+      ]);
+      const [studio, pool] = weekModel(week, 'admin').days[0]!.slots;
+      expect(studio!.window).toEqual({ start: z('2026-11-16T07:30'), end: z('2026-11-16T11:00') });
+      expect(pool!.window).toEqual({ start: z('2026-11-16T11:00'), end: z('2026-11-16T13:00') });
+      expect([studio!.typeName, pool!.typeName]).toEqual(['Studio', 'Swimming Pool']);
+    });
+
+    it('a slot that no window of the answer holds is its own window, and its type has no name', () => {
+      const week = view('2026-11-16', {}, [{ date: '2026-11-17', slots: [{ start: z('2026-11-17T08:00'), end: z('2026-11-17T09:00'), typeId: STUDIO }] }]);
+      expect(weekModel(week, 'user').days[1]!.slots[0]).toMatchObject({
+        day: 'Tue 17 Nov',
+        typeName: '',
+        window: { start: z('2026-11-17T08:00'), end: z('2026-11-17T09:00') },
+      });
+    });
+
+    it('the two slots at 02:00 of 2027-10-31 carry their own instants, an hour apart, in one window', () => {
+      const slot = (start: string, end: string) => ({ start: z(start), end: z(end), typeId: STUDIO });
+      const week = view('2027-10-25', {}, [
+        {
+          date: '2027-10-31',
+          windows: [{ start: z('2027-10-30T23:00'), end: z('2027-10-31T03:00'), typeId: STUDIO, typeName: 'Studio' }],
+          slots: [slot('2027-10-31T00:00', '2027-10-31T01:00'), slot('2027-10-31T01:00', '2027-10-31T02:00')],
+        },
+      ]);
+      const slots = weekModel(week, 'user').days[6]!.slots;
+      expect(slots.map((s) => [s.start, s.end])).toEqual([
+        [z('2027-10-31T00:00'), z('2027-10-31T01:00')],
+        [z('2027-10-31T01:00'), z('2027-10-31T02:00')],
+      ]);
+      expect(slots.map((s) => s.day)).toEqual(['Sun 31 Oct', 'Sun 31 Oct']);
+      expect(slots[1]!.window).toEqual({ start: z('2027-10-30T23:00'), end: z('2027-10-31T03:00') });
     });
   });
 

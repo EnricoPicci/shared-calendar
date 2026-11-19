@@ -53,6 +53,52 @@
             <div class="days"></div>
           </div>
 
+          <!-- The book dialog: a free slot of the week, a note; for the Administrator also the
+               User to book for and other times inside the slot's window. Outside the region
+               the script redraws. -->
+          <dialog class="book" aria-labelledby="book-title">
+            <form>
+              <h3 id="book-title">Book an appointment</h3>
+              <p class="what"></p>
+              <div class="choices" hidden>
+                <label>For <select name="username"></select></label>
+                <p class="users-message" role="status"></p>
+                <div class="times">
+                  <label>From <select name="start"></select></label>
+                  <label>To <select name="end"></select></label>
+                </div>
+              </div>
+              <label>Note <textarea name="note" rows="3" maxlength="500"></textarea></label>
+              <p class="error" role="alert"></p>
+              <div class="actions">
+                <button type="button" class="close">Close</button>
+                <button class="primary submit">Book</button>
+              </div>
+            </form>
+          </dialog>
+
+          <!-- The detail of one appointment, with what can be done to it -->
+          <dialog class="detail" aria-labelledby="detail-title">
+            <h3 id="detail-title">Appointment</h3>
+            <dl>
+              <dt>When</dt>
+              <dd class="when"></dd>
+              <dt>Type</dt>
+              <dd class="typeName"></dd>
+              <dt>For</dt>
+              <dd class="who"></dd>
+              <dt>Note</dt>
+              <dd class="note"></dd>
+            </dl>
+            <p class="booked"></p>
+            <p class="hint"></p>
+            <p class="error" role="alert"></p>
+            <div class="actions">
+              <button type="button" class="close">Close</button>
+              <button type="button" class="danger cancel" hidden>Cancel appointment</button>
+            </div>
+          </dialog>
+
           <!-- The pieces the script copies to draw a week -->
           <template id="tpl-legend-item">
             <li></li>
@@ -73,10 +119,14 @@
             <div class="block busy"><span class="time"></span> busy</div>
           </template>
           <template id="tpl-slot">
-            <div class="block slot"><span class="time"></span> free</div>
+            <button type="button" class="block slot"><span class="time"></span> free</button>
           </template>
           <template id="tpl-appointment">
-            <div class="block appointment"><span class="time"></span> <strong class="who"></strong> <span class="note"></span></div>
+            <button type="button" class="block appointment"><span class="time"></span> <strong class="who"></strong> <span class="note"></span></button>
+          </template>
+          <!-- A choice of a list in the book dialog -->
+          <template id="tpl-option">
+            <option></option>
           </template>
         </section>
       </main>

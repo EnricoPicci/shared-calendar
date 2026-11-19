@@ -1,13 +1,18 @@
+import type { Role } from '@shared-calendar/shared';
 import { BehaviorSubject } from 'rxjs';
-import type { DayModel, Placed, WeekModel } from '../../../src/logic/week.model';
+import type { AppointmentDetail } from '../../../src/logic/appointment.detail';
+import type { DayModel, Placed, SlotBlock, WeekModel } from '../../../src/logic/week.model';
 import type { WeekState } from '../../../src/logic/week.screen';
+import type { BookState, CancelState } from '../../../src/services/appointments.types';
+import type { ListUsersState } from '../../../src/services/users.types';
 import { mountWeek, type WeekDeps } from '../../../src/views/week.view';
-import { find, useRealPage } from './page';
+import { find, submit, useRealPage } from './page';
 
 // The DOM test of the week view (docs/FRONTEND_ARCHITECTURE.md section 8): the real index.html,
-// and a fake WeekScreen whose stream the test controls and whose methods are spies. The weeks
-// are written by hand: what the view does with a week is checked here, how a week is made is
-// checked in the logic layer's tests.
+// and a fake WeekScreen, a fake AppointmentsService and a fake UsersService whose streams the
+// test controls and whose methods are spies. The weeks and the details are written by hand:
+// what the view does with them is checked here, how they are made is checked in the logic
+// layer's tests.
 
 const SCRIPT = '<script>window.hacked = true</script><b>bold</b>';
 const FAILURE = 'The server cannot be reached. Check the connection and try again.';
@@ -24,6 +29,21 @@ const day = (date: string, label: string, over: Partial<DayModel> = {}): DayMode
   ...over,
 });
 
+// What a slot carries for the book dialog: Monday 16 November 2026 in Rome, in a window
+// 08:00–12:00 of the type Studio.
+const slot = (placed: Placed, colour: number, over: Partial<SlotBlock> = {}): SlotBlock => ({
+  ...placed,
+  colour,
+  start: '2026-11-16T07:00:00.000Z',
+  end: '2026-11-16T08:00:00.000Z',
+  day: 'Mon 16 Nov',
+  typeName: 'Studio',
+  window: { start: '2026-11-16T07:00:00.000Z', end: '2026-11-16T11:00:00.000Z' },
+  ...over,
+});
+const APPOINTMENT = '01M6DMQ0000000000000000001';
+const OTHER_APPOINTMENT = '01M6DMQ0000000000000000002';
+
 // A week with one of everything on Monday, and the two repeated slots side by side.
 const WEEK: WeekModel = {
   timeZone: 'Europe/Rome',
@@ -36,12 +56,12 @@ const WEEK: WeekModel = {
     day('2026-11-16', 'Mon 16 Nov', {
       windows: [{ ...at('0%', '40%', '08:00–12:00'), typeName: 'Studio', colour: 2 }],
       slots: [
-        { ...at('0%', '10%', '08:00–09:00'), colour: 2 },
-        { ...at('60%', '10%', '02:00 +02:00 – 02:00 +01:00', 0, 2), colour: 5 },
-        { ...at('60%', '10%', '02:00 +01:00 – 03:00 +01:00', 1, 2), colour: 5 },
+        slot(at('0%', '10%', '08:00–09:00'), 2),
+        slot(at('60%', '10%', '02:00 +02:00 – 02:00 +01:00', 0, 2), 5),
+        slot(at('60%', '10%', '02:00 +01:00 – 03:00 +01:00', 1, 2), 5),
       ],
       busy: [at('10%', '10%', '09:00–10:00')],
-      appointments: [{ ...at('30%', '12.5%', '11:00–12:15'), who: 'You', typeName: 'Studio', note: 'First lesson', colour: 2 }],
+      appointments: [{ ...at('30%', '12.5%', '11:00–12:15'), appointmentId: APPOINTMENT, who: 'You', typeName: 'Studio', note: 'First lesson', colour: 2 }],
     }),
     day('2026-11-17', 'Tue 17 Nov', { today: true }),
     ...['Wed 18 Nov', 'Thu 19 Nov', 'Fri 20 Nov', 'Sat 21 Nov', 'Sun 22 Nov'].map((label, i) => day(`2026-11-${18 + i}`, label)),
@@ -55,24 +75,47 @@ const OTHER: WeekModel = {
   legend: [{ name: 'Piscina', colour: 1 }],
   days: [
     day('2026-11-23', 'Mon 23 Nov', {
-      appointments: [{ ...at('0%', '50%', '06:00–07:00'), who: 'bob', typeName: 'Piscina', note: '', colour: 1 }],
+      appointments: [{ ...at('0%', '50%', '06:00–07:00'), appointmentId: OTHER_APPOINTMENT, who: 'bob', typeName: 'Piscina', note: '', colour: 1 }],
     }),
   ],
 };
 
 const state = (over: Partial<WeekState> = {}): WeekState => ({ label: '16 Nov – 22 Nov 2026', loading: false, failure: null, week: null, ...over });
 
-function mounted(first: WeekState = state()) {
+// The details the fake WeekScreen knows, by appointment id.
+const DETAIL: AppointmentDetail = {
+  appointmentId: APPOINTMENT,
+  when: 'Mon 16 Nov, 11:00–12:15',
+  typeName: 'Studio',
+  who: 'You',
+  note: 'First lesson',
+  booked: 'Booked by you on Thu 12 Nov, 13:24',
+  canCancel: true,
+  hint: 'It can be cancelled until Sun 15 Nov, 11:00.',
+};
+
+function mounted(first: WeekState = state(), role: Role = 'user', details: AppointmentDetail[] = [DETAIL]) {
   const week$ = new BehaviorSubject<WeekState>(first);
+  const bookState$ = new BehaviorSubject<BookState>({ status: 'idle' });
+  const cancelState$ = new BehaviorSubject<CancelState>({ status: 'idle' });
+  const listUsersState$ = new BehaviorSubject<ListUsersState>({ status: 'idle' });
   const screen = {
     week$: week$.asObservable(),
-    previous: vi.fn<WeekDeps['previous']>(),
-    next: vi.fn<WeekDeps['next']>(),
-    today: vi.fn<WeekDeps['today']>(),
+    previous: vi.fn<WeekDeps['screen']['previous']>(),
+    next: vi.fn<WeekDeps['screen']['next']>(),
+    today: vi.fn<WeekDeps['screen']['today']>(),
+    detail: vi.fn<WeekDeps['screen']['detail']>((id) => details.find((detail) => detail.appointmentId === id) ?? null),
   };
+  const appointments = {
+    bookState$: bookState$.asObservable(),
+    cancelState$: cancelState$.asObservable(),
+    book: vi.fn<WeekDeps['appointments']['book']>(),
+    cancel: vi.fn<WeekDeps['appointments']['cancel']>(),
+  };
+  const users = { listUsersState$: listUsersState$.asObservable(), listUsers: vi.fn<WeekDeps['users']['listUsers']>() };
   const root = find('#week');
-  const subscription = mountWeek(root, screen);
-  return { week$, screen, root, subscription };
+  const subscription = mountWeek(root, { screen, appointments, users, role });
+  return { week$, bookState$, cancelState$, listUsersState$, screen, appointments, users, root, subscription };
 }
 
 const all = (selector: string) => [...document.querySelectorAll<HTMLElement>(`#week ${selector}`)];
@@ -185,13 +228,20 @@ describe('mountWeek', () => {
       expect(find('#week .loading').hidden).toBe(true);
     });
 
-    it('slots and appointments are plain elements that do nothing: no button, no handler', () => {
+    it('slots and appointments are buttons a keyboard reaches, named by their text; windows and busy blocks are plain elements', () => {
       mounted(state({ week: WEEK }));
-      expect(all('.days button, .days a')).toHaveLength(0);
-      for (const block of all('.block')) {
+      for (const block of all('.slot, .appointment')) {
+        expect(block.tagName).toBe('BUTTON');
+        expect(block.getAttribute('type')).toBe('button');
+        expect(block.hasAttribute('tabindex')).toBe(false);
+      }
+      expect(find('#week .slot').textContent).toBe('08:00–09:00 free');
+      expect(find('#week .appointment').textContent).toBe('11:00–12:15 You First lesson');
+      for (const block of all('.window, .busy')) {
         expect(block.tagName).toBe('DIV');
         expect(block.onclick).toBeNull();
       }
+      expect(all('.days a')).toHaveLength(0);
     });
   });
 
@@ -231,9 +281,9 @@ describe('mountWeek', () => {
       days: [
         day('2026-11-16', SCRIPT, {
           windows: [{ ...at('0%', '10%', SCRIPT), typeName: SCRIPT, colour: 0 }],
-          slots: [{ ...at('0%', '10%', SCRIPT), colour: 0 }],
+          slots: [slot(at('0%', '10%', SCRIPT), 0)],
           busy: [at('0%', '10%', SCRIPT)],
-          appointments: [{ ...at('0%', '10%', SCRIPT), who: SCRIPT, typeName: SCRIPT, note: SCRIPT, colour: 0 }],
+          appointments: [{ ...at('0%', '10%', SCRIPT), appointmentId: APPOINTMENT, who: SCRIPT, typeName: SCRIPT, note: SCRIPT, colour: 0 }],
         }),
       ],
     };
@@ -273,6 +323,520 @@ describe('mountWeek', () => {
     });
   });
 
+  // The two dialogs of the week and what is in them.
+  const book = () => find<HTMLDialogElement>('#week dialog.book');
+  const bookForm = () => find<HTMLFormElement>('#week dialog.book form');
+  const note = () => find<HTMLTextAreaElement>('#week dialog.book [name="note"]');
+  const bookError = () => find('#week dialog.book .error');
+  const bookSubmit = () => find<HTMLButtonElement>('#week dialog.book .submit');
+  const select = (name: string) => find<HTMLSelectElement>(`#week dialog.book [name="${name}"]`);
+  const options = (name: string) => [...select(name).options].map((option) => option.value);
+  const usersMessage = () => find('#week dialog.book .users-message');
+  const detail = () => find<HTMLDialogElement>('#week dialog.detail');
+  const detailError = () => find('#week dialog.detail .error');
+  const cancelButton = () => find<HTMLButtonElement>('#week dialog.detail .cancel');
+  const detailText = (field: string) => find(`#week dialog.detail .${field}`).textContent;
+
+  const ALICE_AND_BOB: ListUsersState = {
+    status: 'success',
+    users: [
+      { username: 'alice', createdAt: '2026-11-01T10:00:00.000Z' },
+      { username: 'bob', createdAt: '2026-11-02T10:00:00.000Z' },
+    ],
+  };
+  const TAKEN = 'This time has just been taken. The calendar has been refreshed: please choose another time.';
+  const booked = (): BookState => ({ status: 'success', appointment: {} as never });
+
+  describe('the book dialog, for a User', () => {
+    it('before any click both dialogs are closed', () => {
+      mounted(state({ week: WEEK }));
+      expect([book().open, detail().open]).toEqual([false, false]);
+    });
+
+    it('a click on a free slot opens it: what is booked in words, an empty note, no failure, "Book" enabled', () => {
+      const { appointments } = mounted(state({ week: WEEK }));
+      find('#week .slot').click();
+      expect(book().open).toBe(true);
+      expect(detail().open).toBe(false);
+      expect(find('#week dialog.book .what').textContent).toBe('Mon 16 Nov, 08:00–09:00 · Studio');
+      expect(note().value).toBe('');
+      expect(note().maxLength).toBe(500);
+      expect(bookError().textContent).toBe('');
+      expect(bookError().getAttribute('role')).toBe('alert');
+      expect(bookSubmit().disabled).toBe(false);
+      expect(appointments.book).not.toHaveBeenCalled();
+    });
+
+    it('the User picker and the custom times are hidden, and the list of users is never asked for', () => {
+      const { users } = mounted(state({ week: WEEK }));
+      find('#week .slot').click();
+      expect(find('#week dialog.book .choices').hidden).toBe(true);
+      expect([options('username'), options('start'), options('end')]).toEqual([[], [], []]);
+      expect(users.listUsers).not.toHaveBeenCalled();
+    });
+
+    it('"Book" calls book() with the slot\'s start and the note, once, and changes nothing on screen by itself', () => {
+      const { appointments } = mounted(state({ week: WEEK }));
+      find('#week .slot').click();
+      note().value = '  First lesson ';
+      const { prevented } = submit(bookForm());
+      expect(prevented).toBe(true);
+      expect(appointments.book).toHaveBeenCalledTimes(1);
+      expect(appointments.book).toHaveBeenCalledWith({ start: '2026-11-16T07:00:00.000Z', note: 'First lesson' });
+      // The outcome comes from the stream: the dialog is still open, the button still enabled.
+      expect(book().open).toBe(true);
+      expect(bookSubmit().disabled).toBe(false);
+      expect(note().value).toBe('  First lesson ');
+    });
+
+    it('without a note only the start is sent', () => {
+      const { appointments } = mounted(state({ week: WEEK }));
+      find('#week .slot').click();
+      submit(bookForm());
+      expect(appointments.book).toHaveBeenCalledWith({ start: '2026-11-16T07:00:00.000Z' });
+    });
+
+    it('each slot books its own instant: the second of the two repeated slots', () => {
+      const repeated = { ...WEEK, days: [day('2027-10-31', 'Sun 31 Oct', { slots: [
+        slot(at('0%', '10%', '02:00 +02:00 – 02:00 +01:00', 0, 2), 5, { start: '2027-10-31T00:00:00.000Z', end: '2027-10-31T01:00:00.000Z', day: 'Sun 31 Oct' }),
+        slot(at('0%', '10%', '02:00 +01:00 – 03:00 +01:00', 1, 2), 5, { start: '2027-10-31T01:00:00.000Z', end: '2027-10-31T02:00:00.000Z', day: 'Sun 31 Oct' }),
+      ] })] };
+      const { appointments } = mounted(state({ week: repeated }));
+      all('.slot')[1]!.click();
+      expect(find('#week dialog.book .what').textContent).toBe('Sun 31 Oct, 02:00 +01:00 – 03:00 +01:00 · Studio');
+      submit(bookForm());
+      expect(appointments.book).toHaveBeenCalledWith({ start: '2027-10-31T01:00:00.000Z' });
+    });
+
+    it('bookState$ pending: "Book" is disabled; the dialog and the note stay', () => {
+      const { bookState$ } = mounted(state({ week: WEEK }));
+      find('#week .slot').click();
+      note().value = 'First lesson';
+      submit(bookForm());
+      bookState$.next({ status: 'pending', booking: { start: '2026-11-16T07:00:00.000Z', note: 'First lesson' } });
+      expect(bookSubmit().disabled).toBe(true);
+      expect(book().open).toBe(true);
+      expect(note().value).toBe('First lesson');
+      expect(bookError().textContent).toBe('');
+    });
+
+    it('bookState$ success: the dialog closes', () => {
+      const { bookState$ } = mounted(state({ week: WEEK }));
+      find('#week .slot').click();
+      submit(bookForm());
+      bookState$.next({ status: 'pending', booking: { start: '2026-11-16T07:00:00.000Z' } });
+      bookState$.next(booked());
+      expect(book().open).toBe(false);
+      expect(bookSubmit().disabled).toBe(false);
+    });
+
+    it('bookState$ failure: the sentence in plain words, the dialog still open with what was typed, "Book" usable again', () => {
+      const { bookState$ } = mounted(state({ week: WEEK }));
+      find('#week .slot').click();
+      note().value = 'First lesson';
+      submit(bookForm());
+      bookState$.next({ status: 'pending', booking: { start: '2026-11-16T07:00:00.000Z', note: 'First lesson' } });
+      bookState$.next({ status: 'failure', reason: 'slot_taken', message: 'slot_taken: the slot overlaps appointment 01M6…' });
+      expect(bookError().textContent).toBe(TAKEN);
+      expect(book().open).toBe(true);
+      expect(note().value).toBe('First lesson');
+      expect(bookSubmit().disabled).toBe(false);
+      expect(find('#week').textContent).not.toContain('overlaps');
+    });
+
+    it('a second try after a failure: the sentence goes while it is pending, and a success closes', () => {
+      const { bookState$, appointments } = mounted(state({ week: WEEK }));
+      find('#week .slot').click();
+      submit(bookForm());
+      bookState$.next({ status: 'failure', reason: 'network', message: 'TypeError: Failed to fetch' });
+      expect(bookError().textContent).toBe(FAILURE);
+      submit(bookForm());
+      expect(appointments.book).toHaveBeenCalledTimes(2);
+      bookState$.next({ status: 'pending', booking: { start: '2026-11-16T07:00:00.000Z' } });
+      expect(bookError().textContent).toBe('');
+      bookState$.next(booked());
+      expect(book().open).toBe(false);
+    });
+
+    it('"Close" closes it without a call', () => {
+      const { appointments } = mounted(state({ week: WEEK }));
+      find('#week .slot').click();
+      find('#week dialog.book .close').click();
+      expect(book().open).toBe(false);
+      expect(appointments.book).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the book dialog opened a second time shows nothing of the first', () => {
+    it('after a success: an empty note, no failure', () => {
+      const { bookState$ } = mounted(state({ week: WEEK }));
+      find('#week .slot').click();
+      note().value = 'First lesson';
+      submit(bookForm());
+      bookState$.next(booked());
+      expect(book().open).toBe(false);
+
+      all('.slot')[1]!.click();
+      expect(book().open).toBe(true);
+      expect(note().value).toBe('');
+      expect(bookError().textContent).toBe('');
+      expect(find('#week dialog.book .what').textContent).toBe('Mon 16 Nov, 02:00 +02:00 – 02:00 +01:00 · Studio');
+    });
+
+    it('after a failure and the Escape key (close()): an empty note, no failure, "Book" enabled', () => {
+      const { bookState$ } = mounted(state({ week: WEEK }));
+      find('#week .slot').click();
+      note().value = 'First lesson';
+      submit(bookForm());
+      bookState$.next({ status: 'failure', reason: 'slot_taken', message: 'taken' });
+      book().close();
+
+      find('#week .slot').click();
+      expect(note().value).toBe('');
+      expect(bookError().textContent).toBe('');
+      expect(bookSubmit().disabled).toBe(false);
+    });
+
+    it('a failure that was already in the stream when the view was mounted is not shown at opening', () => {
+      const { bookState$, subscription } = mounted(state({ week: WEEK }));
+      bookState$.next({ status: 'failure', reason: 'slot_taken', message: 'taken' });
+      expect(bookError().textContent).toBe('');
+      find('#week .slot').click();
+      expect(bookError().textContent).toBe('');
+      subscription.unsubscribe();
+    });
+
+    it('a booking still under way from an opening that was closed: "Book" is disabled, and its result is neither shown nor closes the new dialog', () => {
+      const { bookState$ } = mounted(state({ week: WEEK }));
+      find('#week .slot').click();
+      submit(bookForm());
+      bookState$.next({ status: 'pending', booking: { start: '2026-11-16T07:00:00.000Z' } });
+      book().close();
+
+      all('.slot')[1]!.click();
+      expect(bookSubmit().disabled).toBe(true);
+      bookState$.next({ status: 'failure', reason: 'slot_taken', message: 'taken' });
+      expect(bookError().textContent).toBe('');
+      expect(bookSubmit().disabled).toBe(false);
+
+      book().close();
+      find('#week .slot').click();
+      bookState$.next(booked());
+      expect(book().open).toBe(true);
+    });
+  });
+
+  describe('the book dialog, for the Administrator', () => {
+    const opened = () => {
+      const view = mounted(state({ week: WEEK }), 'admin');
+      find('#week .slot').click();
+      return view;
+    };
+
+    it('shows the User picker and the times, and asks for the list of users at every opening', () => {
+      const { users } = opened();
+      expect(find('#week dialog.book .choices').hidden).toBe(false);
+      expect(users.listUsers).toHaveBeenCalledTimes(1);
+      book().close();
+      find('#week .slot').click();
+      expect(users.listUsers).toHaveBeenCalledTimes(2);
+    });
+
+    it('the times are every quarter of the slot\'s window, set to the slot\'s own', () => {
+      opened();
+      expect(options('start')).toHaveLength(16);
+      expect([options('start')[0], options('start').at(-1)]).toEqual(['08:00', '11:45']);
+      expect([options('end')[0], options('end').at(-1)]).toEqual(['08:15', '12:00']);
+      expect([select('start').value, select('end').value]).toEqual(['08:00', '09:00']);
+    });
+
+    it('before the list arrives and while it loads: no choice, "Book" disabled, and loading says so', () => {
+      const { listUsersState$ } = opened();
+      expect(bookSubmit().disabled).toBe(true);
+      expect(options('username')).toEqual([]);
+      listUsersState$.next({ status: 'pending' });
+      expect(usersMessage().textContent).toBe('Loading the users…');
+      expect(bookSubmit().disabled).toBe(true);
+    });
+
+    it('the list loaded: one choice per User, "Book" enabled, no message', () => {
+      const { listUsersState$ } = opened();
+      listUsersState$.next({ status: 'pending' });
+      listUsersState$.next(ALICE_AND_BOB);
+      expect(options('username')).toEqual(['alice', 'bob']);
+      expect(select('username').value).toBe('alice');
+      expect(usersMessage().textContent).toBe('');
+      expect(bookSubmit().disabled).toBe(false);
+    });
+
+    it('an empty list says that there is no User to book for, and "Book" stays disabled', () => {
+      const { listUsersState$ } = opened();
+      listUsersState$.next({ status: 'success', users: [] });
+      expect(usersMessage().textContent).toBe('There is no User to book for.');
+      expect(options('username')).toEqual([]);
+      expect(bookSubmit().disabled).toBe(true);
+    });
+
+    it('a failed list is said in plain words in the dialog, and "Book" stays disabled', () => {
+      const { listUsersState$ } = opened();
+      listUsersState$.next({ status: 'failure', reason: 'network', message: 'TypeError: Failed to fetch' });
+      expect(usersMessage().textContent).toBe(FAILURE);
+      expect(bookSubmit().disabled).toBe(true);
+      expect(find('#week').textContent).not.toContain('TypeError');
+    });
+
+    it('a list that arrives while the dialog is closed is left alone; the next opening starts without choices', () => {
+      const { listUsersState$ } = opened();
+      book().close();
+      listUsersState$.next(ALICE_AND_BOB);
+      expect(options('username')).toEqual([]);
+
+      find('#week .slot').click();
+      expect(bookSubmit().disabled).toBe(true);
+      listUsersState$.next({ status: 'pending' });
+      listUsersState$.next({ status: 'success', users: [{ username: 'carol', createdAt: '2026-11-03T10:00:00.000Z' }] });
+      expect(options('username')).toEqual(['carol']);
+    });
+
+    it('"Book" with the times not touched: the User chosen, the slot\'s own start and end, the note', () => {
+      const { listUsersState$, appointments } = opened();
+      listUsersState$.next(ALICE_AND_BOB);
+      select('username').value = 'bob';
+      note().value = 'For Bob';
+      submit(bookForm());
+      expect(appointments.book).toHaveBeenCalledWith({ start: '2026-11-16T07:00:00.000Z', end: '2026-11-16T08:00:00.000Z', username: 'bob', note: 'For Bob' });
+    });
+
+    it('"Book" with a custom start and end: the two times of the slot\'s day in the calendar\'s zone', () => {
+      const { listUsersState$, appointments } = opened();
+      listUsersState$.next(ALICE_AND_BOB);
+      select('start').value = '10:15';
+      select('end').value = '10:45';
+      submit(bookForm());
+      expect(appointments.book).toHaveBeenCalledWith({ start: '2026-11-16T09:15:00.000Z', end: '2026-11-16T09:45:00.000Z', username: 'alice' });
+    });
+
+    it('an end not after the start goes to the service, whose refusal is shown in plain words with the dialog open', () => {
+      const { listUsersState$, bookState$, appointments } = opened();
+      listUsersState$.next(ALICE_AND_BOB);
+      select('start').value = '11:00';
+      select('end').value = '10:00';
+      submit(bookForm());
+      expect(appointments.book).toHaveBeenCalledWith({ start: '2026-11-16T10:00:00.000Z', end: '2026-11-16T09:00:00.000Z', username: 'alice' });
+      bookState$.next({ status: 'pending', booking: appointments.book.mock.lastCall![0] });
+      bookState$.next({ status: 'failure', reason: 'invalid_request', message: 'end: end must be after start' });
+      expect(bookError().textContent).toBe('The request was not accepted. Please try again.');
+      expect(book().open).toBe(true);
+      expect([select('start').value, select('end').value]).toEqual(['11:00', '10:00']);
+    });
+
+    it('a booking under way and a list still loading both keep "Book" disabled', () => {
+      const { listUsersState$, bookState$ } = opened();
+      bookState$.next({ status: 'pending', booking: { start: '2026-11-16T07:00:00.000Z' } });
+      listUsersState$.next(ALICE_AND_BOB);
+      expect(bookSubmit().disabled).toBe(true);
+      bookState$.next({ status: 'failure', reason: 'network', message: 'x' });
+      expect(bookSubmit().disabled).toBe(false);
+    });
+
+    it('opened a second time: the times are the new slot\'s own, the note is empty, the User is the first again', () => {
+      const { listUsersState$ } = opened();
+      listUsersState$.next(ALICE_AND_BOB);
+      select('username').value = 'bob';
+      select('start').value = '10:15';
+      note().value = 'For Bob';
+      book().close();
+
+      find('#week .slot').click();
+      expect([select('start').value, select('end').value]).toEqual(['08:00', '09:00']);
+      expect(note().value).toBe('');
+      listUsersState$.next(ALICE_AND_BOB);
+      expect(select('username').value).toBe('alice');
+    });
+  });
+
+  describe('the appointment detail', () => {
+    it('a click on an appointment asks the screen for its detail and shows every field', () => {
+      const { screen } = mounted(state({ week: WEEK }));
+      find('#week .appointment').click();
+      expect(screen.detail).toHaveBeenCalledWith(APPOINTMENT);
+      expect(detail().open).toBe(true);
+      expect(book().open).toBe(false);
+      expect(['when', 'typeName', 'who', 'note', 'booked', 'hint'].map(detailText)).toEqual([
+        'Mon 16 Nov, 11:00–12:15',
+        'Studio',
+        'You',
+        'First lesson',
+        'Booked by you on Thu 12 Nov, 13:24',
+        'It can be cancelled until Sun 15 Nov, 11:00.',
+      ]);
+      expect(detailError().textContent).toBe('');
+      expect(detailError().getAttribute('role')).toBe('alert');
+    });
+
+    it('"Cancel appointment" is shown when the logic layer offers it, hidden when it does not', () => {
+      const offered = mounted(state({ week: WEEK }));
+      find('#week .appointment').click();
+      expect(cancelButton().hidden).toBe(false);
+      expect(cancelButton().disabled).toBe(false);
+      offered.subscription.unsubscribe();
+
+      mounted(state({ week: WEEK }), 'user', [{ ...DETAIL, canCancel: false, hint: 'It is too late to cancel this appointment.' }]);
+      find('#week .appointment').click();
+      expect(cancelButton().hidden).toBe(true);
+      expect(detailText('hint')).toBe('It is too late to cancel this appointment.');
+    });
+
+    it('an appointment the week on screen no longer holds opens nothing', () => {
+      const { screen } = mounted(state({ week: WEEK }), 'user', []);
+      find('#week .appointment').click();
+      expect(screen.detail).toHaveBeenCalledTimes(1);
+      expect(detail().open).toBe(false);
+    });
+
+    it('"Cancel appointment" calls cancel() with the id, once, with no second question, and changes nothing by itself', () => {
+      const { appointments } = mounted(state({ week: WEEK }));
+      find('#week .appointment').click();
+      cancelButton().click();
+      expect(appointments.cancel).toHaveBeenCalledTimes(1);
+      expect(appointments.cancel).toHaveBeenCalledWith(APPOINTMENT);
+      expect(detail().open).toBe(true);
+      expect(cancelButton().disabled).toBe(false);
+    });
+
+    it('cancelState$ pending for this appointment disables the button; for another one it does not', () => {
+      const { cancelState$ } = mounted(state({ week: WEEK }));
+      find('#week .appointment').click();
+      cancelState$.next({ status: 'pending', appointmentId: OTHER_APPOINTMENT });
+      expect(cancelButton().disabled).toBe(false);
+      cancelButton().click();
+      cancelState$.next({ status: 'pending', appointmentId: APPOINTMENT });
+      expect(cancelButton().disabled).toBe(true);
+      expect(detail().open).toBe(true);
+    });
+
+    it('cancelState$ success: the dialog closes', () => {
+      const { cancelState$ } = mounted(state({ week: WEEK }));
+      find('#week .appointment').click();
+      cancelButton().click();
+      cancelState$.next({ status: 'pending', appointmentId: APPOINTMENT });
+      cancelState$.next({ status: 'success', appointment: {} as never });
+      expect(detail().open).toBe(false);
+    });
+
+    it('cancelState$ failure: the sentence in plain words, the dialog still open, the button usable again', () => {
+      const { cancelState$ } = mounted(state({ week: WEEK }));
+      find('#week .appointment').click();
+      cancelButton().click();
+      cancelState$.next({ status: 'pending', appointmentId: APPOINTMENT });
+      cancelState$.next({ status: 'failure', reason: 'cancellation_notice_too_short', message: 'cancellation_notice_too_short: 23 h < 24 h' });
+      expect(detailError().textContent).toBe('It is too late to cancel this appointment.');
+      expect(detail().open).toBe(true);
+      expect(cancelButton().disabled).toBe(false);
+      expect(find('#week').textContent).not.toContain('23 h');
+    });
+
+    it('"Close" and the Escape key (close()) close it without a call', () => {
+      const { appointments } = mounted(state({ week: WEEK }));
+      find('#week .appointment').click();
+      find('#week dialog.detail .close').click();
+      expect(detail().open).toBe(false);
+      find('#week .appointment').click();
+      detail().close();
+      expect(detail().open).toBe(false);
+      expect(appointments.cancel).not.toHaveBeenCalled();
+    });
+
+    it('opened a second time after a failure it shows no failure; one already in the stream is not shown either', () => {
+      const { cancelState$ } = mounted(state({ week: WEEK }));
+      cancelState$.next({ status: 'failure', reason: 'network', message: 'x' });
+      find('#week .appointment').click();
+      expect(detailError().textContent).toBe('');
+      cancelButton().click();
+      cancelState$.next({ status: 'failure', reason: 'concurrent_update', message: 'x' });
+      expect(detailError().textContent).toBe('The calendar was being changed at the same moment. Please try again.');
+      detail().close();
+
+      find('#week .appointment').click();
+      expect(detailError().textContent).toBe('');
+    });
+
+    it('a cancellation still under way from an opening that was closed: disabled for the same appointment, and its result is neither shown nor closes the dialog', () => {
+      const { cancelState$ } = mounted(state({ week: WEEK }));
+      find('#week .appointment').click();
+      cancelButton().click();
+      cancelState$.next({ status: 'pending', appointmentId: APPOINTMENT });
+      detail().close();
+
+      find('#week .appointment').click();
+      expect(cancelButton().disabled).toBe(true);
+      cancelState$.next({ status: 'success', appointment: {} as never });
+      expect(detail().open).toBe(true);
+      expect(cancelButton().disabled).toBe(false);
+      expect(detailError().textContent).toBe('');
+    });
+  });
+
+  it('a note and a username containing <script> are shown as text in both dialogs', () => {
+    const week: WeekModel = { ...WEEK, days: [day('2026-11-16', 'Mon 16 Nov', {
+      slots: [slot(at('0%', '10%', SCRIPT), 0, { day: SCRIPT, typeName: SCRIPT })],
+      appointments: [{ ...at('0%', '10%', '11:00–12:15'), appointmentId: APPOINTMENT, who: SCRIPT, typeName: SCRIPT, note: SCRIPT, colour: 0 }],
+    })] };
+    const scripted: AppointmentDetail = { ...DETAIL, when: SCRIPT, typeName: SCRIPT, who: SCRIPT, note: SCRIPT, booked: SCRIPT, hint: SCRIPT };
+    const { listUsersState$ } = mounted(state({ week }), 'admin', [scripted]);
+
+    find('#week .slot').click();
+    listUsersState$.next({ status: 'success', users: [{ username: SCRIPT, createdAt: '2026-11-01T10:00:00.000Z' }] });
+    expect(find('#week dialog.book .what').textContent).toBe(`${SCRIPT}, ${SCRIPT} · ${SCRIPT}`);
+    expect(find('#week dialog.book .what').children).toHaveLength(0);
+    expect(select('username').options[0]!.textContent).toBe(SCRIPT);
+    expect(select('username').options[0]!.children).toHaveLength(0);
+    book().close();
+
+    find('#week .appointment').click();
+    for (const field of ['when', 'typeName', 'who', 'note', 'booked', 'hint']) {
+      const element = find(`#week dialog.detail .${field}`);
+      expect(element.textContent, field).toBe(SCRIPT);
+      expect(element.children, field).toHaveLength(0);
+    }
+    expect(document.querySelectorAll('script, b')).toHaveLength(0);
+  });
+
+  describe('a reload while a dialog is open', () => {
+    it('redraws the days behind the book dialog and leaves the dialog, what was typed and its failure as they are', () => {
+      const { week$, bookState$, appointments } = mounted(state({ week: WEEK }));
+      find('#week .slot').click();
+      note().value = 'First lesson';
+      submit(bookForm());
+      bookState$.next({ status: 'failure', reason: 'slot_taken', message: 'taken' });
+      const before = all('.day')[0];
+
+      week$.next(state({ loading: true, week: WEEK }));
+      week$.next(state({ week: OTHER }));
+      expect(all('.day')[0]).not.toBe(before);
+      expect(all('.slot')).toHaveLength(0); // the slot is gone from the week behind
+      expect(book().open).toBe(true);
+      expect(note().value).toBe('First lesson');
+      expect(bookError().textContent).toBe(TAKEN);
+      expect(find('#week dialog.book .what').textContent).toBe('Mon 16 Nov, 08:00–09:00 · Studio');
+
+      // And the dialog still books the slot it was opened for.
+      submit(bookForm());
+      expect(appointments.book).toHaveBeenLastCalledWith({ start: '2026-11-16T07:00:00.000Z', note: 'First lesson' });
+    });
+
+    it('redraws the days behind the detail and leaves it as it is', () => {
+      const { week$, appointments } = mounted(state({ week: WEEK }));
+      find('#week .appointment').click();
+      week$.next(state({ week: OTHER }));
+      expect(texts('.day h3')).toEqual(['Mon 23 Nov']);
+      expect(detail().open).toBe(true);
+      expect(detailText('note')).toBe('First lesson');
+      cancelButton().click();
+      expect(appointments.cancel).toHaveBeenCalledWith(APPOINTMENT);
+    });
+  });
+
   describe('leaving the view', () => {
     it('after unsubscribing nothing is left in the page, which is as index.html has it', () => {
       const before = html();
@@ -289,10 +853,65 @@ describe('mountWeek', () => {
       expect(html()).toBe(before);
     });
 
-    it('the stream is no longer heard', () => {
-      const { week$, subscription } = mounted();
+    it('with the book dialog open and filled, as the Administrator: closed, emptied, and the page as index.html has it', () => {
+      const before = html();
+      const { subscription, listUsersState$, bookState$ } = mounted(state({ week: WEEK }), 'admin');
+      find('#week .slot').click();
+      listUsersState$.next({ status: 'success', users: [{ username: 'alice', createdAt: '2026-11-01T10:00:00.000Z' }] });
+      note().value = 'A private note';
+      submit(bookForm());
+      bookState$.next({ status: 'failure', reason: 'slot_taken', message: 'taken' });
+      expect(book().open).toBe(true);
+
       subscription.unsubscribe();
-      expect(week$.observed).toBe(false);
+      expect(book().open).toBe(false);
+      expect(note().value).toBe('');
+      expect(all('dialog.book option')).toHaveLength(0);
+      expect(find('#week dialog.book').textContent).not.toContain('Mon 16 Nov');
+      expect(bookError().textContent).toBe('');
+      expect(find('#week dialog.book .choices').hidden).toBe(true);
+      expect(html()).not.toContain('alice');
+      expect(html()).toBe(before);
+    });
+
+    it('with the detail open after a failed cancellation: closed, emptied, and the page as index.html has it', () => {
+      const before = html();
+      const { subscription, cancelState$ } = mounted(state({ week: WEEK }));
+      find('#week .appointment').click();
+      cancelButton().click();
+      cancelState$.next({ status: 'pending', appointmentId: APPOINTMENT });
+      expect(cancelButton().disabled).toBe(true);
+      cancelState$.next({ status: 'failure', reason: 'network', message: 'TypeError: Failed to fetch' });
+      expect(detail().open).toBe(true);
+
+      subscription.unsubscribe();
+      expect(detail().open).toBe(false);
+      expect(find('#week dialog.detail').textContent).not.toContain('First lesson');
+      expect(cancelButton().hidden).toBe(true);
+      expect(html()).not.toContain('First lesson');
+      expect(html()).toBe(before);
+    });
+
+    it('left while a booking and a cancellation are under way, neither button is left disabled', () => {
+      const before = html();
+      const { subscription, bookState$, cancelState$ } = mounted(state({ week: WEEK }));
+      find('#week .appointment').click();
+      cancelButton().click();
+      cancelState$.next({ status: 'pending', appointmentId: APPOINTMENT });
+      detail().close();
+      find('#week .slot').click();
+      submit(bookForm());
+      bookState$.next({ status: 'pending', booking: { start: '2026-11-16T07:00:00.000Z' } });
+      expect(bookSubmit().disabled).toBe(true);
+      subscription.unsubscribe();
+      expect([bookSubmit().disabled, cancelButton().disabled]).toEqual([false, false]);
+      expect(html()).toBe(before);
+    });
+
+    it('the streams are no longer heard', () => {
+      const { week$, bookState$, cancelState$, listUsersState$, subscription } = mounted();
+      subscription.unsubscribe();
+      expect([week$.observed, bookState$.observed, cancelState$.observed, listUsersState$.observed]).toEqual([false, false, false, false]);
       week$.next(state({ loading: true, failure: FAILURE, week: WEEK }));
       expect(all('.day')).toHaveLength(0);
       expect(find('#week .failure').textContent).toBe('');
@@ -308,11 +927,18 @@ describe('mountWeek', () => {
     it('mounted again on the same element, it listens to the new screen only', () => {
       const first = mounted(state({ week: WEEK }));
       first.subscription.unsubscribe();
-      const second = mounted(state({ week: OTHER }));
+      const second = mounted(state({ week: OTHER }), 'user', [{ ...DETAIL, appointmentId: OTHER_APPOINTMENT }]);
       find('#week .next').click();
       expect(first.screen.next).not.toHaveBeenCalled();
       expect(second.screen.next).toHaveBeenCalledTimes(1);
       expect(texts('.day h3')).toEqual(['Mon 23 Nov']);
+      // The dialogs too: an appointment's detail is asked of the new screen, a cancellation of
+      // the new service.
+      find('#week .appointment').click();
+      cancelButton().click();
+      expect(first.screen.detail).not.toHaveBeenCalled();
+      expect(first.appointments.cancel).not.toHaveBeenCalled();
+      expect(second.appointments.cancel).toHaveBeenCalledWith(OTHER_APPOINTMENT);
     });
   });
 });

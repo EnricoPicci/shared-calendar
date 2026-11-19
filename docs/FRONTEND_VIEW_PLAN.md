@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`), waiting for review; next step 62 |
+| Status | v3 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`). Step 62 done on 2026-11-19 (brief `prompts/85-step-62-implementation.md`), waiting for review; next step 63 |
 | Scope | Everything needed to go from the services layer that exists to **all the views written, tested and running in a browser against the local stack**: the tooling, the shell, the logic layer and one view per screen. Steps 60 to 69 |
 | Not in scope | Hosting, the CORS configuration, the Content-Security-Policy of the hosting, logout as a designed service, the session across a reload, the cloud deployment of the front end. They are the open points O1, O2, O3, O5 and O7 of `docs/FRONTEND_ARCHITECTURE.md` section 10 and get their own plan |
 | Governed by | `docs/FRONTEND_ARCHITECTURE.md` (the rules of the view layer), `docs/FRONTEND_SERVICES.md` (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/ARCHITECTURE.md` section 4 (the API). On any conflict with this plan, they win |
@@ -13,6 +13,7 @@
 |---|---|---|
 | v1 | 2026-11-16 | First version: steps 60 to 69. |
 | v2 | 2026-11-19 | Step 61, decided before its implementation: "today", for the week the screen opens on, is taken in the default time zone (`DEFAULT_TIME_ZONE` of `shared/`), not in the zone the settings give; the week screen makes no request for the settings. The limit this accepts is in `docs/FRONTEND_ARCHITECTURE.md` section 5.1. Step 61's bullet on "today" and its line on the seed (which also books a few appointments for `alice`) are corrected. |
+| v3 | 2026-11-19 | Step 62 gains a reload of the week every time the browser's tab becomes visible again, so that a booking made by someone else is seen without a sign-out. No change to the back end: the API has no way to push, and a WebSocket connection would be a feature of its own, outside this plan (section 8, decision 11). |
 
 ---
 
@@ -228,7 +229,10 @@ follows.
 Logic: the booking body from a slot, a note and a username; for the Administrator the custom
 start and end on the 15-minute grid, checked with the shared schemas and rules; whether "Cancel"
 is offered and until when (`cancellableUntil`, the role); the reload of the week after every
-booking or cancellation, whatever its outcome.
+booking or cancellation, whatever its outcome; **the reload of the week every time the browser's
+tab becomes visible again**, so that what other people booked or cancelled in the meantime is
+shown. The logic layer has no DOM: the shell hands the week screen a stream that notifies when
+the page becomes visible (the document's `visibilitychange`), as it hands it "now".
 
 View: the book dialog (the slot, the note; for the Administrator the User to book for, from
 `GET /users`, and the custom start and end) and the appointment detail dialog (the fields of
@@ -240,7 +244,9 @@ nothing of the first.
 a note with `<b>` in it is shown as text; a slot taken in the meantime is refused in plain words
 and the week is refreshed; a slot too late to book and an appointment too late to cancel say so.
 As `admin`: book for `alice`; book a custom start and end; cancel anyone's appointment. The
-Escape key closes a dialog.
+Escape key closes a dialog. With the week on screen in one tab, a booking made from elsewhere
+(another window, or the API) is shown when the person comes back to the tab, and a dialog that
+is open stays as it is.
 
 **Acceptance:** the common check.
 
@@ -455,3 +461,4 @@ step 68 (everything the Administrator does), after step 69.
 | 8 | A local seed for the calendar is part of step 61 | A week needs availability to show; the local table starts empty and the back end's journeys empty it |
 | 9 | "Sign out" clears the session store only, and a reload signs out | Open points O7 and O3 of `docs/FRONTEND_ARCHITECTURE.md` section 10, outside this plan |
 | 10 | The interactions for "change" (step 63) and for a date's override (step 68) are proposed in their step and approved before code | They are choices about the screens that no document has made yet |
+| 11 | The week is loaded again when the tab becomes visible (step 62); nothing is pushed by the server and nothing is asked on a timer | The API is request and answer only. A reload on coming back to the tab shows other people's bookings at the moment someone looks, with no change to the back end and no call while nobody is looking. Real-time updates over a WebSocket need a second API, a table of connections and a stand-in for the local stack: a feature with its own specification, not a step of this plan |

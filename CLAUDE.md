@@ -15,8 +15,8 @@ with the browser front end (the API contract types, `Role`/`resolveRole`, the us
 in `shared/` (package `@shared-calendar/shared`), and in `frontend/` the browser's services
 layer (`docs/FRONTEND_SERVICES.md`) and the start of its view layer
 (`docs/FRONTEND_ARCHITECTURE.md`: the build and the dev server, the shell with its navigation,
-the login, the logic layer and the week calendar, read-only; the other views follow
-`docs/FRONTEND_VIEW_PLAN.md`). Layout and placement rules:
+the login, the logic layer and the week calendar with booking and cancelling; the other views
+follow `docs/FRONTEND_VIEW_PLAN.md`). Layout and placement rules:
 `docs/FOLDER_STRUCTURE.md`.
 
 ## Where the truth lives
@@ -30,10 +30,11 @@ the login, the logic layer and the week calendar, read-only; the other views fol
 - `docs/SHARED_CALENDAR_SPEC.md` specifies the shared calendar (agreed with the Product Owner,
   brief 40, not yet implemented). It is the input for the calendar's plan steps; once merged into
   `ARCHITECTURE.md` (spec section 19), the architecture wins as usual.
-- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v3; the foundation and the
-  week implemented, plan steps 60 and 61): plain HTML and CSS with one TypeScript module script,
-  the layers (services, logic, views, shell), the rules of a view, the logic layer as built (its
-  section 5.1), the table of screens and the navigation by the hash (its section 6), and the
+- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v4; the foundation, the
+  week, booking and cancelling implemented, plan steps 60 to 62): plain HTML and CSS with one
+  TypeScript module script, the layers (services, logic, views, shell), the rules of a view, the
+  shape of a dialog (its section 4), the logic layer as built (its section 5.1, with the reloads
+  of the week), the table of screens and the navigation by the hash (its section 6), and the
   tooling (its section 12: the bundle command, the dev server, the tests' environment). Hosting,
   CORS, the session across a reload, the hosting's Content-Security-Policy, logout and the size
   of the bundle are its open points (section 10).
@@ -41,9 +42,10 @@ the login, the logic layer and the week calendar, read-only; the other views fol
   `docs/FRONTEND_VIEW_OPTIONS.md` is the record of why this option, not a source of truth.
 - `docs/FRONTEND_VIEW_PLAN.md` defines the order of work for the views (brief 82): steps 60–69,
   each with its acceptance check and its browser check, ending with all the views running against
-  the local stack. Steps 60 (tooling, shell, login) and 61 (the logic layer, the week calendar
-  read-only, the navigation, the local seed) are done (2026-11-19); next step 62, booking and
-  cancelling.
+  the local stack. Steps 60 (tooling, shell, login), 61 (the logic layer, the week calendar
+  read-only, the navigation, the local seed) and 62 (booking and cancelling, the week loaded
+  again after a write and when the tab becomes visible) are done (2026-11-19); next step 63,
+  editing the note and changing an appointment.
 - `docs/RENAME_PLAN.md` plans the move from the "hello-world" names to "shared-calendar" (plan
   steps 56–58: repository, new stack `shared-calendar-api`, retirement of `hello-world-api`), with
   the way back at every stage. The repository uses the new names (step 56) and the stack in use
@@ -451,10 +453,15 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   everything `hidden`: the login `#login`; the frame `#app` with the header, an empty `nav`, the
   template of a navigation link and `main.screen`, which holds one element per screen: so far
   `#week`, with the toolbar, the failure (`role="alert"`), the time zone's sentence, the legend,
-  the hours, the days and its seven templates `tpl-legend-item`, `tpl-hour`, `tpl-day`,
-  `tpl-window`, `tpl-busy`, `tpl-slot`, `tpl-appointment`; one module script `app.js`, one style
-  sheet, nothing inline), `style.css` (also the six type colours `type-0` … `type-5` and the
-  lanes `lane-0-of-2`, `lane-1-of-2`),
+  the hours, the days, its two native dialogs `dialog.book` (a form: what is booked, the part
+  `.choices` for the Administrator with the lists `username`, `start` and `end`, the note with
+  `maxlength` 500, the failure) and `dialog.detail` (the fields, `.booked`, `.hint`, the failure,
+  "Cancel appointment"), and its eight templates `tpl-legend-item`, `tpl-hour`, `tpl-day`,
+  `tpl-window`, `tpl-busy`, `tpl-slot` and `tpl-appointment` (both `<button type="button">`),
+  `tpl-option`; one module script `app.js`, one style sheet, nothing inline), `style.css` (also
+  the six type colours `type-0` … `type-5`, the lanes `lane-0-of-2`, `lane-1-of-2`, the dialogs
+  and the focus ring; a class of the page must not hold the word `admin`: the shell's test looks
+  for that name in the whole document after a sign-out),
   `src/main.ts` (the bundle's entry, one statement: the only file that knows the three constants
   `API_URL`, `COGNITO_URL`, `CLIENT_ID`, which esbuild's `define` puts in), `src/views/`:
   `shell.ts` (`runShell(config)` creates the `SessionStore`, the `LoginService` and the
@@ -462,8 +469,9 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   which shows the login on `null` and the frame on a session, reduced to `Person` = username and
   role before anything else sees it; `distinctUntilChanged` on the two, so a refresh mounts
   nothing and loads nothing; `enter(person)` fills the header, creates the session's objects
-  (`sessionObjects`: a new `CalendarService` and `WeekScreen` per person, dropped when the person
-  leaves), fills the navigation from the table `SCREENS` (an entry: `hash`, `label`, `roles`,
+  (`sessionObjects`: the role, a new `CalendarService`, `AppointmentsService`, `UsersService` and
+  `WeekScreen` per person, dropped when the person leaves, and the stream of the page becoming
+  visible, from the document's `visibilitychange`, handed to the `WeekScreen`), fills the navigation from the table `SCREENS` (an entry: `hash`, `label`, `roles`,
   `element`, `show`, which mounts the view and then starts its logic object; one entry so far,
   `#/week`; `mountShell` takes another table as the optional `screens`, for its test) and
   follows the URL's hash (`fromEvent(window, 'hashchange')` from the current hash): an empty,
@@ -472,28 +480,49 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   leaves one screen and mounts the next; "Sign out" only clears the store and leaves the
   address), `login.view.ts` (`mountLogin(root, login)`, with `LoginDeps`, the part of the service
   it uses; a failure is shown through `failureText(reason)`, never the service's `message`) and
-  `week.view.ts` (`mountWeek(root, screen)`, with `WeekDeps`, the part of `WeekScreen` it uses:
-  `week$` and the three moves; copies the templates, sets `top` and `height` as properties and
-  the lane and the type colour as classes, redraws the days only when the week object changed;
-  slots and appointments are plain elements that do nothing yet). A view is
+  `week.view.ts` (`mountWeek(root, { screen, appointments, users, role })`, with `WeekDeps`: the
+  parts it uses of the `WeekScreen` (`week$`, the three moves, `detail`), of the
+  `AppointmentsService` (`book`, `cancel` and their state streams) and of the `UsersService`
+  (`listUsers` and its state stream), and the role; copies the templates, sets `top` and
+  `height` as properties and the lane and the type colour as classes, redraws the days only
+  when the week object changed; a slot opens the book dialog, an appointment its detail, which
+  can cancel it; what an open dialog is about and whether its action was asked for since it
+  opened are local variables, a result is shown only in the dialog that asked for it, an
+  opening resets the form, a close only forgets, a week that arrives behind an open dialog
+  leaves it as it is: `docs/FRONTEND_ARCHITECTURE.md` section 4; step 64 moves what a second
+  screen shares out of this file). A view is
   `mount<Name>(root, deps): Subscription` with a teardown that wipes what it put in the page.
   The logic layer, `src/logic/` (`docs/FRONTEND_ARCHITECTURE.md` section 5.1; no DOM, lint
   refuses `document` and `window` there): `texts.ts` (pure: `dateText`, `timeText`, `rangeText`,
-  `weekLabel`, `offsetText`, all through `shared/`'s time helpers and the zone given, never the
-  browser's; `failureText(reason)`, the failure in plain words, with one general sentence for a
-  reason it does not know: a new route's codes get their sentences here), `week.model.ts` (pure:
+  `dateTimeText`, `weekLabel`, `offsetText`, `offsetChangesOn`, all through `shared/`'s time
+  helpers and the zone given, never the browser's; `failureText(reason)`, the failure in plain
+  words, with one general sentence for a reason it does not know: a new route's codes get their
+  sentences here; it has those of the login, of `GET /calendar`, of a booking, of a cancellation
+  and of the list of users), `week.model.ts` (pure:
   `weekModel(view, role)`, the week ready to draw: days of windows, slots, busy blocks and
-  appointments, each with `top`, `height`, `time`, `lane` and `lanes`; the hours shown, 08:00 to
+  appointments, each with `top`, `height`, `time`, `lane` and `lanes`; a slot also with its
+  `start`, `end`, `day`, `typeName` and the instants of its `window` (through `shared/`'s
+  `effectiveWindows`), an appointment with its `appointmentId`; the hours shown, 08:00 to
   18:00 widened to hold everything; the legend; `colourOf(typeId)`, 0 to 5; on a day whose UTC
   offset changes every time carries its offset, and two blocks of one kind in the same place on
-  the clock get lanes 0 and 1 of 2) and `week.screen.ts` (`WeekScreen(calendar, role, now)`:
-  `week$` = label, loading, failure, the last week loaded; `start()`, `previous()`, `next()`,
-  `today()`; "now" is passed in, and "today" for the week to open on is taken in
-  `DEFAULT_TIME_ZONE`, the one place the default zone is used; it does not reload after a write
-  yet: plan step 62). `scripts/` (Node, outside the browser's lint rules): `bundle.mjs` (the
+  the clock get lanes 0 and 1 of 2) , `booking.ts` (pure, for the book dialog: `bookingText(slot)`;
+  `timeChoice(slot, zone)`, the Administrator's local times on the 15-minute grid over the
+  slot's window; `userChoice(state)`, the names, the message and "ready" from the state of
+  `listUsers`; `bookingFor(slot, zone, role, fields)`, the argument of `book`: a User sends the
+  start and the note only, the Administrator the User and both instants, the slot's own while
+  the times were not changed), `appointment.detail.ts` (pure:
+  `appointmentDetail(appointment, role, now, zone)`, the detail dialog's texts, `canCancel` and
+  the sentence under the button) and `week.screen.ts`
+  (`WeekScreen(calendar, appointments, role, now, visible$)`: `week$` = label, loading, failure,
+  the last week loaded; `start()`, `previous()`, `next()`, `today()`, `detail(appointmentId)`;
+  "now" is passed in, and "today" for the week to open on is taken in `DEFAULT_TIME_ZONE`, the
+  one place the default zone is used; between `start()` and the end of its subscription it
+  calls `calendar.reload()` at every result of `bookResult$` and `cancelResult$`, a failure
+  included, and at every notification of `visible$`, but not for a result that was already
+  there at `start()`). `scripts/` (Node, outside the browser's lint rules): `bundle.mjs` (the
   esbuild options the two share), `build.mjs`, `dev.mjs`, `seed-local.mjs`.
   `tests/unit/logic/` (project `unit`): `zone.ts`, `fixtures.ts`, `texts.test.ts`,
-  `week.model.test.ts`, `week.screen.test.ts`. `tests/unit/views/` (project `views`): `page.ts`
+  `week.model.test.ts`, `booking.test.ts`, `appointment.detail.test.ts`, `week.screen.test.ts`. `tests/unit/views/` (project `views`): `page.ts`
   (`useRealPage()`, `find`, `submit`), `page.test.ts`, `login.view.test.ts`,
   `week.view.test.ts`, `shell.test.ts`. No `template.yaml` yet: the hosting
   waits for the open points of `docs/FRONTEND_ARCHITECTURE.md` section 10.
@@ -542,14 +571,20 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   nothing left in the page after unsubscribing. Under `happy-dom`, `import.meta.url` is not a
   `file:` URL (use `import.meta.dirname`), parsing a whole page with `DOMParser` tries to load its
   style sheet (use a `<template>`, as `pageAside()` does), and the native `<dialog>` has no Escape
-  key, no inertness and no focus handling: those are for the browser check.
+  key, no inertness and no focus handling: those are for the browser check. A dialog's test
+  calls `close()` for the Escape key; since a click passes through a modal dialog there, a test
+  can have both dialogs open, which a person cannot. An appointment id in a test that reaches a
+  real service must be a ULID (the fixtures' `appt-…` ids are refused before any request). The
+  shell's test of the tab becoming visible defines `visibilityState` on the document and sends
+  `visibilitychange` itself, and removes the property after each test.
 - Two more ESLint rules on the front end (root `eslint.config.js`): no `innerHTML`, `outerHTML` or
   `insertAdjacentHTML` anywhere in `frontend/src`; no global `document` or `window` in
   `frontend/src/services` and `frontend/src/logic` (a parameter with that name is allowed). The
   second block repeats the Node globals, because a later `no-restricted-globals` for the same
   files replaces the earlier list.
 - The logic layer's tests (`frontend/tests/unit/logic/`, project `unit`, in node, no DOM): fake
-  services (plain objects: a subject for the stream, `vi.fn` for the methods) and a fixed "now"
+  services (plain objects: a subject for the stream, `vi.fn` for the methods; a
+  `ReplaySubject(1)` for a result stream, which replays as the real one does) and a fixed "now"
   handed to the object under test, never a faked clock. Every file calls `useFarBrowserZone()`
   (`tests/unit/logic/zone.ts`) first: it sets `process.env.TZ` to `Pacific/Kiritimati` (UTC+14)
   and adds a test that the setting took, so a date or a time read in the machine's own zone is a
@@ -560,7 +595,8 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   2027-10-31 (clocks back) and 2027-03-28 (forward), a window ending at 24:00, an empty week,
   the hours widened, both roles.
 - The shell's test stubs the global `fetch` for the whole file (unanswered unless a test answers
-  it): entering the frame creates the real `CalendarService`, which loads the week. It resets
+  it): entering the frame creates the real `CalendarService`, which loads the week, and the real
+  `AppointmentsService` and `UsersService`, which a test reaches through the two dialogs. It resets
   the emulated page's hash before each test. `happy-dom` sends a `hashchange` on
   `history.replaceState` too, which a browser does not: harmless for the shell
   (`distinctUntilChanged` on the screen), but do not build on it.

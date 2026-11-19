@@ -1,13 +1,15 @@
 import type { Role } from '@shared-calendar/shared';
 import { fromEvent, Subscription } from 'rxjs';
-import { distinctUntilChanged, map, startWith } from 'rxjs/operators';
+import { distinctUntilChanged, filter, map, startWith } from 'rxjs/operators';
 import { WeekScreen } from '../logic/week.screen';
 import type { ApiConfig } from '../services/api';
+import { AppointmentsService } from '../services/appointments.service';
 import { CalendarService } from '../services/calendar.service';
 import type { CognitoConfig } from '../services/cognito';
 import { LoginService } from '../services/login.service';
 import { RefreshService } from '../services/refresh.service';
 import { SessionStore } from '../services/session.store';
+import { UsersService } from '../services/users.service';
 import { mountLogin, type LoginDeps } from './login.view';
 import { mountWeek } from './week.view';
 
@@ -37,11 +39,20 @@ const ROLE_IN_WORDS: Record<Role, string> = { admin: 'Administrator', user: 'Use
 // What belongs to one person's session: the API services and the logic objects, created when
 // the person enters and dropped when the person leaves, so that nothing of one person's data
 // can be replayed to the next (docs/FRONTEND_ARCHITECTURE.md section 6, point 4).
-export type SessionObjects = { week: WeekScreen };
+// The role is there for the views that show a part to one role only.
+export type SessionObjects = { role: Role; week: WeekScreen; appointments: AppointmentsService; users: UsersService };
 
 function sessionObjects(config: ApiConfig, store: SessionStore, person: Person): SessionObjects {
   const calendar = new CalendarService(config, store);
-  return { week: new WeekScreen(calendar, person.role, () => new Date()) };
+  const appointments = new AppointmentsService(config, store);
+  const users = new UsersService(config, store);
+  // Notifies each time the page becomes visible again (the person comes back to the tab, or
+  // brings the window back up): the week screen then loads its week again, to show what other
+  // people booked or cancelled in the meantime. The API cannot push, and nothing is asked on a
+  // timer (docs/FRONTEND_VIEW_PLAN.md section 8, decision 11).
+  const visible$ = fromEvent(document, 'visibilitychange').pipe(filter(() => document.visibilityState === 'visible'));
+  const week = new WeekScreen(calendar, appointments, person.role, () => new Date(), visible$);
+  return { role: person.role, week, appointments, users };
 }
 
 // A screen of the application: its address (the URL's hash), its name in the navigation, the
@@ -64,8 +75,8 @@ export const SCREENS: readonly Screen[] = [
     label: 'Week',
     roles: ['admin', 'user'],
     element: '#week',
-    show: (root, { week }) => {
-      const subscription = mountWeek(root, week);
+    show: (root, { week, appointments, users, role }) => {
+      const subscription = mountWeek(root, { screen: week, appointments, users, role });
       subscription.add(week.start());
       return subscription;
     },

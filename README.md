@@ -112,7 +112,10 @@ which empty the local table.
 Open the address (in a Codespace, the forwarded port 5173) and sign in as `alice` /
 `Alice-Local-Pass-1!` or `admin` / `Admin-Local-Pass-1!`. The header shows who is signed in and
 the role, and the page shows the week of today, with "previous", "Today" and "next"; "Sign out"
-returns to the login. A reload of the page signs out too: the session is kept in memory only. An edit to `frontend/src`, `frontend/index.html` or `frontend/style.css`
+returns to the login. A click on a free slot opens the book dialog (a note; as `admin` also the
+User to book for and other times inside the slot's window); a click on an appointment opens its
+detail, where "Cancel appointment" is offered when the rules allow it. The week is loaded again
+after every booking or cancellation, and every time the browser's tab becomes visible again. A reload of the page signs out too: the session is kept in memory only. An edit to `frontend/src`, `frontend/index.html` or `frontend/style.css`
 shows after a reload. The dev server passes the page's calls on to the local API and to
 cognito-local; it is for local work only, and the front end is not deployed anywhere yet.
 

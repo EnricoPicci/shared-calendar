@@ -1,5 +1,5 @@
-import { localDateOf, localTimeOf, toInstant, type CalendarView, type Role } from '@shared-calendar/shared';
-import { dateText, offsetText, rangeText } from './texts';
+import { effectiveWindows, localDateOf, localTimeOf, type CalendarView, type Role } from '@shared-calendar/shared';
+import { dateText, offsetChangesOn, rangeText } from './texts';
 
 // The week ready to draw (docs/FRONTEND_ARCHITECTURE.md section 5): what GET /calendar answers
 // (docs/SHARED_CALENDAR_SPEC.md section 11.6) turned into days of blocks, each with its place in
@@ -13,9 +13,20 @@ import { dateText, offsetText, rangeText } from './texts';
 export type Placed = { top: string; height: string; time: string; lane: 0 | 1; lanes: 1 | 2 };
 // `colour` is one of the type colours the style sheet defines: the class `type-<colour>`.
 export type WindowBlock = Placed & { typeName: string; colour: number };
-export type SlotBlock = Placed & { colour: number };
+// A free slot also carries what the book dialog needs: its own instants, its day in words, its
+// type's name, and the instants of the window that holds it, between which the Administrator
+// may choose other times (docs/SHARED_CALENDAR_SPEC.md R-BOOK-08).
+export type SlotBlock = Placed & {
+  colour: number;
+  start: string;
+  end: string;
+  day: string; // "Mon 16 Nov"
+  typeName: string;
+  window: { start: string; end: string };
+};
 export type BusyBlock = Placed;
 export type AppointmentBlock = Placed & {
+  appointmentId: string; // what the detail dialog is opened with
   who: string; // the User's name for the Administrator, "You" for a User
   typeName: string;
   note: string; // '' when there is none
@@ -111,7 +122,10 @@ export function weekModel(view: CalendarView, role: Role): WeekModel {
       .sort((a, b) => a.name.localeCompare(b.name, 'en')),
     days: days.map((day) => {
       // A day in which the zone's offset changes: every time shown in it carries its offset.
-      const offsetChanges = offsetText(toInstant(day.date, '00:00', zone), zone) !== offsetText(toInstant(day.date, '24:00', zone), zone);
+      const offsetChanges = offsetChangesOn(day.date, zone);
+      // The day's windows with those that touch and share a type made one
+      // (docs/SHARED_CALENDAR_SPEC.md section 6.6): a slot lies inside one of them.
+      const merged = effectiveWindows(day.windows);
       // The blocks of one kind, each placed among the others of that kind.
       const placed = <T extends Interval>(intervals: readonly T[]): (T & Placed)[] => {
         const daySpans = intervals.map((interval) => spanOf(interval, day.date, zone));
@@ -130,12 +144,24 @@ export function weekModel(view: CalendarView, role: Role): WeekModel {
         label: dateText(day.date),
         today: day.date === today,
         windows: placed(day.windows).map((w) => ({ ...place(w), typeName: w.typeName, colour: colourOf(w.typeId) })),
-        slots: placed(day.slots).map((s) => ({ ...place(s), colour: colourOf(s.typeId) })),
+        slots: placed(day.slots).map((s) => {
+          const holder = merged.find((w) => w.start <= s.start && s.end <= w.end) ?? s;
+          return {
+            ...place(s),
+            colour: colourOf(s.typeId),
+            start: s.start,
+            end: s.end,
+            day: dateText(day.date),
+            typeName: typeNames.get(s.typeId) ?? '',
+            window: { start: holder.start, end: holder.end },
+          };
+        }),
         busy: placed(day.busy).map(place),
         // The Administrator's view holds everyone's appointments, a User's only the User's own
         // (docs/SHARED_CALENDAR_SPEC.md section 11.6): nothing is added to what the server sent.
         appointments: placed(day.appointments).map((a) => ({
           ...place(a),
+          appointmentId: a.appointmentId,
           who: role === 'admin' ? a.username : 'You',
           typeName: a.typeName,
           note: a.note ?? '',

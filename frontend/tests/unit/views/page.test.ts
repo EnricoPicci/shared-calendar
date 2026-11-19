@@ -1,3 +1,4 @@
+import { CALENDAR_LIMITS } from '@shared-calendar/shared';
 import { loadPage, pageAside } from './page';
 
 // index.html itself: what docs/FRONTEND_ARCHITECTURE.md section 3, rules 2 and 6 ask of the page,
@@ -44,6 +45,7 @@ describe('index.html', () => {
       'tpl-busy',
       'tpl-slot',
       'tpl-appointment',
+      'tpl-option',
     ]);
     for (const template of templates) expect(template.content.children, template.id).toHaveLength(1);
   });
@@ -53,8 +55,42 @@ describe('index.html', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('the blocks of the week are plain elements: nothing in a template can be clicked or typed in', () => {
+  it('of the week\'s templates only a slot and an appointment can be clicked: each is one button of type "button"; nothing in a template can be typed in', () => {
     const templates = [...pageAside().querySelectorAll<HTMLTemplateElement>('#week template')];
-    for (const template of templates) expect(template.content.querySelectorAll('button, a, input, select, textarea'), template.id).toHaveLength(0);
+    const clickable = templates.filter((template) => template.content.querySelector('button, a') !== null).map((template) => template.id);
+    expect(clickable).toEqual(['tpl-slot', 'tpl-appointment']);
+    for (const id of clickable) {
+      const block = pageAside().querySelector<HTMLTemplateElement>(`#${id}`)!.content.firstElementChild!;
+      expect([block.tagName, block.getAttribute('type')], id).toEqual(['BUTTON', 'button']);
+      expect(block.querySelectorAll('button, a'), id).toHaveLength(0);
+    }
+    for (const template of templates) expect(template.content.querySelectorAll('input, select, textarea'), template.id).toHaveLength(0);
+  });
+
+  it('the week has two dialogs, closed, outside the region that is redrawn, each named by its heading', () => {
+    loadPage();
+    const dialogs = [...document.querySelectorAll<HTMLDialogElement>('dialog')];
+    expect(dialogs.map((dialog) => dialog.className)).toEqual(['book', 'detail']);
+    for (const dialog of dialogs) {
+      expect(dialog.open, dialog.className).toBe(false);
+      expect(dialog.parentElement!.id, dialog.className).toBe('week');
+      expect(dialog.closest('.week'), dialog.className).toBeNull();
+      expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)!.tagName, dialog.className).toBe('H3');
+    }
+  });
+
+  it('the book dialog starts with no choice in its lists and the Administrator\'s part hidden; the note is limited to 500 characters', () => {
+    loadPage();
+    for (const select of document.querySelectorAll('dialog.book select')) expect(select.children).toHaveLength(0);
+    expect(document.querySelector<HTMLElement>('dialog.book .choices')!.hidden).toBe(true);
+    expect(document.querySelector('dialog.book textarea')!.getAttribute('maxlength')).toBe(String(CALENDAR_LIMITS.noteLength));
+    expect(document.querySelector<HTMLElement>('dialog.detail .cancel')!.hidden).toBe(true);
+  });
+
+  it('every button outside a form says its type, so that none sends a form by accident', () => {
+    const outside = [...pageAside().querySelectorAll('button')].filter((button) => button.closest('form') === null);
+    for (const button of [...outside, ...[...pageAside().querySelectorAll('template')].flatMap((t) => [...t.content.querySelectorAll('button')])]) {
+      expect(button.getAttribute('type'), button.className).toBe('button');
+    }
   });
 });
