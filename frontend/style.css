@@ -116,6 +116,21 @@ button.block:focus-visible { outline-offset: 1px; z-index: 1; }
 .row.is-ended .status, .row.is-changed .status { color: #52606d; }
 .row.is-cancelled .status { color: #b3261e; }
 
+/* The settings: one narrow form; a field with its range and, when in fault, its refusal */
+.toolbar h2:first-child { margin-left: 0; }
+.unread { display: grid; gap: 0.5rem; justify-items: start; margin-top: 0.75rem; }
+.settings { display: grid; gap: 1rem; max-width: 26rem; margin-top: 0.75rem; }
+.field { display: grid; gap: 0.25rem; }
+.field p, .settings p { margin: 0; }
+.field .range, .settings .about { font-size: 0.8rem; color: #52606d; overflow-wrap: anywhere; }
+.field .refusal:empty, .settings .failure:empty { display: none; }
+.field input[aria-invalid="true"] { border-color: #b3261e; }
+.field input:disabled { background: #eceff3; }
+input[type="checkbox"] { width: auto; margin: 0; }
+label.check { display: flex; align-items: center; gap: 0.4rem; }
+.settings .saved { color: #1b6e3c; }
+.settings .actions { justify-content: flex-start; }
+
 /* The dialogs: as wide as a phone allows, scrolling inside when taller than the screen */
 dialog { width: min(24rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); box-sizing: border-box; overflow-y: auto; border: 0; border-radius: 10px; padding: 1.25rem; box-shadow: 0 8px 30px #0004; color: inherit; }
 dialog::backdrop { background: #1f293380; }

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v6 — **decided; the foundation, the week, booking, cancelling, the note, the change and "My appointments" implemented** (2026-11-19, `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 64, briefs `prompts/83-step-60-implementation.md`, `prompts/84-step-61-implementation.md`, `prompts/85-step-62-implementation.md`, `prompts/86-step-63-implementation.md` and `prompts/87-step-64-implementation.md`): the build and dev-server commands, the tests' environment, the shell with its navigation between two screens, the login view, the logic layer (`frontend/src/logic/`), the week calendar with its book dialog (which also confirms a change), a User's list of appointments (upcoming and history), and an appointment's detail (its note, "Change" and "Cancel appointment"), one dialog opened from both screens, exist in `frontend/`. The other views follow, one plan step each |
+| Status | v7 — **decided; the foundation, the week, booking, cancelling, the note, the change, "My appointments" and the settings implemented** (2026-11-19, `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 65, briefs `prompts/83-step-60-implementation.md` to `prompts/88-step-65-implementation.md`): the build and dev-server commands, the tests' environment, the shell with its navigation between two screens, the login view, the logic layer (`frontend/src/logic/`), the week calendar with its book dialog (which also confirms a change), a User's list of appointments (upcoming and history), an appointment's detail (its note, "Change" and "Cancel appointment"), one dialog opened from both screens, and the Administrator's settings, one form whose fields are checked before any call, exist in `frontend/`. The other views follow, one plan step each |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders |
 | Not in scope yet | Hosting, the CORS gap, keeping the session across a reload, the Content-Security-Policy of the hosting, logout. They are the open points of section 10, for later versions of this document |
 | Depends on | `docs/FRONTEND_SERVICES.md` v7 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work) |
@@ -20,6 +20,7 @@
 | v4 | 2026-11-19 | Plan step 62: booking and cancelling. Section 4: a slot and an appointment are buttons; the shape of a dialog (what is local to the view, how a result is tied to the dialog that asked for it, what an opening and a close do). Section 5.1: five files (`booking.ts` and `appointment.detail.ts` are new), the week loaded again after every booking or cancellation and every time the page becomes visible, why nothing is pushed, "now" for the detail, the Administrator's custom times and their limit on the night the clocks go back, the new sentences of `failureText`. Section 6: what a session owns now, and the stream the shell builds from `visibilitychange`. Section 8: what the dialogs' tests rely on. Section 9: the tree. Section 12.1: the size at step 62. Section 11: decisions 32 to 42. |
 
 | v6 | 2026-11-19 | Plan step 64: "My appointments". Section 4: a dialog used from two views (the detail, moved out of the week's element and out of `week.view.ts`), the shape of the list. Section 5.1: seven files (`appointments.model.ts` and `appointments.screen.ts` are new), the list screen, the time zone read from the settings and what that leaves of decision 23, the period's own checks, the hand-over of an appointment to the week screen and what still ends a move, the detail's sentence by what the appointment is. Section 6: the second entry of the table, what a session owns, what the shell hands a view. Section 8: the detail's test run from three hosts, the native date field under `happy-dom`. Section 9: the tree. Section 12.1: the size at step 64. Section 11: decisions 53 to 65. |
+| v7 | 2026-11-19 | Plan step 65: the settings. Section 4: the shape of a form whose fields are checked (a field in fault). Section 5.1: nine files (`settings.model.ts` and `settings.screen.ts` are new), the settings screen, the checks of the fields and where the ranges come from, the read after a save and what it fills, the second sentence of `failureText` that depends on what was attempted. Section 6: the third entry, what a session owns. Section 8: the number field and the checkbox under `happy-dom`. Section 9: the tree. Section 12.1: the size at step 65. Section 11: decision 59 confirmed, decisions 66 to 76. Two wordings decided at the reviews of steps 63 and 64: the book dialog's two lists of times are labelled "Start" and "End", and the limit met by a change has its own sentence. |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
 TypeScript module script**. The markup of every screen is in one `index.html`; the script
@@ -392,6 +393,44 @@ another period object, so a list that arrives while a date is being typed leaves
 alone. The form has `novalidate`: an empty or half-typed date is refused by the logic layer in
 words, beside the form, not by the browser's own bubble.
 
+**A form whose fields are checked** (`docs/FRONTEND_VIEW_PLAN.md` step 65: the settings,
+`#settings`, `frontend/src/views/settings.view.ts`; the pattern for the forms of the steps that
+follow). The markup of one field:
+
+```html
+<div class="field">
+  <label>Booking horizon <input type="number" name="bookingHorizonDays" inputmode="numeric" /></label>
+  <p class="range"></p>                         <!-- "days, from 1 to 365", set by the script -->
+  <p class="error refusal" role="alert"></p>    <!-- why the value was refused -->
+</div>
+```
+
+- **A field is a `.field`**: its label with its input, the words of its range, and its
+  refusal. The view finds the input by its `name` and the two texts through
+  `input.closest('.field')`.
+- **A field in fault** is three things, all set from the stream and from nothing else: its
+  sentence in `.refusal` (announced: `role="alert"`), `aria-invalid="true"` on the input, and
+  through that attribute a red border from the style sheet. When the stream no longer names the
+  field, the sentence is emptied and the attribute removed. The view decides nothing: the
+  logic layer says which fields are in fault and in which words (section 5.1).
+- **"Save" sends the fields as text**, as they are, to the logic object, which checks them:
+  the view parses nothing. The form has `novalidate`; the native field's `min`, `max` and
+  `step` are set by the script from the logic layer's ranges, as a convenience (the arrows stop
+  there), and no range is written in `index.html`.
+- **The form is filled only when the stream brings another object** for its fields, as the two
+  dates of the list are: a notification that arrives while a value is being typed leaves it.
+  What the form says beside its fields (the time zone, who saved last) follows every
+  notification.
+- **One pure view action**: "No limit" takes its number field out of use (`disabled`) and gives
+  it back. An edit, typed or ticked, is told to the logic object (`edited()`), which is what
+  takes "Settings saved." away: the sentence goes because the stream says so.
+- **The fixed texts are in the page** (the labels, "Settings saved.", "Try again"); the range
+  under a field and a refusal are made by the logic layer, since they hold numbers of
+  `shared/`. A refusal names its field with the words of the label: the view's test checks
+  that the two agree.
+- The loop that shows and clears the refusals is six lines of the stream's subscription; no
+  helper that builds or updates nodes was written (section 7).
+
 ## 5. The logic layer
 
 Some of what the screens need may not be in a view (section 3, rule 1) and is not a remote call
@@ -404,7 +443,7 @@ either. It lives in the logic layer:
 | A response made ready to draw | The week: per day, its windows, slots, busy blocks and appointments, each with its place in the day and its time as text |
 | What is offered | Whether the note can be edited and whether "Change" and "Cancel" are shown for an appointment (the status, the end, the role, `cancellableUntil`) |
 | The texts | A date and a time in the calendar's time zone, whatever the browser's; a failure `reason` in plain words (`docs/SHARED_CALENDAR_SPEC.md` section 16.8) |
-| From the user's input to a call's argument | The booking body from a slot, a note and a username |
+| From the user's input to a call's argument | The booking body from a slot, a note and a username; the settings' body from four fields typed as text, or why not, field by field |
 
 Its rules:
 
@@ -423,9 +462,9 @@ Its rules:
 7. **Tested like the services**: unit tests with no network and no DOM, inside the 100 % line
    coverage of `frontend/src`.
 
-### 5.1 As built: seven files
+### 5.1 As built: nine files
 
-`frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` steps 61 to 64), each with its test in
+`frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` steps 61 to 65), each with its test in
 `frontend/tests/unit/logic/`:
 
 | File | What it holds |
@@ -437,6 +476,8 @@ Its rules:
 | `week.screen.ts` | The class `WeekScreen`: which week is on screen, its loads and reloads, the detail of one of its appointments, and the appointment being moved to another time, one of its own or one handed over by the list screen |
 | `appointments.model.ts` | Pure, for "My appointments": `appointmentRows(appointments, now, zone)`, the list ready to draw (date, time, type, note, and the status in words); the two sentences of an empty list (`emptyText`); the period the history opens on (`defaultPeriod`) and the period's own checks (`periodRefusal`) |
 | `appointments.screen.ts` | The class `AppointmentsScreen`: which of the two lists is on show, the period of the history, the time zone read from the settings, the loads and reloads, the detail of one of its appointments, and the hand-over of one to the week screen |
+| `settings.model.ts` | Pure, for the settings form: what the fields are filled with (`settingsFields`), what the form says beside them (`settingsInfo`: the time zone, who saved last and when), the range of a field with its words (`settingRange`), and from what the fields hold to the body of the save or to the refusals (`settingsFor`) |
+| `settings.screen.ts` | The class `SettingsScreen`: the settings read when the screen is shown, the save with its checks, and the read that follows every save |
 
 **"Now" is passed in.** Nothing in `logic/` reads the clock by itself. `WeekScreen` receives a
 function `now: () => Date` through its constructor (the shell passes `() => new Date()`, a test a
@@ -698,6 +739,73 @@ the appointment's local date; the list's view then asks the shell for the week (
 - After a change made this way the person is in the week, where the new appointment is.
   Nothing brings them back to the list.
 
+**The settings screen** (`docs/FRONTEND_VIEW_PLAN.md` step 65; the Administrator's).
+
+```ts
+// `fields` is what the form is filled with: null until the settings are read, and another
+// object only when the form is to be filled again. `info` is what the form says beside the
+// fields. `unread` is why the settings could not be read, while there is no form.
+export type SettingsState = {
+  loading: boolean; unread: string | null;
+  fields: SettingsFields | null; info: { timeZone: string; lastSaved: string } | null;
+  saving: boolean; refusals: Partial<Record<SettingField, string>>; failure: string | null; saved: boolean;
+};
+
+export class SettingsScreen {
+  readonly settings$: Observable<SettingsState>;
+  // `settings`: `load`, `settingsResult$`, `update` and `updateResult$` of the CalendarSettingsService.
+  constructor(settings: SettingsCalls) { … }
+  start(): Subscription { … }            // reads the settings
+  retry(): void { … }                    // reads again, after a read that failed
+  save(fields: SettingsFields): void { … } // checks the fields; saves, or says which are in fault
+  edited(): void { … }                   // something was typed or ticked: "saved" no longer holds
+}
+```
+
+- **The fields are checked here, before any call** (`settingsFor`). What a field holds is text.
+  It is accepted when, spaces around it aside, it is written with digits only and its value is
+  inside the field's range; the ranges are `SETTINGS_RANGES` of `shared/`, never a number
+  written a second time. So twenty-four typed alone, between spaces or after a zero is
+  accepted; a decimal point (also followed by a zero), an exponent, a sign, an empty field and
+  a word are refused. Every field in fault is said, not the first only, each with one
+  sentence that names it in the words of its label and says the range: "Booking horizon must be
+  a whole number from 1 to 365." No request is sent, and nothing else in the state changes.
+- **The service checks again**, with the shared schema, what the logic accepted. Its
+  `invalid_request` carries a message that names the field, but that message is a developer's
+  and never reaches the page (section 11, decision 27): this is why the check is made twice. A
+  body accepted here and refused there would be a defect; the person would read the general
+  sentence of `invalid_request`.
+- **"No limit" is a checkbox** (`noLimit` of the fields): ticked, `null` is sent and the
+  limit's field is not looked at; not ticked, the field's number is sent, and an empty field is
+  a field in fault. An empty field never means "no limit".
+- **Beside the fields**: each range in words (`settingRange`, "hours, from 0 to 720"); the
+  calendar's time zone, read-only (`docs/SHARED_CALENDAR_SPEC.md` R-TIME-01); and "Last saved
+  by admin on Thu 19 Nov, 16:44", the moment in the calendar's zone, or "These are the default
+  settings: nobody has saved them yet." while `updatedAt` is `null`
+  (`docs/SHARED_CALENDAR_SPEC.md` R-SET-01).
+- **Reading.** `start()` reads the settings; until they arrive there is no form and the stream
+  says `loading`. A read that fails is `unread`, in plain words, in the place of the form, and
+  `retry()` reads again.
+- **After a save, whatever its outcome, the settings are read again**
+  (`docs/SHARED_CALENDAR_SPEC.md` section 16.3). On a success `saved` is true and the form is
+  filled with what the server answered (`fields` is another object). On a failure `failure`
+  says why and **`fields` stays the same object**, so what was typed stays in the form. The
+  read that follows brings `info` up to date in both cases and fills nothing; if that read
+  fails nothing is said of it.
+- **`saved` lasts until the next save or the next edit** (`edited()`); the refusals until the
+  next "Save".
+- **Nothing else is told of a change of settings.** The week and the list read what they need
+  when they are next shown or loaded again. The settings screen is the Administrator's and the
+  only screen on show when a save is made, so nothing on screen is stale after it; a User's
+  open page shows slots and "can be cancelled until" as they were until its next load (a
+  change of week, a write, the tab shown again), and the server decides every write with the
+  new values (`docs/SHARED_CALENDAR_SPEC.md` R-SET-03).
+- **One `CalendarSettingsService` per session serves two screens**: the list screen, for the
+  time zone, and this one. Each listens while it is started and takes no result that was
+  there before its `start()`.
+- **Values typed and not saved are lost** at a change of screen and at signing out, with no
+  question: the end of the subscription forgets everything, and the next `start()` reads.
+
 **The change.** `changeFor(slot, zone, role, fields)` makes the argument of
 `AppointmentsService.change` from what the confirmation holds. The times are a booking's: a
 User sends the slot's `start`, the Administrator both instants, the slot's own while the two
@@ -743,16 +851,21 @@ knows the reasons a person can meet so far: the transport reasons every API serv
 and the codes of a booking, of a cancellation, of a change, of a note and of the list of users
 (`docs/FRONTEND_SERVICES.md` sections 19.1 and 13.1). The list of appointments and the read of
 the settings (`docs/FRONTEND_SERVICES.md` sections 19.1 and 15.1) brought no code without a
-sentence. The sentence of `slot_taken` says that
+sentence, and neither did the save of the settings. The sentence of `slot_taken` says that
 the calendar has been refreshed, which the reload above makes true. `invalid_request` has one
 sentence for every case and every screen, "The request was not accepted. Check what you entered
 and try again.": an end not after the start has no sentence of its own, and the logic layer
 does not check the two times. **A second, optional argument says what was attempted**
-(`failureText(reason, 'change')`), for a reason whose words depend on it. There is one:
+(`failureText(reason, 'change')`), for a reason whose words depend on it. There are two.
 `cancellation_notice_too_short` is "It is too late to cancel this appointment." after a
 cancellation and "It is too late to change this appointment." after a change, which the server
-refuses with the same code (`docs/SHARED_CALENDAR_SPEC.md` section 8.4). Every other reason
-keeps one sentence whatever was attempted.
+refuses with the same code (`docs/SHARED_CALENDAR_SPEC.md` section 8.4).
+`appointment_limit_reached` is "You have as many upcoming appointments as the calendar allows.
+Cancel one to book another." after a booking and "You have more upcoming appointments than the
+calendar now allows, so this one cannot be moved. Cancel one first." after a change: a change
+books nothing more, so it meets the limit only when the limit was lowered below what the User
+already holds (`docs/SHARED_CALENDAR_SPEC.md` R-SET-03). Every other reason keeps one sentence
+whatever was attempted.
 The raw technical text is never shown: a reason without a sentence gets one general sentence,
 never the service's `message`, which is written for a developer. The login view uses it too. A
 wrong password and an unknown user are one reason and get one sentence. Each later step adds the
@@ -787,9 +900,9 @@ API's configuration and the whole store because it creates the API services of e
    next (the services' result streams replay their last value). One function of the shell,
    `sessionObjects`, creates them when a person enters: today the `CalendarService`, the
    `AppointmentsService`, the `UsersService` (for both roles; a User's view never calls it),
-   the `CalendarSettingsService` (read by the list screen only, for the time zone), the
-   `WeekScreen` and the `AppointmentsScreen`, which is given the `WeekScreen` for the hand-over
-   of section 5.1. They live as long as the person's session, not as long as a screen is on
+   the `CalendarSettingsService` (read by the list screen for the time zone, read and saved by
+   the settings screen), the `WeekScreen`, the `AppointmentsScreen`, which is given the
+   `WeekScreen` for the hand-over of section 5.1, and the `SettingsScreen`. They live as long as the person's session, not as long as a screen is on
    show: coming back to a screen finds its logic object as it was left. The same function builds
    the stream both screens reload on (section 5.1): the document's `visibilitychange` event,
    keeping the notifications at which `document.visibilityState` is `visible`. Each screen
@@ -817,11 +930,11 @@ export type Screen = {
 };
 ```
 
-There are two entries so far: `#/week`, "Week", both roles, and `#/appointments`, "My
-appointments", the role `user` only. The dialogs have no address. A new screen is a new entry,
+There are three entries so far: `#/week`, "Week", both roles; `#/appointments`, "My
+appointments", the role `user` only; and `#/settings`, "Settings", the role `admin` only. The dialogs have no address. A new screen is a new entry,
 its element in `index.html`, and its services and logic object in `sessionObjects`; the code
 that reads the address, fills the navigation and switches between screens does not change, and
-did not for the second entry. `mountShell` takes the table as an optional dependency, which a
+did not for the second entry, nor for the third. `mountShell` takes the table as an optional dependency, which a
 test uses to bring an entry whose mount is a spy.
 
 **What the shell hands a view** is in the entry's `show`: the logic object and the parts of the
@@ -950,6 +1063,22 @@ What the tests of the list and of the shared dialog rely on (plan step 64):
   one person left behind looks for data (a note, a name, a date), not for fixed words of the
   page, which a comment of `index.html` may hold.
 
+What the tests of the settings rely on (plan step 65), as `happy-dom` 21 has it:
+
+- **The number field** (`<input type="number">`): its `value` is set and read as text. A text
+  that is not a number reads back as an empty text, as in a browser; a text with spaces around
+  a number is kept as it is there, where a browser gives an empty text. `valueAsNumber`,
+  `min`, `max` and the field's `validity` are there; the view uses none of them to decide.
+  What a person can type into the field is the browser's only: Chromium lets digits, a point,
+  a sign and the letter of an exponent through, and nothing else.
+- **The checkbox**: `click()` ticks it and sends `change` but **no `input` event**, where a
+  browser sends both. The view therefore tells the logic object of an edit from the checkbox's
+  `change` too, and a test of an edit typed into a field sends the `input` event itself.
+  `form.reset()` unticks it and empties the fields, and leaves `disabled` as it is, as in a
+  browser: the view's teardown puts it back.
+- **A checkbox's `value` is always "on".** A test that reads every field of the page for what a
+  person left behind reads a checkbox by whether it is ticked.
+
 ## 9. Placement
 
 Inside `frontend/`, next to the services:
@@ -968,9 +1097,11 @@ frontend/
 │   ├── services/              # docs/FRONTEND_SERVICES.md
 │   ├── logic/                 # the logic layer, no DOM (section 5.1): texts.ts, week.model.ts,
 │   │                          # booking.ts, appointment.detail.ts, week.screen.ts,
-│   │                          # appointments.model.ts, appointments.screen.ts
+│   │                          # appointments.model.ts, appointments.screen.ts,
+│   │                          # settings.model.ts, settings.screen.ts
 │   └── views/                 # shell.ts and one <name>.view.ts per view: login.view.ts, week.view.ts,
-│                              # appointments.view.ts; detail.view.ts, the dialog two views mount
+│                              # appointments.view.ts, settings.view.ts; detail.view.ts, the dialog
+│                              # two views mount
 ├── tests/
 │   └── unit/
 │       ├── services/          # vitest project `unit`, in node
@@ -1080,13 +1211,24 @@ than what the trial showed: these deserve the first look in a review.
 | 56 | The mode and the period are state of the `AppointmentsScreen` and last as long as the session; the zone and the list are forgotten when its subscription ends (section 5.1) | A screen left and found again is where it was left (decision 30), and what it shows is read again, not replayed: between two visits a change was perhaps made from the week | The second half, yes |
 | 57 | Another mode or another period forgets the list on show; the same ones, loaded again, keep it meanwhile (section 5.1) | A list of upcoming appointments under "History" would be read as the history. The week keeps its last week under the next label because both are weeks; here the two lists are not the same thing | Yes |
 | 58 | The period's own checks are in `logic/appointments.model.ts`, before any call, with the limit of `shared/`; the form has `novalidate` (sections 4 and 5.1) | A rule and date arithmetic: not a view's. The browser's own check would stop the form before the sentence could be shown, and says it in its own words | The `novalidate`, yes |
-| 59 | The history opens on the 30 days that end today (section 5.1) | Decided with the Product Owner. Its consequence was seen in the browser check: an appointment cancelled today for a later date is not in it. Whether the default should reach forward is for the review | |
+| 59 | The history opens on the 30 days that end today (section 5.1) | Decided with the Product Owner. Its consequence was seen in the browser check: an appointment cancelled today for a later date is not in it, and is found by choosing a period that reaches forward. Confirmed as it is at the review of step 64 | |
 | 60 | "Change" from the list hands the appointment over to the `WeekScreen` (`handOver`), which takes it once, at its next `start()` or at once when started; leaving the week still ends the move (section 5.1) | Decided with the Product Owner. The new time is chosen in the week, with step 63's banner and confirmation and no second way to move. One thing crosses from a screen to another, through the logic layer, and step 63's rule (decision 45) holds without an exception | |
 | 61 | The list's view is handed `showWeek` by its entry of the table of screens; the code that follows the address did not change (section 6) | A view knows no address (the table does). The change of address is followed like one made by a link | Yes |
 | 62 | The detail's sentence says first what the appointment is (moved, cancelled, ended), for both roles; only for one still to end does it speak of changing and cancelling (section 5.1) | The history shows cancelled and ended appointments, for which "too late to change or cancel" was wrong. A changed case of step 63: a User's ended appointment now reads "This appointment has ended." | |
 | 63 | A row carries what the appointment is twice: in words (`status`) and as one of four names (`kind`), which the view applies as a class (section 4) | The style sheet says what a cancelled row looks like; the view decides nothing | Yes |
 | 64 | A date of the list has no year, like the dates of the week (section 5.1, known limit) | `texts.ts` was to grow only for a code without a sentence. At most 92 days are listed; across the end of a year the rows do not say which year | Yes |
 | 65 | No condition of section 7 was met at plan step 64 | `week.view.ts` went from 390 to 313 lines, `detail.view.ts` is 137 and `appointments.view.ts` 117; the lines that look a node up or copy a template are 46, 10 and 19. No field in a redrawn region; no helper that builds or updates nodes (`rowFor` copies a template and fills it, as the week's blocks do); sharing the dialog needed a mount function and its dependencies, nothing more | |
+| 66 | The fields of the settings are checked in `logic/settings.model.ts` before any call, with the ranges of `shared/`; the service's own check stays, and its message still never reaches the page (section 5.1) | `docs/FRONTEND_VIEW_PLAN.md` step 65 asks for the field to be named. The only text that names it otherwise is a developer's message (decision 27). The check is made twice, with one source for the numbers | Yes: `docs/FRONTEND_SERVICES.md` section 8, decision 42 leaves such checks to the service |
+| 67 | A value is accepted when it is written with digits only, spaces aside, and is inside its range; a decimal point, an exponent and a sign are refused also when the value would be a whole number (section 5.1) | One rule a person can predict, and one sentence for every fault. The native field lets those texts through, so the rule is the logic's | Yes |
+| 68 | A refusal is one sentence per field, naming it in the words of its label; every field in fault is said (section 5.1) | The person corrects everything in one go. The label is in the page and the name in the logic layer: said twice, and the view's test checks that they agree | The words said twice, yes |
+| 69 | A field in fault is a `.field` with its sentence in `.refusal` (`role="alert"`) and `aria-invalid` on its input, all from the stream; the form has `novalidate` and the native limits are a convenience (section 4) | The pattern for the forms of the steps that follow: three things, set in one loop of the subscription, with nothing decided in the view | Yes |
+| 70 | "No limit" is a checkbox beside the number field; an empty field is a field in fault, never "no limit" (section 5.1) | Decided with the Product Owner (`docs/FRONTEND_VIEW_PLAN.md` step 65): a field emptied by mistake must not remove the limit | |
+| 71 | The form shows each range in words, the time zone read-only, and who saved last and when (section 5.1) | Decided with the Product Owner. All of it is in the server's answer | |
+| 72 | Values typed and not saved are lost with no question, on a change of screen and on signing out (section 5.1) | Decided with the Product Owner: as a typed note is in the dialogs. Four small fields | |
+| 73 | The settings are read again after every save; a success fills the form with the server's answer, a failure leaves what was typed, and the read that follows fills nothing (section 5.1) | Decided with the Product Owner. `docs/SHARED_CALENDAR_SPEC.md` section 16.3: a failed write may have been applied, and the line about the last save then says so, while the person keeps what they typed | |
+| 74 | Two wordings decided at the reviews of steps 63 and 64: the book dialog's two lists of times are labelled "Start" and "End"; `appointment_limit_reached` after a change has its own sentence (sections 4 and 5.1) | "From" and "To" were also the words of the two lines above them in the confirmation. A change books nothing more, so "Cancel one to book another" did not say what to do | |
+| 75 | The label of the limit says "per person", not "per User" (section 4) | The page's fixed texts are in the document also while they are hidden, and the shell's test of a second person signing in looks for the word "User", the first person's role, in the whole frame | Yes |
+| 76 | No condition of section 7 was met at plan step 65 | `settings.view.ts` is 110 lines, 16 of which look a node up. The fields are in a fixed form, not in a redrawn region; the refusals are shown and cleared by one loop of the subscription, not by a helper that builds or updates nodes | |
 
 ## 12. The tooling (open points O4, O6 and O8, decided)
 
@@ -1123,7 +1265,7 @@ in other languages), which `shared/`'s schemas bring in with any import from
 At plan step 61, with the logic layer and the week: `app.js` 504 kB, 110 kB compressed. At plan
 step 62, with booking and cancelling: 518 kB, 113 kB compressed. At plan step 63, with the note
 and the change: 520 kB, 114 kB compressed. At plan step 64, with "My appointments": 528 kB,
-115 kB compressed. What to do about `zod`'s share
+115 kB compressed. At plan step 65, with the settings: 532 kB, 117 kB compressed. What to do about `zod`'s share
 is open point O9 (section 10).
 
 ### 12.2 The dev server
@@ -1167,8 +1309,9 @@ texts that depend on data are made by the logic layer (section 5.1, `frontend/sr
 dates, times, and a failure in plain words by its `reason`. The sentences that depend on a
 state are there too: the one about changing and cancelling in the detail
 (`appointment.detail.ts`), those beside the User picker (`booking.ts`, section 11,
-decision 40), and those of "My appointments": the status of a row, the empty list and the
-period's refusals (`appointments.model.ts`). The words that name an appointment being moved come from the logic layer
+decision 40), those of "My appointments": the status of a row, the empty list and the
+period's refusals (`appointments.model.ts`), and those of the settings: the range under a
+field, a field's refusal and the line about the last save (`settings.model.ts`). The words that name an appointment being moved come from the logic layer
 (`movingOf`); the fixed words around them ("Moving: … Choose a free time.", "From:", "To:") are
 in the page. No view shows the `message` of a
 service. The shell holds the two names of the roles.

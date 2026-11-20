@@ -21,6 +21,9 @@ const ADMIN = session({ username: 'admin', role: 'admin', accessToken: 'access-t
 const TOKENS = [ALICE, ADMIN].flatMap((s) => [s.accessToken, s.idToken, s.refreshToken]);
 
 const html = () => document.documentElement.outerHTML;
+// What a field of the page holds: its value, or for a checkbox, whose value never changes,
+// whether it is ticked.
+const held = (field: HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement) => (field instanceof HTMLInputElement && field.type === 'checkbox' ? (field.checked ? 'ticked' : '') : field.value);
 
 let shell: Subscription | undefined;
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -352,7 +355,7 @@ describe('the navigation', () => {
 
   it.each([
     ['a User', ALICE, 'access-token-alice', [['Week', '#/week', 'page'], ['My appointments', '#/appointments', null]]],
-    ['the Administrator', ADMIN, 'access-token-admin', [['Week', '#/week', 'page']]],
+    ['the Administrator', ADMIN, 'access-token-admin', [['Week', '#/week', 'page'], ['Settings', '#/settings', null]]],
   ])('the first screen of %s is the week: the address, the links of the role with the week\'s marked, the week of today loaded', async (_name, who, token, navigation) => {
     fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
     const { store } = mounted();
@@ -363,7 +366,7 @@ describe('the navigation', () => {
     expect(window.location.hash).toBe('#/week');
     expect(links().map((a) => [a.textContent, a.getAttribute('href'), a.getAttribute('aria-current')])).toEqual(navigation);
     expect(find('#week').hidden).toBe(false);
-    expect(find('#appointments').hidden).toBe(true);
+    expect([find('#appointments').hidden, find('#settings').hidden]).toEqual([true, true]);
     // Mounted first, then started: the view was listening when the load began.
     expect(find('#week .week-label').textContent).toBe('16 Nov – 22 Nov 2026');
     expect(find('#week .loading').hidden).toBe(false);
@@ -782,7 +785,7 @@ describe('the navigation', () => {
 
       signOut.click();
       expect([banner().hidden, book().open, detail().open]).toEqual([true, false, false]);
-      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map((field) => field.value);
+      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
       expect(fields.every((value) => value === '')).toBe(true);
       for (const gone of ['bob', 'Bob\'s note', 'A private note', 'Typed in the detail', 'Mon 16 Nov', 'Studio']) expect(html()).not.toContain(gone);
       expect(html()).toBe(before);
@@ -907,9 +910,10 @@ describe('the navigation', () => {
       mounted(ADMIN, screens);
       expect(links().map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
         ['Week', '#/week'],
+        ['Settings', '#/settings'],
         ['Other', '#/other'],
       ]);
-      // "My appointments" is in the table before it, and is not the Administrator's.
+      // "My appointments" is in the table too, and is not the Administrator's.
       shell?.unsubscribe();
       mounted(ALICE, screens);
       expect(links().map((a) => a.textContent)).toEqual(['Week', 'My appointments']);
@@ -920,14 +924,14 @@ describe('the navigation', () => {
       const { screens, show, left } = other();
       mounted(ADMIN, screens);
       await weekDrawn();
-      expect(current()).toEqual([['Week', 'page'], ['Other', null]]);
+      expect(current()).toEqual([['Week', 'page'], ['Settings', null], ['Other', null]]);
 
       window.location.hash = '#/other';
       await vi.waitFor(() => expect(show).toHaveBeenCalledTimes(1));
       expect(show.mock.calls[0]![0]).toBe(find('#week'));
       expect(days()).toHaveLength(0); // the week view was left, and cleaned up after itself
       expect(find('#week').hidden).toBe(false); // the element is the other screen's now
-      expect(current()).toEqual([['Week', null], ['Other', 'page']]);
+      expect(current()).toEqual([['Week', null], ['Settings', null], ['Other', 'page']]);
       expect(left).not.toHaveBeenCalled();
 
       // Back: the other screen is left, the week mounted and loaded again.
@@ -935,7 +939,7 @@ describe('the navigation', () => {
       links()[0]!.click();
       await weekDrawn();
       expect(left).toHaveBeenCalledTimes(1);
-      expect(current()).toEqual([['Week', 'page'], ['Other', null]]);
+      expect(current()).toEqual([['Week', 'page'], ['Settings', null], ['Other', null]]);
       expect(apiCalls()).toHaveLength(2);
     });
 
@@ -1093,7 +1097,7 @@ describe('the navigation', () => {
       fetchMock.mockResolvedValueOnce(json(200, adminWeek()));
       mounted(ADMIN);
       expect(window.location.hash).toBe('#/week');
-      expect(current()).toEqual([['Week', 'page']]);
+      expect(current()).toEqual([['Week', 'page'], ['Settings', null]]);
       expect([find('#week').hidden, find('#appointments').hidden]).toEqual([false, true]);
       await weekDrawn();
       expect(apiCalls()).toEqual([[WEEK_URL, 'Bearer access-token-admin']]);
@@ -1352,7 +1356,7 @@ describe('the navigation', () => {
       expect(detail().open).toBe(false);
       expect(rows()).toHaveLength(0);
       expect(find('#appointments').hidden).toBe(true);
-      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map((field) => field.value);
+      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
       expect(fields.every((value) => value === '')).toBe(true);
       for (const gone of ['alice', 'First lesson', 'A private note', 'Mon 7 Dec', 'Studio', 'Changed']) expect(html()).not.toContain(gone);
       expect(links()).toHaveLength(0);
@@ -1394,6 +1398,244 @@ describe('the navigation', () => {
       expect(apiCalls().at(-1)).toEqual([WEEK_URL, BEARER]);
       expect(banner().hidden).toBe(true);
       expect(find<HTMLButtonElement>('#week .appointment').disabled).toBe(false);
+    });
+  });
+  // The settings, the Administrator's second screen (docs/FRONTEND_ARCHITECTURE.md section 6):
+  // its address, for the Administrator only; the read, the save and the read that follows, with
+  // the real service of the session behind the stubbed fetch; and nothing of it left behind.
+  describe('the settings, the Administrator\'s second screen', () => {
+    const SETTINGS_URL = 'http://api.test/calendar/settings';
+    const BEARER = 'Bearer access-token-admin';
+    const stored = (over: object = {}) => ({
+      timeZone: 'Europe/Rome',
+      cancellationNoticeHours: 24,
+      minBookingNoticeHours: 0,
+      bookingHorizonDays: 56,
+      maxFutureAppointmentsPerUser: null,
+      updatedAt: '2026-11-19T15:44:09.338Z',
+      updatedBy: { username: 'carol', role: 'admin' },
+      ...over,
+    });
+    const calls = () => (fetchMock.mock.calls as [string, RequestInit][]).filter(([url]) => url.startsWith(CONFIG.apiUrl));
+    const at = (hash: string) => window.history.replaceState(null, '', `${window.location.pathname}${hash}`);
+    const field = (name: string) => find<HTMLInputElement>(`#settings [name="${name}"]`);
+    const form = () => find<HTMLFormElement>('#settings form.settings');
+    const shown = () => vi.waitFor(() => expect(form().hidden).toBe(false));
+    const current = () => links().map((a) => [a.textContent, a.getAttribute('aria-current')]);
+    // The Administrator on the settings' address, with the settings read.
+    const onSettings = async (answer: object = stored()) => {
+      at('#/settings');
+      fetchMock.mockResolvedValueOnce(json(200, answer));
+      const made = mounted(ADMIN);
+      await shown();
+      return made;
+    };
+
+    it('the Administrator on #/settings: the address stays, its link is the one marked, the one request is the settings with the person\'s token, and the form holds them', async () => {
+      at('#/settings');
+      fetchMock.mockResolvedValueOnce(json(200, stored()));
+      mounted(ADMIN);
+      expect(window.location.hash).toBe('#/settings');
+      expect(current()).toEqual([['Week', null], ['Settings', 'page']]);
+      expect([find('#week').hidden, find('#appointments').hidden, find('#settings').hidden]).toEqual([true, true, false]);
+      // Mounted first, then started: the view was listening when the read began.
+      expect(find('#settings .loading').hidden).toBe(false);
+      expect(form().hidden).toBe(true);
+
+      await shown();
+      expect(apiCalls()).toEqual([[SETTINGS_URL, BEARER]]);
+      expect(calls()[0]![1].method).toBe('GET');
+      expect(['cancellationNoticeHours', 'minBookingNoticeHours', 'bookingHorizonDays', 'maxFutureAppointmentsPerUser'].map((name) => field(name).value)).toEqual(['24', '0', '56', '']);
+      expect([field('noLimit').checked, field('maxFutureAppointmentsPerUser').disabled]).toEqual([true, true]);
+      expect(find('#settings .zone-name').textContent).toBe('Europe/Rome');
+      expect(find('#settings .last-saved').textContent).toBe('Last saved by carol on Thu 19 Nov, 16:44');
+      expect(find('#settings .loading').hidden).toBe(true);
+      for (const token of TOKENS) expect(html()).not.toContain(token);
+    });
+
+    it('#/settings typed by a User shows the week, the address is put right, and the settings are not asked for', async () => {
+      at('#/settings');
+      fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
+      mounted(ALICE);
+      expect(window.location.hash).toBe('#/week');
+      expect(links().map((a) => a.textContent)).toEqual(['Week', 'My appointments']);
+      expect([find('#week').hidden, find('#settings').hidden]).toEqual([false, true]);
+      await weekDrawn();
+      window.location.hash = '#/settings';
+      await vi.waitFor(() => expect(window.location.hash).toBe('#/week'));
+      expect(find('#settings').hidden).toBe(true);
+      expect(apiCalls()).toEqual([[WEEK_URL, 'Bearer access-token-alice']]);
+    });
+
+    it('a failed read is said in the place of the form; "Try again" reads again', async () => {
+      at('#/settings');
+      fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      mounted(ADMIN);
+      await vi.waitFor(() => expect(find('#settings .unread').hidden).toBe(false));
+      expect(find('#settings .unread .error').textContent).toBe('The server cannot be reached. Check the connection and try again.');
+      expect(form().hidden).toBe(true);
+      expect(html()).not.toContain('Failed to fetch');
+
+      fetchMock.mockResolvedValueOnce(json(200, stored()));
+      find('#settings .retry').click();
+      await shown();
+      expect(find('#settings .unread').hidden).toBe(true);
+      expect(apiCalls().map(([address]) => address)).toEqual([SETTINGS_URL, SETTINGS_URL]);
+    });
+
+    it('a save: the PUT with the four values, "Settings saved.", the form filled with the answer, and the settings read again', async () => {
+      await onSettings();
+      field('cancellationNoticeHours').value = ' 48 ';
+      field('noLimit').click();
+      field('maxFutureAppointmentsPerUser').value = '5';
+      const saved = stored({ cancellationNoticeHours: 48, maxFutureAppointmentsPerUser: 5, updatedAt: '2026-11-19T16:00:00.000Z', updatedBy: { username: 'admin', role: 'admin' } });
+      fetchMock.mockResolvedValueOnce(json(200, saved));
+      fetchMock.mockResolvedValueOnce(json(200, saved));
+      submit(form());
+      expect(find<HTMLButtonElement>('#settings .submit').disabled).toBe(true);
+
+      await vi.waitFor(() => expect(find('#settings .saved').hidden).toBe(false));
+      const [url, init] = calls()[1]!;
+      expect([url, init.method, (init.headers as Record<string, string>).Authorization]).toEqual([SETTINGS_URL, 'PUT', BEARER]);
+      expect(JSON.parse(String(init.body))).toEqual({ cancellationNoticeHours: 48, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: 5 });
+      expect(field('cancellationNoticeHours').value).toBe('48');
+      expect(find<HTMLButtonElement>('#settings .submit').disabled).toBe(false);
+      await vi.waitFor(() => expect(apiCalls()).toHaveLength(3));
+      expect([calls()[2]![0], calls()[2]![1].method]).toEqual([SETTINGS_URL, 'GET']);
+      expect(find('#settings .last-saved').textContent).toBe('Last saved by admin on Thu 19 Nov, 17:00');
+
+      // An edit takes the sentence away.
+      field('bookingHorizonDays').value = '30';
+      field('bookingHorizonDays').dispatchEvent(new Event('input', { bubbles: true }));
+      expect(find('#settings .saved').hidden).toBe(true);
+    });
+
+    it('"No limit" ticked sends null', async () => {
+      await onSettings(stored({ maxFutureAppointmentsPerUser: 5 }));
+      expect([field('noLimit').checked, field('maxFutureAppointmentsPerUser').value]).toEqual([false, '5']);
+      field('noLimit').click();
+      fetchMock.mockResolvedValueOnce(json(200, stored()));
+      submit(form());
+      await vi.waitFor(() => expect(find('#settings .saved').hidden).toBe(false));
+      expect(JSON.parse(String(calls()[1]![1].body)).maxFutureAppointmentsPerUser).toBeNull();
+    });
+
+    it('a value out of range is refused under its field, with no request sent', async () => {
+      await onSettings();
+      field('bookingHorizonDays').value = '366';
+      field('minBookingNoticeHours').value = '';
+      submit(form());
+      const refusal = (name: string) => field(name).closest('.field')!.querySelector('.refusal')!.textContent;
+      expect(refusal('bookingHorizonDays')).toBe('Booking horizon must be a whole number from 1 to 365.');
+      expect(refusal('minBookingNoticeHours')).toBe('Minimum booking notice must be a whole number from 0 to 720.');
+      expect(field('bookingHorizonDays').getAttribute('aria-invalid')).toBe('true');
+      expect(apiCalls()).toHaveLength(1);
+      expect(find<HTMLButtonElement>('#settings .submit').disabled).toBe(false);
+      expect(find('#settings .saved').hidden).toBe(true);
+    });
+
+    it('a save the server refuses: the sentence, the settings read again, and the typed values still in the form after that read', async () => {
+      await onSettings();
+      field('bookingHorizonDays').value = '30';
+      fetchMock.mockResolvedValueOnce(json(409, { error: 'concurrent_update', message: 'the lock was held' }));
+      fetchMock.mockResolvedValueOnce(json(200, stored({ updatedAt: '2026-11-19T16:30:00.000Z', updatedBy: { username: 'dave', role: 'admin' } })));
+      submit(form());
+      await vi.waitFor(() => expect(find('#settings .failure').textContent).toBe('The calendar was being changed at the same moment. Please try again.'));
+      await vi.waitFor(() => expect(find('#settings .last-saved').textContent).toBe('Last saved by dave on Thu 19 Nov, 17:30'));
+      expect(apiCalls()).toHaveLength(3);
+      expect(field('bookingHorizonDays').value).toBe('30');
+      expect(find('#settings .saved').hidden).toBe(true);
+      expect(html()).not.toContain('lock was held');
+
+      // The next try goes, and succeeds.
+      fetchMock.mockResolvedValueOnce(json(200, stored({ bookingHorizonDays: 30 })));
+      submit(form());
+      await vi.waitFor(() => expect(find('#settings .saved').hidden).toBe(false));
+      expect(find('#settings .failure').textContent).toBe('');
+    });
+
+    it('week, settings, week, settings: nothing left over or doubled, the week where it was left, and values typed and not saved are gone', async () => {
+      fetchMock.mockResolvedValueOnce(json(200, adminWeek()));
+      mounted(ADMIN);
+      await weekDrawn();
+      fetchMock.mockResolvedValueOnce(json(200, view('2026-11-23')));
+      find('#week .next').click();
+      await vi.waitFor(() => expect(find('#week .loading').hidden).toBe(true));
+
+      fetchMock.mockResolvedValueOnce(json(200, stored()));
+      links()[1]!.click();
+      await shown();
+      expect([find('#week').hidden, find('#settings').hidden]).toEqual([true, false]);
+      expect(days()).toHaveLength(0);
+      expect(current()).toEqual([['Week', null], ['Settings', 'page']]);
+      field('bookingHorizonDays').value = '30';
+      field('noLimit').click();
+      field('minBookingNoticeHours').value = '';
+      submit(form()); // a refusal on show
+
+      fetchMock.mockResolvedValueOnce(json(200, view('2026-11-23')));
+      links()[0]!.click();
+      await vi.waitFor(() => expect(find('#week').hidden).toBe(false));
+      await weekDrawn();
+      expect(find('#week .week-label').textContent).toBe('23 Nov – 29 Nov 2026');
+      expect([find('#settings').hidden, form().hidden, field('bookingHorizonDays').value, field('noLimit').checked]).toEqual([true, true, '', false]);
+      expect(find('#settings').textContent).not.toContain('carol');
+      expect(find('#settings').textContent).not.toContain('must be');
+
+      fetchMock.mockResolvedValueOnce(json(200, stored()));
+      links()[1]!.click();
+      await shown();
+      expect([field('bookingHorizonDays').value, field('minBookingNoticeHours').value, field('noLimit').checked]).toEqual(['56', '0', true]);
+      expect(document.querySelectorAll('#settings [aria-invalid]')).toHaveLength(0);
+      expect(apiCalls().map(([address]) => address)).toEqual([
+        WEEK_URL,
+        'http://api.test/calendar?from=2026-11-23&to=2026-11-29',
+        SETTINGS_URL,
+        'http://api.test/calendar?from=2026-11-23&to=2026-11-29',
+        SETTINGS_URL,
+      ]);
+      expect(days()).toHaveLength(0);
+      expect(document.querySelectorAll('#app .nav a')).toHaveLength(2);
+    });
+
+    it('signing out on the settings with values typed and a refusal on show leaves nothing; a User then sees nothing of it, and "My appointments" still reads the settings, then the list', async () => {
+      at('#/settings');
+      const { store, signOut } = mounted();
+      const before = html(); // the page at the login, before anyone signed in
+      fetchMock.mockResolvedValueOnce(json(200, stored({ maxFutureAppointmentsPerUser: 7 })));
+      store.set(ADMIN);
+      await shown();
+      field('cancellationNoticeHours').value = '999';
+      field('bookingHorizonDays').value = '31';
+      field('noLimit').click();
+      submit(form());
+      expect(html()).toContain('Cancellation notice must be');
+      expect(html()).toContain('carol');
+
+      signOut.click();
+      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
+      expect(fields.every((value) => value === '')).toBe(true);
+      for (const gone of ['carol', 'Europe/Rome', 'must be', 'from 0 to 720', 'aria-invalid']) expect(html()).not.toContain(gone);
+      expect(html()).toBe(before);
+      expect(window.location.hash).toBe('#/settings'); // signing out leaves the address
+
+      // A User: the address is not theirs. Their list reads the settings, then the list.
+      const asked = apiCalls().length;
+      fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
+      store.set(ALICE);
+      expect(window.location.hash).toBe('#/week');
+      await weekDrawn();
+      fetchMock.mockResolvedValueOnce(json(200, stored()));
+      fetchMock.mockResolvedValueOnce(json(200, { appointments: [] }));
+      links()[1]!.click();
+      await vi.waitFor(() => expect(find('#appointments .empty').hidden).toBe(false));
+      expect(apiCalls().slice(asked)).toEqual([
+        [WEEK_URL, 'Bearer access-token-alice'],
+        [SETTINGS_URL, 'Bearer access-token-alice'],
+        ['http://api.test/calendar/appointments?upcoming=true&status=booked', 'Bearer access-token-alice'],
+      ]);
+      expect([find('#settings').hidden, form().hidden]).toEqual([true, true]);
+      expect(html()).not.toContain('carol');
     });
   });
 });

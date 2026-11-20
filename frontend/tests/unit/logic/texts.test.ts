@@ -174,6 +174,13 @@ describe('texts', () => {
       expect(failureText('cancellation_notice_too_short', 'change')).toBe('It is too late to change this appointment.');
     });
 
+    it('appointment_limit_reached after a change says that the appointment cannot be moved; after a booking, and with nothing said, it stays as it is', () => {
+      const booking = 'You have as many upcoming appointments as the calendar allows. Cancel one to book another.';
+      expect(failureText('appointment_limit_reached', 'change')).toBe('You have more upcoming appointments than the calendar now allows, so this one cannot be moved. Cancel one first.');
+      expect(failureText('appointment_limit_reached')).toBe(booking);
+      expect(failureText('appointment_limit_reached', undefined)).toBe(booking);
+    });
+
     it('without the second argument, after a cancellation, it stays as it is', () => {
       expect(failureText('cancellation_notice_too_short')).toBe('It is too late to cancel this appointment.');
       expect(failureText('cancellation_notice_too_short', undefined)).toBe('It is too late to cancel this appointment.');
@@ -188,16 +195,18 @@ describe('texts', () => {
     it('every other reason has the same sentence after a change, an unknown one the general sentence', () => {
       const others = [
         'network', 'server', 'unexpected', 'not_signed_in', 'session_rejected', 'forbidden', 'invalid_request', 'internal_error', 'invalid_json',
-        'slot_taken', 'booking_in_past', 'booking_notice_too_short', 'booking_beyond_horizon', 'outside_availability', 'appointment_limit_reached',
+        'slot_taken', 'booking_in_past', 'booking_notice_too_short', 'booking_beyond_horizon', 'outside_availability',
         'user_not_found', 'concurrent_update', 'appointment_not_found', 'appointment_not_active', 'type_in_use', '', 'constructor',
       ];
       for (const reason of others) expect(failureText(reason, 'change'), reason).toBe(failureText(reason));
     });
 
-    it('the sentence after a change is a sentence like the others', () => {
-      const text = failureText('cancellation_notice_too_short', 'change');
-      expect(text).toMatch(/^[A-Z].*\.$/);
-      expect(text).not.toMatch(/_|fetch|TypeError|HTTP|API|JSON|token|\d{3}/);
+    it('the sentences after a change are sentences like the others', () => {
+      for (const reason of ['cancellation_notice_too_short', 'appointment_limit_reached']) {
+        const text = failureText(reason, 'change');
+        expect(text, reason).toMatch(/^[A-Z].*\.$/);
+        expect(text, reason).not.toMatch(/_|fetch|TypeError|HTTP|API|JSON|token|\d{3}/);
+      }
     });
   });
 });

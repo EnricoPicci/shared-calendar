@@ -2,6 +2,7 @@ import type { Role } from '@shared-calendar/shared';
 import { fromEvent, Subscription } from 'rxjs';
 import { distinctUntilChanged, filter, map, startWith } from 'rxjs/operators';
 import { AppointmentsScreen } from '../logic/appointments.screen';
+import { SettingsScreen } from '../logic/settings.screen';
 import { WeekScreen } from '../logic/week.screen';
 import type { ApiConfig } from '../services/api';
 import { AppointmentsService } from '../services/appointments.service';
@@ -14,6 +15,7 @@ import { SessionStore } from '../services/session.store';
 import { UsersService } from '../services/users.service';
 import { mountAppointments } from './appointments.view';
 import { mountLogin, type LoginDeps } from './login.view';
+import { mountSettings } from './settings.view';
 import { mountWeek } from './week.view';
 
 // The shell (docs/FRONTEND_ARCHITECTURE.md section 6): the start-up, the switch between the
@@ -42,16 +44,25 @@ const ROLE_IN_WORDS: Record<Role, string> = { admin: 'Administrator', user: 'Use
 // What belongs to one person's session: the API services and the logic objects, created when
 // the person enters and dropped when the person leaves, so that nothing of one person's data
 // can be replayed to the next (docs/FRONTEND_ARCHITECTURE.md section 6, point 4).
-// The role is there for the views that show a part to one role only. `week` and `list` are the
-// logic objects of the two screens, the week and "My appointments".
-export type SessionObjects = { role: Role; week: WeekScreen; list: AppointmentsScreen; appointments: AppointmentsService; users: UsersService };
+// The role is there for the views that show a part to one role only. `week`, `list` and
+// `settings` are the logic objects of the three screens: the week, "My appointments" and the
+// settings.
+export type SessionObjects = {
+  role: Role;
+  week: WeekScreen;
+  list: AppointmentsScreen;
+  settings: SettingsScreen;
+  appointments: AppointmentsService;
+  users: UsersService;
+};
 
 function sessionObjects(config: ApiConfig, store: SessionStore, person: Person): SessionObjects {
   const calendar = new CalendarService(config, store);
   const appointments = new AppointmentsService(config, store);
   const users = new UsersService(config, store);
-  // The settings are read by the list screen only, for the calendar's time zone.
-  const settings = new CalendarSettingsService(config, store);
+  // One service for the settings: the list screen reads them for the calendar's time zone, the
+  // settings screen reads and saves them.
+  const calendarSettings = new CalendarSettingsService(config, store);
   // Notifies each time the page becomes visible again (the person comes back to the tab, or
   // brings the window back up): the screen on show then loads what it shows again, to show
   // what other people booked or cancelled in the meantime. The API cannot push, and nothing is
@@ -60,8 +71,9 @@ function sessionObjects(config: ApiConfig, store: SessionStore, person: Person):
   const now = () => new Date();
   const week = new WeekScreen(calendar, appointments, person.role, now, visible$);
   // The list screen hands an appointment to move over to the week screen.
-  const list = new AppointmentsScreen(settings, appointments, week, person.role, now, visible$);
-  return { role: person.role, week, list, appointments, users };
+  const list = new AppointmentsScreen(calendarSettings, appointments, week, person.role, now, visible$);
+  const settings = new SettingsScreen(calendarSettings);
+  return { role: person.role, week, list, settings, appointments, users };
 }
 
 // A screen of the application: its address (the URL's hash), its name in the navigation, the
@@ -105,6 +117,17 @@ export const SCREENS: readonly Screen[] = [
       };
       const subscription = mountAppointments(root, { screen: list, appointments, showWeek });
       subscription.add(list.start());
+      return subscription;
+    },
+  },
+  {
+    hash: '#/settings',
+    label: 'Settings',
+    roles: ['admin'],
+    element: '#settings',
+    show: (root, { settings }) => {
+      const subscription = mountSettings(root, settings);
+      subscription.add(settings.start());
       return subscription;
     },
   },

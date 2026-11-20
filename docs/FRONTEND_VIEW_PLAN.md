@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v5 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`). Step 62 done on 2026-11-19 (brief `prompts/85-step-62-implementation.md`). Step 63 done on 2026-11-19 (brief `prompts/86-step-63-implementation.md`). Step 64 done on 2026-11-19 (brief `prompts/87-step-64-implementation.md`), waiting for review; next step 65 |
+| Status | v6 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`). Step 62 done on 2026-11-19 (brief `prompts/85-step-62-implementation.md`). Step 63 done on 2026-11-19 (brief `prompts/86-step-63-implementation.md`). Step 64 done on 2026-11-19 (brief `prompts/87-step-64-implementation.md`). Step 65 done on 2026-11-19 (brief `prompts/88-step-65-implementation.md`), waiting for review; next step 66 |
 | Scope | Everything needed to go from the services layer that exists to **all the views written, tested and running in a browser against the local stack**: the tooling, the shell, the logic layer and one view per screen. Steps 60 to 69 |
 | Not in scope | Hosting, the CORS configuration, the Content-Security-Policy of the hosting, logout as a designed service, the session across a reload, the cloud deployment of the front end. They are the open points O1, O2, O3, O5 and O7 of `docs/FRONTEND_ARCHITECTURE.md` section 10 and get their own plan |
 | Governed by | `docs/FRONTEND_ARCHITECTURE.md` (the rules of the view layer), `docs/FRONTEND_SERVICES.md` (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/ARCHITECTURE.md` section 4 (the API). On any conflict with this plan, they win |
@@ -16,6 +16,7 @@
 | v3 | 2026-11-19 | Step 62 gains a reload of the week every time the browser's tab becomes visible again, so that a booking made by someone else is seen without a sign-out. No change to the back end: the API has no way to push, and a WebSocket connection would be a feature of its own, outside this plan (section 8, decision 11). |
 | v4 | 2026-11-19 | Step 63: how a change is made on the screen is decided, with the Product Owner, before the step's implementation, and no longer "to settle first". The step's text says the interaction as decided: the banner, any week while moving, what ends a move and what does not, the book dialog as the confirmation, the note always sent, and the known limit of a move inside a full window. Section 8, decision 10 says so for step 63; step 68's interaction is still to propose. |
 | v5 | 2026-11-19 | Step 64: three choices about the screen were made with the Product Owner before the step's implementation (brief `prompts/87-step-64-implementation.md`), and the step's text says them: the list's time zone is read from the settings; the history's period is chosen with two dates and opens on the 30 days that end today; "Change" from the list goes to the week, with step 63's banner and confirmation. The step's browser check is brought in line. |
+| v6 | 2026-11-19 | Step 65: four choices about the settings screen were made with the Product Owner before the step's implementation (brief `prompts/88-step-65-implementation.md`), and the step's text says them: "No limit" as a checkbox, what the form shows beside its fields, unsaved values lost with no question, and what follows a save. The step also carries two wordings decided at the reviews of steps 63 and 64 (the labels "Start" and "End" of the book dialog; a sentence of its own for the limit met by a change), and records that the history of "My appointments" keeps its default period. |
 
 ---
 
@@ -354,17 +355,41 @@ week; signing out on the list with the detail open leaves nothing.
 ### Step 65 — Settings (≈ 3 h)
 
 **Goal:** the Administrator reads and changes the four settings. The first of the
-Administrator's forms, and the simplest.
+Administrator's forms, and the simplest: how a value is refused, with its field named and no
+request sent, is settled here for the forms that follow.
 
-Logic: the settings as the form shows them, with the defaults and the ranges from `shared/`; what
-is sent when the form is saved.
+**Four choices about the screen**, made with the Product Owner before any code (brief
+`prompts/88-step-65-implementation.md`; the reasons are in `docs/FRONTEND_ARCHITECTURE.md`
+section 11, decisions 70 to 73):
 
-View: `settings.view.ts`, one fixed form. Shell: `#/settings`, Administrator only.
+- **"No limit"** for the maximum of upcoming appointments is a checkbox beside the number
+  field. An empty field is refused; it never means "no limit".
+- **Beside the four fields** the form shows each range in words, the calendar's time zone,
+  which cannot be changed here, and who saved the settings last and when.
+- **Values typed and not saved are lost**, with no question, on a change of screen and on
+  signing out.
+- **After "Save"** the settings are read again, whatever the outcome. A success says "Settings
+  saved." and fills the form with the server's answer; after a failure what was typed stays.
 
-**Browser check:** the current values; a value out of range is refused with the field named and
-no request sent; a saved value is there after signing out and in; as `alice`, the address is not
-in the navigation and typed by hand shows the week; a booking then follows the new notice or
-horizon. The values found before the check are put back.
+Logic: the settings as the form shows them; the ranges from `shared/`; the fields checked one
+by one before any call (not empty, a whole number written with digits, inside its range), with
+one sentence per field in fault; what is sent when the form is saved; the read after a save.
+
+View: `settings.view.ts`, one fixed form; a field in fault is marked and has its sentence
+under it. Shell: `#/settings`, Administrator only.
+
+Also in this step, decided at the reviews of steps 63 and 64: the two lists of times of the
+book dialog are labelled "Start" and "End"; a change refused because the User holds more
+appointments than the limit now allows has a sentence of its own. The history of "My
+appointments" keeps opening on the 30 days that end today.
+
+**Browser check:** the current values, the ranges, the time zone and who saved last; a value
+above or below its range, an empty field, a decimal and a text are each refused under their
+field with no request sent; a saved value is there after signing out and in; "No limit" sends
+no number; a save that fails is said in plain words and what was typed stays; as `alice`, the
+address is not in the navigation and typed by hand shows the week; a booking then follows the
+new notice or horizon, and a change refused for the limit says so in its own words. The values
+found before the check are put back.
 
 **Acceptance:** the common check.
 

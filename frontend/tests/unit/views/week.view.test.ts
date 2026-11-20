@@ -1098,6 +1098,22 @@ describe('mountWeek', () => {
         expect(bookError().textContent).toBe('It is too late to change this appointment.');
       });
 
+      it('the limit of upcoming appointments met by a change is said as a change\'s, not as a booking\'s; met by a booking, it keeps its own words', () => {
+        const { changeState$, bookState$, week$ } = moving();
+        find('#week .slot').click();
+        submit(bookForm());
+        changeState$.next({ status: 'failure', reason: 'appointment_limit_reached', message: 'appointment_limit_reached: 5 >= 1' });
+        expect(bookError().textContent).toBe('You have more upcoming appointments than the calendar now allows, so this one cannot be moved. Cancel one first.');
+        expect(banner().hidden).toBe(false);
+        book().close();
+
+        week$.next(state({ week: WEEK, moving: null }));
+        find('#week .slot').click();
+        submit(bookForm());
+        bookState$.next({ status: 'failure', reason: 'appointment_limit_reached', message: 'appointment_limit_reached: 5 >= 1' });
+        expect(bookError().textContent).toBe('You have as many upcoming appointments as the calendar allows. Cancel one to book another.');
+      });
+
       it('"Close" closes the confirmation without a call, and the banner stays', () => {
         const { appointments, screen } = moving();
         find('#week .slot').click();

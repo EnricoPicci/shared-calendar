@@ -16,7 +16,8 @@ in `shared/` (package `@shared-calendar/shared`), and in `frontend/` the browser
 layer (`docs/FRONTEND_SERVICES.md`) and the start of its view layer
 (`docs/FRONTEND_ARCHITECTURE.md`: the build and the dev server, the shell with its navigation,
 the login, the logic layer, the week calendar with booking, cancelling, the note and the change,
-and a User's "My appointments"; the other views follow `docs/FRONTEND_VIEW_PLAN.md`). Layout and placement rules:
+a User's "My appointments" and the Administrator's settings; the other views follow
+`docs/FRONTEND_VIEW_PLAN.md`). Layout and placement rules:
 `docs/FOLDER_STRUCTURE.md`.
 
 ## Where the truth lives
@@ -30,15 +31,17 @@ and a User's "My appointments"; the other views follow `docs/FRONTEND_VIEW_PLAN.
 - `docs/SHARED_CALENDAR_SPEC.md` specifies the shared calendar (agreed with the Product Owner,
   brief 40, not yet implemented). It is the input for the calendar's plan steps; once merged into
   `ARCHITECTURE.md` (spec section 19), the architecture wins as usual.
-- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v6; the foundation, the
-  week, booking, cancelling, the note, the change and "My appointments" implemented, plan steps
-  60 to 64): plain HTML and CSS with one TypeScript module script, the layers (services, logic,
+- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v7; the foundation, the
+  week, booking, cancelling, the note, the change, "My appointments" and the settings
+  implemented, plan steps 60 to 65): plain HTML and CSS with one TypeScript module script, the layers (services, logic,
   views, shell), the rules of a view, the shape of a dialog (its section 4, with the book
-  dialog's second mode, the banner of a move, the detail dialog that two views mount and the
-  shape of the list), the logic layer as built (its section 5.1, with the reloads of the week,
+  dialog's second mode, the banner of a move, the detail dialog that two views mount, the
+  shape of the list and the shape of a form whose fields are checked: a field in fault), the
+  logic layer as built (its section 5.1, with the reloads of the week,
   the detail's three actions and its one sentence, the appointment being moved, the list
-  screen with its time zone read from the settings and its period, and the hand-over of an
-  appointment from the list to the week), the table of screens, what the shell hands a view and
+  screen with its time zone read from the settings and its period, the hand-over of an
+  appointment from the list to the week, and the settings screen with the checks of its fields
+  and the read after a save), the table of screens, what the shell hands a view and
   the navigation by the hash (its section 6), and the
   tooling (its section 12: the bundle command, the dev server, the tests' environment). Hosting,
   CORS, the session across a reload, the hosting's Content-Security-Policy, logout and the size
@@ -52,7 +55,8 @@ and a User's "My appointments"; the other views follow `docs/FRONTEND_VIEW_PLAN.
   again after a write and when the tab becomes visible), 63 (the note edited in the detail,
   an appointment moved to another time) and 64 ("My appointments": the upcoming list and the
   history, the detail dialog shared by two screens, "Change" from the list handed over to the
-  week) are done (2026-11-19); next step 65, the settings.
+  week) and 65 (the settings: one form, its fields checked before any call) are done
+  (2026-11-19); next step 66, the users.
 - `docs/RENAME_PLAN.md` plans the move from the "hello-world" names to "shared-calendar" (plan
   steps 56–58: repository, new stack `shared-calendar-api`, retirement of `hello-world-api`), with
   the way back at every stage. The repository uses the new names (step 56) and the stack in use
@@ -459,10 +463,11 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   The view layer (`docs/FRONTEND_ARCHITECTURE.md`; no framework): `index.html` (all the markup,
   everything `hidden`: the login `#login`; the frame `#app` with the header, an empty `nav`, the
   template of a navigation link and `main.screen`, which holds one element per screen: so far
-  `#week` and `#appointments`. `#week` has the toolbar, the failure (`role="alert"`), the banner `.moving` of an appointment
+  `#week`, `#appointments` and `#settings`. `#week` has the toolbar, the failure (`role="alert"`), the banner `.moving` of an appointment
   being moved (its words `.moving-what`, the button `.keep`), the time zone's sentence, the
   legend, the hours, the days, its two native dialogs `dialog.book` (a form: what is booked, the
-  part `.choices` for the Administrator with the lists `username`, `start` and `end`, the note
+  part `.choices` for the Administrator with the lists `username`, `start` and `end` (labelled
+  "For", "Start" and "End"), the note
   with `maxlength` 500, the failure; in its second mode it confirms a change: the elements
   marked `in-booking` are shown in the first mode only, the User's choice `.user` among them,
   those marked `in-change` in the second only, the old time `.old` among them), and its eight
@@ -472,14 +477,21 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   (`aria-pressed`), the period's form `.period` (`novalidate`; the date fields `from` and `to`,
   "Show", the refusal), the failure, the sentence `.empty`, the list `.list` and the template
   `tpl-appointment-row` (an `<li>` holding one `<button type="button" class="row">` with the
-  date, the time, the type, the note and the status). After `main.screen`, in no screen,
+  date, the time, the type, the note and the status). `#settings` has the read's failure
+  `.unread` with "Try again", and the form `form.settings` (`novalidate`): four `.field`
+  elements, each a label with its `<input type="number">` (`cancellationNoticeHours`,
+  `minBookingNoticeHours`, `bookingHorizonDays`, `maxFutureAppointmentsPerUser`), the words of
+  its range `.range` and its refusal `.refusal` (`role="alert"`), the last one also with the
+  checkbox `noLimit`; then the time zone, the line `.last-saved`, the save's failure, "Settings
+  saved." and "Save". No range is written in the page: the script sets the words and the
+  fields' `min`, `max` and `step`. After `main.screen`, in no screen,
   `dialog#detail` (class `detail`: the fields, the note as a text in `.noted` or in the form
   `.note-form` with "Save note", `.booked`, `.hint`, the failure, "Change", "Cancel
   appointment"), which the view of the screen on show mounts. One module script `app.js`, one
   style sheet, nothing inline), `style.css` (also
   the six type colours `type-0` … `type-5`, the lanes `lane-0-of-2`, `lane-1-of-2`, the rows of
-  the list with `is-booked`, `is-ended`, `is-cancelled`, `is-changed`, the dialogs and the focus
-  ring; a class of the page must not hold the word `admin`: the shell's test looks
+  the list with `is-booked`, `is-ended`, `is-cancelled`, `is-changed`, a field in fault
+  (`.field input[aria-invalid="true"]`), the dialogs and the focus ring; a class of the page must not hold the word `admin`: the shell's test looks
   for that name in the whole document after a sign-out),
   `src/main.ts` (the bundle's entry, one statement: the only file that knows the three constants
   `API_URL`, `COGNITO_URL`, `CLIENT_ID`, which esbuild's `define` puts in), `src/views/`:
@@ -489,13 +501,13 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   role before anything else sees it; `distinctUntilChanged` on the two, so a refresh mounts
   nothing and loads nothing; `enter(person)` fills the header, creates the session's objects
   (`sessionObjects`: the role, a new `CalendarService`, `AppointmentsService`, `UsersService`,
-  `CalendarSettingsService`, `WeekScreen` and `AppointmentsScreen` per person, dropped when the
-  person leaves, and the stream of the page becoming visible, from the document's
+  `CalendarSettingsService`, `WeekScreen`, `AppointmentsScreen` and `SettingsScreen` per
+  person, dropped when the person leaves, and the stream of the page becoming visible, from the document's
   `visibilitychange`, handed to both screens), fills the navigation from the table `SCREENS` (an
   entry: `hash`, `label`, `roles`, `element`, `show`, which mounts the view and then starts its
-  logic object; two entries so far, `#/week` for both roles and `#/appointments`, "My
+  logic object; three entries so far, `#/week` for both roles, `#/appointments`, "My
   appointments", for a User only, whose `show` also hands the view `showWeek`, a function that
-  sets the address to the week's; `mountShell` takes another table as the optional `screens`,
+  sets the address to the week's, and `#/settings`, "Settings", for the Administrator only; `mountShell` takes another table as the optional `screens`,
   for its test) and
   follows the URL's hash (`fromEvent(window, 'hashchange')` from the current hash): an empty,
   unknown or forbidden hash shows the role's first screen and the address is put right with
@@ -513,7 +525,13 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   `AppointmentsDeps`: of the `AppointmentsScreen` `list$`, `upcoming`, `history`, `show`,
   `detail` and `move`; it redraws the rows only when the list object changed and sets the two
   dates only when the period object changed; a row opens the detail; "Change" there calls
-  `screen.move(appointmentId)`, then `showWeek()`) and
+  `screen.move(appointmentId)`, then `showWeek()`),
+  `settings.view.ts` (`mountSettings(root, screen)`, with `SettingsDeps`: of the
+  `SettingsScreen` `settings$`, `save`, `edited` and `retry`; it sets the ranges at the mount,
+  fills the form only when the fields object changed, sends the fields as text at "Save",
+  tells of an edit from the form's `input` and the checkbox's `change`, and at every
+  notification shows or clears each field's refusal and `aria-invalid`; "No limit" disabling
+  its number field is its one pure view action) and
   `week.view.ts` (`mountWeek(root, { screen, appointments, users, role })`, with `WeekDeps`: the
   parts it uses of the `WeekScreen` (`week$`, the three changes of week, `detail`, `move`,
   `keep`), of the `AppointmentsService` (`book`, `cancel`, `change`, `updateNote` and their
@@ -536,9 +554,9 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   words, with one general sentence for a reason it does not know: a new route's codes get their
   sentences here; it has those of the login, of `GET /calendar`, of a booking, of a cancellation,
   of a change, of a note and of the list of users, which also cover the list of appointments and
-  the read of the settings; its optional second argument says what was
-  attempted, for the one reason whose words depend on it: `cancellation_notice_too_short`
-  after `'change'`), `week.model.ts` (pure:
+  the read and the save of the settings; its optional second argument says what was
+  attempted, for the two reasons whose words depend on it: `cancellation_notice_too_short` and
+  `appointment_limit_reached` after `'change'`), `week.model.ts` (pure:
   `weekModel(view, role)`, the week ready to draw: days of windows, slots, busy blocks and
   appointments, each with `top`, `height`, `time`, `lane` and `lanes`; a slot also with its
   `start`, `end`, `day`, `typeName` and the instants of its `window` (through `shared/`'s
@@ -571,7 +589,20 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   `start()`; another mode or period forgets the list on show; it loads its list again at every
   result of `cancelResult$` and `updateNoteResult$` and at every notification of `visible$`,
   not for a result already there at `start()`; `move` hands the appointment's `Moving` copy and
-  its date over to the `WeekScreen`) and
+  its date over to the `WeekScreen`),
+  `settings.model.ts` (pure, for the settings form: `SETTING_FIELDS`, the four names in the
+  form's order; `settingsFields(settings)`, the four values as text and `noLimit`;
+  `settingsInfo(settings)`, the time zone and the line about the last save, in the calendar's
+  zone; `settingRange(field)`, `min`, `max` and the words, from `SETTINGS_RANGES`;
+  `settingsFor(fields)`, the body of the save or the refusals, one sentence per field in
+  fault: a value is accepted when written with digits only, spaces aside, and inside its
+  range),
+  `settings.screen.ts` (`SettingsScreen(settings)`: `settings$` = loading, unread, fields,
+  info, saving, refusals, failure, saved; `start()`, `retry()`, `save(fields)`, `edited()`;
+  `start()` reads the settings; `save` checks the fields and calls `update` only when none is
+  in fault; after every result of a save it reads again; `fields` becomes another object only
+  at the first read and after a save that succeeded, so what was typed stays after a failure;
+  no result that was there before `start()` is taken) and
   `week.screen.ts`
   (`WeekScreen(calendar, appointments, role, now, visible$)`: `week$` = label, loading, failure,
   the last week loaded, and `moving`, the appointment being moved or `null`; `start()`,
@@ -588,9 +619,11 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   esbuild options the two share), `build.mjs`, `dev.mjs`, `seed-local.mjs`.
   `tests/unit/logic/` (project `unit`): `zone.ts`, `fixtures.ts`, `texts.test.ts`,
   `week.model.test.ts`, `booking.test.ts`, `appointment.detail.test.ts`, `week.screen.test.ts`,
-  `appointments.model.test.ts`, `appointments.screen.test.ts`. `tests/unit/views/` (project
-  `views`): `page.ts` (`useRealPage()`, `find`, `submit`), `page.test.ts`, `login.view.test.ts`,
-  `week.view.test.ts`, `detail.view.test.ts`, `appointments.view.test.ts`, `shell.test.ts`. No `template.yaml` yet: the hosting
+  `appointments.model.test.ts`, `appointments.screen.test.ts`, `settings.model.test.ts`,
+  `settings.screen.test.ts`. `tests/unit/views/` (project `views`): `page.ts`
+  (`useRealPage()`, `find`, `submit`), `page.test.ts`, `login.view.test.ts`,
+  `week.view.test.ts`, `detail.view.test.ts`, `appointments.view.test.ts`,
+  `settings.view.test.ts`, `shell.test.ts`. No `template.yaml` yet: the hosting
   waits for the open points of `docs/FRONTEND_ARCHITECTURE.md` section 10.
 - `shared/`: package `@shared-calendar/shared`, no build step (`exports` points at
   `src/index.ts`; each consumer bundles it). `src/api.ts` (response and error body types,
@@ -648,7 +681,13 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   A native date field's `value` is set and read as `YYYY-MM-DD` and emptied by `form.reset()`;
   what can be typed into it is for the browser check. A test that looks in the whole document
   (`outerHTML`) for what a person left behind looks for data, not for fixed words of the page:
-  the comments of `index.html` are in it. An
+  the comments of `index.html` are in it. A number field's `value` is set and read as text (a
+  text that is not a number reads back empty); a checkbox's `click()` sends `change` but no
+  `input` event there, so a test of an edit typed into a field sends `input` itself; a
+  checkbox's `value` is always "on", so a test that reads every field of the page reads a
+  checkbox by `checked` (the shell's test has `held(field)` for that). The page's fixed texts
+  are in the frame's `textContent` also while hidden: the shell's test of a second person looks
+  for the word "User" there, which is why no label of the page holds it. An
   appointment id in a test that reaches a
   real service must be a ULID (the fixtures' `appt-…` ids are refused before any request). The
   shell's test of the tab becoming visible defines `visibilityState` on the document and sends
@@ -673,8 +712,9 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
 - The shell's test stubs the global `fetch` for the whole file (unanswered unless a test answers
   it): entering the frame creates the real `CalendarService`, which loads the week, and the real
   `AppointmentsService`, `UsersService` and `CalendarSettingsService`, which a test reaches
-  through the two dialogs and the list (on `#/appointments` the first request is the settings,
-  the second the list: answer them in that order). It resets
+  through the two dialogs, the list (on `#/appointments` the first request is the settings,
+  the second the list: answer them in that order) and the settings (one `GET`; after a `PUT`
+  another `GET`). It resets
   the emulated page's hash before each test. `happy-dom` sends a `hashchange` on
   `history.replaceState` too, which a browser does not: harmless for the shell
   (`distinctUntilChanged` on the screen), but do not build on it.

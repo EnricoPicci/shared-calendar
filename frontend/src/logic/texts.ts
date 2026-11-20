@@ -125,8 +125,14 @@ const PLAIN_WORDS = new Map<string, string>([
 // What was being attempted when a call failed, where the same reason needs other words for it.
 export type Attempt = 'change';
 // A change is refused with the cancellation's reason when its appointment is too close to be
-// moved by a User (docs/SHARED_CALENDAR_SPEC.md section 8.4): nothing was being cancelled.
-const AFTER_A_CHANGE = new Map<string, string>([['cancellation_notice_too_short', 'It is too late to change this appointment.']]);
+// moved by a User (docs/SHARED_CALENDAR_SPEC.md section 8.4): nothing was being cancelled. And
+// a change that meets the limit of upcoming appointments books nothing more: the limit was
+// lowered below what the User already holds (docs/SHARED_CALENDAR_SPEC.md R-SET-03), and the
+// way out is to cancel one, not to give up a booking.
+const AFTER_A_CHANGE = new Map<string, string>([
+  ['cancellation_notice_too_short', 'It is too late to change this appointment.'],
+  ['appointment_limit_reached', 'You have more upcoming appointments than the calendar now allows, so this one cannot be moved. Cancel one first.'],
+]);
 
 // A failure's `reason` as a sentence; a reason without a sentence of its own gets the general
 // one. `attempt` says what was attempted, for the reasons whose sentence depends on it.

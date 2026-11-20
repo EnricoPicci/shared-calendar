@@ -76,8 +76,8 @@
                   <p class="users-message" role="status"></p>
                 </div>
                 <div class="times">
-                  <label>From <select name="start"></select></label>
-                  <label>To <select name="end"></select></label>
+                  <label>Start <select name="start"></select></label>
+                  <label>End <select name="end"></select></label>
                 </div>
               </div>
               <label>Note <textarea name="note" rows="3" maxlength="500"></textarea></label>
@@ -146,6 +146,52 @@
               <button type="button" class="row"><span class="date"></span> <span class="time"></span> <span class="type-name"></span> <span class="note"></span> <span class="status"></span></button>
             </li>
           </template>
+        </section>
+
+        <!-- The settings (src/views/settings.view.ts), at the address #/settings: the four
+             values of the calendar in one fixed form. A field in fault is said under it. -->
+        <section id="settings" class="settings-screen" hidden>
+          <div class="toolbar">
+            <h2>Settings</h2>
+            <span class="loading" role="status" hidden>Loading…</span>
+          </div>
+          <!-- Shown in the place of the form when the settings could not be read -->
+          <div class="unread" hidden>
+            <p class="error" role="alert"></p>
+            <button type="button" class="retry">Try again</button>
+          </div>
+          <!-- novalidate: a value out of range is refused by the script, in words, under its
+               field. Each field is a .field: its label, its range, its refusal. -->
+          <form class="settings" novalidate hidden>
+            <div class="field">
+              <label>Cancellation notice <input type="number" name="cancellationNoticeHours" inputmode="numeric" /></label>
+              <p class="range"></p>
+              <p class="error refusal" role="alert"></p>
+            </div>
+            <div class="field">
+              <label>Minimum booking notice <input type="number" name="minBookingNoticeHours" inputmode="numeric" /></label>
+              <p class="range"></p>
+              <p class="error refusal" role="alert"></p>
+            </div>
+            <div class="field">
+              <label>Booking horizon <input type="number" name="bookingHorizonDays" inputmode="numeric" /></label>
+              <p class="range"></p>
+              <p class="error refusal" role="alert"></p>
+            </div>
+            <div class="field">
+              <label>Maximum upcoming appointments per person <input type="number" name="maxFutureAppointmentsPerUser" inputmode="numeric" /></label>
+              <label class="check"><input type="checkbox" name="noLimit" /> No limit</label>
+              <p class="range"></p>
+              <p class="error refusal" role="alert"></p>
+            </div>
+            <p class="about">Time zone: <strong class="zone-name"></strong>. It is set when the calendar is installed and cannot be changed here.</p>
+            <p class="about last-saved"></p>
+            <p class="error failure" role="alert"></p>
+            <p class="saved" role="status" hidden>Settings saved.</p>
+            <div class="actions">
+              <button class="primary submit">Save</button>
+            </div>
+          </form>
         </section>
       </main>
 

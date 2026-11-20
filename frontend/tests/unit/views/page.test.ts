@@ -28,7 +28,7 @@ describe('index.html', () => {
   it('every screen of the frame has an id and starts hidden; the navigation and the lists start empty', () => {
     loadPage();
     const screens = [...document.querySelectorAll<HTMLElement>('#app main.screen > :not(template)')];
-    expect(screens.map((element) => element.id)).toEqual(['week', 'appointments']);
+    expect(screens.map((element) => element.id)).toEqual(['week', 'appointments', 'settings']);
     expect(screens.every((element) => element.hidden)).toBe(true);
     expect(document.querySelector('#app .nav')!.children).toHaveLength(0);
     for (const list of document.querySelectorAll('#week .legend, #week .hours, #week .days, #appointments .list')) expect(list.children).toHaveLength(0);
@@ -165,5 +165,44 @@ describe('index.html', () => {
     expect([buttons[0]!.tagName, buttons[0]!.getAttribute('type')]).toEqual(['BUTTON', 'button']);
     expect([...buttons[0]!.children].map((part) => part.className)).toEqual(['date', 'time', 'type-name', 'note', 'status']);
     expect(row.querySelectorAll('input, select, textarea')).toHaveLength(0);
+  });
+
+  it('the two lists of times of the book dialog are labelled "Start" and "End"; the lines of a change above them say "From:" and "To:"', () => {
+    loadPage();
+    const label = (name: string) => document.querySelector(`dialog.book [name="${name}"]`)!.closest('label')!.textContent.trim();
+    expect([label('start'), label('end')]).toEqual(['Start', 'End']);
+    expect(document.querySelector('dialog.book .old')!.parentElement!.textContent).toBe('From: ');
+    expect(document.querySelector('dialog.book .what')!.parentElement!.textContent).toBe('To: ');
+  });
+
+  it('the settings start with the form hidden and empty: four number fields, each in a field of its own with its label, its range and its refusal, and "No limit"', () => {
+    loadPage();
+    const one = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector<T>(`#settings ${selector}`)!;
+    const form = one<HTMLFormElement>('form.settings');
+    expect(form.hidden).toBe(true);
+    // The script says in words what is wrong with a value: the browser's own check is off.
+    expect(form.noValidate).toBe(true);
+    const numbers = [...form.querySelectorAll<HTMLInputElement>('input[type="number"]')];
+    expect(numbers.map((field) => [field.name, field.closest('label')!.textContent.trim(), field.value])).toEqual([
+      ['cancellationNoticeHours', 'Cancellation notice', ''],
+      ['minBookingNoticeHours', 'Minimum booking notice', ''],
+      ['bookingHorizonDays', 'Booking horizon', ''],
+      ['maxFutureAppointmentsPerUser', 'Maximum upcoming appointments per person', ''],
+    ]);
+    for (const field of numbers) {
+      const box = field.closest('.field')!;
+      expect(box.querySelectorAll('input[type="number"]'), field.name).toHaveLength(1);
+      expect(box.querySelector('.range')!.textContent, field.name).toBe('');
+      expect([box.querySelector('.refusal')!.getAttribute('role'), box.querySelector('.refusal')!.textContent], field.name).toEqual(['alert', '']);
+      // The ranges are the script's to set, from shared/: none is written in the page.
+      expect(['min', 'max', 'step', 'required', 'aria-invalid'].filter((name) => field.hasAttribute(name)), field.name).toEqual([]);
+    }
+    const noLimit = one<HTMLInputElement>('[name="noLimit"]');
+    expect([noLimit.type, noLimit.checked, noLimit.closest('label')!.textContent.trim()]).toEqual(['checkbox', false, 'No limit']);
+    expect(noLimit.closest('.field')).toBe(one('[name="maxFutureAppointmentsPerUser"]').closest('.field'));
+    expect([one('.loading').hidden, one('.unread').hidden, one('.saved').hidden]).toEqual([true, true, true]);
+    expect([one('.saved').textContent, one('.saved').getAttribute('role'), one('.failure').getAttribute('role')]).toEqual(['Settings saved.', 'status', 'alert']);
+    expect([one('.submit').textContent, one('.retry').textContent]).toEqual(['Save', 'Try again']);
+    expect([one('.zone-name').textContent, one('.last-saved').textContent]).toEqual(['', '']);
   });
 });
