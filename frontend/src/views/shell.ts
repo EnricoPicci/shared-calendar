@@ -3,6 +3,7 @@ import { fromEvent, Subscription } from 'rxjs';
 import { distinctUntilChanged, filter, map, startWith } from 'rxjs/operators';
 import { AppointmentsScreen } from '../logic/appointments.screen';
 import { AvailabilityScreen } from '../logic/availability.screen';
+import { DateScreen } from '../logic/date.screen';
 import { SettingsScreen } from '../logic/settings.screen';
 import { UsersScreen } from '../logic/users.screen';
 import { WeekScreen } from '../logic/week.screen';
@@ -18,7 +19,9 @@ import { RefreshService } from '../services/refresh.service';
 import { SessionStore } from '../services/session.store';
 import { UsersService } from '../services/users.service';
 import { mountAppointments } from './appointments.view';
+import { mountConfirm } from './availability.parts';
 import { mountAvailability } from './availability.view';
+import { mountDate } from './date.view';
 import { mountLogin, type LoginDeps } from './login.view';
 import { mountSettings } from './settings.view';
 import { mountUsers } from './users.view';
@@ -52,7 +55,8 @@ const ROLE_IN_WORDS: Record<Role, string> = { admin: 'Administrator', user: 'Use
 // can be replayed to the next (docs/FRONTEND_ARCHITECTURE.md section 6, point 4).
 // The role is there for the views that show a part to one role only. `week`, `list`,
 // `settings`, `accounts` and `availability` are the logic objects of the five screens: the
-// week, "My appointments", the settings, the users and the availability. `users` is the
+// week, "My appointments", the settings, the users and the availability; `date` is the
+// availability's second logic object, for its part about a single date. `users` is the
 // service the week's book dialog and the users screen share; `types` and `rules` are the two
 // services of the availability, whose view calls their deletes.
 export type SessionObjects = {
@@ -62,6 +66,7 @@ export type SessionObjects = {
   settings: SettingsScreen;
   accounts: UsersScreen;
   availability: AvailabilityScreen;
+  date: DateScreen;
   appointments: AppointmentsService;
   users: UsersService;
   types: AvailabilityTypesService;
@@ -89,7 +94,12 @@ function sessionObjects(config: ApiConfig, store: SessionStore, person: Person):
   const types = new AvailabilityTypesService(config, store);
   const rules = new AvailabilityRulesService(config, store);
   const availability = new AvailabilityScreen(calendarSettings, types, rules, now, visible$);
-  return { role: person.role, week, list, settings, accounts, availability, appointments, users, types, rules };
+  // The part about a single date reads the calendar view of that one date through a
+  // CalendarService of its own: the service has one pair of streams and one pending call, and
+  // the week's must keep the week (docs/FRONTEND_SERVICES.md section 18). What the
+  // availability screen knows (the time zone, the types, the patterns) is handed over.
+  const date = new DateScreen(availability.known$, new CalendarService(config, store), types, rules, now, visible$);
+  return { role: person.role, week, list, settings, accounts, availability, date, appointments, users, types, rules };
 }
 
 // A screen of the application: its address (the URL's hash), its name in the navigation, the
@@ -163,9 +173,17 @@ export const SCREENS: readonly Screen[] = [
     label: 'Availability',
     roles: ['admin'],
     element: '#availability',
-    show: (root, { availability, types, rules }) => {
-      const subscription = mountAvailability(root, { screen: availability, types, rules });
+    // One screen, two views and two logic objects: the types and the patterns, and a single
+    // date. Both views open the one dialog that confirms, mounted here and handed to each.
+    // The availability screen is started first: its three reads leave, and the object of a
+    // single date, which reads nothing until a date is shown, then takes what it knows.
+    show: (root, { availability, date, types, rules }) => {
+      const confirm = mountConfirm(root);
+      const subscription = mountAvailability(root, { screen: availability, types, rules, confirm });
+      subscription.add(mountDate(root, { screen: date, confirm }));
+      subscription.add(confirm.subscription);
       subscription.add(availability.start());
+      subscription.add(date.start());
       return subscription;
     },
   },

@@ -135,6 +135,13 @@ const PLAIN_WORDS = new Map<string, string>([
   ['availability_overlap', 'Another window of the same day covers part of these hours, whatever its type. Choose other hours.'],
   ['availability_conflict', 'This would leave booked appointments outside the hours open for booking. Cancel or move them in the week first.'],
   ['limit_reached', 'The calendar cannot hold more of these. Delete one to create another.'],
+  // A single date: its own windows and its extra windows (docs/FRONTEND_SERVICES.md
+  // section 17.1). A date before today, the calendar's today, cannot be changed
+  // (docs/SHARED_CALENDAR_SPEC.md R-AV-02): the server says so for a page left open over
+  // midnight.
+  ['date_in_past', 'This date is now in the past, so it can no longer be changed.'],
+  ['override_not_found', 'This day no longer has windows of its own: the weekly patterns apply.'],
+  ['window_not_found', 'This extra window no longer exists.'],
   // The login (docs/FRONTEND_SERVICES.md section 4.3). A wrong password and an unknown user are
   // one reason, so that the sentence does not say which usernames exist.
   ['invalid_credentials', 'The username or the password is not correct.'],
@@ -145,7 +152,7 @@ const PLAIN_WORDS = new Map<string, string>([
 ]);
 
 // What was being attempted when a call failed, where the same reason needs other words for it.
-export type Attempt = 'change' | 'type' | 'pattern';
+export type Attempt = 'change' | 'type' | 'pattern' | 'window' | 'patterns-back';
 const AFTER: Record<Attempt, Map<string, string>> = {
   // A change is refused with the cancellation's reason when its appointment is too close to be
   // moved by a User (docs/SHARED_CALENDAR_SPEC.md section 8.4): nothing was being cancelled. And
@@ -161,6 +168,12 @@ const AFTER: Record<Attempt, Map<string, string>> = {
   // (docs/SHARED_CALENDAR_SPEC.md R-PAT-04). The numbers are those of shared/.
   type: new Map([['limit_reached', `The calendar can hold ${CALENDAR_LIMITS.types} types at most. Delete one to create another.`]]),
   pattern: new Map([['limit_reached', `The calendar can hold ${CALENDAR_LIMITS.patterns} weekly patterns at most. Delete one to create another.`]]),
+  // An extra window of a date (docs/SHARED_CALENDAR_SPEC.md R-ONE-03), with the number of shared/.
+  window: new Map([['limit_reached', `A day can hold ${CALENDAR_LIMITS.oneOffWindowsPerDate} extra windows at most. Delete one to add another.`]]),
+  // Going back to the weekly patterns chooses no hours: the overlap is between the patterns'
+  // hours, which would apply again, and an extra window of the day
+  // (docs/SHARED_CALENDAR_SPEC.md section 6.5, the last row of its table).
+  'patterns-back': new Map([['availability_overlap', 'The hours the weekly patterns give this day overlap one of its extra windows. Delete that extra window first.']]),
 };
 
 // A failure's `reason` as a sentence; a reason without a sentence of its own gets the general

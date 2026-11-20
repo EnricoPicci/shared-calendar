@@ -90,11 +90,14 @@ stays at the root.
 │   │   │                        # booking.ts, appointment.detail.ts, appointments.model.ts,
 │   │   │                        # appointments.screen.ts, settings.model.ts, settings.screen.ts,
 │   │   │                        # users.model.ts, users.screen.ts, availability.model.ts,
-│   │   │                        # conflicts.ts, availability.screen.ts
+│   │   │                        # conflicts.ts, availability.screen.ts, date.model.ts,
+│   │   │                        # date.screen.ts
 │   │   └── views/               # shell.ts (with the table of screens) and one <name>.view.ts per
 │   │                            # view: login.view.ts, week.view.ts, appointments.view.ts,
-│   │                            # settings.view.ts, users.view.ts, availability.view.ts;
-│   │                            # detail.view.ts, the appointment's dialog that two views mount
+│   │                            # settings.view.ts, users.view.ts, availability.view.ts and
+│   │                            # date.view.ts (two views of one screen, with what they share
+│   │                            # in availability.parts.ts); detail.view.ts, the appointment's
+│   │                            # dialog that two views mount
 │   ├── tests/
 │   │   ├── unit/                # mirrors src/ (plus services/fixtures.ts, logic/zone.ts and
 │   │   │                        # logic/fixtures.ts, views/page.ts)
@@ -366,7 +369,16 @@ What exists:
   two forms, the two lists and the screen's three dialogs, which are in `index.html` inside
   the screen's element), and in `src/views/shell.ts` the fifth entry of the table of screens
   with the `AvailabilityTypesService` and the `AvailabilityRulesService` of each session. No
-  new script and no new dependency. The other views come with the following plan steps.
+  new script and no new dependency.
+- **A single date of the availability, since 2026-11-20** (`docs/FRONTEND_VIEW_PLAN.md`
+  step 68; date overrides and one-off windows): `src/logic/date.model.ts` and
+  `src/logic/date.screen.ts`, the screen's second logic object; `src/views/date.view.ts`,
+  the screen's second view, for its third part; `src/views/availability.parts.ts`, what the
+  screen's two views share (the look-up of a form, the choices of a list, the conflicts
+  list, and the one dialog that confirms). The same entry of the table of screens mounts
+  both views and starts both objects, and each session has a second `CalendarService` for
+  this part. No new script and no new dependency. Every screen of
+  `docs/FRONTEND_VIEW_PLAN.md` section 3 exists; its step 69 closes the plan.
 
 What still waits for the open points of `docs/FRONTEND_ARCHITECTURE.md` section 10: the hosting,
 so no `template.yaml` and no `deploy` script (the root scripts use `--if-present`, so their

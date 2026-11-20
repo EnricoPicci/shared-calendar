@@ -5,6 +5,7 @@ import type { Ask, AvailabilityState } from '../../../src/logic/availability.scr
 import { conflictList } from '../../../src/logic/conflicts';
 import type { DeletePatternState } from '../../../src/services/availability-rules.types';
 import type { RemoveTypeState } from '../../../src/services/availability-types.types';
+import { mountConfirm } from '../../../src/views/availability.parts';
 import { mountAvailability, type AvailabilityDeps } from '../../../src/views/availability.view';
 import { POOL, STUDIO } from '../logic/fixtures';
 import { find, loadPage, submit, useRealPage } from './page';
@@ -77,7 +78,10 @@ function mounted(first: AvailabilityState = listed(), removed: RemoveTypeState =
   };
   const types = { remove: vi.fn<AvailabilityDeps['types']['remove']>(), removeState$: removeState$.asObservable() };
   const rules = { deletePattern: vi.fn<AvailabilityDeps['rules']['deletePattern']>(), deletePatternState$: deletePatternState$.asObservable() };
-  const subscription = mountAvailability(find('#availability'), { screen, types, rules });
+  // The dialog that confirms is mounted by whoever shows the screen and ends with it.
+  const confirm = mountConfirm(find('#availability'));
+  const subscription = mountAvailability(find('#availability'), { screen, types, rules, confirm });
+  subscription.add(confirm.subscription);
   const writes = () => [screen.createType, screen.rename, screen.createPattern, screen.change, types.remove, rules.deletePattern].map((spy) => spy.mock.calls.length);
   return { availability$, removeState$, deletePatternState$, screen, types, rules, subscription, writes };
 }
@@ -732,10 +736,10 @@ describe('mountAvailability', () => {
       return made;
     };
 
-    it('"Delete" on a type opens it with the question about that type, "Keep" before "Delete", and no call', () => {
+    it('"Delete" on a type opens it with the question about that type, "Keep" before "Confirm", and no call', () => {
       const { writes } = aboutType();
       expect([dialog('delete').open, one('dialog.delete .question').textContent, one('dialog.delete .error').textContent, conflictsOf('dialog.delete')]).toEqual([true, TYPE_QUESTION, '', null]);
-      expect(all('dialog.delete button').map((button) => button.textContent)).toEqual(['Keep', 'Delete']);
+      expect(all('dialog.delete button').map((button) => button.textContent)).toEqual(['Keep', 'Confirm']);
       expect(writes()).toEqual([0, 0, 0, 0, 0, 0]);
     });
 
@@ -946,7 +950,8 @@ describe('mountAvailability', () => {
       expect(all('li, option, .groups section')).toHaveLength(0);
       for (const gone of ['Studio', 'Piscina', 'alice', 'bob', 'Sala nuova', 'Mon 23 Nov', 'appointments are in the way', 'Monday', TYPE_NAME_HINT, FAILURE, 'Delete the', STUDIO, POOL, P2]) expect(anywhere(gone), gone).toBe(false);
       const fields = [...find('#availability').querySelectorAll<HTMLInputElement | HTMLSelectElement>('input, select, textarea')];
-      expect([fields.length, fields.map((each) => each.value).join('')]).toEqual([14, '']);
+      // The 14 fields of this view's four forms, and the 7 of the part about a single date.
+      expect([fields.length, fields.map((each) => each.value).join('')]).toEqual([21, '']);
       expect(all('[aria-invalid], :disabled')).toHaveLength(0);
       // The page is the one index.html has.
       expect(html()).toBe(untouched);

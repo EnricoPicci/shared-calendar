@@ -2296,5 +2296,233 @@ describe('the navigation', () => {
       expect([find('#availability').hidden, drawn()]).toEqual([true, 0]);
       for (const gone of ['Piscina', 'Sala segreta', 'Mon 23 Nov']) expect(anywhere(gone), gone).toBe(false);
     });
+
+    describe('a single date, the screen\'s third part', () => {
+      const DATE = '2026-11-23'; // a Monday: the first of the two patterns gives it 09:00 to 13:00 of Studio
+      const W1 = '01M6W1ND0W0000000000000001';
+      const DAY_URL = `/calendar?from=${DATE}&to=${DATE}`;
+      const GET_DAY = `GET ${DAY_URL}`;
+      // An hour of that Monday on Rome's clock, as an instant.
+      const hour = (local: number) => `${DATE}T${String(local - 1).padStart(2, '0')}:00:00.000Z`;
+      const seen = (start: number, end: number, typeId: string, typeName: string, source: string, sourceId: string) => ({ start: hour(start), end: hour(end), typeId, typeName, source, sourceId });
+      const BY_PATTERN = seen(9, 13, STUDIO, 'Studio', 'pattern', P1);
+      const EXTRA = seen(18, 20, POOL, 'Piscina', 'one_off', W1);
+      const dayOf = (windows: object[] = [BY_PATTERN], hasOverride = false) =>
+        json(200, { timeZone: 'Europe/Rome', from: DATE, to: DATE, generatedAt: '2026-11-19T10:00:00.000Z', days: [{ date: DATE, weekday: 1, windows, slots: [], busy: [], hasOverride }], appointments: [] });
+      const part = <T extends HTMLElement = HTMLElement>(selector: string) => one<T>(`.one-date ${selector}`);
+      const lines = (list: string) => all(`.one-date .${list} > li`).map((item) => `${item.querySelector('.time')!.textContent} ${item.querySelector('.type-name')!.textContent}`);
+      const which = (sentence: string) => vi.waitFor(() => expect(part('.which').textContent).toBe(sentence));
+      const APPLY = 'The weekly patterns apply on this day.';
+      const OWN = 'This day has its own windows, in the place of the weekly patterns.';
+      const CLOSED = 'This day is not available: the weekly patterns do not apply.';
+      const confirmIt = () => one<HTMLButtonElement>('dialog.delete .submit').click();
+      // The Administrator on the availability, with the Monday shown as `first` answers it.
+      const onDate = async (first: Response = dayOf()) => {
+        const made = await onAvailability();
+        field('.one-date form.choose', 'date').value = DATE;
+        fetchMock.mockResolvedValueOnce(first);
+        submit(part<HTMLFormElement>('form.choose'));
+        await vi.waitFor(() => expect(part('.date-words').textContent).toBe('Monday 23 November 2026'));
+        return made;
+      };
+      // "This day only" on that Monday, with one window added after the pattern's.
+      const drafting = async () => {
+        const made = await onDate();
+        part('.edit').click();
+        set('.one-date form.add-draft', { start: '14:00', end: '16:00', typeId: POOL });
+        submit(part<HTMLFormElement>('form.add-draft'));
+        expect(lines('draft-rows')).toEqual(['09:00 – 13:00 Studio', '14:00 – 16:00 Piscina']);
+        return made;
+      };
+
+      it('#/availability makes its three requests and no fourth: the date field is on today, the calendar\'s, and nothing of a day is shown', async () => {
+        await onAvailability();
+        expect(sent()).toEqual(READS);
+        expect([field('.one-date form.choose', 'date').value, part('.shown').hidden, part('.loading').hidden]).toEqual(['2026-11-19', true, true]);
+        expect([...field('.one-date form.add-window', 'typeId').querySelectorAll('option')].map((option) => option.textContent)).toEqual(['Piscina', 'Studio']);
+      });
+
+      it('a date shown asks GET /calendar for that date alone, with the person\'s token; the week, shown afterwards, loads its own week once, through its own service', async () => {
+        await onDate();
+        expect(sent()).toEqual([...READS, GET_DAY]);
+        expect(apiCalls().at(-1)).toEqual([`http://api.test${DAY_URL}`, BEARER]);
+        expect([lines('given-rows'), part('.which').textContent, lines('own-rows'), part('.extras .none').textContent]).toEqual([['09:00 – 13:00 Studio'], APPLY, [], 'This day has no extra windows.']);
+
+        fetchMock.mockResolvedValueOnce(json(200, adminWeek()));
+        links()[0]!.click();
+        await weekDrawn();
+        expect(sent()).toEqual([...READS, GET_DAY, 'GET /calendar?from=2026-11-16&to=2026-11-22']);
+      });
+
+      it('a date before today is refused under the field with no request, and nothing is shown for it', async () => {
+        await onAvailability();
+        field('.one-date form.choose', 'date').value = '2026-11-18';
+        submit(part<HTMLFormElement>('form.choose'));
+        expect([part('form.choose .refusal').textContent, part('.shown').hidden, sent()]).toEqual(['A date before today cannot be changed. The week shows what a past day had.', true, READS]);
+      });
+
+      it('while the settings could not be read, "Show" is refused with that failure and no request; after "Try again" it goes', async () => {
+        at('#/availability');
+        fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(typesOf()).mockResolvedValueOnce(patternsOf());
+        mounted(ADMIN);
+        await typesListed('Piscina', 'Studio');
+        await quiet();
+        field('.one-date form.choose', 'date').value = DATE;
+        submit(part<HTMLFormElement>('form.choose'));
+        expect([part('form.choose .refusal').textContent, sent()]).toEqual(['The server cannot be reached. Check the connection and try again.', READS]);
+
+        fetchMock.mockResolvedValueOnce(settings()).mockResolvedValueOnce(patternsOf());
+        one('.patterns .retry').click();
+        await patternsListed(MONDAY, TUESDAY);
+        expect([part('form.choose .refusal').textContent, field('.one-date form.choose', 'date').value]).toEqual(['', '2026-11-19']);
+        field('.one-date form.choose', 'date').value = DATE;
+        fetchMock.mockResolvedValueOnce(dayOf());
+        submit(part<HTMLFormElement>('form.choose'));
+        await which(APPLY);
+      });
+
+      it('a draft saved: nothing is sent before "Save this day"; then one PUT with the whole list, and the day read again', async () => {
+        await drafting();
+        expect(sent()).toEqual([...READS, GET_DAY]);
+        const own = [seen(9, 13, STUDIO, 'Studio', 'override', DATE), seen(14, 16, POOL, 'Piscina', 'override', DATE)];
+        fetchMock.mockResolvedValueOnce(json(200, { date: DATE, windows: [], updatedAt: STAMPS.updatedAt })).mockResolvedValueOnce(dayOf(own, true));
+        part('.save').click();
+        await which(OWN);
+        expect(sent().slice(4)).toEqual([`PUT /calendar/overrides/${DATE}`, GET_DAY]);
+        expect(bodyOf(4)).toEqual({ windows: [{ start: '09:00', end: '13:00', typeId: STUDIO }, { start: '14:00', end: '16:00', typeId: POOL }] });
+        expect([part('.draft').hidden, lines('own-rows'), lines('given-rows'), part('.back').hidden]).toEqual([true, ['09:00 – 13:00 Studio', '14:00 – 16:00 Piscina'], ['09:00 – 13:00 Studio'], false]);
+      });
+
+      it('a save refused with 409 availability_conflict: the sentence and the appointment in the way, in the calendar\'s zone, under the windows, which stay; the day is read again', async () => {
+        await drafting();
+        fetchMock.mockResolvedValueOnce(json(409, conflict)).mockResolvedValueOnce(dayOf());
+        part('.save').click();
+        await vi.waitFor(() => expect(all('.one-date .draft .conflicts-list li')).toHaveLength(1));
+        expect(part('.save-failure').textContent).toBe('This would leave booked appointments outside the hours open for booking. Cancel or move them in the week first.');
+        expect([...all('.one-date .draft .conflicts-list li')[0]!.children].map((each) => each.textContent)).toEqual(['Mon 23 Nov', '09:00–10:00', 'alice']);
+        await vi.waitFor(() => expect(sent().slice(4)).toEqual([`PUT /calendar/overrides/${DATE}`, GET_DAY]));
+        expect([part('.draft').hidden, lines('draft-rows').length]).toEqual([false, 2]);
+        // The server's own words never reach the page.
+        expect(anywhere('would fall outside')).toBe(false);
+      });
+
+      it('date_in_past from the server (a page left open over midnight) is said in plain words, and the draft stays', async () => {
+        await drafting();
+        fetchMock.mockResolvedValueOnce(json(409, { error: 'date_in_past', message: 'the date is before today' })).mockResolvedValueOnce(dayOf());
+        part('.save').click();
+        await vi.waitFor(() => expect(part('.save-failure').textContent).toBe('This date is now in the past, so it can no longer be changed.'));
+        expect([lines('draft-rows').length, anywhere('the date is before today')]).toEqual([2, false]);
+      });
+
+      it('"not available": the dialog asks; confirmed, one PUT with no window, then the read; the day says it is not available', async () => {
+        await onDate();
+        part('.make-closed').click();
+        expect([dialog('delete').open, one('dialog.delete h3').textContent, one('dialog.delete .question').textContent.startsWith('Make Monday 23 November 2026 not available?'), sent().length]).toEqual([true, 'Please confirm', true, 4]);
+        fetchMock.mockResolvedValueOnce(json(200, { date: DATE, windows: [], updatedAt: STAMPS.updatedAt })).mockResolvedValueOnce(dayOf([], true));
+        confirmIt();
+        await which(CLOSED);
+        expect([dialog('delete').open, sent().slice(4), bodyOf(4)]).toEqual([false, [`PUT /calendar/overrides/${DATE}`, GET_DAY], { windows: [] }]);
+      });
+
+      it('back to the weekly patterns: the dialog asks; confirmed, the DELETE, then the read; the day says the patterns apply', async () => {
+        await onDate(dayOf([], true));
+        part('.back').click();
+        expect(one('dialog.delete .question').textContent.startsWith('Back to the weekly patterns for Monday 23 November 2026?')).toBe(true);
+        fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 })).mockResolvedValueOnce(dayOf());
+        confirmIt();
+        await which(APPLY);
+        expect([dialog('delete').open, sent().slice(4), part('.back').hidden]).toEqual([false, [`DELETE /calendar/overrides/${DATE}`, GET_DAY], true]);
+      });
+
+      it('an extra window created and deleted: the POST with the date on show, then the read; the DELETE by its id after the dialog, then the read', async () => {
+        await onDate();
+        set('.one-date form.add-window', { start: '18:00', end: '20:00', typeId: POOL });
+        fetchMock.mockResolvedValueOnce(json(201, { windowId: W1, date: DATE, start: '18:00', end: '20:00', typeId: POOL, createdAt: STAMPS.createdAt })).mockResolvedValueOnce(dayOf([BY_PATTERN, EXTRA]));
+        submit(part<HTMLFormElement>('form.add-window'));
+        await vi.waitFor(() => expect(lines('extra-rows')).toEqual(['18:00 – 20:00 Piscina']));
+        expect([sent().slice(4), bodyOf(4)]).toEqual([['POST /calendar/windows', GET_DAY], { date: DATE, start: '18:00', end: '20:00', typeId: POOL }]);
+        // The form is back on its starting values.
+        expect([field('.one-date form.add-window', 'start').value, field('.one-date form.add-window', 'typeId').value]).toEqual(['09:00', '']);
+
+        part('.extra-rows .ask-delete').click();
+        expect(one('dialog.delete .question').textContent.startsWith('Delete the extra window 18:00 – 20:00 Piscina of Monday 23 November 2026?')).toBe(true);
+        fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 })).mockResolvedValueOnce(dayOf());
+        confirmIt();
+        await vi.waitFor(() => expect(lines('extra-rows')).toEqual([]));
+        expect([dialog('delete').open, sent().slice(6)]).toEqual([false, [`DELETE /calendar/windows/${W1}`, GET_DAY]]);
+      });
+
+      it('a pattern deleted in the screen\'s second part while a date is on show: the patterns and the day are both read again, and the day\'s two descriptions follow', async () => {
+        await onDate();
+        one('.patterns .groups section:nth-child(1) .ask-delete').click();
+        fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 })).mockResolvedValueOnce(patternsOf([PATTERNS[1]!])).mockResolvedValueOnce(dayOf([]));
+        confirmIt();
+        await patternsListed(TUESDAY);
+        await vi.waitFor(() => expect(part('.given .none').textContent).toBe('The weekly patterns give no hours on this day.'));
+        expect(sent().slice(4)).toEqual([`DELETE /calendar/patterns/${P1}`, 'GET /calendar/patterns', GET_DAY]);
+        expect([lines('given-rows'), part('.which').textContent]).toEqual([[], APPLY]);
+      });
+
+      it('the tab shown again with a draft open: the two lists and the day are read again, and the draft keeps its windows', async () => {
+        await drafting();
+        fetchMock.mockResolvedValueOnce(typesOf()).mockResolvedValueOnce(patternsOf()).mockResolvedValueOnce(dayOf([BY_PATTERN, EXTRA]));
+        becomesVisible();
+        await vi.waitFor(() => expect(lines('extra-rows')).toEqual(['18:00 – 20:00 Piscina']));
+        expect(sent().slice(4)).toEqual(['GET /calendar/types', 'GET /calendar/patterns', GET_DAY]);
+        expect(lines('draft-rows')).toEqual(['09:00 – 13:00 Studio', '14:00 – 16:00 Piscina']);
+      });
+
+      it('availability, week, availability: nothing left over or doubled, the draft gone, no date shown and no request for one', async () => {
+        await drafting();
+        fetchMock.mockResolvedValueOnce(json(200, adminWeek()));
+        links()[0]!.click();
+        await weekDrawn();
+        expect([find('#availability').hidden, drawn(), field('.one-date form.choose', 'date').value]).toEqual([true, 0, '']);
+        for (const gone of ['Piscina', 'Monday 23 November']) expect(anywhere(gone), gone).toBe(false);
+
+        fetchMock.mockResolvedValueOnce(settings()).mockResolvedValueOnce(typesOf()).mockResolvedValueOnce(patternsOf());
+        links()[3]!.click();
+        await patternsListed(MONDAY, TUESDAY);
+        await quiet();
+        expect(sent()).toEqual([...READS, GET_DAY, 'GET /calendar?from=2026-11-16&to=2026-11-22', ...READS]);
+        expect([part('.shown').hidden, part('.draft').hidden, lines('draft-rows'), field('.one-date form.choose', 'date').value]).toEqual([true, true, [], '2026-11-19']);
+        expect([field('.one-date form.add-draft', 'start').querySelectorAll('option').length, field('.one-date form.add-window', 'typeId').querySelectorAll('option').length]).toEqual([96, 2]);
+      });
+
+      it('signing out with a draft open and a conflicts list on show leaves nothing: the page as before anyone signed in; a User then asks for none of the routes of a date', async () => {
+        at('#/availability');
+        const { store, signOut } = mounted();
+        const before = html(); // the page at the login, before anyone signed in
+        fetchMock.mockResolvedValueOnce(settings()).mockResolvedValueOnce(typesOf()).mockResolvedValueOnce(patternsOf());
+        store.set(ADMIN);
+        await patternsListed(MONDAY, TUESDAY);
+        await quiet();
+        field('.one-date form.choose', 'date').value = DATE;
+        fetchMock.mockResolvedValueOnce(dayOf([BY_PATTERN, EXTRA]));
+        submit(part<HTMLFormElement>('form.choose'));
+        await which(APPLY);
+        part('.edit').click();
+        fetchMock.mockResolvedValueOnce(json(409, conflict)).mockResolvedValueOnce(dayOf([BY_PATTERN, EXTRA]));
+        part('.save').click();
+        await vi.waitFor(() => expect(all('.one-date .draft .conflicts-list li')).toHaveLength(1));
+        await vi.waitFor(() => expect(part('.loading').hidden).toBe(true));
+        part('.extra-rows .ask-delete').click();
+        expect([part('.draft').hidden, dialog('delete').open, anywhere('alice'), anywhere('Monday 23 November 2026')]).toEqual([false, true, true, true]);
+
+        signOut.click();
+        expect(dialog('delete').open).toBe(false);
+        for (const gone of ['Piscina', 'Studio', 'alice', 'Mon 23 Nov', 'Monday 23 November', 'admin', STUDIO, POOL, W1, DATE, '2026-11-19']) expect(anywhere(gone), gone).toBe(false);
+        expect(fields().every((value) => value === '')).toBe(true);
+        expect(html()).toBe(before);
+
+        const asked = apiCalls().length;
+        fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
+        store.set(ALICE);
+        await weekDrawn();
+        expect(apiCalls().slice(asked)).toEqual([[WEEK_URL, 'Bearer access-token-alice']]);
+        expect(sent().filter((request) => request.includes('/overrides') || request.includes('/windows'))).toEqual([`PUT /calendar/overrides/${DATE}`]);
+        expect([find('#availability').hidden, drawn()]).toEqual([true, 0]);
+      });
+    });
   });
 });

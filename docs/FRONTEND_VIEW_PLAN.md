@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v8 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`). Step 62 done on 2026-11-19 (brief `prompts/85-step-62-implementation.md`). Step 63 done on 2026-11-19 (brief `prompts/86-step-63-implementation.md`). Step 64 done on 2026-11-19 (brief `prompts/87-step-64-implementation.md`). Step 65 done on 2026-11-19 (brief `prompts/88-step-65-implementation.md`). Step 66 done on 2026-11-20 (brief `prompts/89-step-66-implementation.md`). Step 67 done on 2026-11-20 (brief `prompts/90-step-67-implementation.md`), waiting for review; next step 68 |
+| Status | v9 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`). Step 62 done on 2026-11-19 (brief `prompts/85-step-62-implementation.md`). Step 63 done on 2026-11-19 (brief `prompts/86-step-63-implementation.md`). Step 64 done on 2026-11-19 (brief `prompts/87-step-64-implementation.md`). Step 65 done on 2026-11-19 (brief `prompts/88-step-65-implementation.md`). Step 66 done on 2026-11-20 (brief `prompts/89-step-66-implementation.md`). Step 67 done on 2026-11-20 (brief `prompts/90-step-67-implementation.md`). Step 68 done on 2026-11-20 (brief `prompts/91-step-68-implementation.md`), waiting for review: **every screen of section 3 exists**; next step 69, the closing |
 | Scope | Everything needed to go from the services layer that exists to **all the views written, tested and running in a browser against the local stack**: the tooling, the shell, the logic layer and one view per screen. Steps 60 to 69 |
 | Not in scope | Hosting, the CORS configuration, the Content-Security-Policy of the hosting, logout as a designed service, the session across a reload, the cloud deployment of the front end. They are the open points O1, O2, O3, O5 and O7 of `docs/FRONTEND_ARCHITECTURE.md` section 10 and get their own plan |
 | Governed by | `docs/FRONTEND_ARCHITECTURE.md` (the rules of the view layer), `docs/FRONTEND_SERVICES.md` (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/ARCHITECTURE.md` section 4 (the API). On any conflict with this plan, they win |
@@ -19,6 +19,7 @@
 | v6 | 2026-11-19 | Step 65: four choices about the settings screen were made with the Product Owner before the step's implementation (brief `prompts/88-step-65-implementation.md`), and the step's text says them: "No limit" as a checkbox, what the form shows beside its fields, unsaved values lost with no question, and what follows a save. The step also carries two wordings decided at the reviews of steps 63 and 64 (the labels "Start" and "End" of the book dialog; a sentence of its own for the limit met by a change), and records that the history of "My appointments" keeps its default period. |
 | v7 | 2026-11-20 | Step 66: four choices about the users screen were made with the Product Owner before the step's implementation (brief `prompts/89-step-66-implementation.md`), and the step's text says them: no "Copy" button, the password dialog closed by its button only, a confirmation with two buttons before a delete, and a row with the username only. The step's text also says where the generated password is and is not, and its browser check is brought in line. |
 | v8 | 2026-11-20 | Step 67: four choices about the availability screen were made with the Product Owner before the step's implementation (brief `prompts/90-step-67-implementation.md`), and the step's text says them: creating is a fixed form and changing is a dialog; every pattern is listed, an ended one marked; "Change" is one call; a pattern's start and end are two lists on the 15-minute grid. The step's text also says what the screen reads, where a refusal is shown, and the conflicts list's three places, and its browser check is brought in line. The status line no longer says that step 66 waits for review. |
+| v9 | 2026-11-20 | Step 68: nine choices about the screen were made with the Product Owner before the step's implementation (brief `prompts/91-step-68-implementation.md`), and the step's text says them in the place of "to settle first": the date is chosen on the availability screen; "this day only" is a list put together and saved in one go; "not available" is a button of its own that asks first; an extra window is created and deleted, not edited; a past date is refused; two windows of the list that overlap are refused at "Add"; "Show" is refused while the list is open; the dialog that confirms has neutral words; the logic of the part is a second object. Its browser check is brought in line. Section 8, decision 10 says so. The status line no longer says that step 67 waits for review. |
 
 ---
 
@@ -515,20 +516,64 @@ keyboard only. Everything the check created is removed at its end.
 **Goal:** the Administrator changes single dates: "this day only…", "not available", and extra
 windows.
 
-To settle first and to propose for approval: where a date is chosen. The proposed direction: a
-date field on the availability screen that shows that day as the patterns give it and as it is
-now, with the actions on it; no new address.
+**Nine choices about the screen**, made with the Product Owner before any code (brief
+`prompts/91-step-68-implementation.md`; the reasons are in `docs/FRONTEND_ARCHITECTURE.md`
+section 11, decisions 109 to 117):
 
-Logic: a date's defined and effective windows from `shared/`'s rules; an override's body
-("not available" is an override with no window); a one-off window's body; a past date refused
-before sending.
+- **The date is chosen on the availability screen**: a third part, "A single date", with a
+  native date field and "Show", and under it that day as the weekly patterns give it and as
+  it is now, with the actions on it. No new address and no new link.
+- **"This day only" is put together, then saved in one go.** The button starts a list that
+  holds the windows the day has by itself (its own, or the weekly patterns'). A row has
+  "Remove" and nothing else; a fixed form, "Start", "End", "Type" and "Add", adds a window.
+  Nothing is sent until "Save this day": one request with the whole list. "Discard" drops
+  it. No row has a field.
+- **"Not available on this day" is a button of its own**, which asks first and then sends
+  the day's own windows as none. The extra windows of the day stay, and the question says so.
+- **An extra window is created and deleted, not edited.**
+- **A date before today, the calendar's, is refused** under the date field; nothing is read
+  for it. While the calendar's time zone could not be read "Show" is refused with the
+  failure of that read.
+- **Two windows of the list that overlap are refused by the page, at "Add"**; windows that
+  touch are accepted. An overlap with an extra window of the day is the server's to say.
+- **While the list is open, "Show" is refused**; leaving the screen and signing out drop
+  the list with no question.
+- **The dialog that confirms has neutral words** for everything it confirms, step 67's two
+  deletions included: "Please confirm", "Keep", "Confirm". The question says what will happen.
+- **The logic of the part is a second object**, with its own stream; the availability
+  screen's object hands it what it knows (the types, the patterns, the time zone).
 
-View: on the availability screen, the per-date editor and the one-off windows of the date, with
-the conflicts list of step 67.
+Logic: the date checked before any call, in the calendar's zone; the day as the weekly
+patterns give it, from `shared/`'s `definedWindows`, and as it is now, from the calendar view
+of that one date; the windows of "this day only" with their checks (the fields, an overlap
+among themselves, the limit of 10) and their body ("not available" is the same body with no
+window); an extra window's body; the three questions; the second logic object (what it is
+handed, the read of a date and its new tries, the five writes, the date read again after
+every write to a date, to a type or to a pattern and when the tab becomes visible).
 
-**Browser check:** set "this day only" windows and see them in the week; set "not available";
-remove the override and the patterns are back; add and delete a one-off window; a past date is
-refused; an override that would leave an appointment uncovered is refused with its conflicts.
+View: `date.view.ts`, mounted beside `availability.view.ts` on the same screen: the date's
+form, the day's two descriptions, the windows being put together, the extra windows, and the
+conflicts list of step 67 under a refused save and in the dialog that confirms. What the two
+views share (the look-up of a form, the choices, the conflicts list, the dialog) is one file,
+`availability.parts.ts`.
+
+Shell: the same entry, which mounts both views and starts both objects; a second
+`CalendarService` per session, for this part.
+
+**Browser check:** the part with its date field on today and no request; a date shown with
+one request, both descriptions the same; an empty date and a past one refused with no
+request; "this day only" put together (a remove, two adds, the refusals under the fields)
+and saved with one request, then seen in the week, the next week unchanged; edited again
+and discarded; an overlap refused at "Add" and one with an extra window by the server;
+"not available" after the dialog, and no window that day in the week; back to the weekly
+patterns; an extra window added, seen in the week, and one that overlaps refused; with an
+appointment on the day, a save, "not available", the way back and an extra window's
+deletion each refused with the appointment listed, and going through once it is cancelled;
+a write that cannot reach the server said where it was asked, and the same button working
+again; a pattern changed while the date is on show; the tab shown again with the list open;
+"Show" refused while the list is open; signing out with the list and a conflicts list on
+show leaves nothing for the next person, whose page asks for none of these routes; a phone
+width; everything by keyboard only. Everything the check created is removed at its end.
 
 **Acceptance:** the common check. Checkpoint: every screen of section 3 exists.
 
@@ -601,5 +646,5 @@ step 68 (everything the Administrator does), after step 69.
 | 7 | No screen for Hello World | Not among the screens of `docs/SHARED_CALENDAR_SPEC.md` section 16.8; the route proves the back end's chain, which the calendar's screens also exercise |
 | 8 | A local seed for the calendar is part of step 61 | A week needs availability to show; the local table starts empty and the back end's journeys empty it |
 | 9 | "Sign out" clears the session store only, and a reload signs out | Open points O7 and O3 of `docs/FRONTEND_ARCHITECTURE.md` section 10, outside this plan |
-| 10 | The interactions for "change" (step 63) and for a date's override (step 68) are proposed in their step and approved before code. Step 63's was decided with the Product Owner on 2026-11-19 and is written in the step | They are choices about the screens that no document has made yet |
+| 10 | The interactions for "change" (step 63) and for a date's override (step 68) are proposed in their step and approved before code. Step 63's was decided with the Product Owner on 2026-11-19 and is written in the step; step 68's, nine choices, on 2026-11-20, written in the step too | They are choices about the screens that no document has made yet |
 | 11 | The week is loaded again when the tab becomes visible (step 62); nothing is pushed by the server and nothing is asked on a timer | The API is request and answer only. A reload on coming back to the tab shows other people's bookings at the moment someone looks, with no change to the back end and no call while nobody is looking. Real-time updates over a WebSocket need a second API, a table of connections and a stand-in for the local stack: a feature with its own specification, not a step of this plan |

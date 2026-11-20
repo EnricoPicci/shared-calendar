@@ -96,6 +96,11 @@ export function patternFields(pattern: PatternBody): PatternFields {
 
 const isDate = (text: string) => LocalDate.safeParse(text).success;
 
+// The two refusals of a window's fields, which a pattern, a window of one date's own and an
+// extra window share: each starts with the words of its field's label.
+export const END_NOT_LATER = 'End must be later than Start.';
+export const TYPE_NOT_CHOSEN = 'Type must be chosen.';
+
 // From what the form holds to the body of a create or of a change, or to the refusals: one
 // sentence per field in fault, each naming its field in the words of its label, and every
 // field in fault said. The weekday and the two times come from lists that hold nothing wrong;
@@ -104,8 +109,8 @@ const isDate = (text: string) => LocalDate.safeParse(text).success;
 export function patternFor(fields: PatternFields): { pattern: PatternBody } | { refusals: Partial<Record<PatternField, string>> } {
   const refusals: Partial<Record<PatternField, string>> = {};
   // Two times of one day, written alike: the later one is the greater text, "24:00" included.
-  if (fields.end <= fields.start) refusals.end = 'End must be later than Start.';
-  if (fields.typeId === '') refusals.typeId = 'Type must be chosen.';
+  if (fields.end <= fields.start) refusals.end = END_NOT_LATER;
+  if (fields.typeId === '') refusals.typeId = TYPE_NOT_CHOSEN;
   if (!isDate(fields.validFrom)) refusals.validFrom = 'Valid from must be a date.';
   if (fields.validUntil !== '') {
     if (!isDate(fields.validUntil)) refusals.validUntil = 'Valid until must be a date, or left empty.';

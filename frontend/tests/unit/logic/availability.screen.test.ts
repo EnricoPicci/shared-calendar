@@ -1,7 +1,7 @@
 import type { AppointmentConflict, AvailabilityType, CalendarSettings, WeeklyPattern } from '@shared-calendar/shared';
 import { ReplaySubject, Subject } from 'rxjs';
 import { NO_PATTERNS, NO_TYPE_YET, NO_TYPES, startingFields, TYPE_NAME_HINT, type PatternFields } from '../../../src/logic/availability.model';
-import { AvailabilityScreen, type Ask, type AvailabilityRules, type AvailabilityState, type AvailabilityTypes } from '../../../src/logic/availability.screen';
+import { AvailabilityScreen, type Ask, type AvailabilityRules, type AvailabilityState, type AvailabilityTypes, type Known } from '../../../src/logic/availability.screen';
 import type { CreatePatternResult, DeletePatternResult, PatternsResult, UpdatePatternResult } from '../../../src/services/availability-rules.types';
 import type { CreateTypeResult, RemoveTypeResult, RenameTypeResult, TypesResult } from '../../../src/services/availability-types.types';
 import type { SettingsResult } from '../../../src/services/calendar-settings.types';
@@ -855,6 +855,59 @@ describe('AvailabilityScreen', () => {
       expect(last().typeCreate).toEqual(QUIET);
       screen.createType('Altra');
       expect(types.create.mock.calls).toEqual([['Sala'], ['Altra']]);
+    });
+  });
+
+  describe('known$: what the part of a single date is handed', () => {
+    const knownOf = () => {
+      const made = screenOf();
+      const known: Known[] = [];
+      made.screen.known$.subscribe((k) => known.push(k));
+      return { ...made, known, lastKnown: () => known.at(-1)! };
+    };
+    const NOTHING_KNOWN = { zone: null, zoneWhy: null, types: null, patterns: null };
+
+    it('before start() and while the three reads are under way, nothing is known and no reason is given', () => {
+      const { screen, known } = knownOf();
+      expect(known).toEqual([NOTHING_KNOWN]);
+      screen.start();
+      expect(known).toEqual([NOTHING_KNOWN]);
+    });
+
+    it('it notifies after every read that was answered, with what is known by then', () => {
+      const { screen, zoned, typed, patterned, known, lastKnown } = knownOf();
+      screen.start();
+      typed(STUDIO_TYPE);
+      expect(lastKnown()).toEqual({ ...NOTHING_KNOWN, types: [STUDIO_TYPE] });
+      zoned();
+      expect(lastKnown()).toEqual({ zone: 'Europe/Rome', zoneWhy: null, types: [STUDIO_TYPE], patterns: null });
+      patterned(MONDAY);
+      expect(lastKnown()).toEqual({ zone: 'Europe/Rome', zoneWhy: null, types: [STUDIO_TYPE], patterns: [MONDAY] });
+      expect(known).toHaveLength(4);
+    });
+
+    it('settings that could not be read: no zone, and why, in plain words; a new try that succeeds brings the zone and takes the reason away', () => {
+      const { screen, results, zoned, lastKnown } = knownOf();
+      screen.start();
+      results.settings.next(failure('network'));
+      expect(lastKnown()).toEqual({ ...NOTHING_KNOWN, zoneWhy: UNREACHABLE });
+      screen.retryPatterns();
+      zoned();
+      expect([lastKnown().zone, lastKnown().zoneWhy]).toEqual(['Europe/Rome', null]);
+    });
+
+    it('a read of the types that fails keeps the types as last read; a read of the patterns that fails takes the patterns away', () => {
+      const { shown, results, lastKnown } = knownOf();
+      shown();
+      results.types.next(failure('network'));
+      results.patterns.next(failure('network'));
+      expect([lastKnown().types, lastKnown().patterns]).toEqual([[POOL_TYPE, STUDIO_TYPE], null]);
+    });
+
+    it('the end of the subscription says that nothing is known any more', () => {
+      const { shown, lastKnown } = knownOf();
+      shown().unsubscribe();
+      expect(lastKnown()).toEqual(NOTHING_KNOWN);
     });
   });
 

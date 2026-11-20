@@ -73,6 +73,13 @@ export type AvailabilityState = {
   change: Ask<PatternField>;
 };
 
+// What the screen knows that the part of a single date needs too (the DateScreen): the
+// calendar's time zone, null until the settings are read, with why they could not be read,
+// null while they are being read; the types as last read, for their names and for the choices
+// of a list; the patterns as last read, null after a read that failed.
+export type Known = { zone: string | null; zoneWhy: string | null; types: readonly AvailabilityType[] | null; patterns: readonly WeeklyPattern[] | null };
+const NOT_KNOWN: Known = { zone: null, zoneWhy: null, types: null, patterns: null };
+
 // What the screen uses of the three services: the reads, the four writes it checks, and the
 // results of every write. The two deletes themselves are called by the view, from its dialog.
 export type AvailabilitySettings = Pick<CalendarSettingsService, 'load' | 'settingsResult$'>;
@@ -86,7 +93,7 @@ export type AvailabilityRules = Pick<
 type Outcome = { status: 'success' } | { status: 'failure'; reason: string; conflicts?: AppointmentConflict[] };
 type Read = 'settings' | 'types' | 'patterns';
 
-const QUIET: Ask<never> = { about: '', busy: false, refusals: {}, failure: null, conflicts: null, done: false };
+export const QUIET: Ask<never> = { about: '', busy: false, refusals: {}, failure: null, conflicts: null, done: false };
 const NOTHING: AvailabilityState = {
   loading: false,
   typesUnread: null,
@@ -107,7 +114,7 @@ const NOTHING: AvailabilityState = {
 
 // What was read again when it is what is on show keeps the object on show, so that the view
 // redraws nothing and the keyboard stays where it is. Rows and choices are plain data.
-const kept = <T>(shown: T, read: T): T => (JSON.stringify(shown) === JSON.stringify(read) ? shown : read);
+export const kept = <T>(shown: T, read: T): T => (JSON.stringify(shown) === JSON.stringify(read) ? shown : read);
 
 export class AvailabilityScreen {
   private started = false;
@@ -124,6 +131,10 @@ export class AvailabilityScreen {
   private patternsWhy: string | null = null;
   private readonly state = new BehaviorSubject<AvailabilityState>(NOTHING);
   readonly availability$: Observable<AvailabilityState> = this.state.asObservable();
+  // What is known, for the part of a single date: notified after every read that was
+  // answered, and with nothing known when the subscription of start() ends.
+  private readonly knownSubject = new BehaviorSubject<Known>(NOT_KNOWN);
+  readonly known$: Observable<Known> = this.knownSubject.asObservable();
 
   // `now` gives the present moment, for "today"; `visible$` notifies each time the page
   // becomes visible again: nothing here reads the clock or the document by itself
@@ -205,6 +216,7 @@ export class AvailabilityScreen {
       this.zone = this.zoneWhy = this.typesWhy = this.patternsWhy = null;
       this.listed = this.known = this.patterns = null;
       this.state.next(NOTHING);
+      this.knownSubject.next(NOT_KNOWN);
     });
     live = true;
     this.started = true;
@@ -320,6 +332,7 @@ export class AvailabilityScreen {
   // rename changes them with no read of the patterns.
   private haveRead(what: Read, more: Partial<AvailabilityState> = {}): void {
     this.reading.delete(what);
+    this.knownSubject.next({ zone: this.zone, zoneWhy: this.zoneWhy, types: this.known, patterns: this.patterns });
     const shown = this.state.getValue();
     const today = this.today();
     const types = this.listed === null ? null : kept(shown.types, typeRows(this.listed));

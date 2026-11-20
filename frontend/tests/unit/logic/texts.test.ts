@@ -268,5 +268,35 @@ describe('texts', () => {
       ];
       for (const attempt of ['type', 'pattern'] as const) for (const reason of others) expect(failureText(reason, attempt), `${attempt} ${reason}`).toBe(failureText(reason));
     });
+
+    it('limit_reached after an extra window says how many a day holds, with the number of shared/', () => {
+      expect(failureText('limit_reached', 'window')).toBe(`A day can hold ${CALENDAR_LIMITS.oneOffWindowsPerDate} extra windows at most. Delete one to add another.`);
+      expect(failureText('limit_reached', 'window')).toContain(' 10 extra windows ');
+    });
+
+    it('availability_overlap after the way back to the weekly patterns says what overlaps what; everywhere else it says to choose other hours', () => {
+      expect(failureText('availability_overlap', 'patterns-back')).toBe('The hours the weekly patterns give this day overlap one of its extra windows. Delete that extra window first.');
+      for (const attempt of [undefined, 'window', 'pattern'] as const) expect(failureText('availability_overlap', attempt), attempt).toBe('Another window of the same day covers part of these hours, whatever its type. Choose other hours.');
+    });
+
+    it('every other reason has the same sentence whether an extra window was being added or the weekly patterns brought back', () => {
+      const others = ['network', 'server', 'forbidden', 'invalid_request', 'internal_error', 'concurrent_update', 'date_in_past', 'override_not_found', 'window_not_found', 'type_not_found', 'availability_conflict', '', 'constructor'];
+      for (const reason of others) {
+        expect(failureText(reason, 'window'), reason).toBe(failureText(reason));
+        expect(failureText(reason, 'patterns-back'), reason).toBe(failureText(reason));
+      }
+      expect(failureText('limit_reached', 'patterns-back')).toBe(failureText('limit_reached'));
+    });
+  });
+
+  describe('failureText, a single date', () => {
+    it.each([
+      ['date_in_past', 'This date is now in the past, so it can no longer be changed.'],
+      ['override_not_found', 'This day no longer has windows of its own: the weekly patterns apply.'],
+      ['window_not_found', 'This extra window no longer exists.'],
+    ])('%s has a sentence of its own, not the general one', (reason, sentence) => {
+      expect(failureText(reason)).toBe(sentence);
+      expect(failureText(reason)).not.toBe(failureText('no such reason'));
+    });
   });
 });
