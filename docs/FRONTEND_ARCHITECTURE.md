@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v11 — **implemented** (2026-11-20). Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback as a proposal, are in sections 7.1 and 7.2 |
+| Status | v12 — **implemented** (2026-11-20). Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders |
 | Not in scope | Hosting, the CORS gap, keeping the session across a reload, the Content-Security-Policy of the hosting, logout, the size of the bundle. They are the open points of section 10: the only things between the front end and a deployment |
 | Depends on | `docs/FRONTEND_SERVICES.md` v7 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work) |
@@ -26,6 +26,7 @@
 | v10 | 2026-11-20 | Plan step 68: a single date (date overrides and one-off windows). Section 4: the screen's third part (the date, the day, the windows of "this day only" as rows that hold a button only, the extra windows), a screen with two views, what the two share and how, the dialog that confirms with neutral words and five kinds, the conflicts list's new places. Section 5.1: sixteen files (`date.model.ts` and `date.screen.ts` are new), the second logic object of the screen and what the first hands it, what is read and when, the checks of the date, the draft, the five writes; the three new sentences of `failureText` and the two new things that can be attempted. Section 6: the fifth entry mounts two views and starts two objects; the second `CalendarService` of a session. Section 8: a native date field typed by keyboard, where the keyboard is after a row is gone, a button the page does not offer. Section 9: the tree. Section 12.1: the size at step 68. Section 11: decisions 109 to 128. |
 
 | v11 | 2026-11-20 | Plan step 69, the closing. Status: implemented. The text is brought to the present tense: it says what is, not what a step added. Section 3, rule 2: why nothing shows before the script decides. Section 4: the handlers of a view that was left; a slot and an appointment named with their day for a screen reader; the dialogs that ask described by their question; the sentence of an overlap among the windows of "this day only" said once, under "Start", with "End" marked (a field in fault with no words of its own). Section 6: the sequence from "Sign in" to the first week. Section 7: the new sections 7.1, what the code became, and 7.2, the verdict on the fallback, as a proposal. Section 8: the walk, a document of its own (`docs/FRONTEND_WALK.md`); the table of the dialogs and the focus; the two tests of `page.test.ts` on reading the page without a mouse. Section 10: every open point as it stands today. Section 12.1: the size at step 69 and the share of `zod`, measured again. Section 11: decision 106 closed, decision 123 as settled, decisions 129 to 136. The trial's code (`prototypes/`) is deleted; what was still true of its page on the loading sequence is in sections 3, 4 and 6. |
+| v12 | 2026-11-20 | The verdict of section 7.2 taken at the review of plan step 69: section 3, rule 12 and the third condition of section 7 are reworded to allow what `availability.parts.ts` is, a file of helpers shared by the views of one screen, with its bound. Section 7.2 says what was decided, no longer what was proposed. Section 11: decision 135 as taken, decision 137. No code changed. |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
 TypeScript module script**. The markup of every screen is in one `index.html`; the script
@@ -132,9 +133,15 @@ end up in a view.
 12. **The platform before anything of our own.** Native `<dialog>` opened with `showModal()`,
     native form controls, HTML validation attributes (`required`) as a convenience; the check
     that counts is the one the services make before sending a request. A view may have the
-    two small helpers of section 4 (`find`, `copy`). The day someone wants a helper that builds
-    or updates nodes is the day to use the fallback of section 7 for that view, not to write a
-    rendering library.
+    two small helpers of section 4 (`find`, `copy`). The views of one screen may share a file
+    of helpers that do what a view does by hand: find elements once; set their values, texts
+    and attributes; fill copies of a `<template>` with `textContent`. Such a helper never
+    decides what is shown (the logic layer does), never makes an element other than by
+    copying a template, and keeps no state beyond that of rule 10. The day someone wants a
+    helper that compares what is on the page with what should be there, or that makes markup
+    from data without a template, is the day to use the fallback of section 7 for that view,
+    not to write a rendering library. No lint rule can hold this bound: the review of a view
+    does.
 
 13. **One hand-written style sheet.** Plain CSS, no design system, no preprocessor. A phone and a
     desktop are served by the same markup, through CSS (grid, media queries).
@@ -780,7 +787,7 @@ What the two share is one file, `frontend/src/views/availability.parts.ts`:
   same ones: writing them twice was the alternative. None decides anything; each sets values
   and texts of elements found once, or fills copies of a template with `textContent`.
 - **It is more than the "two small helpers" of section 3, rule 12**, and it is not local to
-  one view: section 7.2 says what that means for the rule, as a proposal.
+  one view: rule 12 was reworded to allow exactly this, with its bound (section 7.2).
 - The sizes of the two views and of this file are in section 7.1.
 
 ## 5. The logic layer
@@ -1745,7 +1752,10 @@ one of these is true for that view:
 - it needs input fields inside a region that is redrawn (section 3, rule 4 cannot be kept);
 - the code that looks nodes up to react to a second or third stream has become longer than the
   rest of the view;
-- someone is about to write a helper that builds or updates nodes (section 3, rule 12).
+- someone is about to write a helper that compares what is on the page with what should be
+  there, or that makes markup from data without a template (section 3, rule 12). A helper that
+  finds elements once, sets their values, texts and attributes, or fills copies of a
+  `<template>` is not that.
 
 The week calendar is the likely first case, and it may be the only one. In the trial its plain
 version stayed readable, so it starts plain.
@@ -1873,10 +1883,13 @@ of `rxjs` they use. Open point O9 (section 10) is about the 454.
   metafile for the same options (`bundleOptions` of `frontend/scripts/bundle.mjs`, `minify`,
   `metafile`), `bytesInOutput` summed by where each input file is.
 
-### 7.2 The verdict on the fallback (a proposal, for the review of step 69)
+### 7.2 The verdict on the fallback
 
-**`lit-html` was not added, and no view was rewritten.** What follows is proposed, not
-decided: the review of `docs/FRONTEND_VIEW_PLAN.md` step 69 takes it or changes it.
+**`lit-html` was not added, and no view was rewritten.** What follows was written as a
+proposal at `docs/FRONTEND_VIEW_PLAN.md` step 69 and **taken at its review** (2026-11-20):
+rule 12 and the third condition above now have the words proposed here (section 11,
+decision 137). The conditions quoted in this section are those of before the rewording,
+which is what the argument is about.
 
 **The three conditions, and the view that came closest to each.**
 
@@ -1900,9 +1913,9 @@ become. Nothing in the file does that. Every function does what a view does by h
 other views (`rowFor` in the users' view is `copy` and three assignments; the settings' view
 has `say` as a loop of six lines), for four forms and four lists instead of one.
 
-**Should the rule change, or the code?**
+**Should the rule change, or the code? The rule: it was reworded.**
 
-- *Reword rule 12 to allow what was built* (what I lean to). Proposed words, in the place of
+- *Reword rule 12 to allow what was built* (taken). The words, in the place of
   its last two sentences: "A view may have the two small helpers of section 4 (`find`,
   `copy`). The views of one screen may share a file of helpers that do what a view does by
   hand: find elements once; set their values, texts and attributes; fill copies of a
@@ -2406,8 +2419,9 @@ than what the trial showed: these deserve the first look in a review.
 | 132 | The two dialogs that ask before an action are described by their question (`aria-describedby`); each "Try again" says what it reads again (`aria-label`, fixed in the page: there are five, three of them on one screen) | Found at step 69. A screen reader said "Please confirm, Keep" and not what was to be confirmed. Markup only | Yes |
 | 133 | The message beside the User picker of the book dialog keeps `role="status"`, although it can hold a failure (the list of Users could not be read) | It also holds "Loading the users…" at every opening; as an alert that would interrupt the dialog's own name each time. A failure there is said when the reader is free, and "Book" stays disabled meanwhile. Every other place of a failure or a refusal is an alert: `page.test.ts` holds the list | Yes |
 | 134 | No focus management of our own: where the keyboard is after each close of each dialog is what the browser does, written down in one table (section 8). Where it ends on nothing, the next Tab continues from where the element was | The platform before anything of our own (section 3, rule 12). In every case found the next Tab reaches the next sensible thing; moving the focus by script would be state the views do not have today, in ten files | |
-| 135 | The verdict on the fallback is a proposal (section 7.2): no condition of section 7 called for `lit-html`; `availability.parts.ts` meets the third condition by its letter and not by its reason; rule 12 should be reworded to allow what was built. Nothing was added or rewritten for it | Settled before step 69 that the verdict is proposed here and taken at the review, and that whatever it is, a view that should move is a step of its own | |
+| 135 | The verdict on the fallback was written as a proposal (section 7.2) and taken at the review (decision 137): no condition of section 7 called for `lit-html`; `availability.parts.ts` meets the third condition by its letter and not by its reason; rule 12 should be reworded to allow what was built. Nothing was added or rewritten for it | Settled before step 69 that the verdict is proposed here and taken at the review, and that whatever it is, a view that should move is a step of its own | |
 | 136 | The trial's code, `prototypes/`, is deleted. Of its page on the loading sequence, three things that were still true of `frontend/` and said nowhere are in this document: why nothing shows before the script decides (section 3, rule 2), the handlers of a view that was left (section 4), and the sequence from "Sign in" to the first week, as a numbered list (section 6). Its diagram was not kept | `docs/FRONTEND_VIEW_PLAN.md` step 69. The rest of that page described the trial's own files, or said what sections 4, 6 and 12 already say (the selectors as the contract, `hidden` as the switch, a module script being deferred, the dev server and what it answers). The one diagram, from the request of the page to the login form, says nothing that the last paragraphs of section 6 do not | |
+| 137 | Section 3, rule 12 and the third condition of section 7 are reworded: the views of one screen may share a file of helpers that find elements once, set their values, texts and attributes, and fill copies of a `<template>` with `textContent`; such a helper never decides what is shown, never makes an element other than by copying a template, and keeps no state beyond rule 10's. The fallback is for the day a helper would compare the page with what it should be, or make markup from data without a template | Decided at the review of `docs/FRONTEND_VIEW_PLAN.md` step 69, as section 7.2 proposed. `availability.parts.ts` met the old words by their letter and not by their reason; changing the code to fit them meant some 60 lines written twice, or a move to `lit-html` that would replace about 25 lines. The bound is the review's to hold: no lint rule can | Yes |
 
 ## 12. The tooling (open points O4, O6 and O8, decided)
 

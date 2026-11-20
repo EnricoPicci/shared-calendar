@@ -32,7 +32,7 @@ section 3 exists and that plan is done, 2026-11-20; it runs locally and is deplo
 - `docs/SHARED_CALENDAR_SPEC.md` specifies the shared calendar (agreed with the Product Owner,
   brief 40, not yet implemented). It is the input for the calendar's plan steps; once merged into
   `ARCHITECTURE.md` (spec section 19), the architecture wins as usual.
-- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v11, **implemented**: the
+- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v12, **implemented**: the
   foundation, the week, booking, cancelling, the note, the change, "My appointments", the
   settings, the users and the availability, its types, its weekly patterns and a single date,
   plan steps 60 to 69): plain HTML and CSS with one TypeScript module script, the layers (services, logic,
@@ -59,7 +59,8 @@ section 3 exists and that plan is done, 2026-11-20; it runs locally and is deplo
   the navigation by the hash (its section 6), and the
   tooling (its section 12: the bundle command, the dev server, the tests' environment). What
   the code became, in numbers, is its section 7.1, and the verdict on the fallback (`lit-html`
-  was needed nowhere; a proposal about its section 3, rule 12 and `availability.parts.ts`) its
+  was needed nowhere; its section 3, rule 12 was reworded after it, to allow a file of
+  helpers shared by the views of one screen, as `availability.parts.ts` is, with its bound) its
   section 7.2; where the keyboard is after each dialog closes is one table in its section 8.
   Hosting, CORS, the session across a reload, the hosting's Content-Security-Policy, logout and
   the size of the bundle are its open points (section 10): the only things between the front

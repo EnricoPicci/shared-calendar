@@ -627,7 +627,8 @@ five points above or makes them precise:
   appointment's time keep their two forms (`docs/FRONTEND_ARCHITECTURE.md` section 11,
   decisions 123, 129 and 106).
 - **What the code became** is `docs/FRONTEND_ARCHITECTURE.md` section 7.1, and **the verdict on
-  the fallback** its section 7.2, written as a proposal for the review: `lit-html` was needed
+  the fallback** its section 7.2, written as a proposal and taken at the review (rule 12 of its section 3
+  was reworded after it, its section 11, decision 137): `lit-html` was needed
   nowhere and was not added; no view was rewritten.
 - **The order of the acceptance** was: the root `npm run verify` on a fresh stack; then a
   second fresh stack, the seed and the walk. One stack cannot serve both: after the back end's
