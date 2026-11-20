@@ -259,6 +259,194 @@
             </div>
           </dialog>
         </section>
+
+        <!-- The availability (src/views/availability.view.ts), at the address #/availability:
+             the availability types and the weekly patterns, each with a form that creates
+             one and its list. The forms are outside the lists the script redraws; a row holds
+             buttons only, which open a dialog. Each field is a .field: its label, its hint
+             when it has one, its refusal. The choices of every list are the script's to set. -->
+        <section id="availability" class="availability-screen" hidden>
+          <div class="toolbar">
+            <h2>Availability</h2>
+            <span class="loading" role="status" hidden>Loading…</span>
+          </div>
+
+          <section class="types">
+            <h3>Types</h3>
+            <!-- novalidate: a text that is not a name is refused by the script, in words,
+                 under the field -->
+            <form class="create create-type" novalidate>
+              <div class="field">
+                <label>Name <input name="name" autocomplete="off" aria-describedby="type-name-hint" /></label>
+                <p class="hint name-hint" id="type-name-hint"></p>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <p class="error failure" role="alert"></p>
+              <div class="actions">
+                <button class="primary submit">Create type</button>
+              </div>
+            </form>
+            <!-- Shown in the place of the list when it could not be read -->
+            <div class="unread" hidden>
+              <p class="error" role="alert"></p>
+              <button type="button" class="retry">Try again</button>
+            </div>
+            <p class="empty" hidden></p>
+            <ul class="list"></ul>
+          </section>
+
+          <section class="patterns">
+            <h3>Weekly patterns</h3>
+            <!-- novalidate: a field in fault is said by the script, in words, under it -->
+            <form class="create-pattern" novalidate>
+              <div class="pattern-fields">
+                <div class="field">
+                  <label>Weekday <select name="weekday"></select></label>
+                  <p class="error refusal" role="alert"></p>
+                </div>
+                <div class="field">
+                  <label>Start <select name="start"></select></label>
+                  <p class="error refusal" role="alert"></p>
+                </div>
+                <div class="field">
+                  <label>End <select name="end"></select></label>
+                  <p class="error refusal" role="alert"></p>
+                </div>
+                <div class="field">
+                  <label>Type <select name="typeId" aria-describedby="pattern-type-hint"></select></label>
+                  <p class="hint type-hint" id="pattern-type-hint"></p>
+                  <p class="error refusal" role="alert"></p>
+                </div>
+                <div class="field">
+                  <label>Valid from <input type="date" name="validFrom" /></label>
+                  <p class="error refusal" role="alert"></p>
+                </div>
+                <div class="field">
+                  <label>Valid until <input type="date" name="validUntil" aria-describedby="pattern-until-hint" /></label>
+                  <p class="hint" id="pattern-until-hint">Leave empty for no end.</p>
+                  <p class="error refusal" role="alert"></p>
+                </div>
+              </div>
+              <p class="error failure" role="alert"></p>
+              <div class="conflicts" hidden>
+                <p class="conflicts-count"></p>
+                <ul class="conflicts-list"></ul>
+              </div>
+              <div class="actions">
+                <button class="primary submit">Create pattern</button>
+              </div>
+            </form>
+            <!-- Shown in the place of the list when it could not be read -->
+            <div class="unread" hidden>
+              <p class="error" role="alert"></p>
+              <button type="button" class="retry">Try again</button>
+            </div>
+            <p class="empty" hidden></p>
+            <div class="groups"></div>
+          </section>
+
+          <!-- A row of the types: the name and its two buttons, whose names for a screen
+               reader the script completes with the name -->
+          <template id="tpl-type-row">
+            <li class="type-row"><span class="name"></span> <button type="button" class="ask-rename">Rename</button> <button type="button" class="danger ask-delete">Delete</button></li>
+          </template>
+          <!-- The patterns of one weekday, under its name -->
+          <template id="tpl-pattern-group">
+            <section class="pattern-group">
+              <h4></h4>
+              <ul class="list"></ul>
+            </section>
+          </template>
+          <!-- A row of the patterns: its hours, its type, its validity, "ended" when that is
+               over, and its two buttons -->
+          <template id="tpl-pattern-row">
+            <li class="pattern-row"><span class="time"></span> <span class="type-name"></span> <span class="validity"></span> <span class="ended" hidden>ended</span> <button type="button" class="ask-change">Change</button> <button type="button" class="danger ask-delete">Delete</button></li>
+          </template>
+          <!-- An appointment in the way of a change of availability: one row of a conflicts list -->
+          <template id="tpl-conflict">
+            <li><span class="date"></span> <span class="time"></span> <span class="username"></span></li>
+          </template>
+          <!-- A choice of a list of the pattern forms -->
+          <template id="tpl-choice">
+            <option></option>
+          </template>
+
+          <!-- Renames a type: opened with its name -->
+          <dialog class="rename" aria-labelledby="rename-title">
+            <form novalidate>
+              <h3 id="rename-title">Rename type</h3>
+              <div class="field">
+                <label>Name <input name="name" autocomplete="off" aria-describedby="rename-hint" /></label>
+                <p class="hint name-hint" id="rename-hint"></p>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <p class="error failure" role="alert"></p>
+              <div class="actions">
+                <button type="button" class="close">Close</button>
+                <button class="primary submit">Rename</button>
+              </div>
+            </form>
+          </dialog>
+
+          <!-- Changes a pattern: the fields of the form that creates one, opened with the
+               pattern's own -->
+          <dialog class="change" aria-labelledby="change-title">
+            <form novalidate>
+              <h3 id="change-title">Change pattern</h3>
+              <div class="field">
+                <label>Weekday <select name="weekday"></select></label>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <div class="field">
+                <label>Start <select name="start"></select></label>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <div class="field">
+                <label>End <select name="end"></select></label>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <div class="field">
+                <label>Type <select name="typeId" aria-describedby="change-type-hint"></select></label>
+                <p class="hint type-hint" id="change-type-hint"></p>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <div class="field">
+                <label>Valid from <input type="date" name="validFrom" /></label>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <div class="field">
+                <label>Valid until <input type="date" name="validUntil" aria-describedby="change-until-hint" /></label>
+                <p class="hint" id="change-until-hint">Leave empty for no end.</p>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <p class="error failure" role="alert"></p>
+              <div class="conflicts" hidden>
+                <p class="conflicts-count"></p>
+                <ul class="conflicts-list"></ul>
+              </div>
+              <div class="actions">
+                <button type="button" class="close">Close</button>
+                <button class="primary submit">Change</button>
+              </div>
+            </form>
+          </dialog>
+
+          <!-- Asks before a type or a pattern is deleted. "Keep" comes first: the keyboard is
+               on it when the dialog opens. -->
+          <dialog class="delete" aria-labelledby="availability-delete-title">
+            <h3 id="availability-delete-title">Confirm the deletion</h3>
+            <p class="question"></p>
+            <p class="error" role="alert"></p>
+            <div class="conflicts" hidden>
+              <p class="conflicts-count"></p>
+              <ul class="conflicts-list"></ul>
+            </div>
+            <div class="actions">
+              <button type="button" class="keep">Keep</button>
+              <button type="button" class="danger submit">Delete</button>
+            </div>
+          </dialog>
+        </section>
       </main>
 
       <!-- The detail of one appointment, with what can be done to it

@@ -1,4 +1,4 @@
-import { localDateOf, localTimeOf, toInstant } from '@shared-calendar/shared';
+import { CALENDAR_LIMITS, localDateOf, localTimeOf, toInstant } from '@shared-calendar/shared';
 
 // The texts that depend on data (docs/FRONTEND_ARCHITECTURE.md section 5 and section 12.4): a
 // date, a time, a range, a date with a time, a week's label, a UTC offset, and a failure in plain
@@ -11,14 +11,15 @@ const pad = (n: number) => String(n).padStart(2, '0');
 
 type DateParts = { weekday: string; day: string; month: string; year: string };
 
-// The words of a local date `YYYY-MM-DD`. The parts are put together here, not by Intl, so that
-// the order and the punctuation do not change with the browser's version of the locale data.
-function partsOf(date: string): DateParts {
+// The words of a local date `YYYY-MM-DD`, its month short ("Nov") or whole ("November"). The
+// parts are put together here, not by Intl, so that the order and the punctuation do not change
+// with the browser's version of the locale data.
+function partsOf(date: string, month: 'short' | 'long' = 'short'): DateParts {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'UTC',
     weekday: 'short',
     day: 'numeric',
-    month: 'short',
+    month,
     year: 'numeric',
   }).formatToParts(new Date(`${date}T00:00:00Z`));
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
@@ -29,6 +30,12 @@ function partsOf(date: string): DateParts {
 export function dateText(date: string): string {
   const { weekday, day, month } = partsOf(date);
   return `${weekday} ${day} ${month}`;
+}
+
+// A local date with its year, for a date that may be far from today: "20 November 2026".
+export function longDateText(date: string): string {
+  const { day, month, year } = partsOf(date, 'long');
+  return `${day} ${month} ${year}`;
 }
 
 // The seven days from `monday`: "16 Nov – 22 Nov 2026". The first date carries its year only when
@@ -116,6 +123,18 @@ const PLAIN_WORDS = new Map<string, string>([
   // Creating and deleting a user (docs/FRONTEND_SERVICES.md section 13.1).
   ['user_exists', 'A user with this username exists already. Choose another username.'],
   ['cannot_delete_admin', 'An Administrator cannot be deleted.'],
+  // The availability types and the weekly patterns (docs/FRONTEND_SERVICES.md sections 16.1
+  // and 17.1). A type is in use as docs/SHARED_CALENDAR_SPEC.md R-TYPE-03 says; two windows of
+  // one date may not overlap whatever their types (docs/SHARED_CALENDAR_SPEC.md R-AV-01); and
+  // the appointments a change of availability would leave outside it are listed under the
+  // sentence of `availability_conflict` (docs/SHARED_CALENDAR_SPEC.md R-AV-03).
+  ['type_name_exists', 'A type with this name exists already. Choose another name.'],
+  ['type_in_use', 'This type is in use, so it cannot be deleted. A type is in use while a weekly pattern, a date of today or later or an upcoming appointment uses it.'],
+  ['type_not_found', 'This type no longer exists.'],
+  ['pattern_not_found', 'This pattern no longer exists.'],
+  ['availability_overlap', 'Another window of the same day covers part of these hours, whatever its type. Choose other hours.'],
+  ['availability_conflict', 'This would leave booked appointments outside the hours open for booking. Cancel or move them in the week first.'],
+  ['limit_reached', 'The calendar cannot hold more of these. Delete one to create another.'],
   // The login (docs/FRONTEND_SERVICES.md section 4.3). A wrong password and an unknown user are
   // one reason, so that the sentence does not say which usernames exist.
   ['invalid_credentials', 'The username or the password is not correct.'],
@@ -126,19 +145,26 @@ const PLAIN_WORDS = new Map<string, string>([
 ]);
 
 // What was being attempted when a call failed, where the same reason needs other words for it.
-export type Attempt = 'change';
-// A change is refused with the cancellation's reason when its appointment is too close to be
-// moved by a User (docs/SHARED_CALENDAR_SPEC.md section 8.4): nothing was being cancelled. And
-// a change that meets the limit of upcoming appointments books nothing more: the limit was
-// lowered below what the User already holds (docs/SHARED_CALENDAR_SPEC.md R-SET-03), and the
-// way out is to cancel one, not to give up a booking.
-const AFTER_A_CHANGE = new Map<string, string>([
-  ['cancellation_notice_too_short', 'It is too late to change this appointment.'],
-  ['appointment_limit_reached', 'You have more upcoming appointments than the calendar now allows, so this one cannot be moved. Cancel one first.'],
-]);
+export type Attempt = 'change' | 'type' | 'pattern';
+const AFTER: Record<Attempt, Map<string, string>> = {
+  // A change is refused with the cancellation's reason when its appointment is too close to be
+  // moved by a User (docs/SHARED_CALENDAR_SPEC.md section 8.4): nothing was being cancelled. And
+  // a change that meets the limit of upcoming appointments books nothing more: the limit was
+  // lowered below what the User already holds (docs/SHARED_CALENDAR_SPEC.md R-SET-03), and the
+  // way out is to cancel one, not to give up a booking.
+  change: new Map([
+    ['cancellation_notice_too_short', 'It is too late to change this appointment.'],
+    ['appointment_limit_reached', 'You have more upcoming appointments than the calendar now allows, so this one cannot be moved. Cancel one first.'],
+  ]),
+  // The limit met says how many the calendar holds, which depends on what was being created:
+  // an availability type (docs/SHARED_CALENDAR_SPEC.md R-TYPE-01) or a weekly pattern
+  // (docs/SHARED_CALENDAR_SPEC.md R-PAT-04). The numbers are those of shared/.
+  type: new Map([['limit_reached', `The calendar can hold ${CALENDAR_LIMITS.types} types at most. Delete one to create another.`]]),
+  pattern: new Map([['limit_reached', `The calendar can hold ${CALENDAR_LIMITS.patterns} weekly patterns at most. Delete one to create another.`]]),
+};
 
 // A failure's `reason` as a sentence; a reason without a sentence of its own gets the general
 // one. `attempt` says what was attempted, for the reasons whose sentence depends on it.
 export function failureText(reason: string, attempt?: Attempt): string {
-  return (attempt === 'change' ? AFTER_A_CHANGE.get(reason) : undefined) ?? PLAIN_WORDS.get(reason) ?? GENERAL;
+  return (attempt === undefined ? undefined : AFTER[attempt].get(reason)) ?? PLAIN_WORDS.get(reason) ?? GENERAL;
 }

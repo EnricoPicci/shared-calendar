@@ -2,11 +2,14 @@ import type { Role } from '@shared-calendar/shared';
 import { fromEvent, Subscription } from 'rxjs';
 import { distinctUntilChanged, filter, map, startWith } from 'rxjs/operators';
 import { AppointmentsScreen } from '../logic/appointments.screen';
+import { AvailabilityScreen } from '../logic/availability.screen';
 import { SettingsScreen } from '../logic/settings.screen';
 import { UsersScreen } from '../logic/users.screen';
 import { WeekScreen } from '../logic/week.screen';
 import type { ApiConfig } from '../services/api';
 import { AppointmentsService } from '../services/appointments.service';
+import { AvailabilityRulesService } from '../services/availability-rules.service';
+import { AvailabilityTypesService } from '../services/availability-types.service';
 import { CalendarSettingsService } from '../services/calendar-settings.service';
 import { CalendarService } from '../services/calendar.service';
 import type { CognitoConfig } from '../services/cognito';
@@ -15,6 +18,7 @@ import { RefreshService } from '../services/refresh.service';
 import { SessionStore } from '../services/session.store';
 import { UsersService } from '../services/users.service';
 import { mountAppointments } from './appointments.view';
+import { mountAvailability } from './availability.view';
 import { mountLogin, type LoginDeps } from './login.view';
 import { mountSettings } from './settings.view';
 import { mountUsers } from './users.view';
@@ -47,25 +51,29 @@ const ROLE_IN_WORDS: Record<Role, string> = { admin: 'Administrator', user: 'Use
 // the person enters and dropped when the person leaves, so that nothing of one person's data
 // can be replayed to the next (docs/FRONTEND_ARCHITECTURE.md section 6, point 4).
 // The role is there for the views that show a part to one role only. `week`, `list`,
-// `settings` and `accounts` are the logic objects of the four screens: the week, "My
-// appointments", the settings and the users. `users` is the service the week's book dialog
-// and the users screen share.
+// `settings`, `accounts` and `availability` are the logic objects of the five screens: the
+// week, "My appointments", the settings, the users and the availability. `users` is the
+// service the week's book dialog and the users screen share; `types` and `rules` are the two
+// services of the availability, whose view calls their deletes.
 export type SessionObjects = {
   role: Role;
   week: WeekScreen;
   list: AppointmentsScreen;
   settings: SettingsScreen;
   accounts: UsersScreen;
+  availability: AvailabilityScreen;
   appointments: AppointmentsService;
   users: UsersService;
+  types: AvailabilityTypesService;
+  rules: AvailabilityRulesService;
 };
 
 function sessionObjects(config: ApiConfig, store: SessionStore, person: Person): SessionObjects {
   const calendar = new CalendarService(config, store);
   const appointments = new AppointmentsService(config, store);
   const users = new UsersService(config, store);
-  // One service for the settings: the list screen reads them for the calendar's time zone, the
-  // settings screen reads and saves them.
+  // One service for the settings: the list screen and the availability screen read them for
+  // the calendar's time zone, the settings screen reads and saves them.
   const calendarSettings = new CalendarSettingsService(config, store);
   // Notifies each time the page becomes visible again (the person comes back to the tab, or
   // brings the window back up): the screen on show then loads what it shows again, to show
@@ -78,7 +86,10 @@ function sessionObjects(config: ApiConfig, store: SessionStore, person: Person):
   const list = new AppointmentsScreen(calendarSettings, appointments, week, person.role, now, visible$);
   const settings = new SettingsScreen(calendarSettings);
   const accounts = new UsersScreen(users, visible$);
-  return { role: person.role, week, list, settings, accounts, appointments, users };
+  const types = new AvailabilityTypesService(config, store);
+  const rules = new AvailabilityRulesService(config, store);
+  const availability = new AvailabilityScreen(calendarSettings, types, rules, now, visible$);
+  return { role: person.role, week, list, settings, accounts, availability, appointments, users, types, rules };
 }
 
 // A screen of the application: its address (the URL's hash), its name in the navigation, the
@@ -144,6 +155,17 @@ export const SCREENS: readonly Screen[] = [
     show: (root, { accounts, users }) => {
       const subscription = mountUsers(root, { screen: accounts, users });
       subscription.add(accounts.start());
+      return subscription;
+    },
+  },
+  {
+    hash: '#/availability',
+    label: 'Availability',
+    roles: ['admin'],
+    element: '#availability',
+    show: (root, { availability, types, rules }) => {
+      const subscription = mountAvailability(root, { screen: availability, types, rules });
+      subscription.add(availability.start());
       return subscription;
     },
   },

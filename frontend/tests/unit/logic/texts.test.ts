@@ -1,4 +1,5 @@
-import { dateText, dateTimeText, failureText, offsetChangesOn, offsetText, rangeText, timeText, weekLabel } from '../../../src/logic/texts';
+import { CALENDAR_LIMITS } from '@shared-calendar/shared';
+import { dateText, dateTimeText, failureText, longDateText, offsetChangesOn, offsetText, rangeText, timeText, weekLabel } from '../../../src/logic/texts';
 import { useFarBrowserZone } from './zone';
 
 describe('texts', () => {
@@ -13,6 +14,17 @@ describe('texts', () => {
       ['2026-09-05', 'Sat 5 Sep'],
     ])('%s is "%s", whatever the browser\'s zone', (date, text) => {
       expect(dateText(date)).toBe(text);
+    });
+  });
+
+  describe('longDateText', () => {
+    it.each([
+      ['2026-11-20', '20 November 2026'],
+      ['2027-01-01', '1 January 2027'],
+      ['2028-02-29', '29 February 2028'],
+      ['2026-12-31', '31 December 2026'],
+    ])('%s is "%s": the day, the whole month and the year, whatever the browser\'s zone', (date, text) => {
+      expect(longDateText(date)).toBe(text);
     });
   });
 
@@ -142,6 +154,14 @@ describe('texts', () => {
       // Creating and deleting a user.
       'user_exists',
       'cannot_delete_admin',
+      // The availability types and the weekly patterns.
+      'type_name_exists',
+      'type_in_use',
+      'type_not_found',
+      'pattern_not_found',
+      'availability_overlap',
+      'availability_conflict',
+      'limit_reached',
     ];
 
     it.each(REASONS)('%s has a sentence: a capital, a full stop, no code (no underscore) and no technical word', (reason) => {
@@ -158,7 +178,7 @@ describe('texts', () => {
 
     it('a reason without a sentence gets the general one, also when it is the name of something every object has', () => {
       const general = 'Something went wrong. Please try again.';
-      expect(failureText('type_in_use')).toBe(general);
+      expect(failureText('no_such_reason')).toBe(general);
       expect(failureText('')).toBe(general);
       expect(failureText('constructor')).toBe(general);
       expect(failureText('unexpected')).toBe(general);
@@ -171,6 +191,15 @@ describe('texts', () => {
     it('a username that exists says so and what to do; an Administrator that cannot be deleted says so', () => {
       expect(failureText('user_exists')).toBe('A user with this username exists already. Choose another username.');
       expect(failureText('cannot_delete_admin')).toBe('An Administrator cannot be deleted.');
+    });
+
+    it('the availability: a name that exists, a type or a pattern that is gone, a type in use with what "in use" means, an overlap whatever the type, and the appointments in the way', () => {
+      expect(failureText('type_name_exists')).toBe('A type with this name exists already. Choose another name.');
+      expect(failureText('type_not_found')).toBe('This type no longer exists.');
+      expect(failureText('pattern_not_found')).toBe('This pattern no longer exists.');
+      expect(failureText('type_in_use')).toBe('This type is in use, so it cannot be deleted. A type is in use while a weekly pattern, a date of today or later or an upcoming appointment uses it.');
+      expect(failureText('availability_overlap')).toBe('Another window of the same day covers part of these hours, whatever its type. Choose other hours.');
+      expect(failureText('availability_conflict')).toBe('This would leave booked appointments outside the hours open for booking. Cancel or move them in the week first.');
     });
 
     it('says the same for a wrong password and an unknown user: both are invalid_credentials', () => {
@@ -198,6 +227,8 @@ describe('texts', () => {
       const sentence = 'The request was not accepted. Check what you entered and try again.';
       expect(failureText('invalid_request')).toBe(sentence);
       expect(failureText('invalid_request', 'change')).toBe(sentence);
+      expect(failureText('invalid_request', 'type')).toBe(sentence);
+      expect(failureText('invalid_request', 'pattern')).toBe(sentence);
     });
 
     it('every other reason has the same sentence after a change, an unknown one the general sentence', () => {
@@ -216,6 +247,26 @@ describe('texts', () => {
         expect(text, reason).toMatch(/^[A-Z].*\.$/);
         expect(text, reason).not.toMatch(/_|fetch|TypeError|HTTP|API|JSON|token|\d{3}/);
       }
+    });
+
+    it('limit_reached says how many the calendar holds, of what was being created, with the numbers of shared/', () => {
+      expect(failureText('limit_reached', 'type')).toBe(`The calendar can hold ${CALENDAR_LIMITS.types} types at most. Delete one to create another.`);
+      expect(failureText('limit_reached', 'pattern')).toBe(`The calendar can hold ${CALENDAR_LIMITS.patterns} weekly patterns at most. Delete one to create another.`);
+      expect([CALENDAR_LIMITS.types, CALENDAR_LIMITS.patterns]).toEqual([20, 50]);
+      expect(failureText('limit_reached', 'type')).toContain(' 20 types ');
+      expect(failureText('limit_reached', 'pattern')).toContain(' 50 weekly patterns ');
+      // With nothing said of what was attempted, and after a change of an appointment, no number.
+      expect(failureText('limit_reached')).toBe('The calendar cannot hold more of these. Delete one to create another.');
+      expect(failureText('limit_reached', 'change')).toBe(failureText('limit_reached'));
+    });
+
+    it('every other reason has the same sentence whether a type or a pattern was being written; the sentences of a change are not theirs', () => {
+      const others = [
+        'network', 'server', 'unexpected', 'forbidden', 'invalid_request', 'invalid_json', 'internal_error', 'concurrent_update',
+        'type_name_exists', 'type_in_use', 'type_not_found', 'pattern_not_found', 'availability_overlap', 'availability_conflict',
+        'cancellation_notice_too_short', 'appointment_limit_reached', '', 'constructor',
+      ];
+      for (const attempt of ['type', 'pattern'] as const) for (const reason of others) expect(failureText(reason, attempt), `${attempt} ${reason}`).toBe(failureText(reason));
     });
   });
 });

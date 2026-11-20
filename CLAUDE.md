@@ -16,8 +16,8 @@ in `shared/` (package `@shared-calendar/shared`), and in `frontend/` the browser
 layer (`docs/FRONTEND_SERVICES.md`) and the start of its view layer
 (`docs/FRONTEND_ARCHITECTURE.md`: the build and the dev server, the shell with its navigation,
 the login, the logic layer, the week calendar with booking, cancelling, the note and the change,
-a User's "My appointments" and the Administrator's settings and users; the other views follow
-`docs/FRONTEND_VIEW_PLAN.md`). Layout and placement rules:
+a User's "My appointments" and the Administrator's settings, users and, of the availability,
+the types and the weekly patterns; the other views follow `docs/FRONTEND_VIEW_PLAN.md`). Layout and placement rules:
 `docs/FOLDER_STRUCTURE.md`.
 
 ## Where the truth lives
@@ -31,20 +31,24 @@ a User's "My appointments" and the Administrator's settings and users; the other
 - `docs/SHARED_CALENDAR_SPEC.md` specifies the shared calendar (agreed with the Product Owner,
   brief 40, not yet implemented). It is the input for the calendar's plan steps; once merged into
   `ARCHITECTURE.md` (spec section 19), the architecture wins as usual.
-- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v8; the foundation, the
-  week, booking, cancelling, the note, the change, "My appointments", the settings and the
-  users implemented, plan steps 60 to 66): plain HTML and CSS with one TypeScript module script, the layers (services, logic,
+- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v9; the foundation, the
+  week, booking, cancelling, the note, the change, "My appointments", the settings, the users
+  and the availability types and weekly patterns implemented, plan steps 60 to 67): plain HTML and CSS with one TypeScript module script, the layers (services, logic,
   views, shell), the rules of a view, the shape of a dialog (its section 4, with the book
   dialog's second mode, the banner of a move, the detail dialog that two views mount, the
   shape of the list, the shape of a form whose fields are checked: a field in fault, the
-  password dialog that the Escape key does not close, and the shape of a dialog that confirms
-  a deletion), the
+  password dialog that the Escape key does not close, the shape of a dialog that confirms
+  a deletion, and the availability: a form that creates and a dialog that changes, four forms
+  of one shape, the conflicts list and its three places, one dialog for the deletion of a
+  type or of a pattern), the
   logic layer as built (its section 5.1, with the reloads of the week,
   the detail's three actions and its one sentence, the appointment being moved, the list
   screen with its time zone read from the settings and its period, the hand-over of an
   appointment from the list to the week, the settings screen with the checks of its fields
-  and the read after a save, and the users screen with the check of the username, the reads
-  of its list and where the generated password is and is not), the table of screens, what the shell hands a view and
+  and the read after a save, the users screen with the check of the username, the reads
+  of its list and where the generated password is and is not, and the availability screen
+  with its three reads, the join of the types' names, the checks of a name and of a
+  pattern's fields, and what a write says to the form or the dialog that asked), the table of screens, what the shell hands a view and
   the navigation by the hash (its section 6), and the
   tooling (its section 12: the bundle command, the dev server, the tests' environment). Hosting,
   CORS, the session across a reload, the hosting's Content-Security-Policy, logout and the size
@@ -58,9 +62,11 @@ a User's "My appointments" and the Administrator's settings and users; the other
   again after a write and when the tab becomes visible), 63 (the note edited in the detail,
   an appointment moved to another time) and 64 ("My appointments": the upcoming list and the
   history, the detail dialog shared by two screens, "Change" from the list handed over to the
-  week), 65 (the settings: one form, its fields checked before any call) and 66 (the users: the
-  list, a create that shows the generated password once, a delete that asks first) are done
-  (2026-11-20); next step 67, the availability types and the weekly patterns.
+  week), 65 (the settings: one form, its fields checked before any call), 66 (the users: the
+  list, a create that shows the generated password once, a delete that asks first) and 67
+  (the availability types and the weekly patterns: a form that creates, a dialog that
+  changes, a delete that asks first, the list of the appointments in the way of a refused
+  change) are done (2026-11-20); next step 68, the date overrides and the one-off windows.
 - `docs/RENAME_PLAN.md` plans the move from the "hello-world" names to "shared-calendar" (plan
   steps 56–58: repository, new stack `shared-calendar-api`, retirement of `hello-world-api`), with
   the way back at every stage. The repository uses the new names (step 56) and the stack in use
@@ -467,7 +473,7 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   The view layer (`docs/FRONTEND_ARCHITECTURE.md`; no framework): `index.html` (all the markup,
   everything `hidden`: the login `#login`; the frame `#app` with the header, an empty `nav`, the
   template of a navigation link and `main.screen`, which holds one element per screen: so far
-  `#week`, `#appointments`, `#settings` and `#users`. `#week` has the toolbar, the failure (`role="alert"`), the banner `.moving` of an appointment
+  `#week`, `#appointments`, `#settings`, `#users` and `#availability`. `#week` has the toolbar, the failure (`role="alert"`), the banner `.moving` of an appointment
   being moved (its words `.moving-what`, the button `.keep`), the time zone's sentence, the
   legend, the hours, the days, its two native dialogs `dialog.book` (a form: what is booked, the
   part `.choices` for the Administrator with the lists `username`, `start` and `end` (labelled
@@ -498,7 +504,24 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   takes the keyboard at the opening, the username, the password in `.password`, the sentence
   that it cannot be shown again, and the one button `.understood`, "I have noted the
   password") and `dialog.delete` (the question `.question`, the failure, "Keep" and "Delete
-  user"). No pattern and no length of a username is written in the page. After `main.screen`, in no screen,
+  user"). No pattern and no length of a username is written in the page. `#availability`
+  has two parts, `section.types` and `section.patterns`, each with its form that creates
+  (`form.create-type`: one `.field` with the text input `name`, its hint `.name-hint` and its
+  refusal; `form.create-pattern`: six `.field` elements, the lists `weekday`, `start`, `end`
+  and `typeId` and the date fields `validFrom` and `validUntil`, labelled "Weekday", "Start",
+  "End", "Type", "Valid from" and "Valid until", the type's with its hint `.type-hint`, then
+  the failure and the conflicts list `.conflicts`, hidden: the sentence `.conflicts-count`
+  and the list `.conflicts-list`), the read's failure `.unread` with "Try again", the
+  sentence `.empty` and its list (`ul.list`; `div.groups`); five templates, `tpl-type-row`
+  (the name, "Rename", "Delete"), `tpl-pattern-group` (an `<h4>` and a `ul.list`),
+  `tpl-pattern-row` (the time, the type, the validity, the word "ended", hidden, "Change",
+  "Delete"), `tpl-conflict` (date, time, username) and `tpl-choice` (an `<option>`); and
+  three native dialogs: `dialog.rename` (a form: the name field, its hint, its refusal, the
+  failure, "Close", "Rename"), `dialog.change` (a form: the same six fields, the failure, the
+  conflicts list, "Close", "Change") and `dialog.delete` ("Confirm the deletion": the
+  question, the failure, the conflicts list, "Keep", "Delete"), which serves a type and a
+  pattern. No list of the screen has a choice written in the page: the script sets them all.
+  After `main.screen`, in no screen,
   `dialog#detail` (class `detail`: the fields, the note as a text in `.noted` or in the form
   `.note-form` with "Save note", `.booked`, `.hint`, the failure, "Change", "Cancel
   appointment"), which the view of the screen on show mounts. One module script `app.js`, one
@@ -506,8 +529,9 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   the six type colours `type-0` … `type-5`, the lanes `lane-0-of-2`, `lane-1-of-2`, the rows of
   the list with `is-booked`, `is-ended`, `is-cancelled`, `is-changed`, a field in fault
   (`.field input[aria-invalid="true"]`), the hint of a field hidden while its refusal shows,
-  the rows of the users, the generated password in a fixed-width face, the dialogs and the
-  focus ring; a new class of the page is looked for in the style sheet first: the tests apply
+  the rows of the users, the generated password in a fixed-width face, the availability's
+  fields side by side while there is room, its rows (a pattern's is a grid, `is-ended` for one
+  whose validity is over) and its conflicts list, the dialogs and the focus ring; a new class of the page is looked for in the style sheet first: the tests apply
   no style, and `dialog .noted` once hid a button that had taken that name; a class of the page must not hold the word `admin`: the shell's test looks
   for that name in the whole document after a sign-out),
   `src/main.ts` (the bundle's entry, one statement: the only file that knows the three constants
@@ -518,15 +542,16 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   role before anything else sees it; `distinctUntilChanged` on the two, so a refresh mounts
   nothing and loads nothing; `enter(person)` fills the header, creates the session's objects
   (`sessionObjects`: the role, a new `CalendarService`, `AppointmentsService`, `UsersService`,
-  `CalendarSettingsService`, `WeekScreen`, `AppointmentsScreen`, `SettingsScreen` and
-  `UsersScreen` per
+  `CalendarSettingsService`, `AvailabilityTypesService`, `AvailabilityRulesService`,
+  `WeekScreen`, `AppointmentsScreen`, `SettingsScreen`, `UsersScreen` and
+  `AvailabilityScreen` per
   person, dropped when the person leaves, and the stream of the page becoming visible, from the document's
-  `visibilitychange`, handed to the week, the list and the users screens), fills the navigation from the table `SCREENS` (an
+  `visibilitychange`, handed to the week, the list, the users and the availability screens), fills the navigation from the table `SCREENS` (an
   entry: `hash`, `label`, `roles`, `element`, `show`, which mounts the view and then starts its
-  logic object; four entries so far, `#/week` for both roles, `#/appointments`, "My
+  logic object; five entries so far, `#/week` for both roles, `#/appointments`, "My
   appointments", for a User only, whose `show` also hands the view `showWeek`, a function that
-  sets the address to the week's, and `#/settings`, "Settings", and `#/users`, "Users", for the
-  Administrator only; `mountShell` takes another table as the optional `screens`,
+  sets the address to the week's, and `#/settings`, "Settings", `#/users`, "Users", and
+  `#/availability`, "Availability", for the Administrator only; `mountShell` takes another table as the optional `screens`,
   for its test) and
   follows the URL's hash (`fromEvent(window, 'hashchange')` from the current hash): an empty,
   unknown or forbidden hash shows the role's first screen and the address is put right with
@@ -561,7 +586,26 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   the teardown, never by a `close` handler; the `cancel` event of that dialog is refused; a
   row's "Delete" opens `dialog.delete`, whose "Delete user" calls the service and which shows
   a failure and stays open, with whom it is about and an "asked" as local variables and no
-  `close` handler) and
+  `close` handler),
+  `availability.view.ts` (`mountAvailability(root, { screen, types, rules })`, with
+  `AvailabilityDeps`: of the `AvailabilityScreen` `availability$`, `createType`, `rename`,
+  `createPattern`, `change`, `retryTypes`, `retryPatterns` and `conflicts`; of the
+  `AvailabilityTypesService` `remove` and `removeState$`; of the `AvailabilityRulesService`
+  `deletePattern` and `deletePatternState$`. Its four forms (the two that create, the two
+  dialogs) have one shape and are kept by the names of their outcomes in the stream,
+  `typeCreate`, `rename`, `patternCreate`, `change`; it sets the choices of the weekday and
+  of the two times and the hint of a name at the mount, sends a form's fields as text,
+  redraws a list only when its object changed, fills a form that creates only when its
+  fields object changed, and rebuilds the choices of the type only when theirs changed,
+  putting back what was chosen (a chosen type that is gone leaves none chosen). A form that
+  creates shows its outcome as it is; **a dialog shows an outcome only when it asked since
+  it opened and the outcome's `about` is the id the dialog is about**, and closes when it is
+  done. A row's "Rename" and "Change" open their dialog with the row's values; a row's
+  "Delete" opens the one `dialog.delete`, whose button calls `types.remove` or
+  `rules.deletePattern` by what the dialog is about and which listens to the state of that
+  kind only. The conflicts list is drawn in the form that creates a pattern and in the
+  change dialog from the stream, in the delete dialog from `screen.conflicts(…)` of the
+  failure's list. No dialog has a `close` handler) and
   `week.view.ts` (`mountWeek(root, { screen, appointments, users, role })`, with `WeekDeps`: the
   parts it uses of the `WeekScreen` (`week$`, the three changes of week, `detail`, `move`,
   `keep`), of the `AppointmentsService` (`book`, `cancel`, `change`, `updateNote` and their
@@ -586,10 +630,14 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   words, with one general sentence for a reason it does not know: a new route's codes get their
   sentences here; it has those of the login, of `GET /calendar`, of a booking, of a cancellation,
   of a change, of a note and of the list of users, which also cover the list of appointments and
-  the read and the save of the settings, and those of a user created and deleted
-  (`user_exists`, `cannot_delete_admin`); its optional second argument says what was
-  attempted, for the two reasons whose words depend on it: `cancellation_notice_too_short` and
-  `appointment_limit_reached` after `'change'`), `week.model.ts` (pure:
+  the read and the save of the settings, those of a user created and deleted
+  (`user_exists`, `cannot_delete_admin`) and those of the availability (`type_name_exists`,
+  `type_in_use`, `type_not_found`, `pattern_not_found`, `availability_overlap`,
+  `availability_conflict`, `limit_reached`); its optional second argument says what was
+  attempted, for the reasons whose words depend on it: `cancellation_notice_too_short` and
+  `appointment_limit_reached` after `'change'`, `limit_reached` after `'type'` and after
+  `'pattern'`, with the numbers of `CALENDAR_LIMITS`; and `longDateText`, a date with its
+  year, "20 November 2026"), `week.model.ts` (pure:
   `weekModel(view, role)`, the week ready to draw: days of windows, slots, busy blocks and
   appointments, each with `top`, `height`, `time`, `lane` and `lanes`; a slot also with its
   `start`, `end`, `day`, `typeName` and the instants of its `window` (through `shared/`'s
@@ -650,7 +698,48 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   read that fails takes the list away; the same users read again keep the same `rows`
   object; `field` becomes another object only after a create that succeeded; **no password
   passes through it**: it reads a create's result as `CreateOutcome`, a type that does not
-  name one) and
+  name one),
+  `availability.model.ts` (pure, for the availability screen: `typeRows(types)`, a row per
+  type in the order given, with `renameLabel` and `deleteLabel`; `NO_TYPES`;
+  `TYPE_NAME_HINT`, what a name is, both the hint and the refusal, its number from
+  `CALENDAR_LIMITS.typeNameLength`; `typeNameFor(text)`, the name, spaces around it removed,
+  or the refusal, decided by the shared `TypeName` schema; `deleteTypeQuestion(row)`;
+  `WEEKDAY_CHOICES`, `START_CHOICES` (00:00 to 23:45), `END_CHOICES` (00:15 to 24:00) and
+  `typeChoices(types)`, the choices of the pattern form's lists as `{ value, label }`;
+  `NO_TYPE_YET`; `PATTERN_FIELDS`, the six names in the form's order; `startingFields(today)`,
+  Monday, 09:00 to 10:00, no type, valid from today; `patternFields(pattern)`, a pattern's
+  fields as text; `patternFor(fields)`, the body of a create or of a change, or the refusals,
+  one sentence per field in fault that starts with the words of its label: the end not after
+  the start, no type, "valid from" not a date, "valid until" not a date or before "valid
+  from"; `patternGroups(patterns, types, today)`, the groups Monday to Sunday, an empty
+  weekday left out, a group by start, end and "valid from", a row with `time` ("09:00 –
+  13:00"), `typeName` (joined from the types, `UNKNOWN_TYPE` when they do not hold it),
+  `validity`, `ended` (the validity ended before today; one that ends today has not),
+  `what`, `changeLabel`, `deleteLabel` and `fields`; `NO_PATTERNS`;
+  `deletePatternQuestion(row)`),
+  `conflicts.ts` (pure: `conflictList(conflicts, zone)`, the appointments in the way of a
+  refused change of availability, by start and then by username, each with `date`, `time`
+  (the offsets on a day the clocks change) and `username`, under the sentence that counts
+  them; `null` for no list and for an empty one; personal data, for the page only),
+  `availability.screen.ts` (`AvailabilityScreen(settings, types, rules, now, visible$)`:
+  `availability$` = loading, typesUnread, types, typesEmpty, patternsUnread, groups,
+  patternsEmpty, choices, typeHint, typeField, patternFields and the four outcomes
+  `typeCreate`, `rename`, `patternCreate`, `change`, each an `Ask`: `about` (the id it was
+  asked for, empty for a create), `busy`, `refusals`, `failure`, `conflicts`, `done`;
+  `start()`, `retryTypes()`, `retryPatterns()`, `createType(text)`, `rename(typeId, text)`,
+  `createPattern(fields)`, `change(patternId, fields)`, `conflicts(list)`; `start()` reads
+  the settings, for the calendar's time zone, the types and the patterns at once; the
+  patterns are listed once both they and the zone are known; each list fails and is tried
+  again by itself, and one that could not be read again is taken off, while the types as
+  last read stay as the choices and as the names in the patterns' rows; the same lists read
+  again keep the same objects; a write is checked and its call made only when nothing is in
+  fault; **while a write of a kind is under way another of that kind is not taken**; the
+  types are read again at every result of a create, a rename and a delete of a type, the
+  patterns at every result of a create, a change and a delete of a pattern, a failure
+  included, the types too when a pattern's write answers `type_not_found`, and both at every
+  notification of `visible$`, not for a result already there at `start()`; `typeField`
+  becomes another object after a create that succeeded, `patternFields` then too and when
+  the settings first say the zone; the two deletes are the view's to call) and
   `week.screen.ts`
   (`WeekScreen(calendar, appointments, role, now, visible$)`: `week$` = label, loading, failure,
   the last week loaded, and `moving`, the appointment being moved or `null`; `start()`,
@@ -668,10 +757,11 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   `tests/unit/logic/` (project `unit`): `zone.ts`, `fixtures.ts`, `texts.test.ts`,
   `week.model.test.ts`, `booking.test.ts`, `appointment.detail.test.ts`, `week.screen.test.ts`,
   `appointments.model.test.ts`, `appointments.screen.test.ts`, `settings.model.test.ts`,
-  `settings.screen.test.ts`, `users.model.test.ts`, `users.screen.test.ts`. `tests/unit/views/` (project `views`): `page.ts`
+  `settings.screen.test.ts`, `users.model.test.ts`, `users.screen.test.ts`,
+  `availability.model.test.ts`, `conflicts.test.ts`, `availability.screen.test.ts`. `tests/unit/views/` (project `views`): `page.ts`
   (`useRealPage()`, `find`, `submit`), `page.test.ts`, `login.view.test.ts`,
   `week.view.test.ts`, `detail.view.test.ts`, `appointments.view.test.ts`,
-  `settings.view.test.ts`, `users.view.test.ts`, `shell.test.ts`. No `template.yaml` yet: the hosting
+  `settings.view.test.ts`, `users.view.test.ts`, `availability.view.test.ts`, `shell.test.ts`. No `template.yaml` yet: the hosting
   waits for the open points of `docs/FRONTEND_ARCHITECTURE.md` section 10.
 - `shared/`: package `@shared-calendar/shared`, no build step (`exports` points at
   `src/index.ts`; each consumer bundles it). `src/api.ts` (response and error body types,
@@ -744,9 +834,20 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   and `autofocus`, and sends `close` inside `close()`: a test sends `cancel` itself to see it
   refused, and sends a `close` event itself after an opening to stand for the browser's late
   one; that Escape does not close the password dialog, and where the keyboard lands, are for
-  the browser check. An
+  the browser check. **A list (`<select>`) in a test**: set to a value none of its choices
+  has, it reads back empty with `selectedIndex` −1, as in a browser, which is how the
+  availability's forms have no type chosen; rebuilt with `replaceChildren`, and after
+  `form.reset()`, it has its first choice chosen. The `textContent` of a `<label>` around a
+  list holds the texts of the list's choices: a test that reads a label's words reads its
+  first text node. A test helper that puts a screen's id before a selector scopes only the
+  first part of a list of selectors (`#availability li, option` is every `<option>` of the
+  page): count what a view left behind from the screen's element. The availability view's
+  test hands the mount function a fake screen whose `conflicts` is a `vi.fn` that makes the
+  rows in the calendar's zone of the test. Where the keyboard is after a dialog closes (on
+  nothing, after a write that redrew the list) is for the browser check. An
   appointment id in a test that reaches a
-  real service must be a ULID (the fixtures' `appt-…` ids are refused before any request). The
+  real service must be a ULID (the fixtures' `appt-…` ids are refused before any request);
+  so must a type's and a pattern's id in the shell's test of the availability. The
   shell's test of the tab becoming visible defines `visibilityState` on the document and sends
   `visibilitychange` itself, and removes the property after each test.
 - Two more ESLint rules on the front end (root `eslint.config.js`): no `innerHTML`, `outerHTML` or
@@ -768,10 +869,14 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   the hours widened, both roles.
 - The shell's test stubs the global `fetch` for the whole file (unanswered unless a test answers
   it): entering the frame creates the real `CalendarService`, which loads the week, and the real
-  `AppointmentsService`, `UsersService` and `CalendarSettingsService`, which a test reaches
+  `AppointmentsService`, `UsersService`, `CalendarSettingsService`, `AvailabilityTypesService`
+  and `AvailabilityRulesService`, which a test reaches
   through the two dialogs, the list (on `#/appointments` the first request is the settings,
   the second the list: answer them in that order), the settings (one `GET`; after a `PUT`
-  another `GET`) and the users (one `GET /users`; after a `POST` or a `DELETE` another). It resets
+  another `GET`), the users (one `GET /users`; after a `POST` or a `DELETE` another) and the
+  availability (on `#/availability` three requests, in this order: the settings, the types,
+  the patterns; after a write to a type another `GET /calendar/types`, after a write to a
+  pattern another `GET /calendar/patterns`). It resets
   the emulated page's hash before each test. `happy-dom` sends a `hashchange` on
   `history.replaceState` too, which a browser does not: harmless for the shell
   (`distinctUntilChanged` on the screen), but do not build on it.

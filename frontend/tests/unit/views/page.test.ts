@@ -28,10 +28,10 @@ describe('index.html', () => {
   it('every screen of the frame has an id and starts hidden; the navigation and the lists start empty', () => {
     loadPage();
     const screens = [...document.querySelectorAll<HTMLElement>('#app main.screen > :not(template)')];
-    expect(screens.map((element) => element.id)).toEqual(['week', 'appointments', 'settings', 'users']);
+    expect(screens.map((element) => element.id)).toEqual(['week', 'appointments', 'settings', 'users', 'availability']);
     expect(screens.every((element) => element.hidden)).toBe(true);
     expect(document.querySelector('#app .nav')!.children).toHaveLength(0);
-    for (const list of document.querySelectorAll('#week .legend, #week .hours, #week .days, #appointments .list, #users .list')) expect(list.children).toHaveLength(0);
+    for (const list of document.querySelectorAll('#week .legend, #week .hours, #week .days, #appointments .list, #users .list, #availability .list, #availability .groups, #availability .conflicts-list')) expect(list.children).toHaveLength(0);
   });
 
   it('every <template> has an id of its own and holds exactly one element', () => {
@@ -48,6 +48,11 @@ describe('index.html', () => {
       'tpl-option',
       'tpl-appointment-row',
       'tpl-user-row',
+      'tpl-type-row',
+      'tpl-pattern-group',
+      'tpl-pattern-row',
+      'tpl-conflict',
+      'tpl-choice',
     ]);
     for (const template of templates) expect(template.content.children, template.id).toHaveLength(1);
   });
@@ -69,20 +74,24 @@ describe('index.html', () => {
     for (const template of templates) expect(template.content.querySelectorAll('input, select, textarea'), template.id).toHaveLength(0);
   });
 
-  it('the page has four dialogs, closed, each named by its heading: the book dialog is the week\'s and the two of the users are theirs, outside the regions that are redrawn; the detail belongs to no screen', () => {
+  it('the page has seven dialogs, closed, each named by its heading: the book dialog is the week\'s, two are the users\' and three the availability\'s, outside the regions that are redrawn; the detail belongs to no screen', () => {
     loadPage();
     const dialogs = [...document.querySelectorAll<HTMLDialogElement>('dialog')];
-    expect(dialogs.map((dialog) => dialog.className)).toEqual(['book', 'created', 'delete', 'detail']);
+    expect(dialogs.map((dialog) => dialog.className)).toEqual(['book', 'created', 'delete', 'rename', 'change', 'delete', 'detail']);
     for (const dialog of dialogs) {
       expect(dialog.open, dialog.className).toBe(false);
       expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)!.tagName, dialog.className).toBe('H3');
     }
-    const [book, created, remove, detail] = dialogs as [HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement];
+    const [book, created, remove, rename, change, removeAvailability, detail] = dialogs as [HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement];
     expect(book.parentElement!.id).toBe('week');
     expect(book.closest('.week')).toBeNull();
     for (const dialog of [created, remove]) {
       expect(dialog.parentElement!.id, dialog.className).toBe('users');
       expect(dialog.closest('.list'), dialog.className).toBeNull();
+    }
+    for (const dialog of [rename, change, removeAvailability]) {
+      expect(dialog.parentElement!.id, dialog.className).toBe('availability');
+      expect(dialog.closest('.list, .groups'), dialog.className).toBeNull();
     }
     // The detail is opened from two screens: it is in the frame, after the screens, with an id
     // of its own for the views that mount it.
@@ -266,5 +275,112 @@ describe('index.html', () => {
     expect([dialog.querySelector('.question')!.textContent, dialog.querySelector('.error')!.textContent, dialog.querySelector('.error')!.getAttribute('role')]).toEqual(['', '', 'alert']);
     expect([...dialog.querySelectorAll('button')].map((button) => [button.textContent, button.disabled])).toEqual([['Keep', false], ['Delete user', false]]);
     expect(dialog.querySelectorAll('input, select, textarea, form')).toHaveLength(0);
+  });
+  describe('the availability', () => {
+    const one = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector<T>(`#availability ${selector}`.trim())!;
+    const all = <T extends HTMLElement = HTMLElement>(selector: string) => [...document.querySelectorAll<T>(`#availability ${selector}`)];
+    const SIX = [
+      ['weekday', 'SELECT', 'Weekday'],
+      ['start', 'SELECT', 'Start'],
+      ['end', 'SELECT', 'End'],
+      ['typeId', 'SELECT', 'Type'],
+      ['validFrom', 'INPUT', 'Valid from'],
+      ['validUntil', 'INPUT', 'Valid until'],
+    ];
+
+    it('has two parts, each under its heading, with its form, the failure of its read with "Try again", its empty sentence and its list, all starting empty', () => {
+      loadPage();
+      expect([...one('').children].filter((part) => part.tagName === 'SECTION').map((part) => [part.className, part.querySelector('h3')!.textContent])).toEqual([['types', 'Types'], ['patterns', 'Weekly patterns']]);
+      for (const part of ['.types', '.patterns']) {
+        expect([one(`${part} .unread`).hidden, one(`${part} .empty`).hidden, one(`${part} .empty`).textContent], part).toEqual([true, true, '']);
+        expect([one(`${part} .unread .error`).getAttribute('role'), one(`${part} .unread .error`).textContent, one(`${part} .retry`).textContent], part).toEqual(['alert', '', 'Try again']);
+        // The form is before the list, and outside it.
+        expect(one(`${part} form`).closest('.list, .groups'), part).toBeNull();
+        expect(one<HTMLFormElement>(`${part} form`).noValidate, part).toBe(true);
+      }
+      expect([one('.loading').hidden, one('.loading').getAttribute('role')]).toEqual([true, 'status']);
+      expect([one('.types form .submit').textContent, one('.patterns form .submit').textContent]).toEqual(['Create type', 'Create pattern']);
+    });
+
+    it('a name is typed in one text field, in the form that creates a type and in the dialog that renames one: its label, its hint, its refusal, and no length or pattern in the page', () => {
+      loadPage();
+      const fields = [one<HTMLInputElement>('form.create-type [name="name"]'), one<HTMLInputElement>('dialog.rename [name="name"]')];
+      for (const field of fields) {
+        expect([field.type, field.value, field.closest('label')!.textContent.trim(), field.getAttribute('autocomplete')]).toEqual(['text', '', 'Name', 'off']);
+        expect(['pattern', 'minlength', 'maxlength', 'required', 'aria-invalid'].filter((name) => field.hasAttribute(name))).toEqual([]);
+        const box = field.closest('.field')!;
+        expect([box.querySelector('.hint')!.textContent, box.querySelector('.hint')!.id]).toEqual(['', field.getAttribute('aria-describedby')]);
+        expect([box.querySelector('.refusal')!.getAttribute('role'), box.querySelector('.refusal')!.textContent]).toEqual(['alert', '']);
+        const form = field.closest('form')!;
+        expect([form.noValidate, form.querySelector('.failure')!.getAttribute('role'), form.querySelector('.failure')!.textContent]).toEqual([true, 'alert', '']);
+        expect(form.querySelectorAll('input, select, textarea')).toHaveLength(1);
+      }
+    });
+
+    it.each([['the form that creates a pattern', 'form.create-pattern'], ['the dialog that changes one', 'dialog.change form']])('%s has the six fields of a pattern, each in a field of its own with its label and its refusal; every list starts with no choice', (_what, selector) => {
+      loadPage();
+      const form = one<HTMLFormElement>(selector);
+      expect(form.noValidate).toBe(true);
+      const fields = [...form.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input, select, textarea')];
+      expect(fields.map((field) => [field.name, field.tagName, field.closest('label')!.textContent.trim()])).toEqual(SIX);
+      for (const field of fields) {
+        const box = field.closest('.field')!;
+        expect(box.querySelectorAll('input, select'), field.name).toHaveLength(1);
+        expect([box.querySelector('.refusal')!.getAttribute('role'), box.querySelector('.refusal')!.textContent], field.name).toEqual(['alert', '']);
+        expect([field.children.length, field.value, field.hasAttribute('aria-invalid'), field.hasAttribute('required')], field.name).toEqual([0, '', false, false]);
+        if (field instanceof HTMLInputElement) expect(field.type, field.name).toBe('date');
+      }
+      // The two hints: that a type must exist, the script's to say, and that no end is an empty field.
+      const hint = (name: string) => form.querySelector(`#${form.querySelector(`[name="${name}"]`)!.getAttribute('aria-describedby')}`)!;
+      expect([hint('typeId').textContent, hint('validUntil').textContent]).toEqual(['', 'Leave empty for no end.']);
+      expect([form.querySelector('.failure')!.getAttribute('role'), form.querySelector('.failure')!.textContent]).toEqual(['alert', '']);
+    });
+
+    it('the conflicts list has three places, hidden and empty: the form that creates a pattern, the dialog that changes one and the dialog that deletes; one template serves the three', () => {
+      loadPage();
+      const boxes = all('.conflicts');
+      expect(boxes.map((box) => box.closest('form.create-pattern, dialog')!.className)).toEqual(['create-pattern', 'change', 'delete']);
+      for (const box of boxes) {
+        expect([box.hidden, box.querySelector('.conflicts-count')!.textContent, box.querySelector('.conflicts-list')!.children.length]).toEqual([true, '', 0]);
+      }
+      const row = pageAside().querySelector<HTMLTemplateElement>('#tpl-conflict')!.content.firstElementChild!;
+      expect([row.tagName, [...row.children].map((part) => part.className)]).toEqual(['LI', ['date', 'time', 'username']]);
+      expect(row.querySelectorAll('button, a, input, select, textarea')).toHaveLength(0);
+    });
+
+    it('a row of the types is the name and two buttons of type "button", "Rename" and "Delete"; a row of the patterns its three texts, "ended", hidden, and "Change" and "Delete"; nothing in either can be typed in', () => {
+      const template = (id: string) => pageAside().querySelector<HTMLTemplateElement>(`#${id}`)!.content.firstElementChild!;
+      const parts = (row: Element) => [...row.children].map((part) => [part.tagName, part.className, part.textContent]);
+      expect(parts(template('tpl-type-row'))).toEqual([['SPAN', 'name', ''], ['BUTTON', 'ask-rename', 'Rename'], ['BUTTON', 'danger ask-delete', 'Delete']]);
+      expect(parts(template('tpl-pattern-row'))).toEqual([
+        ['SPAN', 'time', ''],
+        ['SPAN', 'type-name', ''],
+        ['SPAN', 'validity', ''],
+        ['SPAN', 'ended', 'ended'],
+        ['BUTTON', 'ask-change', 'Change'],
+        ['BUTTON', 'danger ask-delete', 'Delete'],
+      ]);
+      expect(template('tpl-pattern-row').querySelector('.ended')!.hasAttribute('hidden')).toBe(true);
+      for (const id of ['tpl-type-row', 'tpl-pattern-row', 'tpl-pattern-group']) {
+        const row = template(id);
+        expect(row.querySelectorAll('input, select, textarea, a'), id).toHaveLength(0);
+        // Which row a button is of is the script's to say.
+        for (const button of row.querySelectorAll('button')) expect([button.getAttribute('type'), button.hasAttribute('aria-label')], id).toEqual(['button', false]);
+      }
+      expect(parts(template('tpl-pattern-group')).map(([tag, name]) => [tag, name])).toEqual([['H4', ''], ['UL', 'list']]);
+      expect(template('tpl-choice').tagName).toBe('OPTION');
+    });
+
+    it('the dialogs that rename and change are forms with "Close" before their action; the one that deletes has "Keep" before "Delete" and nothing to type; all close with the Escape key', () => {
+      loadPage();
+      const buttons = (selector: string) => all<HTMLButtonElement>(`${selector} button`).map((button) => [button.textContent, button.getAttribute('type'), button.disabled]);
+      expect([one('dialog.rename h3').textContent, one('dialog.change h3').textContent, one('dialog.delete h3').textContent]).toEqual(['Rename type', 'Change pattern', 'Confirm the deletion']);
+      expect(buttons('dialog.rename')).toEqual([['Close', 'button', false], ['Rename', null, false]]);
+      expect(buttons('dialog.change')).toEqual([['Close', 'button', false], ['Change', null, false]]);
+      expect(buttons('dialog.delete')).toEqual([['Keep', 'button', false], ['Delete', 'button', false]]);
+      expect(one('dialog.delete').querySelectorAll('input, select, textarea, form')).toHaveLength(0);
+      expect([one('dialog.delete .question').textContent, one('dialog.delete .error').textContent, one('dialog.delete .error').getAttribute('role')]).toEqual(['', '', 'alert']);
+      expect(all('dialog[closedby]')).toHaveLength(0);
+    });
   });
 });

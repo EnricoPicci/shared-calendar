@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v8 — **decided; the foundation, the week, booking, cancelling, the note, the change, "My appointments", the settings and the users implemented** (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 66, briefs `prompts/83-step-60-implementation.md` to `prompts/89-step-66-implementation.md`): the build and dev-server commands, the tests' environment, the shell with its navigation between the screens, the login view, the logic layer (`frontend/src/logic/`), the week calendar with its book dialog (which also confirms a change), a User's list of appointments (upcoming and history), an appointment's detail (its note, "Change" and "Cancel appointment"), one dialog opened from both screens, the Administrator's settings, one form whose fields are checked before any call, and the Administrator's users: the list, a create that shows the generated password once, and a delete that asks first, exist in `frontend/`. The other views follow, one plan step each |
+| Status | v9 — **decided; the foundation, the week, booking, cancelling, the note, the change, "My appointments", the settings, the users and the first half of the availability implemented** (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 67, briefs `prompts/83-step-60-implementation.md` to `prompts/90-step-67-implementation.md`): the build and dev-server commands, the tests' environment, the shell with its navigation between the screens, the login view, the logic layer (`frontend/src/logic/`), the week calendar with its book dialog (which also confirms a change), a User's list of appointments (upcoming and history), an appointment's detail (its note, "Change" and "Cancel appointment"), one dialog opened from both screens, the Administrator's settings, one form whose fields are checked before any call, the Administrator's users: the list, a create that shows the generated password once, and a delete that asks first, and the Administrator's availability: the types and the weekly patterns, each with a form that creates, a dialog that changes and a delete that asks first, and the list of the appointments in the way of a refused change, exist in `frontend/`. The other views follow, one plan step each |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders |
 | Not in scope yet | Hosting, the CORS gap, keeping the session across a reload, the Content-Security-Policy of the hosting, logout. They are the open points of section 10, for later versions of this document |
 | Depends on | `docs/FRONTEND_SERVICES.md` v7 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work) |
@@ -22,6 +22,7 @@
 | v6 | 2026-11-19 | Plan step 64: "My appointments". Section 4: a dialog used from two views (the detail, moved out of the week's element and out of `week.view.ts`), the shape of the list. Section 5.1: seven files (`appointments.model.ts` and `appointments.screen.ts` are new), the list screen, the time zone read from the settings and what that leaves of decision 23, the period's own checks, the hand-over of an appointment to the week screen and what still ends a move, the detail's sentence by what the appointment is. Section 6: the second entry of the table, what a session owns, what the shell hands a view. Section 8: the detail's test run from three hosts, the native date field under `happy-dom`. Section 9: the tree. Section 12.1: the size at step 64. Section 11: decisions 53 to 65. |
 | v7 | 2026-11-19 | Plan step 65: the settings. Section 4: the shape of a form whose fields are checked (a field in fault). Section 5.1: nine files (`settings.model.ts` and `settings.screen.ts` are new), the settings screen, the checks of the fields and where the ranges come from, the read after a save and what it fills, the second sentence of `failureText` that depends on what was attempted. Section 6: the third entry, what a session owns. Section 8: the number field and the checkbox under `happy-dom`. Section 9: the tree. Section 12.1: the size at step 65. Section 11: decision 59 confirmed, decisions 66 to 76. Two wordings decided at the reviews of steps 63 and 64: the book dialog's two lists of times are labelled "Start" and "End", and the limit met by a change has its own sentence. |
 | v8 | 2026-11-20 | Plan step 66: the users. Section 4: the username, a second field that is checked, whose hint and refusal are the same words; the password dialog, which the Escape key does not close; the shape of a dialog that confirms a deletion. Section 5.1: eleven files (`users.model.ts` and `users.screen.ts` are new), the users screen, the check of the username, the reads of the list, where the generated password is and is not, the two new sentences of `failureText`. Section 6: the fourth entry, what a session owns. Section 8: what Chromium does with Escape on a modal dialog (the `cancel` event, `closedby`), a `close` event that arrives late, a class the style sheet already knew. Section 9: the tree. Section 12.1: the size at step 66. Section 11: decision 75's reason ended, decisions 77 to 88. At the review of the step: the `close` handlers of the detail and of the book dialog removed (section 4, "A close does nothing"; decision 84). |
+| v9 | 2026-11-20 | Plan step 67: the availability types and the weekly patterns. Section 4: a screen with two lists, a form that creates and a dialog that changes for each, four forms of one shape, the lists of choices, the conflicts list and its three places, one dialog that confirms the deletion of a type or of a pattern. Section 5.1: fourteen files (`availability.model.ts`, `conflicts.ts` and `availability.screen.ts` are new), the availability screen: its three reads, the join of the types' names, what a write says to the form or the dialog that asked, what goes through the screen object; the seven new sentences of `failureText` and the two new things that can be attempted. Section 6: the fifth entry, what a session owns. Section 8: a list with no choice, what a label's text holds, where the keyboard is after a dialog closes. Section 9: the tree. Section 12.1: the size at step 67. Section 11: decisions 89 to 108. |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
 TypeScript module script**. The markup of every screen is in one `index.html`; the script
@@ -573,6 +574,111 @@ users.deleteUserState$.subscribe((state) => {
 - The view is 172 lines, 26 of which look a node up or copy a template; no helper that builds
   or updates nodes was written (section 7).
 
+**The availability: a form that creates, a dialog that changes** (`docs/FRONTEND_VIEW_PLAN.md`
+step 67: `#availability`, `frontend/src/views/availability.view.ts`). One screen with two
+parts, each under its heading, "Types" and "Weekly patterns". A part is the shape of the users
+screen: a fixed form that creates, the failure of its read with "Try again", the sentence of
+an empty list, and the list. What is new:
+
+- **Creating is a fixed form, changing is a dialog.** A row holds buttons only (section 3,
+  rule 4): "Rename" and "Delete" for a type, "Change" and "Delete" for a pattern. "Rename" and
+  "Change" open a dialog filled with the row's values: `dialog.rename`, one name field, and
+  `dialog.change`, the six fields of the form that creates a pattern, written a second time in
+  `index.html`. Both are forms with "Close" before their action, as the book dialog is. A
+  button of a row says which row it is of to a screen reader (`aria-label`, "Change Monday
+  09:00 – 13:00 Studio"), with the words of the logic layer.
+- **Four forms, one shape.** The two forms that create and the two dialogs are each a `<form
+  novalidate>` of `.field` elements (the pattern of a field in fault above), a failure and a
+  button. The view finds the parts of the four with one look-up function and keeps them by
+  the names their outcomes have in the stream (`typeCreate`, `rename`, `patternCreate`,
+  `change`). Three local functions serve the four: what a form holds, as text (`held`); a form
+  filled with given values (`fill`); and what a write says in its form (`say`): each field in
+  fault marked with its sentence under it, the failure, the appointments in the way. They set
+  values and texts of elements found once; none builds a node.
+- **A pattern's six fields**: "Weekday", "Start", "End" and "Type" are native lists, "Valid
+  from" and "Valid until" native date fields; "Valid until" says under it "Leave empty for no
+  end." The choices of the weekday and of the two times are fixed, and the script sets them
+  once, at the mount, from the logic layer (the times are the 15-minute grid: nothing off it
+  can be chosen). The choices of the type follow the stream. All are copies of one template,
+  `tpl-choice`, and all are removed when the view is left.
+- **A list of types that arrives leaves what is chosen**, in the form and in the open dialog:
+  the script notes the list's value, rebuilds its choices and puts the value back. **A chosen
+  type that is no longer among them leaves none chosen** (a list set to a value it does not
+  hold shows nothing), and the logic layer then refuses the form with "Type must be chosen."
+  This is the second place where a redrawn region is a form control (the first is the book
+  dialog's list of users): a fixed field whose choices change, never a field that is rebuilt.
+- **The form that creates a pattern starts with no type chosen**, so that a type is always
+  chosen on purpose; while no type exists the place of the type's hint says that one must be
+  created first. Its starting values, and its return to them after a create that succeeded,
+  come from the stream (another object for the fields), as the username field's emptying does.
+- **A result reaches the dialog that asked for it, and only it.** The four writes that have a
+  check go through the logic object, whose stream carries one outcome per kind of write
+  (section 5.1): whether it is under way, the refusals of its fields, its failure, the
+  appointments in the way, whether it is done, and `about`, the id of the type or of the
+  pattern it was asked for. The two forms that create show their outcome as it is. A dialog
+  shows its own only while two things hold: its action was asked for since it opened (the
+  local "asked" of the shape of a dialog), and the outcome is about what the dialog is about.
+  It closes when that outcome is done. A button is disabled from the stream alone, while a
+  write of its kind is under way.
+- **An ended pattern** stays in the list (section 5.1) with the word "ended", fixed in the
+  row's template and shown by the script, and a quieter look (`is-ended`).
+
+**The conflicts list** (`docs/SHARED_CALENDAR_SPEC.md` section 6.7). A change of availability
+that would leave booked appointments outside it is refused with `availability_conflict` and
+the list of those appointments. Its markup, the same in each of its places:
+
+```html
+<p class="error failure" role="alert"></p>     <!-- the failure's own sentence -->
+<div class="conflicts" hidden>
+  <p class="conflicts-count"></p>              <!-- "2 appointments are in the way:" -->
+  <ul class="conflicts-list"></ul>             <!-- copies of tpl-conflict: date, time, User -->
+</div>
+```
+
+- **Three places so far**: the form that creates a pattern, the dialog that changes one, and
+  the dialog that confirms a deletion. One template for a row, `tpl-conflict`; one function of
+  the logic layer that makes the rows (`conflictList`, section 5.1); one local function of the
+  view that draws a list in a place (`showConflicts`).
+- **The failure is one sentence, and the list stands under it** with the sentence that counts
+  it. A failure that names no appointment shows its sentence alone.
+- **Personal data** (`docs/FRONTEND_SERVICES.md` section 17.7): usernames and times reach the
+  page through `textContent` only and are never logged. The list is taken out of the page at
+  the next try (the stream no longer carries it), at the next opening of the dialog that
+  showed it, and when the view is left. The id of an appointment never reaches the page.
+- **Nothing can be done to an appointment from the list**: the sentence sends the
+  Administrator to the week ("Cancel or move them in the week first.").
+- **What `docs/FRONTEND_VIEW_PLAN.md` step 68 reuses as it is**: the markup above in each new
+  place, `tpl-conflict`, `conflictList` and `showConflicts`; an override and a one-off window
+  need no word more.
+
+**One dialog confirms the deletion of a type or of a pattern** (`dialog.delete`, inside
+`#availability`): the dialog of the users above, copied, with two differences. It serves
+every deletion of the screen, so its fixed words name none: "Confirm the deletion", "Keep",
+"Delete"; what is deleted is in the question, which the logic layer makes ("Delete the type
+Studio? This cannot be undone."). And it has the conflicts list, for a pattern.
+
+```ts
+let deleting: { kind: 'type' | 'pattern'; id: string } | null = null; // what the open dialog is about
+let deleteAsked = false;                                                // "Delete" was pressed since it opened
+removeSubmit.onclick = () => {                                          // nothing to check: the view calls the service
+  deleteAsked = true;
+  if (deleting!.kind === 'type') types.remove(deleting!.id);
+  else rules.deletePattern(deleting!.id);
+};
+```
+
+- **Its state comes from the service of its kind**: `removeState$` of the
+  `AvailabilityTypesService` for a type, `deletePatternState$` of the
+  `AvailabilityRulesService` for a pattern. A state of the other kind changes nothing in it.
+  The button is disabled while a delete of the dialog's own kind is under way.
+- **The appointments in the way of a pattern's deletion** come with the service's failure;
+  the view hands them to the logic object (`screen.conflicts(…)`), which knows the calendar's
+  time zone, and draws what comes back.
+- **One dialog, not one per kind**: `docs/FRONTEND_VIEW_PLAN.md` step 68 adds two more
+  deletions to this screen, and each is then a question and a call, not a dialog more.
+- The view is 282 lines and listens to three streams; 36 of its lines look a node up or copy
+  a template (section 7; section 11, decision 107).
+
 ## 5. The logic layer
 
 Some of what the screens need may not be in a view (section 3, rule 1) and is not a remote call
@@ -585,7 +691,7 @@ either. It lives in the logic layer:
 | A response made ready to draw | The week: per day, its windows, slots, busy blocks and appointments, each with its place in the day and its time as text |
 | What is offered | Whether the note can be edited and whether "Change" and "Cancel" are shown for an appointment (the status, the end, the role, `cancellableUntil`) |
 | The texts | A date and a time in the calendar's time zone, whatever the browser's; a failure `reason` in plain words (`docs/SHARED_CALENDAR_SPEC.md` section 16.8) |
-| From the user's input to a call's argument | The booking body from a slot, a note and a username; the settings' body from four fields typed as text, or why not, field by field; the username to create from what its field holds, or why not |
+| From the user's input to a call's argument | The booking body from a slot, a note and a username; the settings' body from four fields typed as text, or why not, field by field; the username to create from what its field holds, or why not; a type's name and a pattern's body from what their forms hold, or why not, field by field |
 
 Its rules:
 
@@ -604,14 +710,14 @@ Its rules:
 7. **Tested like the services**: unit tests with no network and no DOM, inside the 100 % line
    coverage of `frontend/src`.
 
-### 5.1 As built: eleven files
+### 5.1 As built: fourteen files
 
-`frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` steps 61 to 66), each with its test in
+`frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` steps 61 to 67), each with its test in
 `frontend/tests/unit/logic/`:
 
 | File | What it holds |
 |---|---|
-| `texts.ts` | Pure functions: a date (`dateText`, "Mon 16 Nov"), a time (`timeText`, "09:00"), a range (`rangeText`, "09:00–10:00"), a date with a time (`dateTimeText`, "Mon 23 Nov, 10:00"), a week's label (`weekLabel`, "16 Nov – 22 Nov 2026"), a UTC offset (`offsetText`, "+02:00"), whether a day's offset changes (`offsetChangesOn`), and a failure in plain words (`failureText`) |
+| `texts.ts` | Pure functions: a date (`dateText`, "Mon 16 Nov"), a time (`timeText`, "09:00"), a range (`rangeText`, "09:00–10:00"), a date with a time (`dateTimeText`, "Mon 23 Nov, 10:00"), a date with its year (`longDateText`, "20 November 2026"), a week's label (`weekLabel`, "16 Nov – 22 Nov 2026"), a UTC offset (`offsetText`, "+02:00"), whether a day's offset changes (`offsetChangesOn`), and a failure in plain words (`failureText`) |
 | `week.model.ts` | Pure: `weekModel(view, role)`, a `CalendarView` in, the week ready to draw out |
 | `booking.ts` | Pure, for the book dialog: what is booked in words (`bookingText`), the times the Administrator may choose (`timeChoice`), the Users to choose from (`userChoice`), and from what the dialog holds to the argument of `AppointmentsService.book` (`bookingFor`) or, when it confirms a change, of `AppointmentsService.change` (`changeFor`) |
 | `appointment.detail.ts` | Pure: `appointmentDetail(appointment, role, now, zone)`, an `Appointment` in, what the detail dialog shows out, with which of its three actions are offered (the note, "Change", "Cancel appointment"), the note as a text and as a field's value, and the sentence about them; `movingOf(detail, role)`, an appointment being moved, in the words of the banner and of the confirmation |
@@ -622,6 +728,9 @@ Its rules:
 | `settings.screen.ts` | The class `SettingsScreen`: the settings read when the screen is shown, the save with its checks, and the read that follows every save |
 | `users.model.ts` | Pure, for the users screen: the list ready to draw (`userRows`: the username, and whom its "Delete" button deletes), the sentence of an empty list (`NO_USERS`), what a username is in words (`USERNAME_HINT`), from what the field holds to the username to create or to the refusal (`usernameFor`), and the words of the dialog that confirms a deletion (`deleteQuestion`) |
 | `users.screen.ts` | The class `UsersScreen`: the list read when the screen is shown, a create with its check, and the list read again after every create and delete and when the page becomes visible |
+| `availability.model.ts` | Pure, for the availability screen. The types: the list ready to draw (`typeRows`), the sentence of an empty list (`NO_TYPES`), what a name is in words (`TYPE_NAME_HINT`), from what the field holds to the name or to the refusal (`typeNameFor`), the question before a deletion (`deleteTypeQuestion`). The patterns: the choices of the form's lists (`WEEKDAY_CHOICES`, `START_CHOICES`, `END_CHOICES`, `typeChoices`), what the form starts with (`startingFields`), the fields of an existing pattern (`patternFields`), from what the form holds to the body or to the refusals (`patternFor`), the list grouped by weekday and ready to draw (`patternGroups`), the question before a deletion (`deletePatternQuestion`) |
+| `conflicts.ts` | Pure: `conflictList(conflicts, zone)`, the appointments in the way of a refused change of availability, ready to draw, with the sentence that counts them |
+| `availability.screen.ts` | The class `AvailabilityScreen`: the settings (for the time zone), the types and the patterns read when the screen is shown, the four writes that have a check, and the lists read again after every write and when the page becomes visible |
 
 **"Now" is passed in.** Nothing in `logic/` reads the clock by itself. `WeekScreen` receives a
 function `now: () => Date` through its constructor (the shell passes `() => new Date()`, a test a
@@ -1023,6 +1132,142 @@ export class UsersScreen {
 - **What is kept, and what is not.** Nothing: the end of the subscription of `start()`
   forgets the list, what the form said and what was typed, and the next `start()` reads.
 
+**The availability screen** (`docs/FRONTEND_VIEW_PLAN.md` step 67; the Administrator's; the
+first screen that uses two services at once, and a third for the time zone).
+
+```ts
+// What one of the four writes says to the form or the dialog that asked, replaced whole at
+// every new ask. `about` is the id of the type renamed or of the pattern changed, empty for
+// a create.
+export type Ask<F extends string> = {
+  about: string; busy: boolean; refusals: Partial<Record<F, string>>;
+  failure: string | null; conflicts: ConflictList | null; done: boolean;
+};
+
+// `types` and `groups` are the two lists as last read: null until there is one and after a
+// read that failed, and another object only when what was read differs from what is on show.
+// `choices` are the types to choose from in the two pattern forms. `typeField` and
+// `patternFields` are what the two forms that create are filled with: another object only
+// when the form is to be filled again.
+export type AvailabilityState = {
+  loading: boolean;
+  typesUnread: string | null; types: readonly TypeRow[] | null; typesEmpty: string | null;
+  patternsUnread: string | null; groups: readonly PatternGroup[] | null; patternsEmpty: string | null;
+  choices: readonly Choice[]; typeHint: string;
+  typeField: { name: string }; patternFields: PatternFields;
+  typeCreate: Ask<'name'>; rename: Ask<'name'>; patternCreate: Ask<PatternField>; change: Ask<PatternField>;
+};
+
+export class AvailabilityScreen {
+  readonly availability$: Observable<AvailabilityState>;
+  // `settings`: `load` and `settingsResult$`. `types`: `load`, `create`, `rename` and the four
+  // result streams of the AvailabilityTypesService. `rules`: `loadPatterns`, `createPattern`,
+  // `updatePattern` and the four result streams of the patterns, of the AvailabilityRulesService.
+  constructor(settings: AvailabilitySettings, types: AvailabilityTypes, rules: AvailabilityRules, now: () => Date, visible$: Observable<unknown>) { … }
+  start(): Subscription { … }                    // reads the settings, the types and the patterns
+  retryTypes(): void { … }                       // reads the types again, after a read that failed
+  retryPatterns(): void { … }                    // the patterns, and the settings while the zone is not known
+  createType(text: string): void { … }           // checks the name; creates, or says why not
+  rename(typeId: string, text: string): void { … }
+  createPattern(fields: PatternFields): void { … } // checks the six fields; creates, or says which are in fault
+  change(patternId: string, fields: PatternFields): void { … } // one call that replaces the pattern's fields
+  conflicts(conflicts: readonly AppointmentConflict[] | undefined): ConflictList | null { … }
+}
+```
+
+- **Three reads, at once.** `start()` asks for the settings, the types and the patterns
+  together. The settings are read for the calendar's time zone only, as the list screen reads
+  them: the zone decides "today" (which patterns have ended, and the date the form that
+  creates a pattern starts on) and the dates and times of a conflict. The list of the types
+  needs its own read only; the list of the patterns needs the patterns and the zone. While
+  any read is under way the stream says `loading`.
+- **A failed read is said in the place of its list**, and the two lists fail and are tried
+  again independently: `retryTypes()` reads the types, `retryPatterns()` the patterns, and the
+  settings too while the zone is not known. A failed read of the settings is said in the
+  place of the patterns' list. Both forms stay usable meanwhile; a pattern needs a type to be
+  chosen, so it cannot be created while no list of types was ever read.
+- **A list that could not be read again is taken off the screen**, as the users' is. **The
+  types as last read are kept** for two things all the same: the choices of the two pattern
+  forms, so that an open dialog does not lose its type to a read that failed, and the names in
+  the patterns' rows. The server has the last word on a type that is gone (`type_not_found`).
+- **The same lists read again keep the same objects** (the rows and the choices are compared
+  as data), so the view redraws nothing and the keyboard stays on a row's button; a dialog
+  that is open is left as it is in every case.
+- **A type's rows** (`typeRows`): the name, in the server's order (by name), and the names of
+  its two buttons for a screen reader ("Rename Studio", "Delete Studio").
+- **A pattern's rows** (`patternGroups`): one group per weekday, Monday to Sunday, a weekday
+  with no pattern left out; in a group by start, then by end, then by the first date of
+  validity. A row has its hours ("09:00 – 13:00"; an end at midnight is "24:00"), the name of
+  its type, and its validity in words, with the year, since a pattern may run for years
+  ("from 20 November 2026", "from 20 November 2026 to 19 January 2027").
+- **Every pattern the server returns is listed.** One whose validity ended before today, the
+  calendar's today, is marked `ended` and stays: a type cannot be deleted while any pattern
+  uses it, ended or not (`docs/SHARED_CALENDAR_SPEC.md` R-TYPE-03), so the Administrator must
+  see it to delete it. A pattern that ends today has not ended. No switch hides anything.
+- **The type's name is joined here** from the two lists, which are read at different moments.
+  A rename therefore changes the patterns' rows when the types are read again, with no read
+  of the patterns. A pattern whose type the types do not hold shows "Unknown type"; opened in
+  the dialog that changes it, it has no type chosen.
+- **A type's name is checked here, before any call** (`typeNameFor`), with the shared
+  `TypeName` schema and nothing else: spaces around it are removed, by the schema, and
+  nothing else is changed. The refusal is one sentence, the same that stands under the field
+  as its hint (`TYPE_NAME_HINT`): "A name has 1 to 40 characters, with no tab in it.", the
+  number being `CALENDAR_LIMITS.typeNameLength` of `shared/`. A name that exists, whatever
+  its capitals, and the limit of types are the server's to say: the form's failure, the field
+  not marked. The page never compares a name with the list on show. A rename to the same name
+  is sent as it is.
+- **A pattern's fields are checked here, before any call** (`patternFor`). The refusals: "End
+  must be later than Start."; "Type must be chosen."; "Valid from must be a date."; "Valid
+  until must be a date, or left empty."; "Valid until must not be before Valid from." Every
+  field in fault is said, each sentence starting with the words of its label (decisions 68
+  and 69). Two times and two dates are compared as texts written alike; whether a text is a
+  date is the shared `LocalDate` schema's to say. The weekday and the two times come from
+  lists that hold nothing wrong and are not checked. "Today" is not a rule: a pattern may
+  start in the past (`docs/SHARED_CALENDAR_SPEC.md` R-PAT-03). What only the server knows is
+  not checked: an overlap, a conflict, the limit of patterns, a type deleted meanwhile.
+- **The service checks again**, with `PatternBody`, which has the last word; a body accepted
+  here and refused there would be a defect. The tests of `availability.model.ts` hold the two
+  together: every body the logic accepts is parsed by the schema unchanged, and every case it
+  refuses the schema refuses too.
+- **"Change" is one call**, `updatePattern`, which replaces the pattern's six fields. The
+  shortcut of `docs/SHARED_CALENDAR_SPEC.md` section 6.2, "from a date on" in two calls, is
+  not built: the Administrator sets "Valid until" on the old pattern and creates a new one.
+- **The form that creates a pattern** starts on Monday, 09:00 to 10:00, no type chosen, valid
+  from today with no end (`startingFields`). "Today" is the calendar's, so `patternFields`
+  becomes another object when the settings first say the zone, and again after every create
+  that succeeded; after a refusal or a failure what was chosen stays.
+- **What a write says** is one `Ask` per kind of write, replaced whole at every ask: a
+  refusal by the check (no call, the lists kept), `busy` while the call is under way, then
+  `done` or the failure in plain words (`failureText`, with what was attempted), with the
+  appointments in the way when the server named some. **While a write of a kind is under way
+  another of that kind is not taken**, sent or refused: the answer that arrives is then
+  always of the write the state is about, which is what lets a dialog trust `about`
+  (section 4). A change and a create under way together do not concern each other.
+- **The lists are read again after every write, whatever its outcome**
+  (`docs/SHARED_CALENDAR_SPEC.md` section 16.3): the types after a create, a rename and a
+  delete of a type; the patterns after a create, a change and a delete of a pattern. A
+  pattern's write answered `type_not_found` means the list of types on show is old: the types
+  are read again too. And both lists every time the page becomes visible, through the stream
+  the shell hands the other screens. Not for a result that was already there at `start()`.
+- **The two deletes are called by the view** (decision 86: a write with nothing to check);
+  the screen hears their results, to read again. For the appointments in the way of a
+  pattern's deletion the view asks `conflicts(…)`, which makes them ready to draw in the
+  calendar's zone, or nothing while the zone is not known.
+- **The conflicts** (`conflictList`, in a file of its own since
+  `docs/FRONTEND_VIEW_PLAN.md` step 68 uses it for an override and a window): the rows by
+  start, then by username, each with its date ("Mon 23 Nov"), its time in the calendar's
+  zone, with the offsets on a day the clocks change, and its User; above them "1 appointment
+  is in the way:" or "3 appointments are in the way:". No list, or an empty one, is nothing
+  to draw. The id of an appointment is not carried further.
+- **Nothing is told to the week.** It loads at its `start()`, so going from "Availability" to
+  "Week" shows the new windows and a renamed type's name; a User's open page shows them at
+  its next load.
+- **One `CalendarSettingsService` per session now serves three screens**; each listens while
+  it is started and takes no result that was there before its `start()`.
+- **What is kept, and what is not.** Nothing: the end of the subscription of `start()`
+  forgets the lists, the zone, what the forms said and what was typed, and the next `start()`
+  reads everything again.
+
 **The change.** `changeFor(slot, zone, role, fields)` makes the argument of
 `AppointmentsService.change` from what the confirmation holds. The times are a booking's: a
 User sends the slot's `start`, the Administrator both instants, the slot's own while the two
@@ -1085,8 +1330,24 @@ refuses with the same code (`docs/SHARED_CALENDAR_SPEC.md` section 8.4).
 Cancel one to book another." after a booking and "You have more upcoming appointments than the
 calendar now allows, so this one cannot be moved. Cancel one first." after a change: a change
 books nothing more, so it meets the limit only when the limit was lowered below what the User
-already holds (`docs/SHARED_CALENDAR_SPEC.md` R-SET-03). Every other reason keeps one sentence
+already holds (`docs/SHARED_CALENDAR_SPEC.md` R-SET-03). Every other reason of an appointment keeps one sentence
 whatever was attempted.
+**The availability** (`docs/FRONTEND_SERVICES.md` sections 16.1 and 17.1) brought seven
+codes. `type_name_exists`: "A type with this name exists already. Choose another name."
+`type_in_use`: "This type is in use, so it cannot be deleted. A type is in use while a weekly
+pattern, a date of today or later or an upcoming appointment uses it."
+(`docs/SHARED_CALENDAR_SPEC.md` R-TYPE-03). `type_not_found`: "This type no longer exists."
+`pattern_not_found`: "This pattern no longer exists." `availability_overlap`: "Another window
+of the same day covers part of these hours, whatever its type. Choose other hours."
+(`docs/SHARED_CALENDAR_SPEC.md` R-AV-01). `availability_conflict`: "This would leave booked
+appointments outside the hours open for booking. Cancel or move them in the week first.",
+under which the conflicts list stands. And `limit_reached`, whose words depend on what was
+attempted, a third and a fourth value of the second argument: after `'type'`, "The calendar
+can hold 20 types at most. Delete one to create another."; after `'pattern'`, "The calendar
+can hold 50 weekly patterns at most. Delete one to create another."; the two numbers are
+`CALENDAR_LIMITS.types` and `CALENDAR_LIMITS.patterns` of `shared/`, never written in the
+sentence by hand. With nothing said of what was attempted it is "The calendar cannot hold
+more of these. Delete one to create another."
 The raw technical text is never shown: a reason without a sentence gets one general sentence,
 never the service's `message`, which is written for a developer. The login view uses it too. A
 wrong password and an unknown user are one reason and get one sentence. Each later step adds the
@@ -1124,9 +1385,9 @@ API's configuration and the whole store because it creates the API services of e
    the `CalendarSettingsService` (read by the list screen for the time zone, read and saved by
    the settings screen), the `WeekScreen`, the `AppointmentsScreen`, which is given the
    `WeekScreen` for the hand-over of section 5.1, the `SettingsScreen` and the `UsersScreen`,
-   which is given the session's `UsersService`, the one the week's book dialog asks for its list. They live as long as the person's session, not as long as a screen is on
+   which is given the session's `UsersService`, the one the week's book dialog asks for its list, the `AvailabilityTypesService`, the `AvailabilityRulesService` and the `AvailabilityScreen`, which is given both and the session's `CalendarSettingsService`. They live as long as the person's session, not as long as a screen is on
    show: coming back to a screen finds its logic object as it was left. The same function builds
-   the stream the week, the list and the users screens reload on (section 5.1): the document's `visibilitychange` event,
+   the stream the week, the list, the users and the availability screens reload on (section 5.1): the document's `visibilitychange` event,
    keeping the notifications at which `document.visibilityState` is `visible`. Each screen
    listens to it only while it is started, so the screen on show is the one that loads again,
    and nothing is loaded at the login or after signing out.
@@ -1152,12 +1413,12 @@ export type Screen = {
 };
 ```
 
-There are four entries so far: `#/week`, "Week", both roles; `#/appointments`, "My
-appointments", the role `user` only; `#/settings`, "Settings", and `#/users`, "Users", the
-role `admin` only. The dialogs have no address. A new screen is a new entry,
+There are five entries so far: `#/week`, "Week", both roles; `#/appointments`, "My
+appointments", the role `user` only; `#/settings`, "Settings", `#/users`, "Users", and
+`#/availability`, "Availability", the role `admin` only. The dialogs have no address. A new screen is a new entry,
 its element in `index.html`, and its services and logic object in `sessionObjects`; the code
 that reads the address, fills the navigation and switches between screens does not change, and
-did not for the second entry, nor for the third, nor for the fourth. `mountShell` takes the table as an optional dependency, which a
+did not for the second entry, nor for the third, the fourth or the fifth. `mountShell` takes the table as an optional dependency, which a
 test uses to bring an entry whose mount is a spy.
 
 **What the shell hands a view** is in the entry's `show`: the logic object and the parts of the
@@ -1338,6 +1599,33 @@ What the tests of the users rely on (plan step 66), and what was learnt in the b
   there with the page the Administrator finds when nobody was there before, with the clock
   standing still: anything left of the first person, of whatever kind, makes the two differ.
 
+What the tests of the availability rely on (plan step 67), and what was learnt in the browser:
+
+- **A list with no choice chosen.** A `<select>` whose `value` is set to a text none of its
+  choices has shows nothing, has `selectedIndex` −1 and reads back as an empty text, in
+  `happy-dom` 21 as in Chromium. The view uses it twice: the form that creates a pattern
+  starts with no type chosen, and a chosen type that is gone from the list that arrives
+  leaves none chosen. A list rebuilt with `replaceChildren` has its first choice chosen, and
+  `form.reset()` chooses the first one too, in both: the view sets the value after a rebuild,
+  and never relies on a reset to put a list back.
+- **A label's text holds the texts of its list's choices** (`textContent` of a `<label>`
+  around a `<select>`): a test that reads the words of a label reads its first text node.
+- **A helper that puts the screen's id before a selector scopes only the first part of a
+  list of selectors**: `#availability li, option` is every `<option>` of the page. A test
+  that counts what a view left behind asks the screen's element instead.
+- **The page's fixed words are in its comments** (plan step 64, above): "in the way" is in a
+  comment of `index.html`; the tests look for a conflict's date and name.
+- **Where the keyboard is after a dialog closes** is the browser's only, and in Chromium 159
+  it is this. After "Close", "Keep" or the Escape key it is back on the row's button that
+  opened the dialog. After a rename, a change or a delete that succeeded it is on nothing:
+  the list was read again and differs, so the row's button is a new element, or is gone; the
+  next Tab continues from where the button was. The same after "Create pattern" pressed on
+  its button, which is disabled while the create is under way; "Create type" by the Enter
+  key leaves the keyboard in the name field. When a dialog opens the keyboard is on its
+  first field (the name, the weekday), and on "Keep" in the one that deletes.
+- **By keyboard, a list is driven by typing** ("Sunday", "05:00") or by the arrow keys; from
+  a list with none chosen the first arrow chooses the first choice.
+
 ## 9. Placement
 
 Inside `frontend/`, next to the services:
@@ -1358,10 +1646,11 @@ frontend/
 │   │                          # booking.ts, appointment.detail.ts, week.screen.ts,
 │   │                          # appointments.model.ts, appointments.screen.ts,
 │   │                          # settings.model.ts, settings.screen.ts, users.model.ts,
-│   │                          # users.screen.ts
+│   │                          # users.screen.ts, availability.model.ts, conflicts.ts,
+│   │                          # availability.screen.ts
 │   └── views/                 # shell.ts and one <name>.view.ts per view: login.view.ts, week.view.ts,
-│                              # appointments.view.ts, settings.view.ts, users.view.ts;
-│                              # detail.view.ts, the dialog two views mount
+│                              # appointments.view.ts, settings.view.ts, users.view.ts,
+│                              # availability.view.ts; detail.view.ts, the dialog two views mount
 ├── tests/
 │   └── unit/
 │       ├── services/          # vitest project `unit`, in node
@@ -1501,6 +1790,26 @@ than what the trial showed: these deserve the first look in a review.
 | 86 | "Delete user" calls the `UsersService` from the view; "Create user" goes through the `UsersScreen` (sections 4 and 5.1) | Section 2: a view may call a service, and the logic layer holds only what would otherwise end up in a view. A create has a check and words; a delete has none | |
 | 87 | The shell's test of a second person compares the whole page, its source and what every field holds, with the page the same person finds when nobody was there before (section 8) | It relied on a word, "User", that the page's own fixed texts now hold. The comparison still catches a role, a name, a link, a row, a value, an attribute or an open dialog left by the first person, and anything a later screen leaves | Yes |
 | 88 | No condition of section 7 was met at plan step 66 | `users.view.ts` is 172 lines and listens to three streams; 26 of its lines look a node up or copy a template. The one field is in a fixed form; the rows hold buttons only; `rowFor` copies a template and fills it, as the list's does; the two dialogs are filled by a few assignments each | |
+| 89 | On the availability screen creating is a fixed form and changing is a dialog; a row holds buttons only: "Rename" or "Change", and "Delete" (section 4) | Decided with the Product Owner (`docs/FRONTEND_VIEW_PLAN.md` step 67). As "Create user" is; and editing is never inline in a redrawn list (decision 11) | |
+| 90 | The list of the patterns shows every pattern the server returns, grouped by weekday; one whose validity has ended is marked "ended" and stays; no switch hides anything (section 5.1) | Decided with the Product Owner. A type used by any pattern, ended or not, cannot be deleted (`docs/SHARED_CALENDAR_SPEC.md` R-TYPE-03), so the Administrator must be able to see it and delete it | |
+| 91 | "Change" is one call that replaces the pattern's fields; "from a date on" in two calls is not built (section 5.1) | Decided with the Product Owner. The Administrator sets "Valid until" on the old pattern and creates a new one, by hand; two calls of which the second can fail would need a design of their own | |
+| 92 | A pattern's start and end are two lists of the local times on the 15-minute grid, 00:00 to 23:45 and 00:15 to 24:00; its two dates are native date fields (section 4) | Decided with the Product Owner. As the book dialog's "Start" and "End" (decision 37): nothing off the grid can be chosen | |
+| 93 | Three new files in the logic layer: `availability.model.ts`, pure, for the types and the patterns; `conflicts.ts`, pure, for the conflicts list; `availability.screen.ts`, the class (section 5.1) | The pattern of the users (a model and a screen). The conflicts are apart because `docs/FRONTEND_VIEW_PLAN.md` step 68 uses them for an override and a window, and they are about appointments, not about a pattern | Yes |
+| 94 | A type's name is checked in `logic/availability.model.ts` with the shared `TypeName` schema; its refusal and the hint under the field are one sentence, whose number is `CALENDAR_LIMITS.typeNameLength`; a name that exists and the limit of types are the server's to say (section 5.1) | Decision 82 again. The sentence also says "with no tab in it": the schema refuses a control character inside a name, and a tab is the one a person can paste into a text field; without the words a pasted name of ten characters would be told that it must have 1 to 40 | The words about the tab, yes |
+| 95 | A pattern's fields are checked in `logic/availability.model.ts`: two comparisons of texts written alike (the two times, the two dates) and the shared `LocalDate` schema; `PatternBody` has the last word through the service, and the model's tests hold the two together (section 5.1) | Decisions 66 and 68: the field is named, in the words of its label, and every field in fault is said. The schema's own cross-field checks are not relied on for that: whether they run when another field is also in fault is the schema library's to decide | Yes |
+| 96 | The availability screen reads the settings, the types and the patterns at once; the list of patterns needs the zone and the patterns; each list fails and is tried again by itself (section 5.1) | Decision 55 again, for the calendar's "today" and the dates of a conflict. Nothing waits for the settings but the patterns' list: the three requests leave together | |
+| 97 | A read of the types that fails takes their rows off the screen and keeps the types as last read for the choices of the pattern forms and the names in the patterns' rows; a pattern whose type the types do not hold shows "Unknown type" (section 5.1) | Decision 85 for the rows, which have "Delete" buttons. The choices are another matter: emptied behind an open dialog they would take its type away, and the server refuses a type that is gone anyway | Yes |
+| 98 | The outcome of each of the four writes that have a check is one object of the stream, with `about`, the id it was asked for; a dialog shows it only when it asked since it opened and the outcome is about what the dialog is about; while a write of a kind is under way another of that kind is not taken (sections 4 and 5.1) | Decision 34 was enough while the outcome came from a service's state, which only a call changes. Here a refusal by the check changes the outcome with no call, so a call left under way by an earlier opening could answer into a later one: the id and the rule of one write at a time close that. It departs from the users screen, where a second create goes to the service, which keeps the last | Yes |
+| 99 | The two deletes are called by the view on their services; the appointments in the way of a pattern's deletion are made ready to draw by `AvailabilityScreen.conflicts(…)` (sections 4 and 5.1) | Decision 86: a write with nothing to check. The view has no time zone and may do no date arithmetic, so it asks the logic object, as the week view asks for a detail | Yes |
+| 100 | One dialog confirms the deletion of a type or of a pattern; its fixed words name neither ("Confirm the deletion", "Keep", "Delete"), and the question says what is deleted (section 4) | `docs/FRONTEND_VIEW_PLAN.md` step 68 adds two more deletions to the screen: with one dialog each is a question and a call. The price: the heading and the button do not say "type" or "pattern"; the question does, in its first words | Yes |
+| 101 | The conflicts list is one markup in three places, one template for a row, one function of the logic layer and one local function of the view; it stands under the failure's own sentence with a sentence that counts it; nothing can be done to an appointment from it (sections 4 and 5.1) | `docs/SHARED_CALENDAR_SPEC.md` section 16.8 asks for the list. Cancelling from there would be a second way to cancel, with its own failures, inside a dialog that is about something else: the Administrator goes to the week | The count as a second sentence, yes |
+| 102 | The form that creates a pattern starts with no type chosen; a list of types that arrives leaves what is chosen; a chosen type that is gone leaves none chosen, which the check refuses (section 4) | A native list always has its first choice chosen unless told otherwise: the first type would be the pattern's type by accident, and a type that is gone would silently become another | Yes |
+| 103 | After a create that succeeded the form that creates a pattern goes back to its starting values; "Valid from" starts on today, the calendar's (section 5.1) | Asked by the brief of the step. Known cost: five patterns of one type for five weekdays are five times the type and the hours chosen again; copying a pattern and several weekdays in one create are not built | |
+| 104 | `failureText` takes `'type'` and `'pattern'` as what was attempted, for `limit_reached`; with nothing said the sentence names no number (section 5.1) | Decision 51's second argument, extended rather than a second way. The numbers are `CALENDAR_LIMITS`' | |
+| 105 | `texts.ts` gains `longDateText`, a date with its whole month and its year; a pattern's validity uses it, a conflict's date stays without a year (section 5.1) | A pattern may be valid for years; an appointment in the way has not ended and is within the booking horizon, a year at most, so its date is not ambiguous (decision 64) | Yes |
+| 106 | A pattern's hours are written "09:00 – 13:00", with spaces around the dash; an appointment's time stays "09:00–10:00" (`rangeText`), also in the conflicts list of the same screen (section 5.1) | The first are two local times of a rule, written as the brief of the step has them; the second is the time of an appointment, as the week and the list write it. To settle at the review if one form is wanted | Yes |
+| 107 | No condition of section 7 was met at plan step 67; one came close | `availability.view.ts` is 282 lines (the week's is 312) and listens to three streams; 36 of its lines look a node up or copy a template. No field is in a redrawn region: the rows hold buttons, and the choices of a fixed list are rebuilt, as in the book dialog (decision 39). **What came close**: four forms of one shape gave the view local functions that set values and texts of elements found once (`fill`, `say`, `showConflicts`, `choices`), where the settings had one loop in its subscription. None builds a node or decides anything; they are the same few assignments for four forms instead of written four times. If step 68's per-date editor needs rows of fields that come and go, that is the first condition of section 7, and the step must stop there | |
+| 108 | The availability is a fifth entry of the table of screens, with its two services and its logic object in `sessionObjects`; the code that reads the address, fills the navigation and switches between screens did not change (section 6) | Decision 28, for the fifth time | |
 
 ## 12. The tooling (open points O4, O6 and O8, decided)
 
@@ -1537,7 +1846,7 @@ in other languages), which `shared/`'s schemas bring in with any import from
 At plan step 61, with the logic layer and the week: `app.js` 504 kB, 110 kB compressed. At plan
 step 62, with booking and cancelling: 518 kB, 113 kB compressed. At plan step 63, with the note
 and the change: 520 kB, 114 kB compressed. At plan step 64, with "My appointments": 528 kB,
-115 kB compressed. At plan step 65, with the settings: 532 kB, 117 kB compressed. At plan step 66, with the users: 537 kB, 118 kB compressed. What to do about `zod`'s share
+115 kB compressed. At plan step 65, with the settings: 532 kB, 117 kB compressed. At plan step 66, with the users: 537 kB, 118 kB compressed. At plan step 67, with the types and the weekly patterns: 561 kB, 124 kB compressed. What to do about `zod`'s share
 is open point O9 (section 10).
 
 ### 12.2 The dev server
@@ -1588,7 +1897,15 @@ the users: what a username is, which is the hint and the refusal, the sentence o
 list, the name of a row's button for a screen reader and the question of the delete dialog
 (`users.model.ts`); the fixed words of the two dialogs of the users ("User created", "This
 password cannot be shown again. Give it to the user now.", "I have noted the password",
-"Delete user", "Keep") are in the page. The words that name an appointment being moved come from the logic layer
+"Delete user", "Keep") are in the page. Those of the availability are made by the logic
+layer too: what a type's name is, which is the hint and the refusal, the refusals of a
+pattern's fields, the two sentences of an empty list, the word for a type that is not known,
+that a type must be created first, the names of the weekdays, a pattern's validity, the names
+of a row's buttons for a screen reader, the two questions before a deletion
+(`availability.model.ts`) and the sentence that counts the appointments in the way
+(`conflicts.ts`); the fixed words of the screen ("Types", "Weekly patterns", the six labels,
+"Leave empty for no end.", "ended", "Rename type", "Change pattern", "Confirm the deletion",
+"Close", "Keep", "Delete") are in the page. The words that name an appointment being moved come from the logic layer
 (`movingOf`); the fixed words around them ("Moving: … Choose a free time.", "From:", "To:") are
 in the page. No view shows the `message` of a
 service. The shell holds the two names of the roles.

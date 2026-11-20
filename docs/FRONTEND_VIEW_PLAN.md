@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v7 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`). Step 62 done on 2026-11-19 (brief `prompts/85-step-62-implementation.md`). Step 63 done on 2026-11-19 (brief `prompts/86-step-63-implementation.md`). Step 64 done on 2026-11-19 (brief `prompts/87-step-64-implementation.md`). Step 65 done on 2026-11-19 (brief `prompts/88-step-65-implementation.md`). Step 66 done on 2026-11-20 (brief `prompts/89-step-66-implementation.md`), waiting for review; next step 67 |
+| Status | v8 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`). Step 62 done on 2026-11-19 (brief `prompts/85-step-62-implementation.md`). Step 63 done on 2026-11-19 (brief `prompts/86-step-63-implementation.md`). Step 64 done on 2026-11-19 (brief `prompts/87-step-64-implementation.md`). Step 65 done on 2026-11-19 (brief `prompts/88-step-65-implementation.md`). Step 66 done on 2026-11-20 (brief `prompts/89-step-66-implementation.md`). Step 67 done on 2026-11-20 (brief `prompts/90-step-67-implementation.md`), waiting for review; next step 68 |
 | Scope | Everything needed to go from the services layer that exists to **all the views written, tested and running in a browser against the local stack**: the tooling, the shell, the logic layer and one view per screen. Steps 60 to 69 |
 | Not in scope | Hosting, the CORS configuration, the Content-Security-Policy of the hosting, logout as a designed service, the session across a reload, the cloud deployment of the front end. They are the open points O1, O2, O3, O5 and O7 of `docs/FRONTEND_ARCHITECTURE.md` section 10 and get their own plan |
 | Governed by | `docs/FRONTEND_ARCHITECTURE.md` (the rules of the view layer), `docs/FRONTEND_SERVICES.md` (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/ARCHITECTURE.md` section 4 (the API). On any conflict with this plan, they win |
@@ -18,6 +18,7 @@
 | v5 | 2026-11-19 | Step 64: three choices about the screen were made with the Product Owner before the step's implementation (brief `prompts/87-step-64-implementation.md`), and the step's text says them: the list's time zone is read from the settings; the history's period is chosen with two dates and opens on the 30 days that end today; "Change" from the list goes to the week, with step 63's banner and confirmation. The step's browser check is brought in line. |
 | v6 | 2026-11-19 | Step 65: four choices about the settings screen were made with the Product Owner before the step's implementation (brief `prompts/88-step-65-implementation.md`), and the step's text says them: "No limit" as a checkbox, what the form shows beside its fields, unsaved values lost with no question, and what follows a save. The step also carries two wordings decided at the reviews of steps 63 and 64 (the labels "Start" and "End" of the book dialog; a sentence of its own for the limit met by a change), and records that the history of "My appointments" keeps its default period. |
 | v7 | 2026-11-20 | Step 66: four choices about the users screen were made with the Product Owner before the step's implementation (brief `prompts/89-step-66-implementation.md`), and the step's text says them: no "Copy" button, the password dialog closed by its button only, a confirmation with two buttons before a delete, and a row with the username only. The step's text also says where the generated password is and is not, and its browser check is brought in line. |
+| v8 | 2026-11-20 | Step 67: four choices about the availability screen were made with the Product Owner before the step's implementation (brief `prompts/90-step-67-implementation.md`), and the step's text says them: creating is a fixed form and changing is a dialog; every pattern is listed, an ended one marked; "Change" is one call; a pattern's start and end are two lists on the 15-minute grid. The step's text also says what the screen reads, where a refusal is shown, and the conflicts list's three places, and its browser check is brought in line. The status line no longer says that step 66 waits for review. |
 
 ---
 
@@ -455,20 +456,55 @@ the document after the dialog is closed and after the view is left.
 
 **Goal:** the Administrator manages the availability types and the weekly patterns.
 
-Logic: the types list; the patterns grouped by weekday and ordered by time; a pattern's body from
-the form, checked with the shared schemas; the conflicts list of a refused change
-(`availability_conflict`) ready to draw, each appointment with its date, time and User.
+**Four choices about the screen**, made with the Product Owner before any code (brief
+`prompts/90-step-67-implementation.md`; the reasons are in `docs/FRONTEND_ARCHITECTURE.md`
+section 11, decisions 89 to 92):
+
+- **Creating is a fixed form, changing is a dialog.** Above each list a form that creates;
+  a row's "Rename" (a type) and "Change" (a pattern) open a dialog filled with the current
+  values; a row's "Delete" opens the dialog that confirms a deletion (step 66's).
+- **The list shows every pattern the server returns**, grouped by weekday. One whose validity
+  has ended is marked "ended" and stays, so that it can be seen and deleted: a type used by
+  any pattern cannot be deleted. No switch hides anything.
+- **"Change" is one call that replaces the pattern's fields.** "From a date on" in two calls
+  is not built: the Administrator sets "Valid until" on the old pattern and creates a new one.
+- **A pattern's start and end are two lists of the local times on the 15-minute grid**, as
+  the book dialog's are for the Administrator; the two dates are native date fields.
+
+Logic: the types list; the patterns grouped by weekday and ordered by time, each with its
+type's name joined from the list of types, its validity in words and whether it has ended, in
+the calendar's time zone, which is read from the settings; a type's name checked with the
+shared schema before any call; a pattern's body from the form's six fields, each field in
+fault said with its own sentence, the shared schema keeping the last word; the conflicts list
+of a refused change (`availability_conflict`) ready to draw, each appointment with its date,
+time and User; the availability screen (its three reads, each list's failure and new try, the
+four writes that have a check, the lists read again after every write and when the tab
+becomes visible).
 
 View: `availability.view.ts`: the types (create, rename, delete) and the patterns (create,
-change, delete), every edit in a dialog or a fixed form, the lists read-only. A refused change
-shows its conflicts.
+change, delete), every edit in a dialog or a fixed form, the lists read-only. A refusal and a
+failure are shown where the write was asked: in the form that creates, or in the dialog that
+asked, which stays open. A refused change shows its conflicts under its failure, in the form
+that creates a pattern, in the dialog that changes one and in the dialog that deletes; the
+list is taken out of the page at the next try, at the next opening and when the view is
+left. One dialog confirms the deletion of a type or of a pattern.
 
-Shell: `#/availability`, Administrator only.
+Shell: `#/availability`, Administrator only, after "Users".
 
-**Browser check:** create, rename and delete a type; a type in use cannot be deleted and says
-why; a duplicate name is refused; create a pattern and see its windows in the week; change and
-delete it; a change that would leave a booked appointment outside any window is refused and lists
-the appointments in the way.
+**Browser check:** the two lists after three requests; a type's name that is not allowed is
+refused under the field with no request, and one that exists by the server, in plain words;
+create, rename and delete a type; a type in use cannot be deleted and says why; create a
+pattern in hours the others leave free and see its windows in the week, with no reload of
+the page; fields in fault are refused under them with no request, and an overlap by the
+server; change the pattern, and make one that ends at 24:00; a pattern whose validity ended
+is listed, marked, and can be deleted; a change and a deletion that would leave a booked
+appointment outside any window are refused and list the appointment in the way, with its
+date, time and User in the calendar's zone, and go through once it is cancelled; a write that
+cannot reach the server is said where it was asked, and the same button works again; the tab
+shown again reads both lists and leaves an open dialog as it is; signing out with a dialog
+and a conflicts list on show leaves nothing for the next person; as `alice`, the address is
+not in the navigation and typed by hand shows the week; a phone width; everything by
+keyboard only. Everything the check created is removed at its end.
 
 **Acceptance:** the common check.
 

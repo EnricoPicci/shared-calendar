@@ -125,7 +125,10 @@ the maximum of upcoming appointments, in one form; a value out of its range is r
 its field, and nothing is sent. And "Users" (`#/users`): the list of the users, a form that
 creates one and shows the password the server generated, once, in a dialog that only its
 button closes, and a "Delete" per row, which asks first and cancels that user's future
-appointments. The
+appointments. And "Availability" (`#/availability`): the availability types and the weekly
+patterns, each with a form that creates one, a dialog that renames or changes one and a
+"Delete" that asks first; a change that would leave a booked appointment outside the hours
+open for booking is refused and lists the appointments in the way. The
 week is loaded again after every booking, cancellation, change or note saved, and every time
 the browser's tab becomes visible again. A reload of the page signs out too: the session is kept in memory only. An edit to `frontend/src`, `frontend/index.html` or `frontend/style.css`
 shows after a reload. The dev server passes the page's calls on to the local API and to

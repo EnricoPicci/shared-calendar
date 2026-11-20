@@ -371,7 +371,7 @@ describe('the navigation', () => {
 
   it.each([
     ['a User', ALICE, 'access-token-alice', [['Week', '#/week', 'page'], ['My appointments', '#/appointments', null]]],
-    ['the Administrator', ADMIN, 'access-token-admin', [['Week', '#/week', 'page'], ['Settings', '#/settings', null], ['Users', '#/users', null]]],
+    ['the Administrator', ADMIN, 'access-token-admin', [['Week', '#/week', 'page'], ['Settings', '#/settings', null], ['Users', '#/users', null], ['Availability', '#/availability', null]]],
   ])('the first screen of %s is the week: the address, the links of the role with the week\'s marked, the week of today loaded', async (_name, who, token, navigation) => {
     fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
     const { store } = mounted();
@@ -382,7 +382,7 @@ describe('the navigation', () => {
     expect(window.location.hash).toBe('#/week');
     expect(links().map((a) => [a.textContent, a.getAttribute('href'), a.getAttribute('aria-current')])).toEqual(navigation);
     expect(find('#week').hidden).toBe(false);
-    expect([find('#appointments').hidden, find('#settings').hidden, find('#users').hidden]).toEqual([true, true, true]);
+    expect([find('#appointments').hidden, find('#settings').hidden, find('#users').hidden, find('#availability').hidden]).toEqual([true, true, true, true]);
     // Mounted first, then started: the view was listening when the load began.
     expect(find('#week .week-label').textContent).toBe('16 Nov – 22 Nov 2026');
     expect(find('#week .loading').hidden).toBe(false);
@@ -928,6 +928,7 @@ describe('the navigation', () => {
         ['Week', '#/week'],
         ['Settings', '#/settings'],
         ['Users', '#/users'],
+        ['Availability', '#/availability'],
         ['Other', '#/other'],
       ]);
       // "My appointments" is in the table too, and is not the Administrator's.
@@ -941,14 +942,14 @@ describe('the navigation', () => {
       const { screens, show, left } = other();
       mounted(ADMIN, screens);
       await weekDrawn();
-      expect(current()).toEqual([['Week', 'page'], ['Settings', null], ['Users', null], ['Other', null]]);
+      expect(current()).toEqual([['Week', 'page'], ['Settings', null], ['Users', null], ['Availability', null], ['Other', null]]);
 
       window.location.hash = '#/other';
       await vi.waitFor(() => expect(show).toHaveBeenCalledTimes(1));
       expect(show.mock.calls[0]![0]).toBe(find('#week'));
       expect(days()).toHaveLength(0); // the week view was left, and cleaned up after itself
       expect(find('#week').hidden).toBe(false); // the element is the other screen's now
-      expect(current()).toEqual([['Week', null], ['Settings', null], ['Users', null], ['Other', 'page']]);
+      expect(current()).toEqual([['Week', null], ['Settings', null], ['Users', null], ['Availability', null], ['Other', 'page']]);
       expect(left).not.toHaveBeenCalled();
 
       // Back: the other screen is left, the week mounted and loaded again.
@@ -956,7 +957,7 @@ describe('the navigation', () => {
       links()[0]!.click();
       await weekDrawn();
       expect(left).toHaveBeenCalledTimes(1);
-      expect(current()).toEqual([['Week', 'page'], ['Settings', null], ['Users', null], ['Other', null]]);
+      expect(current()).toEqual([['Week', 'page'], ['Settings', null], ['Users', null], ['Availability', null], ['Other', null]]);
       expect(apiCalls()).toHaveLength(2);
     });
 
@@ -1114,7 +1115,7 @@ describe('the navigation', () => {
       fetchMock.mockResolvedValueOnce(json(200, adminWeek()));
       mounted(ADMIN);
       expect(window.location.hash).toBe('#/week');
-      expect(current()).toEqual([['Week', 'page'], ['Settings', null], ['Users', null]]);
+      expect(current()).toEqual([['Week', 'page'], ['Settings', null], ['Users', null], ['Availability', null]]);
       expect([find('#week').hidden, find('#appointments').hidden]).toEqual([false, true]);
       await weekDrawn();
       expect(apiCalls()).toEqual([[WEEK_URL, 'Bearer access-token-admin']]);
@@ -1453,7 +1454,7 @@ describe('the navigation', () => {
       fetchMock.mockResolvedValueOnce(json(200, stored()));
       mounted(ADMIN);
       expect(window.location.hash).toBe('#/settings');
-      expect(current()).toEqual([['Week', null], ['Settings', 'page'], ['Users', null]]);
+      expect(current()).toEqual([['Week', null], ['Settings', 'page'], ['Users', null], ['Availability', null]]);
       expect([find('#week').hidden, find('#appointments').hidden, find('#settings').hidden]).toEqual([true, true, false]);
       // Mounted first, then started: the view was listening when the read began.
       expect(find('#settings .loading').hidden).toBe(false);
@@ -1584,7 +1585,7 @@ describe('the navigation', () => {
       await shown();
       expect([find('#week').hidden, find('#settings').hidden]).toEqual([true, false]);
       expect(days()).toHaveLength(0);
-      expect(current()).toEqual([['Week', null], ['Settings', 'page'], ['Users', null]]);
+      expect(current()).toEqual([['Week', null], ['Settings', 'page'], ['Users', null], ['Availability', null]]);
       field('bookingHorizonDays').value = '30';
       field('noLimit').click();
       field('minBookingNoticeHours').value = '';
@@ -1612,7 +1613,7 @@ describe('the navigation', () => {
         SETTINGS_URL,
       ]);
       expect(days()).toHaveLength(0);
-      expect(document.querySelectorAll('#app .nav a')).toHaveLength(3);
+      expect(document.querySelectorAll('#app .nav a')).toHaveLength(4);
     });
 
     it('signing out on the settings with values typed and a refusal on show leaves nothing; a User then sees nothing of it, and "My appointments" still reads the settings, then the list', async () => {
@@ -1708,7 +1709,7 @@ describe('the navigation', () => {
       fetchMock.mockResolvedValueOnce(usersOf('alice', 'bob'));
       mounted(ADMIN);
       expect(window.location.hash).toBe('#/users');
-      expect(current()).toEqual([['Week', null], ['Settings', null], ['Users', 'page']]);
+      expect(current()).toEqual([['Week', null], ['Settings', null], ['Users', 'page'], ['Availability', null]]);
       expect([find('#week').hidden, find('#appointments').hidden, find('#settings').hidden, find('#users').hidden]).toEqual([true, true, true, false]);
       // Mounted first, then started: the view was listening when the read began.
       expect(find('#users .loading').hidden).toBe(false);
@@ -1886,7 +1887,7 @@ describe('the navigation', () => {
       expect(created().open).toBe(false);
       expect(anywhere(PASSWORD)).toBe(false);
       expect(sent()).toEqual(['GET /users', 'POST /users', 'GET /users', 'GET /calendar?from=2026-11-16&to=2026-11-22', 'GET /users', 'GET /users']);
-      expect(document.querySelectorAll('#app .nav a')).toHaveLength(3);
+      expect(document.querySelectorAll('#app .nav a')).toHaveLength(4);
       expect(days()).toHaveLength(0);
 
       // A new create on this visit shows its own password.
@@ -1933,6 +1934,367 @@ describe('the navigation', () => {
       await listed('alice', 'bob', 'carol');
       expect(created().open).toBe(false);
       expect(anywhere(PASSWORD)).toBe(false);
+    });
+  });
+  // The availability, the first screen that uses two services at once, and a third for the
+  // calendar's time zone: the real services of the session behind the stubbed fetch.
+  describe('the availability, the Administrator\'s fourth screen', () => {
+    const BEARER = 'Bearer access-token-admin';
+    const STAMPS = { createdAt: '2026-11-01T10:00:00.000Z', updatedAt: '2026-11-01T10:00:00.000Z' };
+    const POOL = '01M6DMMJZ04FZ6M1H8QJ0C3BNA';
+    const SALA = '01M6DN5A1A0000000000000000';
+    const P1 = '01M6PATTERN000000000000001';
+    const P2 = '01M6PATTERN000000000000002';
+    const type = (typeId: string, name: string) => ({ typeId, name, ...STAMPS });
+    const pattern = (patternId: string, over: object = {}) => ({ patternId, weekday: 1, start: '09:00', end: '13:00', typeId: STUDIO, validFrom: '2026-11-20', validUntil: null, ...STAMPS, ...over });
+    const TYPES = [type(POOL, 'Piscina'), type(STUDIO, 'Studio')];
+    const PATTERNS = [pattern(P1), pattern(P2, { weekday: 2, start: '15:00', end: '18:00', typeId: POOL })];
+    const settings = (timeZone = 'Europe/Rome') => json(200, { timeZone, cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: null, updatedAt: null, updatedBy: null });
+    const typesOf = (list: object[] = TYPES) => json(200, { types: list });
+    const patternsOf = (list: object[] = PATTERNS) => json(200, { patterns: list });
+    const calls = () => (fetchMock.mock.calls as [string, RequestInit][]).filter(([url]) => url.startsWith(CONFIG.apiUrl));
+    const sent = () => calls().map(([url, init]) => `${init.method} ${url.slice(CONFIG.apiUrl.length)}`);
+    const READS = ['GET /calendar/settings', 'GET /calendar/types', 'GET /calendar/patterns'];
+    const bodyOf = (index: number) => JSON.parse(String(calls()[index]![1].body)) as unknown;
+    const at = (hash: string) => window.history.replaceState(null, '', `${window.location.pathname}${hash}`);
+    const one = <T extends HTMLElement = HTMLElement>(selector: string) => find<T>(`#availability ${selector}`);
+    const all = <T extends HTMLElement = HTMLElement>(selector: string) => [...document.querySelectorAll<T>(`#availability ${selector}`)];
+    // How many rows and choices the script has put in the screen.
+    const drawn = () => find('#availability').querySelectorAll('li, option, .groups section').length;
+    const typeNames = () => all('.types .list .name').map((name) => name.textContent);
+    const rows = () => all('.patterns .groups section').map((section) => `${section.querySelector('h4')!.textContent}: ${[...section.querySelectorAll('li')].map((item) => `${item.querySelector('.time')!.textContent} ${item.querySelector('.type-name')!.textContent}`).join(', ')}`);
+    const typesListed = (...names: string[]) => vi.waitFor(() => expect(typeNames()).toEqual(names));
+    const patternsListed = (...texts: string[]) => vi.waitFor(() => expect(rows()).toEqual(texts));
+    const quiet = () => vi.waitFor(() => expect(one('.loading').hidden).toBe(true));
+    const field = (formOf: string, name: string) => one<HTMLInputElement | HTMLSelectElement>(`${formOf} [name="${name}"]`);
+    const set = (formOf: string, values: Record<string, string>) => {
+      for (const [name, value] of Object.entries(values)) field(formOf, name).value = value;
+    };
+    const dialog = (name: 'rename' | 'change' | 'delete') => one<HTMLDialogElement>(`dialog.${name}`);
+    const current = () => links().map((a) => [a.textContent, a.getAttribute('aria-current')]);
+    const fields = () => [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
+    const anywhere = (text: string) => html().includes(text) || fields().some((value) => value.includes(text));
+    const MONDAY = 'Monday: 09:00 – 13:00 Studio';
+    const TUESDAY = 'Tuesday: 15:00 – 18:00 Piscina';
+    // The Administrator on the availability's address, with its three reads answered.
+    const onAvailability = async () => {
+      at('#/availability');
+      fetchMock.mockResolvedValueOnce(settings()).mockResolvedValueOnce(typesOf()).mockResolvedValueOnce(patternsOf());
+      const made = mounted(ADMIN);
+      await patternsListed(MONDAY, TUESDAY);
+      await quiet();
+      return made;
+    };
+    const conflict = { error: 'availability_conflict', message: '1 appointment would fall outside the availability', conflicts: [{ appointmentId: '01M6APPT000000000000000001', username: 'alice', start: '2026-11-23T08:00:00.000Z', end: '2026-11-23T09:00:00.000Z' }] };
+    const becomesVisible = () => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+    afterEach(() => {
+      // Back to the emulated document's own property.
+      delete (document as { visibilityState?: string }).visibilityState;
+    });
+
+    it('the Administrator on #/availability: the address stays, its link is the one marked, the three requests carry the person\'s token, and the two lists are drawn', async () => {
+      at('#/availability');
+      fetchMock.mockResolvedValueOnce(settings()).mockResolvedValueOnce(typesOf()).mockResolvedValueOnce(patternsOf());
+      mounted(ADMIN);
+      expect(window.location.hash).toBe('#/availability');
+      expect(current()).toEqual([['Week', null], ['Settings', null], ['Users', null], ['Availability', 'page']]);
+      expect([find('#week').hidden, find('#appointments').hidden, find('#settings').hidden, find('#users').hidden, find('#availability').hidden]).toEqual([true, true, true, true, false]);
+      // Mounted first, then started: the view was listening when the reads began.
+      expect(one('.loading').hidden).toBe(false);
+
+      await typesListed('Piscina', 'Studio');
+      await patternsListed(MONDAY, TUESDAY);
+      await quiet();
+      expect(apiCalls()).toEqual([
+        ['http://api.test/calendar/settings', BEARER],
+        ['http://api.test/calendar/types', BEARER],
+        ['http://api.test/calendar/patterns', BEARER],
+      ]);
+      expect(sent()).toEqual(READS);
+      // The form that creates a pattern starts on today in the calendar's zone, with the types to choose from and none chosen.
+      expect([field('form.create-pattern', 'validFrom').value, field('form.create-pattern', 'typeId').value, [...field('form.create-pattern', 'typeId').querySelectorAll('option')].map((option) => option.textContent)]).toEqual(['2026-11-19', '', ['Piscina', 'Studio']]);
+      expect(one('form.create-type .hint').textContent).toBe('A name has 1 to 40 characters, with no tab in it.');
+      for (const token of TOKENS) expect(html()).not.toContain(token);
+    });
+
+    it('"today" is the calendar\'s: in a zone where it is already tomorrow, the form starts on tomorrow', async () => {
+      // 10:00 UTC on Thursday 19 November is 23:00 on that day in Auckland; 12:30 UTC is Friday there.
+      vi.setSystemTime(new Date('2026-11-19T12:30:00.000Z'));
+      at('#/availability');
+      fetchMock.mockResolvedValueOnce(settings('Pacific/Auckland')).mockResolvedValueOnce(typesOf()).mockResolvedValueOnce(patternsOf());
+      mounted(ADMIN);
+      await vi.waitFor(() => expect(field('form.create-pattern', 'validFrom').value).toBe('2026-11-20'));
+    });
+
+    it('#/availability typed by a User shows the week, the address is put right, and none of its routes is asked for', async () => {
+      at('#/availability');
+      fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
+      mounted(ALICE);
+      expect(window.location.hash).toBe('#/week');
+      expect(links().map((a) => a.textContent)).toEqual(['Week', 'My appointments']);
+      expect([find('#week').hidden, find('#availability').hidden]).toEqual([false, true]);
+      await weekDrawn();
+      window.location.hash = '#/availability';
+      await vi.waitFor(() => expect(window.location.hash).toBe('#/week'));
+      expect(find('#availability').hidden).toBe(true);
+      expect(apiCalls()).toEqual([[WEEK_URL, 'Bearer access-token-alice']]);
+      expect(drawn()).toBe(0);
+    });
+
+    it('a failed read of one list is said in its place and leaves the other; its "Try again" reads it again, and only it', async () => {
+      at('#/availability');
+      fetchMock.mockResolvedValueOnce(settings()).mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce(patternsOf());
+      mounted(ADMIN);
+      await vi.waitFor(() => expect(one('.types .unread').hidden).toBe(false));
+      expect(one('.types .unread .error').textContent).toBe('The server cannot be reached. Check the connection and try again.');
+      await patternsListed('Monday: 09:00 – 13:00 Unknown type', 'Tuesday: 15:00 – 18:00 Unknown type');
+      expect([one('.patterns .unread').hidden, html().includes('Failed to fetch')]).toEqual([true, false]);
+
+      fetchMock.mockResolvedValueOnce(typesOf());
+      one('.types .retry').click();
+      await typesListed('Piscina', 'Studio');
+      await patternsListed(MONDAY, TUESDAY);
+      expect(one('.types .unread').hidden).toBe(true);
+      expect(sent()).toEqual([...READS, 'GET /calendar/types']);
+    });
+
+    it('a type is created: the POST with the name, spaces removed, the field emptied, and the types read again; it is in the list and among the types of both pattern forms', async () => {
+      await onAvailability();
+      fetchMock.mockResolvedValueOnce(json(201, type(SALA, 'Sala'))).mockResolvedValueOnce(typesOf([TYPES[0]!, type(SALA, 'Sala'), TYPES[1]!]));
+      field('form.create-type', 'name').value = ' Sala ';
+      submit(one<HTMLFormElement>('form.create-type'));
+      expect(one<HTMLButtonElement>('form.create-type .submit').disabled).toBe(true);
+      await typesListed('Piscina', 'Sala', 'Studio');
+      expect(sent()).toEqual([...READS, 'POST /calendar/types', 'GET /calendar/types']);
+      expect([bodyOf(3), (calls()[3]![1].headers as Record<string, string>).Authorization]).toEqual([{ name: 'Sala' }, BEARER]);
+      expect([field('form.create-type', 'name').value, one<HTMLButtonElement>('form.create-type .submit').disabled]).toEqual(['', false]);
+      for (const formOf of ['form.create-pattern', 'dialog.change']) expect([...field(formOf, 'typeId').querySelectorAll('option')].map((option) => option.textContent), formOf).toEqual(['Piscina', 'Sala', 'Studio']);
+    });
+
+    it('a name that is not one is refused under its field with no request; a name that exists is the server\'s to refuse, in plain words, and what was typed stays', async () => {
+      await onAvailability();
+      for (const text of ['', '   ', 'a'.repeat(41)]) {
+        field('form.create-type', 'name').value = text;
+        submit(one<HTMLFormElement>('form.create-type'));
+        expect(one('form.create-type .refusal').textContent, text).toBe('A name has 1 to 40 characters, with no tab in it.');
+        expect(field('form.create-type', 'name').getAttribute('aria-invalid'), text).toBe('true');
+      }
+      expect(sent()).toEqual(READS);
+
+      fetchMock.mockResolvedValueOnce(json(409, { error: 'type_name_exists', message: 'a type named "Studio" exists' })).mockResolvedValueOnce(typesOf());
+      field('form.create-type', 'name').value = 'studio';
+      submit(one<HTMLFormElement>('form.create-type'));
+      await vi.waitFor(() => expect(one('form.create-type .failure').textContent).toBe('A type with this name exists already. Choose another name.'));
+      await vi.waitFor(() => expect(sent()).toEqual([...READS, 'POST /calendar/types', 'GET /calendar/types']));
+      expect([field('form.create-type', 'name').value, field('form.create-type', 'name').hasAttribute('aria-invalid'), html().includes('a type named')]).toEqual(['studio', false, false]);
+    });
+
+    it('a type is renamed: the dialog opens with its name, "Close" asks nothing, a refused name stays in the dialog, a good one sends the PUT, the dialog closes, and the patterns\' rows say the new name with no read of the patterns', async () => {
+      await onAvailability();
+      one('.types .list li:nth-child(2) .ask-rename').click();
+      expect([dialog('rename').open, field('dialog.rename', 'name').value]).toEqual([true, 'Studio']);
+      one('dialog.rename .close').click();
+      expect([dialog('rename').open, sent()]).toEqual([false, READS]);
+
+      one('.types .list li:nth-child(2) .ask-rename').click();
+      fetchMock.mockResolvedValueOnce(json(409, { error: 'type_name_exists', message: 'exists' })).mockResolvedValueOnce(typesOf());
+      field('dialog.rename', 'name').value = 'Piscina';
+      submit(one<HTMLFormElement>('dialog.rename form'));
+      await vi.waitFor(() => expect(one('dialog.rename .failure').textContent).toBe('A type with this name exists already. Choose another name.'));
+      expect([dialog('rename').open, field('dialog.rename', 'name').value, one('form.create-type .failure').textContent]).toEqual([true, 'Piscina', '']);
+      await quiet();
+
+      fetchMock.mockResolvedValueOnce(json(200, type(STUDIO, 'Sala'))).mockResolvedValueOnce(typesOf([TYPES[0]!, type(STUDIO, 'Sala')]));
+      field('dialog.rename', 'name').value = 'Sala';
+      submit(one<HTMLFormElement>('dialog.rename form'));
+      await vi.waitFor(() => expect(dialog('rename').open).toBe(false));
+      await typesListed('Piscina', 'Sala');
+      await patternsListed('Monday: 09:00 – 13:00 Sala', TUESDAY);
+      expect(sent()).toEqual([...READS, `PUT /calendar/types/${STUDIO}`, 'GET /calendar/types', `PUT /calendar/types/${STUDIO}`, 'GET /calendar/types']);
+      expect(bodyOf(5)).toEqual({ name: 'Sala' });
+    });
+
+    it('a type is deleted: the dialog names it, "Keep" asks nothing; in use, the server\'s refusal says why and the dialog stays open; then the DELETE, the dialog closes and the types are read again', async () => {
+      await onAvailability();
+      one('.types .list li:nth-child(2) .ask-delete').click();
+      expect([dialog('delete').open, one('dialog.delete .question').textContent]).toEqual([true, 'Delete the type Studio? This cannot be undone.']);
+      one('dialog.delete .keep').click();
+      expect([dialog('delete').open, sent()]).toEqual([false, READS]);
+
+      one('.types .list li:nth-child(2) .ask-delete').click();
+      fetchMock.mockResolvedValueOnce(json(409, { error: 'type_in_use', message: 'the type is referenced by 5 patterns' })).mockResolvedValueOnce(typesOf());
+      one('dialog.delete .submit').click();
+      await vi.waitFor(() => expect(one('dialog.delete .error').textContent).toMatch(/^This type is in use, so it cannot be deleted\./));
+      await vi.waitFor(() => expect(sent()).toEqual([...READS, `DELETE /calendar/types/${STUDIO}`, 'GET /calendar/types']));
+      await quiet();
+      expect([dialog('delete').open, one<HTMLButtonElement>('dialog.delete .submit').disabled, html().includes('referenced by')]).toEqual([true, false, false]);
+
+      fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 })).mockResolvedValueOnce(typesOf([TYPES[0]!]));
+      one('dialog.delete .submit').click();
+      await vi.waitFor(() => expect(dialog('delete').open).toBe(false));
+      await typesListed('Piscina');
+      expect(sent().slice(5)).toEqual([`DELETE /calendar/types/${STUDIO}`, 'GET /calendar/types']);
+      expect((calls()[5]![1].headers as Record<string, string>).Authorization).toBe(BEARER);
+      // The pattern that still names it shows the fixed word, with no read of the patterns.
+      await patternsListed('Monday: 09:00 – 13:00 Unknown type', TUESDAY);
+    });
+
+    it('a pattern is created: the POST with its body, the patterns read again, the row under its weekday, and the form back to its starting values', async () => {
+      await onAvailability();
+      const created = pattern('01M6PATTERN000000000000003', { weekday: 3, start: '20:00', end: '24:00', typeId: POOL, validFrom: '2026-12-01', validUntil: '2026-12-31' });
+      fetchMock.mockResolvedValueOnce(json(201, created)).mockResolvedValueOnce(patternsOf([...PATTERNS, created]));
+      set('form.create-pattern', { weekday: '3', start: '20:00', end: '24:00', typeId: POOL, validFrom: '2026-12-01', validUntil: '2026-12-31' });
+      submit(one<HTMLFormElement>('form.create-pattern'));
+      expect(one<HTMLButtonElement>('form.create-pattern .submit').disabled).toBe(true);
+      await patternsListed(MONDAY, TUESDAY, 'Wednesday: 20:00 – 24:00 Piscina');
+      expect(sent()).toEqual([...READS, 'POST /calendar/patterns', 'GET /calendar/patterns']);
+      expect(bodyOf(3)).toEqual({ weekday: 3, start: '20:00', end: '24:00', typeId: POOL, validFrom: '2026-12-01', validUntil: '2026-12-31' });
+      expect(['weekday', 'start', 'end', 'typeId', 'validFrom', 'validUntil'].map((name) => field('form.create-pattern', name).value)).toEqual(['1', '09:00', '10:00', '', '2026-11-19', '']);
+      expect(one<HTMLButtonElement>('form.create-pattern .submit').disabled).toBe(false);
+    });
+
+    it('fields in fault are refused under them with no request; an overlap is the server\'s to refuse, in plain words, and what was chosen stays', async () => {
+      await onAvailability();
+      set('form.create-pattern', { start: '10:00', end: '10:00', validFrom: '', validUntil: '' });
+      submit(one<HTMLFormElement>('form.create-pattern'));
+      expect(all('form.create-pattern .refusal').map((refusal) => refusal.textContent)).toEqual(['', '', 'End must be later than Start.', 'Type must be chosen.', 'Valid from must be a date.', '']);
+      expect(all('form.create-pattern [aria-invalid="true"]').map((each) => (each as HTMLInputElement).name)).toEqual(['end', 'typeId', 'validFrom']);
+      expect(sent()).toEqual(READS);
+
+      fetchMock.mockResolvedValueOnce(json(409, { error: 'availability_overlap', message: '2026-11-23: 09:00–13:00 overlaps 10:00–11:00' })).mockResolvedValueOnce(patternsOf());
+      const chosen = { weekday: '1', start: '10:00', end: '11:00', typeId: POOL, validFrom: '2026-11-20', validUntil: '' };
+      set('form.create-pattern', chosen);
+      submit(one<HTMLFormElement>('form.create-pattern'));
+      await vi.waitFor(() => expect(one('form.create-pattern .failure').textContent).toBe('Another window of the same day covers part of these hours, whatever its type. Choose other hours.'));
+      await vi.waitFor(() => expect(sent()).toEqual([...READS, 'POST /calendar/patterns', 'GET /calendar/patterns']));
+      expect(Object.keys(chosen).map((name) => field('form.create-pattern', name).value)).toEqual(Object.values(chosen));
+      expect([all('form.create-pattern [aria-invalid="true"]').length, html().includes('overlaps')]).toEqual([0, false]);
+    });
+
+    it('a pattern is changed: the dialog opens with its six values, "Change" sends the PUT with the whole body, the dialog closes and the patterns are read again', async () => {
+      await onAvailability();
+      one('.patterns .groups section:nth-child(2) .ask-change').click();
+      expect(dialog('change').open).toBe(true);
+      expect(['weekday', 'start', 'end', 'typeId', 'validFrom', 'validUntil'].map((name) => field('dialog.change', name).value)).toEqual(['2', '15:00', '18:00', POOL, '2026-11-20', '']);
+
+      const changed = pattern(P2, { weekday: 2, start: '15:00', end: '19:00', typeId: POOL, validUntil: '2027-01-19' });
+      fetchMock.mockResolvedValueOnce(json(200, changed)).mockResolvedValueOnce(patternsOf([PATTERNS[0]!, changed]));
+      set('dialog.change', { end: '19:00', validUntil: '2027-01-19' });
+      submit(one<HTMLFormElement>('dialog.change form'));
+      await vi.waitFor(() => expect(dialog('change').open).toBe(false));
+      await patternsListed(MONDAY, 'Tuesday: 15:00 – 19:00 Piscina');
+      expect(sent()).toEqual([...READS, `PUT /calendar/patterns/${P2}`, 'GET /calendar/patterns']);
+      expect(bodyOf(3)).toEqual({ weekday: 2, start: '15:00', end: '19:00', typeId: POOL, validFrom: '2026-11-20', validUntil: '2027-01-19' });
+      expect(one('.patterns .groups section:nth-child(2) .validity').textContent).toBe('from 20 November 2026 to 19 January 2027');
+    });
+
+    it('a change with appointments in the way: the 409 is said in the dialog, still open, with its list in the calendar\'s zone; the patterns are read again all the same, and no id of an appointment reaches the page', async () => {
+      await onAvailability();
+      one('.patterns .groups section:nth-child(1) .ask-change').click();
+      fetchMock.mockResolvedValueOnce(json(409, conflict)).mockResolvedValueOnce(patternsOf());
+      set('dialog.change', { end: '09:30' });
+      submit(one<HTMLFormElement>('dialog.change form'));
+      await vi.waitFor(() => expect(one('dialog.change .failure').textContent).toBe('This would leave booked appointments outside the hours open for booking. Cancel or move them in the week first.'));
+      expect(one('dialog.change .conflicts').hidden).toBe(false);
+      expect(one('dialog.change .conflicts-count').textContent).toBe('1 appointment is in the way:');
+      expect(all('dialog.change .conflicts-list li').map((row) => [...row.children].map((part) => part.textContent))).toEqual([['Mon 23 Nov', '09:00–10:00', 'alice']]);
+      await vi.waitFor(() => expect(sent()).toEqual([...READS, `PUT /calendar/patterns/${P1}`, 'GET /calendar/patterns']));
+      await quiet();
+      expect([dialog('change').open, field('dialog.change', 'end').value, anywhere('01M6APPT'), anywhere('would fall outside')]).toEqual([true, '09:30', false, false]);
+      // Nothing of it in the form that creates.
+      expect([one('form.create-pattern .failure').textContent, one('form.create-pattern .conflicts').hidden]).toEqual(['', true]);
+    });
+
+    it('a pattern is deleted: the dialog names it; with an appointment in the way the 409 is said there with its list; then the DELETE, the dialog closes and the patterns are read again', async () => {
+      await onAvailability();
+      one('.patterns .groups section:nth-child(1) .ask-delete').click();
+      expect(one('dialog.delete .question').textContent).toBe('Delete the pattern Monday 09:00 – 13:00 Studio, from 20 November 2026? Its hours will no longer be open for booking. This cannot be undone.');
+      fetchMock.mockResolvedValueOnce(json(409, conflict)).mockResolvedValueOnce(patternsOf());
+      one('dialog.delete .submit').click();
+      await vi.waitFor(() => expect(all('dialog.delete .conflicts-list li').map((row) => [...row.children].map((part) => part.textContent))).toEqual([['Mon 23 Nov', '09:00–10:00', 'alice']]));
+      expect([dialog('delete').open, one('dialog.delete .error').textContent.startsWith('This would leave booked appointments')]).toEqual([true, true]);
+      await vi.waitFor(() => expect(sent()).toEqual([...READS, `DELETE /calendar/patterns/${P1}`, 'GET /calendar/patterns']));
+      await quiet();
+
+      fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 })).mockResolvedValueOnce(patternsOf([PATTERNS[1]!]));
+      one('dialog.delete .submit').click();
+      await vi.waitFor(() => expect(dialog('delete').open).toBe(false));
+      await patternsListed(TUESDAY);
+      expect(sent().slice(5)).toEqual([`DELETE /calendar/patterns/${P1}`, 'GET /calendar/patterns']);
+      expect(anywhere('alice')).toBe(false);
+    });
+
+    it('with the change dialog open, the tab shown again reads both lists again, not the settings, and leaves what is chosen in the dialog', async () => {
+      await onAvailability();
+      one('.patterns .groups section:nth-child(2) .ask-change').click();
+      set('dialog.change', { weekday: '5', typeId: STUDIO });
+      fetchMock.mockResolvedValueOnce(typesOf([...TYPES, type(SALA, 'Zeta')])).mockResolvedValueOnce(patternsOf([PATTERNS[0]!]));
+      becomesVisible();
+      await typesListed('Piscina', 'Studio', 'Zeta');
+      await patternsListed(MONDAY);
+      expect(sent()).toEqual([...READS, 'GET /calendar/types', 'GET /calendar/patterns']);
+      expect([dialog('change').open, field('dialog.change', 'weekday').value, field('dialog.change', 'typeId').value, field('dialog.change', 'start').value]).toEqual([true, '5', STUDIO, '15:00']);
+    });
+
+    it('availability, week, availability: nothing left over or doubled, everything read again, and what was typed and not sent is gone', async () => {
+      await onAvailability();
+      field('form.create-type', 'name').value = 'Sala';
+      set('form.create-pattern', { weekday: '4', typeId: POOL });
+      one('.types .list li:nth-child(1) .ask-rename').click();
+
+      // The week: the availability is left and emptied.
+      fetchMock.mockResolvedValueOnce(json(200, adminWeek()));
+      links()[0]!.click();
+      await weekDrawn();
+      expect([find('#availability').hidden, dialog('rename').open, drawn(), field('form.create-type', 'name').value]).toEqual([true, false, 0, '']);
+      expect(anywhere('Piscina')).toBe(false);
+
+      // Back: the three reads again, one row each, the lists of the forms filled once.
+      fetchMock.mockResolvedValueOnce(settings()).mockResolvedValueOnce(typesOf()).mockResolvedValueOnce(patternsOf());
+      links()[3]!.click();
+      await patternsListed(MONDAY, TUESDAY);
+      await typesListed('Piscina', 'Studio');
+      expect(sent()).toEqual([...READS, 'GET /calendar?from=2026-11-16&to=2026-11-22', ...READS]);
+      expect([days().length, document.querySelectorAll('#app .nav a').length]).toEqual([0, 4]);
+      expect([field('form.create-pattern', 'weekday').querySelectorAll('option').length, field('form.create-pattern', 'typeId').querySelectorAll('option').length]).toEqual([7, 2]);
+      expect([field('form.create-type', 'name').value, field('form.create-pattern', 'weekday').value, field('form.create-pattern', 'typeId').value, dialog('rename').open]).toEqual(['', '1', '', false]);
+    });
+
+    it('signing out with a dialog open and a conflicts list on show leaves nothing: the page as before anyone signed in; a User then sees nothing of it and asks for none of its routes', async () => {
+      at('#/availability');
+      const { store, signOut } = mounted();
+      const before = html(); // the page at the login, before anyone signed in
+      fetchMock.mockResolvedValueOnce(settings()).mockResolvedValueOnce(typesOf()).mockResolvedValueOnce(patternsOf());
+      store.set(ADMIN);
+      await patternsListed(MONDAY, TUESDAY);
+      await quiet();
+      field('form.create-type', 'name').value = 'Sala segreta';
+      one('.patterns .groups section:nth-child(1) .ask-change').click();
+      fetchMock.mockResolvedValueOnce(json(409, conflict)).mockResolvedValueOnce(patternsOf());
+      submit(one<HTMLFormElement>('dialog.change form'));
+      await vi.waitFor(() => expect(all('dialog.change .conflicts-list li')).toHaveLength(1));
+      await quiet();
+      one('.types .list li:nth-child(1) .ask-delete').click(); // the emulated page lets a click through a modal dialog
+      expect([dialog('change').open, dialog('delete').open, anywhere('alice')]).toEqual([true, true, true]);
+
+      signOut.click();
+      expect([dialog('change').open, dialog('delete').open]).toEqual([false, false]);
+      for (const gone of ['Piscina', 'Studio', 'Sala segreta', 'alice', 'Mon 23 Nov', 'admin', STUDIO, POOL, P1, '2026-11-20']) expect(anywhere(gone), gone).toBe(false);
+      expect(fields().every((value) => value === '')).toBe(true);
+      expect(html()).toBe(before);
+      expect(window.location.hash).toBe('#/availability'); // signing out leaves the address
+
+      const asked = apiCalls().length;
+      fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
+      store.set(ALICE);
+      expect(window.location.hash).toBe('#/week');
+      await weekDrawn();
+      expect(apiCalls().slice(asked)).toEqual([[WEEK_URL, 'Bearer access-token-alice']]);
+      expect([find('#availability').hidden, drawn()]).toEqual([true, 0]);
+      for (const gone of ['Piscina', 'Sala segreta', 'Mon 23 Nov']) expect(anywhere(gone), gone).toBe(false);
     });
   });
 });

@@ -89,11 +89,12 @@ stays at the root.
 │   │   │                        # failures in plain words), week.model.ts, week.screen.ts,
 │   │   │                        # booking.ts, appointment.detail.ts, appointments.model.ts,
 │   │   │                        # appointments.screen.ts, settings.model.ts, settings.screen.ts,
-│   │   │                        # users.model.ts, users.screen.ts
+│   │   │                        # users.model.ts, users.screen.ts, availability.model.ts,
+│   │   │                        # conflicts.ts, availability.screen.ts
 │   │   └── views/               # shell.ts (with the table of screens) and one <name>.view.ts per
 │   │                            # view: login.view.ts, week.view.ts, appointments.view.ts,
-│   │                            # settings.view.ts, users.view.ts; detail.view.ts, the appointment's dialog
-│   │                            # that two views mount
+│   │                            # settings.view.ts, users.view.ts, availability.view.ts;
+│   │                            # detail.view.ts, the appointment's dialog that two views mount
 │   ├── tests/
 │   │   ├── unit/                # mirrors src/ (plus services/fixtures.ts, logic/zone.ts and
 │   │   │                        # logic/fixtures.ts, views/page.ts)
@@ -357,8 +358,15 @@ What exists:
   `src/logic/users.model.ts` and `src/logic/users.screen.ts`, `src/views/users.view.ts` (the
   form, the list and the screen's two dialogs, the password's and the delete's, which are in
   `index.html` inside the screen's element), and in `src/views/shell.ts` the fourth entry of
-  the table of screens. No new script and no new dependency. The other views come with the
-  following plan steps.
+  the table of screens. No new script and no new dependency.
+- **The availability types and the weekly patterns, since 2026-11-20**
+  (`docs/FRONTEND_VIEW_PLAN.md` step 67): `src/logic/availability.model.ts`,
+  `src/logic/conflicts.ts` (the appointments in the way of a refused change, which the next
+  step uses too) and `src/logic/availability.screen.ts`, `src/views/availability.view.ts` (the
+  two forms, the two lists and the screen's three dialogs, which are in `index.html` inside
+  the screen's element), and in `src/views/shell.ts` the fifth entry of the table of screens
+  with the `AvailabilityTypesService` and the `AvailabilityRulesService` of each session. No
+  new script and no new dependency. The other views come with the following plan steps.
 
 What still waits for the open points of `docs/FRONTEND_ARCHITECTURE.md` section 10: the hosting,
 so no `template.yaml` and no `deploy` script (the root scripts use `--if-present`, so their
