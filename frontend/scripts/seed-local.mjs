@@ -11,8 +11,10 @@
 //
 // It only adds, and it does nothing at all when the type "Studio" exists already. It refuses any
 // address that is not on this machine. It prints what it created, never a token or a password.
-// Appointments cannot be deleted through the API: after the back end's calendar journeys have
-// emptied the table, run it again.
+// Appointments cannot be deleted through the API. The back end's calendar journeys empty the
+// table and then leave data of their own in it, a type named "Studio" among them: after them
+// this script does nothing, and its calendar comes back only on a new local stack (the table is
+// in memory), seeded again.
 //
 // The date arithmetic is shared/src/calendar/time.ts itself (Node runs it, stripping its
 // types), so "today" and the weeks are those of the calendar's time zone, not the machine's.

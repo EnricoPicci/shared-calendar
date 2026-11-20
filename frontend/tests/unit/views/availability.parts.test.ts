@@ -87,5 +87,14 @@ describe('the parts the two views of the availability share', () => {
       choose.say(null);
       expect([choose.fields[0]!.refusal.textContent, choose.fields[0]!.input.hasAttribute('aria-invalid')]).toEqual(['', false]);
     });
+
+    it('a field named with an empty sentence is marked in fault and has no words under it; a field not named is not marked', () => {
+      const { form } = availabilityParts(root());
+      const add = form('.one-date .add-draft', ['start', 'end', 'typeId']);
+      add.say({ refusals: { start: 'Start and End overlap.', end: '' }, failure: null, conflicts: null });
+      expect(add.fields.map(({ input, refusal }) => [input.getAttribute('aria-invalid'), refusal.textContent])).toEqual([['true', 'Start and End overlap.'], ['true', ''], [null, '']]);
+      add.say(null);
+      expect(add.fields.map(({ input }) => input.hasAttribute('aria-invalid'))).toEqual([false, false, false]);
+    });
   });
 });

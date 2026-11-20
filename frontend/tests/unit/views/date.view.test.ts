@@ -3,7 +3,7 @@ import { BehaviorSubject } from 'rxjs';
 import { typeChoices } from '../../../src/logic/availability.model';
 import type { Ask } from '../../../src/logic/availability.screen';
 import { conflictList } from '../../../src/logic/conflicts';
-import { dateFor, dayModel, draftAdd, draftModel, DRAFT_FULL, DRAFT_OPEN, OVERLAPS_DRAFT, PAST_DATE, STARTING_WINDOW, windowFor, type WindowFields } from '../../../src/logic/date.model';
+import { dateFor, dayModel, draftAdd, draftModel, DRAFT_FULL, DRAFT_OPEN, IN_FAULT_TOO, OVERLAPS_DRAFT, PAST_DATE, STARTING_WINDOW, windowFor, type WindowFields } from '../../../src/logic/date.model';
 import type { DateState } from '../../../src/logic/date.screen';
 import { mountConfirm } from '../../../src/views/availability.parts';
 import { mountDate, type DateDeps } from '../../../src/views/date.view';
@@ -336,11 +336,11 @@ describe('mountDate', () => {
       expect(screen.add.mock.calls).toEqual([[{ start: '17:00', end: '16:00', typeId: '' }]]);
     });
 
-    it('the refusals of "Add": each field in fault has its sentence under it, announced, and is marked; gone when the stream says so, what was chosen kept', () => {
+    it('the refusals of "Add": each field in fault is marked and has its sentence under it, announced; an overlap marks "Start" and "End" and is said once, under "Start"; gone when the stream says so, what was chosen kept', () => {
       const { date$ } = mounted(editing());
       set(ADD, { start: '12:00', end: '15:00', typeId: POOL });
-      date$.next(editing({ add: ask({ refusals: { start: OVERLAPS_DRAFT, end: OVERLAPS_DRAFT } }) }));
-      expect([marked(ADD), refusalOf(ADD, 'start').textContent, refusalOf(ADD, 'end').textContent, refusalOf(ADD, 'typeId').textContent, refusalOf(ADD, 'end').getAttribute('role')]).toEqual([['start', 'end'], OVERLAPS_DRAFT, OVERLAPS_DRAFT, '', 'alert']);
+      date$.next(editing({ add: ask({ refusals: { start: OVERLAPS_DRAFT, end: IN_FAULT_TOO } }) }));
+      expect([marked(ADD), refusalOf(ADD, 'start').textContent, refusalOf(ADD, 'end').textContent, refusalOf(ADD, 'typeId').textContent, refusalOf(ADD, 'start').getAttribute('role')]).toEqual([['start', 'end'], OVERLAPS_DRAFT, '', '', 'alert']);
       // The form that adds an extra window shows none of it.
       expect([marked(WINDOW), refusalOf(WINDOW, 'start').textContent]).toEqual([[], '']);
       date$.next(editing({ add: ask({ refusals: { typeId: 'Type must be chosen.' } }) }));
@@ -349,7 +349,7 @@ describe('mountDate', () => {
       expect([marked(ADD), held(ADD)]).toEqual([[], { start: '12:00', end: '15:00', typeId: POOL }]);
     });
 
-    it('every refusal of the logic layer names its field in the words of the field\'s label: at its start, or, for the one sentence that stands under two fields, both labels at its start', () => {
+    it('every refusal of the logic layer names its field in the words of the field\'s label: at its start; the one sentence of two fields has both labels at its start, and the second field has no sentence of its own', () => {
       mounted(editing());
       const refused = draftAdd([], { start: '10:00', end: '09:00', typeId: '' });
       const overlap = draftAdd([{ start: '09:00', end: '12:00', typeId: STUDIO }], { start: '10:00', end: '11:00', typeId: STUDIO });
@@ -359,9 +359,10 @@ describe('mountDate', () => {
         expect(Object.keys(refusals).length).toBeGreaterThan(0);
         for (const [name, sentence] of Object.entries(refusals)) {
           const label = field(selector, name).closest('label')!.childNodes[0]!.textContent!.trim();
-          expect(sentence === OVERLAPS_DRAFT ? sentence.startsWith('Start and End ') && sentence.includes(label) : sentence.startsWith(label), `${name}: ${sentence}`).toBe(true);
+          expect(sentence === IN_FAULT_TOO ? OVERLAPS_DRAFT.includes(` ${label} `) : sentence.startsWith(label), `${name}: ${sentence}`).toBe(true);
         }
       }
+      expect('refusals' in overlap && overlap.refusals).toEqual({ start: OVERLAPS_DRAFT, end: IN_FAULT_TOO });
     });
 
     it('the limit of windows is the failure of the form that adds, announced, no field marked', () => {
@@ -660,7 +661,7 @@ describe('mountDate', () => {
           loading: true,
           refusal: DRAFT_OPEN,
           unread: FAILURE,
-          add: ask({ refusals: { start: OVERLAPS_DRAFT, end: OVERLAPS_DRAFT }, failure: DRAFT_FULL }),
+          add: ask({ refusals: { start: OVERLAPS_DRAFT, end: IN_FAULT_TOO }, failure: DRAFT_FULL }),
           save: ask({ busy: true, failure: CONFLICT, conflicts: IN_THE_WAY }),
           window: ask({ busy: true, refusals: { typeId: 'Type must be chosen.' }, failure: FAILURE }),
           confirm: ask({ about: W1, busy: true, failure: CONFLICT, conflicts: IN_THE_WAY }),

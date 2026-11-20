@@ -168,6 +168,15 @@ describe('mountWeek', () => {
       expect(find('#week .week').classList.contains('stale')).toBe(false);
     });
 
+    it('a slot and an appointment are named, for a screen reader, with their day before their own words; a text with markup in a name stays text', () => {
+      mounted(state({ week: WEEK }));
+      const names = (selector: string) => all(selector).map((button) => button.getAttribute('aria-label'));
+      expect(names('.slot')).toEqual(['Mon 16 Nov 08:00–09:00 free', 'Mon 16 Nov 02:00 +02:00 – 02:00 +01:00 free', 'Mon 16 Nov 02:00 +01:00 – 03:00 +01:00 free']);
+      expect(names('.appointment')).toEqual(['Mon 16 Nov 11:00–12:15 You First lesson']);
+      // What cannot be pressed has no name of its own.
+      expect(names('.window, .busy')).toEqual([null, null]);
+    });
+
     it('a week: the blocks of a day, each with its texts and its type\'s colour', () => {
       mounted(state({ week: WEEK }));
       const monday = all('.day')[0]!;

@@ -31,7 +31,8 @@ import { failureText, type Attempt } from './texts';
 // What one of the four writes says to the form or the dialog that asked for it, replaced
 // whole at every new ask: `about`, the id of the type renamed or of the pattern changed, empty
 // for a create; `busy` while its call is under way; `refusals`, why a field was not accepted,
-// with no call made; `failure`, why a call that was made did not succeed, with `conflicts`,
+// with no call made (a field named with an empty sentence is in fault without words of its
+// own: another field's sentence names it); `failure`, why a call that was made did not succeed, with `conflicts`,
 // the appointments in the way, when the server named some; `done` once it succeeded. A dialog
 // shows it only while it is about what the dialog is about.
 export type Ask<F extends string> = {

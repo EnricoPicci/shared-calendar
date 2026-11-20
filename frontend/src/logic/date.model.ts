@@ -166,6 +166,9 @@ export function draftModel(windows: readonly WindowBody[], types: readonly Avail
 }
 
 export const OVERLAPS_DRAFT = 'Start and End overlap another window of this day. Choose other hours.';
+// A field in fault that has no sentence of its own: another field's sentence names it. The
+// form marks it and writes nothing under it.
+export const IN_FAULT_TOO = '';
 export const DRAFT_FULL = `A day can have ${CALENDAR_LIMITS.overrideWindowsPerDate} windows of its own at most. Remove one to add another.`;
 
 // The refusals of the three fields by themselves: the end not after the start (two times of
@@ -180,14 +183,15 @@ function fieldRefusals(fields: WindowFields): Partial<Record<WindowField, string
 // "Add": the windows with one more, by start, or why not. What only the windows being put
 // together can know is checked here, before anything is sent: one more than a day may have
 // of its own (the number of shared/), said as the form's failure; and a window that overlaps
-// one of them, said under its "Start" and "End". Windows that touch do not overlap, whatever
-// their types (docs/SHARED_CALENDAR_SPEC.md R-AV-01, through `overlaps` of shared/). The
+// one of them: an overlap is of the two times together, so both fields are in fault and the
+// sentence, which names both, is said once, under "Start". Windows that touch do not overlap,
+// whatever their types (docs/SHARED_CALENDAR_SPEC.md R-AV-01, through `overlaps` of shared/). The
 // extra windows of the day are the server's to compare, at the save.
 export function draftAdd(windows: readonly WindowBody[], fields: WindowFields): { windows: WindowBody[] } | { refusals: Partial<Record<WindowField, string>> } | { failure: string } {
   const refusals = fieldRefusals(fields);
   if (Object.keys(refusals).length > 0) return { refusals };
   if (windows.length >= CALENDAR_LIMITS.overrideWindowsPerDate) return { failure: DRAFT_FULL };
-  if (windows.some((window) => overlaps(window, fields))) return { refusals: { start: OVERLAPS_DRAFT, end: OVERLAPS_DRAFT } };
+  if (windows.some((window) => overlaps(window, fields))) return { refusals: { start: OVERLAPS_DRAFT, end: IN_FAULT_TOO } };
   return { windows: [...windows, { start: fields.start, end: fields.end, typeId: fields.typeId }].sort(byStart) };
 }
 

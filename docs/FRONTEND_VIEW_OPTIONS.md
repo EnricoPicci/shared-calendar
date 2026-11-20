@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v3 — **recommendation accepted** (2026-11-16, brief `prompts/81-frontend-architecture-view-layer.md`): the views are plain HTML/CSS with one TypeScript module script. The rules are in `docs/FRONTEND_ARCHITECTURE.md`, which is the source of truth; this document stays as the record of the options and of why, and is not updated further. v2 — proposal (2026-11-16, brief `prompts/80-design-view-layer.md`) |
+| Status | v3 — **recommendation accepted** (2026-11-16, brief `prompts/81-frontend-architecture-view-layer.md`): the views are plain HTML/CSS with one TypeScript module script. The rules are in `docs/FRONTEND_ARCHITECTURE.md`, which is the source of truth; this document stays as the record of the options and of why, and is not updated further (v4, 2026-11-20, is a note on its status line and change log only: the view layer is implemented, and the trial's code is no longer in the repository). v2 — proposal (2026-11-16, brief `prompts/80-design-view-layer.md`) |
 | Scope | How the views are written: the technology that turns the services' streams into a screen and the user's actions into service calls. An analysis of the options and one recommendation |
 | Not in scope | Hosting, the CORS gap (`docs/FRONTEND_SERVICES.md` section 10.3), keeping the session across a reload (section 9.6 there), the build and dev tooling, the screens' design. They belong to `docs/FRONTEND_ARCHITECTURE.md`; section 9 lists what this recommendation hands over to it |
 | Depends on | `docs/FRONTEND_SERVICES.md` v7 (the rules of section 2, the pattern of section 3, the "Use from the view layer" sections), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7 |
@@ -13,6 +13,7 @@
 |---|---|---|
 | v1 | 2026-11-16 | First analysis. Recommended `lit-html` used alone; plain DOM code judged unsafe (escaping) and complicated (lists). |
 | v2 | 2026-11-16 | **Recommendation changed to plain HTML/CSS with one TypeScript module script**, after the review of v1. v1 had judged the plain option without the HTML `<template>` element and without a lint rule on `innerHTML`, which answer most of its two objections. `lit-html` becomes the named fallback, for single views. Sections 4.1, 5, 6, 7, 8, 9 and 10 rewritten accordingly; the other options are unchanged. |
+| v4 | 2026-11-20 | A note only (`docs/FRONTEND_VIEW_PLAN.md` step 69): every view of `docs/SHARED_CALENDAR_SPEC.md` section 16.8 is written the way recommended here, and `lit-html`, the fallback, was not needed (`docs/FRONTEND_ARCHITECTURE.md` sections 7.1 and 7.2). The two prototypes of the trial, a folder `prototypes/` at the root of the repository, were throw-away and were deleted at that step; they are in git history, and commit `f2ade74` is the last that holds them. The text below is still v2's, unchanged. |
 | v3 | 2026-11-16 | Recommendation accepted after the two prototypes (login and week calendar, plain and `lit-html`). Status line only: the text below is v2's, unchanged. Its section 9 points H1, H2 and H4 are decided in `docs/FRONTEND_ARCHITECTURE.md` (section 5 for H1, section 9 for H2 and H4); H3 and H5 to H8 are open points there (section 10). |
 
 **The recommendation in one paragraph.** Write the views in **plain HTML and CSS, with one

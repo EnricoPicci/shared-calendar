@@ -65,8 +65,10 @@ export function availabilityParts(root: HTMLElement) {
         for (const { name, input } of fields) input.value = values[name]!;
       },
       // What a write says, in the form: each field in fault marked for a screen reader and for
-      // the style sheet, its sentence under it; the failure; the appointments in the way. With
-      // no outcome, nothing of it: the form of a dialog that opens.
+      // the style sheet, its sentence under it; the failure; the appointments in the way. A
+      // field named with an empty sentence is marked and has no words under it: the sentence
+      // of another field names it. With no outcome, nothing of it: the form of a dialog that
+      // opens.
       say: (said: Said | null) => {
         for (const { name, input, refusal } of fields) {
           const why = said?.refusals[name];

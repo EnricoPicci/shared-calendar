@@ -11,12 +11,12 @@ HTTP API, identities in Amazon Cognito, messages in DynamoDB, everything declare
 template and fully testable on a laptop before anything reaches the cloud.
 
 This is v1 of the back end of a larger application. The repository is a monorepo: the back end
-in `backend/`, the code it shares with the browser front end that will follow (the API contract
+in `backend/`, the code it shares with the browser front end (the API contract
 and the username rule) in `shared/`, and in `frontend/` the front end: its services layer
 (session store, login, token refresh, Hello World, user administration, the calendar;
-`docs/FRONTEND_SERVICES.md`) and the start of its pages (`docs/FRONTEND_ARCHITECTURE.md`): today
-a login page and the week calendar, read-only, which can be seen locally (see "The page,
-locally" below). The other screens follow `docs/FRONTEND_VIEW_PLAN.md`.
+`docs/FRONTEND_SERVICES.md`) and its pages (`docs/FRONTEND_ARCHITECTURE.md`): the login, the
+week calendar, a User's appointments and the Administrator's settings, users and availability.
+They run locally (see "The page, locally" below); the front end is not deployed anywhere yet.
 
 Where the full story is:
 
@@ -106,37 +106,32 @@ npm run dev -w frontend        # http://localhost:5173, foreground; Ctrl-C stops
 
 The seed creates two availability types ("Studio" and "Piscina"), a few weekly patterns valid
 for 60 days and a few appointments for `alice`, through the local API. It only adds, does
-nothing when "Studio" exists already, and is run again after the back end's calendar journeys,
-which empty the local table.
+nothing when "Studio" exists already. The back end's calendar journeys (the root `verify` runs
+them) empty the local table and leave data of their own in it, a type named "Studio" among
+them: after them the seed does nothing, and what brings its calendar back is a new stack
+(`local:down`, `local:up`, `local:api`) and then the seed.
 
 Open the address (in a Codespace, the forwarded port 5173) and sign in as `alice` /
-`Alice-Local-Pass-1!` or `admin` / `Admin-Local-Pass-1!`. The header shows who is signed in and
-the role, and the page shows the week of today, with "previous", "Today" and "next"; "Sign out"
-returns to the login. A click on a free slot opens the book dialog (a note; as `admin` also the
-User to book for and other times inside the slot's window); a click on an appointment opens its
-detail, where the note is edited and saved, and "Change" and "Cancel appointment" are offered
-when the rules allow it. "Change" shows a banner over the week: the next free slot clicked, in
-any week, is the new time, confirmed in a dialog; "Keep the appointment as it is" gives up. A
-User also has "My appointments" (`#/appointments`): the upcoming appointments, or, under
-"History", all those of a period chosen with two dates, each with its status; a row opens the
-same detail, whose "Change" goes to the week of that appointment. The Administrator also has
-"Settings" (`#/settings`): the cancellation notice, the booking notice, the booking horizon and
-the maximum of upcoming appointments, in one form; a value out of its range is refused under
-its field, and nothing is sent. And "Users" (`#/users`): the list of the users, a form that
-creates one and shows the password the server generated, once, in a dialog that only its
-button closes, and a "Delete" per row, which asks first and cancels that user's future
-appointments. And "Availability" (`#/availability`): the availability types and the weekly
-patterns, each with a form that creates one, a dialog that renames or changes one and a
-"Delete" that asks first; a change that would leave a booked appointment outside the hours
-open for booking is refused and lists the appointments in the way. Its third part, "A single
-date", shows one day as the weekly patterns give it and as it is now, and changes it: "This
-day only…" (windows put together on the page and saved in one go), "Not available on this
-day", "Back to the weekly patterns", and extra windows added to the day; a date before today
-cannot be changed. The
-week is loaded again after every booking, cancellation, change or note saved, and every time
-the browser's tab becomes visible again. A reload of the page signs out too: the session is kept in memory only. An edit to `frontend/src`, `frontend/index.html` or `frontend/style.css`
-shows after a reload. The dev server passes the page's calls on to the local API and to
-cognito-local; it is for local work only, and the front end is not deployed anywhere yet.
+`Alice-Local-Pass-1!` (a User) or `admin` / `Admin-Local-Pass-1!` (the Administrator). What
+each of them finds:
+
+| Screen | Who | What it does |
+|---|---|---|
+| Week (`#/week`) | both | The week, with "previous", "Today" and "next". A free slot opens the book dialog (a note; the Administrator also chooses the User and other times inside the slot's window). An appointment opens its detail: the note, "Change" (the next free slot clicked, in any week, is the new time) and "Cancel appointment", offered when the rules allow them |
+| My appointments (`#/appointments`) | User | The upcoming appointments, or all those of a period, each with its status; a row opens the same detail |
+| Settings (`#/settings`) | Administrator | The cancellation notice, the booking notice, the booking horizon and the maximum of upcoming appointments |
+| Users (`#/users`) | Administrator | The list, a form that creates a user and shows the generated password once, a "Delete" per row that asks first |
+| Availability (`#/availability`) | Administrator | The availability types, the weekly patterns, and a single date: its own windows ("This day only…"), "Not available on this day", extra windows. A change that would leave a booked appointment outside the hours open for booking is refused and lists the appointments in the way |
+
+Good to know: the week is loaded again after every write and every time the browser's tab
+becomes visible again; a reload of the page signs out, since the session is kept in memory
+only; an edit to `frontend/src`, `frontend/index.html` or `frontend/style.css` shows after a
+reload. The dev server passes the page's calls on to the local API and to cognito-local; it is
+for local work only, and the front end is not deployed anywhere yet (what stands between it
+and a deployment: `docs/FRONTEND_ARCHITECTURE.md` section 10).
+
+**To check every screen after a change**: `docs/FRONTEND_WALK.md`, one list of checks to do
+by hand in the browser, as `alice` and as `admin`, from a fresh, seeded local stack.
 
 Layout: `backend/` holds `src/handlers/` (one Lambda per file), `src/lib/` (the only code that
 touches the AWS SDK), `tests/`, `scripts/`, `template.yaml` and `docker-compose.yml`; `shared/src/`

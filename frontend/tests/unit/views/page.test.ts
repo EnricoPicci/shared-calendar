@@ -60,6 +60,67 @@ describe('index.html', () => {
     for (const template of templates) expect(template.content.children, template.id).toHaveLength(1);
   });
 
+  // Reading the page without a mouse (docs/FRONTEND_VIEW_PLAN.md step 69): what a screen
+  // reader says of a field, of a button and of a dialog that asks.
+  describe('without a mouse', () => {
+    // The words of a label, without those of the field it holds (a list's choices are in the
+    // label's text).
+    const words = (label: Element) => [...label.childNodes].filter((node) => node.nodeType === 3).map((node) => node.textContent).join('').trim();
+    const everywhere = (selector: string) => {
+      const page = pageAside();
+      return [...page.querySelectorAll<HTMLElement>(selector), ...[...page.querySelectorAll('template')].flatMap((template) => [...template.content.querySelectorAll<HTMLElement>(selector)])];
+    };
+
+    it('every field has its label: a <label> around it, with words of its own', () => {
+      const fields = everywhere('input, select, textarea');
+      expect(fields).toHaveLength(36);
+      for (const field of fields) {
+        const label = field.closest('label');
+        expect(label, field.getAttribute('name')!).not.toBeNull();
+        expect(words(label!), field.getAttribute('name')!).not.toBe('');
+        // One field per label: the words are of this field only.
+        expect(label!.querySelectorAll('input, select, textarea'), field.getAttribute('name')!).toHaveLength(1);
+      }
+    });
+
+    it('every button has words, or a name for a screen reader; the two arrows of the week and every "Try again" say what they act on', () => {
+      // A slot's, an appointment's and a row's button are filled by the script: they hold the places of their texts.
+      for (const button of everywhere('button')) expect(button.textContent.trim() !== '' || button.hasAttribute('aria-label') || button.children.length > 0, button.className).toBe(true);
+      const named = everywhere('button[aria-label]').map((button) => [button.textContent, button.getAttribute('aria-label')]);
+      expect(named).toEqual([
+        ['‹', 'Previous week'],
+        ['›', 'Next week'],
+        ['Try again', 'Try again to read the settings'],
+        ['Try again', 'Try again to read the users'],
+        ['Try again', 'Try again to read the types'],
+        ['Try again', 'Try again to read the weekly patterns'],
+        ['Try again', 'Try again to read this date'],
+      ]);
+      expect(everywhere('.retry')).toHaveLength(5);
+    });
+
+    it('a dialog that asks before an action is described by its question, which a screen reader says when it opens', () => {
+      loadPage();
+      const asking = [...document.querySelectorAll('dialog[aria-describedby]')];
+      expect(asking.map((dialog) => [dialog.parentElement!.id, dialog.className])).toEqual([['users', 'delete'], ['availability', 'delete']]);
+      for (const dialog of asking) expect(document.getElementById(dialog.getAttribute('aria-describedby')!)).toBe(dialog.querySelector('.question'));
+    });
+
+    it('every failure and every refusal is announced at once (role "alert"), every "Loading…" and every other news when the reader is free (role "status")', () => {
+      const place = (element: Element) => [...element.classList].join('.');
+      const alerts = everywhere('[role="alert"]');
+      const failures = everywhere('.error');
+      expect(failures).toHaveLength(48);
+      expect(alerts).toEqual(failures);
+      for (const alert of alerts) expect(['P', alert.textContent], place(alert)).toEqual(['P', '']);
+      const loading = everywhere('.loading');
+      expect(loading.map((element) => [element.getAttribute('role'), element.textContent, element.hidden])).toEqual(Array.from({ length: 6 }, () => ['status', 'Loading…', true]));
+      // What else is news: the appointment being moved, the list of Users being read for the
+      // book dialog, and "Settings saved.".
+      expect(everywhere('[role="status"]:not(.loading)').map((element) => place(element) || place(element.parentElement!))).toEqual(['moving', 'users-message', 'saved']);
+    });
+  });
+
   it('no id is used twice', () => {
     const ids = [...pageAside().querySelectorAll('[id]')].map((element) => element.id);
     expect(new Set(ids).size).toBe(ids.length);

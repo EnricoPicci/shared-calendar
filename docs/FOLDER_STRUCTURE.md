@@ -8,7 +8,7 @@
 | Brief | `prompts/20-org-folders-for-client-and-server.md` (decision), `prompts/21-step-20-implementation.md` (move) |
 
 This repository holds every part of the application: the back end that exists today (the
-shared calendar's API, with its Hello World route, `docs/ARCHITECTURE.md`), the browser front end that will follow, and the
+shared calendar's API, with its Hello World route, `docs/ARCHITECTURE.md`), the browser front end (`docs/FRONTEND_ARCHITECTURE.md`), and the
 code both of them share. This document fixes **which folder holds what**, so that a reader
 can tell the three apart at a glance, and the rules for putting a new file in the right place.
 It is written for a reader who knows TypeScript but is not an expert in monorepo tooling:
@@ -302,7 +302,8 @@ The front end is a browser single-page application in TypeScript built to static
 (decided 2026-11-04). Its own architecture document, `docs/FRONTEND_ARCHITECTURE.md`, fixes the
 view layer (2026-11-16: plain HTML and CSS with one TypeScript module script, no framework; the
 folders for the views in its section 9; 2026-11-19: the build and the dev server, its section 12)
-and will fix the hosting, which is among its open points. This section only fixes what the folder
+and will fix the hosting, which is among its open points (its section 10: they are the only
+things between the front end and a deployment). This section only fixes what the folder
 must look like so that it fits the repository:
 
 - `frontend/package.json`, name `frontend`, depends on `@shared-calendar/shared`; scripts
@@ -377,8 +378,15 @@ What exists:
   screen's two views share (the look-up of a form, the choices of a list, the conflicts
   list, and the one dialog that confirms). The same entry of the table of screens mounts
   both views and starts both objects, and each session has a second `CalendarService` for
-  this part. No new script and no new dependency. Every screen of
-  `docs/FRONTEND_VIEW_PLAN.md` section 3 exists; its step 69 closes the plan.
+  this part. No new script and no new dependency.
+
+**The view layer is complete** (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69): every screen
+of that plan's section 3 exists, and the plan is done. The folder holds nothing of the trial
+that came before the choice: its two prototypes were in a folder `prototypes/` at the root,
+outside the workspaces, and were deleted at that step (they are in git history; commit
+`f2ade74` is the last that holds them). The walk through every screen in a browser, the check
+to repeat after a later change, is `docs/FRONTEND_WALK.md`; the script that ran it in a
+headless browser is not in the repository, and no end-to-end test tool is.
 
 What still waits for the open points of `docs/FRONTEND_ARCHITECTURE.md` section 10: the hosting,
 so no `template.yaml` and no `deploy` script (the root scripts use `--if-present`, so their

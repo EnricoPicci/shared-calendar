@@ -11,6 +11,7 @@ import {
   NO_EXTRAS,
   NO_PATTERN_HOURS,
   NOT_AVAILABLE,
+  IN_FAULT_TOO,
   OVERLAPS_DRAFT,
   OWN_WINDOWS,
   PAST_DATE,
@@ -253,8 +254,9 @@ describe('date.model', () => {
       expect(draftAdd(DRAFT, fields('18:00', '19:00', ''))).toEqual({ refusals: { typeId: 'Type must be chosen.' } });
     });
 
-    it('a window that overlaps one of the list is refused under "Start" and "End", whatever its type (R-AV-01)', () => {
-      const refused = { refusals: { start: OVERLAPS_DRAFT, end: OVERLAPS_DRAFT } };
+    it('a window that overlaps one of the list is refused, whatever its type (R-AV-01): "Start" and "End" are both in fault, and the sentence, which names both, is said once, under "Start"', () => {
+      const refused = { refusals: { start: OVERLAPS_DRAFT, end: '' } };
+      expect([IN_FAULT_TOO, OVERLAPS_DRAFT.startsWith('Start and End ')]).toEqual(['', true]);
       for (const [start, end] of [['11:00', '13:00'], ['08:00', '09:15'], ['10:00', '11:00'], ['08:00', '17:00'], ['15:45', '24:00']] as const) {
         expect(draftAdd(DRAFT, fields(start, end)), `${start}–${end}`).toEqual(refused);
         expect(draftAdd(DRAFT, fields(start, end, POOL)), `${start}–${end} Piscina`).toEqual(refused);

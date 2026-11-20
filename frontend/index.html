@@ -89,7 +89,9 @@
             </form>
           </dialog>
 
-          <!-- The pieces the script copies to draw a week -->
+          <!-- The pieces the script copies to draw a week. A slot and an appointment show
+               their time: the script gives each a name for a screen reader that starts with
+               its day. -->
           <template id="tpl-legend-item">
             <li></li>
           </template>
@@ -158,7 +160,7 @@
           <!-- Shown in the place of the form when the settings could not be read -->
           <div class="unread" hidden>
             <p class="error" role="alert"></p>
-            <button type="button" class="retry">Try again</button>
+            <button type="button" class="retry" aria-label="Try again to read the settings">Try again</button>
           </div>
           <!-- novalidate: a value out of range is refused by the script, in words, under its
                field. Each field is a .field: its label, its range, its refusal. -->
@@ -218,7 +220,7 @@
           <!-- Shown in the place of the list when it could not be read -->
           <div class="unread" hidden>
             <p class="error" role="alert"></p>
-            <button type="button" class="retry">Try again</button>
+            <button type="button" class="retry" aria-label="Try again to read the users">Try again</button>
           </div>
           <p class="empty" hidden></p>
           <ul class="list"></ul>
@@ -248,10 +250,11 @@
           </dialog>
 
           <!-- Asks before a user is deleted. "Keep" comes first: the keyboard is on it when
-               the dialog opens. -->
-          <dialog class="delete" aria-labelledby="delete-title">
+               the dialog opens, and a screen reader then says the question, which describes
+               the dialog. -->
+          <dialog class="delete" aria-labelledby="delete-title" aria-describedby="delete-question">
             <h3 id="delete-title">Delete user</h3>
-            <p class="question"></p>
+            <p class="question" id="delete-question"></p>
             <p class="error" role="alert"></p>
             <div class="actions">
               <button type="button" class="keep">Keep</button>
@@ -289,7 +292,7 @@
             <!-- Shown in the place of the list when it could not be read -->
             <div class="unread" hidden>
               <p class="error" role="alert"></p>
-              <button type="button" class="retry">Try again</button>
+              <button type="button" class="retry" aria-label="Try again to read the types">Try again</button>
             </div>
             <p class="empty" hidden></p>
             <ul class="list"></ul>
@@ -339,7 +342,7 @@
             <!-- Shown in the place of the list when it could not be read -->
             <div class="unread" hidden>
               <p class="error" role="alert"></p>
-              <button type="button" class="retry">Try again</button>
+              <button type="button" class="retry" aria-label="Try again to read the weekly patterns">Try again</button>
             </div>
             <p class="empty" hidden></p>
             <div class="groups"></div>
@@ -364,7 +367,7 @@
             <!-- Shown in the place of the day when it could not be read -->
             <div class="unread" hidden>
               <p class="error" role="alert"></p>
-              <button type="button" class="retry">Try again</button>
+              <button type="button" class="retry" aria-label="Try again to read this date">Try again</button>
             </div>
             <div class="shown" hidden>
               <p class="date-words"></p>
@@ -548,10 +551,11 @@
 
           <!-- Asks before a type, a pattern, a date's own windows or an extra window is deleted,
                and before a date is made not available: what will happen is in the question.
-               "Keep" comes first: the keyboard is on it when the dialog opens. -->
-          <dialog class="delete" aria-labelledby="availability-delete-title">
+               "Keep" comes first: the keyboard is on it when the dialog opens, and a screen
+               reader then says the question, which describes the dialog. -->
+          <dialog class="delete" aria-labelledby="availability-delete-title" aria-describedby="availability-delete-question">
             <h3 id="availability-delete-title">Please confirm</h3>
-            <p class="question"></p>
+            <p class="question" id="availability-delete-question"></p>
             <p class="error" role="alert"></p>
             <div class="conflicts" hidden>
               <p class="conflicts-count"></p>

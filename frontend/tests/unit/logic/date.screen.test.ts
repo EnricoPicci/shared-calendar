@@ -402,7 +402,7 @@ describe('DateScreen', () => {
       screen.add(fields('15:00', '15:00', ''));
       expect(last().add).toEqual({ ...QUIET, refusals: { end: 'End must be later than Start.', typeId: 'Type must be chosen.' } });
       screen.add(fields('12:00', '14:00', POOL));
-      expect(last().add).toEqual({ ...QUIET, refusals: { start: OVERLAPS_DRAFT, end: OVERLAPS_DRAFT } });
+      expect(last().add).toEqual({ ...QUIET, refusals: { start: OVERLAPS_DRAFT, end: '' } });
       expect([last().draft === before.rows, last().addFields === before.addFields, draft(), writes()]).toEqual([true, true, ['09:00 – 13:00 Studio'], [0, 0, 0, 0]]);
       // A window that touches is accepted, and the refusal goes.
       screen.add(fields('13:00', '14:00', POOL));

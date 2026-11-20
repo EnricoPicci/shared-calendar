@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| Status | v10 — **decided; every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 implemented**: the foundation, the week, booking, cancelling, the note, the change, "My appointments", the settings, the users and the availability (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 68, briefs `prompts/83-step-60-implementation.md` to `prompts/91-step-68-implementation.md`): the build and dev-server commands, the tests' environment, the shell with its navigation between the screens, the login view, the logic layer (`frontend/src/logic/`), the week calendar with its book dialog (which also confirms a change), a User's list of appointments (upcoming and history), an appointment's detail (its note, "Change" and "Cancel appointment"), one dialog opened from both screens, the Administrator's settings, one form whose fields are checked before any call, the Administrator's users: the list, a create that shows the generated password once, and a delete that asks first, and the Administrator's availability: the types and the weekly patterns, each with a form that creates, a dialog that changes and a delete that asks first, the list of the appointments in the way of a refused change, and a third part about a single date: the day as the weekly patterns give it and as it is now, "this day only" windows put together and saved in one go, "not available", the way back to the weekly patterns and extra windows, exist in `frontend/`. `docs/FRONTEND_VIEW_PLAN.md` step 69 closes the plan |
+| Status | v11 — **implemented** (2026-11-20). Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback as a proposal, are in sections 7.1 and 7.2 |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders |
-| Not in scope yet | Hosting, the CORS gap, keeping the session across a reload, the Content-Security-Policy of the hosting, logout. They are the open points of section 10, for later versions of this document |
+| Not in scope | Hosting, the CORS gap, keeping the session across a reload, the Content-Security-Policy of the hosting, logout, the size of the bundle. They are the open points of section 10: the only things between the front end and a deployment |
 | Depends on | `docs/FRONTEND_SERVICES.md` v7 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work) |
 | Why this choice | `docs/FRONTEND_VIEW_OPTIONS.md` v3: the options compared (plain HTML/CSS, `lit-html`, Lit, React, Angular, Svelte) and the reasons. Not repeated here |
 
@@ -25,12 +25,14 @@
 | v9 | 2026-11-20 | Plan step 67: the availability types and the weekly patterns. Section 4: a screen with two lists, a form that creates and a dialog that changes for each, four forms of one shape, the lists of choices, the conflicts list and its three places, one dialog that confirms the deletion of a type or of a pattern. Section 5.1: fourteen files (`availability.model.ts`, `conflicts.ts` and `availability.screen.ts` are new), the availability screen: its three reads, the join of the types' names, what a write says to the form or the dialog that asked, what goes through the screen object; the seven new sentences of `failureText` and the two new things that can be attempted. Section 6: the fifth entry, what a session owns. Section 8: a list with no choice, what a label's text holds, where the keyboard is after a dialog closes. Section 9: the tree. Section 12.1: the size at step 67. Section 11: decisions 89 to 108. |
 | v10 | 2026-11-20 | Plan step 68: a single date (date overrides and one-off windows). Section 4: the screen's third part (the date, the day, the windows of "this day only" as rows that hold a button only, the extra windows), a screen with two views, what the two share and how, the dialog that confirms with neutral words and five kinds, the conflicts list's new places. Section 5.1: sixteen files (`date.model.ts` and `date.screen.ts` are new), the second logic object of the screen and what the first hands it, what is read and when, the checks of the date, the draft, the five writes; the three new sentences of `failureText` and the two new things that can be attempted. Section 6: the fifth entry mounts two views and starts two objects; the second `CalendarService` of a session. Section 8: a native date field typed by keyboard, where the keyboard is after a row is gone, a button the page does not offer. Section 9: the tree. Section 12.1: the size at step 68. Section 11: decisions 109 to 128. |
 
+| v11 | 2026-11-20 | Plan step 69, the closing. Status: implemented. The text is brought to the present tense: it says what is, not what a step added. Section 3, rule 2: why nothing shows before the script decides. Section 4: the handlers of a view that was left; a slot and an appointment named with their day for a screen reader; the dialogs that ask described by their question; the sentence of an overlap among the windows of "this day only" said once, under "Start", with "End" marked (a field in fault with no words of its own). Section 6: the sequence from "Sign in" to the first week. Section 7: the new sections 7.1, what the code became, and 7.2, the verdict on the fallback, as a proposal. Section 8: the walk, a document of its own (`docs/FRONTEND_WALK.md`); the table of the dialogs and the focus; the two tests of `page.test.ts` on reading the page without a mouse. Section 10: every open point as it stands today. Section 12.1: the size at step 69 and the share of `zod`, measured again. Section 11: decision 106 closed, decision 123 as settled, decisions 129 to 136. The trial's code (`prototypes/`) is deleted; what was still true of its page on the loading sequence is in sections 3, 4 and 6. |
+
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
 TypeScript module script**. The markup of every screen is in one `index.html`; the script
 subscribes to the services' streams, fills the markup and turns the user's actions into service
 calls. There is no rendering library, no framework and no compiler beyond the one bundle command
 a browser needs anyway. `lit-html` is the fallback, added for a single view on the day the plain
-code of that view proves painful (section 7).
+code of that view proves painful (section 7); no view needed it (section 7.2).
 
 ---
 
@@ -43,11 +45,15 @@ code of that view proves painful (section 7).
 - `docs/ARCHITECTURE.md` stays the source of truth for the API. On any conflict it wins.
 - `docs/FRONTEND_VIEW_OPTIONS.md` is the record of why this option was chosen. It is not a source
   of truth: where it differs from this document, this document is right.
-- The order of work belongs to `docs/FRONTEND_VIEW_PLAN.md` (steps 60 to 69).
+- The order of work was that of `docs/FRONTEND_VIEW_PLAN.md` (steps 60 to 69, done).
+- `docs/FRONTEND_WALK.md` is the walk through every screen in a browser: the check to repeat
+  after a later change. It is not a source of truth either: this document and the tests win.
 
 The choice was tried before it was made: the login view and the week calendar were written twice,
 in plain HTML/CSS and with `lit-html`, against the real services and the local stack. Several
-rules below come from that trial.
+rules below come from that trial. Its code, the folder `prototypes/`, was throw-away and was
+deleted at `docs/FRONTEND_VIEW_PLAN.md` step 69; it is in git history (commit `f2ade74` is the
+last that holds it).
 
 ## 2. The layers
 
@@ -74,7 +80,10 @@ end up in a view.
 2. **One HTML page holds all the markup.** Every screen is an element of `index.html` with an
    `id`, hidden with the attribute `hidden` until the shell shows it. The script does not build a
    screen's structure: it finds elements that are already there. One page also keeps the
-   in-memory session alive from screen to screen.
+   in-memory session alive from screen to screen. The style sheet's first rule about it is
+   `[hidden] { display: none !important; }`, so that no other rule can show an element the
+   script has not shown: between the moment the page is parsed and the moment the script
+   decides, the page is blank, and nothing of a screen flashes.
 
 3. **Repeated elements are copies of a `<template>`.** HTML has no loop. A row, a day, a block
    is drawn by copying the content of a `<template>` element of `index.html` and filling the
@@ -196,6 +205,14 @@ the button is disabled because `loginState$` notifies `pending`, and the screen 
 the session stream notifies the shell. Every change on screen comes from a stream, except pure
 view actions such as opening a dialog.
 
+**The handlers of a view that was left stay where they are.** A handler is attached by
+assigning a property (`form.onsubmit = …`, `button.onclick = …`), never with
+`addEventListener`. Leaving a view does not remove them: they stay on elements that are hidden,
+which nobody can press, and the next mount replaces each of them, because assigning the
+property again overwrites the one before. This is why the same view can be mounted again and
+again on the same elements, for one person after another, without a handler being called
+twice, and why a teardown lists texts, lists and dialogs and no handler.
+
 **Lists and templates.** For a larger view, two helpers keep the look-ups short:
 
 ```ts
@@ -238,8 +255,11 @@ element `#week`: `tpl-day` (a heading and the day's body), `tpl-window`, `tpl-bu
 `tpl-appointment`, two for the lists beside the days, `tpl-legend-item` and `tpl-hour`, and one
 for a choice of a list in the book dialog, `tpl-option`. The navigation's link has one too,
 `tpl-nav-link`, in the frame. A slot and an appointment are `<button type="button">` elements
-(`docs/FRONTEND_VIEW_PLAN.md` step 62): a keyboard reaches them, and a screen reader says their
-text, the time and "free" or the person. A window and a busy block stay plain elements. The
+(`docs/FRONTEND_VIEW_PLAN.md` step 62): a keyboard reaches them. On the screen each shows its
+time, and its day is the column it stands in; a screen reader reaches a button without its
+column, so the view gives each a name (`aria-label`) made of the day's label and the button's
+own words: "Mon 23 Nov 09:00–10:00 free", "Mon 23 Nov 11:00–12:15 You First lesson". A window
+and a busy block stay plain elements. The
 number of hours shown is set on each day's body as
 the custom property `--hours`, so nothing the script sets stays on an element that outlives the
 week. The view redraws the days only when the stream brings another week object, not at every
@@ -341,7 +361,7 @@ appointments.bookState$.subscribe((state) => {
   those marked `in-change` in the second only, and the script only shows and hides them. The
   choice of User is `in-booking`: a change asks for no User and never calls `listUsers`; the
   Administrator keeps the two lists of times.
-- **What the open book dialog is about** now includes the move it confirms, or `null` for a
+- **What the open book dialog is about** includes the move it confirms, or `null` for a
   booking: a copy taken at the opening of what `week$` last said. "Book" or "Change" calls
   `appointments.book(…)` or `appointments.change(appointmentId, …)` according to it, and
   nothing else. The two modes share the "asked" flag and the failure element and are kept
@@ -402,8 +422,8 @@ alone. The form has `novalidate`: an empty or half-typed date is refused by the 
 words, beside the form, not by the browser's own bubble.
 
 **A form whose fields are checked** (`docs/FRONTEND_VIEW_PLAN.md` step 65: the settings,
-`#settings`, `frontend/src/views/settings.view.ts`; the pattern for the forms of the steps that
-follow). The markup of one field:
+`#settings`, `frontend/src/views/settings.view.ts`; the pattern of every form of the users and
+of the availability). The markup of one field:
 
 ```html
 <div class="field">
@@ -420,7 +440,11 @@ follow). The markup of one field:
   sentence in `.refusal` (announced: `role="alert"`), `aria-invalid="true"` on the input, and
   through that attribute a red border from the style sheet. When the stream no longer names the
   field, the sentence is emptied and the attribute removed. The view decides nothing: the
-  logic layer says which fields are in fault and in which words (section 5.1).
+  logic layer says which fields are in fault and in which words (section 5.1). **A field can
+  be in fault with no words of its own**: the logic layer names it with an empty sentence,
+  the view marks it and writes nothing under it, and the sentence of another field names it.
+  The one case is an overlap among the windows of "this day only", which is of "Start" and
+  "End" together (below, "A single date").
 - **"Save" sends the fields as text**, as they are, to the logic object, which checks them:
   the view parses nothing. The form has `novalidate`; the native field's `min`, `max` and
   `step` are set by the script from the logic layer's ranges, as a convenience (the arrows stop
@@ -526,13 +550,13 @@ users.createUserState$.subscribe((state) => {  // the service's own state: the p
 - **While it is open nothing else of the page can be reached**, "Sign out" included: it is a
   modal dialog. A session that ends by itself meanwhile closes it through the view's teardown.
 
-**A dialog that confirms a deletion** (`dialog.delete`, inside `#users`; the pattern for the
-deletions of the steps that follow: a type, a pattern, an override, a window).
+**A dialog that confirms a deletion** (`dialog.delete`, inside `#users`; the pattern of the
+dialog that confirms on the availability screen, below).
 
 ```html
-<dialog class="delete" aria-labelledby="delete-title">
+<dialog class="delete" aria-labelledby="delete-title" aria-describedby="delete-question">
   <h3 id="delete-title">Delete user</h3>
-  <p class="question"></p>                     <!-- whom, what follows, and that it cannot be undone -->
+  <p class="question" id="delete-question"></p> <!-- whom, what follows, and that it cannot be undone -->
   <p class="error" role="alert"></p>
   <div class="actions">
     <button type="button" class="keep">Keep</button>
@@ -568,12 +592,15 @@ users.deleteUserState$.subscribe((state) => {
   list again (section 5.1), not because the view removes it.
 - **Two buttons, "Keep" first.** The keyboard is on "Keep" when the dialog opens, so Enter
   pressed by habit keeps; the Escape key closes it too. Nothing is typed to confirm.
+- **The question describes the dialog** (`aria-describedby`): when it opens, a screen reader
+  says its name, then the question, then "Keep". Without it the question, which is the whole
+  point of the dialog, would be said only to someone who went looking for it.
 - **No handler of the `close` event**, like every dialog of the page (the shape of a dialog
   above, "A close does nothing"): whom it is about is replaced at the next opening.
 - **The button of a row says whom** to a screen reader (`aria-label`, "Delete alice"), set by
   the script with the words of the logic layer.
-- The view is 172 lines, 26 of which look a node up or copy a template; no helper that builds
-  or updates nodes was written (section 7).
+- No helper that builds or updates nodes was written (section 7); the view's size is in
+  section 7.1.
 
 **The availability: a form that creates, a dialog that changes** (`docs/FRONTEND_VIEW_PLAN.md`
 step 67: `#availability`, `frontend/src/views/availability.view.ts`). One screen with two
@@ -595,9 +622,8 @@ an empty list, and the list. What is new:
   `change`). Three functions serve the four: what a form holds, as text (`held`); a form
   filled with given values (`fill`); and what a write says in its form (`say`): each field in
   fault marked with its sentence under it, the failure, the appointments in the way. They set
-  values and texts of elements found once; none builds a node. Since
-  `docs/FRONTEND_VIEW_PLAN.md` step 68 they are in the file the screen's two views share
-  ("A screen with two views" below).
+  values and texts of elements found once; none builds a node. They are in the file the
+  screen's two views share ("A screen with two views" below).
 - **A pattern's six fields**: "Weekday", "Start", "End" and "Type" are native lists, "Valid
   from" and "Valid until" native date fields; "Valid until" says under it "Leave empty for no
   end." The choices of the weekday and of the two times are fixed, and the script sets them
@@ -653,8 +679,8 @@ the list of those appointments. Its markup, the same in each of its places:
   showed it, and when the view is left. The id of an appointment never reaches the page.
 - **Nothing can be done to an appointment from the list**: the sentence sends the
   Administrator to the week ("Cancel or move them in the week first.").
-- **`docs/FRONTEND_VIEW_PLAN.md` step 68 reused it as it was**: the markup above in its new
-  place, `tpl-conflict`, `conflictList` and `showConflicts`, with no word more.
+- **The fourth place was added with no word more** (`docs/FRONTEND_VIEW_PLAN.md` step 68): the
+  markup above, `tpl-conflict`, `conflictList` and `showConflicts`.
 
 **One dialog confirms** (`dialog.delete`, inside `#availability`): the dialog of the users
 above, with three differences. It serves five things: the deletion of a type, of a pattern
@@ -712,7 +738,9 @@ date": a native date field and "Show"; under it, once a date is shown, that day.
 - **"This day only" is put together, then saved in one go.** The button starts a list of
   windows, shown in a box of its own: each row is the window's hours, its type and
   "Remove"; a fixed form under the rows ("Start", "End", "Type", "Add") adds one; "Discard"
-  and "Save this day" end it. **No row holds a field** (section 3, rule 4): a window is
+  and "Save this day" end it. A window that overlaps one of the rows is refused at "Add":
+  "Start" and "End" are both marked in fault, and the sentence, which names both, stands
+  once, under "Start" (a field in fault with no words of its own, above). **No row holds a field** (section 3, rule 4): a window is
   removed and added, not edited in place, which is what keeps the first condition of
   section 7 away. The list is state of the logic layer (section 5.1): the view draws the
   rows the stream brings and calls `add`, `remove(index)`, `discard` and `save`.
@@ -730,8 +758,7 @@ date": a native date field and "Show"; under it, once a date is shown, that day.
   changes. A notification of another kind leaves every row's button the same element.
 - **While windows are being put together the day's three buttons are not shown** (the
   stream offers none): there is one thing under way, and its own two buttons end it.
-- The view is 174 lines and listens to one stream; 18 of its lines look a node up or copy a
-  template.
+- The view listens to one stream; its size is in section 7.1.
 
 **A screen with two views** (`docs/FRONTEND_VIEW_PLAN.md` step 68). The availability is one
 element and one entry of the table of screens, with two mount functions, each listening to
@@ -748,15 +775,13 @@ What the two share is one file, `frontend/src/views/availability.parts.ts`:
 | `availabilityParts(root)` | Finds the screen's templates once and returns `copy` (a copy of a template's element), `choices` (the `<option>`s of a list), `showConflicts` (a conflicts list drawn in a place) and `form(selector, names)`: a form whose fields are checked, found once, with `held()`, `fill(values)` and `say(outcome)` |
 | `mountConfirm(root)` | The dialog that confirms, above |
 
-- These are the functions `availability.view.ts` had as local ones at
-  `docs/FRONTEND_VIEW_PLAN.md` step 67, moved as they were: the second view needed the same
-  ones, and writing them twice was the alternative. None decides anything; each sets values
+- These are functions `availability.view.ts` first had as local ones
+  (`docs/FRONTEND_VIEW_PLAN.md` step 67), moved as they were when the second view needed the
+  same ones: writing them twice was the alternative. None decides anything; each sets values
   and texts of elements found once, or fills copies of a template with `textContent`.
-- **It is more than the "two small helpers" of section 3, rule 12**, and it is no longer
-  local to one view: section 11, decision 127 says how close this is to the third condition
-  of section 7.
-- `availability.view.ts` went from 282 to 213 lines; it still listens to three streams, and
-  23 of its lines look a node up or copy a template. `availability.parts.ts` is 158 lines.
+- **It is more than the "two small helpers" of section 3, rule 12**, and it is not local to
+  one view: section 7.2 says what that means for the rule, as a proposal.
+- The sizes of the two views and of this file are in section 7.1.
 
 ## 5. The logic layer
 
@@ -1011,9 +1036,9 @@ export class AppointmentsScreen {
   the detail it answers and "today" for the default period use that zone. While it is not known
   nothing is listed and the stream says `loading`. A failed read is the failure shown in the
   place of the list, and choosing a mode again reads again. The read is for the zone only: no
-  setting is shown or changed. Nothing here uses `DEFAULT_TIME_ZONE`. **The week screen keeps
-  opening without that request**: its limit around midnight (above) stands, and lifting it now
-  has a precedent.
+  setting is shown or changed. Nothing here uses `DEFAULT_TIME_ZONE`. **The week screen opens
+  without that request**: its limit around midnight (above) stands, and lifting it has a
+  precedent here.
 - **Two modes, one list.** Upcoming is `list({ upcoming: 'true' })`, which the service sends
   with `status=booked`; the history is `list({ from, to, status: 'all' })`. They share the
   service's one pair of streams, so a change of mode or of period while a load is under way
@@ -1318,7 +1343,8 @@ export class AvailabilityScreen {
   becomes another object when the settings first say the zone, and again after every create
   that succeeded; after a refusal or a failure what was chosen stays.
 - **What a write says** is one `Ask` per kind of write, replaced whole at every ask: a
-  refusal by the check (no call, the lists kept), `busy` while the call is under way, then
+  refusal by the check (no call, the lists kept; a field named with an empty sentence is in
+  fault with no words of its own), `busy` while the call is under way, then
   `done` or the failure in plain words (`failureText`, with what was attempted), with the
   appointments in the way when the server named some. **While a write of a kind is under way
   another of that kind is not taken**, sent or refused: the answer that arrives is then
@@ -1343,7 +1369,7 @@ export class AvailabilityScreen {
 - **Nothing is told to the week.** It loads at its `start()`, so going from "Availability" to
   "Week" shows the new windows and a renamed type's name; a User's open page shows them at
   its next load.
-- **One `CalendarSettingsService` per session now serves three screens**; each listens while
+- **One `CalendarSettingsService` per session serves three screens**; each listens while
   it is started and takes no result that was there before its `start()`.
 - **What is kept, and what is not.** Nothing: the end of the subscription of `start()`
   forgets the lists, the zone, what the forms said and what was typed, and the next `start()`
@@ -1442,8 +1468,9 @@ export class DateScreen {
   patterns give it (`startingWindows`). `add(fields)` checks the three fields with the
   sentences of a pattern's form ("End must be later than Start.", "Type must be chosen.")
   and then what only the list can know: **a window that overlaps one of the list is
-  refused**, under "Start" and "End" ("Start and End overlap another window of this day.
-  Choose other hours."), with `shared/`'s `overlaps`, so windows that touch are accepted
+  refused**: "Start" and "End" are both in fault, and the sentence is said once, under
+  "Start" ("Start and End overlap another window of this day. Choose other hours."; the
+  refusal of "End" is the empty sentence, `IN_FAULT_TOO`), with `shared/`'s `overlaps`, so windows that touch are accepted
   whatever their types (`docs/SHARED_CALENDAR_SPEC.md` R-AV-01); and **one more than a day
   may have of its own is refused** as the form's failure ("A day can have 10 windows of its
   own at most. Remove one to add another.", the number being
@@ -1529,7 +1556,7 @@ the calendar's zone. **Known limits, on the two nights of a clock change:**
 Availability at night on those two nights is rare; neither is solved.
 
 **Failures in plain words.** `failureText(reason)` turns a failure's `reason` into a sentence. It
-knows the reasons a person can meet so far: the transport reasons every API service shares
+knows the reasons a person can meet: the transport reasons every API service shares
 (`docs/FRONTEND_SERVICES.md` section 10.2), the codes of `GET /calendar`, the login's reasons,
 and the codes of a booking, of a cancellation, of a change, of a note and of the list of users
 (`docs/FRONTEND_SERVICES.md` sections 19.1 and 13.1). The list of appointments and the read of
@@ -1582,8 +1609,8 @@ extra window first.": the way back chooses no hours, so "Choose other hours." wo
 nothing there (`docs/SHARED_CALENDAR_SPEC.md` section 6.5, the last row of its table).
 The raw technical text is never shown: a reason without a sentence gets one general sentence,
 never the service's `message`, which is written for a developer. The login view uses it too. A
-wrong password and an unknown user are one reason and get one sentence. Each later step adds the
-sentences of its routes' codes.
+wrong password and an unknown user are one reason and get one sentence. A new route's codes get
+their sentences here.
 
 ## 6. The shell
 
@@ -1612,7 +1639,7 @@ API's configuration and the whole store because it creates the API services of e
 4. **New API services and logic objects for every session.** They are created when a session
    starts and dropped when it ends, so that nothing of one person's data can be replayed to the
    next (the services' result streams replay their last value). One function of the shell,
-   `sessionObjects`, creates them when a person enters: today the `CalendarService`, the
+   `sessionObjects`, creates them when a person enters: the `CalendarService`, the
    `AppointmentsService`, the `UsersService` (for both roles; a User's view never calls it),
    the `CalendarSettingsService` (read by the list screen for the time zone, read and saved by
    the settings screen), the `WeekScreen`, the `AppointmentsScreen`, which is given the
@@ -1645,12 +1672,12 @@ export type Screen = {
 };
 ```
 
-There are five entries so far: `#/week`, "Week", both roles; `#/appointments`, "My
+There are five entries: `#/week`, "Week", both roles; `#/appointments`, "My
 appointments", the role `user` only; `#/settings`, "Settings", `#/users`, "Users", and
 `#/availability`, "Availability", the role `admin` only. The dialogs have no address. A new screen is a new entry,
 its element in `index.html`, and its services and logic object in `sessionObjects`; the code
-that reads the address, fills the navigation and switches between screens does not change, and
-did not for the second entry, nor for the third, the fourth or the fifth. `mountShell` takes the table as an optional dependency, which a
+that reads the address, fills the navigation and switches between screens does not change: it
+was written for the first entry and not touched for the four that followed. `mountShell` takes the table as an optional dependency, which a
 test uses to bring an entry whose mount is a spy.
 
 **The fifth entry shows one screen with two views** (`docs/FRONTEND_VIEW_PLAN.md` step 68).
@@ -1681,7 +1708,34 @@ of hash, leaving the list and mounting the week.
 The sequence when the page is loaded: the browser parses `index.html`, with every view hidden;
 the module script runs once the whole page is parsed (a module script is deferred), so every
 element exists; the shell subscribes to `session$`, which answers at once with `null` (section
-10, open point O3); the login view is shown and mounted.
+10, open point O3); the login view is shown and mounted. All of it happens inside the one run
+of the script, before the browser paints: the first thing a person sees is the login form.
+
+The sequence from "Sign in" to the first week on screen, which no single point above says in
+order:
+
+1. The login view's handler calls `login.login(…)` and nothing else. `loginState$` says
+   `pending` and the view disables the button.
+2. On a success the `LoginService` puts the session in the `SessionStore`; `session$` notifies
+   the shell, which reduces it to a person (the username and the role).
+3. The shell **leaves the login view first**: it unsubscribes it, and the view's teardown
+   resets the form, so the password typed is no longer in the page. Then it hides `#login`
+   and shows `#app`.
+4. `enter(person)` fills the header, creates the session's services and logic objects
+   (`sessionObjects`: nothing is asked of the server yet), and fills the navigation.
+5. The address is read. With no hash it becomes `#/week`, in place. The entry's `show` runs:
+   it un-hides `#week`, **mounts the view**, which subscribes to `week$` and gets its starting
+   state at once (the label of the week, no week, nothing loading), and **then** starts the
+   `WeekScreen` (section 3, rule 8).
+6. `start()` asks for the week: `week$` says `loading` with the label, and the view shows
+   "Loading…".
+7. The answer arrives; the `WeekScreen` makes the week ready to draw (`weekModel`) and
+   `week$` carries it; the view draws the days from the templates, once for that week object.
+
+Signing out is the same sequence backwards: the store is cleared, `session$` says `null`, the
+shell unsubscribes the person's one subscription, which ends the logic object's and the
+view's and runs the view's teardown, hides `#app`, shows `#login` and mounts the login view on
+the same, emptied, form.
 
 ## 7. The fallback: `lit-html` for a single view
 
@@ -1714,6 +1768,194 @@ When it is added:
 becomes a requirement, the candidate is Svelte (`docs/FRONTEND_VIEW_OPTIONS.md` section 4.6). The
 services and the logic layer would not change.
 
+### 7.1 What the code became
+
+Measured at `docs/FRONTEND_VIEW_PLAN.md` step 69 (2026-11-20), with every screen built.
+
+**The views** (`frontend/src/views/`):
+
+| File | Lines | Lines of code | Lines that look a node up or copy a template | Streams listened to | Dialogs wired |
+|---|---|---|---|---|---|
+| `week.view.ts` | 315 | 227 | 47 | 4 | 1 (the book dialog, in its two modes); it mounts the detail |
+| `availability.view.ts` | 213 | 159 | 23 | 3 | 2 (rename, change); it opens the one that confirms |
+| `date.view.ts` | 174 | 131 | 18 | 1 | 0; it opens the one that confirms |
+| `users.view.ts` | 172 | 121 | 25 | 3 | 2 (the password, the delete) |
+| `availability.parts.ts` | 160 | 107 | 19 | 0 | 1 (the one that confirms, `mountConfirm`) |
+| `detail.view.ts` | 134 | 89 | 10 | 2 | 1 (the detail) |
+| `appointments.view.ts` | 117 | 85 | 19 | 1 | 0; it mounts the detail |
+| `settings.view.ts` | 110 | 81 | 16 | 1 | 0 |
+| `login.view.ts` | 39 | 23 | 3 | 1 | 0 |
+| `shell.ts` | 303 | 221 | 10 | 2 (the session, the address) | 0 |
+| **All ten** | **1737** | **1244** | **190** | | **7**, each wired once |
+
+**The page**: `frontend/index.html` is 605 lines: the login, the frame, 5 screens, 7 dialogs,
+19 templates, 36 fields, 48 places for a failure or a refusal. `frontend/style.css` is 253
+lines.
+
+**The logic layer** (`frontend/src/logic/`):
+
+| File | Lines | Lines of code |
+|---|---|---|
+| `date.screen.ts` | 382 | 264 |
+| `availability.screen.ts` | 358 | 247 |
+| `date.model.ts` | 207 | 119 |
+| `availability.model.ts` | 196 | 112 |
+| `appointments.screen.ts` | 191 | 129 |
+| `texts.ts` | 183 | 107 |
+| `week.screen.ts` | 181 | 111 |
+| `week.model.ts` | 173 | 133 |
+| `users.screen.ts` | 140 | 87 |
+| `settings.screen.ts` | 123 | 80 |
+| `booking.ts` | 97 | 54 |
+| `settings.model.ts` | 91 | 54 |
+| `appointment.detail.ts` | 90 | 61 |
+| `appointments.model.ts` | 80 | 48 |
+| `users.model.ts` | 39 | 14 |
+| `conflicts.ts` | 28 | 14 |
+| **All sixteen** | **2559** | **1634** |
+
+**The logic against the views.** 1634 lines of code in the logic layer against 1244 in the
+views and the shell, or 1023 in the views without the shell: the bet of
+`docs/FRONTEND_VIEW_PLAN.md` section 4 ("logic first") was that the rules would live in the
+logic, and they do. The two screens whose views are longest are also those whose logic is
+longest by more: the availability has 547 lines in its two views and their shared file, and
+1171 in its four logic files. The services, which the plan did not touch, are 2031 lines (1482
+of code).
+
+**The tests** (`npm run test:unit -w frontend`: 2067 tests in 40 files, 100 % of the lines of
+`frontend/src`, `src/main.ts` left out):
+
+| Layer | Tests |
+|---|---|
+| Services (`tests/unit/services/`) | 639 |
+| Logic (`tests/unit/logic/`) | 768 |
+| Views (`tests/unit/views/`, the shell's file aside) | 539 |
+| Shell (`tests/unit/views/shell.test.ts`) | 121 |
+
+**The bundle** (`dist/app.js`, minified; "compressed" is gzip, as the build prints it):
+
+| Plan step | What it added | `app.js` | Compressed |
+|---|---|---|---|
+| 60 | The login, the shell | 490 kB | 105 kB |
+| 61 | The logic layer, the week | 504 kB | 110 kB |
+| 62 | Booking and cancelling | 518 kB | 113 kB |
+| 63 | The note, the change | 520 kB | 114 kB |
+| 64 | "My appointments" | 528 kB | 115 kB |
+| 65 | The settings | 532 kB | 117 kB |
+| 66 | The users | 537 kB | 118 kB |
+| 67 | The types, the weekly patterns | 561 kB | 124 kB |
+| 68 | A single date | 575 kB | 128 kB |
+| 69 | Nothing of size | 575 kB | 128 kB |
+
+Of the 575 kB at step 69: `zod` 454 kB (79 %; 264 kB of it its messages in other languages,
+190 kB the rest), `rxjs` with its helper library 28 kB, `shared/` 6 kB, the services 27 kB,
+the logic 36 kB, the views and the shell 24 kB. From step 60 to step 69 the bundle grew by
+85 kB, which is all the logic and all the views, the services they brought in, and the parts
+of `rxjs` they use. Open point O9 (section 10) is about the 454.
+
+**How each number was counted**, so that it can be counted again the same way:
+
+- *Lines*: `wc -l`. *Lines of code*: the lines that are neither blank nor a comment alone
+  (`grep -vE '^\s*(//.*)?$'`).
+- *Lines that look a node up or copy a template*: among the lines that are not a comment
+  alone, those that match `querySelector`, a call of `find(…)`, `all(…)`, `copy(…)` or
+  `form('…')`, `closest(` or `getElementById`. The definitions of those helpers are counted
+  too. The figures of the decisions of each step (42, 52, 65, 76, 88, 107, 127) were counted
+  by eye and differ from these by one line here and there.
+- *Streams listened to*: the calls of `.subscribe(` in the file. *Dialogs wired*: the
+  dialogs whose `showModal()` the file calls.
+- *The page*: `<dialog`, `<template`, and `input`, `select` and `textarea` elements counted in
+  `index.html`; the places for a failure are the elements with `role="alert"`
+  (`page.test.ts` holds the last two counts).
+- *Tests*: vitest's JSON report (`npx vitest run --project unit --project views
+  --reporter=json`), the tests of each file summed by its folder.
+- *The bundle*: the build's own printed sizes, in thousands of bytes. *The shares*: esbuild's
+  metafile for the same options (`bundleOptions` of `frontend/scripts/bundle.mjs`, `minify`,
+  `metafile`), `bytesInOutput` summed by where each input file is.
+
+### 7.2 The verdict on the fallback (a proposal, for the review of step 69)
+
+**`lit-html` was not added, and no view was rewritten.** What follows is proposed, not
+decided: the review of `docs/FRONTEND_VIEW_PLAN.md` step 69 takes it or changes it.
+
+**The three conditions, and the view that came closest to each.**
+
+| Condition | Closest | How close | Recorded in |
+|---|---|---|---|
+| Input fields inside a region that is redrawn | `date.view.ts`, the windows of "this day only" | **Not met, by a choice about the screen.** The natural shape of that editor is rows with two times and a type each, added and removed: fields in a redrawn list. It was built as rows with one button and one fixed form that adds (decision 110). Two smaller cases were accepted and named: a fixed list whose choices are rebuilt (the Users of the book dialog, decision 39; the types of the four pattern and window forms, decision 107), never a field that is rebuilt | Decisions 39, 107, 110, 127 |
+| The look-ups for a second or third stream longer than the rest of the view | `week.view.ts` | **Far.** 47 of its 315 lines look a node up or copy a template, for four streams; in no view is the share above one line in six | Decisions 42, 52, 65 |
+| A helper that builds or updates nodes | `availability.parts.ts` | **Met, read by its letter; not met, read by its reason.** See below | Decisions 107, 122, 127 |
+
+**`availability.parts.ts`, named for what it is.** It is a file of view helpers of our own,
+160 lines, imported by two views: `copy`, `choices` and `showConflicts`, which make nodes by
+copying a template and filling the copy; `form(…)`, whose `fill` and `say` set values, texts
+and one attribute on elements found once; and `mountConfirm`, the wiring of one dialog.
+Section 3, rule 12 allows "the two small helpers of section 4 (`find`, `copy`)" and names "a
+helper that builds or updates nodes" as the day to use the fallback. `choices` and
+`showConflicts` build nodes; `say` updates nodes. By the letter of the rule the third
+condition was met at step 67 and more so at step 68, and the two decisions that say "not
+met" (107, 127) argued from the reason of the rule instead: what it guards against is a
+rendering library of our own, something that takes data and decides what the page should
+become. Nothing in the file does that. Every function does what a view does by hand in the
+other views (`rowFor` in the users' view is `copy` and three assignments; the settings' view
+has `say` as a loop of six lines), for four forms and four lists instead of one.
+
+**Should the rule change, or the code?**
+
+- *Reword rule 12 to allow what was built* (what I lean to). Proposed words, in the place of
+  its last two sentences: "A view may have the two small helpers of section 4 (`find`,
+  `copy`). The views of one screen may share a file of helpers that do what a view does by
+  hand: find elements once; set their values, texts and attributes; fill copies of a
+  `<template>` with `textContent`. Such a helper never decides what is shown (the logic layer
+  does), never makes an element other than by copying a template, and keeps no state beyond
+  that of rule 10. The day someone wants a helper that compares what is on the page with what
+  should be there, or that makes markup from data without a template, is the day to use the
+  fallback of section 7 for that view, not to write a rendering library." And the third
+  condition of this section in the same words. **Cost:** one paragraph, and a bound that
+  no lint rule can hold: the review of a view must. The risk is the slow one, a file of
+  helpers that grows a function at a time.
+- *Change what was built to fit the rule as written.* Either the functions go back into the
+  two views, each with its own copy (about 60 lines written twice, and their tests twice,
+  for no line less anywhere), or the availability screen moves to `lit-html`: two views and
+  the shared file rewritten (547 lines), about 300 lines of markup moved from `index.html`
+  into them, their three test files, the largest of the view layer, rewritten against
+  rendered markup, and the first dependency of the view layer. **And it would not fit
+  well**: of what the file holds, `lit-html` would replace `copy`, `choices` and
+  `showConflicts`, some 25 lines. `form(…)` works on fixed fields whose values must *not* be
+  written again at every notification (a value being typed is left alone: section 4), which
+  is the opposite of a template rendered from state; and `mountConfirm` is a modal dialog,
+  which a template cannot open (this section, above; finding 3 of the trial).
+
+**Was `lit-html` needed anywhere? No, and not adding it was right.** The reasons are in what
+the interface turned out to be made of: 7 dialogs and 13 forms, which the plain code handles
+directly and a template library does not help with; and redrawn regions that are small lists
+of rows with texts and buttons. The week, expected to be the first case, is 315 lines of
+which the drawing is about 65: five functions that copy a template and fill it. The trial's
+finding that the week is "where `lit-html` pays" was true of its markup, and the week's
+markup is 30 lines of `index.html`.
+
+**Which view would need it first, and at what change.** `date.view.ts`, the day the windows
+of "this day only" must be edited in place: a row with its two times and its type as fields,
+rows that come and go while others are being edited. That is the first condition with no way
+round it, and the same would hold for editing a pattern in its row. After it, `week.view.ts`,
+if the week gained a second way of being drawn (a month, a day at a phone width) or
+appointments that are dragged: the five drawing functions would then be written twice, or
+turn into the helper the rule forbids.
+
+**"When to think again altogether", read once more.** The interface is the views of
+`docs/SHARED_CALENDAR_SPEC.md` section 16.8, the login and the users: five screens, not
+"well beyond". No design system is asked for. So: not now. Two things the last paragraph of
+section 7 does not name are worth watching, because they are where the plain approach
+already costs something. **The same fields written more than once in the page**: a pattern's
+six fields twice (the form and the dialog), a window's three fields twice, a name twice;
+plain HTML has no way to say "this again", and a sixth screen with forms like these would
+make it a third and a fourth time. **Everything in one page and one test of the shell**: a
+change to a screen is checked against the whole page (the shell's test compares whole pages,
+`page.test.ts` counts every field), which is what kept one person's data out of the next
+person's page, and is also why every step touched the same few files. Neither is a reason to
+move today; both would be the first arguments for Svelte on the day the list of screens
+grows.
+
 ## 8. Testing the views
 
 - **Every view has a DOM test.** It loads the real `index.html` into an emulated document, so a
@@ -1735,6 +1977,62 @@ services and the logic layer would not change.
 
 The emulated document is `happy-dom`'s, and the views are inside the 100 % line coverage of
 `frontend/src` (section 12.3).
+
+**What the tests cannot see is walked in a browser.** `docs/FRONTEND_WALK.md` is one numbered
+list of checks through every screen, as a User and as the Administrator, at a desktop and at a
+phone width, against a fresh, seeded local stack: **the check to repeat after a later change
+to the view layer**. It is made from the browser checks of `docs/FRONTEND_VIEW_PLAN.md` steps 60
+to 68, which this section quotes step by step below, and it was run twice, whole, at step 69.
+It is a written list a person can follow; the script that ran it in a headless browser is not
+in the repository, and no end-to-end test tool is (section 11, decision 130). Its last part
+lists what only a person can check: a real switch of tab, a real phone, a screen reader's
+voice, the native date picker.
+
+**Reading the page without a mouse** (`docs/FRONTEND_VIEW_PLAN.md` step 69). Four things, the
+first and the third held by `page.test.ts` from now on:
+
+- **Every field has its label.** Each of the 36 `input`, `select` and `textarea` elements of
+  `index.html` is inside a `<label>` that has words of its own and holds no other field. A
+  button whose words do not say what it acts on gets a name from the script, with the words
+  of the logic layer: a row's "Delete", "Rename", "Change" and "Remove" (which row), and a
+  slot and an appointment of the week (which day). The five "Try again" and the two arrows of
+  the week have theirs in the page.
+- **Every dialog takes the focus and gives it back**: the table below.
+- **Every failure is announced.** The 48 elements that show a failure or a refusal (class
+  `error`) have `role="alert"`, and nothing else has; the six "Loading…" have `role="status"`,
+  as have three other pieces of news: the appointment being moved, "Settings saved." and the
+  message beside the User picker of the book dialog, which can also be a failure (section 11,
+  decision 133). The two dialogs that ask are described by their question.
+- **Everything is reachable by keyboard.** In the walk's desktop run every action of every
+  screen is done once by keyboard only (the checks marked `[K]`): Tab to reach, Enter or the
+  space bar to press, typing or the arrow keys in a list, Escape.
+
+**The dialogs and the focus**, as Chromium 159 does it at a desktop width, each dialog opened
+by keyboard from the element named (probed at `docs/FRONTEND_VIEW_PLAN.md` step 69; the lines of
+the steps below say the same of single cases). No line of the views moves the focus: this is
+the native modal `<dialog>`, and one `autofocus` in the page (section 11, decision 134).
+**In every dialog Tab stays inside it.**
+
+| Dialog | Opened from | The keyboard is on, when it opens | After "Close", "Keep" or the Escape key | After its action succeeded |
+|---|---|---|---|---|
+| Book (`dialog.book`), a booking | A free slot | The note; for the Administrator the "For" list | Back on the slot | "Book": on nothing, since the week was redrawn; one Tab: the first slot or appointment of the week |
+| Book, confirming a change | A free slot, while moving | The note | Back on the slot | "Change": on nothing (the week was redrawn); one Tab: the first slot or appointment of the week |
+| Detail (`dialog#detail`), from the week | An appointment | The note's field; "Close" when the note cannot be edited | Back on the appointment | "Save note" and "Cancel appointment" close it: on nothing (the week was redrawn; after a cancellation the appointment is gone); one Tab: the first slot or appointment of the week. "Change": on nothing, since the appointment's button is disabled while moving; one Tab: the next slot after it |
+| Detail, from "My appointments" | A row | The same | Back on the row | "Save note", "Cancel appointment": on nothing (the list was redrawn, or the row is gone); one Tab: the first row. "Change": the week is shown |
+| The password (`dialog.created`) | "Create user", or Enter in the field | Its heading, "User created" (`autofocus`): Enter and the space bar do nothing there; one Tab: its button | The Escape key does not close it | Its button: back where the keyboard was, the username field or "Create user" |
+| Delete a user (`dialog.delete` of `#users`) | A row's "Delete" | "Keep" | Back on the row's "Delete" | "Delete user": on nothing (the row is gone); one Tab: the first "Delete" of the list |
+| Rename (`dialog.rename`) | A row's "Rename" | The name | Back on the row's "Rename" | On nothing (the list was redrawn); one Tab: the first "Rename" of the list |
+| Change a pattern (`dialog.change`) | A row's "Change" | "Weekday" | Back on the row's "Change" | On nothing (the list was redrawn); one Tab: the first "Change" of the list |
+| The one that confirms (`dialog.delete` of `#availability`) | A row's "Delete", "Not available on this day", "Back to the weekly patterns" | "Keep" | Back on the button that opened it | A type, a pattern or an extra window deleted: on nothing (the row is gone); one Tab: the first button of that list. "Not available": back on its button, which is still there. The way back: on nothing (its button is no longer shown); one Tab: the "Start" list of the form that adds an extra window |
+
+- **Where the keyboard ends on nothing, one more Tab reaches the next sensible thing** in every
+  case: the start of the list or of the week that was redrawn, never the top of the page. A
+  person who uses a screen reader hears no announcement of where they are until that Tab.
+- **Nothing was added to mend it.** Putting the focus back by script (on the row that took
+  the place of the one renamed, on the heading of the list after a deletion) would need the
+  views to know which row was which across a redraw, which they do not keep today. If one
+  case were to be mended first it would be the deletions: after "Delete user" or "Confirm" the
+  person is told nothing of the outcome but the dialog closing. It is left, and said here.
 
 **What `happy-dom` does not emulate of the native `<dialog>`** (tried with `happy-dom` 21, plan
 step 60). It does: `showModal()`, `close()`, the property and the attribute `open`,
@@ -1946,24 +2244,26 @@ frontend/
 
 ## 10. Open points
 
-Not decided by this version. "Blocks" says what cannot be done before the point is settled.
-O4, O6 and O8 were decided with `docs/FRONTEND_VIEW_PLAN.md` (its section 2) and are no longer
-open: their rows say where the decision is written.
+Not decided. "Blocks" says what cannot be done before the point is settled. O4, O6 and O8 were
+decided with `docs/FRONTEND_VIEW_PLAN.md` (its section 2) and are no longer open: their rows
+say where the decision is written. Each open row ends with **what is true of it today**
+(2026-11-20, every view built and running against the local stack).
 
 | # | Point | Direction, where there is one | Blocks |
 |---|---|---|---|
-| O1 | **Hosting.** Static files on an S3 bucket behind CloudFront, or equivalent, in its own SAM template (`docs/FOLDER_STRUCTURE.md` section 7) | Fixed in principle there; the template, the domain and the deploy script are not designed | The first deployment |
-| O2 | **The CORS gap.** The API answers no cross-origin request (`docs/FRONTEND_SERVICES.md` section 10.3) | One origin for the page and the API (the hosting routes a path to the API), or a `CorsConfiguration` on the API naming the page's origin. Decided with O1. Locally the dev server passes the API's and Cognito's paths on, which gives one origin (section 12.2): the gap does not bite there, and is not solved | The first deployment |
-| O3 | **The session across a reload.** In memory only: a reload means signing in again (`docs/FRONTEND_SERVICES.md` section 9.6) | `sessionStorage` is the candidate named there. Decided with O5 | Nothing: the application works without it |
+| O1 | **Hosting.** Static files on an S3 bucket behind CloudFront, or equivalent, in its own SAM template (`docs/FOLDER_STRUCTURE.md` section 7) | Fixed in principle there; the template, the domain and the deploy script are not designed. **Today:** `npm run build -w frontend` writes the three files a host would serve (`frontend/dist/`), with the three values of the configuration taken from the environment; nothing serves them outside this machine, and `frontend/` has no template and no `deploy` script | The first deployment |
+| O2 | **The CORS gap.** The API answers no cross-origin request (`docs/FRONTEND_SERVICES.md` section 10.3) | One origin for the page and the API (the hosting routes a path to the API), or a `CorsConfiguration` on the API naming the page's origin. Decided with O1. Locally the dev server passes the API's and Cognito's paths on, which gives one origin (section 12.2): the gap does not bite there, and is not solved. **Today:** every screen makes its calls through that one origin; the bundle's two addresses are whatever the build is given, so either direction needs no change to `frontend/src` | The first deployment |
+| O3 | **The session across a reload.** In memory only: a reload means signing in again (`docs/FRONTEND_SERVICES.md` section 9.6) | `sessionStorage` is the candidate named there. Decided with O5. **Today:** a reload shows the login (`docs/FRONTEND_WALK.md` check 101). The screens add to what a reload loses: the address is kept (the hash), but the week on show, the mode and the period of "My appointments", an appointment being moved and everything typed and not saved are in memory only | Nothing: the application works without it |
 | O4 | **The bundle command and the dev server**, and with them where the configuration comes from and where the built files go | **Decided: esbuild**, two Node scripts. Sections 12.1 and 12.2 | Nothing any more |
-| O5 | **The Content-Security-Policy of the hosting** | `default-src 'self'` works: the dev server sends it (section 12.2). To settle: `zod` probes for `eval` when it starts, which such a policy reports in the console (it is caught, and harmless) | The first deployment |
+| O5 | **The Content-Security-Policy of the hosting** | `default-src 'self'` works: the dev server sends it (section 12.2). To settle: `zod` probes for `eval` when it starts, which such a policy reports in the console (it is caught, and harmless). **Today:** the whole walk ran under that policy, at two widths, with that one report and no other: the views need no inline script, no inline style and no other origin (section 3, rule 6; `page.test.ts` holds the page to it) | The first deployment |
 | O6 | **The DOM emulation for the views' tests and the coverage of the views** | **Decided: `happy-dom`, and the views inside the 100 % line coverage** of `frontend/src`. Section 12.3 | Nothing any more |
-| O7 | **Logout.** Not designed in the services layer (`docs/FRONTEND_SERVICES.md`, status line) | The shell needs it. Until then "Sign out" can only clear the `SessionStore`, which leaves the refresh token valid at Cognito | The first deployment |
+| O7 | **Logout.** Not designed in the services layer (`docs/FRONTEND_SERVICES.md`, status line) | The shell needs it. Until then "Sign out" can only clear the `SessionStore`, which leaves the refresh token valid at Cognito. **Today:** that is what "Sign out" does (section 6, point 2). Everything of the person leaves the page and the memory with it (the session's objects are dropped, every view empties what it showed: the shell's test compares whole pages); what is left is at Cognito, not in the browser | The first deployment |
 | O8 | **The language of the interface** and where its texts are kept | **Decided: English only**, no translation mechanism. Section 12.4 | Nothing any more |
-| O9 | **The size of the bundle.** Of the 490 kB of `app.js` at plan step 60, 454 are `zod`, and 264 of those are its messages in other languages, which the interface never shows (section 12.1) | Slimming it means changing how `shared/` brings `zod` in (which entry of `zod` its schemas import, or what `shared/` exports to the browser): a change to `shared/`, which the back end uses too, so a decision of its own | The first deployment. Nothing locally |
+| O9 | **The size of the bundle.** Of the 490 kB of `app.js` at plan step 60, 454 are `zod`, and 264 of those are its messages in other languages, which the interface never shows (section 12.1). **Today:** 575 kB, 128 kB compressed, with every view; `zod` is still 454 kB of it, 79 %, and everything written for this front end (the services, the logic, the views) is 87 kB | Slimming it means changing how `shared/` brings `zod` in (which entry of `zod` its schemas import, or what `shared/` exports to the browser): a change to `shared/`, which the back end uses too, so a decision of its own | The first deployment. Nothing locally |
 
-What is still open stands between the front end and its first deployment, not between it and
-the next view.
+**These are now the only things between the front end and a deployment.** O1, O2, O5 and O7
+block it; O9 should be looked at before it, since it decides what every person downloads; O3
+blocks nothing. No view waits for any of them, and none of them needs a view to change.
 
 ## 11. Decisions and assumptions
 
@@ -2077,7 +2377,7 @@ than what the trial showed: these deserve the first look in a review.
 | 103 | After a create that succeeded the form that creates a pattern goes back to its starting values; "Valid from" starts on today, the calendar's (section 5.1) | Asked by the brief of the step. Known cost: five patterns of one type for five weekdays are five times the type and the hours chosen again; copying a pattern and several weekdays in one create are not built | |
 | 104 | `failureText` takes `'type'` and `'pattern'` as what was attempted, for `limit_reached`; with nothing said the sentence names no number (section 5.1) | Decision 51's second argument, extended rather than a second way. The numbers are `CALENDAR_LIMITS`' | |
 | 105 | `texts.ts` gains `longDateText`, a date with its whole month and its year; a pattern's validity uses it, a conflict's date stays without a year (section 5.1) | A pattern may be valid for years; an appointment in the way has not ended and is within the booking horizon, a year at most, so its date is not ambiguous (decision 64) | Yes |
-| 106 | A pattern's hours are written "09:00 – 13:00", with spaces around the dash; an appointment's time stays "09:00–10:00" (`rangeText`), also in the conflicts list of the same screen (section 5.1) | The first are two local times of a rule, written as the brief of the step has them; the second is the time of an appointment, as the week and the list write it. To settle at the review if one form is wanted | Yes |
+| 106 | A pattern's hours are written "09:00 – 13:00", with spaces around the dash; an appointment's time stays "09:00–10:00" (`rangeText`), also in the conflicts list of the same screen (section 5.1) | The first are two local times of a rule, written as the brief of the step has them; the second is the time of an appointment, as the week and the list write it. Two forms, on purpose (settled at `docs/FRONTEND_VIEW_PLAN.md` step 69) | Yes |
 | 107 | No condition of section 7 was met at plan step 67; one came close | `availability.view.ts` is 282 lines (the week's is 312) and listens to three streams; 36 of its lines look a node up or copy a template. No field is in a redrawn region: the rows hold buttons, and the choices of a fixed list are rebuilt, as in the book dialog (decision 39). **What came close**: four forms of one shape gave the view local functions that set values and texts of elements found once (`fill`, `say`, `showConflicts`, `choices`), where the settings had one loop in its subscription. None builds a node or decides anything; they are the same few assignments for four forms instead of written four times. If step 68's per-date editor needs rows of fields that come and go, that is the first condition of section 7, and the step must stop there | |
 | 108 | The availability is a fifth entry of the table of screens, with its two services and its logic object in `sessionObjects`; the code that reads the address, fills the navigation and switches between screens did not change (section 6) | Decision 28, for the fifth time | |
 | 109 | A single date is chosen on the availability screen: a third part, "A single date", with a native date field and "Show"; no new address and no new link (section 4) | Decided with the Product Owner (`docs/FRONTEND_VIEW_PLAN.md` step 68) | |
@@ -2094,12 +2394,20 @@ than what the trial showed: these deserve the first look in a review.
 | 120 | All five writes on a date go through the `DateScreen`, the three the dialog confirms included; the dialog shows its outcome from the object's stream, by what it is about (sections 4 and 5.1) | It departs from decision 99. The date is the object's state; "not available" and the save are one call with one result stream; the appointments in the way need the zone | Yes |
 | 121 | While the list of "this day only" is open the day's three buttons are not offered, and "not available" and the way back are not taken (sections 4 and 5.1) | The brief of the step offered two of them on every date shown. With a list open, "This day only…" pressed again could only restart it or do nothing, and "not available" would leave a list that no longer starts from the day | Yes |
 | 122 | What the screen's two views share is one file, `availability.parts.ts`: the look-up of a form whose fields are checked (`held`, `fill`, `say`), `choices`, `showConflicts`, `copy`, and `mountConfirm`, the dialog, mounted by the entry of the table of screens and handed to both views (sections 4 and 6) | The second view needed the functions the first had as local ones; moved as they were, instead of written twice. The dialog is one element with one button: two mounts would overwrite each other's handlers, so it is mounted once, and an opening is told only by the view that made it | Yes |
-| 123 | Both forms that add a window go back to 09:00 to 10:00 with no type chosen after an add that was accepted; the sentence of an overlap stands under "Start" and under "End", the same words twice (sections 4 and 5.1) | Decisions 102 and 103 again. The overlap is of the two fields together, and the brief of the step asks for it under both; a screen reader hears it twice. To settle at the review if once is wanted | The words said twice, yes |
+| 123 | Both forms that add a window go back to 09:00 to 10:00 with no type chosen after an add that was accepted; the sentence of an overlap is said once, under "Start", and "End" is marked in fault with no sentence of its own (sections 4 and 5.1; decision 129) | Decisions 102 and 103 again. The overlap is of the two fields together. It first stood under both, the same words twice, which a screen reader heard twice; settled at `docs/FRONTEND_VIEW_PLAN.md` step 69 | |
 | 124 | On the page a date override is "its own windows" and "this day only", a one-off window "an extra window" (section 4) | The words of the Product Owner's brief for the buttons; "override" and "one-off" are the API's words | Yes |
 | 125 | `failureText` gains `date_in_past`, `override_not_found` and `window_not_found`, and two things that can be attempted: `'window'`, for `limit_reached`, and `'patterns-back'`, for `availability_overlap` (section 5.1) | Decision 104 again. The second was not asked by the brief of the step: the general sentence ends with "Choose other hours.", and the way back to the weekly patterns chooses none | The second, yes |
 | 126 | A write of a date answered `type_not_found` does not read the types again (section 5.1, known limit) | The `DateScreen` reads nothing the `AvailabilityScreen` reads (decision 117). The person reads "This type no longer exists."; the choices follow the next write to a type or a pattern, or the page shown again | Yes |
-| 127 | No condition of section 7 was met at plan step 68; the third came closer | `date.view.ts` is 174 lines and listens to one stream, with 18 lines that look a node up or copy a template; `availability.view.ts` went from 282 to 213 (23 such lines); `index.html` is 601 lines. **First condition**: not met. No row holds a field: the windows of "this day only" are rows with one button, added through a fixed form (decision 110). **Second**: not met. **Third, what came closer**: the functions that decision 107 named as local to one view (`fill`, `say`, `showConflicts`, `choices`) are now a file of 158 lines that two views import, with the look-up of a form and the dialog that confirms beside them. None decides anything or builds a node other than a copy of a template filled with `textContent`, and nothing was added to what they do; but it is a small set of view helpers of our own, for one screen, which section 3, rule 12 allows only as "two small helpers". `docs/FRONTEND_VIEW_PLAN.md` step 69 takes its verdict from this | |
+| 127 | No condition of section 7 was met at plan step 68; the third came closer | `date.view.ts` is 174 lines and listens to one stream, with 18 lines that look a node up or copy a template; `availability.view.ts` went from 282 to 213 (23 such lines); `index.html` is 601 lines. **First condition**: not met. No row holds a field: the windows of "this day only" are rows with one button, added through a fixed form (decision 110). **Second**: not met. **Third, what came closer**: the functions that decision 107 named as local to one view (`fill`, `say`, `showConflicts`, `choices`) are now a file of 158 lines that two views import, with the look-up of a form and the dialog that confirms beside them. None decides anything or builds a node other than a copy of a template filled with `textContent`, and nothing was added to what they do; but it is a small set of view helpers of our own, for one screen, which section 3, rule 12 allows only as "two small helpers". The verdict is in section 7.2 | |
 | 128 | The availability stays one entry of the table of screens, whose `show` mounts two views and starts two logic objects; the code that reads the address, fills the navigation and switches between screens did not change (section 6) | Decision 28 again: the entry is where a screen says how it is shown | |
+| 129 | A field can be in fault with no words of its own: the logic layer names it in `refusals` with an empty sentence (`IN_FAULT_TOO`, in `date.model.ts`), `say` marks it and writes nothing under it. The one use is "End" in an overlap among the windows of "this day only", whose sentence stands once, under "Start" (sections 4 and 5.1) | Settled before `docs/FRONTEND_VIEW_PLAN.md` step 69. It is the smallest change: the type of `refusals` did not change, and `say` already marked a field for any sentence, the empty one included, so no line of a view changed; the style sheet already hides an empty refusal. A second map of "fields in fault" beside `refusals` was the alternative, for one case | |
+| 130 | The walk is a document of its own, `docs/FRONTEND_WALK.md`: one numbered list of checks a person can do by hand, made from the browser checks of plan steps 60 to 68. It is not a source of truth, and the script that ran it in a headless browser is not in the repository (section 8) | Settled before step 69. `docs/FRONTEND_VIEW_PLAN.md` section 8, decision 6: no end-to-end test tool is in the architecture; the list is what is kept, as the check to repeat after a later change | |
+| 131 | A slot and an appointment of the week are named for a screen reader with their day before their own words (`aria-label`, set by the view from the day's label and the button's text) | Found at step 69, reading the page without a mouse: the day of a button is the column it stands in, which a screen reader does not say when the button is reached by Tab. The view joins two texts the logic layer made; nothing is decided there | Yes |
+| 132 | The two dialogs that ask before an action are described by their question (`aria-describedby`); each "Try again" says what it reads again (`aria-label`, fixed in the page: there are five, three of them on one screen) | Found at step 69. A screen reader said "Please confirm, Keep" and not what was to be confirmed. Markup only | Yes |
+| 133 | The message beside the User picker of the book dialog keeps `role="status"`, although it can hold a failure (the list of Users could not be read) | It also holds "Loading the users…" at every opening; as an alert that would interrupt the dialog's own name each time. A failure there is said when the reader is free, and "Book" stays disabled meanwhile. Every other place of a failure or a refusal is an alert: `page.test.ts` holds the list | Yes |
+| 134 | No focus management of our own: where the keyboard is after each close of each dialog is what the browser does, written down in one table (section 8). Where it ends on nothing, the next Tab continues from where the element was | The platform before anything of our own (section 3, rule 12). In every case found the next Tab reaches the next sensible thing; moving the focus by script would be state the views do not have today, in ten files | |
+| 135 | The verdict on the fallback is a proposal (section 7.2): no condition of section 7 called for `lit-html`; `availability.parts.ts` meets the third condition by its letter and not by its reason; rule 12 should be reworded to allow what was built. Nothing was added or rewritten for it | Settled before step 69 that the verdict is proposed here and taken at the review, and that whatever it is, a view that should move is a step of its own | |
+| 136 | The trial's code, `prototypes/`, is deleted. Of its page on the loading sequence, three things that were still true of `frontend/` and said nowhere are in this document: why nothing shows before the script decides (section 3, rule 2), the handlers of a view that was left (section 4), and the sequence from "Sign in" to the first week, as a numbered list (section 6). Its diagram was not kept | `docs/FRONTEND_VIEW_PLAN.md` step 69. The rest of that page described the trial's own files, or said what sections 4, 6 and 12 already say (the selectors as the contract, `hidden` as the switch, a module script being deferred, the dev server and what it answers). The one diagram, from the request of the page to the login form, says nothing that the last paragraphs of section 6 do not | |
 
 ## 12. The tooling (open points O4, O6 and O8, decided)
 
@@ -2136,7 +2444,7 @@ in other languages), which `shared/`'s schemas bring in with any import from
 At plan step 61, with the logic layer and the week: `app.js` 504 kB, 110 kB compressed. At plan
 step 62, with booking and cancelling: 518 kB, 113 kB compressed. At plan step 63, with the note
 and the change: 520 kB, 114 kB compressed. At plan step 64, with "My appointments": 528 kB,
-115 kB compressed. At plan step 65, with the settings: 532 kB, 117 kB compressed. At plan step 66, with the users: 537 kB, 118 kB compressed. At plan step 67, with the types and the weekly patterns: 561 kB, 124 kB compressed. At plan step 68, with a single date: 575 kB, 128 kB compressed. What to do about `zod`'s share
+115 kB compressed. At plan step 65, with the settings: 532 kB, 117 kB compressed. At plan step 66, with the users: 537 kB, 118 kB compressed. At plan step 67, with the types and the weekly patterns: 561 kB, 124 kB compressed. At plan step 68, with a single date: 575 kB, 128 kB compressed. At plan step 69, which added nothing of size: 575 kB, 128 kB compressed (575,102 bytes, 127,546 compressed), of which `zod` is 454 kB, measured again. The sizes step by step and the shares are one table in section 7.1. What to do about `zod`'s share
 is open point O9 (section 10).
 
 ### 12.2 The dev server
@@ -2169,7 +2477,7 @@ id, and says so when the file is missing) and, to sign in, `npm run local:api -w
 - `frontend/tests/unit/views/page.ts` loads the `<body>` of the real `index.html` into the
   emulated document before each test (`useRealPage()`); no view test writes markup of its own.
   `page.test.ts` checks the page itself: one module script and one style sheet, nothing inline,
-  everything hidden at the start.
+  everything hidden at the start, and what a person without a mouse needs of it (section 8).
 - All of `frontend/src` is held to 100 % lines, the views and the shell included. The one file
   left out, by name, is `src/main.ts`.
 

@@ -13,12 +13,12 @@ with AWS SAM.
 The repository is an npm-workspaces monorepo: the back end in `backend/`, the code it shares
 with the browser front end (the API contract types, `Role`/`resolveRole`, the username schemas)
 in `shared/` (package `@shared-calendar/shared`), and in `frontend/` the browser's services
-layer (`docs/FRONTEND_SERVICES.md`) and the start of its view layer
+layer (`docs/FRONTEND_SERVICES.md`) and its view layer
 (`docs/FRONTEND_ARCHITECTURE.md`: the build and the dev server, the shell with its navigation,
 the login, the logic layer, the week calendar with booking, cancelling, the note and the change,
 a User's "My appointments" and the Administrator's settings, users and availability: the
 types, the weekly patterns and a single date; every screen of `docs/FRONTEND_VIEW_PLAN.md`
-section 3 exists, and its step 69 closes the plan). Layout and placement rules:
+section 3 exists and that plan is done, 2026-11-20; it runs locally and is deployed nowhere). Layout and placement rules:
 `docs/FOLDER_STRUCTURE.md`.
 
 ## Where the truth lives
@@ -32,10 +32,10 @@ section 3 exists, and its step 69 closes the plan). Layout and placement rules:
 - `docs/SHARED_CALENDAR_SPEC.md` specifies the shared calendar (agreed with the Product Owner,
   brief 40, not yet implemented). It is the input for the calendar's plan steps; once merged into
   `ARCHITECTURE.md` (spec section 19), the architecture wins as usual.
-- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v10; the foundation, the
-  week, booking, cancelling, the note, the change, "My appointments", the settings, the users
-  and the availability, its types, its weekly patterns and a single date, implemented, plan
-  steps 60 to 68): plain HTML and CSS with one TypeScript module script, the layers (services, logic,
+- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v11, **implemented**: the
+  foundation, the week, booking, cancelling, the note, the change, "My appointments", the
+  settings, the users and the availability, its types, its weekly patterns and a single date,
+  plan steps 60 to 69): plain HTML and CSS with one TypeScript module script, the layers (services, logic,
   views, shell), the rules of a view, the shape of a dialog (its section 4, with the book
   dialog's second mode, the banner of a move, the detail dialog that two views mount, the
   shape of the list, the shape of a form whose fields are checked: a field in fault, the
@@ -57,9 +57,13 @@ section 3 exists, and its step 69 closes the plan). Layout and placement rules:
   when, the checks of the date, the windows being put together, its five writes), the table
   of screens, what the shell hands a view and
   the navigation by the hash (its section 6), and the
-  tooling (its section 12: the bundle command, the dev server, the tests' environment). Hosting,
-  CORS, the session across a reload, the hosting's Content-Security-Policy, logout and the size
-  of the bundle are its open points (section 10).
+  tooling (its section 12: the bundle command, the dev server, the tests' environment). What
+  the code became, in numbers, is its section 7.1, and the verdict on the fallback (`lit-html`
+  was needed nowhere; a proposal about its section 3, rule 12 and `availability.parts.ts`) its
+  section 7.2; where the keyboard is after each dialog closes is one table in its section 8.
+  Hosting, CORS, the session across a reload, the hosting's Content-Security-Policy, logout and
+  the size of the bundle are its open points (section 10): the only things between the front
+  end and a deployment.
   `docs/FRONTEND_SERVICES.md` stays the truth for the services;
   `docs/FRONTEND_VIEW_OPTIONS.md` is the record of why this option, not a source of truth.
 - `docs/FRONTEND_VIEW_PLAN.md` defines the order of work for the views (brief 82): steps 60–69,
@@ -75,8 +79,16 @@ section 3 exists, and its step 69 closes the plan). Layout and placement rules:
   changes, a delete that asks first, the list of the appointments in the way of a refused
   change) and 68 (a single date of the availability: date overrides and one-off windows,
   "this day only" put together and saved in one go, "not available", the way back to the
-  weekly patterns, extra windows; one dialog that confirms, with neutral words) are done
-  (2026-11-20): every screen of the plan's section 3 exists; next step 69, the closing.
+  weekly patterns, extra windows; one dialog that confirms, with neutral words) and 69 (the
+  closing: the walk, the page read without a mouse, what the code became, the trial's
+  prototypes deleted) are done (2026-11-20): **the plan is done**, and stays as the record of
+  the order of work.
+- `docs/FRONTEND_WALK.md` is the walk through every screen in a browser, as `alice` and as
+  `admin`, at a desktop and at a phone width, from a fresh, seeded local stack: 102 numbered
+  checks a person does by hand. **The check to repeat after a change to the view layer.** Not
+  a source of truth: on any conflict the architecture and the tests win, and the walk is
+  fixed. When a screen changes what a check says, the check changes in the same commit. No
+  end-to-end test tool is in the repository, and no script of the walk.
 - `docs/RENAME_PLAN.md` plans the move from the "hello-world" names to "shared-calendar" (plan
   steps 56–58: repository, new stack `shared-calendar-api`, retirement of `hello-world-api`), with
   the way back at every stage. The repository uses the new names (step 56) and the stack in use
@@ -219,7 +231,11 @@ form works the same. Paths below without a folder are relative to `backend/`.
   adds; it does nothing at all when the type "Studio" exists already; it refuses any address but
   `localhost` and `127.0.0.1` (`SEED_API_URL`, `SEED_COGNITO_URL` for other local ports); it
   prints what it created, never a token or a password. Appointments cannot be deleted through
-  the API: **after the back end's calendar journeys have emptied the table, run it again.** Its
+  the API. **After the back end's calendar journeys the seed does nothing**: they empty the
+  table and then leave their own data in it, a type named "Studio" among them (found at view
+  plan step 69). The seed's calendar comes back with a new stack (`local:down`, `local:up`,
+  `local:api`: the table is in memory) and then `seed:local`; so the root `verify` and a walk
+  through the pages (`docs/FRONTEND_WALK.md`) need a restart between them. Its
   date arithmetic imports `shared/src/calendar/time.ts` in node (Node ≥ 22.18, type stripping),
   like the smoke test's.
 - `API_URL=… COGNITO_URL=… CLIENT_ID=… npm run build -w frontend` (`frontend/scripts/build.mjs`):
@@ -513,8 +529,10 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   `dialog.created` (`closedby="none"`: the Escape key does not close it; the heading, which
   takes the keyboard at the opening, the username, the password in `.password`, the sentence
   that it cannot be shown again, and the one button `.understood`, "I have noted the
-  password") and `dialog.delete` (the question `.question`, the failure, "Keep" and "Delete
-  user"). No pattern and no length of a username is written in the page. `#availability`
+  password") and `dialog.delete` (the question `.question`, which describes the dialog for a
+  screen reader, `aria-describedby`, as in the availability's; the failure, "Keep" and "Delete
+  user"). Each of the page's five "Try again" buttons says what it reads again
+  (`aria-label`). No pattern and no length of a username is written in the page. `#availability`
   has three parts; the first two, `section.types` and `section.patterns`, each with its form that creates
   (`form.create-type`: one `.field` with the text input `name`, its hint `.name-hint` and its
   refusal; `form.create-pattern`: six `.field` elements, the lists `weekday`, `start`, `end`
@@ -663,7 +681,8 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   `keep`), of the `AppointmentsService` (`book`, `cancel`, `change`, `updateNote` and their
   state streams) and of the `UsersService` (`listUsers` and its state stream), and the role;
   copies the templates, sets `top` and `height` as properties and the lane and the type colour
-  as classes, redraws the days only when the week object changed; it mounts the detail dialog
+  as classes, gives every slot and appointment a name for a screen reader that starts with its
+  day (`aria-label`), redraws the days only when the week object changed; it mounts the detail dialog
   with `screen.detail` and `screen.move`; a slot opens the book dialog, an appointment its
   detail, in which the note is saved and which can cancel it or start its move; while `week$` carries a move the banner shows, every appointment's button is disabled
   and a slot opens the book dialog as the confirmation of the change, with no list of users
@@ -808,8 +827,10 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   `startingWindows(date, day, zone)`, what "this day only" starts from: the view's windows
   that are not extra ones; `draftModel(windows, types)`, the rows with `removeLabel`, and
   `empty`; `draftAdd(windows, fields)`, one window more, by start, or the refusals (the two
-  of a pattern's form, and `OVERLAPS_DRAFT` under `start` and `end`, through `shared/`'s
-  `overlaps`) or the failure `DRAFT_FULL`; `windowFor(date, fields)`, an extra window's
+  of a pattern's form, and for an overlap, through `shared/`'s `overlaps`, `OVERLAPS_DRAFT`
+  under `start` and `IN_FAULT_TOO`, the empty sentence, under `end`: **a field named with an
+  empty sentence is in fault with no words of its own**, marked by `say` with nothing written
+  under it) or the failure `DRAFT_FULL`; `windowFor(date, fields)`, an extra window's
   body or the refusals; `WINDOW_FIELDS`, `STARTING_WINDOW`),
   `date.screen.ts` (`DateScreen(known$, calendar, types, rules, now, visible$)`: `date$` =
   loading, field, refusal, unread, day, offers, choices, draft, addFields, add, save,
@@ -952,6 +973,13 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   so must a type's and a pattern's id in the shell's test of the availability. The
   shell's test of the tab becoming visible defines `visibilityState` on the document and sends
   `visibilitychange` itself, and removes the property after each test.
+- `page.test.ts` holds what a person without a mouse needs of `index.html` (its block "without
+  a mouse"): every field inside a `<label>` with words of its own; every button with words or
+  a name; every `.error` a `role="alert"` and nothing else an alert; every "Loading…" a
+  `role="status"`; the two dialogs that ask described by their question. It counts the fields
+  (36) and the places of a failure (48): a new field or a new failure line changes a number
+  there, on purpose. What a screen reader says aloud, and where the keyboard is after a
+  dialog closes (the table of `docs/FRONTEND_ARCHITECTURE.md` section 8), are for the walk.
 - Two more ESLint rules on the front end (root `eslint.config.js`): no `innerHTML`, `outerHTML` or
   `insertAdjacentHTML` anywhere in `frontend/src`; no global `document` or `window` in
   `frontend/src/services` and `frontend/src/logic` (a parameter with that name is allowed). The

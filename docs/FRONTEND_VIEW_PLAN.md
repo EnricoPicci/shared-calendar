@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v9 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`). Step 62 done on 2026-11-19 (brief `prompts/85-step-62-implementation.md`). Step 63 done on 2026-11-19 (brief `prompts/86-step-63-implementation.md`). Step 64 done on 2026-11-19 (brief `prompts/87-step-64-implementation.md`). Step 65 done on 2026-11-19 (brief `prompts/88-step-65-implementation.md`). Step 66 done on 2026-11-20 (brief `prompts/89-step-66-implementation.md`). Step 67 done on 2026-11-20 (brief `prompts/90-step-67-implementation.md`). Step 68 done on 2026-11-20 (brief `prompts/91-step-68-implementation.md`), waiting for review: **every screen of section 3 exists**; next step 69, the closing |
+| Status | v10 — **done** (2026-11-20): steps 60 to 69, every one with its acceptance check; the views are written, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`). The plan stays in the repository as the record of the order of work. Planned 2026-11-16 (brief `prompts/82-plan-view-layer-implementation.md`); step 69 done on 2026-11-20 (brief `prompts/92-step-69-implementation.md`). Before: v9 — under way (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`). Step 62 done on 2026-11-19 (brief `prompts/85-step-62-implementation.md`). Step 63 done on 2026-11-19 (brief `prompts/86-step-63-implementation.md`). Step 64 done on 2026-11-19 (brief `prompts/87-step-64-implementation.md`). Step 65 done on 2026-11-19 (brief `prompts/88-step-65-implementation.md`). Step 66 done on 2026-11-20 (brief `prompts/89-step-66-implementation.md`). Step 67 done on 2026-11-20 (brief `prompts/90-step-67-implementation.md`). Step 68 done on 2026-11-20 (brief `prompts/91-step-68-implementation.md`): every screen of section 3 exists) |
 | Scope | Everything needed to go from the services layer that exists to **all the views written, tested and running in a browser against the local stack**: the tooling, the shell, the logic layer and one view per screen. Steps 60 to 69 |
 | Not in scope | Hosting, the CORS configuration, the Content-Security-Policy of the hosting, logout as a designed service, the session across a reload, the cloud deployment of the front end. They are the open points O1, O2, O3, O5 and O7 of `docs/FRONTEND_ARCHITECTURE.md` section 10 and get their own plan |
 | Governed by | `docs/FRONTEND_ARCHITECTURE.md` (the rules of the view layer), `docs/FRONTEND_SERVICES.md` (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/ARCHITECTURE.md` section 4 (the API). On any conflict with this plan, they win |
@@ -20,6 +20,8 @@
 | v7 | 2026-11-20 | Step 66: four choices about the users screen were made with the Product Owner before the step's implementation (brief `prompts/89-step-66-implementation.md`), and the step's text says them: no "Copy" button, the password dialog closed by its button only, a confirmation with two buttons before a delete, and a row with the username only. The step's text also says where the generated password is and is not, and its browser check is brought in line. |
 | v8 | 2026-11-20 | Step 67: four choices about the availability screen were made with the Product Owner before the step's implementation (brief `prompts/90-step-67-implementation.md`), and the step's text says them: creating is a fixed form and changing is a dialog; every pattern is listed, an ended one marked; "Change" is one call; a pattern's start and end are two lists on the 15-minute grid. The step's text also says what the screen reads, where a refusal is shown, and the conflicts list's three places, and its browser check is brought in line. The status line no longer says that step 66 waits for review. |
 | v9 | 2026-11-20 | Step 68: nine choices about the screen were made with the Product Owner before the step's implementation (brief `prompts/91-step-68-implementation.md`), and the step's text says them in the place of "to settle first": the date is chosen on the availability screen; "this day only" is a list put together and saved in one go; "not available" is a button of its own that asks first; an extra window is created and deleted, not edited; a past date is refused; two windows of the list that overlap are refused at "Add"; "Show" is refused while the list is open; the dialog that confirms has neutral words; the logic of the part is a second object. Its browser check is brought in line. Section 8, decision 10 says so. The status line no longer says that step 67 waits for review. |
+
+| v10 | 2026-11-20 | Step 69, the closing, done: the plan is done. Six choices were made with the Product Owner before the step (brief `prompts/92-step-69-implementation.md`), and the step's text says what was done where it differs from what was planned: the walk is a document of its own, `docs/FRONTEND_WALK.md`, and stays a written list; two wordings left open at steps 67 and 68 are settled; the verdict on the fallback is a proposal for the review; nothing of `prototypes/view-plain/LOADING_SEQUENCE.md` is kept as a page. The status line no longer says that step 68 waits for review. |
 
 ---
 
@@ -215,7 +217,8 @@ with its first address, `#/week`; an unknown hash shows the week.
 Also: `frontend/scripts/seed-local.mjs` (`npm run seed:local -w frontend`), which gives an empty
 local calendar two types, a few patterns and a few appointments for `alice` through the API, so
 that there is a week to look at. It only adds, and only on `localhost`. (The back end's calendar
-journeys empty the local table: the seed is run again after them.)
+journeys empty the local table and leave data of their own in it, a type "Studio" among them:
+after them the seed does nothing until the stack is started anew, as step 69 found.)
 
 **Browser check:** the week of today with its windows, slots and the legend; previous, next and
 "Today"; "Loading…" and the dimmed week while loading; with the local API stopped, the failure in
@@ -605,6 +608,36 @@ width; everything by keyboard only. Everything the check created is removed at i
 end's checks and the front end's); the whole walk passes, line by line; no comment or document in
 the repository refers to a deleted file.
 
+**As done** (2026-11-20, brief `prompts/92-step-69-implementation.md`), where it differs from the
+five points above or makes them precise:
+
+- **The walk** is a document of its own, `docs/FRONTEND_WALK.md`, beside
+  `docs/FRONTEND_ARCHITECTURE.md`, which points to it from its section 8: 102 numbered checks,
+  each one a person can do by hand, made from the browser checks of steps 60 to 68. It stays
+  a written list (section 8, decision 6): the script that ran it in a headless browser, twice,
+  is not in the repository.
+- **Reading the page without a mouse** brought three small changes: a slot and an appointment
+  of the week named with their day for a screen reader, the two dialogs that ask described by
+  their question, each "Try again" saying what it reads again; and two tests of
+  `page.test.ts`, on the labels and on the announcements. No focus management of our own was
+  added: where the keyboard is after each close of each dialog is one table in
+  `docs/FRONTEND_ARCHITECTURE.md` section 8.
+- **Two wordings left open are settled**: the sentence of an overlap among the windows of
+  "this day only" is said once, under "Start", with "End" marked; a pattern's hours and an
+  appointment's time keep their two forms (`docs/FRONTEND_ARCHITECTURE.md` section 11,
+  decisions 123, 129 and 106).
+- **What the code became** is `docs/FRONTEND_ARCHITECTURE.md` section 7.1, and **the verdict on
+  the fallback** its section 7.2, written as a proposal for the review: `lit-html` was needed
+  nowhere and was not added; no view was rewritten.
+- **The order of the acceptance** was: the root `npm run verify` on a fresh stack; then a
+  second fresh stack, the seed and the walk. One stack cannot serve both: after the back end's
+  calendar journeys, which leave a type named "Studio", the seed does nothing.
+- **`prototypes/` is deleted** (commit `f2ade74` is the last that holds it). Of
+  `prototypes/view-plain/LOADING_SEQUENCE.md`, a page of that folder, three things still true
+  of `frontend/` and said nowhere went into `docs/FRONTEND_ARCHITECTURE.md` (its section 11,
+  decision 136); the page itself was not kept. The briefs under `prompts/` that name the
+  folder are left as they are: they are the record of what was asked at the time.
+
 ---
 
 ## 6. Order of work and checkpoints
@@ -630,7 +663,7 @@ step 68 (everything the Administrator does), after step 69.
 | A selector in the script and the markup drift apart | Every view's test runs against the real `index.html`; 100 % line coverage means every look-up is executed |
 | `happy-dom` does not behave like a browser for something the views use (the native `<dialog>` is the likely place) | Step 60 tries `showModal()`, `close()` and the Escape key in the test environment first, and reports what must be checked in the browser only |
 | The changes of a step break an earlier screen | The earlier steps' checks are run again in short at every step (section 4), and all of them at step 69 |
-| The local calendar is emptied by the back end's journeys while a browser check is under way | Known (`CLAUDE.md`): the seed of step 61 is run again; never run the journeys during a browser check |
+| The local calendar is emptied by the back end's journeys while a browser check is under way | Known (`CLAUDE.md`): never run the journeys during a browser check. After them the seed of step 61 does nothing (they leave a type "Studio"): the stack is started anew, then seeded |
 | The screens' design is decided while coding | Steps 63 and 68 name the interaction to approve before any code (step 63's is decided); any other screen whose shape is not obvious gets the same treatment in its step |
 
 ## 8. Decisions and assumptions
@@ -642,7 +675,7 @@ step 68 (everything the Administrator does), after step 69.
 | 3 | esbuild, `happy-dom`, the views at 100 % line coverage, English only | Clarification round (section 2) |
 | 4 | The tooling and the first view are one step | Every step ends with something that runs: tooling alone would not |
 | 5 | The week calendar is the second step | The hardest screen first, so that the plain approach is tested where it is weakest |
-| 6 | The browser check is a written list per step, not an automated browser test | No end-to-end test tool is in the architecture; adding one is a decision of its own. The DOM tests and the services' journeys cover the two sides the browser check joins |
+| 6 | The browser check is a written list per step, not an automated browser test; at step 69 the lists became one, `docs/FRONTEND_WALK.md`, still written | No end-to-end test tool is in the architecture; adding one is a decision of its own. The DOM tests and the services' journeys cover the two sides the browser check joins |
 | 7 | No screen for Hello World | Not among the screens of `docs/SHARED_CALENDAR_SPEC.md` section 16.8; the route proves the back end's chain, which the calendar's screens also exercise |
 | 8 | A local seed for the calendar is part of step 61 | A week needs availability to show; the local table starts empty and the back end's journeys empty it |
 | 9 | "Sign out" clears the session store only, and a reload signs out | Open points O7 and O3 of `docs/FRONTEND_ARCHITECTURE.md` section 10, outside this plan |

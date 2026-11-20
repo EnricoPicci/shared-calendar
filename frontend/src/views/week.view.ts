@@ -145,6 +145,9 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
       ...day.slots.map((slot) => slotFor(slot, model.timeZone)),
       ...day.appointments.map(appointmentFor),
     );
+    // A slot and an appointment show their time, and their day is the column they stand in: a
+    // screen reader, which reaches a button without its column, is told the day first.
+    for (const button of body.querySelectorAll('button')) button.setAttribute('aria-label', `${day.label} ${button.textContent.trim()}`);
     return element;
   };
   const itemFor = (id: string, text: string, colour?: number) => {
