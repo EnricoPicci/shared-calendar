@@ -5,7 +5,7 @@ import type { LoginDeps } from '../../../src/views/login.view';
 import { mountShell, runShell, SCREENS, type Screen } from '../../../src/views/shell';
 import { appointment, STUDIO, view, winterWeek } from '../logic/fixtures';
 import { call, cognitoError, cognitoTokens, json, jwt, session } from '../services/fixtures';
-import { find, submit, useRealPage } from './page';
+import { find, loadPage, submit, useRealPage } from './page';
 
 // The DOM test of the shell (docs/FRONTEND_ARCHITECTURE.md sections 6 and 8): the real
 // index.html, the real SessionStore (memory only, no remote call), a fake LoginService, and the
@@ -182,14 +182,30 @@ describe('mountShell', () => {
     expect(username.textContent).toBe('');
   });
 
-  it('a second person signing in sees nothing of the first', () => {
+  it('a second person signing in sees nothing of the first: the page is the one that person finds when nobody was there before', () => {
+    // The clock stands still, so that the week's label is the same in both.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-19T10:00:00.000Z'));
+    // The whole page as a person finds it: its source, and what every field holds.
+    const page = () => ({ source: html(), fields: [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held) });
+
+    // The Administrator, alone on a fresh page.
+    mounted(ADMIN);
+    const alone = page();
+    expect(alone.source).toContain('Administrator');
+    shell?.unsubscribe();
+    loadPage();
+
+    // A User first, then the Administrator.
     const { store, username, role, signOut } = mounted(ALICE);
+    expect(role.textContent).toBe('User');
+    expect(page()).not.toEqual(alone);
     signOut.click();
     store.set(ADMIN);
     expect(username.textContent).toBe('admin');
     expect(role.textContent).toBe('Administrator');
     expect(html()).not.toContain('alice');
-    expect(find('#app').textContent).not.toContain('User');
+    expect(page()).toEqual(alone);
   });
 
   it('another person replacing the session without a sign-out gets a frame of their own', () => {
@@ -355,7 +371,7 @@ describe('the navigation', () => {
 
   it.each([
     ['a User', ALICE, 'access-token-alice', [['Week', '#/week', 'page'], ['My appointments', '#/appointments', null]]],
-    ['the Administrator', ADMIN, 'access-token-admin', [['Week', '#/week', 'page'], ['Settings', '#/settings', null]]],
+    ['the Administrator', ADMIN, 'access-token-admin', [['Week', '#/week', 'page'], ['Settings', '#/settings', null], ['Users', '#/users', null]]],
   ])('the first screen of %s is the week: the address, the links of the role with the week\'s marked, the week of today loaded', async (_name, who, token, navigation) => {
     fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
     const { store } = mounted();
@@ -366,7 +382,7 @@ describe('the navigation', () => {
     expect(window.location.hash).toBe('#/week');
     expect(links().map((a) => [a.textContent, a.getAttribute('href'), a.getAttribute('aria-current')])).toEqual(navigation);
     expect(find('#week').hidden).toBe(false);
-    expect([find('#appointments').hidden, find('#settings').hidden]).toEqual([true, true]);
+    expect([find('#appointments').hidden, find('#settings').hidden, find('#users').hidden]).toEqual([true, true, true]);
     // Mounted first, then started: the view was listening when the load began.
     expect(find('#week .week-label').textContent).toBe('16 Nov – 22 Nov 2026');
     expect(find('#week .loading').hidden).toBe(false);
@@ -911,6 +927,7 @@ describe('the navigation', () => {
       expect(links().map((a) => [a.textContent, a.getAttribute('href')])).toEqual([
         ['Week', '#/week'],
         ['Settings', '#/settings'],
+        ['Users', '#/users'],
         ['Other', '#/other'],
       ]);
       // "My appointments" is in the table too, and is not the Administrator's.
@@ -924,14 +941,14 @@ describe('the navigation', () => {
       const { screens, show, left } = other();
       mounted(ADMIN, screens);
       await weekDrawn();
-      expect(current()).toEqual([['Week', 'page'], ['Settings', null], ['Other', null]]);
+      expect(current()).toEqual([['Week', 'page'], ['Settings', null], ['Users', null], ['Other', null]]);
 
       window.location.hash = '#/other';
       await vi.waitFor(() => expect(show).toHaveBeenCalledTimes(1));
       expect(show.mock.calls[0]![0]).toBe(find('#week'));
       expect(days()).toHaveLength(0); // the week view was left, and cleaned up after itself
       expect(find('#week').hidden).toBe(false); // the element is the other screen's now
-      expect(current()).toEqual([['Week', null], ['Settings', null], ['Other', 'page']]);
+      expect(current()).toEqual([['Week', null], ['Settings', null], ['Users', null], ['Other', 'page']]);
       expect(left).not.toHaveBeenCalled();
 
       // Back: the other screen is left, the week mounted and loaded again.
@@ -939,7 +956,7 @@ describe('the navigation', () => {
       links()[0]!.click();
       await weekDrawn();
       expect(left).toHaveBeenCalledTimes(1);
-      expect(current()).toEqual([['Week', 'page'], ['Settings', null], ['Other', null]]);
+      expect(current()).toEqual([['Week', 'page'], ['Settings', null], ['Users', null], ['Other', null]]);
       expect(apiCalls()).toHaveLength(2);
     });
 
@@ -1097,7 +1114,7 @@ describe('the navigation', () => {
       fetchMock.mockResolvedValueOnce(json(200, adminWeek()));
       mounted(ADMIN);
       expect(window.location.hash).toBe('#/week');
-      expect(current()).toEqual([['Week', 'page'], ['Settings', null]]);
+      expect(current()).toEqual([['Week', 'page'], ['Settings', null], ['Users', null]]);
       expect([find('#week').hidden, find('#appointments').hidden]).toEqual([false, true]);
       await weekDrawn();
       expect(apiCalls()).toEqual([[WEEK_URL, 'Bearer access-token-admin']]);
@@ -1436,7 +1453,7 @@ describe('the navigation', () => {
       fetchMock.mockResolvedValueOnce(json(200, stored()));
       mounted(ADMIN);
       expect(window.location.hash).toBe('#/settings');
-      expect(current()).toEqual([['Week', null], ['Settings', 'page']]);
+      expect(current()).toEqual([['Week', null], ['Settings', 'page'], ['Users', null]]);
       expect([find('#week').hidden, find('#appointments').hidden, find('#settings').hidden]).toEqual([true, true, false]);
       // Mounted first, then started: the view was listening when the read began.
       expect(find('#settings .loading').hidden).toBe(false);
@@ -1567,7 +1584,7 @@ describe('the navigation', () => {
       await shown();
       expect([find('#week').hidden, find('#settings').hidden]).toEqual([true, false]);
       expect(days()).toHaveLength(0);
-      expect(current()).toEqual([['Week', null], ['Settings', 'page']]);
+      expect(current()).toEqual([['Week', null], ['Settings', 'page'], ['Users', null]]);
       field('bookingHorizonDays').value = '30';
       field('noLimit').click();
       field('minBookingNoticeHours').value = '';
@@ -1595,7 +1612,7 @@ describe('the navigation', () => {
         SETTINGS_URL,
       ]);
       expect(days()).toHaveLength(0);
-      expect(document.querySelectorAll('#app .nav a')).toHaveLength(2);
+      expect(document.querySelectorAll('#app .nav a')).toHaveLength(3);
     });
 
     it('signing out on the settings with values typed and a refusal on show leaves nothing; a User then sees nothing of it, and "My appointments" still reads the settings, then the list', async () => {
@@ -1636,6 +1653,286 @@ describe('the navigation', () => {
       ]);
       expect([find('#settings').hidden, form().hidden]).toEqual([true, true]);
       expect(html()).not.toContain('carol');
+    });
+  });
+
+  // The users, the Administrator's third screen (docs/FRONTEND_ARCHITECTURE.md section 6), with
+  // the real UsersService of the session behind the stubbed fetch: the same one the week's book
+  // dialog asks for its list. The passwords here are made up for the stub's answers.
+  describe('the users, the Administrator\'s third screen', () => {
+    const USERS_URL = 'http://api.test/users';
+    const BEARER = 'Bearer access-token-admin';
+    const PASSWORD = 'Xk3-made.up_Pass!7';
+    const usersOf = (...usernames: string[]) => json(200, { users: usernames.map((username) => ({ username, createdAt: '2026-11-01T10:00:00.000Z' })) });
+    const calls = () => (fetchMock.mock.calls as [string, RequestInit][]).filter(([url]) => url.startsWith(CONFIG.apiUrl));
+    const sent = () => calls().map(([url, init]) => `${init.method} ${url.slice(CONFIG.apiUrl.length)}`);
+    const at = (hash: string) => window.history.replaceState(null, '', `${window.location.pathname}${hash}`);
+    const names = () => [...document.querySelectorAll('#users .list .username')].map((name) => name.textContent);
+    const listed = (...usernames: string[]) => vi.waitFor(() => expect(names()).toEqual(usernames));
+    const field = () => find<HTMLInputElement>('#users [name="username"]');
+    const form = () => find<HTMLFormElement>('#users form.create');
+    const created = () => find<HTMLDialogElement>('#users dialog.created');
+    const remove = () => find<HTMLDialogElement>('#users dialog.delete');
+    const current = () => links().map((a) => [a.textContent, a.getAttribute('aria-current')]);
+    const fields = () => [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
+    // Whether a text is in the page's source, in a field or in the address.
+    const anywhere = (text: string) => html().includes(text) || fields().some((value) => value.includes(text)) || window.location.href.includes(text);
+    // The Administrator on the users' address, with the list read.
+    const onUsers = async (...usernames: string[]) => {
+      at('#/users');
+      fetchMock.mockResolvedValueOnce(usersOf(...usernames));
+      const made = mounted(ADMIN);
+      await listed(...usernames);
+      return made;
+    };
+    // Types a name and presses "Create user"; the server creates it and then lists `after`.
+    const create = async (username: string, after: string[], password = PASSWORD) => {
+      fetchMock.mockResolvedValueOnce(json(201, { username, password }));
+      fetchMock.mockResolvedValueOnce(usersOf(...after));
+      field().value = username;
+      submit(form());
+      await vi.waitFor(() => expect(created().open).toBe(true));
+      await listed(...after);
+    };
+    const becomesVisible = () => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+    afterEach(() => {
+      // Back to the emulated document's own property.
+      delete (document as { visibilityState?: string }).visibilityState;
+    });
+
+    it('the Administrator on #/users: the address stays, its link is the one marked, the one request is the list with the person\'s token, and the rows are the users', async () => {
+      at('#/users');
+      fetchMock.mockResolvedValueOnce(usersOf('alice', 'bob'));
+      mounted(ADMIN);
+      expect(window.location.hash).toBe('#/users');
+      expect(current()).toEqual([['Week', null], ['Settings', null], ['Users', 'page']]);
+      expect([find('#week').hidden, find('#appointments').hidden, find('#settings').hidden, find('#users').hidden]).toEqual([true, true, true, false]);
+      // Mounted first, then started: the view was listening when the read began.
+      expect(find('#users .loading').hidden).toBe(false);
+
+      await listed('alice', 'bob');
+      expect(apiCalls()).toEqual([[USERS_URL, BEARER]]);
+      expect(sent()).toEqual(['GET /users']);
+      expect(find('#users .loading').hidden).toBe(true);
+      expect(find('#users .field .hint').textContent).toMatch(/^A username has 3 to 32 characters/);
+      for (const token of TOKENS) expect(html()).not.toContain(token);
+    });
+
+    it('#/users typed by a User shows the week, the address is put right, and the users are not asked for', async () => {
+      at('#/users');
+      fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
+      mounted(ALICE);
+      expect(window.location.hash).toBe('#/week');
+      expect(links().map((a) => a.textContent)).toEqual(['Week', 'My appointments']);
+      expect([find('#week').hidden, find('#users').hidden]).toEqual([false, true]);
+      await weekDrawn();
+      window.location.hash = '#/users';
+      await vi.waitFor(() => expect(window.location.hash).toBe('#/week'));
+      expect(find('#users').hidden).toBe(true);
+      expect(apiCalls()).toEqual([[WEEK_URL, 'Bearer access-token-alice']]);
+    });
+
+    it('a failed read is said in the place of the list; "Try again" reads again', async () => {
+      at('#/users');
+      fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      mounted(ADMIN);
+      await vi.waitFor(() => expect(find('#users .unread').hidden).toBe(false));
+      expect(find('#users .unread .error').textContent).toBe('The server cannot be reached. Check the connection and try again.');
+      expect(html()).not.toContain('Failed to fetch');
+
+      fetchMock.mockResolvedValueOnce(usersOf('alice'));
+      find('#users .retry').click();
+      await listed('alice');
+      expect(find('#users .unread').hidden).toBe(true);
+      expect(sent()).toEqual(['GET /users', 'GET /users']);
+    });
+
+    it('a create: the POST with the username, the password shown once in its dialog, the field emptied, and the list read again', async () => {
+      await onUsers('alice');
+      fetchMock.mockResolvedValueOnce(json(201, { username: 'carol', password: PASSWORD }));
+      fetchMock.mockResolvedValueOnce(usersOf('alice', 'carol'));
+      field().value = ' carol ';
+      submit(form());
+      expect(find<HTMLButtonElement>('#users .submit').disabled).toBe(true);
+
+      await vi.waitFor(() => expect(created().open).toBe(true));
+      const [url, init] = calls()[1]!;
+      expect([url, init.method, (init.headers as Record<string, string>).Authorization]).toEqual([USERS_URL, 'POST', BEARER]);
+      expect(JSON.parse(String(init.body))).toEqual({ username: 'carol' });
+      expect([find('#users dialog.created .username').textContent, find('#users dialog.created .password').textContent]).toEqual(['carol', PASSWORD]);
+      await listed('alice', 'carol');
+      expect(sent()).toEqual(['GET /users', 'POST /users', 'GET /users']);
+      expect([field().value, find<HTMLButtonElement>('#users .submit').disabled]).toEqual(['', false]);
+      // The password is in the dialog and nowhere else; the address never held it.
+      expect(html().split(PASSWORD)).toHaveLength(2);
+      expect(fields().some((value) => value.includes(PASSWORD))).toBe(false);
+      expect(calls().some(([address]) => address.includes(PASSWORD))).toBe(false);
+
+      find('#users dialog.created .understood').click();
+      expect(created().open).toBe(false);
+      expect(anywhere(PASSWORD)).toBe(false);
+      expect(names()).toEqual(['alice', 'carol']);
+    });
+
+    it('a text that is not a username is refused under the field, with no request sent', async () => {
+      await onUsers('alice');
+      for (const text of ['Bob', 'ab', '', 'alice smith']) {
+        field().value = text;
+        submit(form());
+        expect(find('#users .field .refusal').textContent, text).toMatch(/^A username has 3 to 32 characters/);
+        expect(field().getAttribute('aria-invalid'), text).toBe('true');
+        expect(field().value, text).toBe(text);
+      }
+      expect(sent()).toEqual(['GET /users']);
+      expect(find<HTMLButtonElement>('#users .submit').disabled).toBe(false);
+      expect(created().open).toBe(false);
+    });
+
+    it('a username that exists: the server\'s refusal in plain words, the field not marked, what was typed kept, and the list read again', async () => {
+      await onUsers('alice');
+      fetchMock.mockResolvedValueOnce(json(409, { error: 'user_exists', message: 'User account already exists' }));
+      fetchMock.mockResolvedValueOnce(usersOf('alice'));
+      field().value = 'alice';
+      submit(form());
+      await vi.waitFor(() => expect(find('#users form.create .failure').textContent).toBe('A user with this username exists already. Choose another username.'));
+      await vi.waitFor(() => expect(sent()).toEqual(['GET /users', 'POST /users', 'GET /users']));
+      expect([field().value, field().hasAttribute('aria-invalid'), created().open]).toEqual(['alice', false, false]);
+      expect(html()).not.toContain('already exists');
+
+      // The next try, with another name, goes.
+      await create('carol', ['alice', 'carol']);
+      expect(find('#users form.create .failure').textContent).toBe('');
+    });
+
+    it('a delete: the dialog names the user, "Keep" asks nothing, "Delete user" sends the DELETE, the dialog closes and the list is read again', async () => {
+      await onUsers('alice', 'bob');
+      find('#users .list li:nth-child(2) button').click();
+      expect(remove().open).toBe(true);
+      expect(find('#users dialog.delete .question').textContent).toBe('Delete bob? Their future appointments will be cancelled. This cannot be undone.');
+      find('#users dialog.delete .keep').click();
+      expect(remove().open).toBe(false);
+      expect(sent()).toEqual(['GET /users']);
+
+      find('#users .list li:nth-child(2) button').click();
+      fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+      fetchMock.mockResolvedValueOnce(usersOf('alice'));
+      find('#users dialog.delete .submit').click();
+      expect(find<HTMLButtonElement>('#users dialog.delete .submit').disabled).toBe(true);
+      await vi.waitFor(() => expect(remove().open).toBe(false));
+      await listed('alice');
+      expect(sent()).toEqual(['GET /users', 'DELETE /users/bob', 'GET /users']);
+      expect((calls()[1]![1].headers as Record<string, string>).Authorization).toBe(BEARER);
+    });
+
+    it('a delete the server refuses: the sentence in the dialog, still open, the list read again all the same, and "Delete user" works again', async () => {
+      await onUsers('alice', 'bob');
+      find('#users .list li:nth-child(2) button').click();
+      fetchMock.mockResolvedValueOnce(json(409, { error: 'concurrent_update', message: 'the lock was held' }));
+      fetchMock.mockResolvedValueOnce(usersOf('alice', 'bob'));
+      find('#users dialog.delete .submit').click();
+      await vi.waitFor(() => expect(find('#users dialog.delete .error').textContent).toBe('The calendar was being changed at the same moment. Please try again.'));
+      await vi.waitFor(() => expect(sent()).toEqual(['GET /users', 'DELETE /users/bob', 'GET /users']));
+      await vi.waitFor(() => expect(find('#users .loading').hidden).toBe(true));
+      expect([remove().open, find<HTMLButtonElement>('#users dialog.delete .submit').disabled]).toEqual([true, false]);
+      expect(html()).not.toContain('lock was held');
+
+      // The user was gone already: the server says so, and the list that follows shows it.
+      fetchMock.mockResolvedValueOnce(json(404, { error: 'user_not_found' }));
+      fetchMock.mockResolvedValueOnce(usersOf('alice'));
+      find('#users dialog.delete .submit').click();
+      await vi.waitFor(() => expect(find('#users dialog.delete .error').textContent).toBe('This user no longer exists.'));
+      await listed('alice');
+      expect(remove().open).toBe(true);
+    });
+
+    it('with the password dialog open, the tab shown again reads the list again and leaves the dialog and its password as they are', async () => {
+      await onUsers('alice');
+      await create('carol', ['alice', 'carol']);
+      fetchMock.mockResolvedValueOnce(usersOf('alice', 'carol', 'dave'));
+      becomesVisible();
+      await listed('alice', 'carol', 'dave');
+      expect(sent()).toEqual(['GET /users', 'POST /users', 'GET /users', 'GET /users']);
+      expect([created().open, find('#users dialog.created .password').textContent]).toEqual([true, PASSWORD]);
+    });
+
+    it('users, week, users: nothing left over or doubled, the password dialog not opened again, and the book dialog\'s list asked for at its opening, with the user just created', async () => {
+      await onUsers('alice');
+      await create('carol', ['alice', 'carol']);
+      find('#users dialog.created .understood').click();
+
+      // The week: the users screen is left and emptied.
+      fetchMock.mockResolvedValueOnce(json(200, adminWeek()));
+      links()[0]!.click();
+      await weekDrawn();
+      expect([find('#users').hidden, names(), field().value]).toEqual([true, [], '']);
+      expect(anywhere(PASSWORD)).toBe(false);
+      expect(anywhere('carol')).toBe(false);
+
+      // The book dialog asks for its list itself, as before, and holds the new user.
+      fetchMock.mockResolvedValueOnce(usersOf('alice', 'carol'));
+      find('#week .slot').click();
+      const picker = find<HTMLSelectElement>('#week dialog.book [name="username"]');
+      await vi.waitFor(() => expect([...picker.options].map((option) => option.value)).toEqual(['alice', 'carol']));
+      find<HTMLDialogElement>('#week dialog.book').close();
+
+      // Back: the list is read again, not taken from what the book dialog was answered, and
+      // the create of the first visit, which the session's service still holds, opens nothing.
+      fetchMock.mockResolvedValueOnce(usersOf('alice', 'carol', 'dave'));
+      links()[2]!.click();
+      await listed('alice', 'carol', 'dave');
+      expect(created().open).toBe(false);
+      expect(anywhere(PASSWORD)).toBe(false);
+      expect(sent()).toEqual(['GET /users', 'POST /users', 'GET /users', 'GET /calendar?from=2026-11-16&to=2026-11-22', 'GET /users', 'GET /users']);
+      expect(document.querySelectorAll('#app .nav a')).toHaveLength(3);
+      expect(days()).toHaveLength(0);
+
+      // A new create on this visit shows its own password.
+      await create('erin', ['alice', 'carol', 'dave', 'erin'], 'Zq9-other.one_Pass?2');
+      expect(find('#users dialog.created .password').textContent).toBe('Zq9-other.one_Pass?2');
+      expect(anywhere(PASSWORD)).toBe(false);
+    });
+
+    it('signing out with the password dialog open leaves the password nowhere in the document; the next person sees nothing of the first, and the same Administrator again is not shown it', async () => {
+      at('#/users');
+      const { store, signOut } = mounted();
+      const before = html(); // the page at the login, before anyone signed in
+      fetchMock.mockResolvedValueOnce(usersOf('alice', 'bob'));
+      store.set(ADMIN);
+      await listed('alice', 'bob');
+      await create('carol', ['alice', 'bob', 'carol']);
+      field().value = 'dave';
+      find('#users .list li:nth-child(2) button').click(); // the emulated page lets a click through a modal dialog
+      expect([created().open, remove().open]).toEqual([true, true]);
+      expect(anywhere(PASSWORD)).toBe(true);
+
+      signOut.click();
+      expect([created().open, remove().open]).toEqual([false, false]);
+      for (const gone of [PASSWORD, 'carol', 'bob', 'dave', 'alice', 'A username has', 'Delete bob']) expect(anywhere(gone), gone).toBe(false);
+      expect(fields().every((value) => value === '')).toBe(true);
+      expect(html()).toBe(before);
+      expect(window.location.hash).toBe('#/users'); // signing out leaves the address
+
+      // A User: the address is not theirs, and nothing of the users is asked or shown.
+      const asked = apiCalls().length;
+      fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
+      store.set(ALICE);
+      expect(window.location.hash).toBe('#/week');
+      await weekDrawn();
+      expect(apiCalls().slice(asked)).toEqual([[WEEK_URL, 'Bearer access-token-alice']]);
+      expect([find('#users').hidden, names()]).toEqual([true, []]);
+      for (const gone of [PASSWORD, 'carol', 'bob']) expect(anywhere(gone), gone).toBe(false);
+
+      // The same Administrator again: a session of its own, whose service never created anyone.
+      signOut.click();
+      at('#/users');
+      fetchMock.mockResolvedValueOnce(usersOf('alice', 'bob', 'carol'));
+      store.set(ADMIN);
+      await listed('alice', 'bob', 'carol');
+      expect(created().open).toBe(false);
+      expect(anywhere(PASSWORD)).toBe(false);
     });
   });
 });

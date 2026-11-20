@@ -197,6 +197,8 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
       bookStart.value = times.start;
       bookEnd.value = times.end;
     }
+    // Open before the list is asked for: its states are applied only while the dialog is open.
+    book.showModal();
     if (role === 'admin' && moving === null) {
       // The Users, asked for at every opening of a booking: the list's states arrive through
       // its stream. A change asks for none: the User is the old appointment's.
@@ -204,14 +206,11 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
       users.listUsers();
     }
     enableBook();
-    book.showModal();
   };
-  // Closing, by "Close", by the Escape key or after a success, only forgets what the dialog was
-  // about.
-  book.onclose = () => {
-    booking = null;
-    bookAsked = false;
-  };
+  // Nothing is done when it closes, by "Close", by the Escape key or after a success: what it
+  // was about is replaced at the next opening. A browser sends the close event a moment after
+  // the close, which can be after the dialog was opened again: a handler that forgot would
+  // then forget the new opening.
 
   // 5. The user's actions become calls. "Book" and "Change" in the confirmation only call the
   // service, and the banner's button the week screen: what follows on screen comes from the
@@ -275,7 +274,7 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
   // when a list arrives, which is at opening, before anything can be chosen.
   subscription.add(
     users.listUsersState$.subscribe((state) => {
-      if (booking === null || booking.moving) return;
+      if (!book.open || booking!.moving) return;
       const choice = userChoice(state);
       choices(bookUser, choice.usernames);
       bookUsersMessage.textContent = choice.message;

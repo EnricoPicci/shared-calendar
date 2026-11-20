@@ -230,6 +230,24 @@ describe.each([ALONE, BY_THE_WEEK, BY_THE_LIST])('the appointment detail, mounte
       expect(cancelButton().disabled).toBe(false);
     });
 
+    it('a close event that arrives late, after the dialog was opened again, changes nothing: the appointment is still the one cancelled, its note the one saved, and a success closes the dialog', () => {
+      const { appointments, cancelState$ } = mount();
+      open();
+      detail().close(); // the Escape key
+      open(); // opened again at once
+      // A browser sends the close event a moment after the close: here, after the new opening.
+      detail().dispatchEvent(new Event('close'));
+      submit(noteForm());
+      expect(appointments.updateNote).toHaveBeenCalledWith(APPOINTMENT, 'First lesson');
+      cancelButton().click();
+      expect(appointments.cancel).toHaveBeenCalledWith(APPOINTMENT);
+      cancelState$.next({ status: 'pending', appointmentId: APPOINTMENT });
+      expect(cancelButton().disabled).toBe(true);
+      detail().dispatchEvent(new Event('close'));
+      cancelState$.next({ status: 'success', appointment: {} as never });
+      expect(detail().open).toBe(false);
+    });
+
     it('cancelState$ pending for this appointment disables the button; for another one it does not', () => {
       const { cancelState$ } = mount();
       open();

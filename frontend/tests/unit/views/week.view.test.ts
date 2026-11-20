@@ -479,6 +479,33 @@ describe('mountWeek', () => {
   });
 
   describe('the book dialog opened a second time shows nothing of the first', () => {
+    it('a close event that arrives late, after the dialog was opened again, changes nothing: the slot is still the one booked, and a success closes the dialog', () => {
+      const { appointments, bookState$ } = mounted(state({ week: WEEK }));
+      find('#week .slot').click();
+      book().close(); // the Escape key
+      find('#week .slot').click(); // opened again at once
+      // A browser sends the close event a moment after the close: here, after the new opening.
+      book().dispatchEvent(new Event('close'));
+      submit(bookForm());
+      expect(appointments.book).toHaveBeenCalledWith({ start: '2026-11-16T07:00:00.000Z' });
+      book().dispatchEvent(new Event('close'));
+      bookState$.next(booked());
+      expect(book().open).toBe(false);
+    });
+
+    it('for the Administrator the same late close event leaves the list of users to the open dialog', () => {
+      const { listUsersState$ } = mounted(state({ week: WEEK }), 'admin');
+      find('#week .slot').click();
+      book().close();
+      find('#week .slot').click();
+      book().dispatchEvent(new Event('close'));
+      listUsersState$.next({ status: 'pending' });
+      expect(usersMessage().textContent).toBe('Loading the users…');
+      listUsersState$.next(ALICE_AND_BOB);
+      expect(options('username')).toEqual(['alice', 'bob']);
+      expect(bookSubmit().disabled).toBe(false);
+    });
+
     it('after a success: an empty note, no failure', () => {
       const { bookState$ } = mounted(state({ week: WEEK }));
       find('#week .slot').click();

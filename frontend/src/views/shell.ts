@@ -3,6 +3,7 @@ import { fromEvent, Subscription } from 'rxjs';
 import { distinctUntilChanged, filter, map, startWith } from 'rxjs/operators';
 import { AppointmentsScreen } from '../logic/appointments.screen';
 import { SettingsScreen } from '../logic/settings.screen';
+import { UsersScreen } from '../logic/users.screen';
 import { WeekScreen } from '../logic/week.screen';
 import type { ApiConfig } from '../services/api';
 import { AppointmentsService } from '../services/appointments.service';
@@ -16,6 +17,7 @@ import { UsersService } from '../services/users.service';
 import { mountAppointments } from './appointments.view';
 import { mountLogin, type LoginDeps } from './login.view';
 import { mountSettings } from './settings.view';
+import { mountUsers } from './users.view';
 import { mountWeek } from './week.view';
 
 // The shell (docs/FRONTEND_ARCHITECTURE.md section 6): the start-up, the switch between the
@@ -44,14 +46,16 @@ const ROLE_IN_WORDS: Record<Role, string> = { admin: 'Administrator', user: 'Use
 // What belongs to one person's session: the API services and the logic objects, created when
 // the person enters and dropped when the person leaves, so that nothing of one person's data
 // can be replayed to the next (docs/FRONTEND_ARCHITECTURE.md section 6, point 4).
-// The role is there for the views that show a part to one role only. `week`, `list` and
-// `settings` are the logic objects of the three screens: the week, "My appointments" and the
-// settings.
+// The role is there for the views that show a part to one role only. `week`, `list`,
+// `settings` and `accounts` are the logic objects of the four screens: the week, "My
+// appointments", the settings and the users. `users` is the service the week's book dialog
+// and the users screen share.
 export type SessionObjects = {
   role: Role;
   week: WeekScreen;
   list: AppointmentsScreen;
   settings: SettingsScreen;
+  accounts: UsersScreen;
   appointments: AppointmentsService;
   users: UsersService;
 };
@@ -73,7 +77,8 @@ function sessionObjects(config: ApiConfig, store: SessionStore, person: Person):
   // The list screen hands an appointment to move over to the week screen.
   const list = new AppointmentsScreen(calendarSettings, appointments, week, person.role, now, visible$);
   const settings = new SettingsScreen(calendarSettings);
-  return { role: person.role, week, list, settings, appointments, users };
+  const accounts = new UsersScreen(users, visible$);
+  return { role: person.role, week, list, settings, accounts, appointments, users };
 }
 
 // A screen of the application: its address (the URL's hash), its name in the navigation, the
@@ -128,6 +133,17 @@ export const SCREENS: readonly Screen[] = [
     show: (root, { settings }) => {
       const subscription = mountSettings(root, settings);
       subscription.add(settings.start());
+      return subscription;
+    },
+  },
+  {
+    hash: '#/users',
+    label: 'Users',
+    roles: ['admin'],
+    element: '#users',
+    show: (root, { accounts, users }) => {
+      const subscription = mountUsers(root, { screen: accounts, users });
+      subscription.add(accounts.start());
       return subscription;
     },
   },

@@ -113,6 +113,9 @@ const PLAIN_WORDS = new Map<string, string>([
   ['appointment_not_found', 'This appointment cannot be found.'],
   ['appointment_not_active', 'This appointment has already been cancelled, or it has ended.'],
   ['cancellation_notice_too_short', 'It is too late to cancel this appointment.'],
+  // Creating and deleting a user (docs/FRONTEND_SERVICES.md section 13.1).
+  ['user_exists', 'A user with this username exists already. Choose another username.'],
+  ['cannot_delete_admin', 'An Administrator cannot be deleted.'],
   // The login (docs/FRONTEND_SERVICES.md section 4.3). A wrong password and an unknown user are
   // one reason, so that the sentence does not say which usernames exist.
   ['invalid_credentials', 'The username or the password is not correct.'],

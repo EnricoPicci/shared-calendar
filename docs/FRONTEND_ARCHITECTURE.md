@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v7 — **decided; the foundation, the week, booking, cancelling, the note, the change, "My appointments" and the settings implemented** (2026-11-19, `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 65, briefs `prompts/83-step-60-implementation.md` to `prompts/88-step-65-implementation.md`): the build and dev-server commands, the tests' environment, the shell with its navigation between two screens, the login view, the logic layer (`frontend/src/logic/`), the week calendar with its book dialog (which also confirms a change), a User's list of appointments (upcoming and history), an appointment's detail (its note, "Change" and "Cancel appointment"), one dialog opened from both screens, and the Administrator's settings, one form whose fields are checked before any call, exist in `frontend/`. The other views follow, one plan step each |
+| Status | v8 — **decided; the foundation, the week, booking, cancelling, the note, the change, "My appointments", the settings and the users implemented** (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 66, briefs `prompts/83-step-60-implementation.md` to `prompts/89-step-66-implementation.md`): the build and dev-server commands, the tests' environment, the shell with its navigation between the screens, the login view, the logic layer (`frontend/src/logic/`), the week calendar with its book dialog (which also confirms a change), a User's list of appointments (upcoming and history), an appointment's detail (its note, "Change" and "Cancel appointment"), one dialog opened from both screens, the Administrator's settings, one form whose fields are checked before any call, and the Administrator's users: the list, a create that shows the generated password once, and a delete that asks first, exist in `frontend/`. The other views follow, one plan step each |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders |
 | Not in scope yet | Hosting, the CORS gap, keeping the session across a reload, the Content-Security-Policy of the hosting, logout. They are the open points of section 10, for later versions of this document |
 | Depends on | `docs/FRONTEND_SERVICES.md` v7 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work) |
@@ -21,6 +21,7 @@
 
 | v6 | 2026-11-19 | Plan step 64: "My appointments". Section 4: a dialog used from two views (the detail, moved out of the week's element and out of `week.view.ts`), the shape of the list. Section 5.1: seven files (`appointments.model.ts` and `appointments.screen.ts` are new), the list screen, the time zone read from the settings and what that leaves of decision 23, the period's own checks, the hand-over of an appointment to the week screen and what still ends a move, the detail's sentence by what the appointment is. Section 6: the second entry of the table, what a session owns, what the shell hands a view. Section 8: the detail's test run from three hosts, the native date field under `happy-dom`. Section 9: the tree. Section 12.1: the size at step 64. Section 11: decisions 53 to 65. |
 | v7 | 2026-11-19 | Plan step 65: the settings. Section 4: the shape of a form whose fields are checked (a field in fault). Section 5.1: nine files (`settings.model.ts` and `settings.screen.ts` are new), the settings screen, the checks of the fields and where the ranges come from, the read after a save and what it fills, the second sentence of `failureText` that depends on what was attempted. Section 6: the third entry, what a session owns. Section 8: the number field and the checkbox under `happy-dom`. Section 9: the tree. Section 12.1: the size at step 65. Section 11: decision 59 confirmed, decisions 66 to 76. Two wordings decided at the reviews of steps 63 and 64: the book dialog's two lists of times are labelled "Start" and "End", and the limit met by a change has its own sentence. |
+| v8 | 2026-11-20 | Plan step 66: the users. Section 4: the username, a second field that is checked, whose hint and refusal are the same words; the password dialog, which the Escape key does not close; the shape of a dialog that confirms a deletion. Section 5.1: eleven files (`users.model.ts` and `users.screen.ts` are new), the users screen, the check of the username, the reads of the list, where the generated password is and is not, the two new sentences of `failureText`. Section 6: the fourth entry, what a session owns. Section 8: what Chromium does with Escape on a modal dialog (the `cancel` event, `closedby`), a `close` event that arrives late, a class the style sheet already knew. Section 9: the tree. Section 12.1: the size at step 66. Section 11: decision 75's reason ended, decisions 77 to 88. At the review of the step: the `close` handlers of the detail and of the book dialog removed (section 4, "A close does nothing"; decision 84). |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
 TypeScript module script**. The markup of every screen is in one `index.html`; the script
@@ -248,8 +249,8 @@ book dialog is inside `#week`, the detail belongs to no screen, see "A dialog us
 views" below):
 
 ```ts
-// What the open dialog is about; null while it is closed. And whether its action was asked for
-// since it opened.
+// What the dialog is about, replaced at every opening; null until the first one. And whether
+// its action was asked for since it opened.
 let booking: { slot: SlotBlock; zone: string } | null = null;
 let bookAsked = false;
 
@@ -260,11 +261,7 @@ const openBook = (slot: SlotBlock, timeZone: string) => {
   bookAsked = false;
   bookWhat.textContent = bookingText(slot);
   book.showModal();
-};
-book.onclose = () => {           // "Close", the Escape key, or the close after a success
-  booking = null;
-  bookAsked = false;
-};
+};                               // no handler of the close event: see "A close does nothing" below
 bookForm.onsubmit = (event) => {
   event.preventDefault();
   bookAsked = true;
@@ -284,21 +281,30 @@ appointments.bookState$.subscribe((state) => {
 - **A result is tied to the dialog that asked for it.** A state stream keeps its last value, and
   that value may belong to an earlier opening, or to a call still under way when the dialog was
   closed. The view shows a failure, and closes on a success, only while "asked" is true: it is
-  set by the handler just before the call, and cleared at every opening and at every close.
+  set by the handler just before the call, and cleared at every opening. A result that
+  arrives while the dialog is closed changes nothing a person sees: the failure it would
+  write is emptied at the next opening, and closing a closed dialog does nothing.
   The service cancels its pending call when a new one is made, so the next result is that
   call's. A button is disabled from the state alone, asked or not: "Book" while any booking is
   under way, "Cancel appointment" while the cancellation under way is of the appointment shown
   (`pending` carries its id).
-- **An opening starts clean**: the form is reset and the failure emptied. **A close only
-  forgets** what the dialog was about. **Leaving the view** closes both dialogs, resets the
-  form, and empties the lists and every text (section 3, rule 9).
+- **An opening starts clean**: the form is reset, the failure emptied, what the dialog is
+  about replaced and "asked" cleared. **A close does nothing**: no dialog has a handler of the
+  `close` event. A browser sends that event a moment after the close, which can be after the
+  dialog was opened again (the Escape key, then Enter on the button that has the keyboard
+  back): a handler that forgot what the dialog was about would then forget the new opening,
+  and its action would reach nobody or its result be shown to nobody. Found in the browser
+  check of `docs/FRONTEND_VIEW_PLAN.md` step 66; the book dialog and the detail had such a
+  handler until then. **Leaving the view** closes both dialogs, resets the form, and empties
+  the lists and every text (section 3, rule 9).
 - **A week that arrives while a dialog is open** redraws the days behind it and leaves the
   dialog as it is: what was typed, a failure, and the slot the dialog books stay. The block that
   opened the dialog is then a new element, so the focus does not return to it at the close.
 - **The Administrator's part** of the book dialog (the User, and two lists of times) is one
   element, hidden for a User, whose view never asks for the list of users. The list is asked
   for at every opening (`UsersService.listUsers()`); its states arrive through the stream and
-  are applied only while the dialog is open. The picker's choices are rebuilt when a list
+  are applied only while the dialog is open (`book.open`), which is why it is opened before
+  the list is asked for. The picker's choices are rebuilt when a list
   arrives: the one place where a redrawn region holds a form control, accepted because it
   happens at opening, before anything can be chosen, and nothing else in a session asks for
   the list while the dialog is open.
@@ -314,8 +320,8 @@ appointments.bookState$.subscribe((state) => {
   included: the shared schema, through the service, trims it and makes a blank note `null`.
 - **Two actions of one dialog have an "asked" each.** The detail has "Save note" and "Cancel
   appointment", one failure element, and two local flags: a note's result is shown only after
-  "Save note", a cancellation's only after "Cancel appointment", both cleared at every opening
-  and close. Each button is disabled while the call under way is of the appointment shown.
+  "Save note", a cancellation's only after "Cancel appointment", both cleared at every
+  opening. Each button is disabled while the call under way is of the appointment shown.
 - **"Change" closes the detail and tells the week screen** (`screen.move(appointmentId)`), which
   holds the move from then on (section 5.1). The handler does nothing else: the banner appears
   because `week$` then says that an appointment is being moved.
@@ -377,7 +383,7 @@ export function mountDetail(root: HTMLDialogElement, deps: DetailDeps): DetailVi
   and "Cancel appointment" call the service in both.
 - **Everything of the shape of a dialog above is unchanged**: what is local (the appointment
   shown, an "asked" for each of the two actions), a result shown only in the opening that asked
-  for it, an opening that starts clean, a close that only forgets, and a teardown that closes
+  for it, an opening that starts clean, a close that does nothing, and a teardown that closes
   it and empties it.
 - The book dialog, with its second mode, stays the week's: only the week books and confirms.
 
@@ -431,6 +437,142 @@ follow). The markup of one field:
 - The loop that shows and clears the refusals is six lines of the stream's subscription; no
   helper that builds or updates nodes was written (section 7).
 
+**A second field that is checked: the username** (`docs/FRONTEND_VIEW_PLAN.md` step 66: the
+users, `#users`, `frontend/src/views/users.view.ts`). The pattern above is used as it is, for
+one field:
+
+```html
+<form class="create" novalidate>
+  <div class="field">
+    <label>Username <input name="username" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="username-hint" /></label>
+    <p class="hint" id="username-hint"></p>       <!-- what a username is, set by the script -->
+    <p class="error refusal" role="alert"></p>    <!-- the same words, when the text was refused -->
+  </div>
+  <p class="error failure" role="alert"></p>      <!-- a create the server refused, or that failed -->
+  <div class="actions"><button class="primary submit">Create user</button></div>
+</form>
+```
+
+- **The hint stands where the settings have a range**, and its words are the refusal's: the
+  logic layer has them once (section 5.1). While the refusal shows, the style sheet hides the
+  hint (`.field:has(.refusal:not(:empty)) .hint`), so the sentence is read once, in red, and
+  announced. The field names the hint as its description (`aria-describedby`).
+- **A browser neither offers nor corrects a username**: `autocomplete="off"`,
+  `autocapitalize="none"`, `spellcheck="false"`. No pattern and no length is in the page.
+- **"Create user" sends the field as text**, as it is, to the logic object. The field is
+  emptied only when the stream brings another object for it, which is after a create that
+  succeeded; after a refusal or a failure what was typed stays.
+- **A name that exists is the form's failure, not a field in fault**: it is the server's
+  answer, said under the field's box in plain words, and the field is not marked.
+- The form is outside the list the script redraws (section 3, rule 4); the rows hold a button
+  each and nothing to type in.
+
+**The password dialog** (`dialog.created`, inside `#users`). Creating a user shows the password
+the server generated, once: it cannot be shown again and no route sets another
+(`docs/FRONTEND_SERVICES.md` section 2, rule 6, the one exception, and section 13.7).
+
+```html
+<dialog class="created" aria-labelledby="created-title" closedby="none">
+  <h3 id="created-title" tabindex="-1" autofocus>User created</h3>
+  <dl><dt>Username</dt><dd class="username"></dd><dt>Password</dt><dd class="password"></dd></dl>
+  <p>This password cannot be shown again. Give it to the user now.</p>
+  <div class="actions"><button type="button" class="primary understood">I have noted the password</button></div>
+</dialog>
+```
+
+```ts
+let createAsked = false;                       // a create was asked for from this mount
+const forget = () => { createdName.textContent = ''; password.textContent = ''; };
+created.oncancel = (event) => event.preventDefault();
+find('dialog.created .understood').onclick = () => { created.close(); forget(); };
+form.onsubmit = (event) => { event.preventDefault(); createAsked = true; screen.create(field.value); };
+users.createUserState$.subscribe((state) => {  // the service's own state: the password is there
+  if (!createAsked || state.status !== 'success') return;
+  createAsked = false;
+  createdName.textContent = state.user.username;
+  password.textContent = state.user.password;
+  created.showModal();
+});
+```
+
+- **Where the password is.** In one element of the dialog, through `textContent`, from the
+  opening to the close: in no attribute, no field, not in the address or the title, and in no
+  `console` call. It comes from the service's own create state, read by the view at the moment
+  it shows it; it never passes through the logic layer (section 5.1).
+- **Where it goes.** The button takes it out of the page in the same handler that closes the
+  dialog, not at the `close` event, which a browser sends a moment later. Leaving the view
+  (another screen, signing out) closes the dialog and takes it out too (section 3, rule 9).
+- **Shown once.** The service keeps the create's success, password included, until the next
+  create or the end of the session. A success that was there when the view was mounted is an
+  earlier visit's: the dialog opens only for a create asked for from this mount (the "asked"
+  of the shape of a dialog). **Known limit:** a create left under way when the screen is left
+  is answered to nobody: the user exists, its password was never shown, and the Administrator
+  deletes the user and creates it again.
+- **The Escape key does not close it**, pressed once or many times: a key pressed by mistake
+  must not lose the password. `closedby="none"` is what holds in Chromium (section 8); the
+  `cancel` event is refused as well, for a browser that does not know the attribute. A click
+  outside it closes no modal dialog. The other dialogs of the page keep closing with Escape.
+- **The keyboard lands on the heading**, not on the button (`tabindex="-1"` and `autofocus`
+  on the `<h3>`): Enter or the space bar pressed by habit when the dialog appears does
+  nothing, and the button is the next Tab. A screen reader says the dialog's name, "User
+  created" (`aria-labelledby`).
+- **No "Copy" button**, and the page never touches the clipboard. The password is plain text
+  in a fixed-width face, large enough to tell `l` from `1` and `O` from `0`; one click selects
+  it whole (`user-select: all`), to be copied by hand.
+- **A list that arrives behind it** (the read after the create, the tab shown again) redraws
+  the rows and leaves the dialog as it is.
+- **While it is open nothing else of the page can be reached**, "Sign out" included: it is a
+  modal dialog. A session that ends by itself meanwhile closes it through the view's teardown.
+
+**A dialog that confirms a deletion** (`dialog.delete`, inside `#users`; the pattern for the
+deletions of the steps that follow: a type, a pattern, an override, a window).
+
+```html
+<dialog class="delete" aria-labelledby="delete-title">
+  <h3 id="delete-title">Delete user</h3>
+  <p class="question"></p>                     <!-- whom, what follows, and that it cannot be undone -->
+  <p class="error" role="alert"></p>
+  <div class="actions">
+    <button type="button" class="keep">Keep</button>
+    <button type="button" class="danger submit">Delete user</button>
+  </div>
+</dialog>
+```
+
+```ts
+let deleting = '';                             // whom the open dialog is about
+let deleteAsked = false;                       // "Delete user" was pressed since it opened
+const openDelete = (row: UserRow) => {         // a row's "Delete": a click only opens the dialog
+  deleting = row.username;
+  deleteAsked = false;
+  question.textContent = deleteQuestion(row.username);
+  removeError.textContent = '';
+  remove.showModal();
+};
+find('dialog.delete .keep').onclick = () => remove.close();
+removeSubmit.onclick = () => { deleteAsked = true; users.deleteUser(deleting); };
+users.deleteUserState$.subscribe((state) => {
+  removeSubmit.disabled = state.status === 'pending';
+  if (!deleteAsked) return;                    // not this opening's delete
+  removeError.textContent = state.status === 'failure' ? failureText(state.reason) : '';
+  if (state.status === 'success') remove.close();
+});
+```
+
+- **Its shape is the shape of a dialog above**, with nothing to type: what it is about and one
+  "asked" are local; the words come from the logic layer (`deleteQuestion`); the outcome comes
+  from the service's state. A failure is said in the dialog, which stays open, and the button
+  can be pressed again; a success closes it. The row goes because the logic layer reads the
+  list again (section 5.1), not because the view removes it.
+- **Two buttons, "Keep" first.** The keyboard is on "Keep" when the dialog opens, so Enter
+  pressed by habit keeps; the Escape key closes it too. Nothing is typed to confirm.
+- **No handler of the `close` event**, like every dialog of the page (the shape of a dialog
+  above, "A close does nothing"): whom it is about is replaced at the next opening.
+- **The button of a row says whom** to a screen reader (`aria-label`, "Delete alice"), set by
+  the script with the words of the logic layer.
+- The view is 172 lines, 26 of which look a node up or copy a template; no helper that builds
+  or updates nodes was written (section 7).
+
 ## 5. The logic layer
 
 Some of what the screens need may not be in a view (section 3, rule 1) and is not a remote call
@@ -443,7 +585,7 @@ either. It lives in the logic layer:
 | A response made ready to draw | The week: per day, its windows, slots, busy blocks and appointments, each with its place in the day and its time as text |
 | What is offered | Whether the note can be edited and whether "Change" and "Cancel" are shown for an appointment (the status, the end, the role, `cancellableUntil`) |
 | The texts | A date and a time in the calendar's time zone, whatever the browser's; a failure `reason` in plain words (`docs/SHARED_CALENDAR_SPEC.md` section 16.8) |
-| From the user's input to a call's argument | The booking body from a slot, a note and a username; the settings' body from four fields typed as text, or why not, field by field |
+| From the user's input to a call's argument | The booking body from a slot, a note and a username; the settings' body from four fields typed as text, or why not, field by field; the username to create from what its field holds, or why not |
 
 Its rules:
 
@@ -462,9 +604,9 @@ Its rules:
 7. **Tested like the services**: unit tests with no network and no DOM, inside the 100 % line
    coverage of `frontend/src`.
 
-### 5.1 As built: nine files
+### 5.1 As built: eleven files
 
-`frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` steps 61 to 65), each with its test in
+`frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` steps 61 to 66), each with its test in
 `frontend/tests/unit/logic/`:
 
 | File | What it holds |
@@ -478,6 +620,8 @@ Its rules:
 | `appointments.screen.ts` | The class `AppointmentsScreen`: which of the two lists is on show, the period of the history, the time zone read from the settings, the loads and reloads, the detail of one of its appointments, and the hand-over of one to the week screen |
 | `settings.model.ts` | Pure, for the settings form: what the fields are filled with (`settingsFields`), what the form says beside them (`settingsInfo`: the time zone, who saved last and when), the range of a field with its words (`settingRange`), and from what the fields hold to the body of the save or to the refusals (`settingsFor`) |
 | `settings.screen.ts` | The class `SettingsScreen`: the settings read when the screen is shown, the save with its checks, and the read that follows every save |
+| `users.model.ts` | Pure, for the users screen: the list ready to draw (`userRows`: the username, and whom its "Delete" button deletes), the sentence of an empty list (`NO_USERS`), what a username is in words (`USERNAME_HINT`), from what the field holds to the username to create or to the refusal (`usernameFor`), and the words of the dialog that confirms a deletion (`deleteQuestion`) |
+| `users.screen.ts` | The class `UsersScreen`: the list read when the screen is shown, a create with its check, and the list read again after every create and delete and when the page becomes visible |
 
 **"Now" is passed in.** Nothing in `logic/` reads the clock by itself. `WeekScreen` receives a
 function `now: () => Date` through its constructor (the shell passes `() => new Date()`, a test a
@@ -806,6 +950,79 @@ export class SettingsScreen {
 - **Values typed and not saved are lost** at a change of screen and at signing out, with no
   question: the end of the subscription forgets everything, and the next `start()` reads.
 
+**The users screen** (`docs/FRONTEND_VIEW_PLAN.md` step 66; the Administrator's).
+
+```ts
+// `rows` is the last list read: null until there is one and after a read that failed, and
+// another object only when the users read differ from those on show. `field` is what the
+// username field is filled with: another object only when it is to be emptied. `refusal` is
+// why the text typed was not sent, `failure` why a create that was sent did not succeed,
+// `created` the username of the last create that succeeded.
+export type UsersState = {
+  loading: boolean; unread: string | null; rows: readonly UserRow[] | null; empty: string | null;
+  field: { username: string }; creating: boolean; refusal: string | null; failure: string | null; created: string | null;
+};
+
+export class UsersScreen {
+  readonly users$: Observable<UsersState>;
+  // `users`: `listUsers`, `listUsersResult$`, `createUser`, `createUserResult$` and
+  // `deleteUserResult$` of the UsersService. `visible$` notifies each time the page becomes visible.
+  constructor(users: UsersCalls, visible$: Observable<unknown>) { … }
+  start(): Subscription { … }      // reads the list
+  retry(): void { … }              // reads again, after a read that failed
+  create(text: string): void { … } // checks the text; creates the user, or says why not
+}
+```
+
+- **One request.** A row is the username and its "Delete" button. The creation date that
+  `GET /users` also gives is not shown, so the screen needs no time zone and asks for nothing
+  but the list. The order is the server's: by username, never an administrator
+  (`docs/SHARED_CALENDAR_SPEC.md` section 10.1).
+- **The username is checked here, before any call** (`usernameFor`), with the shared `Username`
+  schema and nothing else: no pattern and no length is written in `frontend/src`. Spaces around
+  the name are removed, as a name pasted with one would have them, and nothing else is
+  changed: "Bob" is refused, not sent as "bob". The refusal is one sentence, the same that
+  stands under the field as its hint (`USERNAME_HINT`): "A username has 3 to 32 characters:
+  lowercase letters, digits, ".", "_" and "-", starting with a letter or a digit." The two
+  lengths and the three signs are in those words only; the test of the file holds them to the
+  schema (a name one character shorter and one longer than the words say, each sign inside a
+  name and at its start). No request is sent for a text refused.
+- **The service checks again**, with the same schema; its message never reaches the page
+  (section 11, decision 27). A name accepted here and refused there would be a defect.
+- **A name that exists is the server's to say**: "admin" and "alice" pass the check, the
+  server answers `user_exists`, and the stream carries that as `failure`, not as a refusal.
+- **The generated password never passes through this object.** The screen reads a create's
+  result through a type of its own (`CreateOutcome`: a success with its username, or a failure
+  with its reason), which the service's result fits and which does not name the password: no
+  line of the logic layer can read it, no state can hold it, and no fixture of the logic's
+  tests stands for one. The stream says that a create is under way (`creating`), that it
+  failed and why (`failure`), or for which username it succeeded (`created`). The view takes
+  the password from the service's own state (section 4). The view does not use `created`.
+- **Reading.** `start()` reads the list; until it arrives the stream says `loading`. A read
+  that fails is `unread`, in plain words, in the place of the list, and `retry()` reads again;
+  the form stays usable meanwhile. **A list that could not be read again is taken off the
+  screen**: it is no longer known to be true (a user deleted from elsewhere may be in it).
+- **The list is read again** after every result of a create and of a delete, a failure
+  included: a failed write may have been applied (`docs/SHARED_CALENDAR_SPEC.md` section
+  16.3), and a delete answered `user_not_found` means the list on show is old. And every time
+  the page becomes visible, through the stream the shell hands the week and the list screens.
+  Not for a result that was already there at `start()`.
+- **The same users keep the same rows object.** A read that brings the usernames already on
+  show changes `loading` only, so the view redraws nothing and the keyboard stays on a row's
+  button through it; a dialog that is open is left as it is in every case.
+- **The delete is called by the view**, from its dialog (`UsersService.deleteUser`), like a
+  cancellation from the detail; its failure is said there with `failureText`. The screen only
+  hears its result, to read the list again. `cannot_delete_admin` cannot arrive from this
+  screen, whose list never holds an administrator, and has its sentence all the same.
+- **One `UsersService` per session serves the week's book dialog and this screen.** `listUsers`
+  has one pair of streams and one pending call; only one screen is on show at a time, so the
+  two never ask together. This screen takes no list that was there before its `start()` (the
+  book dialog may have left one) and reads its own; the book dialog asks at every opening
+  (section 4), so a user created here is in its list and a deleted one is not, with no code
+  for it. `createUser` and `deleteUser` are this screen's only.
+- **What is kept, and what is not.** Nothing: the end of the subscription of `start()`
+  forgets the list, what the form said and what was typed, and the next `start()` reads.
+
 **The change.** `changeFor(slot, zone, role, fields)` makes the argument of
 `AppointmentsService.change` from what the confirmation holds. The times are a booking's: a
 User sends the slot's `start`, the Administrator both instants, the slot's own while the two
@@ -851,7 +1068,11 @@ knows the reasons a person can meet so far: the transport reasons every API serv
 and the codes of a booking, of a cancellation, of a change, of a note and of the list of users
 (`docs/FRONTEND_SERVICES.md` sections 19.1 and 13.1). The list of appointments and the read of
 the settings (`docs/FRONTEND_SERVICES.md` sections 19.1 and 15.1) brought no code without a
-sentence, and neither did the save of the settings. The sentence of `slot_taken` says that
+sentence, and neither did the save of the settings. The users (`docs/FRONTEND_SERVICES.md`
+section 13.1) brought two: `user_exists`, "A user with this username exists already. Choose
+another username.", and `cannot_delete_admin`, "An Administrator cannot be deleted."
+`user_not_found`, met after a booking, is the same sentence after a delete: "This user no
+longer exists." The sentence of `slot_taken` says that
 the calendar has been refreshed, which the reload above makes true. `invalid_request` has one
 sentence for every case and every screen, "The request was not accepted. Check what you entered
 and try again.": an end not after the start has no sentence of its own, and the logic layer
@@ -902,9 +1123,10 @@ API's configuration and the whole store because it creates the API services of e
    `AppointmentsService`, the `UsersService` (for both roles; a User's view never calls it),
    the `CalendarSettingsService` (read by the list screen for the time zone, read and saved by
    the settings screen), the `WeekScreen`, the `AppointmentsScreen`, which is given the
-   `WeekScreen` for the hand-over of section 5.1, and the `SettingsScreen`. They live as long as the person's session, not as long as a screen is on
+   `WeekScreen` for the hand-over of section 5.1, the `SettingsScreen` and the `UsersScreen`,
+   which is given the session's `UsersService`, the one the week's book dialog asks for its list. They live as long as the person's session, not as long as a screen is on
    show: coming back to a screen finds its logic object as it was left. The same function builds
-   the stream both screens reload on (section 5.1): the document's `visibilitychange` event,
+   the stream the week, the list and the users screens reload on (section 5.1): the document's `visibilitychange` event,
    keeping the notifications at which `document.visibilityState` is `visible`. Each screen
    listens to it only while it is started, so the screen on show is the one that loads again,
    and nothing is loaded at the login or after signing out.
@@ -930,11 +1152,12 @@ export type Screen = {
 };
 ```
 
-There are three entries so far: `#/week`, "Week", both roles; `#/appointments`, "My
-appointments", the role `user` only; and `#/settings`, "Settings", the role `admin` only. The dialogs have no address. A new screen is a new entry,
+There are four entries so far: `#/week`, "Week", both roles; `#/appointments`, "My
+appointments", the role `user` only; `#/settings`, "Settings", and `#/users`, "Users", the
+role `admin` only. The dialogs have no address. A new screen is a new entry,
 its element in `index.html`, and its services and logic object in `sessionObjects`; the code
 that reads the address, fills the navigation and switches between screens does not change, and
-did not for the second entry, nor for the third. `mountShell` takes the table as an optional dependency, which a
+did not for the second entry, nor for the third, nor for the fourth. `mountShell` takes the table as an optional dependency, which a
 test uses to bring an entry whose mount is a spy.
 
 **What the shell hands a view** is in the entry's `show`: the logic object and the parts of the
@@ -1079,6 +1302,42 @@ What the tests of the settings rely on (plan step 65), as `happy-dom` 21 has it:
 - **A checkbox's `value` is always "on".** A test that reads every field of the page for what a
   person left behind reads a checkbox by whether it is ticked.
 
+What the tests of the users rely on (plan step 66), and what was learnt in the browser:
+
+- **The Escape key on a modal dialog, in Chromium 159** (tried before any code, in the headless
+  browser of the check). Plain: a `cancel` event, then the dialog closes. With the `cancel`
+  event refused (`preventDefault()`): the dialog stays open at the first and at the second
+  press and **closes at the third**, whatever the handler does: a page cannot keep refusing.
+  With the attribute `closedby="none"`: no `cancel` event at all, and the dialog stays open
+  however many times the key is pressed (eight in a row in the check). The page uses both: the
+  attribute is what holds, the refusal is for a browser that does not know the attribute. A
+  click outside a modal dialog closes it in none of these cases.
+- **`happy-dom` 21 has neither**: no Escape key, no `cancel` event of its own, and `closedby`
+  is an attribute like any other. The view's test sends a `cancel` event itself and checks that
+  it is refused, and `page.test.ts` checks the attribute; that the dialog stays open under the
+  key is the browser's only.
+- **`autofocus` and where the keyboard lands** when a dialog opens are the browser's only
+  (`happy-dom` moves no focus). In Chromium the heading of the password dialog has it, Enter
+  and the space bar there do nothing, and one Tab reaches the button.
+- **A `close` event that arrives late.** `happy-dom` sends `close` inside `close()`; a browser
+  sends it a moment later, and input that arrives meanwhile is handled first. A test stands
+  for it by sending a `close` event itself after the dialog was opened again: the delete
+  dialog, the detail and the book dialog, none of which has a handler for it, must still act
+  on what they show and close on their success (`users.view.test.ts`,
+  `detail.view.test.ts`, `week.view.test.ts`).
+- **A class the style sheet already knew.** `happy-dom` applies no style sheet. The button of
+  the password dialog first had the class `noted`, which an older rule matches
+  (`dialog .noted { display: contents; }`, the detail's note): in the browser it was invisible
+  and out of the keyboard's reach, with every test green. A new class is looked for in
+  `style.css` before it is used, and the browser check reaches every button by keyboard.
+- **A password in the tests.** The view's and the shell's tests use made-up texts as the
+  generated password and look for them in the whole document's source, in every field's value
+  and in the address; the logic's tests have none. No test takes a snapshot.
+- **The shell's test of a second person** no longer looks for a word. It compares the whole
+  page (its source and what every field holds) as the Administrator finds it after a User was
+  there with the page the Administrator finds when nobody was there before, with the clock
+  standing still: anything left of the first person, of whatever kind, makes the two differ.
+
 ## 9. Placement
 
 Inside `frontend/`, next to the services:
@@ -1098,10 +1357,11 @@ frontend/
 │   ├── logic/                 # the logic layer, no DOM (section 5.1): texts.ts, week.model.ts,
 │   │                          # booking.ts, appointment.detail.ts, week.screen.ts,
 │   │                          # appointments.model.ts, appointments.screen.ts,
-│   │                          # settings.model.ts, settings.screen.ts
+│   │                          # settings.model.ts, settings.screen.ts, users.model.ts,
+│   │                          # users.screen.ts
 │   └── views/                 # shell.ts and one <name>.view.ts per view: login.view.ts, week.view.ts,
-│                              # appointments.view.ts, settings.view.ts; detail.view.ts, the dialog
-│                              # two views mount
+│                              # appointments.view.ts, settings.view.ts, users.view.ts;
+│                              # detail.view.ts, the dialog two views mount
 ├── tests/
 │   └── unit/
 │       ├── services/          # vitest project `unit`, in node
@@ -1227,8 +1487,20 @@ than what the trial showed: these deserve the first look in a review.
 | 72 | Values typed and not saved are lost with no question, on a change of screen and on signing out (section 5.1) | Decided with the Product Owner: as a typed note is in the dialogs. Four small fields | |
 | 73 | The settings are read again after every save; a success fills the form with the server's answer, a failure leaves what was typed, and the read that follows fills nothing (section 5.1) | Decided with the Product Owner. `docs/SHARED_CALENDAR_SPEC.md` section 16.3: a failed write may have been applied, and the line about the last save then says so, while the person keeps what they typed | |
 | 74 | Two wordings decided at the reviews of steps 63 and 64: the book dialog's two lists of times are labelled "Start" and "End"; `appointment_limit_reached` after a change has its own sentence (sections 4 and 5.1) | "From" and "To" were also the words of the two lines above them in the confirmation. A change books nothing more, so "Cancel one to book another" did not say what to do | |
-| 75 | The label of the limit says "per person", not "per User" (section 4) | The page's fixed texts are in the document also while they are hidden, and the shell's test of a second person signing in looks for the word "User", the first person's role, in the whole frame | Yes |
+| 75 | The label of the limit says "per person", not "per User" (section 4) | The page's fixed texts are in the document also while they are hidden, and the shell's test of a second person signing in looks for the word "User", the first person's role, in the whole frame. **That reason ended with plan step 66**, whose screen is called "Users": the test now compares whole pages (decision 87). The label stays as it is | Yes |
 | 76 | No condition of section 7 was met at plan step 65 | `settings.view.ts` is 110 lines, 16 of which look a node up. The fields are in a fixed form, not in a redrawn region; the refusals are shown and cleared by one loop of the subscription, not by a helper that builds or updates nodes | |
+| 77 | The password dialog has no "Copy" button; the password is plain text, to be selected and copied by hand, and the page never touches the clipboard (section 4) | Decided with the Product Owner (`docs/FRONTEND_VIEW_PLAN.md` step 66). One click selects the whole password, through the style sheet (`user-select: all`), which touches no clipboard | The selection by one click, yes |
+| 78 | The password dialog is closed by its button only, "I have noted the password": `closedby="none"` on the dialog, and its `cancel` event refused (sections 4 and 8) | Decided with the Product Owner: the password cannot be shown again and no route sets another, so a key pressed by mistake must not lose it. In Chromium a refused `cancel` alone gives way at the third Escape; the attribute holds. The other dialogs keep closing with Escape | |
+| 79 | Deleting asks first, in a dialog with two buttons, "Keep" and "Delete user", which names the user and says that their future appointments will be cancelled and that this cannot be undone; nothing is typed to confirm (section 4) | Decided with the Product Owner. A deleted user cannot be brought back, unlike a cancelled slot (decision 35) | |
+| 80 | A row of the users shows the username only; the creation date is not shown (section 5.1) | Decided with the Product Owner: the screen then needs no time zone and makes one request | |
+| 81 | The generated password goes from the service's own create state to one element of the page, through `textContent`, and out at the dialog's close and at the view's teardown; it never passes through the logic layer, whose screen reads a create's result through a type that does not name it (sections 4 and 5.1) | `docs/FRONTEND_SERVICES.md` section 2, rule 6 and section 13.7. No state object, no fixture of the logic's tests and no log of a stream can then hold it. The price: the view listens to one stream of the service beside the screen's, and the stream's `created` is used by no view. Known limit: a create left under way when the screen is left shows its password to nobody | Yes |
+| 82 | The username is checked in `logic/users.model.ts` with the shared `Username` schema, spaces around it removed and nothing else changed; its refusal and the hint under the field are the same sentence, written once, and the style sheet hides the hint while the refusal shows (sections 4 and 5.1) | Decision 66 again, for a text. The pattern and the lengths stay in `shared/`; the numbers are in the sentence's words only, and a test holds them to the schema | The hint hidden, yes |
+| 83 | When the password dialog opens the keyboard is on its heading, one Tab before the button (section 4) | The brief of the step allowed either. A button with the keyboard on it is pressed by Enter and by the space bar: the same slip the Escape key was closed against | Yes |
+| 84 | No dialog has a handler of the `close` event: what a dialog is about and its "asked" are replaced at the next opening, and the list of users is applied to the book dialog while `book.open` (sections 4 and 8) | Found in the browser check of step 66: the event can arrive after the dialog was opened again, and a handler that forgets then breaks the new opening. The delete dialog was built without one; the handlers of the detail and of the book dialog were removed at the review of the step, with a test of the late event for each of the three | Yes |
+| 85 | A list of users that could not be read again is taken off the screen; users read again that are those on show keep the same rows object (section 5.1) | The week keeps its last week under a failure; a list with "Delete" buttons that may be old is better not offered. The same object keeps the keyboard on a row's button through the read after a refused delete and when the tab is shown again | Yes |
+| 86 | "Delete user" calls the `UsersService` from the view; "Create user" goes through the `UsersScreen` (sections 4 and 5.1) | Section 2: a view may call a service, and the logic layer holds only what would otherwise end up in a view. A create has a check and words; a delete has none | |
+| 87 | The shell's test of a second person compares the whole page, its source and what every field holds, with the page the same person finds when nobody was there before (section 8) | It relied on a word, "User", that the page's own fixed texts now hold. The comparison still catches a role, a name, a link, a row, a value, an attribute or an open dialog left by the first person, and anything a later screen leaves | Yes |
+| 88 | No condition of section 7 was met at plan step 66 | `users.view.ts` is 172 lines and listens to three streams; 26 of its lines look a node up or copy a template. The one field is in a fixed form; the rows hold buttons only; `rowFor` copies a template and fills it, as the list's does; the two dialogs are filled by a few assignments each | |
 
 ## 12. The tooling (open points O4, O6 and O8, decided)
 
@@ -1265,7 +1537,7 @@ in other languages), which `shared/`'s schemas bring in with any import from
 At plan step 61, with the logic layer and the week: `app.js` 504 kB, 110 kB compressed. At plan
 step 62, with booking and cancelling: 518 kB, 113 kB compressed. At plan step 63, with the note
 and the change: 520 kB, 114 kB compressed. At plan step 64, with "My appointments": 528 kB,
-115 kB compressed. At plan step 65, with the settings: 532 kB, 117 kB compressed. What to do about `zod`'s share
+115 kB compressed. At plan step 65, with the settings: 532 kB, 117 kB compressed. At plan step 66, with the users: 537 kB, 118 kB compressed. What to do about `zod`'s share
 is open point O9 (section 10).
 
 ### 12.2 The dev server
@@ -1311,7 +1583,12 @@ state are there too: the one about changing and cancelling in the detail
 (`appointment.detail.ts`), those beside the User picker (`booking.ts`, section 11,
 decision 40), those of "My appointments": the status of a row, the empty list and the
 period's refusals (`appointments.model.ts`), and those of the settings: the range under a
-field, a field's refusal and the line about the last save (`settings.model.ts`). The words that name an appointment being moved come from the logic layer
+field, a field's refusal and the line about the last save (`settings.model.ts`), and those of
+the users: what a username is, which is the hint and the refusal, the sentence of an empty
+list, the name of a row's button for a screen reader and the question of the delete dialog
+(`users.model.ts`); the fixed words of the two dialogs of the users ("User created", "This
+password cannot be shown again. Give it to the user now.", "I have noted the password",
+"Delete user", "Keep") are in the page. The words that name an appointment being moved come from the logic layer
 (`movingOf`); the fixed words around them ("Moving: … Choose a free time.", "From:", "To:") are
 in the page. No view shows the `message` of a
 service. The shell holds the two names of the roles.

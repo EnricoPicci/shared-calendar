@@ -28,10 +28,10 @@ describe('index.html', () => {
   it('every screen of the frame has an id and starts hidden; the navigation and the lists start empty', () => {
     loadPage();
     const screens = [...document.querySelectorAll<HTMLElement>('#app main.screen > :not(template)')];
-    expect(screens.map((element) => element.id)).toEqual(['week', 'appointments', 'settings']);
+    expect(screens.map((element) => element.id)).toEqual(['week', 'appointments', 'settings', 'users']);
     expect(screens.every((element) => element.hidden)).toBe(true);
     expect(document.querySelector('#app .nav')!.children).toHaveLength(0);
-    for (const list of document.querySelectorAll('#week .legend, #week .hours, #week .days, #appointments .list')) expect(list.children).toHaveLength(0);
+    for (const list of document.querySelectorAll('#week .legend, #week .hours, #week .days, #appointments .list, #users .list')) expect(list.children).toHaveLength(0);
   });
 
   it('every <template> has an id of its own and holds exactly one element', () => {
@@ -47,6 +47,7 @@ describe('index.html', () => {
       'tpl-appointment',
       'tpl-option',
       'tpl-appointment-row',
+      'tpl-user-row',
     ]);
     for (const template of templates) expect(template.content.children, template.id).toHaveLength(1);
   });
@@ -68,17 +69,21 @@ describe('index.html', () => {
     for (const template of templates) expect(template.content.querySelectorAll('input, select, textarea'), template.id).toHaveLength(0);
   });
 
-  it('the page has two dialogs, closed, each named by its heading: the book dialog is the week\'s, outside the region that is redrawn; the detail belongs to no screen', () => {
+  it('the page has four dialogs, closed, each named by its heading: the book dialog is the week\'s and the two of the users are theirs, outside the regions that are redrawn; the detail belongs to no screen', () => {
     loadPage();
     const dialogs = [...document.querySelectorAll<HTMLDialogElement>('dialog')];
-    expect(dialogs.map((dialog) => dialog.className)).toEqual(['book', 'detail']);
+    expect(dialogs.map((dialog) => dialog.className)).toEqual(['book', 'created', 'delete', 'detail']);
     for (const dialog of dialogs) {
       expect(dialog.open, dialog.className).toBe(false);
       expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)!.tagName, dialog.className).toBe('H3');
     }
-    const [book, detail] = dialogs as [HTMLDialogElement, HTMLDialogElement];
+    const [book, created, remove, detail] = dialogs as [HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement];
     expect(book.parentElement!.id).toBe('week');
     expect(book.closest('.week')).toBeNull();
+    for (const dialog of [created, remove]) {
+      expect(dialog.parentElement!.id, dialog.className).toBe('users');
+      expect(dialog.closest('.list'), dialog.className).toBeNull();
+    }
     // The detail is opened from two screens: it is in the frame, after the screens, with an id
     // of its own for the views that mount it.
     expect(detail.id).toBe('detail');
@@ -204,5 +209,62 @@ describe('index.html', () => {
     expect([one('.saved').textContent, one('.saved').getAttribute('role'), one('.failure').getAttribute('role')]).toEqual(['Settings saved.', 'status', 'alert']);
     expect([one('.submit').textContent, one('.retry').textContent]).toEqual(['Save', 'Try again']);
     expect([one('.zone-name').textContent, one('.last-saved').textContent]).toEqual(['', '']);
+  });
+
+  it('the users start with the form empty and the list empty: one text field in a field of its own, with its label, its hint and its refusal, which a browser neither offers nor corrects', () => {
+    loadPage();
+    const one = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector<T>(`#users ${selector}`)!;
+    const form = one<HTMLFormElement>('form.create');
+    // The script says in words what is wrong with a username: the browser's own check is off.
+    expect(form.noValidate).toBe(true);
+    expect(form.closest('.list')).toBeNull();
+    const fields = [...document.querySelectorAll<HTMLInputElement>('#users input, #users select, #users textarea')];
+    expect(fields.map((field) => [field.name, field.type, field.value, field.closest('label')!.textContent.trim()])).toEqual([['username', 'text', '', 'Username']]);
+    const field = fields[0]!;
+    expect([field.getAttribute('autocomplete'), field.getAttribute('autocapitalize'), field.getAttribute('spellcheck')]).toEqual(['off', 'none', 'false']);
+    // What a username is comes from the script, with the shared rule: no pattern and no length in the page.
+    expect(['pattern', 'minlength', 'maxlength', 'required', 'aria-invalid'].filter((name) => field.hasAttribute(name))).toEqual([]);
+    const box = field.closest('.field')!;
+    expect(box.closest('form')).toBe(form);
+    expect([box.querySelector('.hint')!.textContent, box.querySelector('.hint')!.id]).toEqual(['', field.getAttribute('aria-describedby')]);
+    expect([box.querySelector('.refusal')!.getAttribute('role'), box.querySelector('.refusal')!.textContent]).toEqual(['alert', '']);
+    expect([one('.failure').getAttribute('role'), one('.failure').textContent, one('.failure').closest('form')]).toEqual(['alert', '', form]);
+    expect([one('.submit').textContent, one('.retry').textContent]).toEqual(['Create user', 'Try again']);
+    expect([one('.loading').hidden, one('.unread').hidden, one('.empty').hidden]).toEqual([true, true, true]);
+    expect([one('.unread .error').getAttribute('role'), one('.empty').textContent]).toEqual(['alert', '']);
+  });
+
+  it('a row of the users is the username and one button of type "button", "Delete", and nothing in it can be typed in', () => {
+    const row = pageAside().querySelector<HTMLTemplateElement>('#tpl-user-row')!.content.firstElementChild!;
+    expect(row.tagName).toBe('LI');
+    expect([...row.children].map((part) => [part.tagName, part.textContent])).toEqual([['SPAN', ''], ['BUTTON', 'Delete']]);
+    expect(row.querySelector('button')!.getAttribute('type')).toBe('button');
+    // Whom it deletes is the script's to say.
+    expect(row.querySelector('button')!.hasAttribute('aria-label')).toBe(false);
+    expect(row.querySelectorAll('input, select, textarea, a')).toHaveLength(0);
+  });
+
+  it('the password dialog starts empty, cannot be closed by the Escape key, and has one button and no field; the keyboard lands on its heading', () => {
+    loadPage();
+    const dialog = document.querySelector<HTMLDialogElement>('#users dialog.created')!;
+    expect(dialog.getAttribute('closedby')).toBe('none');
+    // The other dialogs of the page keep closing with Escape.
+    expect([...document.querySelectorAll('dialog[closedby]')]).toEqual([dialog]);
+    expect([...dialog.querySelectorAll('dd')].map((part) => [part.className, part.textContent])).toEqual([['username', ''], ['password', '']]);
+    expect(dialog.querySelector('p')!.textContent).toBe('This password cannot be shown again. Give it to the user now.');
+    expect([...dialog.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['I have noted the password']);
+    expect(dialog.querySelectorAll('input, select, textarea, form, a')).toHaveLength(0);
+    const heading = dialog.querySelector('h3')!;
+    expect([heading.textContent, heading.getAttribute('tabindex'), heading.hasAttribute('autofocus')]).toEqual(['User created', '-1', true]);
+    expect(document.querySelectorAll('[autofocus]')).toHaveLength(1);
+  });
+
+  it('the delete dialog starts empty, with "Keep" before "Delete user", and nothing to type', () => {
+    loadPage();
+    const dialog = document.querySelector<HTMLDialogElement>('#users dialog.delete')!;
+    expect(dialog.querySelector('h3')!.textContent).toBe('Delete user');
+    expect([dialog.querySelector('.question')!.textContent, dialog.querySelector('.error')!.textContent, dialog.querySelector('.error')!.getAttribute('role')]).toEqual(['', '', 'alert']);
+    expect([...dialog.querySelectorAll('button')].map((button) => [button.textContent, button.disabled])).toEqual([['Keep', false], ['Delete user', false]]);
+    expect(dialog.querySelectorAll('input, select, textarea, form')).toHaveLength(0);
   });
 });

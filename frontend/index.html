@@ -193,6 +193,72 @@
             </div>
           </form>
         </section>
+
+        <!-- The users (src/views/users.view.ts), at the address #/users: a form that creates
+             one, and the list, each row with its "Delete". The form is outside the list the
+             script redraws. The field is a .field: its label, its hint, its refusal. -->
+        <section id="users" class="users-screen" hidden>
+          <div class="toolbar">
+            <h2>Users</h2>
+            <span class="loading" role="status" hidden>Loading…</span>
+          </div>
+          <!-- novalidate: a text that is not a username is refused by the script, in words,
+               under the field. A browser must neither offer nor correct a username. -->
+          <form class="create" novalidate>
+            <div class="field">
+              <label>Username <input name="username" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="username-hint" /></label>
+              <p class="hint" id="username-hint"></p>
+              <p class="error refusal" role="alert"></p>
+            </div>
+            <p class="error failure" role="alert"></p>
+            <div class="actions">
+              <button class="primary submit">Create user</button>
+            </div>
+          </form>
+          <!-- Shown in the place of the list when it could not be read -->
+          <div class="unread" hidden>
+            <p class="error" role="alert"></p>
+            <button type="button" class="retry">Try again</button>
+          </div>
+          <p class="empty" hidden></p>
+          <ul class="list"></ul>
+
+          <!-- A row of the list: the username and its button, whose name for a screen reader
+               the script completes with the username -->
+          <template id="tpl-user-row">
+            <li class="user-row"><span class="username"></span> <button type="button" class="danger ask-delete">Delete</button></li>
+          </template>
+
+          <!-- Shown once, after a user was created: the password the server generated. The
+               Escape key does not close it (closedby="none"), only its button does: the
+               password cannot be shown again. When it opens the keyboard is on its heading,
+               one Tab before the button, so that a key pressed by habit does not close it. -->
+          <dialog class="created" aria-labelledby="created-title" closedby="none">
+            <h3 id="created-title" tabindex="-1" autofocus>User created</h3>
+            <dl>
+              <dt>Username</dt>
+              <dd class="username"></dd>
+              <dt>Password</dt>
+              <dd class="password"></dd>
+            </dl>
+            <p>This password cannot be shown again. Give it to the user now.</p>
+            <div class="actions">
+              <button type="button" class="primary understood">I have noted the password</button>
+            </div>
+          </dialog>
+
+          <!-- Asks before a user is deleted. "Keep" comes first: the keyboard is on it when
+               the dialog opens. -->
+          <dialog class="delete" aria-labelledby="delete-title">
+            <h3 id="delete-title">Delete user</h3>
+            <p class="question"></p>
+            <p class="error" role="alert"></p>
+            <div class="actions">
+              <button type="button" class="keep">Keep</button>
+              <button type="button" class="danger submit">Delete user</button>
+            </div>
+          </dialog>
+        </section>
       </main>
 
       <!-- The detail of one appointment, with what can be done to it

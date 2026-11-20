@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v6 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`). Step 62 done on 2026-11-19 (brief `prompts/85-step-62-implementation.md`). Step 63 done on 2026-11-19 (brief `prompts/86-step-63-implementation.md`). Step 64 done on 2026-11-19 (brief `prompts/87-step-64-implementation.md`). Step 65 done on 2026-11-19 (brief `prompts/88-step-65-implementation.md`), waiting for review; next step 66 |
+| Status | v7 — **under way** (planned 2026-11-16, brief `prompts/82-plan-view-layer-implementation.md`). Step 60 done on 2026-11-19 (brief `prompts/83-step-60-implementation.md`). Step 61 done on 2026-11-19 (brief `prompts/84-step-61-implementation.md`). Step 62 done on 2026-11-19 (brief `prompts/85-step-62-implementation.md`). Step 63 done on 2026-11-19 (brief `prompts/86-step-63-implementation.md`). Step 64 done on 2026-11-19 (brief `prompts/87-step-64-implementation.md`). Step 65 done on 2026-11-19 (brief `prompts/88-step-65-implementation.md`). Step 66 done on 2026-11-20 (brief `prompts/89-step-66-implementation.md`), waiting for review; next step 67 |
 | Scope | Everything needed to go from the services layer that exists to **all the views written, tested and running in a browser against the local stack**: the tooling, the shell, the logic layer and one view per screen. Steps 60 to 69 |
 | Not in scope | Hosting, the CORS configuration, the Content-Security-Policy of the hosting, logout as a designed service, the session across a reload, the cloud deployment of the front end. They are the open points O1, O2, O3, O5 and O7 of `docs/FRONTEND_ARCHITECTURE.md` section 10 and get their own plan |
 | Governed by | `docs/FRONTEND_ARCHITECTURE.md` (the rules of the view layer), `docs/FRONTEND_SERVICES.md` (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/ARCHITECTURE.md` section 4 (the API). On any conflict with this plan, they win |
@@ -17,6 +17,7 @@
 | v4 | 2026-11-19 | Step 63: how a change is made on the screen is decided, with the Product Owner, before the step's implementation, and no longer "to settle first". The step's text says the interaction as decided: the banner, any week while moving, what ends a move and what does not, the book dialog as the confirmation, the note always sent, and the known limit of a move inside a full window. Section 8, decision 10 says so for step 63; step 68's interaction is still to propose. |
 | v5 | 2026-11-19 | Step 64: three choices about the screen were made with the Product Owner before the step's implementation (brief `prompts/87-step-64-implementation.md`), and the step's text says them: the list's time zone is read from the settings; the history's period is chosen with two dates and opens on the 30 days that end today; "Change" from the list goes to the week, with step 63's banner and confirmation. The step's browser check is brought in line. |
 | v6 | 2026-11-19 | Step 65: four choices about the settings screen were made with the Product Owner before the step's implementation (brief `prompts/88-step-65-implementation.md`), and the step's text says them: "No limit" as a checkbox, what the form shows beside its fields, unsaved values lost with no question, and what follows a save. The step also carries two wordings decided at the reviews of steps 63 and 64 (the labels "Start" and "End" of the book dialog; a sentence of its own for the limit met by a change), and records that the history of "My appointments" keeps its default period. |
+| v7 | 2026-11-20 | Step 66: four choices about the users screen were made with the Product Owner before the step's implementation (brief `prompts/89-step-66-implementation.md`), and the step's text says them: no "Copy" button, the password dialog closed by its button only, a confirmation with two buttons before a delete, and a row with the username only. The step's text also says where the generated password is and is not, and its browser check is brought in line. |
 
 ---
 
@@ -399,21 +400,51 @@ found before the check are put back.
 
 **Goal:** the Administrator lists, creates and deletes users.
 
-Logic: the list ready to draw; the username checked with the shared schema.
+**Four choices about the screen**, made with the Product Owner before any code (brief
+`prompts/89-step-66-implementation.md`; the reasons are in `docs/FRONTEND_ARCHITECTURE.md`
+section 11, decisions 77 to 80):
 
-View: `users.view.ts`. Creating a user shows the generated password **once**, in a dialog, with
-the sentence that it cannot be shown again. The password is the one exception of
-`docs/FRONTEND_SERVICES.md` section 2, rule 6: the view puts it on the screen with `textContent`,
-never logs it, never puts it in the address, and removes it from the page when the dialog is
-closed and when the view is left. Deleting asks for confirmation and says that the user's future
-appointments are cancelled.
+- **The password dialog has no "Copy" button.** The password is a plain text, selected and
+  copied by hand; the page never touches the clipboard.
+- **The password dialog is closed by its button only**, "I have noted the password": the
+  Escape key does not close this one dialog, since the password cannot be shown again and no
+  route sets another.
+- **Deleting asks first**, in a dialog with two buttons, "Keep" and "Delete user", which names
+  the user and says that their future appointments will be cancelled and that this cannot be
+  undone. Nothing is typed to confirm.
+- **A row shows the username only**, with its "Delete" button: the screen makes one request,
+  `GET /users`, and needs no time zone.
 
-Shell: `#/users`, Administrator only.
+Logic: the list ready to draw; the username checked with the shared schema before any call,
+spaces around it removed and nothing else changed, with one sentence that is both the hint
+under the field and its refusal; the words of the delete dialog; the users screen (the read of
+the list, its failure and the new try, the create, the list read again after every create and
+delete and when the tab becomes visible). The generated password never passes through the
+logic layer.
 
-**Browser check:** create a user and sign in as that user in another window with the password
-shown; a username that is not allowed and one that exists are refused in plain words; delete the
-user, whose appointment in the week is then cancelled; after closing the dialog the password is
-nowhere in the page; the new user appears in the book dialog's list.
+View: `users.view.ts`: a fixed form with the username, a field in fault as step 65 settled
+it; the list, a row with its button. Creating a user shows the generated password **once**, in
+a dialog, with the sentence that it cannot be shown again. The password is the one exception of
+`docs/FRONTEND_SERVICES.md` section 2, rule 6: the view takes it from the service's own
+result and puts it on the screen with `textContent`, in one element, never logs it, never puts
+it in the address, and removes it from the page when the dialog is closed and when the view is
+left. A name that exists is the server's answer, said in plain words as the form's failure.
+The delete dialog shows a failure and stays open; it closes on its success.
+
+Shell: `#/users`, Administrator only, after "Settings". The shell's test of a second person
+signing in no longer looks for the word "User" in the frame: it compares whole pages.
+
+**Browser check:** the list, with `alice` and without `admin`, after one request; a username
+that is not allowed is refused under the field with no request, and one that exists by the
+server, in plain words; create a user and sign in as that user in another window with the
+password shown; the Escape key, pressed once and many times, and a click outside do not close
+the password dialog; after closing it the password is nowhere in the page, nor after leaving
+the screen and coming back, nor after signing out with it open; the new user appears in the
+book dialog's list; delete the user, whose appointment in the week is then cancelled and whose
+next booking is refused; a delete refused or that cannot reach the server is said in the
+dialog, which stays open; the tab shown again reads the list again and leaves an open dialog
+as it is; as `alice`, the address is not in the navigation and typed by hand shows the week;
+everything by keyboard only. Every user the check created is deleted at its end.
 
 **Acceptance:** the common check; and the test of the view shows that the password is gone from
 the document after the dialog is closed and after the view is left.

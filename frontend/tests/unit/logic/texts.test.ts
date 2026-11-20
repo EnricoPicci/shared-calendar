@@ -139,6 +139,9 @@ describe('texts', () => {
       'appointment_not_found',
       'appointment_not_active',
       'cancellation_notice_too_short',
+      // Creating and deleting a user.
+      'user_exists',
+      'cannot_delete_admin',
     ];
 
     it.each(REASONS)('%s has a sentence: a capital, a full stop, no code (no underscore) and no technical word', (reason) => {
@@ -163,6 +166,11 @@ describe('texts', () => {
 
     it('slot_taken says that the calendar has been refreshed', () => {
       expect(failureText('slot_taken')).toBe('This time has just been taken. The calendar has been refreshed: please choose another time.');
+    });
+
+    it('a username that exists says so and what to do; an Administrator that cannot be deleted says so', () => {
+      expect(failureText('user_exists')).toBe('A user with this username exists already. Choose another username.');
+      expect(failureText('cannot_delete_admin')).toBe('An Administrator cannot be deleted.');
     });
 
     it('says the same for a wrong password and an unknown user: both are invalid_credentials', () => {
@@ -196,7 +204,8 @@ describe('texts', () => {
       const others = [
         'network', 'server', 'unexpected', 'not_signed_in', 'session_rejected', 'forbidden', 'invalid_request', 'internal_error', 'invalid_json',
         'slot_taken', 'booking_in_past', 'booking_notice_too_short', 'booking_beyond_horizon', 'outside_availability',
-        'user_not_found', 'concurrent_update', 'appointment_not_found', 'appointment_not_active', 'type_in_use', '', 'constructor',
+        'user_not_found', 'concurrent_update', 'appointment_not_found', 'appointment_not_active', 'user_exists', 'cannot_delete_admin',
+        'type_in_use', '', 'constructor',
       ];
       for (const reason of others) expect(failureText(reason, 'change'), reason).toBe(failureText(reason));
     });

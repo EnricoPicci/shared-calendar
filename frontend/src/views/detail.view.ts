@@ -70,13 +70,10 @@ export function mountDetail(root: HTMLDialogElement, { detail, appointments, cha
     enable();
     root.showModal();
   };
-  // Closing, by "Close", by the Escape key or after a success, only forgets what the dialog was
-  // about.
-  root.onclose = () => {
-    shown = null;
-    cancelAsked = false;
-    noteAsked = false;
-  };
+  // Nothing is done when it closes, by "Close", by the Escape key or after a success: which
+  // appointment it was about is replaced at the next opening. A browser sends the close event
+  // a moment after the close, which can be after the dialog was opened again: a handler that
+  // forgot would then forget the new opening.
 
   // 4. The user's actions become calls: what follows on screen comes from the streams.
   find('.close').onclick = () => root.close();

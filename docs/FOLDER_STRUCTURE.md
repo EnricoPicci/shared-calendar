@@ -88,10 +88,11 @@ stays at the root.
 │   │   ├── logic/               # between the services and the views, no DOM: texts.ts (dates, times,
 │   │   │                        # failures in plain words), week.model.ts, week.screen.ts,
 │   │   │                        # booking.ts, appointment.detail.ts, appointments.model.ts,
-│   │   │                        # appointments.screen.ts, settings.model.ts, settings.screen.ts
+│   │   │                        # appointments.screen.ts, settings.model.ts, settings.screen.ts,
+│   │   │                        # users.model.ts, users.screen.ts
 │   │   └── views/               # shell.ts (with the table of screens) and one <name>.view.ts per
 │   │                            # view: login.view.ts, week.view.ts, appointments.view.ts,
-│   │                            # settings.view.ts; detail.view.ts, the appointment's dialog
+│   │                            # settings.view.ts, users.view.ts; detail.view.ts, the appointment's dialog
 │   │                            # that two views mount
 │   ├── tests/
 │   │   ├── unit/                # mirrors src/ (plus services/fixtures.ts, logic/zone.ts and
@@ -351,8 +352,13 @@ What exists:
 - **The settings, since 2026-11-19** (`docs/FRONTEND_VIEW_PLAN.md` step 65):
   `src/logic/settings.model.ts` and `src/logic/settings.screen.ts`,
   `src/views/settings.view.ts`, and in `src/views/shell.ts` the third entry of the table of
-  screens. No new script and no new dependency. The other views come with the following plan
-  steps.
+  screens. No new script and no new dependency.
+- **The users, since 2026-11-20** (`docs/FRONTEND_VIEW_PLAN.md` step 66):
+  `src/logic/users.model.ts` and `src/logic/users.screen.ts`, `src/views/users.view.ts` (the
+  form, the list and the screen's two dialogs, the password's and the delete's, which are in
+  `index.html` inside the screen's element), and in `src/views/shell.ts` the fourth entry of
+  the table of screens. No new script and no new dependency. The other views come with the
+  following plan steps.
 
 What still waits for the open points of `docs/FRONTEND_ARCHITECTURE.md` section 10: the hosting,
 so no `template.yaml` and no `deploy` script (the root scripts use `--if-present`, so their
