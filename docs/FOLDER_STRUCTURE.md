@@ -45,7 +45,10 @@ stays at the root.
 ├── eslint.config.js             # lint rules for every package
 ├── scripts/                     # repository-wide checks: the comment rule of CLAUDE.md ("Comments")
 ├── .nvmrc  .editorconfig  .gitignore
-├── CLAUDE.md                    # guidance for Claude Code (repository-wide)
+├── CLAUDE.md                    # guidance for Claude Code (repository-wide, kept short; each
+│                                # package has its own: backend/, frontend/, shared/CLAUDE.md)
+├── .claude/                     # the project skill explain-journey, and rules/: guidance that
+│                                # loads when a file matching the rule's paths is read
 ├── README.md                    # written by plan step 12
 ├── docs/                        # repository-wide documentation (section 8)
 │   └── journeys/                # the integration journeys explained in simple words (section 8)
@@ -258,7 +261,7 @@ npm run budget -w backend -- shared-calendar-api
 ```
 
 `cd backend && npm run <script> …` is the same thing (drop `-w backend` and the `--` before the
-arguments). `CLAUDE.md`, `README.md` and `docs/RUNBOOK.md` use these forms.
+arguments). `CLAUDE.md`, `README.md`, `docs/COMMANDS.md` and `docs/RUNBOOK.md` use these forms.
 
 ---
 
@@ -404,7 +407,12 @@ repository, they cross-reference each other, and `CLAUDE.md` points at them.
   back-end documents keep their names (`ARCHITECTURE.md`, `IMPLEMENTATION_PLAN.md`,
   `RUNBOOK.md`) to break no link; the day the front-end documents arrive they may be renamed
   with a `BACKEND_` prefix in one commit that also fixes every reference.
-- Repository-wide documents have no prefix: this one, `AWS_ACCOUNTS.md`, `NEW_ACCOUNT.md`.
+- Repository-wide documents have no prefix: this one, `AWS_ACCOUNTS.md`, `NEW_ACCOUNT.md`,
+  `COMMANDS.md` (every command with its notes, and the local stack's quirks).
+- Guidance for Claude Code is not in `docs/`: the root `CLAUDE.md` holds what every session
+  needs, `backend/CLAUDE.md`, `frontend/CLAUDE.md` and `shared/CLAUDE.md` what concerns one
+  package, `.claude/rules/` what concerns some kinds of file. The root file's last section
+  ("Changing these files") says what goes where.
 - `docs/journeys/` explains the integration journeys in simple words, one page per `describe`
   block, for a developer new to the project. These pages are not a source of truth: they explain
   the tests, and the documents above win. `docs/journeys/README.md` holds the format and the list

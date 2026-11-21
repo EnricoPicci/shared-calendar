@@ -1,0 +1,153 @@
+# backend/
+
+The API: Lambda handlers behind an HTTP API, with Cognito and DynamoDB. This file adds to the
+root `CLAUDE.md`, whose rules all apply here. Behaviour, contract and data model:
+`docs/ARCHITECTURE.md` and `docs/SHARED_CALENDAR_SPEC.md`. The commands in full, and the local
+stack's quirks: `docs/COMMANDS.md`.
+
+Paths in this file are relative to `backend/`.
+
+## Folder map
+
+- `package.json` (name `backend`, scripts), `template.yaml`, `samconfig.toml`,
+  `docker-compose.yml`, `tsconfig.json`, `vitest.config.ts`.
+- `src/handlers/`: one Lambda entry point per file.
+- `src/lib/`: back-end modules; the only place that touches the AWS SDK.
+- `tests/unit/`: vitest unit tests, mirroring `src/` (e.g. `tests/unit/lib/http.test.ts`).
+- `tests/integration/`: end-to-end tests against the local Docker stack: `setup.ts` (helpers,
+  including `resetCalendarTable()`, `putCalendarItem()`, `getCalendarItem()`,
+  `deleteCalendarItem()`, `queryCalendarPartition()`), `journeys.test.ts` (the journeys of
+  `docs/IMPLEMENTATION_PLAN.md` step 9), `calendar.test.ts` (the calendar's journeys).
+- `scripts/`: shell scripts behind the npm scripts (`local-seed.sh`, `local-api.sh`,
+  `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`, `budget.sh`, `check-sam.sh`;
+  `target.sh` is sourced by `bootstrap-admin.sh`, `smoke.sh` and `budget.sh`; the first two of
+  those call `cognito.mjs`).
+- `docker/`: files for the local stack (`cognito-local-config.json`).
+- Generated, git-ignored: `env.local.json`, `.cognito/`, `.aws-sam/`, `.verify-ok`, `coverage/`.
+
+## `src/lib/`
+
+- `calendarDb.ts` is the only module that knows the `calendar` table's item layout and the
+  calendar lock (`withCalendarLock`); its configuration (`calendarConfig()`) is read once per
+  container.
+  - Its locked writes take the rule check as a callback (`check`), run on the data read inside
+    the locked attempt; the writes that compare themselves with the rest of the calendar get
+    the availability state (`CalendarState`: types, patterns, overrides and one-off windows
+    from today, appointments from now − 24 h).
+  - Availability writes: patterns, `setOverride`, `deleteOverride`, `createOneOffWindow`,
+    `deleteOneOffWindow` (a window by id: the state first, the whole `WINDOW` partition only on
+    a miss, to tell a past window, `date_in_past`, from an unknown one).
+  - Booking: `bookAppointment` (settings and state read inside the attempt; one transaction of
+    five items: lock, `APPT`, `APPTID`, `EVENT`, a `ConditionCheck` on the `DELETEDUSER#<sub>`
+    marker, whose failure `withCalendarLock` answers through the plan's `onConditionFailed`,
+    without a retry).
+  - Appointments by id (`readAppointment`, internal: `GetItem APPTID#<id>` → `GetItem APPT`,
+    inside the locked attempt; a pointer without its item is absent): `cancelAppointment` and
+    `updateAppointmentNote` (check callback on the appointment or `null`; three items: lock, an
+    `Update` of the changed `APPT` attributes without a condition, `EVENT`; an unchanged note
+    writes nothing).
+  - `changeAppointment` (settings, state and the old appointment by id read inside the attempt,
+    check callback on the three; six items: lock, an `Update` of the old `APPT` (`changed`,
+    `replacedBy`), `Put` of the new `APPT` (`replaces`, built by the booking's
+    `newAppointment`) and its `APPTID`, `EVENT`, the marker `ConditionCheck` on the old one's
+    `userId`, last).
+  - User deletion: `markUserDeleted` (`docs/SHARED_CALENDAR_SPEC.md` section 10.2; chunks of
+    `DELETION_CHUNK` = 40, each under the lock: `APPT` from now − 24 h read inside the attempt,
+    kept by `userId` = the `sub`, `booked`, `end > now`; the first chunk also writes the
+    `DELETEDUSER#<sub>` marker, a plain `Put`; per appointment an `Update` with `cancelReason`
+    `user_deleted` and `Put EVENT`; one event id per appointment on first sight, kept across
+    retries and chunks).
+  - `listAppointments` (`docs/SHARED_CALENDAR_SPEC.md` section 11.1, route 16, a read: a range
+    `SK BETWEEN` as the view, or upcoming `SK ≥ now − 24 h` with `end > now`; owner by `userId`
+    or stored `username`; status; by start).
+- `calendarEvents.ts`: builds the `EVENT` item (`appointmentEvent`, the `AppointmentSnapshot`
+  of the stored appointment; types `booked`, `cancelled`, `note_updated`, and `changed` with
+  `previous`, the old appointment as stored after the change, a key the other types never
+  have), pure; ids and "now" passed in.
+- `calendarRules.ts`: the calendar's checks, pure, no AWS, "today", "now" and the zone passed
+  in; a failed check is `Refusal` (`{ error, message?, conflicts? }`, code from `ApiErrorCode`).
+  Rule names are those of `docs/SHARED_CALENDAR_SPEC.md`.
+  - `checkTypeName`, `checkTypeDelete`, `typeNameKey`, and `checkAvailabilityWrite` for every
+    availability write: patterns, overrides, one-off windows.
+  - `checkBookingTimes`, R-BOOK-02 before the lock, and `checkBooking`, R-BOOK-03..07 and 09
+    under it.
+  - `checkCancel` (R-CAN-01..03, R-PERM-01 by `sub`) and `checkNote` (R-NOTE-01, answers
+    `unchanged`).
+  - `checkChange` (its section 8.4: `checkCancel` on the old appointment, then `checkBooking`
+    for its User on the state without it).
+  - `cancellableUntilFor` (a User on a booked appointment, else `null`); `calendarView`, the
+    calendar view built for one caller's role from what `calendarDb.readCalendarRange` reads;
+    `toResponse`, an appointment as a response.
+- `cognito.ts` also has `getUserSub` (`AdminGetUser`, the `sub`), `isPlainUser` (in `user`, not
+  in `admin`) and `listPlainUsers` (`ListUsersInGroup` for both groups, every page; sorted by
+  code units).
+- `http.ts`: `parseJsonBody` for bodies, `parseQuery` for query strings (the object a
+  `.strict()` query schema checks).
+
+## `src/handlers/`, the calendar
+
+`getCalendarSettings.ts` and `updateCalendarSettings.ts` are the pattern the other calendar
+handlers copy: claims → configuration check → role → path → body → `calendarDb` with the
+`calendarRules` check → one log line. Section numbers below are those of
+`docs/SHARED_CALENDAR_SPEC.md`.
+
+- Admin only; `date_in_past` from the path or body before the lock, except the window delete:
+  - availability types: `listAvailabilityTypes.ts`, `createAvailabilityType.ts`,
+    `renameAvailabilityType.ts`, `deleteAvailabilityType.ts`;
+  - weekly patterns: `listPatterns.ts`, `createPattern.ts`, `updatePattern.ts`,
+    `deletePattern.ts`;
+  - date overrides: `setOverride.ts`, `deleteOverride.ts`;
+  - one-off windows: `createOneOffWindow.ts`, `deleteOneOffWindow.ts`.
+- The view: `getCalendar.ts` (`GET /calendar`, both roles).
+- Booking: `bookAppointment.ts` (`POST /calendar/appointments`, both roles; the checks in the
+  order of its section 8.2, the Administrator's target through Cognito before the lock).
+- Appointments: `listAppointments.ts` (`GET /calendar/appointments`, both roles, read-only, no
+  Cognito), `updateAppointmentNote.ts` (`PATCH …/{appointmentId}`) and `cancelAppointment.ts`
+  (`POST …/{appointmentId}/cancel`), admin or owner (someone else's is 404).
+- Change: `changeAppointment.ts` (`POST …/{appointmentId}/change`, admin or owner, no Cognito:
+  the User is the old appointment's; `checkBookingTimes` before the lock; the order of its
+  section 8.4; logs `appointmentId` and `newAppointmentId`).
+- Users: `listUsers.ts` (`GET /users`, admin, Cognito only, no calendar configuration check;
+  logs `userCount`).
+- `deleteUser.ts` (Hello World's route) has a calendar part: after the admin and group checks,
+  `calendarConfig()`, the `sub`, then `calendarDb.markUserDeleted` before the sign-out and
+  delete; a failure there answers before any Cognito change (`409 concurrent_update` or `500`);
+  logs `cancelledCount` and `lockAttempts`.
+
+## A new calendar function
+
+Declare `CALENDAR_TABLE`, `CALENDAR_TIME_ZONE` and `DYNAMODB_ENDPOINT` in `template.yaml`, with
+a role of its own (root `CLAUDE.md`, "Hard rules from the design"). It needs no line in
+`scripts/local-seed.sh` unless it also calls Cognito; never put `CALENDAR_TIME_ZONE` in
+`env.local.json`. The reasons and the existing exceptions: `docs/COMMANDS.md` section 3.2.
+
+## Writing the scripts
+
+- Passwords and tokens in these scripts never go into a command-line argument (visible in
+  `ps`) or a file: the two Cognito calls carrying a password go through `scripts/cognito.mjs`
+  (AWS SDK, password on stdin), API calls pass the token to curl with `-H @-`, and JSON answers
+  are parsed by `json_field` (node, stdin). The AWS CLI cannot read a request from a pipe, and
+  its errors echo the input. Avoid bash here-strings (`<<<`) for secrets: bash 3.2 writes them
+  to a temp file.
+- The scripts run on macOS (bash 3.2, BSD tools) and Linux (bash 5, GNU tools) and need only
+  node, the AWS CLI, curl and git: no jq. JSON is read with node or `--query`. Keep it that
+  way: no `sed -i`, `stat`, `date -d`/`-v`, or other flags that differ between the two.
+- Never put an e-mail address in `samconfig.toml`: the repository is public.
+
+## Tests
+
+- `vitest.config.ts` has two projects: `unit` (`tests/unit/**/*.test.ts`) and `integration`
+  (`tests/integration/**/*.test.ts`). The integration project only selects files when
+  `RUN_INTEGRATION=1`; otherwise it runs nothing and exits 0.
+- Unit tests mock AWS with `aws-sdk-client-mock`, never real endpoints. `test:unit` fails below
+  100 % line coverage on `src/lib`.
+- Tests of the contract itself (what a schema accepts, `resolveRole`) live in `shared/`; the
+  back end tests what it does with it (the 400 answer, the handlers).
+- The calendar journeys empty the local `calendar` table first (`resetCalendarTable()`, which
+  refuses any endpoint but `localhost`/`127.0.0.1`); integration files run one at a time and in
+  no fixed order, so every file prepares its own state.
+- When a journey changes, its page under `docs/journeys/` changes in the same commit; the
+  `describe` carries the pointer comment
+  `// Explained in simple words in docs/journeys/<package>/<page>.md.` (format and list of
+  pages: `docs/journeys/README.md`; pages still to write: `docs/journeys/PLAN.md`; the project
+  skill `explain-journey` writes, checks and refreshes a page).

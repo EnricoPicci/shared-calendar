@@ -13,9 +13,10 @@ work. Read `SKILL.md` first.
 
 ## 2. Read, in this order
 
-1. **`CLAUDE.md`**: "Comments", the integration notes of the package (the back end's calendar
-   journeys empty the table; the front end's never reset it, and keep their settings in
-   `frontend/tests/integration/fe-calendar-settings.local.json`), and "Test conventions".
+1. **`CLAUDE.md`**, "Comments" (the whole rule: `.claude/rules/comments.md`); **the package's
+   `CLAUDE.md`**, "Tests"; and **`docs/COMMANDS.md` section 4**, the integration notes of the
+   package (the back end's calendar journeys empty the table; the front end's never reset it,
+   and keep their settings in `frontend/tests/integration/fe-calendar-settings.local.json`).
 2. **The whole test file, once**: its opening comment, constants, the file's `beforeAll` and
    `afterAll`, the clean-up helpers, every helper defined at the top. Then **the block in full**:
    its opening comment, its `beforeAll`/`afterAll` (also those registered by a helper, such as

@@ -189,9 +189,10 @@ Two things are simpler than in the first account:
 
 Propose and review before editing; none of these are urgent.
 
-- `CLAUDE.md`, "Cloud": replace `aws sso login --profile shared-calendar-admin --use-device-code` with
-  `aws login --profile shared-calendar-admin --remote`; drop the sentence about the organization's region
-  policy.
+- `CLAUDE.md`, "Cloud safety", and `docs/COMMANDS.md` section 6: replace
+  `aws sso login --profile shared-calendar-admin --use-device-code` with
+  `aws login --profile shared-calendar-admin --remote`; in `docs/COMMANDS.md`, drop the sentence
+  about the organization's region policy.
 - `docs/RUNBOOK.md` sections 1 and 4: same replacement; the one-time setup becomes "IAM user
   `admin` with `AdministratorAccess` and MFA" instead of the Identity Center paragraphs.
 - `docs/AWS_ACCOUNTS.md`: rewrite around two identities (root, `admin`) and one account, or

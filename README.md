@@ -29,7 +29,8 @@ Where the full story is:
 | `docs/FOLDER_STRUCTURE.md` | The monorepo layout (back end, front end, shared): which folder holds what, and how the pieces are built |
 | `docs/FRONTEND_SERVICES.md` | The front end's services layer: `SessionStore`, `LoginService`, `RefreshService`, `HelloService`, `UsersService` (implemented in `frontend/src/services/`) |
 | `docs/journeys/` | The integration journeys explained in simple words, one page per `describe` block (index in `docs/journeys/README.md`) |
-| `CLAUDE.md` | Working rules and the complete list of commands |
+| `docs/COMMANDS.md` | The complete list of commands, with the notes that go with each, and the local stack's quirks |
+| `CLAUDE.md` | Working rules for Claude Code (one more per package: `backend/CLAUDE.md`, `frontend/CLAUDE.md`, `shared/CLAUDE.md`; path-scoped rules in `.claude/rules/`) |
 
 ## Prerequisites
 
@@ -91,7 +92,7 @@ in `backend/` (from inside `backend/`, drop `-w backend` and the `--` before arg
 
 `npm run typecheck`, `npm run lint` and `npm run test:unit` at the root cover every package.
 Everything else (`bootstrap-admin`, `budget`, and the notes that go with each command) is
-listed in `CLAUDE.md`, "Everyday commands". The first deployment of a new stack is different
+listed in `docs/COMMANDS.md`. The first deployment of a new stack is different
 (`npm run deploy -w backend -- --parameter-overrides AlertEmail=<address>`, then
 `bootstrap-admin`, `smoke`, `budget`): `docs/RUNBOOK.md` section 3.
 

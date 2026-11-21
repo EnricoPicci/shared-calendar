@@ -1,0 +1,28 @@
+# shared/
+
+Package `@shared-calendar/shared`: what the back end and the browser both import. This file
+adds to the root `CLAUDE.md`, whose rules all apply here. Paths are relative to `shared/`.
+
+- It imports no AWS SDK, no Node-only module and no DOM API: only TypeScript and `zod`. A new
+  error code or response field starts in `src/api.ts`.
+- No build step: `exports` points at `src/index.ts`, and each consumer bundles it.
+- `src/calendar/time.ts` uses `Intl` only, never the machine's zone.
+
+## Folder map
+
+- `src/api.ts`: response and error body types, `ApiErrorCode`.
+- `src/roles.ts`: `Role`, `resolveRole`.
+- `src/username.ts`: the username pattern and zod schemas.
+- `src/calendar/`: the shared calendar. `time.ts`, the time-zone helpers; `schemas.ts`, the zod
+  schemas: primitives, request bodies, path and query parameters; `types.ts`, the response and
+  event types; `rules.ts`, the pure rules: defined and effective windows, slots, overlap,
+  grids, `cancellableUntil`; `defaults.ts`, default settings, limits and settings ranges.
+- `src/index.ts`: re-exports.
+- `tests/` mirrors `src/`. Generated, git-ignored: `coverage/`.
+
+## Tests
+
+- `vitest.config.ts`: one project (`tests/**/*.test.ts`), 100 % line coverage on `src/`.
+- Tests of the contract itself (what a schema accepts, `resolveRole`) live here; the back end
+  tests what it does with it (the 400 answer, the handlers).
+- `npm run typecheck -w @shared-calendar/shared`: the package has no Node types.
