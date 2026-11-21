@@ -60,6 +60,12 @@ Paths in this file are relative to `backend/`.
   - `listAppointments` (`docs/SHARED_CALENDAR_SPEC.md` section 11.1, route 16, a read: a range
     `SK BETWEEN` as the view, or upcoming `SK ≥ now − 24 h` with `end > now`; owner by `userId`
     or stored `username`; status; by start).
+- `assistantDb.ts` is the only module that knows the `assistant` table's item layout
+  (`docs/ARCHITECTURE.md` section 5.4); `assistantConfig()` is read once per container. It
+  never deletes, never retries and never logs: a writer that lost the race gets
+  `AssistantBusyError`. `readConversation` (two reads; gives the `version` every write must
+  name), `startConversation`, `saveStep`, `takeProposal` (`null` when not taken),
+  `endConversation`, `readDailyUse`; "now" and the time zone are passed in.
 - `calendarEvents.ts`: builds the `EVENT` item (`appointmentEvent`, the `AppointmentSnapshot`
   of the stored appointment; types `booked`, `cancelled`, `note_updated`, and `changed` with
   `previous`, the old appointment as stored after the change, a key the other types never

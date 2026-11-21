@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`) |
+| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`) |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown on its screen, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which is deployed nowhere today (open point P7, section 2.2). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
@@ -220,6 +220,19 @@ two nights the clocks change.
 `assistant` is in dynamodb-admin; `sam validate --lint` passes with the new resources; the
 table's row is in `docs/ARCHITECTURE.md` section 5 and the capacity total (19 / 17) in its
 section 10.
+
+**As done** (2026-11-21). As written, with these differences. The first two were decided with
+the Product Owner before the step and are in `docs/CONVERSATIONAL_ARCHITECTURE.md` v4:
+
+- two permission sets, `AssistantReadPolicy` and `AssistantWritePolicy`, instead of the one
+  `AssistantTablePolicy`;
+- a step reads `META` and then the current conversation's messages only (two reads), instead
+  of one `Query` of the whole partition that skips the earlier conversations;
+- a message's `content` is stored as JSON text, so that it comes back exactly as given;
+- the day's use is added inside the step's transaction, not by a write of its own: a step is
+  counted exactly when it is saved;
+- the module was also tried once against DynamoDB Local, outside the tests: a mocked client
+  does not check that an expression is one DynamoDB accepts.
 
 ---
 

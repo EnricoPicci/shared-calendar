@@ -262,6 +262,74 @@ Resources:
               - dynamodb:ConditionCheckItem
             Resource: !GetAtt CalendarTable.Arn
 
+  # The assistant's memory (docs/CONVERSATIONAL_ARCHITECTURE.md section 9): a person's conversation
+  # with the assistant, its messages and the person's use of the day, told apart by the same generic
+  # two-part key as the calendar table. A table of its own, for three reasons: its items must delete
+  # themselves while the calendar's history is kept. A conversation is personal text that no
+  # calendar function should be able to read. And the calendar's permission sets stay as they are.
+  # Time to live: every item carries the moment it stops being useful in `expiresAt` (seconds since
+  # 1970), and DynamoDB deletes it by itself some time after, at no cost. The code never relies on
+  # that deletion: it checks the age of a conversation itself. Fixed capacity of 8 reads and 6
+  # writes per second: with the two other tables the total is 19 reads and 17 writes, inside the
+  # always-free 25 and 25. Same encryption as the other tables. No deletion protection: nothing in
+  # it is worth keeping, so `sam delete` may remove it. Named after the stack
+  # (shared-calendar-api-assistant; locally plain assistant).
+  AssistantTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${AWS::StackName}-assistant
+      BillingMode: PROVISIONED
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 8
+        WriteCapacityUnits: 6
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      DeletionProtectionEnabled: false
+
+  # Shared permission sets on the assistant table, written once like the calendar's: a named list
+  # of permissions that each assistant function's own role will list under ManagedPolicyArns.
+  # Resource: the assistant table only. Two sets, so that a function that only shows a conversation
+  # gets the first alone and cannot write. No function uses them yet. There is no set to delete:
+  # nothing deletes an item of this table but its time to live.
+  AssistantReadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Read the assistant table (strongly consistent GetItem and Query).
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:Query
+            Resource: !GetAtt AssistantTable.Arn
+
+  # A step of a conversation is one transaction of PutItem (the new messages) and UpdateItem (the
+  # conversation and the day's use), which DynamoDB authorizes by the actions of its parts.
+  AssistantWritePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Write a conversation, its messages and the daily use (PutItem, UpdateItem).
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+            Resource: !GetAtt AssistantTable.Arn
+
   # ---------------------------------------------------------------------------
   # API: the public HTTPS entry point
   # ---------------------------------------------------------------------------

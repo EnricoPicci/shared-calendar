@@ -2,7 +2,8 @@
 # Prepares the local emulators started by docker-compose.yml. Safe to run any number of times:
 # every step first checks whether its object already exists.
 #
-#   1. tables hello-messages and calendar on DynamoDB Local (same key schemas as template.yaml)
+#   1. tables hello-messages, calendar and assistant on DynamoDB Local (same key schemas as
+#      template.yaml; assistant with its time to live)
 #   2. user pool local_pool and app client local_client on cognito-local
 #   3. groups admin and user
 #   4. user admin (group admin) and user alice (group user), permanent passwords
@@ -17,6 +18,7 @@ DYNAMODB_URL="http://localhost:${DYNAMODB_PORT:-8000}"
 COGNITO_URL="http://localhost:9229"
 TABLE_NAME="hello-messages"
 CALENDAR_TABLE="calendar"
+ASSISTANT_TABLE="assistant"
 POOL_NAME="local_pool"
 CLIENT_NAME="local_client"
 ADMIN_PASSWORD="Admin-Local-Pass-1!"
@@ -97,6 +99,29 @@ else
   echo "table $CALENDAR_TABLE: created"
 fi
 
+# The assistant's table. Its items carry the moment they expire in expiresAt, and the table is told
+# so (time to live), as in template.yaml. DynamoDB Local may never delete an expired item: nothing
+# depends on it, the code checks the age of a conversation itself.
+if ddb describe-table --table-name "$ASSISTANT_TABLE" >/dev/null 2>&1; then
+  echo "table $ASSISTANT_TABLE: exists"
+else
+  ddb create-table \
+    --table-name "$ASSISTANT_TABLE" \
+    --attribute-definitions AttributeName=PK,AttributeType=S AttributeName=SK,AttributeType=S \
+    --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE \
+    --provisioned-throughput ReadCapacityUnits=8,WriteCapacityUnits=6 >/dev/null
+  echo "table $ASSISTANT_TABLE: created"
+fi
+TTL_STATUS=$(ddb describe-time-to-live --table-name "$ASSISTANT_TABLE" \
+  --query TimeToLiveDescription.TimeToLiveStatus --output text)
+if [[ "$TTL_STATUS" == "ENABLED" ]]; then
+  echo "table $ASSISTANT_TABLE: time to live on"
+else
+  ddb update-time-to-live --table-name "$ASSISTANT_TABLE" \
+    --time-to-live-specification Enabled=true,AttributeName=expiresAt >/dev/null
+  echo "table $ASSISTANT_TABLE: time to live switched on"
+fi
+
 # 2. User pool and app client
 POOL_ID=$(idp list-user-pools --max-results 60 --query "UserPools[?Name=='$POOL_NAME'].Id | [0]" --output text)
 if [[ "$POOL_ID" == "None" || -z "$POOL_ID" ]]; then
@@ -160,10 +185,13 @@ ensure_user alice "$ALICE_PASSWORD" user
 # DeleteUserFunction also declares the calendar variables (it cancels the deleted user's
 # appointments, docs/SHARED_CALENDAR_SPEC.md section 10.2) and gets the table and the endpoint from
 # "Parameters" too, beside its own section. ListUsersFunction reads Cognito only.
+# ASSISTANT_TABLE reaches nobody yet: no function declares that variable in template.yaml. It is
+# here so that an assistant function gets the table's local name by declaring it.
 cat > env.local.json <<EOF
 {
   "Parameters": {
     "CALENDAR_TABLE": "$CALENDAR_TABLE",
+    "ASSISTANT_TABLE": "$ASSISTANT_TABLE",
     "DYNAMODB_ENDPOINT": "http://dynamodb:8000"
   },
   "AuthorizerFunction": {

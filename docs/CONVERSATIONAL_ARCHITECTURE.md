@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v3, under way: step c00 of `docs/CONVERSATIONAL_PLAN.md` done |
+| Status | v4, under way: steps c00 and c01 of `docs/CONVERSATIONAL_PLAN.md` done |
 | Date | 2026-11-21 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
@@ -14,6 +14,7 @@
 | v1 | 2026-11-21 | First draft, after the clarification round with the Product Owner (section 1.2) |
 | v2 | 2026-11-21 | **The spending limit reached** is told apart from an outage: its own code `assistant_budget_reached` and its own sentence for the person, in the conversation's language (sections 6.1, 7.4, 12, 14, 15) |
 | v3 | 2026-11-21 | **Under way.** Step c00 of `docs/CONVERSATIONAL_PLAN.md` is done: the contract of section 6, the languages of 4.2, the limits of 4.4 and the fixed texts exist in `shared/src/assistant/`, the seven codes in `shared/src/api.ts`. Section 1 says which document governs a part of the assistant once it is built. Section 6 names the field of a refused action: `error`, the route's error code, `null` on every other action. Section 4.2: the fixed Italian texts address the person with the formal "lei". No other change to the design |
+| v4 | 2026-11-21 | Step c01 of `docs/CONVERSATIONAL_PLAN.md` is done: the table and its module exist, and `docs/ARCHITECTURE.md` section 5.4 governs them from now on. Two changes decided with the Product Owner before the step. **Two permission sets** instead of one, `AssistantReadPolicy` and `AssistantWritePolicy`, so that a function that only reads cannot write (section 11.1). **A step reads the current conversation only, in two reads**, instead of the whole partition in one (section 9). Section 9 also says what the implementation fixed: a message's `content` is stored as JSON text, the `META` item stays when a conversation ends, the day's use is added inside the step's transaction |
 
 ---
 
@@ -669,19 +670,26 @@ so that the calendar's shared permission sets stay as they are.
 | Message | `CONV#<sub>` | `MSG#<conversationId>#<seq>` | `kind` (`model`: one entry of the conversation exactly as exchanged with Claude; `notice`: a fixed text of the server, shown and never sent to Claude), `content`, `at`, `expiresAt` |
 | Daily use | `USAGE#<sub>` | `<local date>` | `messages` (N), `inputTokens`, `outputTokens` (N), `expiresAt` (35 days) |
 
-- **One read per step**: a consistent `Query` of `PK = CONV#<sub>` gives the conversation and
-  its messages; those of an earlier conversation still waiting to be deleted are skipped by
-  their `conversationId`.
+- **Two reads per step, of the current conversation only**: a consistent `GetItem` of `META`,
+  then, when it names a conversation that has not run out, a consistent `Query` of that
+  conversation's messages (`SK` beginning `MSG#<conversationId>#`). The messages of an earlier
+  conversation, which wait in the partition to be deleted and may never be locally, are never
+  asked for. A message written between the two reads is left out by its `seq`.
 - **One write per step**: a transaction that adds the new messages and moves `META` on, on the
   condition that its `version` is the one read. Two requests at once for the same person: one
-  wins, the other answers `409 assistant_busy`. The calendar lock is not involved; the handlers
-  take it themselves when a tool runs.
+  wins, the other answers `409 assistant_busy`, with no retry. The day's use is added in the
+  same transaction. The calendar lock is not involved; the handlers take it themselves when a
+  tool runs.
 - **Expiry**: every item of a conversation carries the same `expiresAt`, 48 hours after the
   conversation started; the 24 hours without a message are checked in code. A new conversation
-  is a new `conversationId` on `META`.
+  is a new `conversationId` on `META`; an ended one leaves `META` with none. Nothing is deleted
+  by the code.
+- **A message's `content`** is stored as the JSON text of the entry, not as a DynamoDB map: it
+  comes back exactly as exchanged with Claude, key order included.
 - **Deleting a user** needs no change: the conversation is keyed by the `sub`, a new account
   with the same name gets a new `sub`, and the items are gone within the two days.
-- The module `backend/src/lib/assistantDb.ts` is the only one that knows this layout.
+- The module `backend/src/lib/assistantDb.ts` is the only one that knows this layout, which
+  `docs/ARCHITECTURE.md` section 5.4 describes as built.
 
 A step writes a few kilobytes and reads the whole conversation (at most 100 KB), which now and
 then exceeds 8 units in one second; DynamoDB's burst allowance (five minutes of unused
@@ -742,7 +750,7 @@ template only refers to by name.
 | Parameter `AssistantModel` | Default `claude-sonnet-5-5`; allowed values in section 7.1 |
 | Parameter `AssistantDailyMessageLimit` | Default 30 |
 | Table `AssistantTable` | Section 9 |
-| `AssistantTablePolicy` | A shared permission set on that table only (`GetItem`, `Query`, `PutItem`, `UpdateItem`), like the calendar's three |
+| `AssistantReadPolicy`, `AssistantWritePolicy` | Two shared permission sets on that table only, like the calendar's: read (`GetItem`, `Query`) and write (`PutItem`, `UpdateItem`). A function that only shows the conversation gets the first alone. No set to delete: nothing deletes an item but its time to live |
 | Six functions and routes | Section 6 |
 
 ### 11.2 The Anthropic account

@@ -46,7 +46,7 @@ the scripts themselves win, and this document is fixed.
 ## 3. The local stack
 
 - `npm run local:up -w backend`: starts DynamoDB Local, dynamodb-admin (http://localhost:8001)
-  and cognito-local, then seeds them (tables `hello-messages` and `calendar`, the latter empty;
+  and cognito-local, then seeds them (tables `hello-messages`, `calendar` and `assistant`, the last two empty;
   pool, client, groups, users `admin` / `Admin-Local-Pass-1!` and `alice` /
   `Alice-Local-Pass-1!`) and writes `env.local.json`. Idempotent; rerun it after a change to
   `local-seed.sh`.
@@ -72,8 +72,12 @@ the scripts themselves win, and this document is fixed.
 - cognito-local does not implement `AdminUserGlobalSignOut`. `env.local.json` sets
   `SKIP_GLOBAL_SIGN_OUT=true` for `DeleteUserFunction` so local deletes work; the cloud never
   sets it (`docs/ARCHITECTURE.md` section 8, note on Cognito emulation).
-- The tables are plain `calendar` and `hello-messages`; in the cloud they carry the stack's name
-  (`shared-calendar-api-calendar`, `shared-calendar-api-hello-messages`).
+- The tables are plain `calendar`, `hello-messages` and `assistant`; in the cloud they carry the
+  stack's name (`shared-calendar-api-calendar`, `shared-calendar-api-hello-messages`; the
+  assistant's table is in the template and not deployed yet).
+- The `assistant` table has its time to live on `expiresAt`, as in the cloud, but DynamoDB Local
+  may never delete an expired item: old conversations stay visible in dynamodb-admin. The code
+  does not depend on the deletion (`docs/ARCHITECTURE.md` section 5.4).
 
 ### 3.2 The calendar's variables
 
@@ -87,6 +91,9 @@ section; `ListUsersFunction` has a section of its own and no calendar variable).
 `CALENDAR_TIME_ZONE` is deliberately not in the file (a value there would win over the
 template): it comes from the parameter `CalendarTimeZone` (default `Europe/Rome`). An invalid
 zone makes every calendar request answer 500.
+
+`env.local.json` also sets `ASSISTANT_TABLE` in `Parameters`. No function declares that variable
+yet, so it reaches nobody: an assistant function will get the table's local name by declaring it.
 
 ### 3.3 When the local stack misbehaves
 
