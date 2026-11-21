@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2 — **step 70 done** (2026-11-21, brief `prompts/94-step-70-implementation.md`): the template and the deploy command are written, nothing is deployed. Steps 71 to 73 to do |
+| Status | v3 — **steps 70 and 71 done** (2026-11-21, briefs `prompts/94-step-70-implementation.md` and `prompts/95-step-71-implementation.md`): the template and the deploy command are written, "Sign out" revokes; nothing is deployed. Steps 72 and 73 to do |
 | Scope | Everything needed to go from the views that run locally to **the page in use on the web**: the hosting's template and the deploy command, logout, the first deployment, the documents. Steps 70 to 73 |
 | Not in scope | The session across a reload, the size of the bundle, a domain of our own: the open points O3, O9 and O10 of `docs/FRONTEND_ARCHITECTURE.md` section 10. Any change to the API, to `shared/` or to a view beyond "Sign out" |
 | Governed by | `docs/FRONTEND_ARCHITECTURE.md` section 13 (the hosting and the deployment), `docs/FRONTEND_SERVICES.md` (the services; logout from step 71), `docs/ARCHITECTURE.md` section 8.1 (the deploy gate) and `CLAUDE.md` (cloud safety, the hard rules). On any conflict with this plan, they win |
@@ -13,6 +13,7 @@
 |---|---|---|
 | v1 | 2026-11-21 | First version: steps 70 to 73. |
 | v2 | 2026-11-21 | Step 70 done, with what it found. AWS's documentation says the cache policy `CachingDisabled` keeps no failure: the template sets nothing for failures, and the risk's row and step 72's check of it are reworded (the old check asked for a 401, which CloudFront never keeps). Step 72: the dry run first, what the change set must show, the statuses of the four checks, what the deployment is the first to prove. |
+| v3 | 2026-11-21 | Step 71 done, with what it found: cognito-local implements `RevokeToken`, so the sign-out has an integration journey, and the risk's row is reworded. **Corrected: the dry run of step 70 was run** after that step's commit (2026-11-21, on commit `0e695a7`) and passed; the note under step 70 and point 1 of step 72 said it had not been. Step 72, point 5: what the first deployment must prove of logout, written out as steps a person follows at the deployed page. |
 
 ---
 
@@ -48,7 +49,9 @@ only when asked.
 | The deploy command | `npm run deploy -w frontend`: gate, the back end's outputs, `sam deploy`, build, upload, invalidation, four checks | Section 13.6 |
 | O7, logout | The direction only: `RevokeToken`, then the session cleared whatever the answer | Section 13.7 |
 
-Not settled, and settled by a step: the design of the logout service (step 71).
+Not settled then, and settled by a step: the design of the logout service (step 71, done:
+`docs/FRONTEND_SERVICES.md` section 20; the order of row O7 became "the session cleared, then
+`RevokeToken`").
 
 ## 3. Steps
 
@@ -66,10 +69,10 @@ the list below:
   for artifacts and no capabilities: read in SAM CLI's source, not tried by deploying.
 - `npm run verify -w frontend` now needs the SAM CLI.
 - `docs/FRONTEND_WALK.md` did not change: no check says the policy's words.
-- **The dry run was not tried in this step past its gate**: it needs a committed tree and a
-  fresh stamp, and the step ends before the commit. Each of its parts was tried apart (the
-  read of the back end's stack, the build with the real values). It is the first thing of
-  step 72.
+- The dry run could not pass its gate inside the step: it needs a committed tree and a fresh
+  stamp, and the step ends before the commit. **It was run after the commit** (2026-11-21, on
+  commit `0e695a7`) **and passed**: the gate, the front end's `verify`, the read of the back
+  end's stack, the build. Step 72 runs it again all the same, as its first command.
 
 The step as planned:
 
@@ -109,7 +112,31 @@ without a deployment.
   report in the console.
 - Root `DYNAMODB_PORT=8002 npm run verify` green.
 
-### Step 71 — Logout (≈ 5 h, no cloud)
+### Step 71 — Logout (≈ 5 h, no cloud) — done
+
+**Done 2026-11-21** (brief `prompts/95-step-71-implementation.md`), in two parts with a review
+between them: the design (`docs/FRONTEND_SERVICES.md` v8, section 20), then the code. What was
+built is said there and in `docs/FRONTEND_ARCHITECTURE.md` sections 6 and 13.7 (v16); what
+differs from the list below, or adds to it:
+
+- **The order is the reverse of the direction first written**: the page forgets the person at
+  once and Cognito is told after, with a time limit of 10 seconds. Decided before the design;
+  `docs/FRONTEND_ARCHITECTURE.md` section 13.7 and its decision 152 were corrected.
+- **cognito-local implements `RevokeToken`**, and then refuses a refresh with the revoked
+  token: so there is an integration journey, `frontend/tests/integration/logout.service.test.ts`
+  (7 tests), with its page `docs/journeys/frontend/logout.md`.
+- A sign-out also puts the two page-wide services (login, refresh) back to their first state:
+  their last outcome named the person.
+- The person sees the login and nothing about Cognito's answer: the design's answer to "what
+  the person sees while Cognito is asked and when it does not answer".
+- In the browser, beyond the acceptance: Cognito silent (the request held), where the request
+  is given up after 10 seconds and another person signs in meanwhile.
+- **Not proven here, and so for step 72** (its point 5): that a browser may make the call from
+  the deployed page's address, and what the real Cognito answers.
+- The back end, `shared/`, the hosting's template and the deploy scripts did not change.
+
+The step as planned:
+
 
 - **Design first**, as a new version of `docs/FRONTEND_SERVICES.md`: the service that signs
   out, in the pattern of its section 3 (one result/state pair; the token never in a result),
@@ -138,8 +165,9 @@ without a deployment.
 invalidates), and `npm run deploy -w backend` if the back end has changes not yet deployed.
 
 1. Commit; on a clean tree, root `DYNAMODB_PORT=8002 npm run verify` green, less than 30
-   minutes before. Then `npm run deploy -w frontend -- --dry-run`, which step 70 could not
-   run past its gate: it reads the back end's stack, builds, and says what it would do;
+   minutes before. Then `npm run deploy -w frontend -- --dry-run`, run once already after
+   step 70's commit, when it passed, and run again here because the tree has changed since:
+   it reads the back end's stack, builds, and says what it would do;
    `frontend/dist/app.js` holds `/api` and Cognito's real address and no `localhost`.
 2. If the stack `shared-calendar-api` is behind the repository: `npm run deploy -w backend`
    and its smoke test first (`docs/RUNBOOK.md` section 2).
@@ -162,8 +190,28 @@ invalidates), and `npm run deploy -w backend` if the back end has changes not ye
      twice. The same id twice is a kept answer. No route of this API answers a `GET` with a
      failure that depends on the person, so this is the check there is; a 401 proves nothing
      here, CloudFront never keeps one, and only a `GET` or a `HEAD` is ever kept;
-   - "Sign out", then a refresh with the old refresh token is refused by Cognito (step 71 in
-     the cloud);
+   - **logout, which only the cloud can prove** (step 71 proved it against the local
+     emulator; `docs/FRONTEND_SERVICES.md` section 20.9). With the browser's developer tools
+     open on the network panel, "Preserve log" ticked, signed in as a User:
+     1. Press "Sign out". The login shows at once.
+     2. In the network panel, find the request to `cognito-idp.<region>.amazonaws.com` sent
+        at that moment: its request header `X-Amz-Target` ends in `RevokeToken`. **Its status
+        must be 200.** A line in red, or "CORS error", means the browser was not allowed to
+        make the call: the person was signed out of the page all the same and nothing on the
+        page says so, which is why this is looked at here. If so: stop and report it; the
+        way out is a decision (`docs/FRONTEND_ARCHITECTURE.md` section 13.7).
+     3. The console holds no new line about that request.
+     4. **A refresh with the revoked token is refused.** In the network panel, right-click the
+        *sign-in* request of before (`X-Amz-Target` ending in `InitiateAuth`) and copy its
+        *response*; it holds the session's `RefreshToken`. In a terminal, with the client id
+        of the stack (`UserPoolClientId`), ask Cognito for a refresh with it:
+        `InitiateAuth`, `AuthFlow` `REFRESH_TOKEN_AUTH`, `AuthParameters.REFRESH_TOKEN`. The
+        token goes to the command on standard input or from a variable read with
+        `read -s`, never as an argument and never into a file (`CLAUDE.md`). The answer must
+        be `400 NotAuthorizedException`. Do the same once *before* signing out, with a
+        second sign-in, to see a 200: otherwise a mistyped request also "refuses".
+     5. Sign in again: it works. Sign out with the tab's network set to "Offline": the login
+        shows at once all the same;
    - the console: `zod`'s one report and no other.
 6. Read-only checks: the bucket is not public (its address answers 403 directly); the
    distribution's price class; the API's access log shows the page's calls; the Cost Explorer
@@ -201,7 +249,7 @@ the page.
 | CloudFront keeps a failure of the API although AWS's page says the cache policy `CachingDisabled` keeps none (`docs/FRONTEND_ARCHITECTURE.md` section 13.3, rule 3) | low | Step 72, point 5, third check. Then `CustomErrorResponses` with the time at zero for the statuses it keeps, or `Cache-Control: no-store` on the API's answers, which is a change to the back end and a decision of its own |
 | The function removes `/api` from a path it should not (`/apix`) | low | The rule's pattern is `/api/*`: nothing else reaches the function. The fourth check of the deploy command covers the route that does not exist |
 | A person loads the page during an upload and gets a new script with an old page | low | Four files in a few seconds, `index.html` last; a reload ends it (`docs/FRONTEND_ARCHITECTURE.md` section 13.5) |
-| cognito-local has no `RevokeToken`, so logout is proven only in the cloud | medium | Step 71 says so in the design; the unit tests fix the call's shape; step 72 proves it |
+| The browser is not allowed to call `RevokeToken` from the page's address (AWS's pages do not speak of browsers; Cognito answers one for the login, at the same address with the same headers). cognito-local does have the call, so everything else of logout is proven locally (step 71) | low | Step 72, point 5, the check of logout: the request's status in the network panel. A person is signed out of the page in any case; what would be lost is the revocation. Then: the call passed through the distribution like `/api`, or the limit accepted and written down. A decision, not a fix made in passing |
 | Moving the gate's check into a shared file changes what the back end's deploy refuses | low | Moved word for word; step 70 tried the refusals of both commands by hand (no stamp, an old one, a dirty tree, and for the back end a stamp in the wrong format, of another commit, of a dirty run). What nobody has seen since the move is a deploy that *passes* the gate: step 72 is the first |
 | `sam deploy` wants a bucket for the template after all, or refuses a template without `Transform` | low | Read in SAM CLI's source at step 70, not run. Seen at step 72, point 3, before anything is created. Then `resolve_s3 = true` in `frontend/samconfig.toml` |
 | The bill | low | The free allowances cover this size; the account's 1 USD budget watches the whole bill (`docs/FRONTEND_ARCHITECTURE.md` section 13.8) |

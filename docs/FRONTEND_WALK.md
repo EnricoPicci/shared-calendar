@@ -12,6 +12,7 @@
 | Version | Date | Change |
 |---|---|---|
 | v1 | 2026-11-20 | First version: 102 checks. |
+| v2 | 2026-11-21 | `docs/FRONTEND_DEPLOY_PLAN.md` step 71: "Sign out" also tells Cognito. Check 4 now looks at that request too (mark `[N]`); 102 checks still. Check 4 was done in that step's browser check, by a script; the walk was not run again in full. |
 
 ---
 
@@ -85,7 +86,11 @@ The widths: 1280 × 800 for the desktop, 390 × 844 for the phone.
    disabled while the call is under way (the first call after the stack starts takes seconds).
 3. `[K]` → The frame: the header says `alice` and "User"; the navigation holds "Week" and "My
    appointments" and nothing else; the address ends in `#/week`.
-4. `[K]` Press "Sign out". → The login again, both fields empty, no failure shown.
+4. `[K]` `[N]` Press "Sign out". → The login again, at once, both fields empty, no failure shown.
+   In the Network panel: one request to `/cognito/` sent at the press, its header
+   `X-Amz-Target` ending in `RevokeToken`, answered 200. (With the local Cognito stopped the
+   login shows just the same and nothing on the page says the request failed: not a check
+   of the walk, which needs the stack whole.)
 
 ## 3. A User (`alice`)
 

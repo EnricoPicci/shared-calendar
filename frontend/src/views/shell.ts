@@ -15,6 +15,7 @@ import { CalendarSettingsService } from '../services/calendar-settings.service';
 import { CalendarService } from '../services/calendar.service';
 import type { CognitoConfig } from '../services/cognito';
 import { LoginService } from '../services/login.service';
+import { LogoutService } from '../services/logout.service';
 import { RefreshService } from '../services/refresh.service';
 import { SessionStore } from '../services/session.store';
 import { UsersService } from '../services/users.service';
@@ -32,19 +33,24 @@ import { mountWeek } from './week.view';
 // switch between the screens according to the address.
 
 // The whole configuration, as the entry file hands it over: `cognitoUrl` and `clientId` for the
-// login and the refresh, `apiUrl` for the API services of each session.
+// login, the refresh and the sign-out, `apiUrl` for the API services of each session.
 export type AppConfig = ApiConfig & CognitoConfig;
 
 // Who is signed in, as the header and the views see it: never the Session, which holds the
 // tokens (docs/FRONTEND_ARCHITECTURE.md section 3, rule 11).
 export type Person = { username: string; role: Role };
 
+// What the shell uses of the LogoutService: its one method. No view reads how telling Cognito
+// went (docs/FRONTEND_SERVICES.md section 8, decision 50).
+export type LogoutDeps = Pick<LogoutService, 'logout'>;
+
 export type ShellDeps = {
   config: ApiConfig; // where the API is, for the API services
   // The whole store: an API service reads the token from it at the moment of each call
-  // (docs/FRONTEND_SERVICES.md section 2, rule 9). The shell itself uses `session$` and `clear`.
+  // (docs/FRONTEND_SERVICES.md section 2, rule 9). The shell itself uses `session$` only.
   store: SessionStore;
   login: LoginDeps;
+  logout: LogoutDeps;
   screens?: readonly Screen[]; // the table of screens; SCREENS unless a test brings its own
 };
 
@@ -189,22 +195,25 @@ export const SCREENS: readonly Screen[] = [
   },
 ];
 
-// The start-up, called once by the entry file: creates the store and the two services that live
-// as long as the page, starts the automatic refresh (docs/FRONTEND_SERVICES.md section 11.6) and
-// mounts the shell on the page.
+// The start-up, called once by the entry file: creates the store and the three services that
+// live as long as the page, starts the automatic refresh (docs/FRONTEND_SERVICES.md section
+// 11.6) and mounts the shell on the page. The sign-out service is given the other two, which it
+// puts back to their first state at a sign-out. It is not ended with the shell: a request that
+// tells Cognito of a sign-out ends by itself (docs/FRONTEND_SERVICES.md section 8, decision 48).
 export function runShell(config: AppConfig): Subscription {
   const store = new SessionStore();
   const login = new LoginService(config, store);
   const refresh = new RefreshService(config, store);
+  const logout = new LogoutService(config, store, [login, refresh]);
   refresh.start();
-  const subscription = mountShell(document.body, { config, store, login });
+  const subscription = mountShell(document.body, { config, store, login, logout });
   subscription.add(() => refresh.stop());
   return subscription;
 }
 
 // Shows the login or the frame at every change of person, and in the frame the screen of the
 // address. `root` holds the elements #login and #app of index.html.
-export function mountShell(root: HTMLElement, { config, store, login, screens: table = SCREENS }: ShellDeps): Subscription {
+export function mountShell(root: HTMLElement, { config, store, login, logout, screens: table = SCREENS }: ShellDeps): Subscription {
   const find = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
   const loginRoot = find('#login');
   const frame = find('#app');
@@ -213,9 +222,10 @@ export function mountShell(root: HTMLElement, { config, store, login, screens: t
   const nav = find('#app .nav');
   const linkTemplate = find<HTMLTemplateElement>('#tpl-nav-link');
 
-  // "Sign out" only clears the store (docs/FRONTEND_ARCHITECTURE.md section 10, open point O7);
-  // the screen changes because the session stream then notifies null.
-  find('#app .sign-out').onclick = () => store.clear();
+  // "Sign out" calls the service and nothing else (docs/FRONTEND_ARCHITECTURE.md section 6,
+  // point 2): the service clears the store during the call, and the screen changes because the
+  // session stream then notifies null. Cognito is told after, and its answer is shown nowhere.
+  find('#app .sign-out').onclick = () => logout.logout();
 
   // The frame for one person: the header and the navigation are filled here and emptied when
   // the person leaves, and whatever belongs to this person's session ends with the subscription

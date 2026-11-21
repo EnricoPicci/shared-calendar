@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Status | v14 — the view layer **implemented** (2026-11-20); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`) **and written, not deployed**: the template, the deploy command and its gate exist since `docs/FRONTEND_DEPLOY_PLAN.md` step 70 (2026-11-21, brief `prompts/94-step-70-implementation.md`); nothing is in the cloud, and logout (step 71) and the first deployment (step 72) are to do. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
+| Status | v16 — the view layer **implemented** (2026-11-20); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`) **and written, not deployed**: the template, the deploy command and its gate exist since `docs/FRONTEND_DEPLOY_PLAN.md` step 70 (2026-11-21, brief `prompts/94-step-70-implementation.md`); nothing is in the cloud; **logout is built** (step 71, 2026-11-21, brief `prompts/95-step-71-implementation.md`: `docs/FRONTEND_SERVICES.md` v8, section 20; here sections 6 and 13.7), proven against the local stack and not yet against the real Cognito; the first deployment (step 72) is to do. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders; and, since v13, how the page is hosted and deployed (section 13) |
-| Not in scope | Keeping the session across a reload, the size of the bundle, a domain of our own: open points of section 10, none of which blocks a deployment. The design of the logout service: its direction is in section 13.7, the design goes into `docs/FRONTEND_SERVICES.md` |
-| Depends on | `docs/FRONTEND_SERVICES.md` v7 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work of the views), `docs/FRONTEND_DEPLOY_PLAN.md` (the order of work of the hosting) |
+| Not in scope | Keeping the session across a reload, the size of the bundle, a domain of our own: open points of section 10, none of which blocks a deployment. The design of the logout service: it is `docs/FRONTEND_SERVICES.md` section 20; section 13.7 here keeps the direction and what follows from it for the page |
+| Depends on | `docs/FRONTEND_SERVICES.md` v8 (the services the views use, the sign-out among them), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work of the views), `docs/FRONTEND_DEPLOY_PLAN.md` (the order of work of the hosting) |
 | Why this choice | `docs/FRONTEND_VIEW_OPTIONS.md` v3: the options compared (plain HTML/CSS, `lit-html`, Lit, React, Angular, Svelte) and the reasons. Not repeated here |
 
 ### Change log
@@ -29,6 +29,8 @@
 | v12 | 2026-11-20 | The verdict of section 7.2 taken at the review of plan step 69: section 3, rule 12 and the third condition of section 7 are reworded to allow what `availability.parts.ts` is, a file of helpers shared by the views of one screen, with its bound. Section 7.2 says what was decided, no longer what was proposed. Section 11: decision 135 as taken, decision 137. No code changed. |
 | v13 | 2026-11-21 | The hosting and the deployment, decided (brief `prompts/93-deploy-frontend.md`); nothing built, no code changed. New section 13: what the browser talks to, the stack `shared-calendar-web` (a private bucket behind a CloudFront distribution), the API through the page's address (one origin, no CORS, the back end unchanged), the headers sent with the page, the files and their caching, the deploy command with its gate and its checks, the direction for logout, what is left out on purpose. Section 10: O1, O2 and O5 decided, O7 with its direction, new open point O10 (a domain of our own); what blocks a deployment now is work, not a decision. Section 12.1: where a deployment's values come from. Section 11: decisions 138 to 153. The order of work is a new document, `docs/FRONTEND_DEPLOY_PLAN.md` (steps 70 to 73). |
 | v14 | 2026-11-21 | `docs/FRONTEND_DEPLOY_PLAN.md` step 70: the hosting's template, the deploy command and the gate's shared check are written; nothing is deployed. **Corrected after AWS's documentation:** section 13.3, rule 3 and decision 141: the cache policy `CachingDisabled` keeps no failure, so the distribution sets nothing for failures (no `CustomErrorResponses`); which failures CloudFront keeps elsewhere, and when. Section 13.2: what the template holds as written (no `Transform`, the names of its resources, the bucket's ownership setting). Section 13.4: the header for HTTPS names no sub-domain. Section 13.5: CloudFront's own copy lives a second. Section 13.6: the command as written (its one argument `--dry-run`, the build checked before an upload, the wait for the invalidation, the statuses of the four checks, what `sam deploy` needs and does not). Section 12.2: the dev server's policy. Section 10: O1, O2 and O5 as they stand. Section 11: decisions 141 and 147 corrected, decisions 154 to 158. |
+| v15 | 2026-11-21 | **The sign-out as designed** (`docs/FRONTEND_DEPLOY_PLAN.md` step 71, part A, brief `prompts/95-step-71-implementation.md`; `docs/FRONTEND_SERVICES.md` v8, section 20). No code changed: "Sign out" still only clears the `SessionStore`, and every changed place says so. **Corrected: the order of section 13.7 and of decision 152.** Version 13 wrote "revokes, then clears"; the decision taken with the design is the reverse: the page forgets the person at once and Cognito is told after, with a time limit, so that a slow or dead network never keeps a person signed in. Section 13.7 rewritten with it, and with what the step found: `RevokeToken` confirmed on AWS's pages (no credentials, no secret), cognito-local implements it, whether a browser may call it from another origin is not in the documentation and is proven at step 72. Section 6: the start-up will create a fourth page-wide object, the `LogoutService`, and hand the shell its one method (point 1); "Sign out" will call it and nothing else (point 2); the sequence of a sign-out with the reset before and the request after. Section 10, row O7: designed, not closed. |
+| v16 | 2026-11-21 | **The sign-out built** (`docs/FRONTEND_DEPLOY_PLAN.md` step 71, part B, brief `prompts/95-step-71-implementation.md`), as version 15 described it; no difference found while building. `shell.ts`: `runShell` creates the `LogoutService` with the store, the `LoginService` and the `RefreshService`; `mountShell` is handed its one method; the handler of "Sign out" calls it and nothing else. Sections 6 and 13.7 in the present tense; section 10, row O7 closed; section 8, what the shell's test gained. Checked in a browser against the local stack, also with the local Cognito stopped and with it silent (section 13.7). Section 13.1's table does not change: the local page and the deployed one sign out the same way. Section 7.1 is not measured again: it is the record of `docs/FRONTEND_VIEW_PLAN.md` step 69. |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
 TypeScript module script**. The markup of every screen is in one `index.html`; the script
@@ -1628,23 +1630,32 @@ their sentences here.
 
 The shell is the start-up code, one function called by the entry file of the bundle:
 `runShell(config)`, in `frontend/src/views/shell.ts`. It creates what lives as long as the page
-(point 1) and calls `mountShell(root, { config, store, login })`, which does the rest and is
-what the shell's DOM test drives, with a store and a login of its own. `mountShell` gets the
+(point 1) and calls `mountShell(root, { config, store, login, logout })`, which does the rest and is
+what the shell's DOM test drives, with a store, a login and a sign-out service of its own. `mountShell` gets the
 API's configuration and the whole store because it creates the API services of each session
 (point 4), which read the token from the store at each call.
 
-1. **It creates the `SessionStore`, the `LoginService` and the `RefreshService` once**, with the
+1. **It creates the `SessionStore`, the `LoginService`, the `RefreshService` and the
+   `LogoutService` once**, with the
    configuration (the API's URL, Cognito's URL, the client id), which it receives as one plain
    object and never looks up itself (section 12.1). It starts the automatic refresh
-   (`docs/FRONTEND_SERVICES.md` section 11.6).
+   (`docs/FRONTEND_SERVICES.md` section 11.6). The `LogoutService` is created with the store
+   and with the two services before it, which it puts back to their first state at a sign-out
+   (`docs/FRONTEND_SERVICES.md` section 20.6); `mountShell` is handed its one method,
+   `logout`, beside `login`. It is not one of the objects of point 4: the teardown of the
+   person who leaves must not cancel the request that tells Cognito. Ending the shell does
+   not end it either: a request under way ends by itself, in 10 seconds at most.
 2. **It subscribes to `store.session$`** (`docs/FRONTEND_SERVICES.md` section 9.5). `null` shows
    and mounts the login view. A session hides it and shows the application, with the navigation
    its `role` allows. The application's frame is one element of `index.html` (`#app`): a header
    with the username, the role in words ("Administrator" or "User") and "Sign out", the
    navigation, and the main area where the screens are. The shell fills the header when a person
-   enters and empties it when that person leaves. "Sign out" clears the `SessionStore` and does
-   nothing else (section 10, open point O7): the screen changes because `session$` then notifies
-   `null`.
+   enters and empties it when that person leaves. "Sign out" calls `logout()` of the
+   `LogoutService` and nothing else (section 13.7): the shell clears nothing itself, waits for
+   nothing and shows nothing about Cognito's answer. The screen changes because the service
+   clears the `SessionStore` during that call, and `session$` then notifies `null`. A session
+   that ends by itself (its expiry, a token rejected) reaches the shell the same way, as a
+   `null`, with no call to the service.
 3. **A refreshed session is the same person.** The shell reacts only when the username or the
    role changes (`distinctUntilChanged`), so a token refresh leaves the screen as it is. The session is
    reduced to the username and the role before anything else sees it (section 3, rule 11).
@@ -1744,10 +1755,16 @@ order:
 7. The answer arrives; the `WeekScreen` makes the week ready to draw (`weekModel`) and
    `week$` carries it; the view draws the days from the templates, once for that week object.
 
-Signing out is the same sequence backwards: the store is cleared, `session$` says `null`, the
-shell unsubscribes the person's one subscription, which ends the logic object's and the
-view's and runs the view's teardown, hides `#app`, shows `#login` and mounts the login view on
-the same, emptied, form.
+Signing out is the same sequence backwards, with a step before it and one after
+(section 13.7). The handler of "Sign out" calls `logout()`. The `LogoutService` first puts the
+`LoginService` and the `RefreshService` back to their first state, so the login view mounted
+a moment later finds no outcome of the person who left. Then the store is cleared,
+`session$` says `null`, the shell unsubscribes the person's one subscription, which ends the
+logic object's and the view's and runs the view's teardown, hides `#app`, shows `#login` and
+mounts the login view on the same, emptied, form. Last, the request that tells Cognito
+leaves. All of it is one run of the script, inside the handler: the person sees the login at
+once, and Cognito's answer, whenever it comes and whatever it says, changes nothing on the
+page.
 
 ## 7. The fallback: `lit-html` for a single view
 
@@ -2154,6 +2171,16 @@ What the tests of the users rely on (plan step 66), and what was learnt in the b
   page (its source and what every field holds) as the Administrator finds it after a User was
   there with the page the Administrator finds when nobody was there before, with the clock
   standing still: anything left of the first person, of whatever kind, makes the two differ.
+- **The sign-out in the shell's test** (`docs/FRONTEND_DEPLOY_PLAN.md` step 71). `mounted()`
+  hands `mountShell` the real `LogoutService` on the test's store, so every test that presses
+  "Sign out" also sends the request that tells Cognito, which the file's `fetch` stub leaves
+  unanswered: the page is judged before any answer, as a person sees it. What is the
+  shell's own is tested with a service that does nothing (the person then stays: the shell
+  clears nothing itself). Under `runShell`: the login is back with Cognito silent, with no
+  token in the page, a field or the address; a second person signs in while the first
+  one's request is unanswered, and the page does not change when that request ends, whether
+  with a 200, a refusal or no network. A session that ends by itself sends nothing. The
+  10 seconds, and the request given up, are the service's tests and the browser check.
 
 What the tests of the availability rely on (plan step 67), and what was learnt in the browser:
 
@@ -2266,7 +2293,7 @@ Not decided. "Blocks" says what cannot be done before the point is settled. O4, 
 decided with `docs/FRONTEND_VIEW_PLAN.md` (its section 2) and are no longer open: their rows
 say where the decision is written. Each open row ends with **what is true of it today**
 (2026-11-20, every view built and running against the local stack). O1, O2 and O5 were decided on
-2026-11-21 (section 13), and O7 got its direction: their rows say so, and what they still block
+2026-11-21 (section 13), and O7 was designed and built the same day (`docs/FRONTEND_SERVICES.md` section 20): their rows say so, and what they still block
 is the work of `docs/FRONTEND_DEPLOY_PLAN.md`, no longer a decision. Since that plan's step 70
 (2026-11-21) the template and the deploy command exist; nothing is deployed.
 
@@ -2278,14 +2305,14 @@ is the work of `docs/FRONTEND_DEPLOY_PLAN.md`, no longer a decision. Since that 
 | O4 | **The bundle command and the dev server**, and with them where the configuration comes from and where the built files go | **Decided: esbuild**, two Node scripts. Sections 12.1 and 12.2 | Nothing any more |
 | O5 | **The Content-Security-Policy of the hosting** | **Decided:** `default-src 'self'`, Cognito's address for the login, no frame, no `<base>`; sent by the distribution with three more headers; the dev server sends the same without Cognito's address. `zod`'s probe for `eval` stays reported and harmless. Section 13.4. **Today:** the dev server sends `default-src 'self'; frame-ancestors 'none'; base-uri 'none'`; the login and the week were seen under it, with `zod`'s one report and no other (the whole walk ran under `default-src 'self'` alone, before). The distribution's policy is in the template, sent by nothing yet | The first deployment, as work: step 72 |
 | O6 | **The DOM emulation for the views' tests and the coverage of the views** | **Decided: `happy-dom`, and the views inside the 100 % line coverage** of `frontend/src`. Section 12.3 | Nothing any more |
-| O7 | **Logout.** Not designed in the services layer (`docs/FRONTEND_SERVICES.md`, status line) | **Direction decided:** "Sign out" revokes the refresh token at Cognito (`RevokeToken`), then clears the `SessionStore` whatever Cognito answered. Section 13.7; the service's design is written in `docs/FRONTEND_SERVICES.md` at step 71. **Today:** "Sign out" only clears the `SessionStore` (section 6, point 2), which leaves the refresh token valid at Cognito | The first deployment: step 71 comes before step 72 |
+| O7 | ~~**Logout.** Not designed in the services layer~~ **Closed** on 2026-11-21 (`docs/FRONTEND_DEPLOY_PLAN.md` step 71): designed and built, `docs/FRONTEND_SERVICES.md` section 20 | "Sign out" makes the page forget the person at once (the page-wide services back to their first state, the `SessionStore` cleared), then tells Cognito to revoke the refresh token (`RevokeToken`), giving up after 10 seconds; the person is signed out of the page whatever Cognito answers, and sees nothing about it. Section 13.7. **Not yet proven:** the call from the deployed page's address, and the real Cognito's answers | Nothing. The first deployment proves the rest (step 72, point 5) |
 | O8 | **The language of the interface** and where its texts are kept | **Decided: English only**, no translation mechanism. Section 12.4 | Nothing any more |
 | O9 | **The size of the bundle.** Of the 490 kB of `app.js` at plan step 60, 454 are `zod`, and 264 of those are its messages in other languages, which the interface never shows (section 12.1). **Today:** 575 kB, 128 kB compressed, with every view; `zod` is still 454 kB of it, 79 %, and everything written for this front end (the services, the logic, the views) is 87 kB | Slimming it means changing how `shared/` brings `zod` in (which entry of `zod` its schemas import, or what `shared/` exports to the browser): a change to `shared/`, which the back end uses too, so a decision of its own | The first deployment. Nothing locally |
 | O10 | **A domain of our own** for the page, in the place of `<id>.cloudfront.net` | None yet. A certificate for a CloudFront distribution must be made in `us-east-1`, where the organization's policy lets this account do nothing (`docs/AWS_ACCOUNTS.md`); so it starts with that policy, or with another account (`docs/NEW_ACCOUNT.md`). The address is in no committed file and in no token, so a later change costs a deployment and telling the people | Nothing: the page works on the address AWS gives |
 
 **No decision stands between the front end and a deployment any more; the work of
 `docs/FRONTEND_DEPLOY_PLAN.md` does.** O1, O2 and O5 are decided (section 13), written at its
-step 70 and deployed at its step 72; O7 has its direction and is designed and built at its step 71. O3, O9 and O10
+step 70 and deployed at its step 72; O7 is closed (its step 71); what only the cloud proves of it is checked at its step 72. O3, O9 and O10
 block nothing: O9 is measured again at the first deployment (the page is sent compressed,
 128 kB; section 13.5). No view waits for any of them, and none of them needs a view to change.
 
@@ -2447,7 +2474,7 @@ than what the trial showed: these deserve the first look in a review.
 | 149 | The deploy command ends with four checks made with curl and no credentials; the signed-in call is proven by the walk's first login (section 13.6, point 8) | A script that signs in would need a password. The four checks prove the bucket, the headers, the rule for `/api/*`, the function and that a failure of the API arrives as the API sent it | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 150 | The size of the bundle (O9) does not block the first deployment | It is sent compressed: 128 kB, once per load of the page, answered "not changed" afterwards. Slimming it is a change to `shared/`, which the back end uses too: a decision of its own, and not one to take in a hurry before a release | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 151 | No root `deploy` script that runs both deployments; the order is a procedure of `docs/RUNBOOK.md` | The back end's deploy takes arguments of its own and asks to confirm a change set; the page is released alone more often than with the API | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
-| 152 | "Sign out" revokes the refresh token and signs the person out of the page whatever Cognito answered (section 13.7) | A failed revocation must not keep someone signed in on a shared computer. The access token's last minutes are the limit already accepted for a deleted user (`docs/ARCHITECTURE.md` section 7.3) | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 152 | "Sign out" signs the person out of the page at once and then tells Cognito to revoke the refresh token; what Cognito answers, or that it does not answer, changes nothing of the sign-out (section 13.7). ~~Version 13: "revokes the refresh token and signs the person out of the page whatever Cognito answered", in that order~~ | A failed revocation must not keep someone signed in on a shared computer, and neither must a slow one: with the old order a dead network kept the person's frame on screen for as long as the request lasted. The access token's last minutes are the limit already accepted for a deleted user (`docs/ARCHITECTURE.md` section 7.3) | Yes: decided with brief `prompts/93-deploy-frontend.md`; the order decided with the user before the design of step 71 (`docs/FRONTEND_SERVICES.md` section 8, decision 47) |
 | 153 | No logs of the distribution, no firewall, no second environment, no pipeline (section 13.8); the API's access log shows CloudFront's address for the page's calls | Each is a cost or a thing to keep for a question nobody has asked yet. The table of section 13.8 says when each would come | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 154 | The distribution has no `CustomErrorResponses` at all. Version 13 of this document asked for one entry per status CloudFront keeps, with the time at zero | AWS's page on the failures CloudFront keeps says: "If you're using the CachingDisabled managed cache policy, CloudFront won't cache these status codes or custom error pages." The entries would have done nothing on `/api/*`, and they belong to the whole distribution, so their one effect would have been on the files' rule. The page also says which failures are kept where caching is on: 404, 414 and 500 to 504 always, 400, 403 and 405 only when the origin says for how long, 401 never. Proven at the first deployment by a 404 asked twice, which the API must answer twice (`docs/FRONTEND_DEPLOY_PLAN.md` step 72, point 5) | Yes: found at `docs/FRONTEND_DEPLOY_PLAN.md` step 70, taken before the template was written |
 | 155 | `frontend/template.yaml` has no `Transform` line: it is plain CloudFormation, which `sam validate` and `sam deploy` read as it is. `frontend/samconfig.toml` names no bucket for artifacts (`resolve_s3`) and no `capabilities`, and sets `fail_on_empty_changeset = false` | Nothing in it is one of SAM's short forms. SAM CLI sends a template with nothing to package and under 51,200 bytes as it is (read in the source of SAM CLI 1.171.0, `samcli/commands/deploy/deploy_context.py`; not tried by deploying), so no managed bucket is created for it; it creates no role. A release of the page that changes no resource must go on to the upload | |
@@ -2512,7 +2539,10 @@ id, and says so when the file is missing) and, to sign in, `npm run local:api -w
   with the page (the deployed page's policy without Cognito's address, section 13.4) and
   `cache-control: no-store` with every answer. Since no site may show the page in a frame, a
   preview pane that is itself a frame inside an editor stays empty: the page is opened in a
-  browser tab, the forwarded port of a Codespace included.
+  browser tab, the forwarded port of a Codespace included. Seen on 2026-11-21 through a
+  Codespace's forwarded address, in a browser tab ("Open in Browser" in the editor's list of
+  ports, then "Continue" on GitHub's notice about a development port): the login, then the
+  week, under this policy.
 - It never prints a request's body or headers: the login's body holds a password, and the API
   calls carry a token.
 
@@ -2575,7 +2605,7 @@ yet:** `frontend/template.yaml` and `frontend/samconfig.toml` (section 13.2 to 1
 `frontend/scripts/deploy.sh` and `scripts/deploy-gate.sh` (section 13.6) exist, the template
 passes `sam validate --lint`, and the command's refusals were tried by hand. No stack
 `shared-calendar-web` exists: everything this section says of CloudFront rests on AWS's
-documentation until that plan's step 72, and logout (section 13.7) is its step 71. Where a
+documentation until that plan's step 72. Logout (section 13.7) was its step 71 and is built. Where a
 step finds the section wrong, the step stops and proposes the change here; step 70 did once
 (section 13.3, rule 3).
 
@@ -2799,27 +2829,70 @@ A release of the page alone is `npm run verify` and the last command. There is n
 `deploy` script that runs both: the back end's deploy takes arguments of its own and asks to
 confirm a change set, and the two are released apart more often than together.
 
-### 13.7 Logout (O7): the direction
+### 13.7 Logout (O7)
 
-"Sign out" first **revokes the refresh token at Cognito** (`RevokeToken`), then clears the
-`SessionStore` as it does today. Decided as a direction; the service's design is written in
-`docs/FRONTEND_SERVICES.md` at `docs/FRONTEND_DEPLOY_PLAN.md` step 71, before its code.
-What is known:
+Built at `docs/FRONTEND_DEPLOY_PLAN.md` step 71. `docs/FRONTEND_SERVICES.md` section 20 is the
+truth for the service (`LogoutService`); here is what it means for the page.
 
+"Sign out" does two things, in this order:
+
+1. **The page forgets the person, at once.** The `SessionStore` is cleared, so the login
+   shows, and the two services that live as long as the page (login, refresh) are put back
+   to their first state, so that nothing of the person is left in a service either.
+2. **Then Cognito is told** to revoke the refresh token (`RevokeToken`). The request is given
+   up after 10 seconds.
+
+Version 13 of this document had the two the other way round ("first revokes, then clears").
+With that order a slow or dead network would have kept the person's frame on screen while
+Cognito was waited for. The order above was decided before the design (section 11, decision
+152).
+
+- **The person is signed out of the page whatever Cognito answers, and also when it does not
+  answer.** A failed revocation must not keep someone signed in on a shared computer; what
+  is then left is the refresh token at Cognito, for at most its seven days, held by nothing
+  in the page.
+- **The person sees the login and nothing else**: no "signing out…", no message when the
+  revocation fails. The failure is in the service's result, for a developer and for the
+  tests; no view reads it.
+- **Only "Sign out" tells Cognito.** A session that ends by itself (its expiry, a token the
+  API rejected, a renewal Cognito refused) clears the store and sends nothing: it is like a
+  tab that is closed, which no code sees (`docs/FRONTEND_SERVICES.md` section 20.6).
+- **Only this sign-in is ended.** The same person signed in on another computer stays signed
+  in there.
+- **A tab closed straight after the press** still tells Cognito: the request is sent so that
+  the browser finishes it without the page (`keepalive`; `docs/FRONTEND_SERVICES.md` section
+  8, decision 56). Not something a test here can show.
 - `RevokeToken` needs no AWS credentials and, for an app client without a secret, nothing but
-  the refresh token and the client id: a browser can call it as it calls `InitiateAuth`. The
-  app client already allows it (`EnableTokenRevocation`, `backend/template.yaml`). No change
-  to the back end.
-- **The person is signed out of the page whatever Cognito answers.** A failed revocation must
-  not keep someone signed in on a shared computer; what is then left is the refresh token at
-  Cognito, as today, for at most its seven days.
+  the refresh token and the client id: confirmed on AWS's pages on 2026-11-21
+  (`docs/FRONTEND_SERVICES.md` section 20.1, with the addresses). The app client already
+  allows it (`EnableTokenRevocation`, `backend/template.yaml`). The back end did not change.
+- The policy of section 13.4 already allows the call: it goes to Cognito's address, like the
+  login. Under the dev server it goes to `/cognito/`, like the login.
 - The limit that stays: the API's authorizer checks an access token's signature and expiry,
   not whether it was revoked. A copied access token works for at most its 15 minutes after a
-  sign-out, plus the 5 minutes the authorizer remembers an answer. The same is accepted for a
-  deleted user (`docs/ARCHITECTURE.md` section 7.3).
-- To find out at the step: whether cognito-local implements `RevokeToken` (it lacks
-  `AdminUserGlobalSignOut`, `CLAUDE.md`), and so whether the integration journey can cover it
-  or only the cloud does.
+  sign-out, plus the 5 minutes the authorizer remembers an answer. AWS's guide says so in its
+  own words for any server that only verifies the token. The same is accepted for a deleted
+  user (`docs/ARCHITECTURE.md` section 7.3). What the revocation ends is the making of new
+  access tokens, for the seven days it would otherwise go on.
+- **cognito-local implements `RevokeToken`**, and then refuses a refresh with the revoked
+  token: the sign-out has an integration journey
+  (`frontend/tests/integration/logout.service.test.ts`), and the local page and the deployed
+  one do not differ in it.
+
+**Seen in a browser** (2026-11-21, headless Chromium, the dev server against the local stack):
+
+| Case | What the page did |
+|---|---|
+| The local Cognito running | The login in the same run of the script as the press, both fields empty; nothing of the person or of a token in the page, in a field or in the address; one `RevokeToken` to `/cognito/`, answered 200, its body the client id and the token, no `Authorization` header |
+| The local Cognito stopped (its container stopped, then started again) | The same for the person; the request was answered 502 by the dev server; no message on the page. The browser itself writes one line about the 502 in its console: its own report of a failed request, not the page's |
+| Cognito silent (the request held and never answered) | The same for the person; another person signed in meanwhile and got a frame of their own; the request was aborted after 10 seconds and nothing of the page changed |
+| The console otherwise | `zod`'s one report (section 12.2); no token in any line |
+
+**Rests on nothing run yet, until the first deployment** (step 72): that a browser may make
+the call from the page's address. AWS's pages do not speak of it. Cognito answers a browser
+for the login, and this call goes to the same address with the same headers. It must be
+looked at on purpose, in the browser's network panel: a refused call would sign the person
+out all the same, and nothing on the page would show it.
 
 ### 13.8 Left out on purpose
 

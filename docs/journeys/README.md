@@ -98,6 +98,7 @@ The pages written so far. Which pages are still to come, and in which order, is 
 |---|---|
 | [`frontend/calendar-view.md`](frontend/calendar-view.md) | `frontend/tests/integration/calendar.test.ts`, `calendar view` |
 | [`frontend/calendar-appointments.md`](frontend/calendar-appointments.md) | `frontend/tests/integration/calendar.test.ts`, `appointments` |
+| [`frontend/logout.md`](frontend/logout.md) | `frontend/tests/integration/logout.service.test.ts`, `logout` |
 
 ### Back end
 

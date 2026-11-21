@@ -181,6 +181,44 @@ describe('RefreshService.refresh', () => {
   });
 });
 
+// docs/FRONTEND_SERVICES.md section 11.4: back to the first state, for a sign-out.
+describe('RefreshService.reset', () => {
+  beforeEach(() => setUp());
+
+  it('after a success: idle, nothing replayed, the name in no current value, the store untouched', async () => {
+    await refreshOnce(refreshed());
+    const current = sessions.at(-1);
+    service.reset();
+    expect(states.at(-1)).toEqual({ status: 'idle' });
+    expect(sessions.at(-1)).toBe(current);
+
+    const lateResults: RefreshResult[] = [];
+    const lateStates: RefreshState[] = [];
+    service.refreshResult$.subscribe((r) => lateResults.push(r));
+    service.refreshState$.subscribe((s) => lateStates.push(s));
+    expect(lateResults).toEqual([]);
+    expect(lateStates).toEqual([{ status: 'idle' }]);
+    expect(JSON.stringify([lateResults, lateStates])).not.toContain('alice');
+  });
+
+  it('while pending: the request is aborted, its late answer reports nothing and the store keeps its session', async () => {
+    let signal: AbortSignal | undefined;
+    let answer: (r: Response) => void = () => {};
+    fetchMock.mockImplementationOnce((_url: string, init: RequestInit) => {
+      signal = init.signal ?? undefined;
+      return new Promise<Response>((resolve) => (answer = resolve));
+    });
+    service.refresh();
+    service.reset();
+    expect(signal?.aborted).toBe(true);
+    answer(refreshed());
+    await flush();
+    expect(results).toEqual([]);
+    expect(states.map((s) => s.status)).toEqual(['idle', 'pending', 'idle']);
+    expect(sessions.at(-1)).toBe(alice);
+  });
+});
+
 describe('RefreshService.start / stop', () => {
   beforeEach(() => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'] });
@@ -246,6 +284,14 @@ describe('RefreshService.start / stop', () => {
     store.set(session({}, 15));
     service.start();
     service.start();
+    await vi.advanceTimersByTimeAsync(14 * MINUTE);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('reset keeps the schedule: one fetch at 14 min', async () => {
+    service.start();
+    service.reset();
+    store.set(session({}, 15));
     await vi.advanceTimersByTimeAsync(14 * MINUTE);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });

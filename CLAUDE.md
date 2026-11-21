@@ -20,7 +20,8 @@ a User's "My appointments" and the Administrator's settings, users and availabil
 types, the weekly patterns and a single date; every screen of `docs/FRONTEND_VIEW_PLAN.md`
 section 3 exists and that plan is done, 2026-11-20; it runs locally and is deployed nowhere yet:
 the hosting is decided, its template and deploy command are written
-(`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21), and nothing of it is in the cloud). Layout and placement rules:
+(`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21), "Sign out" revokes the session at
+Cognito (its step 71, 2026-11-21), and nothing of it is in the cloud). Layout and placement rules:
 `docs/FOLDER_STRUCTURE.md`.
 
 ## Where the truth lives
@@ -64,13 +65,17 @@ the hosting is decided, its template and deploy command are written
   was needed nowhere; its section 3, rule 12 was reworded after it, to allow a file of
   helpers shared by the views of one screen, as `availability.parts.ts` is, with its bound) its
   section 7.2; where the keyboard is after each dialog closes is one table in its section 8.
-  It also defines **the hosting and the deployment** of the page (its section 13, v14, decided
+  It also defines **the hosting and the deployment** of the page (its section 13, decided
   2026-11-21, **written, not deployed**: `frontend/template.yaml`, `frontend/scripts/deploy.sh`
   and `scripts/deploy-gate.sh` exist; no stack `shared-calendar-web` does): a private S3 bucket behind a CloudFront distribution in a stack
   of its own, `shared-calendar-web`; one origin, the distribution passing `/api/…` on to the
   API, so no CORS and no change to the back end; the Content-Security-Policy and the other
-  headers; the files' caching; `npm run deploy -w frontend` behind the back end's gate; the
-  direction for logout (`RevokeToken`). What rests on AWS's documentation alone until the
+  headers; the files' caching; `npm run deploy -w frontend` behind the back end's gate; and
+  what logout means for the page (its section 13.7, **built**, `docs/FRONTEND_DEPLOY_PLAN.md`
+  step 71: the page forgets the person at once, then Cognito is told with `RevokeToken`,
+  given up after 10 seconds; the person sees the login and nothing else; the service's truth
+  is `docs/FRONTEND_SERVICES.md` section 20; that a browser may make the call from the
+  deployed page's address rests on nothing run until step 72). What rests on AWS's documentation alone until the
   first deployment is said there (its section 13.3, rules 1 and 3: the `Authorization` header
   through the managed policy, no failure of the API kept, with no `CustomErrorResponses`). Still open (section 10), blocking nothing: the session
   across a reload, the size of the bundle, a domain of our own.
@@ -96,8 +101,10 @@ the hosting is decided, its template and deploy command are written
 - `docs/FRONTEND_DEPLOY_PLAN.md` defines the order of work for the hosting (brief 93): steps
   70 (the hosting's template and the deploy command, no cloud), 71 (logout: design, then
   code), 72 (the first deployment, needs explicit instruction) and 73 (the documents). Step 70
-  is done (2026-11-21, brief 94; its dry run could not pass the gate before the commit and is
-  the first thing of step 72); 71 to 73 are not started.
+  is done (2026-11-21, brief 94; its dry run was run after the commit, on `0e695a7`, and
+  passed; step 72 runs it again as its first command) and so is step 71 (2026-11-21, brief
+  95: the design reviewed, then the code); 72 and 73 are not started. Step 72, point 5, says
+  what the first deployment must prove of logout, as steps a person follows.
 - `docs/FRONTEND_WALK.md` is the walk through every screen in a browser, as `alice` and as
   `admin`, at a desktop and at a phone width, from a fresh, seeded local stack: 102 numbered
   checks a person does by hand. **The check to repeat after a change to the view layer.** Not
@@ -236,8 +243,11 @@ form works the same. Paths below without a folder are relative to `backend/`.
   the page (so a preview pane that is a frame shows nothing: open a browser tab), listens on `127.0.0.1` only and
   never prints a request's body or headers. The console's one known report is `zod`'s `eval`
   probe (`docs/FRONTEND_ARCHITECTURE.md` section 10, open point O5). A reload of the page signs
-  out (open point O3). In a Codespace, open the forwarded port 5173: the bundle's addresses have
-  no host, so any origin works.
+  out (open point O3). In a Codespace, open the forwarded port 5173 in a browser tab ("Open in
+  Browser" in the list of ports, then "Continue" on GitHub's notice; not the editor's preview
+  pane, which is a frame): the bundle's addresses have no host, so any origin works. Seen
+  working under the policy on 2026-11-21. The server must be running: nothing answers on the
+  port otherwise.
 - `npm run seed:local -w frontend` (`frontend/scripts/seed-local.mjs`): gives the local calendar
   a week to look at, through the local API (needs `local:up` + `local:api`). As `admin`: the
   types "Studio" and "Piscina" and 8 weekly patterns, valid for 60 days from today (today in the
@@ -283,9 +293,10 @@ form works the same. Paths below without a folder are relative to `backend/`.
 - Stopping a background `dev` by name: `pkill -f 'node scripts/dev[.]mjs'`, in a command that
   holds no other text matching it (a shell whose command line matches is killed too).
 - `RUN_INTEGRATION=1 npm run test:integration -w frontend`: runs `frontend/tests/integration`
-  (`login.service.test.ts`, `journeys.test.ts` and, since step 53, `calendar.test.ts`: the
-  services against cognito-local on 9229 and the API on 3000, `docs/FRONTEND_SERVICES.md`
-  section 14). Needs `local:up` + `local:api` running and the Codespaces iptables rule below.
+  (`login.service.test.ts`, `journeys.test.ts`, `logout.service.test.ts` and, since step 53,
+  `calendar.test.ts`: the services against cognito-local on 9229 and the API on 3000,
+  `docs/FRONTEND_SERVICES.md` section 14; the sign-out's is its section 20.9: `alice` only,
+  no table touched, every session it opens signed out at its end). Needs `local:up` + `local:api` running and the Codespaces iptables rule below.
   Creates and removes the throw-away users `fe-journey`, `fe-calendar` and `fe-calendar-b` (removed
   first too, so it can be rerun after a failed run). `calendar.test.ts` **never resets the local
   `calendar` table**: it works on top of what the back-end journeys and the smoke test leave, creates
@@ -525,11 +536,19 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     `fail_on_empty_changeset = false`; nothing of a deployment. Deployed nowhere yet.
   - `src/services/`: `session.store.ts`; `cognito.ts`, `api.ts` and `jwt.ts`, the building
     blocks; then one `<name>.service.ts` + `<name>.types.ts` per service: `login`, `refresh`,
-    `hello`, `users`, `calendar-settings`, `availability-types`, `availability-rules`,
+    `logout`, `hello`, `users`, `calendar-settings`, `availability-types`, `availability-rules`,
     `calendar`, `appointments`. One result/state pair per method; input checked with the
     shared schemas before sending. `src/` imports only `rxjs`, `rxjs/fetch`, `rxjs/operators`
     and `@shared-calendar/shared`. Tokens live only in the `SessionStore`: no result, state
-    or service field holds one.
+    or service field holds one. **The one exception** is the sign-out: the store is cleared
+    first, and one copy of the refresh token travels in the request that tells Cognito, for
+    10 seconds at most, in no field (`docs/FRONTEND_SERVICES.md` section 2, rule 9). Rules
+    of the sign-out that are easy to break: **nothing cancels a revocation** (the
+    `LogoutService` has no pending subscription and no teardown, and is not one of the
+    objects made per person); **a failure's message never copies Cognito's own** (it could
+    quote the token); `login`, `refresh` and `logout` live as long as the page, and a
+    sign-out puts the first two back to their first state with `reset()`, so a new
+    page-wide service whose last result names a person needs a `reset()` in that list.
   - `index.html`: all the markup, everything `hidden`: the login `#login`; the frame `#app`
     with the header, the navigation and `main.screen`, which holds one element per screen
     (`#week`, `#appointments`, `#settings`, `#users`, `#availability`), each with its dialogs
@@ -544,7 +563,8 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     `COGNITO_URL` and `CLIENT_ID`.
   - `src/views/`: `shell.ts` (`runShell`, `mountShell`, the table `SCREENS`, `sessionObjects`:
     new services and logic objects per person, a second `CalendarService` for a single
-    date, never the week's); one `<name>.view.ts` per view, `mount<Name>(root, deps):
+    date, never the week's; "Sign out" calls `logout()` and nothing else: the shell clears
+    no store and shows nothing of Cognito's answer); one `<name>.view.ts` per view, `mount<Name>(root, deps):
     Subscription`: `login`, `week`, `appointments`, `settings`, `users`, `availability` and
     `date` (two views of one screen); `detail.view.ts`, the dialog two views mount;
     `availability.parts.ts`, the helpers the availability's two views share, with
@@ -567,8 +587,8 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   - `tests/unit/services/`, `tests/unit/logic/` (project `unit`, in node; `zone.ts`,
     `fixtures.ts`) and `tests/unit/views/` (project `views`, `happy-dom`; `page.ts`,
     `page.test.ts`, `shell.test.ts`) mirror `src/`; `tests/integration/` (`local.ts`,
-    `login.service.test.ts`, `journeys.test.ts`, `calendar.test.ts`) runs the services
-    against the local stack.
+    `login.service.test.ts`, `journeys.test.ts`, `logout.service.test.ts`,
+    `calendar.test.ts`) runs the services against the local stack.
 - `shared/`: package `@shared-calendar/shared`, no build step (`exports` points at
   `src/index.ts`; each consumer bundles it). `src/api.ts` (response and error body types,
   `ApiErrorCode`), `src/roles.ts` (`Role`, `resolveRole`), `src/username.ts` (the username
@@ -609,7 +629,11 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   `frontend/index.html` before each test; no test writes markup of its own, so a selector that
   does not match the page fails. The mount function gets fake services: plain objects typed with
   the view's `…Deps`, whose streams are subjects the test controls and whose methods are `vi.fn`.
-  The shell's test uses the real `SessionStore` (memory only). Every view's test has: each state
+  The shell's test uses the real `SessionStore` (memory only) and the real `LogoutService`
+  on it: a test that presses "Sign out" sends the request to Cognito, which the file's
+  `fetch` stub leaves unanswered, so a count of all the calls of `fetch` after a sign-out
+  holds one more (count the API's with `apiCalls()`, Cognito's with `cognitoCalls()`).
+  Every view's test has: each state
   of each stream, each action of the user and its call, a text with `<script>` shown as text, and
   nothing left in the page after unsubscribing. Under `happy-dom`, `import.meta.url` is not a
   `file:` URL (use `import.meta.dirname`), parsing a whole page with `DOMParser` tries to load its

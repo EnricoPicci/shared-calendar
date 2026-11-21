@@ -90,7 +90,8 @@ stays at the root.
 │   ├── src/
 │   │   ├── main.ts              # the entry file of the bundle: the configuration, then the shell
 │   │   ├── services/            # the services layer (docs/FRONTEND_SERVICES.md): session store,
-│   │   │                        # login, refresh, hello, users, the calendar's; cognito.ts and api.ts
+│   │   │                        # login, refresh, logout, hello, users, the calendar's; cognito.ts
+│   │   │                        # and api.ts
 │   │   ├── logic/               # between the services and the views, no DOM: texts.ts (dates, times,
 │   │   │                        # failures in plain words), week.model.ts, week.screen.ts,
 │   │   │                        # booking.ts, appointment.detail.ts, appointments.model.ts,
@@ -107,7 +108,7 @@ stays at the root.
 │   ├── tests/
 │   │   ├── unit/                # mirrors src/ (plus services/fixtures.ts, logic/zone.ts and
 │   │   │                        # logic/fixtures.ts, views/page.ts)
-│   │   └── integration/         # login and the services' journeys against the local stack
+│   │   └── integration/         # login, logout and the services' journeys against the local stack
 │   └── (generated, git-ignored) coverage/  dist/
 │
 └── shared/                      # ── what both import ─────────────────────────────────────
@@ -417,10 +418,17 @@ headless browser is not in the repository, and no end-to-end test tool is.
   `sam validate --lint` of the template, so it needs the SAM CLI. At the root,
   `scripts/deploy-gate.sh` (section 4.5). No new dependency, and no new generated file: the
   deploy uploads `frontend/dist/`.
+- **Logout, since 2026-11-21** (`docs/FRONTEND_DEPLOY_PLAN.md` step 71, design
+  `docs/FRONTEND_SERVICES.md` section 20): `src/services/logout.service.ts` and
+  `logout.types.ts`; `cognito.ts` gains the `RevokeToken` request; the `LoginService` and the
+  `RefreshService` gain `reset()`; the shell's "Sign out" calls the service
+  (`src/views/shell.ts`). Tests: `tests/unit/services/logout.service.test.ts` and
+  `tests/integration/logout.service.test.ts`, the latter with its page
+  `docs/journeys/frontend/logout.md`. No new dependency, no new allowed import.
 
 What is written and not yet deployed: all of the hosting. No stack `shared-calendar-web`
-exists; the first deployment is `docs/FRONTEND_DEPLOY_PLAN.md` step 72, after logout (its
-step 71).
+exists; the first deployment is `docs/FRONTEND_DEPLOY_PLAN.md` step 72. Logout, its step 71,
+is built.
 
 ---
 

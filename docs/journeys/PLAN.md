@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Goal | one page per `describe` block of the integration journeys (one per test file without a `describe`), in the format of `docs/journeys/README.md` |
-| Pages | 21: the 9 `describe` blocks of `backend/tests/integration/calendar.test.ts`, the 9 of `frontend/tests/integration/calendar.test.ts`, and 3 whole files (the Hello World journeys of both packages, the front end's login test) |
+| Pages | 22: the 9 `describe` blocks of `backend/tests/integration/calendar.test.ts`, the 9 of `frontend/tests/integration/calendar.test.ts`, the block `logout` of `frontend/tests/integration/logout.service.test.ts`, and 3 whole files (the Hello World journeys of both packages, the front end's login test) |
 | Brief | `prompts/60-explore-how-to-add-journey-explanation-docs.md` |
 
 This plan says in which order the pages are written, how, and what makes a session done. The
@@ -71,6 +71,7 @@ About two agents per page, so eight to ten per batch.
 | 6 | Batch 2: back-end appointments and users | `backend/calendar-listing-note-cancel.md`, `backend/calendar-change.md`, `backend/calendar-users.md`, `backend/hello-world-journeys.md` | `backend/tests/integration/calendar.test.ts`: `listing, note and cancel (routes 16, 18, 19)`, `change (route 20)`, `users (route 21, deletion)`; `backend/tests/integration/journeys.test.ts` (whole file) | planned |
 | 7 | Batch 3: front-end availability | `frontend/calendar-settings.md`, `frontend/calendar-types.md`, `frontend/calendar-patterns.md`, `frontend/calendar-overrides.md`, `frontend/calendar-one-off-windows.md` | `frontend/tests/integration/calendar.test.ts`: `settings`, `types`, `patterns`, `overrides`, `one-off windows` | planned |
 | 8 | Batch 4: front-end conflicts, users, Hello World | `frontend/calendar-availability-conflict.md`, `frontend/calendar-users.md`, `frontend/hello-world-journeys.md`, `frontend/login.md` | `frontend/tests/integration/calendar.test.ts`: `availability conflict`, `users`; `frontend/tests/integration/journeys.test.ts` and `login.service.test.ts` (whole files) | planned |
+| 9 | By hand, with the test (`docs/FRONTEND_DEPLOY_PLAN.md` step 71) | `frontend/logout.md` | `frontend/tests/integration/logout.service.test.ts`, `logout` | done; not yet reviewed by the user |
 
 Inside a batch the pages are independent: none needs another page of the same batch. A page that
 needs an idea another batch adds to `concepts.md` comes after it, which is why the back-end
