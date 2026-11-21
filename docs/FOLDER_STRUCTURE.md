@@ -322,8 +322,9 @@ The front end is a browser single-page application in TypeScript built to static
 (decided 2026-11-04). Its own architecture document, `docs/FRONTEND_ARCHITECTURE.md`, fixes the
 view layer (2026-11-16: plain HTML and CSS with one TypeScript module script, no framework; the
 folders for the views in its section 9; 2026-11-19: the build and the dev server, its section 12)
-and, since 2026-11-21, the hosting and the deployment (its section 13: decided and written,
-not yet deployed; the order of work is `docs/FRONTEND_DEPLOY_PLAN.md`, steps 70 to 73). This section only fixes what the folder
+and, since 2026-11-21, the hosting and the deployment (its section 13: decided, written and
+deployed; the order of work was `docs/FRONTEND_DEPLOY_PLAN.md`, steps 70 to 73, done). This
+section only fixes what the folder
 must look like so that it fits the repository:
 
 - `frontend/package.json`, name `frontend`, depends on `@shared-calendar/shared`; scripts
@@ -426,9 +427,20 @@ headless browser is not in the repository, and no end-to-end test tool is.
   `tests/integration/logout.service.test.ts`, the latter with its page
   `docs/journeys/frontend/logout.md`. No new dependency, no new allowed import.
 
-What is written and not yet deployed: all of the hosting. No stack `shared-calendar-web`
-exists; the first deployment is `docs/FRONTEND_DEPLOY_PLAN.md` step 72. Logout, its step 71,
-is built.
+**The hosting is deployed** (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; the record is
+`docs/RUNBOOK.md` section 5.5), as the stack `shared-calendar-web`. What the folder holds and
+what the stack holds:
+
+| | In `frontend/`, committed | In the stack `shared-calendar-web`, in AWS |
+|---|---|---|
+| The hosting | Its description: `template.yaml`, `samconfig.toml` | Six resources: the bucket, its policy, the origin access control, the function that removes `/api`, the response headers policy, the distribution |
+| The page | Its sources: `index.html`, `style.css`, `src/`; built into `dist/` (git-ignored) at every release | The bucket's four objects, uploaded by the deploy command: `index.html`, `style.css`, `app.js`, `app.js.map` |
+| The values of a deployment | None: no address and no id | The parameter `ApiDomain`; the outputs `PageUrl` (the page's address), `BucketName`, `DistributionId` |
+
+A release reads the two stacks and writes nothing back into the folder. Logout
+(`docs/FRONTEND_DEPLOY_PLAN.md` step 71) is built and deployed with the page. That plan is done,
+with checks at the deployed page still owed: they are the open items of `docs/RUNBOOK.md`
+section 5.5.
 
 ---
 

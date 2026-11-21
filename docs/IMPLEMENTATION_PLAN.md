@@ -117,7 +117,8 @@ by unit tests with a fixed clock; the journeys prove the same scenario on dates 
 
 Nothing in the spec is without a step except, by design: R-TIME-05 and the view needs of 16.8
 (the user interface is out of scope, spec 1.3); the future notifier of 15.3; the follow-ups of
-spec 21 (section 6 below); and the CORS gap, which waits for `FRONTEND_ARCHITECTURE.md`.
+spec 21 (section 6 below); and the CORS gap, which waited for `FRONTEND_ARCHITECTURE.md` (closed there on 2026-11-21, its
+section 13.3, with no change to the API).
 
 ---
 
@@ -1185,7 +1186,7 @@ Shared calendar follow-ups (spec 21), not in steps 41–59:
 4. Per-User settings.
 5. A "force" option for availability changes that cancels the affected appointments through the normal path.
 6. Per-day locks instead of the global lock, if load ever grows (spec 13.4, T3).
-7. The user interface: `docs/FRONTEND_ARCHITECTURE.md`, the views of spec 16.8, R-TIME-05, and the CORS gap.
+7. The user interface: `docs/FRONTEND_ARCHITECTURE.md`, the views of spec 16.8, R-TIME-05, and the CORS gap. Done since, in plans of its own: the views (`docs/FRONTEND_VIEW_PLAN.md`, 2026-11-20) and the hosting, which closed the CORS gap with no change to the API (`docs/FRONTEND_DEPLOY_PLAN.md`, 2026-11-21).
 
 ---
 

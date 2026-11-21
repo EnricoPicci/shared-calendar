@@ -1,14 +1,15 @@
 # Operator runbook
 
-What to do, in order, to work on the deployed stack: the daily start, updating the stack,
-deploying from scratch, and the one-time setup done during plan step 11 that is easy to
-forget. The why behind each rule is in `docs/ARCHITECTURE.md` and `CLAUDE.md`. Which AWS
+What to do, in order, to work on the two deployed stacks, the API's and the page's: the daily
+start, updating the API's stack, releasing the page, deploying from scratch, and the one-time
+setup done during plan step 11 that is easy to forget. The tools a machine needs, with their
+versions, are in `README.md`, "Prerequisites". The why behind each rule is in `docs/ARCHITECTURE.md` and `CLAUDE.md`. Which AWS
 identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AWS_ACCOUNTS.md`.
 
 | | |
 |---|---|
-| Stack | `shared-calendar-api` |
-| The page's stack | `shared-calendar-web`, same region and profile: the hosting of the browser page (`docs/FRONTEND_ARCHITECTURE.md` section 13), first deployed on 2026-11-21 (section 5.5). The page's address is its output `PageUrl` |
+| The API's stack | `shared-calendar-api` |
+| The page's stack | `shared-calendar-web`, same region and profile: the hosting of the browser page (`docs/FRONTEND_ARCHITECTURE.md` section 13), first deployed on 2026-11-21 (section 5.5) and released with section 2, step 6. The page's address is its output `PageUrl` (`README.md`, "The deployed stacks", has it) |
 | Region | `eu-north-1` (the only region the AWS organization allows for regional services) |
 | CLI profile | `shared-calendar-admin` (IAM Identity Center, role `AdministratorAccess`) |
 | Alerts to | the `AlertEmail` stack parameter |
@@ -27,9 +28,12 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
    ```
 
 2. `nvm use` (Node 22 from `.nvmrc`). Commands below run from the repository root; the back
-   end's scripts run in its workspace (`-w backend`, or `cd backend` and drop the flag). After a
-   fresh clone or a dependency change: `npm ci` at the root.
-3. In every terminal that talks to AWS:
+   end's scripts run in its workspace (`-w backend`, or `cd backend` and drop the flag), the front
+   end's in its own (`-w frontend`). After a fresh clone or a dependency change: `npm ci` at the
+   root. On a machine that has never run the project, first the tools of `README.md`,
+   "Prerequisites": Node 22, Docker, the SAM CLI, the AWS CLI, git and curl.
+3. In every terminal that talks to AWS (the profile is set up once per machine: section 4; the
+   person needs an Identity Center user with access to the account: `docs/AWS_ACCOUNTS.md`):
 
    ```bash
    export AWS_PROFILE=shared-calendar-admin
@@ -39,11 +43,23 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
 
    The device code is needed in the Codespace: the normal login waits for a browser callback
    on `localhost`, which is the laptop, not the Codespace. Do not set `AWS_REGION`: the scripts
-   and SAM take the region from `backend/samconfig.toml`.
+   and SAM take the region from `backend/samconfig.toml` and, for the page, `frontend/samconfig.toml`.
 
 ---
 
-## 2. Updating the deployed stack (code or template change)
+## 2. Updating the deployed stacks (a change to the code or to a template)
+
+What changed decides the steps:
+
+| What changed | Steps |
+|---|---|
+| `backend/` only | 1 to 5 |
+| `frontend/` only (the page, or its hosting in `frontend/template.yaml`) | 1 to 3, then 6 |
+| `shared/`, or both | 1 to 6: `shared/` is built into the API's functions and into the page |
+
+**The API first, always**: the page is built with values read from the API's stack, and its
+command stops when that stack is missing. One `verify` (step 3) serves both deployments when
+both fit into its 30 minutes; otherwise run it again before the second.
 
 1. Make the change, commit it. The deploy refuses uncommitted changes.
 2. Start the local stack (two terminals, leave them running):
@@ -52,6 +68,9 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
    DYNAMODB_PORT=8002 npm run local:up -w backend
    npm run local:api -w backend         # wait for "Running on http://127.0.0.1:3000"
    ```
+
+   They need Docker running. `DYNAMODB_PORT=8002` is for a machine where another project holds
+   port 8000; drop it when the port is free, and use the same value in step 3.
 
 3. `DYNAMODB_PORT=8002 npm run verify -w backend`: must end with `verify PASSED … (clean tree)`.
    From now on there are **30 minutes** to deploy, and no tracked file may change.
@@ -72,7 +91,8 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
    9 calendar checks: section 2.1). `script -q -c "…" /tmp/smoke.txt` works here too; the
    password prompt does not echo, so the password does not reach the file.
 6. **Releasing the page**, after the back end's deploy and its smoke test, or alone when only
-   `frontend/` changed (then steps 1 to 3, and this one): `npm run deploy -w frontend`, in a
+   `frontend/` changed (then steps 1 to 3, and this one): `npm run deploy -w frontend`, from the
+   repository root, in a
    terminal set up as in section 1, item 3, inside the same 30 minutes of the same stamp. It
    takes no argument but `--dry-run`, which goes as far as the build and then says what it
    would do, changing nothing; it passes the same gate. In order
@@ -95,7 +115,13 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
      and the address. One `FAIL` ends the command with an error: the files are uploaded all
      the same, and what the page then serves is not as designed.
    Record it like the back end's: `script -q -c "npm run deploy -w frontend" /tmp/deploy-web.txt`.
-   The checks cannot prove a signed-in call: sign in at the page once after a release.
+   The checks cannot prove a signed-in call: sign in at the page once after a release, as any
+   user (`README.md`, "The deployed stacks": who can sign in, and with which password); the week
+   that loads is the proof. The page's address is the command's last line and the stack's output
+   `PageUrl`.
+   **Which branch:** the hosting's template and this command were deployed from the branch
+   `deploy-frontend` (section 5.5). Until that branch is merged into `main`, a clone of `main`
+   holds neither: release from `deploy-frontend`.
 
 Rules:
 
@@ -180,7 +206,8 @@ Plan step 11 has the full list; in short:
 0. Region check, read-only: `aws cloudformation describe-stacks --stack-name shared-calendar-api
    --region eu-north-1` must answer "does not exist", not `AccessDenied … explicit deny in a
    service control policy`. In another account, check its organization's allowed region first and
-   put it in `backend/samconfig.toml` (both `region` lines) and the profile.
+   put it in `backend/samconfig.toml` (both `region` lines), in `frontend/samconfig.toml` (the
+   page's deploy stops when the two files name different regions) and in the profile.
 1. Steps 1 to 3 of section 2 (commit, local stack, verify).
 2. `npm run deploy -w backend -- --parameter-overrides AdminUsername="admin" FunctionArchitecture="arm64" AlertEmail=<alert address>`.
    `backend/samconfig.toml` holds everything else (stack, region, capabilities); the address is
@@ -214,6 +241,7 @@ Plan step 11 has the full list; in short:
    `shared-calendar-api-hello-messages` → Explore items shows the smoke rows;
    `shared-calendar-api-calendar` shows the smoke test's cancelled
    appointment, its two events and the deleted-user marker (section 2.1).
+8. The page, which needs this stack: section 3.1.
 
 If the first create fails: CloudFormation rolls back, but cannot delete the three protected
 resources (the tables `<stack>-hello-messages` and `<stack>-calendar`, and the user pool), so the stack may end in
@@ -265,7 +293,7 @@ as above and run `delete-stack` again.
 | Account | Use |
 |---|---|
 | Management account (root user = the sign-up e-mail) | billing and emergencies only; IAM Identity Center lives here (home region `us-east-1`) |
-| "Identity Delegated Admin" | where the stack is deployed and where `shared-calendar-admin` signs in |
+| "Identity Delegated Admin" | where the two stacks are deployed and where `shared-calendar-admin` signs in |
 | "Side Quest Accepted" | unused |
 
 The organization policy `AdvancedModeRegionRestrictionSecurityControlPolicy` applies to all
@@ -517,3 +545,10 @@ which ran nothing that writes to AWS and saw no password and no token of the rea
       sent through the distribution; `PUT /calendar/settings` neither, on purpose (a first
       save leaves a settings item that cannot be removed).
 
+
+**Read again on 2026-11-21, for `docs/FRONTEND_DEPLOY_PLAN.md` step 73** (documents only;
+read-only commands and curl with no credentials, in the session with Claude Code): the stack
+`CREATE_COMPLETE` with its six resources and three outputs; the bucket's settings, policy and
+four objects, the distribution's rules and the headers as recorded above; a second question
+for `/`, `/style.css` and `/app.js` with the first answer's `ETag` answered 304 each. Nothing
+was deployed, and none of the four items above was looked at: they stay open.

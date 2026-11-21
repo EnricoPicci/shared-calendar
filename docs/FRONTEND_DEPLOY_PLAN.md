@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v4 — **steps 70, 71 and 72 done** (2026-11-21, briefs `prompts/94-step-70-implementation.md`, `prompts/95-step-71-implementation.md` and `prompts/96-step-72-implementation.md`): the template and the deploy command are written, "Sign out" revokes, and **the page is deployed** (stack `shared-calendar-web`). Of step 72's checks in a browser a part was done; what is left is listed under the step and in `docs/RUNBOOK.md` section 5.5. Step 73 to do |
+| Status | v5 — **done** (2026-11-21): steps 70 to 73 (briefs `prompts/94-step-70-implementation.md` to `prompts/97-step-73-implementation.md`). The template and the deploy command are written, "Sign out" revokes, **the page is deployed** (stack `shared-calendar-web`) and the documents say so. **Done with checks of step 72 still owed**, at the deployed page: a refresh with the revoked token refused by the real Cognito, a session renewed after its fifteen minutes, "Sign out" with the network off, a reload and the console, and the rest of the walk with the phone width. They are listed under step 72 and are the open items of `docs/RUNBOOK.md` section 5.5; until they are done, nothing says that they hold. The plan stays in the repository as the record of the order of work |
 | Scope | Everything needed to go from the views that run locally to **the page in use on the web**: the hosting's template and the deploy command, logout, the first deployment, the documents. Steps 70 to 73 |
 | Not in scope | The session across a reload, the size of the bundle, a domain of our own: the open points O3, O9 and O10 of `docs/FRONTEND_ARCHITECTURE.md` section 10. Any change to the API, to `shared/` or to a view beyond "Sign out" |
 | Governed by | `docs/FRONTEND_ARCHITECTURE.md` section 13 (the hosting and the deployment), `docs/FRONTEND_SERVICES.md` (the services; logout from step 71), `docs/ARCHITECTURE.md` section 8.1 (the deploy gate) and `CLAUDE.md` (cloud safety, the hard rules). On any conflict with this plan, they win |
@@ -15,6 +15,7 @@
 | v2 | 2026-11-21 | Step 70 done, with what it found. AWS's documentation says the cache policy `CachingDisabled` keeps no failure: the template sets nothing for failures, and the risk's row and step 72's check of it are reworded (the old check asked for a 401, which CloudFront never keeps). Step 72: the dry run first, what the change set must show, the statuses of the four checks, what the deployment is the first to prove. |
 | v3 | 2026-11-21 | Step 71 done, with what it found: cognito-local implements `RevokeToken`, so the sign-out has an integration journey, and the risk's row is reworded. **Corrected: the dry run of step 70 was run** after that step's commit (2026-11-21, on commit `0e695a7`) and passed; the note under step 70 and point 1 of step 72 said it had not been. Step 72, point 5: what the first deployment must prove of logout, written out as steps a person follows at the deployed page. |
 | v4 | 2026-11-21 | Step 72 done: the first deployment, with what differed from the plan and what was not done. Section 4: each risk says whether it came true. |
+| v5 | 2026-11-21 | Step 73 done, with what differed from the plan: the plan is done, with the checks of step 72 that were not made still owed. Section 1: what rested on AWS's documentation was seen at step 72. |
 
 ---
 
@@ -32,8 +33,9 @@ only when asked.
   it, for each command that creates or changes something (`CLAUDE.md`, cloud safety). Read-only
   commands (`describe-stacks`, `list-distributions`, curl against the page) need only a session.
 - **When a step proves `docs/FRONTEND_ARCHITECTURE.md` section 13 wrong, the step stops and
-  proposes the change to that document.** Three things in it rest on AWS's documentation and
-  on nothing run here yet; section 4 lists them, with the step that proves each.
+  proposes the change to that document.** Three things in it rested on AWS's documentation and
+  on nothing run here when the plan was written; section 4 lists them, with what step 72 showed
+  of each.
 - The back end's template, `shared/` and the views are not changed by this plan, except the
   shell's "Sign out" at step 71. If a step needs more, it stops and reports it.
 - Steps 70 and 71 do not depend on each other; step 72 needs both.
@@ -267,7 +269,41 @@ invalidates), and `npm run deploy -w backend` if the back end has changes not ye
 checks done; a second `npm run deploy -w frontend` with no change says that no resource
 changes and ends with the four checks. Checkpoint: the page is deployed.
 
-### Step 73 — Documentation and hand-over (≈ 2 h)
+### Step 73 — Documentation and hand-over (≈ 2 h) — done
+
+**Done 2026-11-21** (brief `prompts/97-step-73-implementation.md`). Documents only: no file
+under `frontend/`, `backend/`, `shared/` or `scripts/` changed, and nothing was deployed. What
+differs from the list below:
+
+- **The plan is called done with checks still owed.** The checks of step 72 that were not made
+  on 2026-11-21 were not made in this step either, by decision: they stay open items of
+  `docs/RUNBOOK.md` section 5.5, in the same words, and wherever a document says that this plan
+  is done it names them. No document says that one of them holds.
+- **`CLAUDE.md` was not changed**, by decision. The sentences of it that this step leaves
+  untrue (this plan's entry says "73 is not started"; the versions it names for
+  `docs/FRONTEND_ARCHITECTURE.md`) are listed in the step's report, with the words that would
+  make each true.
+- **Every sentence put in the present tense was checked first**: against the template and the
+  deploy script, and against the stack with read-only commands and curl with no credentials (the
+  stack and its six resources, the bucket's policy and settings, the distribution's rules, the
+  headers; noted at the end of `docs/RUNBOOK.md` section 5.5). **One sentence was found wrong
+  that way**: `docs/FRONTEND_ARCHITECTURE.md` section 13.4 said that `zod`'s one report is seen
+  in the console under the distribution's policy; the console at the deployed page has not been
+  looked at.
+- **More documents than the list names**: `docs/RUNBOOK.md` (read as a colleague with a clean
+  clone: which steps for which change, the order of the two deployments, the tools, the
+  profile, the port, who signs in at the page after a release, the branch to release from
+  while `deploy-frontend` is not merged), `docs/AWS_ACCOUNTS.md` and `docs/NEW_ACCOUNT.md` (the
+  second stack), `docs/FRONTEND_WALK.md` (where the walk stands at the deployed page), and one
+  sentence or two each in `docs/ARCHITECTURE.md`, `docs/IMPLEMENTATION_PLAN.md`,
+  `docs/SHARED_CALENDAR_SPEC.md` and `docs/RENAME_PLAN.md`, which still called the front end
+  future, undeployed or stopped by the CORS gap.
+- **Left as written**: the change logs, the "step as planned" of this plan, and section 2 of
+  `docs/FRONTEND_VIEW_PLAN.md` (what was open when that plan started): they are history.
+- **The work is on the branch `deploy-frontend`**, not merged into `main` and not pushed: a
+  clone of `main` holds neither the hosting's template nor the deploy command until it is.
+
+The step as planned:
 
 - `docs/FRONTEND_ARCHITECTURE.md`: section 13 in the present tense of what is built, status
   line, the open points as they stand; anything the deployment proved different.

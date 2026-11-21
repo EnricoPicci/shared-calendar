@@ -20,6 +20,7 @@
 | v7 | 2026-11-15 | Implemented (brief 56, plan step 54, from `docs/SHARED_CALENDAR_SPEC.md` v15 section 16). New sections, appended: 18 `CalendarService` (`load(from, to)`, `reload()`, route 15) and 19 `AppointmentsService` (`list`, `book`, `cancel`, `change`, `updateNote`, routes 16–20). **The services layer is complete.** `pending` carries every argument under the contract's names (decision 38); `reload()` re-runs the last `load`'s range, answers `invalid_request` before any load, and shares one pending call with `load` (decision 39). Two stream names differ from spec 16.2, which is not edited: `appointmentsResult$` (spec: `listResult$`) and `updateNoteResult$` (spec: `noteResult$`), by decision 31 (decision 40). Success values and their checks (decision 41); validation with the shared schemas only, nothing that depends on the role or on the server's data (decision 42). Error codes of architecture section 4, which agrees with spec 11.1 on routes 15–20 (decision 44). Journeys (section 14.4): the calendar view, booking, note, change, cancel, `upcoming` and `availability_conflict` end to end; a second throw-away User `fe-calendar-b` for the anonymous `busy` (decided with the user); the appointment blocks set the settings for their run and write them back; the Users are removed before the clean-up; the cancelled appointments, their events and the two deleted-user markers stay as history (decision 43). `suite.ts`: `other` is optional, for a service whose methods share one pending call (decision 45); no existing test changed. Acceptance in section 14.6. |
 | v8 | 2026-11-21 | **The sign-out**, designed (brief 95, part A), reviewed, then implemented (part B; `docs/FRONTEND_DEPLOY_PLAN.md` step 71); acceptance in section 20.10. New section 20, `LogoutService`: `logout()` puts the page-wide services back to their first state, clears the `SessionStore` at once and only then tells Cognito to revoke the refresh token (`RevokeToken`), with a time limit of 10 seconds; its result says whether Cognito revoked, and why not, and holds no token and no name. `cognito.ts` gains `revokeToken` and `toRevokeOutcome` (section 10.1). `LoginService` and `RefreshService` gain `reset()` (sections 4.4 and 11.4). Rule 9 gains its one exception: the copy of the refresh token that travels in the revocation, for at most 10 seconds after the store is cleared. The row "logout" of section 4.8 is rewritten; the rows of sections 9.4 and 9.7 follow. Found: `RevokeToken` on the wire, from AWS's API reference (section 20.1); cognito-local implements it and then refuses a refresh with the revoked token (checked 2026-11-21), so an integration journey covers it (section 20.9). What the code fixed that the design left open: the table of error types is a `Map`, so that a name every object has (`constructor`) is not taken for a type of the list; the unit tests' "no leak" runs after every test of `logout.service.test.ts` rather than as one test; the journey's `afterAll` signs out every store of the file. No difference from the reviewed design otherwise. Decisions 46 to 58: 46 to 54 are the nine points decided with the user before the design, 55 to 58 are the design's own; on review (2026-11-21) the user confirmed the `reset()` of the `RefreshService` (decision 53), `keepalive` (56) and the names `success`/`failure` (46). |
 | v8, note | 2026-11-21 | After the first deployment of the page (`docs/FRONTEND_DEPLOY_PLAN.md` step 72, brief `prompts/96-step-72-implementation.md`): sections 20.1 and 20.9 say what the real Cognito answered at the deployed page (`RevokeToken` from a browser on the page's origin: 200) and what was not tried (a refresh with the revoked token; any refusal). No design and no code changed, so no new version. |
+| v8, note 2 | 2026-11-21 | With the page deployed (`docs/FRONTEND_DEPLOY_PLAN.md` step 73, brief `prompts/97-step-73-implementation.md`), the text around it brought into line: section 10.3, **the CORS gap is closed**, and how (one origin; the API has no CORS configuration and needs none; Cognito answers a browser from the page's origin, as seen for the login and for `RevokeToken`); sections 1, 1.1, 4.7, 5 and 9.6 and decisions 11, 27, 54 and 57 no longer speak of a hosting or of a first deployment to come; section 20.1 says where the browser's call to `RevokeToken` is looked at. No design and no code changed, and nothing new was proven, so no new version. |
 
 ---
 
@@ -29,7 +30,8 @@ The browser front end has two layers (brief `prompts/30-design-first-service-cla
 
 - a **services layer**: plain TypeScript classes that call the remote services and publish the
   results as RxJS observables;
-- a **view layer**: whatever renders the UI (plain HTML, React, Angular: not chosen yet). It
+- a **view layer**: whatever renders the UI (chosen since: plain HTML and CSS with one
+  TypeScript module script, `docs/FRONTEND_ARCHITECTURE.md`). It
   subscribes to the services' observables and calls their methods. It never calls the network
   itself.
 
@@ -54,7 +56,9 @@ Cognito, flow `USER_PASSWORD_AUTH`, which answers with three JWTs (`docs/ARCHITE
 sections 3.1 and 6.2). The API then wants the **access token** as `Authorization: Bearer …` on
 every call. Locally the same call goes to the Cognito emulator (cognito-local on port 9229),
 which speaks the same protocol and sets the CORS headers a browser needs (checked in the
-bundled server of image `jagregory/cognito-local:5.3.0`).
+bundled server of image `jagregory/cognito-local:5.3.0`). The real Cognito answers a browser
+from the deployed page's address too: seen for the login and for the sign-out's `RevokeToken`
+(section 10.3).
 
 So the login service talks to Cognito, not to API Gateway, but it is still "a service that calls
 a remote service and exposes the result", and it follows the same pattern as every other one.
@@ -462,8 +466,9 @@ may use the schema for an early hint if it wishes.
   on the instance, not in `pending`, not in any state or result value.
 - Tokens go from Cognito's answer into the `SessionStore` and nowhere else (rule 9): the login
   outcome on `loginResult$` and `loginState$` carries `username`, `role` and `expiresAt` only.
-- Tokens are in memory only. Persistence, if any, is decided by the front-end architecture
-  document together with the hosting (the CloudFront origin decides the CORS and CSP story).
+- Tokens are in memory only. Persistence, if any, is a decision of the front-end architecture
+  document, where it is open (`docs/FRONTEND_ARCHITECTURE.md` section 10, open point O3): the
+  hosting was decided and deployed without it.
 - Nothing is logged by the service. If the front end later adds a logger, the `Session` and the
   request body are excluded by design, as the back end excludes tokens (CLAUDE.md hard rules).
 - The JWT is decoded without verification only to display claims; authorization always happens
@@ -507,8 +512,8 @@ v2 had `login.service.ts`, `login.types.ts`, `jwt.ts` and their tests.
   `Buffer`, `global`, `require`, `__dirname`, `__filename` (root `eslint.config.js`). Tests are not
   covered: the integration test uses `node:fs` to read `backend/env.local.json`.
 
-When `docs/FRONTEND_ARCHITECTURE.md` (framework, hosting, sign-in flow) is written, this document
-becomes, or is referenced as, its services chapter.
+`docs/FRONTEND_ARCHITECTURE.md` (the views, the hosting and the deployment) refers to this
+document as the truth for the services.
 
 ---
 
@@ -577,7 +582,7 @@ unexpected`).
 | 8 | ~~No code until `docs/FRONTEND_ARCHITECTURE.md` exists~~ Revised in v2: the services layer is created before it; everything else in `frontend/` still waits | Brief 31, decision 1: the services layer depends on nothing the architecture will choose. Recorded in `docs/FOLDER_STRUCTURE.md` section 7. |
 | 9 | One `SessionStore` holds the signed-in `Session`; nobody else keeps a copy of a token | Section 9.1. One place to refresh, expire or clear; every consumer sees the change. No state library: a `BehaviorSubject` is enough. |
 | 10 | `LoginService` writes to the store itself (store injected), before it emits the outcome | Section 9.4. The view does not have to wire login to the store, and a view reacting to `success` already finds the session there. |
-| 11 | Memory only; no `sessionStorage` or `localStorage` in v3 | Rule 7. A reload means signing in again. `sessionStorage` is the candidate if that becomes annoying, decided by the front-end architecture with the hosting and its CSP; `localStorage` is excluded (tokens outlive the tab). |
+| 11 | Memory only; no `sessionStorage` or `localStorage` in v3 | Rule 7. A reload means signing in again. `sessionStorage` is the candidate if that becomes annoying, decided by the front-end architecture with the hosting and its CSP; `localStorage` is excluded (tokens outlive the tab). The hosting was decided and deployed on 2026-11-21 without it: still open (`docs/FRONTEND_ARCHITECTURE.md` section 10, open point O3). |
 | 12 | The store clears itself at `expiresAt` | Section 9.3. The view learns of the expiry on time instead of from a rejected API call (API Gateway's 403, section 9.4; corrected in v4, v3 said 401). `RefreshService` replaces the session before then, which re-arms the timer. |
 | 13 | `session$` is `Session \| null`, without a reason for `null` | Assumed, the simplest option. If the view needs to say "your session expired" rather than show the bare form, the value becomes a small union (`signed_in` / `signed_out` with `reason: 'logout' \| 'expired' \| 'rejected'`) without changing who writes or reads it. |
 | 14 | The shared building blocks are modules of functions (`cognito.ts`, `api.ts`), not a base class | Brief 32, decision 1: extracted, not copied. Each service still declares its own subjects and pipeline, so the pattern of section 3 stays visible in every class; the modules only build a request and map an answer. |
@@ -594,7 +599,7 @@ unexpected`).
 | 25 | 5xx and 429 without an `error` field are `server`; any other answer outside the contract is `unexpected` | 429 is the stage throttling (5 req/s, architecture section 7.1): try again later, like a 5xx. The rest would be a bug or a wrong `apiUrl` (section 10.2). |
 | 26 | Integration: one ordered journeys file (`journeys.test.ts`) next to the login file; a fixed throw-away user `fe-journey`, removed before and after through `UsersService` itself | Mirrors the back end's journeys. No AWS SDK in `frontend/` tests; a fixed name with removal at both ends survives a crashed run (section 14). |
 | 28 | The `SessionStore` is the only place that holds tokens (rule 9); no result, state or service field carries one | The user's decision on reviewing v4 part A. One holder means one place to clear: after logout or expiry no replayed stream still holds a token. It changes `LoginService`'s success (decision 4). |
-| 27 | The missing CORS configuration of the API is recorded as a known gap, not fixed | Brief 32, correction 2. It belongs to the front-end architecture (hosting); the tests run in Node, which does not apply CORS (section 10.3). |
+| 27 | The missing CORS configuration of the API is recorded as a known gap, not fixed | Brief 32, correction 2. It belongs to the front-end architecture (hosting); the tests run in Node, which does not apply CORS (section 10.3). Closed on 2026-11-21 without a change to the API: the page and the API share one origin (section 10.3). |
 | 29 | `ApiRequest` is a union: `GET` and `DELETE` take no `body` (`body?: never`), `POST`, `PUT` and `PATCH` may; `query?: Record<string, string>` encoded with `URLSearchParams`, keys in the order given, no `?` when absent or empty | Brief 54, point 1 (spec 16.1). The compiler refuses a body where fetch would refuse it (`GET`) or the API reads none (`DELETE`). `query` is added now for step 54's routes 15 and 16; `api.test.ts` proves it. |
 | 30 | `ApiFailure.conflicts` is set only with `availability_conflict` (a route code); the service keeps the entries whose `appointmentId`, `username`, `start`, `end` are strings, copied field by field; a missing or non-array list gives `[]`; the reason stays `availability_conflict` in every case | Brief 54, point 1. The view can always list what it got, and a malformed answer does not turn a known refusal into `unexpected`. Copying the four fields keeps anything else the server might add out of the view (section 17.7). |
 | 31 | `pending` carries **every argument of the call under the API contract's names** from `shared/` (`typeId`, `patternId`, `windowId`, `date`, `name`, `windows`); a whole-object argument is named after its object (`settings`, `pattern`, `window`); a load with no argument carries nothing. A load's streams are named after what it loads (`settingsResult$`, `typesResult$`, `patternsResult$`, `listUsersResult$`), every other method's after the method (`updateResult$`, `createResult$`, `renameResult$`, `removeResult$`, `createPatternResult$`, …), each with its `…State$` | Brief 54, point 2; step 54 copies it. Generalises `deleteUserState$`'s `username` (decision 24) so that a view can show what is pending without keeping its own copy. The names follow spec 16.2. |
@@ -620,10 +625,10 @@ unexpected`).
 | 51 | **The revocation is given up after 10 seconds** (`REVOKE_TIMEOUT_MS = 10_000`), measured from the request to the whole answer read; the request is then aborted and the result is `failure timeout`. **Each `logout()` is a call of its own**: it never cancels an earlier one and never waits for it. The result stream gives every revocation's outcome, in the order they arrive; the state follows the latest call only, so a late outcome of an earlier call does not overwrite it | Decided with the user (point 6: "about 10 seconds"). No other service has a time limit to be in line with: they wait for `fetch`, and a new call or a teardown cancels them, which decision 48 rules out here; so the number is the brief's. A second press straight after the first finds the store empty and answers `not_signed_in` without a request. A second person's sign-out within 10 seconds of the first's sends that person's own token. |
 | 52 | **Only "Sign out" revokes.** The expiry, a token the API rejected and a refresh Cognito refused clear the store as before (section 9.4) and send nothing | Decided with the user (point 7). Section 20.6 says for each why the refresh token left at Cognito is acceptable: in short, a session that ends by itself is like a tab that is closed, which no code sees. |
 | 53 | **A sign-out puts the page-wide services back to their first state**: `LoginService.reset()` and `RefreshService.reset()`, called by `LogoutService`, which receives them as a list (`readonly Resettable[]`), before it clears the store. The `LogoutService` keeps its own last result until the next sign-out; it names nobody. The services of one person's session need no `reset()` | Decided with the user (point 8) for the `LoginService`. **Extended by the design to the `RefreshService`, and confirmed by the user on review (2026-11-21)**: it is page-wide too, and its success holds the username (section 11.3); without its `reset()` the aim of the decision, nothing of the person left in a service, is not met. Called by the service rather than by the view, so that whoever calls `logout()` gets all of it. Before the store is cleared, so that the login view, mounted when `session$` says `null`, finds `idle` and never the last person's outcome. |
-| 54 | **The proof: unit tests, an integration journey, and the cloud at step 72.** cognito-local implements `RevokeToken`, and a refresh with the revoked token is then refused (checked 2026-11-21, section 20.1): so `frontend/tests/integration/logout.service.test.ts`, with its page under `docs/journeys/frontend/` (section 20.9). What only the cloud proves is listed there | Decided with the user (point 9), on the branch "cognito-local revokes". |
+| 54 | **The proof: unit tests, an integration journey, and the cloud at step 72.** cognito-local implements `RevokeToken`, and a refresh with the revoked token is then refused (checked 2026-11-21, section 20.1): so `frontend/tests/integration/logout.service.test.ts`, with its page under `docs/journeys/frontend/` (section 20.9). What only the cloud proves is listed there, with what the first deployment showed (the call from a browser, answered 200) and what it did not try (a refresh with the revoked token) | Decided with the user (point 9), on the branch "cognito-local revokes". |
 | 55 | A failure of the revocation never carries Cognito's own `message`: the service writes `Cognito answered <status> <type>`, and names the type only when it is one of the table of section 20.5 | The design's own, for review. AWS's validation errors can quote the value they refuse, and here the only value is the refresh token. Decision 46 says no token in a result; this makes it true whatever Cognito answers. A login keeps Cognito's message as before (section 4.5): there the request's secret is the password, and nothing changes in v8. |
 | 56 | The revocation is sent with `keepalive: true` | The design's own, confirmed by the user on review (2026-11-21). A person on a shared computer presses "Sign out" and closes the tab: without it the browser drops a request still in flight, and the refresh token stays valid. With it the browser finishes the request after the page is gone. `fetch`'s standard option, no new import. Not proven by the unit tests beyond the option being set; a browser's behaviour. |
-| 57 | Cognito's error types for `RevokeToken` are mapped in a table of their own, `toRevokeOutcome` in `cognito.ts`: the eight of AWS's API reference for the operation, `ThrottlingException` of its common errors, and the two cognito-local answers (`NotAuthorizedException`, `ResourceNotFoundException`). A 200 is a success whatever its body | The design's own. AWS's page lists the types but does not say which one answers a token already revoked, expired or malformed, an unknown client, or revocation switched off (section 20.1): the mapping follows the types' descriptions, and step 72 can read the real answers. The reasons differ from a login's (decision 15), so one shared table would mislead. |
+| 57 | Cognito's error types for `RevokeToken` are mapped in a table of their own, `toRevokeOutcome` in `cognito.ts`: the eight of AWS's API reference for the operation, `ThrottlingException` of its common errors, and the two cognito-local answers (`NotAuthorizedException`, `ResourceNotFoundException`). A 200 is a success whatever its body | The design's own. AWS's page lists the types but does not say which one answers a token already revoked, expired or malformed, an unknown client, or revocation switched off (section 20.1): the mapping follows the types' descriptions; no refusal of the real Cognito was provoked at step 72, so none was read. The reasons differ from a login's (decision 15), so one shared table would mislead. |
 | 58 | `cognito.ts` builds both requests with one private function, `cognitoRequest`; `initiateAuth` keeps its signature | The design's own. The address, the method, the two headers and the body's reading are the same for both calls (section 10.1); written twice they would drift. Decision 14: extracted, not copied. |
 
 ---
@@ -792,7 +797,8 @@ to read later.
 If reloads become a nuisance, `sessionStorage` is the candidate (survives a reload, dies with
 the tab): the store would read it in its constructor and write it in `set()` and `clear()`; nobody
 else would change. That decision belongs to the front-end architecture document, together with
-the hosting and its Content-Security-Policy. `localStorage` is not a candidate: the tokens would
+the hosting and its Content-Security-Policy; it was not taken with them, and is open there
+(`docs/FRONTEND_ARCHITECTURE.md` section 10, open point O3). `localStorage` is not a candidate: the tokens would
 outlive the tab by up to the refresh token's 7 days.
 
 ### 9.7 Security notes
@@ -1162,25 +1168,37 @@ services keep only their subjects, their pipelines and their shape checks:
   `WindowIdParam`, `DateParam`). Query values go through `URLSearchParams`, which encodes them.
 - Nothing is logged.
 
-### 10.3 Known gap: the API has no CORS configuration
+### 10.3 The API has no CORS configuration, and needs none
 
 `backend/template.yaml` declares no `CorsConfiguration` on the HTTP API. A browser page served
-from another origin (the front end's future CloudFront domain, or a dev server on another port)
-therefore cannot call it: the preflight `OPTIONS` that the `Authorization` header triggers is not
-answered with `Access-Control-Allow-*` headers, and the browser rejects the call, which the
-services report as `network`.
+from another origin than the API's therefore cannot call it: the preflight `OPTIONS` that the
+`Authorization` header triggers is not answered with `Access-Control-Allow-*` headers, and the
+browser rejects the call, which the services report as `network`.
 
-This step is not blocked: the unit and integration tests run in Node, which does not apply CORS.
-Fixing the gap is a decision of the front-end architecture document, together with the hosting:
-either the API and the page share one origin (CloudFront in front of both, the API under a path),
-or the HTTP API gets a `CorsConfiguration` naming the page's origin. The back end is not changed
-by this design (decision 27). Cognito and cognito-local already answer the preflight (section 1.1).
+When the services were designed this was recorded as a known gap and not fixed (decision 27),
+with two ways out: the API and the page share one origin, or the HTTP API gets a
+`CorsConfiguration` naming the page's origin.
 
-**Decided on 2026-11-21, not yet built:** one origin. The page's CloudFront distribution passes
-`/api/…` on to the API, so the API gets no `CorsConfiguration`
-(`docs/FRONTEND_ARCHITECTURE.md` section 13.3; the order of work is
-`docs/FRONTEND_DEPLOY_PLAN.md`). Nothing in the services changes: `apiUrl` is `/api`, as under
-the dev server.
+**The gap is closed: one origin** (decided and deployed on 2026-11-21). The page's CloudFront
+distribution passes `/api/…` on to the API with the prefix removed, as the dev server does
+locally (`docs/FRONTEND_ARCHITECTURE.md` section 13.3). A browser at the page's address
+therefore asks no cross-origin question of the API: the API has no CORS configuration and
+needs none, and the back end did not change. Nothing in the services changed either: `apiUrl`
+is `/api`, at the deployed page as under the dev server. Seen at the deployed page
+(`docs/RUNBOOK.md` section 5.5): signed-in calls with `GET`, `POST`, `PUT` and `DELETE`
+answered through the page's address.
+
+What still crosses origins is Cognito, which the page calls directly. **Cognito answers a
+browser from the page's origin**: seen at the deployed page for the login (`InitiateAuth`) and
+for the sign-out's `RevokeToken`, answered 200 (section 20.9). The renewal of a session is the
+same operation as the login, with another flow; one made by the deployed page is not yet
+looked at (an open item of `docs/RUNBOOK.md` section 5.5). cognito-local answers the preflight
+too (section 1.1).
+
+The API still answers no cross-origin request: a page served from any other address than the
+distribution's (a dev server that does not pass `/api` on, or the API's own address called
+from a browser) meets the gap as before. The unit and integration tests run in Node, which
+does not apply CORS.
 
 ### 10.4 Unit tests
 
@@ -2626,8 +2644,8 @@ X-Amz-Target: AWSCognitoIdentityProviderService.RevokeToken
   mentions CORS or a browser. What is known is next to it, not it: Cognito answers the
   preflight of `InitiateAuth` (section 10.3, section 1.1), and `RevokeToken` is the same
   address, the same method and the same two header names, with another value in
-  `X-Amz-Target`; a preflight asks about the names of the headers, not their values. **The
-  first deployment proves it** (step 72), and it must be looked at on purpose: if the browser
+  `X-Amz-Target`; a preflight asks about the names of the headers, not their values. It is
+  looked at at the deployed page, and on purpose: if the browser
   refused the call, the result would be `network`, the person would be signed out all the
   same, and nothing on the page would show it (decision 50). **Seen on 2026-11-21: the
   browser may.** At the deployed page the request was answered 200 (section 20.9).

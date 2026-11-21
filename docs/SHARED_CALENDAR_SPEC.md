@@ -1386,8 +1386,9 @@ A new journeys file, `frontend/tests/integration/calendar.test.ts`, against the 
 | Availability management | Administrator | Types list; patterns list grouped by weekday; per-date override editor ("this day only…", "not available"); one-off windows; the conflicts list when a change is refused. |
 | Settings | Administrator | The four settings, with their defaults and ranges. |
 
-The **CORS gap** (`FRONTEND_SERVICES.md` 10.3) applies to the new routes too. The browser cannot
-call any route until the front-end architecture solves it.
+The **CORS gap** (`FRONTEND_SERVICES.md` 10.3) applied to the new routes too. The front-end
+architecture solved it on 2026-11-21 with no change to the API: the deployed page calls every
+route through its own address (`docs/FRONTEND_ARCHITECTURE.md` section 13.3).
 
 ---
 

@@ -192,7 +192,9 @@ From now on the new stack is the one in use; the old one stays as the way back (
 
 New `ApiUrl`, `UserPoolId` and `UserPoolClientId`; the old ones keep working until step 58.
 Every user other than `admin` must be created again in the new pool (on 2026-11-16 there is none).
-No front end is deployed, so nothing else points at the old ids.
+No front end was deployed then, so nothing else pointed at the old ids. The page deployed on
+2026-11-21 (stack `shared-calendar-web`) talks to `shared-calendar-api` only, and its deploy
+command refuses the old stack: still nothing points at the old ids.
 
 ### 6.3 Step 58 — retire `hello-world-api`
 

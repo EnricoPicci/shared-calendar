@@ -13,6 +13,7 @@
 |---|---|---|
 | v1 | 2026-11-20 | First version: 102 checks. |
 | v2 | 2026-11-21 | `docs/FRONTEND_DEPLOY_PLAN.md` step 71: "Sign out" also tells Cognito. Check 4 now looks at that request too (mark `[N]`); 102 checks still. Check 4 was done in that step's browser check, by a script; the walk was not run again in full. |
+| v2, note | 2026-11-21 | `docs/FRONTEND_DEPLOY_PLAN.md` step 73: section 1 says where the walk stands at the deployed page. No check changed. |
 
 ---
 
@@ -39,6 +40,12 @@
 - **Two dates.** *The walk's date*: the first Wednesday that is at least 35 days after today
   (the seed gives it Studio 09:00 to 13:00, and a booking so far ahead is still allowed). *Next
   week*: the week after the one of today, where the seed leaves free slots on every weekday.
+
+**At the deployed page.** The walk is written for the local stack, and has been run in full
+there only. The page deployed on 2026-11-21 is the same page; a part of the checks was done at
+it that day, at a desktop width, with data made by hand through the page (the seed refuses any
+address but the laptop's, on purpose). What was done, and the rest of the walk with the phone
+width, still to do there, are in `docs/RUNBOOK.md` section 5.5.
 
 **What it changes, and what it leaves.**
 
