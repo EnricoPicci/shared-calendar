@@ -1,0 +1,262 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Shared calendar, the hosting of the browser page (docs/FRONTEND_ARCHITECTURE.md section 13).
+  A private S3 bucket holding the four built files, behind a CloudFront distribution that also
+  passes /api/... on to the back end's API, so that a browser sees one address.
+
+# This stack (shared-calendar-web) stands beside the back end's (shared-calendar-api) and is
+# never part of it: a release of the page changes nothing of the API. It holds no function of
+# Lambda, no table and no role. It is deployed by npm run deploy -w frontend
+# (frontend/scripts/deploy.sh), which also uploads the files: the template creates the bucket
+# empty.
+#
+# No "Transform: AWS::Serverless" line: nothing here is one of SAM's short forms, so this is
+# plain CloudFormation, which sam validate and sam deploy read as they are.
+
+# The one value given at deploy time. The deploy command reads it from the back end's stack
+# (the host of its output ApiUrl); it is in no committed file.
+Parameters:
+  ApiDomain:
+    Type: String
+    # A host name only: letters, digits, dots and hyphens. A value with a scheme (https://), a
+    # port or a path holds a ":" or a "/" and is refused before anything is created.
+    AllowedPattern: '^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$'
+    ConstraintDescription: must be a host name only, without "https://", a port or a path.
+    Description: >
+      Host name of the back end's API (<id>.execute-api.<region>.amazonaws.com), where the
+      distribution sends the requests for /api/...
+
+Resources:
+  # ---------------------------------------------------------------------------
+  # The files: a private bucket, readable by this distribution only
+  # ---------------------------------------------------------------------------
+
+  # Where the four built files lie: index.html, style.css, app.js and app.js.map
+  # (docs/FRONTEND_ARCHITECTURE.md section 13.5). Nobody reads it directly: a browser asks the
+  # distribution, which asks the bucket. Its name is left to CloudFormation (the stack's
+  # outputs give it), so no name has to be invented that is free in all of AWS.
+  # Deleting the stack fails while the bucket holds files: it is emptied by hand first.
+  PageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      # Every kind of public access is blocked, whatever a later policy or object setting says.
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      # Encrypted at rest with the key S3 keeps itself: no key of our own to pay for or manage.
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      # The bucket's owner owns every object and the old per-object permission lists (ACLs) are
+      # off: the policy below is the only thing that grants access.
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+  # Who may read the files: the CloudFront service, and only when it asks for this one
+  # distribution (the condition on the distribution's ARN). Reading only (s3:GetObject), and
+  # only the four objects by name: no wildcard in an action or a resource (CLAUDE.md, "Hard
+  # rules from the design"). A fifth file would need a line here, on purpose
+  # (docs/FRONTEND_ARCHITECTURE.md section 11, decision 142).
+  # Since listing the bucket is not granted, S3 answers 403, not 404, for any other name.
+  PageBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref PageBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ReadTheFourFilesThroughThisDistribution
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource:
+              - !Sub ${PageBucket.Arn}/index.html
+              - !Sub ${PageBucket.Arn}/style.css
+              - !Sub ${PageBucket.Arn}/app.js
+              - !Sub ${PageBucket.Arn}/app.js.map
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}
+
+  # How the distribution proves to S3 that it is the one asking: it signs every request to the
+  # bucket with AWS's request signature (sigv4), always. The bucket's policy above then
+  # recognises it.
+  BucketAccess:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        # A name is required and must be free in the account: the stack's name makes it so.
+        Name: !Sub ${AWS::StackName}-bucket
+        Description: Lets the distribution of the shared calendar's page read its bucket
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # ---------------------------------------------------------------------------
+  # The API through the page's address
+  # ---------------------------------------------------------------------------
+
+  # A few lines of JavaScript that CloudFront runs on every request for /api/... before passing
+  # it on. The page calls /api/calendar; the API knows the route as /calendar. So the function
+  # removes the first four characters of the path ("/api") and hands the request back; a path
+  # that is then empty becomes "/". It reads no header and no body and sets none
+  # (docs/FRONTEND_ARCHITECTURE.md section 13.3, rule 4). The dev server does the same in
+  # frontend/scripts/dev.mjs. The runtime is the second generation of CloudFront Functions.
+  StripApiPrefixFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub ${AWS::StackName}-strip-api-prefix
+      # Published at once: a function that is only saved is not run by the distribution.
+      AutoPublish: true
+      FunctionConfig:
+        Comment: Removes the leading /api from the path of a request passed on to the API
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          const request = event.request;
+          const path = request.uri.slice(4);
+          request.uri = path === '' ? '/' : path;
+          return request;
+        }
+
+  # ---------------------------------------------------------------------------
+  # The headers sent with every answer
+  # ---------------------------------------------------------------------------
+
+  # What the distribution adds to every answer, a file's and the API's alike
+  # (docs/FRONTEND_ARCHITECTURE.md section 13.4). "Override: true" means our value wins if the
+  # origin sent the same header; neither the bucket nor the API sends any of these.
+  PageHeaders:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub ${AWS::StackName}-headers
+        Comment: Content-Security-Policy and three more headers for the shared calendar's page
+        SecurityHeadersConfig:
+          # The page loads its script and its style sheet from its own address only, and calls
+          # its own address (the API, under /api) and Cognito, where the login and the refresh
+          # go directly. Cognito's address is built from this stack's region: the user pool is
+          # in the same region. No other site may show the page in a frame, and the page may
+          # hold no <base> element.
+          ContentSecurityPolicy:
+            ContentSecurityPolicy: !Sub >-
+              default-src 'self';
+              connect-src 'self' https://cognito-idp.${AWS::Region}.${AWS::URLSuffix};
+              frame-ancestors 'none';
+              base-uri 'none'
+            Override: true
+          # A browser that has been here once asks over HTTPS only, for a year (in seconds).
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 31536000
+            IncludeSubdomains: false
+            Preload: false
+            Override: true
+          # X-Content-Type-Options: nosniff. A file is what its content type says.
+          ContentTypeOptions:
+            Override: true
+          # The page's address is told to no other site.
+          ReferrerPolicy:
+            ReferrerPolicy: no-referrer
+            Override: true
+
+  # ---------------------------------------------------------------------------
+  # The address: the distribution and its two rules
+  # ---------------------------------------------------------------------------
+
+  # The HTTPS address of the page, https://<id>.cloudfront.net, with AWS's own certificate
+  # (docs/FRONTEND_ARCHITECTURE.md section 13.1). It fetches what it answers from two places
+  # ("origins"), chosen by the path: /api/... from the API, everything else from the bucket.
+  # No domain of our own, no logging and no firewall
+  # (docs/FRONTEND_ARCHITECTURE.md section 13.8).
+  #
+  # No CustomErrorResponses, on purpose (docs/FRONTEND_ARCHITECTURE.md section 13.3, rules 2
+  # and 3): no failure is replaced by a page, so a refusal of the API arrives as the API sent
+  # it; and nothing has to be set for a failure of the API not to be kept, because the rule
+  # for /api/... keeps nothing at all.
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: Shared calendar, the page and the API under /api
+        # A request for "/" is answered with index.html.
+        DefaultRootObject: index.html
+        # The newer, faster forms of HTTP as well as the plain one, and IPv6 addresses too.
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        # The cheapest set of CloudFront's locations: Europe and North America.
+        PriceClass: PriceClass_100
+        # The certificate AWS provides for *.cloudfront.net: nothing to buy or renew.
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+        Origins:
+          # The bucket, reached at its address in this region and signed for by BucketAccess.
+          # The empty OriginAccessIdentity is required by CloudFormation and says that the
+          # older way of granting access is not used.
+          - Id: bucket
+            DomainName: !GetAtt PageBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt BucketAccess.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+          # The back end's API, over HTTPS only, with the current version of TLS only.
+          - Id: api
+            DomainName: !Ref ApiDomain
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+        # The rule for the files: every path that is not /api/...
+        DefaultCacheBehavior:
+          TargetOriginId: bucket
+          # A request over plain HTTP is answered with a redirect to HTTPS.
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          # The files are sent compressed to a browser that accepts it.
+          Compress: true
+          # AWS's managed cache policy "CachingOptimized": CloudFront keeps a file and may send
+          # its compressed form; nothing of the browser's headers, cookies or query string
+          # tells two requests apart. The files are uploaded with "Cache-Control: no-cache", so
+          # a browser asks at every load whether its copy is still the newest; the deploy
+          # command empties CloudFront's copies after an upload
+          # (docs/FRONTEND_ARCHITECTURE.md section 13.5).
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          ResponseHeadersPolicyId: !Ref PageHeaders
+        CacheBehaviors:
+          # The rule for the API (docs/FRONTEND_ARCHITECTURE.md section 13.3).
+          - PathPattern: /api/*
+            TargetOriginId: api
+            ViewerProtocolPolicy: redirect-to-https
+            # All seven: the page reads, creates, changes and deletes through the API.
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+            # AWS's managed cache policy "CachingDisabled": CloudFront keeps no answer of the
+            # API, a failure neither, so an answer given to one person is never given to the
+            # next.
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            # AWS's managed origin request policy "AllViewerExceptHostHeader": every header of
+            # the browser (Authorization, which carries the token, among them), the cookies and
+            # the query string are passed on to the API, except the Host header, which
+            # CloudFront sets to the API's own name: API Gateway finds the API by it.
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+            ResponseHeadersPolicyId: !Ref PageHeaders
+            # The function above runs when the request arrives ("viewer request"), before it
+            # is passed on.
+            FunctionAssociations:
+              - EventType: viewer-request
+                FunctionARN: !GetAtt StripApiPrefixFunction.FunctionMetadata.FunctionARN
+
+# What the deploy command reads after the deployment. None is a secret.
+Outputs:
+  PageUrl:
+    Description: The address of the page
+    Value: !Sub https://${Distribution.DomainName}
+  BucketName:
+    Description: The bucket the four built files are uploaded to
+    Value: !Ref PageBucket
+  DistributionId:
+    Description: The distribution's id, needed to empty its copies after an upload
+    Value: !Ref Distribution

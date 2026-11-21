@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v1 — **planned, not started** (2026-11-21, brief `prompts/93-deploy-frontend.md`): steps 70 to 73 |
+| Status | v2 — **step 70 done** (2026-11-21, brief `prompts/94-step-70-implementation.md`): the template and the deploy command are written, nothing is deployed. Steps 71 to 73 to do |
 | Scope | Everything needed to go from the views that run locally to **the page in use on the web**: the hosting's template and the deploy command, logout, the first deployment, the documents. Steps 70 to 73 |
 | Not in scope | The session across a reload, the size of the bundle, a domain of our own: the open points O3, O9 and O10 of `docs/FRONTEND_ARCHITECTURE.md` section 10. Any change to the API, to `shared/` or to a view beyond "Sign out" |
 | Governed by | `docs/FRONTEND_ARCHITECTURE.md` section 13 (the hosting and the deployment), `docs/FRONTEND_SERVICES.md` (the services; logout from step 71), `docs/ARCHITECTURE.md` section 8.1 (the deploy gate) and `CLAUDE.md` (cloud safety, the hard rules). On any conflict with this plan, they win |
@@ -12,6 +12,7 @@
 | Version | Date | Change |
 |---|---|---|
 | v1 | 2026-11-21 | First version: steps 70 to 73. |
+| v2 | 2026-11-21 | Step 70 done, with what it found. AWS's documentation says the cache policy `CachingDisabled` keeps no failure: the template sets nothing for failures, and the risk's row and step 72's check of it are reworded (the old check asked for a 401, which CloudFront never keeps). Step 72: the dry run first, what the change set must show, the statuses of the four checks, what the deployment is the first to prove. |
 
 ---
 
@@ -51,7 +52,26 @@ Not settled, and settled by a step: the design of the logout service (step 71).
 
 ## 3. Steps
 
-### Step 70 — The hosting's template and the deploy command (≈ 6 h, no cloud)
+### Step 70 — The hosting's template and the deploy command (≈ 6 h, no cloud) — done
+
+**Done 2026-11-21** (brief `prompts/94-step-70-implementation.md`). What was built is said in
+`docs/FRONTEND_ARCHITECTURE.md` section 13 (v14) and its decisions 154 to 158; what differs from
+the list below:
+
+- No status is set to "not kept": AWS's page says `CachingDisabled` keeps no failure, so the
+  distribution has no `CustomErrorResponses` (`docs/FRONTEND_ARCHITECTURE.md` section 13.3,
+  rule 3).
+- The three ids of the managed policies were read again on AWS's pages and are the brief's.
+- `frontend/samconfig.toml` also holds `fail_on_empty_changeset = false`, and names no bucket
+  for artifacts and no capabilities: read in SAM CLI's source, not tried by deploying.
+- `npm run verify -w frontend` now needs the SAM CLI.
+- `docs/FRONTEND_WALK.md` did not change: no check says the policy's words.
+- **The dry run was not tried in this step past its gate**: it needs a committed tree and a
+  fresh stamp, and the step ends before the commit. Each of its parts was tried apart (the
+  read of the back end's stack, the build with the real values). It is the first thing of
+  step 72.
+
+The step as planned:
 
 Builds everything of `docs/FRONTEND_ARCHITECTURE.md` sections 13.2 to 13.6 that can exist
 without a deployment.
@@ -118,12 +138,17 @@ without a deployment.
 invalidates), and `npm run deploy -w backend` if the back end has changes not yet deployed.
 
 1. Commit; on a clean tree, root `DYNAMODB_PORT=8002 npm run verify` green, less than 30
-   minutes before.
+   minutes before. Then `npm run deploy -w frontend -- --dry-run`, which step 70 could not
+   run past its gate: it reads the back end's stack, builds, and says what it would do;
+   `frontend/dist/app.js` holds `/api` and Cognito's real address and no `localhost`.
 2. If the stack `shared-calendar-api` is behind the repository: `npm run deploy -w backend`
    and its smoke test first (`docs/RUNBOOK.md` section 2).
 3. `npm run deploy -w frontend`. Review the change set: only *Add*, six resources, all of
-   section 13.2. A distribution takes some minutes to be ready the first time.
-4. The command's four checks: all PASS.
+   `docs/FRONTEND_ARCHITECTURE.md` section 13.2. SAM must not create or ask for a bucket of
+   its own for artifacts (if it does, `frontend/samconfig.toml` is wrong: stop). A
+   distribution takes some minutes to be ready the first time.
+4. The command's four checks: all PASS (`/` 200 with the policy, `/app.js` 200, `/api/calendar`
+   401, `/api/no-such-route` 404, the last two with the API's own JSON).
 5. In a browser, at the page's address, at a desktop and at a phone width:
    - the Administrator signs in (the first signed-in call through the distribution: the
      week loads, so the `Authorization` header arrived);
@@ -131,8 +156,12 @@ invalidates), and `npm run deploy -w backend` if the back end has changes not ye
      made by hand through the page (a type, a pattern, a User, a booking as that User). The
      local seed refuses any address but the laptop's, on purpose. Which checks were done, and
      which were not, is reported;
-   - a refusal seen by one person is not seen by the next: sign out, ask
-     `https://<page>/api/calendar` with curl and no token (401), sign in, and the week loads;
+   - a failure of the API is not kept: ask `https://<page>/api/no-such-route` twice with
+     curl within ten seconds (a 404, the status CloudFront keeps longest where caching is
+     on). The two answers must carry different `apigw-requestid` headers: the API answered
+     twice. The same id twice is a kept answer. No route of this API answers a `GET` with a
+     failure that depends on the person, so this is the check there is; a 401 proves nothing
+     here, CloudFront never keeps one, and only a `GET` or a `HEAD` is ever kept;
    - "Sign out", then a refresh with the old refresh token is refused by Cognito (step 71 in
      the cloud);
    - the console: `zod`'s one report and no other.
@@ -169,11 +198,12 @@ the page.
 |---|---|---|
 | The organization's policy refuses the creation of a CloudFront distribution (reading is allowed: `list-distributions` answered on 2026-11-21) | low | Found at step 72, point 3: the stack rolls back and nothing is left. Then: ask for CloudFront to be allowed for the account, or the account of `docs/NEW_ACCOUNT.md`, which has no such policy. A host without CloudFront (Amplify Hosting in `eu-north-1`) is the last resort: it is CloudFront underneath, and the decision goes back to `docs/FRONTEND_ARCHITECTURE.md` |
 | The `Authorization` header does not reach the API through the managed policy `AllViewerExceptHostHeader` (AWS's pages say it passes on every header but `Host`, and name its sibling `AllViewer` for this header) | low | Seen at step 72, point 5, at the first sign-in: every call answers 401. Then an origin request policy of our own, or `AllViewer` with the `Host` put right by the function |
-| CloudFront keeps a failure of the API although the time is set to zero, or keeps a status that cannot be set | low | Step 72, point 5, third check. Then `Cache-Control: no-store` on the API's answers, which is a change to the back end and a decision of its own |
+| CloudFront keeps a failure of the API although AWS's page says the cache policy `CachingDisabled` keeps none (`docs/FRONTEND_ARCHITECTURE.md` section 13.3, rule 3) | low | Step 72, point 5, third check. Then `CustomErrorResponses` with the time at zero for the statuses it keeps, or `Cache-Control: no-store` on the API's answers, which is a change to the back end and a decision of its own |
 | The function removes `/api` from a path it should not (`/apix`) | low | The rule's pattern is `/api/*`: nothing else reaches the function. The fourth check of the deploy command covers the route that does not exist |
 | A person loads the page during an upload and gets a new script with an old page | low | Four files in a few seconds, `index.html` last; a reload ends it (`docs/FRONTEND_ARCHITECTURE.md` section 13.5) |
 | cognito-local has no `RevokeToken`, so logout is proven only in the cloud | medium | Step 71 says so in the design; the unit tests fix the call's shape; step 72 proves it |
-| Moving the gate's check into a shared file changes what the back end's deploy refuses | low | Moved word for word; step 70's acceptance tries the refusals of both commands by hand |
+| Moving the gate's check into a shared file changes what the back end's deploy refuses | low | Moved word for word; step 70 tried the refusals of both commands by hand (no stamp, an old one, a dirty tree, and for the back end a stamp in the wrong format, of another commit, of a dirty run). What nobody has seen since the move is a deploy that *passes* the gate: step 72 is the first |
+| `sam deploy` wants a bucket for the template after all, or refuses a template without `Transform` | low | Read in SAM CLI's source at step 70, not run. Seen at step 72, point 3, before anything is created. Then `resolve_s3 = true` in `frontend/samconfig.toml` |
 | The bill | low | The free allowances cover this size; the account's 1 USD budget watches the whole bill (`docs/FRONTEND_ARCHITECTURE.md` section 13.8) |
 
 ## 5. Order of work and checkpoints

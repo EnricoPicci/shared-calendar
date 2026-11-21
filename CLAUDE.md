@@ -19,7 +19,8 @@ the login, the logic layer, the week calendar with booking, cancelling, the note
 a User's "My appointments" and the Administrator's settings, users and availability: the
 types, the weekly patterns and a single date; every screen of `docs/FRONTEND_VIEW_PLAN.md`
 section 3 exists and that plan is done, 2026-11-20; it runs locally and is deployed nowhere yet:
-the hosting is decided and planned, `docs/FRONTEND_DEPLOY_PLAN.md`). Layout and placement rules:
+the hosting is decided, its template and deploy command are written
+(`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21), and nothing of it is in the cloud). Layout and placement rules:
 `docs/FOLDER_STRUCTURE.md`.
 
 ## Where the truth lives
@@ -63,12 +64,15 @@ the hosting is decided and planned, `docs/FRONTEND_DEPLOY_PLAN.md`). Layout and 
   was needed nowhere; its section 3, rule 12 was reworded after it, to allow a file of
   helpers shared by the views of one screen, as `availability.parts.ts` is, with its bound) its
   section 7.2; where the keyboard is after each dialog closes is one table in its section 8.
-  It also defines **the hosting and the deployment** of the page (its section 13, decided
-  2026-11-21, **not built**): a private S3 bucket behind a CloudFront distribution in a stack
+  It also defines **the hosting and the deployment** of the page (its section 13, v14, decided
+  2026-11-21, **written, not deployed**: `frontend/template.yaml`, `frontend/scripts/deploy.sh`
+  and `scripts/deploy-gate.sh` exist; no stack `shared-calendar-web` does): a private S3 bucket behind a CloudFront distribution in a stack
   of its own, `shared-calendar-web`; one origin, the distribution passing `/api/…` on to the
   API, so no CORS and no change to the back end; the Content-Security-Policy and the other
   headers; the files' caching; `npm run deploy -w frontend` behind the back end's gate; the
-  direction for logout (`RevokeToken`). Still open (section 10), blocking nothing: the session
+  direction for logout (`RevokeToken`). What rests on AWS's documentation alone until the
+  first deployment is said there (its section 13.3, rules 1 and 3: the `Authorization` header
+  through the managed policy, no failure of the API kept, with no `CustomErrorResponses`). Still open (section 10), blocking nothing: the session
   across a reload, the size of the bundle, a domain of our own.
   `docs/FRONTEND_SERVICES.md` stays the truth for the services;
   `docs/FRONTEND_VIEW_OPTIONS.md` is the record of why this option, not a source of truth.
@@ -91,8 +95,9 @@ the hosting is decided and planned, `docs/FRONTEND_DEPLOY_PLAN.md`). Layout and 
   the order of work.
 - `docs/FRONTEND_DEPLOY_PLAN.md` defines the order of work for the hosting (brief 93): steps
   70 (the hosting's template and the deploy command, no cloud), 71 (logout: design, then
-  code), 72 (the first deployment, needs explicit instruction) and 73 (the documents). None
-  is started.
+  code), 72 (the first deployment, needs explicit instruction) and 73 (the documents). Step 70
+  is done (2026-11-21, brief 94; its dry run could not pass the gate before the commit and is
+  the first thing of step 72); 71 to 73 are not started.
 - `docs/FRONTEND_WALK.md` is the walk through every screen in a browser, as `alice` and as
   `admin`, at a desktop and at a phone width, from a fresh, seeded local stack: 102 numbered
   checks a person does by hand. **The check to repeat after a change to the view layer.** Not
@@ -217,7 +222,8 @@ form works the same. Paths below without a folder are relative to `backend/`.
 - `npm run typecheck -w frontend`, `npm run lint -w frontend`, `npm run test:unit -w frontend`
   (the vitest projects `unit`, in node, and `views`, in `happy-dom`, with one coverage report:
   100 % line coverage on `frontend/src`, only `src/main.ts` left out), `npm run verify -w frontend`
-  (the three in order, stops at the first failure; no Docker). The root `npm run verify` runs the
+  (the three in order, then `sam validate --lint` on `frontend/template.yaml`; stops at the first
+  failure; no Docker, but the SAM CLI, any version that lints). The root `npm run verify` runs the
   back end's, then this.
 - `npm run dev -w frontend` (`frontend/scripts/dev.mjs`; `-- <port>` for another port than 5173):
   the page on http://localhost:5173 against the local stack, foreground, for local work only.
@@ -226,7 +232,8 @@ form works the same. Paths below without a folder are relative to `backend/`.
   esbuild at every request: an edit shows after a reload of the page; an edit to `dev.mjs` itself
   needs a restart), passes `/api/…` on to `http://127.0.0.1:3000` and `/cognito/…` to
   `http://localhost:9229` so that the browser sees one origin (the API has no CORS), sends
-  `Content-Security-Policy: default-src 'self'` with the page, listens on `127.0.0.1` only and
+  `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'none'` with
+  the page (so a preview pane that is a frame shows nothing: open a browser tab), listens on `127.0.0.1` only and
   never prints a request's body or headers. The console's one known report is `zod`'s `eval`
   probe (`docs/FRONTEND_ARCHITECTURE.md` section 10, open point O5). A reload of the page signs
   out (open point O3). In a Codespace, open the forwarded port 5173: the bundle's addresses have
@@ -251,9 +258,28 @@ form works the same. Paths below without a folder are relative to `backend/`.
 - `API_URL=… COGNITO_URL=… CLIENT_ID=… npm run build -w frontend` (`frontend/scripts/build.mjs`):
   writes `frontend/dist/` (git-ignored, emptied first): `index.html`, `style.css`, `app.js`
   (minified) and `app.js.map`, and prints their sizes. The three values come from the environment
-  only, never from a committed file; a missing one stops the build and is named. No deploy of the
-  front end exists yet (it is `docs/FRONTEND_DEPLOY_PLAN.md` step 70), and `backend`'s `build` is another thing
-  (`sam build`).
+  only, never from a committed file; a missing one stops the build and is named. The deploy command
+  runs it with the stack's values; `backend`'s `build` is another thing (`sam build`).
+- `npm run deploy -w frontend` (`frontend/scripts/deploy.sh`,
+  `docs/FRONTEND_ARCHITECTURE.md` section 13.6): releases the page. **Real cloud action: only
+  when explicitly asked**, and never run yet (the first is `docs/FRONTEND_DEPLOY_PLAN.md`
+  step 72). In order: the deploy gate (the same stamp `backend/.verify-ok` as the back end's
+  deploy, the check being `scripts/deploy-gate.sh`, sourced by both), `npm run verify -w
+  frontend`, a read of the back end's stack (`ApiUrl`, `UserPoolClientId`; stack name and
+  region from the two `samconfig.toml`, which must name one region; `AWS_REGION` wins),
+  `sam deploy` of `frontend/template.yaml` to the stack `shared-calendar-web` with `ApiDomain`
+  (change set confirmed; no `sam build`, no bucket for artifacts), a read of its outputs, the
+  build (`API_URL=/api`), four `aws s3 cp` by name with content type and
+  `Cache-Control: no-cache` (`index.html` last; never `sync` or `--delete`: the bucket's
+  policy names four objects), an invalidation of `/*` that it waits for, and four checks with
+  curl and no credentials, PASS or FAIL each (`/` 200 with the Content-Security-Policy,
+  `/app.js` 200, `/api/calendar` 401 and `/api/no-such-route` 404 with the API's JSON). Its
+  only argument is `--dry-run`: the gate, `verify`, the read, the build, then what it would
+  deploy, upload, invalidate and check; it changes nothing and does not need the hosting's
+  stack. **No switch skips the gate**, for the dry run neither: both need a committed tree
+  and a fresh stamp. It refuses any argument naming `hello-world-api`. It takes and prints
+  no token and no password. A fifth file of the page is a change to the bucket's policy in
+  the template and to the script's list.
 - Stopping a background `dev` by name: `pkill -f 'node scripts/dev[.]mjs'`, in a command that
   holds no other text matching it (a shell whose command line matches is killed too).
 - `RUN_INTEGRATION=1 npm run test:integration -w frontend`: runs `frontend/tests/integration`
@@ -403,7 +429,9 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
 - Root: `package.json` (workspaces `shared`, `backend`, `frontend`; delegating scripts; shared dev tools),
   the one `package-lock.json`, `tsconfig.base.json` (strictness every package extends),
   `eslint.config.js`, `.nvmrc`, `docs/`, `prompts/`, and `scripts/` (the comment check:
-  `doc-references.mjs`, `eslint-doc-references.mjs`, `check-doc-references.mjs`; section "Comments").
+  `doc-references.mjs`, `eslint-doc-references.mjs`, `check-doc-references.mjs`; section "Comments";
+  and `deploy-gate.sh`, sourced, never run: the function `deploy_gate <stamp>` that both
+  packages' `deploy.sh` call, with the gate's checks and sentences in one place).
 - `backend/`: the API. `package.json` (name `backend`, scripts), `template.yaml`,
   `samconfig.toml`, `docker-compose.yml`, `tsconfig.json`, `vitest.config.ts`, and:
   - `src/handlers/`: one Lambda entry point per file.
@@ -485,11 +513,16 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   `docs/FRONTEND_ARCHITECTURE.md` sections 4 and 6, the logic layer in its section 5.1 (one
   row per file), the sizes in its section 7.1.
   - `package.json` (deps `rxjs`, `@shared-calendar/shared`; dev dep `happy-dom`; scripts `dev`,
-    `build`, `seed:local`, `typecheck`, `lint`, `test:unit`, `test:integration`, `verify`; no
-    `deploy` yet), `tsconfig.json` (ES2022 + DOM + DOM.Iterable, no node types),
-    `vitest.config.ts`. No `template.yaml` yet: the hosting is decided
-    (`docs/FRONTEND_ARCHITECTURE.md` section 13) and built at `docs/FRONTEND_DEPLOY_PLAN.md`
-    step 70.
+    `build`, `seed:local`, `typecheck`, `lint`, `test:unit`, `test:integration`, `verify`,
+    `deploy`), `tsconfig.json` (ES2022 + DOM + DOM.Iterable, no node types),
+    `vitest.config.ts`.
+  - `template.yaml`: the hosting (`docs/FRONTEND_ARCHITECTURE.md` section 13.2), plain
+    CloudFormation without a `Transform` line, six resources (`PageBucket`, `PageBucketPolicy`,
+    `BucketAccess`, `StripApiPrefixFunction` with its five lines of JavaScript inline,
+    `PageHeaders`, `Distribution`), one parameter `ApiDomain`, outputs `PageUrl`, `BucketName`,
+    `DistributionId`. No role, no wildcard, no `CustomErrorResponses` (on purpose).
+    `samconfig.toml`: the stack `shared-calendar-web`, the region, `confirm_changeset`,
+    `fail_on_empty_changeset = false`; nothing of a deployment. Deployed nowhere yet.
   - `src/services/`: `session.store.ts`; `cognito.ts`, `api.ts` and `jwt.ts`, the building
     blocks; then one `<name>.service.ts` + `<name>.types.ts` per service: `login`, `refresh`,
     `hello`, `users`, `calendar-settings`, `availability-types`, `availability-rules`,
@@ -529,7 +562,8 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     `availability.screen.ts`, `date.screen.ts`). A new route's failure codes get their
     sentences in `texts.ts` (`failureText`).
   - `scripts/` (Node, outside the browser's lint rules): `bundle.mjs`, `build.mjs`, `dev.mjs`,
-    `seed-local.mjs`.
+    `seed-local.mjs`; and `deploy.sh` (bash, under the rules of the back end's scripts: macOS
+    and Linux, no jq).
   - `tests/unit/services/`, `tests/unit/logic/` (project `unit`, in node; `zone.ts`,
     `fixtures.ts`) and `tests/unit/views/` (project `views`, `happy-dom`; `page.ts`,
     `page.test.ts`, `shell.test.ts`) mirror `src/`; `tests/integration/` (`local.ts`,

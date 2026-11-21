@@ -43,7 +43,8 @@ stays at the root.
 ├── package-lock.json            # the ONE lock file of the repository
 ├── tsconfig.base.json           # TypeScript strictness shared by every package (each extends it)
 ├── eslint.config.js             # lint rules for every package
-├── scripts/                     # repository-wide checks: the comment rule of CLAUDE.md ("Comments")
+├── scripts/                     # repository-wide: the comment rule of CLAUDE.md ("Comments"), and
+│                                # deploy-gate.sh, the deploy gate's check both deploy scripts source
 ├── .nvmrc  .editorconfig  .gitignore
 ├── CLAUDE.md                    # guidance for Claude Code (repository-wide)
 ├── README.md                    # written by plan step 12
@@ -72,7 +73,11 @@ stays at the root.
 │
 ├── frontend/                    # ── the browser app (section 7) ─────────────────────────
 │   ├── package.json             # name "frontend"; deps rxjs, shared; dev dep happy-dom;
-│   │                            # dev/build/seed:local/typecheck/lint/test:unit/verify
+│   │                            # dev/build/seed:local/typecheck/lint/test:unit/verify/deploy
+│   ├── template.yaml            # the hosting's infrastructure (plain CloudFormation, deployed by SAM):
+│   │                            # a private bucket behind a CloudFront distribution, stack
+│   │                            # shared-calendar-web (docs/FRONTEND_ARCHITECTURE.md section 13)
+│   ├── samconfig.toml           # that stack's name and region; nothing of a deployment
 │   ├── tsconfig.json            # extends ../tsconfig.base.json; lib ES2022 + DOM, no node types
 │   ├── vitest.config.ts         # projects unit (node) + views (happy-dom) + integration;
 │   │                            # 100 % line coverage on src/ (src/main.ts left out)
@@ -80,7 +85,8 @@ stays at the root.
 │   │                            # (docs/FRONTEND_ARCHITECTURE.md)
 │   ├── style.css                # the one style sheet
 │   ├── scripts/                 # Node scripts: bundle.mjs (shared esbuild options), build.mjs, dev.mjs,
-│   │                            # seed-local.mjs (a week to look at, in the local calendar)
+│   │                            # seed-local.mjs (a week to look at, in the local calendar); and
+│   │                            # deploy.sh, the release of the page (npm run deploy -w frontend)
 │   ├── src/
 │   │   ├── main.ts              # the entry file of the bundle: the configuration, then the shell
 │   │   ├── services/            # the services layer (docs/FRONTEND_SERVICES.md): session store,
@@ -102,7 +108,6 @@ stays at the root.
 │   │   ├── unit/                # mirrors src/ (plus services/fixtures.ts, logic/zone.ts and
 │   │   │                        # logic/fixtures.ts, views/page.ts)
 │   │   └── integration/         # login and the services' journeys against the local stack
-│   ├── (reserved, not yet) template.yaml
 │   └── (generated, git-ignored) coverage/  dist/
 │
 └── shared/                      # ── what both import ─────────────────────────────────────
@@ -224,6 +229,12 @@ without it. `git status` reports the whole repository, so uncommitted front-end 
 blocks a back-end deploy. That is intended: the gate's promise is "what is deployed is a
 committed state of the repository", and a monorepo has one commit history.
 
+The check of the stamp is one file, `scripts/deploy-gate.sh` at the root, which both deploy
+scripts source (`backend/scripts/deploy.sh` and `frontend/scripts/deploy.sh`): the front end's
+deploy stands behind the same stamp, `backend/.verify-ok`, and refuses for the same reasons in
+the same words. The stamp proves the back end and `shared/`; the front end's deploy runs the
+front end's own `verify` itself, after the gate (`docs/FRONTEND_ARCHITECTURE.md` section 13.6).
+
 ---
 
 ## 5. Everyday commands
@@ -242,7 +253,7 @@ Repository-wide (root scripts that run the same-named script in every package th
 | `npm run typecheck` | `tsc --noEmit` in every package (`shared`, `backend`, `frontend`) |
 | `npm run lint` | `eslint .` from the root, one rule set, every package |
 | `npm run test:unit` | unit tests of every package, each with its own coverage threshold |
-| `npm run verify` | `backend`'s verify, then `frontend`'s (typecheck, lint, unit tests) |
+| `npm run verify` | `backend`'s verify, then `frontend`'s (typecheck, lint, unit tests, `sam validate --lint` of the hosting's template) |
 
 Back-end operator commands keep their names and arguments; they are run in the back-end
 workspace:
@@ -255,6 +266,14 @@ npm run deploy -w backend -- --parameter-overrides AlertEmail=<address>   # firs
 npm run bootstrap-admin -w backend -- shared-calendar-api
 npm run smoke -w backend -- shared-calendar-api
 npm run budget -w backend -- shared-calendar-api
+```
+
+The front end's release, a real cloud action like the back end's deploy (its `--dry-run` says
+what it would do and changes nothing; both pass the deploy gate first):
+
+```
+npm run deploy -w frontend -- --dry-run
+npm run deploy -w frontend
 ```
 
 `cd backend && npm run <script> …` is the same thing (drop `-w backend` and the `--` before the
@@ -302,8 +321,8 @@ The front end is a browser single-page application in TypeScript built to static
 (decided 2026-11-04). Its own architecture document, `docs/FRONTEND_ARCHITECTURE.md`, fixes the
 view layer (2026-11-16: plain HTML and CSS with one TypeScript module script, no framework; the
 folders for the views in its section 9; 2026-11-19: the build and the dev server, its section 12)
-and, since 2026-11-21, the hosting and the deployment (its section 13: decided, not yet built;
-the order of work is `docs/FRONTEND_DEPLOY_PLAN.md`, steps 70 to 73). This section only fixes what the folder
+and, since 2026-11-21, the hosting and the deployment (its section 13: decided and written,
+not yet deployed; the order of work is `docs/FRONTEND_DEPLOY_PLAN.md`, steps 70 to 73). This section only fixes what the folder
 must look like so that it fits the repository:
 
 - `frontend/package.json`, name `frontend`, depends on `@shared-calendar/shared`; scripts
@@ -320,6 +339,7 @@ must look like so that it fits the repository:
   changed by a UI release. The front end's deploy command reads the back end's `ApiUrl` and
   `UserPoolClientId` from the back-end stack outputs at build time (the way
   `backend/scripts/target.sh` does), never from a file committed in the repository.
+  `frontend/samconfig.toml` holds that stack's name and region and nothing of a deployment.
 - Local development: the front end's dev server (`npm run dev -w frontend`,
   `frontend/scripts/dev.mjs`) passes `/api` on to `http://127.0.0.1:3000` (the local API of
   `npm run local:api -w backend`) and `/cognito` to `http://localhost:9229` (cognito-local), and
@@ -389,11 +409,18 @@ outside the workspaces, and were deleted at that step (they are in git history; 
 to repeat after a later change, is `docs/FRONTEND_WALK.md`; the script that ran it in a
 headless browser is not in the repository, and no end-to-end test tool is.
 
-What is decided and not yet built (`docs/FRONTEND_ARCHITECTURE.md` section 13, 2026-11-21): the
-hosting, so no `template.yaml`, no `samconfig.toml` and no `deploy` script yet (the root scripts
-use `--if-present`, so their absence is not an error). They come with
-`docs/FRONTEND_DEPLOY_PLAN.md` step 70, together with `scripts/deploy-gate.sh` at the root, the
-check of the deploy gate (section 4.5) that both packages' deploy scripts then use.
+- **The hosting's template and the deploy command, since 2026-11-21**
+  (`docs/FRONTEND_DEPLOY_PLAN.md` step 70, design `docs/FRONTEND_ARCHITECTURE.md` section 13):
+  `template.yaml` (six resources: the bucket, its policy, the origin access control, the
+  function that removes `/api`, the response headers policy, the distribution), `samconfig.toml`,
+  `scripts/deploy.sh` with the script `deploy` (and its `--dry-run`), and `verify` ending with
+  `sam validate --lint` of the template, so it needs the SAM CLI. At the root,
+  `scripts/deploy-gate.sh` (section 4.5). No new dependency, and no new generated file: the
+  deploy uploads `frontend/dist/`.
+
+What is written and not yet deployed: all of the hosting. No stack `shared-calendar-web`
+exists; the first deployment is `docs/FRONTEND_DEPLOY_PLAN.md` step 72, after logout (its
+step 71).
 
 ---
 

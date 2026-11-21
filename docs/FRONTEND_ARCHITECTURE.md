@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v13 — the view layer **implemented** (2026-11-20); **the hosting and the deployment decided, not built** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`; the order of work is `docs/FRONTEND_DEPLOY_PLAN.md`, steps 70 to 73). Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
+| Status | v14 — the view layer **implemented** (2026-11-20); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`) **and written, not deployed**: the template, the deploy command and its gate exist since `docs/FRONTEND_DEPLOY_PLAN.md` step 70 (2026-11-21, brief `prompts/94-step-70-implementation.md`); nothing is in the cloud, and logout (step 71) and the first deployment (step 72) are to do. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders; and, since v13, how the page is hosted and deployed (section 13) |
 | Not in scope | Keeping the session across a reload, the size of the bundle, a domain of our own: open points of section 10, none of which blocks a deployment. The design of the logout service: its direction is in section 13.7, the design goes into `docs/FRONTEND_SERVICES.md` |
 | Depends on | `docs/FRONTEND_SERVICES.md` v7 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work of the views), `docs/FRONTEND_DEPLOY_PLAN.md` (the order of work of the hosting) |
@@ -28,6 +28,7 @@
 | v11 | 2026-11-20 | Plan step 69, the closing. Status: implemented. The text is brought to the present tense: it says what is, not what a step added. Section 3, rule 2: why nothing shows before the script decides. Section 4: the handlers of a view that was left; a slot and an appointment named with their day for a screen reader; the dialogs that ask described by their question; the sentence of an overlap among the windows of "this day only" said once, under "Start", with "End" marked (a field in fault with no words of its own). Section 6: the sequence from "Sign in" to the first week. Section 7: the new sections 7.1, what the code became, and 7.2, the verdict on the fallback, as a proposal. Section 8: the walk, a document of its own (`docs/FRONTEND_WALK.md`); the table of the dialogs and the focus; the two tests of `page.test.ts` on reading the page without a mouse. Section 10: every open point as it stands today. Section 12.1: the size at step 69 and the share of `zod`, measured again. Section 11: decision 106 closed, decision 123 as settled, decisions 129 to 136. The trial's code (`prototypes/`) is deleted; what was still true of its page on the loading sequence is in sections 3, 4 and 6. |
 | v12 | 2026-11-20 | The verdict of section 7.2 taken at the review of plan step 69: section 3, rule 12 and the third condition of section 7 are reworded to allow what `availability.parts.ts` is, a file of helpers shared by the views of one screen, with its bound. Section 7.2 says what was decided, no longer what was proposed. Section 11: decision 135 as taken, decision 137. No code changed. |
 | v13 | 2026-11-21 | The hosting and the deployment, decided (brief `prompts/93-deploy-frontend.md`); nothing built, no code changed. New section 13: what the browser talks to, the stack `shared-calendar-web` (a private bucket behind a CloudFront distribution), the API through the page's address (one origin, no CORS, the back end unchanged), the headers sent with the page, the files and their caching, the deploy command with its gate and its checks, the direction for logout, what is left out on purpose. Section 10: O1, O2 and O5 decided, O7 with its direction, new open point O10 (a domain of our own); what blocks a deployment now is work, not a decision. Section 12.1: where a deployment's values come from. Section 11: decisions 138 to 153. The order of work is a new document, `docs/FRONTEND_DEPLOY_PLAN.md` (steps 70 to 73). |
+| v14 | 2026-11-21 | `docs/FRONTEND_DEPLOY_PLAN.md` step 70: the hosting's template, the deploy command and the gate's shared check are written; nothing is deployed. **Corrected after AWS's documentation:** section 13.3, rule 3 and decision 141: the cache policy `CachingDisabled` keeps no failure, so the distribution sets nothing for failures (no `CustomErrorResponses`); which failures CloudFront keeps elsewhere, and when. Section 13.2: what the template holds as written (no `Transform`, the names of its resources, the bucket's ownership setting). Section 13.4: the header for HTTPS names no sub-domain. Section 13.5: CloudFront's own copy lives a second. Section 13.6: the command as written (its one argument `--dry-run`, the build checked before an upload, the wait for the invalidation, the statuses of the four checks, what `sam deploy` needs and does not). Section 12.2: the dev server's policy. Section 10: O1, O2 and O5 as they stand. Section 11: decisions 141 and 147 corrected, decisions 154 to 158. |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
 TypeScript module script**. The markup of every screen is in one `index.html`; the script
@@ -49,8 +50,8 @@ code of that view proves painful (section 7); no view needed it (section 7.2).
   of truth: where it differs from this document, this document is right.
 - The order of work was that of `docs/FRONTEND_VIEW_PLAN.md` (steps 60 to 69, done).
 - It is also the source of truth for **the hosting and the deployment** of the page (section 13),
-  decided and not yet built; their order of work is `docs/FRONTEND_DEPLOY_PLAN.md` (steps 70 to
-  73).
+  decided, written and not yet deployed; their order of work is `docs/FRONTEND_DEPLOY_PLAN.md`
+  (steps 70 to 73, the first done).
 - `docs/FRONTEND_WALK.md` is the walk through every screen in a browser: the check to repeat
   after a later change. It is not a source of truth either: this document and the tests win.
 
@@ -2266,15 +2267,16 @@ decided with `docs/FRONTEND_VIEW_PLAN.md` (its section 2) and are no longer open
 say where the decision is written. Each open row ends with **what is true of it today**
 (2026-11-20, every view built and running against the local stack). O1, O2 and O5 were decided on
 2026-11-21 (section 13), and O7 got its direction: their rows say so, and what they still block
-is the work of `docs/FRONTEND_DEPLOY_PLAN.md`, no longer a decision.
+is the work of `docs/FRONTEND_DEPLOY_PLAN.md`, no longer a decision. Since that plan's step 70
+(2026-11-21) the template and the deploy command exist; nothing is deployed.
 
 | # | Point | Direction, where there is one | Blocks |
 |---|---|---|---|
-| O1 | **Hosting.** Static files on an S3 bucket behind CloudFront, in its own SAM template (`docs/FOLDER_STRUCTURE.md` section 7) | **Decided: a private bucket behind a CloudFront distribution**, stack `shared-calendar-web`, on the address AWS gives the distribution; deployed by `npm run deploy -w frontend`. Sections 13.1, 13.2 and 13.6. **Today:** not built; `frontend/` has no template and no `deploy` script | The first deployment, as work: `docs/FRONTEND_DEPLOY_PLAN.md` steps 70 and 72 |
-| O2 | **The CORS gap.** The API answers no cross-origin request (`docs/FRONTEND_SERVICES.md` section 10.3) | **Decided: one origin.** The distribution passes `/api/…` on to the API with the prefix removed, as the dev server does; the API gets no CORS configuration and the back end's template does not change. Section 13.3. **Today:** not built; the bundle's two addresses are whatever the build is given, so `frontend/src` does not change | The first deployment, as work: steps 70 and 72 |
+| O1 | **Hosting.** Static files on an S3 bucket behind CloudFront, in its own SAM template (`docs/FOLDER_STRUCTURE.md` section 7) | **Decided: a private bucket behind a CloudFront distribution**, stack `shared-calendar-web`, on the address AWS gives the distribution; deployed by `npm run deploy -w frontend`. Sections 13.1, 13.2 and 13.6. **Today:** written, not deployed: `frontend/template.yaml`, `frontend/samconfig.toml` and `frontend/scripts/deploy.sh` exist and the template passes `sam validate --lint`; no stack `shared-calendar-web` exists. That the account may create a distribution is still unproven | The first deployment, as work: `docs/FRONTEND_DEPLOY_PLAN.md` step 72 |
+| O2 | **The CORS gap.** The API answers no cross-origin request (`docs/FRONTEND_SERVICES.md` section 10.3) | **Decided: one origin.** The distribution passes `/api/…` on to the API with the prefix removed, as the dev server does; the API gets no CORS configuration and the back end's template does not change. Section 13.3. **Today:** written in the template (the rule for `/api/*`, the function), run nowhere; the bundle's two addresses are whatever the build is given, so `frontend/src` did not change. That the `Authorization` header arrives is proven by the first sign-in at the deployed page | The first deployment, as work: step 72 |
 | O3 | **The session across a reload.** In memory only: a reload means signing in again (`docs/FRONTEND_SERVICES.md` section 9.6) | `sessionStorage` is the candidate named there. Decided with O5. **Today:** a reload shows the login (`docs/FRONTEND_WALK.md` check 101). The screens add to what a reload loses: the address is kept (the hash), but the week on show, the mode and the period of "My appointments", an appointment being moved and everything typed and not saved are in memory only | Nothing: the application works without it |
 | O4 | **The bundle command and the dev server**, and with them where the configuration comes from and where the built files go | **Decided: esbuild**, two Node scripts. Sections 12.1 and 12.2 | Nothing any more |
-| O5 | **The Content-Security-Policy of the hosting** | **Decided:** `default-src 'self'`, Cognito's address for the login, no frame, no `<base>`; sent by the distribution with three more headers; the dev server sends the same without Cognito's address. `zod`'s probe for `eval` stays reported and harmless. Section 13.4. **Today:** the dev server sends `default-src 'self'` alone, and the whole walk ran under it | The first deployment, as work: steps 70 and 72 |
+| O5 | **The Content-Security-Policy of the hosting** | **Decided:** `default-src 'self'`, Cognito's address for the login, no frame, no `<base>`; sent by the distribution with three more headers; the dev server sends the same without Cognito's address. `zod`'s probe for `eval` stays reported and harmless. Section 13.4. **Today:** the dev server sends `default-src 'self'; frame-ancestors 'none'; base-uri 'none'`; the login and the week were seen under it, with `zod`'s one report and no other (the whole walk ran under `default-src 'self'` alone, before). The distribution's policy is in the template, sent by nothing yet | The first deployment, as work: step 72 |
 | O6 | **The DOM emulation for the views' tests and the coverage of the views** | **Decided: `happy-dom`, and the views inside the 100 % line coverage** of `frontend/src`. Section 12.3 | Nothing any more |
 | O7 | **Logout.** Not designed in the services layer (`docs/FRONTEND_SERVICES.md`, status line) | **Direction decided:** "Sign out" revokes the refresh token at Cognito (`RevokeToken`), then clears the `SessionStore` whatever Cognito answered. Section 13.7; the service's design is written in `docs/FRONTEND_SERVICES.md` at step 71. **Today:** "Sign out" only clears the `SessionStore` (section 6, point 2), which leaves the refresh token valid at Cognito | The first deployment: step 71 comes before step 72 |
 | O8 | **The language of the interface** and where its texts are kept | **Decided: English only**, no translation mechanism. Section 12.4 | Nothing any more |
@@ -2282,8 +2284,8 @@ is the work of `docs/FRONTEND_DEPLOY_PLAN.md`, no longer a decision.
 | O10 | **A domain of our own** for the page, in the place of `<id>.cloudfront.net` | None yet. A certificate for a CloudFront distribution must be made in `us-east-1`, where the organization's policy lets this account do nothing (`docs/AWS_ACCOUNTS.md`); so it starts with that policy, or with another account (`docs/NEW_ACCOUNT.md`). The address is in no committed file and in no token, so a later change costs a deployment and telling the people | Nothing: the page works on the address AWS gives |
 
 **No decision stands between the front end and a deployment any more; the work of
-`docs/FRONTEND_DEPLOY_PLAN.md` does.** O1, O2 and O5 are decided (section 13) and built at its
-steps 70 and 72; O7 has its direction and is designed and built at its step 71. O3, O9 and O10
+`docs/FRONTEND_DEPLOY_PLAN.md` does.** O1, O2 and O5 are decided (section 13), written at its
+step 70 and deployed at its step 72; O7 has its direction and is designed and built at its step 71. O3, O9 and O10
 block nothing: O9 is measured again at the first deployment (the page is sent compressed,
 128 kB; section 13.5). No view waits for any of them, and none of them needs a view to change.
 
@@ -2434,19 +2436,24 @@ than what the trial showed: these deserve the first look in a review.
 | 138 | The page is hosted as static files in a private S3 bucket behind a CloudFront distribution, in a stack of its own, `shared-calendar-web` (section 13.2) | `docs/FOLDER_STRUCTURE.md` section 7 fixed it in principle. HTTPS with nothing to run, patch or pay for at this size; a release of the page never changes the back end's stack | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 139 | One origin: the distribution passes `/api/…` on to the API, the prefix removed by a CloudFront Function; no CORS configuration on the API (section 13.3) | The deployed page then calls the API exactly as the local one does, the back end's template does not change, and the Content-Security-Policy needs no API address. The other way (a `CorsConfiguration` naming the page's origin) would make each stack need a value of the other | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 140 | The login and the refresh go to Cognito directly, not through the distribution | Cognito answers a browser from any origin already. Passing it through would be a second rule to keep right, for a password to cross one service more. It costs one address in the Content-Security-Policy | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
-| 141 | The distribution replaces no failure with `index.html` and keeps no failure of the API: for each status CloudFront would keep, the time is zero (section 13.3, rules 2 and 3) | The navigation is the hash, so no path but `/` needs the page; and the cache policy `CachingDisabled` names no header in its key, so a failure kept for ten seconds could be one person's refusal given to another | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 141 | The distribution replaces no failure with `index.html` and keeps no failure of the API (section 13.3, rules 2 and 3). Corrected at `docs/FRONTEND_DEPLOY_PLAN.md` step 70: nothing is set for it, the cache policy `CachingDisabled` is enough (decision 154) | The navigation is the hash, so no path but `/` needs the page; and a failure kept for ten seconds could be one person's refusal given to another, since the cache's key names no header | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 142 | The bucket's policy names the four objects, not `…/*` (section 13.2) | The hard rule of `CLAUDE.md` (no wildcard resource) holds for the bucket too, and it can: the build writes four files with fixed names. A fifth file is a change to the template, on purpose | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 143 | The address is the one AWS gives the distribution; no domain of our own (open point O10) | It works today and needs no certificate. A certificate for CloudFront must be made in `us-east-1`, which the organization's policy blocks for this account | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 144 | The Content-Security-Policy of section 13.4; `frame-ancestors 'none'` and `base-uri 'none'` beside what the dev server sent until now; the dev server sends the same words without Cognito's address | The walk then runs locally under what the deployed page gets. The two additions cost nothing: the page is shown in no frame and has no `<base>` | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 145 | Every file is uploaded with `Cache-Control: no-cache`; the names stay fixed; the deploy command invalidates `/*` (section 13.5) | A name with a hash in it would mean rewriting `index.html` at build time, which is copied as it is and tested as it is. Three small files asked again at each load is a price nobody notices | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 146 | The source map is uploaded with the three files | The repository is public, so the map tells nothing new, and a failure in a person's console can then be read | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
-| 147 | `npm run deploy -w frontend` stands behind the back end's gate (`backend/.verify-ok`), runs the front end's own `verify` itself, and the gate's check becomes one file both deploy scripts use (section 13.6, point 1) | The gate's promise is "what is deployed is a committed, checked state of the repository" (`docs/FOLDER_STRUCTURE.md` section 4.5), and there is one history. The stamp is written before the front end's checks run, so it does not prove them; they need no Docker and take a minute | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 147 | `npm run deploy -w frontend` stands behind the back end's gate (`backend/.verify-ok`), runs the front end's own `verify` itself, and the gate's check becomes one file both deploy scripts use (section 13.6, point 1). Since `docs/FRONTEND_DEPLOY_PLAN.md` step 70 that `verify` ends with `sam validate --lint` of the hosting's template (decision 157) | The gate's promise is "what is deployed is a committed, checked state of the repository" (`docs/FOLDER_STRUCTURE.md` section 4.5), and there is one history. The stamp is written before the front end's checks run, so it does not prove them; they need no Docker and take a minute | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 148 | The deploy command reads `ApiUrl` and `UserPoolClientId` from the back end's stack and builds with them; nothing of a deployment is in a committed file (section 13.6, points 2 and 5) | `docs/FOLDER_STRUCTURE.md` section 7; the repository is public. It also fixes the order: the back end first | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 149 | The deploy command ends with four checks made with curl and no credentials; the signed-in call is proven by the walk's first login (section 13.6, point 8) | A script that signs in would need a password. The four checks prove the bucket, the headers, the rule for `/api/*`, the function and that a failure of the API arrives as the API sent it | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 150 | The size of the bundle (O9) does not block the first deployment | It is sent compressed: 128 kB, once per load of the page, answered "not changed" afterwards. Slimming it is a change to `shared/`, which the back end uses too: a decision of its own, and not one to take in a hurry before a release | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 151 | No root `deploy` script that runs both deployments; the order is a procedure of `docs/RUNBOOK.md` | The back end's deploy takes arguments of its own and asks to confirm a change set; the page is released alone more often than with the API | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 152 | "Sign out" revokes the refresh token and signs the person out of the page whatever Cognito answered (section 13.7) | A failed revocation must not keep someone signed in on a shared computer. The access token's last minutes are the limit already accepted for a deleted user (`docs/ARCHITECTURE.md` section 7.3) | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 153 | No logs of the distribution, no firewall, no second environment, no pipeline (section 13.8); the API's access log shows CloudFront's address for the page's calls | Each is a cost or a thing to keep for a question nobody has asked yet. The table of section 13.8 says when each would come | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 154 | The distribution has no `CustomErrorResponses` at all. Version 13 of this document asked for one entry per status CloudFront keeps, with the time at zero | AWS's page on the failures CloudFront keeps says: "If you're using the CachingDisabled managed cache policy, CloudFront won't cache these status codes or custom error pages." The entries would have done nothing on `/api/*`, and they belong to the whole distribution, so their one effect would have been on the files' rule. The page also says which failures are kept where caching is on: 404, 414 and 500 to 504 always, 400, 403 and 405 only when the origin says for how long, 401 never. Proven at the first deployment by a 404 asked twice, which the API must answer twice (`docs/FRONTEND_DEPLOY_PLAN.md` step 72, point 5) | Yes: found at `docs/FRONTEND_DEPLOY_PLAN.md` step 70, taken before the template was written |
+| 155 | `frontend/template.yaml` has no `Transform` line: it is plain CloudFormation, which `sam validate` and `sam deploy` read as it is. `frontend/samconfig.toml` names no bucket for artifacts (`resolve_s3`) and no `capabilities`, and sets `fail_on_empty_changeset = false` | Nothing in it is one of SAM's short forms. SAM CLI sends a template with nothing to package and under 51,200 bytes as it is (read in the source of SAM CLI 1.171.0, `samcli/commands/deploy/deploy_context.py`; not tried by deploying), so no managed bucket is created for it; it creates no role. A release of the page that changes no resource must go on to the upload | |
+| 156 | The deploy command takes one argument, `--dry-run`, and refuses any other; it passes the stack's name, the region and the template to `sam deploy` itself. After a build it refuses to upload a bundle that holds `localhost` or lacks Cognito's address. The third and fourth checks ask for the API's exact answers: 401 `{"message":"Unauthorized"}` and 404 `{"message":"Not Found"}`, as JSON | The back end's deploy hands its arguments to `sam deploy` because its first deployment needs a parameter; this one reads its only parameter itself, so an argument could only point it somewhere else. The two answers were read from the API's own address on 2026-11-21, without credentials | |
+| 157 | `npm run verify -w frontend` runs `sam validate --lint` on the template, last, and so needs the SAM CLI; without it the last step fails and says that `sam` is not found. It does not go through `backend/scripts/check-sam.sh` | The root `verify` already needs the SAM CLI for the back end, and a template that lint refuses must not reach a deployment. The minimum version of `check-sam.sh` is about `sam build` in a monorepo (`docs/FOLDER_STRUCTURE.md` section 4.3), which this template never needs. The price: a machine with node alone can no longer run the front end's whole `verify`; `typecheck`, `lint` and `test:unit` still run there one by one | |
+| 158 | The header `Strict-Transport-Security` names no sub-domain and asks for no preload; the bucket has `ObjectOwnership: BucketOwnerEnforced`; the resources that need a name carry the stack's (`shared-calendar-web-bucket`, `-strip-api-prefix`, `-headers`) | The address is `<id>.cloudfront.net`, which has no sub-domain of ours. The ownership setting turns the per-object permission lists off, so the bucket's policy is the only grant; it is S3's default for a new bucket, written down. The names must be free in the account | |
 
 ## 12. The tooling (open points O4, O6 and O8, decided)
 
@@ -2501,8 +2508,11 @@ id, and says so when the file is missing) and, to sign in, `npm run local:api -w
 - It passes `/api/…` on to `http://127.0.0.1:3000` and `/cognito/…` to `http://localhost:9229`,
   so the browser sees **one origin** (section 10, open point O2). The two addresses in the
   bundle have no host; the browser completes them with the page's origin.
-- It sends `Content-Security-Policy: default-src 'self'` with the page and
-  `cache-control: no-store` with every answer.
+- It sends `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'none'`
+  with the page (the deployed page's policy without Cognito's address, section 13.4) and
+  `cache-control: no-store` with every answer. Since no site may show the page in a frame, a
+  preview pane that is itself a frame inside an editor stays empty: the page is opened in a
+  browser tab, the forwarded port of a Codespace included.
 - It never prints a request's body or headers: the login's body holds a password, and the API
   calls carry a token.
 
@@ -2559,10 +2569,15 @@ service. The shell holds the two names of the roles.
 
 ## 13. The hosting and the deployment (open points O1, O2 and O5, decided)
 
-Decided on 2026-11-21 (brief `prompts/93-deploy-frontend.md`). **Nothing of this section is
-built yet**: the order of work is `docs/FRONTEND_DEPLOY_PLAN.md` (steps 70 to 73). The section
-says "is" for what the steps build; where a step finds it wrong, the step stops and proposes
-the change here.
+Decided on 2026-11-21 (brief `prompts/93-deploy-frontend.md`); the order of work is
+`docs/FRONTEND_DEPLOY_PLAN.md` (steps 70 to 73). **Written at its step 70, deployed nowhere
+yet:** `frontend/template.yaml` and `frontend/samconfig.toml` (section 13.2 to 13.5),
+`frontend/scripts/deploy.sh` and `scripts/deploy-gate.sh` (section 13.6) exist, the template
+passes `sam validate --lint`, and the command's refusals were tried by hand. No stack
+`shared-calendar-web` exists: everything this section says of CloudFront rests on AWS's
+documentation until that plan's step 72, and logout (section 13.7) is its step 71. Where a
+step finds the section wrong, the step stops and proposes the change here; step 70 did once
+(section 13.3, rule 3).
 
 ### 13.1 What a person's browser talks to
 
@@ -2604,20 +2619,26 @@ Where the deployed page and the local one differ, and nowhere else:
 
 One SAM template, `frontend/template.yaml`, and one stack, `shared-calendar-web`, in
 `eu-north-1`, beside the back end's and never part of it (`docs/FOLDER_STRUCTURE.md`
-section 7). It holds no function, no table and no role. Its resources, in plain words:
+section 7). It holds no function of Lambda, no table and no role. The template is plain
+CloudFormation, with no `Transform` line: nothing in it is one of SAM's short forms
+(section 11, decision 155). Its six resources, in plain words:
 
 | Resource | What it is | What is set |
 |---|---|---|
-| The bucket (`AWS::S3::Bucket`) | Where the four built files lie | Private: every kind of public access blocked, no web-site mode, encrypted at rest with S3's own key. Its name is left to CloudFormation |
+| The bucket (`AWS::S3::Bucket`) | Where the four built files lie | Private: every kind of public access blocked, no web-site mode, encrypted at rest with S3's own key, the per-object permission lists off. Its name is left to CloudFormation. It is created empty; the stack cannot be deleted while it holds files |
 | The bucket's policy (`AWS::S3::BucketPolicy`) | Who may read the files | The CloudFront service, for this one distribution only (a condition on the distribution's ARN), action `s3:GetObject`, on **the four objects by name**: `index.html`, `style.css`, `app.js`, `app.js.map`. No wildcard (`CLAUDE.md`, hard rules) |
 | The origin access control (`AWS::CloudFront::OriginAccessControl`) | How the distribution proves to S3 that it is the one asking | Requests to the bucket are signed (SigV4), always |
-| The function (`AWS::CloudFront::Function`) | A few lines of JavaScript that CloudFront runs on a request for `/api/…` before passing it on | It removes the leading `/api` from the path, and does nothing else. Its code is in the template; it holds no value of a deployment |
+| The function (`AWS::CloudFront::Function`) | A few lines of JavaScript that CloudFront runs on a request for `/api/…` before passing it on | It removes the first four characters of the path (`/api`), and does nothing else; a path that is then empty becomes `/`. Its code, five lines, is in the template (runtime `cloudfront-js-2.0`); it holds no value of a deployment and has no test of its own: the deploy command's third and fourth checks prove it |
 | The headers (`AWS::CloudFront::ResponseHeadersPolicy`) | What the distribution adds to every answer | Section 13.4 |
-| The distribution (`AWS::CloudFront::Distribution`) | The address, and the rules of section 13.3 and 13.5 | HTTP is redirected to HTTPS; `index.html` answers `/`; answers are compressed; the cheapest price class (Europe and North America) |
+| The distribution (`AWS::CloudFront::Distribution`) | The address, and the rules of section 13.3 and 13.5 | HTTP is redirected to HTTPS; `index.html` answers `/`; the files are sent compressed; the cheapest price class (Europe and North America); HTTP/2 and HTTP/3, IPv6; the API reached over HTTPS only, TLS 1.2; no alias, no logging |
 
 One parameter, `ApiDomain`: the host name of the back end's API (`<id>.execute-api.<region>.amazonaws.com`),
-which the deploy command reads from the back end's stack (section 13.6). Three outputs:
-`PageUrl`, `BucketName`, `DistributionId`.
+which the deploy command reads from the back end's stack (section 13.6); the template refuses a
+value that is not a host name alone (a `/` or a `:` in it). Three outputs: `PageUrl`,
+`BucketName`, `DistributionId`. The three managed policies are named by their ids, as read on
+AWS's pages on 2026-11-21: `CachingDisabled` `4135ea2d-6df8-44a3-9df3-4b5a84be39ad`,
+`CachingOptimized` `658327ea-f89d-4fab-a63d-7e88639e58f6`, `AllViewerExceptHostHeader`
+`b689b0a8-53d0-40ab-baf2-68738e2966ac`.
 
 The stack is created from `eu-north-1` like the other. CloudFront itself is a global service:
 it has no region to choose. The organization's policy allows regional services in `eu-north-1`
@@ -2640,15 +2661,25 @@ Rules that are easy to break:
 1. **The `Authorization` header must reach the API.** CloudFront removes it unless told
    otherwise; a policy that passes on all the browser's headers passes it on too, and one
    cannot name it alone in a policy of one's own. `Host` is the one header not passed on: API
-   Gateway finds the API by it, and it must be the API's own.
+   Gateway finds the API by it, and it must be the API's own. AWS's pages say of
+   `AllViewerExceptHostHeader` that it is "intended for use with Amazon API Gateway" and passes
+   on every header but `Host`; where they speak of `Authorization` they name its sibling
+   `AllViewer`. So the first sign-in at the deployed page is the proof
+   (`docs/FRONTEND_DEPLOY_PLAN.md` section 4).
 2. **No answer of the API is replaced.** The distribution has no "custom error response" that
    swaps a 403 or a 404 for `index.html`, the usual trick of a single-page application. The
    page needs none (its navigation is the URL's hash, section 6), and the trick would turn the
    API's refusals into a page of HTML.
-3. **No answer of the API is kept, a failure neither.** CloudFront keeps some failures of an
-   origin for ten seconds by default, whatever the cache policy says of successes. For each
-   status it would keep, the distribution sets that time to zero and replaces nothing: a
-   refusal given to one person is never the answer to the next.
+3. **No answer of the API is kept, a failure neither**, so a refusal given to one person is
+   never the answer to the next. Nothing is set for it beyond the rule's cache policy: where
+   caching is on, CloudFront keeps some failures of an origin for ten seconds (404, 414 and 500
+   to 504 always; 400, 403 and 405 only when the origin says for how long; 401 never), but
+   AWS's page says: "If you're using the CachingDisabled managed cache policy, CloudFront won't
+   cache these status codes or custom error pages." So the distribution has no
+   `CustomErrorResponses` at all, which is also what rule 2 asks (section 11, decision 154).
+   On the files' rule the bucket answers 403 for any name that is not one of the four files
+   (listing is not granted, so S3 does not say 404), which CloudFront does not keep either;
+   whatever it did keep there would be the same answer for everybody, and nobody's data.
 4. The function touches the path only. It reads no header and no body.
 
 What this changes for the API, and what it does not:
@@ -2671,13 +2702,15 @@ One response headers policy, on both rules, so every answer carries the same:
 | Header | Value | Why |
 |---|---|---|
 | `Content-Security-Policy` | `default-src 'self'; connect-src 'self' https://cognito-idp.<region>.amazonaws.com; frame-ancestors 'none'; base-uri 'none'` | The page loads its script and its style from its own address and nowhere else, and calls its own address and Cognito only (section 3, rule 6: nothing inline). No other site may show it in a frame |
-| `Strict-Transport-Security` | `max-age=31536000` | A browser that has been here once never asks over plain HTTP again |
+| `Strict-Transport-Security` | `max-age=31536000` (no sub-domains, no preload) | A browser that has been here once never asks over plain HTTP again |
 | `X-Content-Type-Options` | `nosniff` | A file is what its type says |
 | `Referrer-Policy` | `no-referrer` | The page's address is told to nobody |
 
 - The region in the policy is the stack's own (`AWS::Region`): the user pool is in the same
   region as the hosting stack, and the deploy command builds `COGNITO_URL` from the same
-  value.
+  value; it stops when the two `samconfig.toml` files name different regions.
+- Each of the four is set to win over a header of the same name from the bucket or the API
+  (neither sends one).
 - **The dev server sends the same policy without Cognito's address**, which it does not need
   (`connect-src` is then left out and `default-src` decides): the walk
   (`docs/FRONTEND_WALK.md`) runs locally under the words the deployed page gets. It sends the
@@ -2698,7 +2731,8 @@ So no file may be kept by a browser without asking:
 - Every object is uploaded with `Cache-Control: no-cache`: a browser keeps its copy but asks,
   at every load, whether it is still the newest, and gets a short "not changed" when it is.
 - CloudFront keeps the files (managed cache policy `CachingOptimized`) and, since the files
-  say `no-cache`, asks the bucket again as well. After an upload the deploy command also
+  say `no-cache`, asks the bucket again as well, once its copy is a second old (that policy's
+  shortest time, which `no-cache` does not undo). After an upload the deploy command also
   empties CloudFront's copies (an *invalidation* of `/*`), so that a release is there at once
   and not a moment later.
 - An upload is four files one after the other, `index.html` last. A person who loads the
@@ -2712,7 +2746,8 @@ point O9, which does not block a deployment (section 11, decision 150).
 
 `npm run deploy -w frontend` (`frontend/scripts/deploy.sh`), a real cloud action: only when
 explicitly asked (`CLAUDE.md`, cloud safety). The same command for the first deployment and
-for every release. In order, stopping at the first failure:
+for every release. Its one argument is `--dry-run` (below); any other is refused. In order,
+stopping at the first failure and naming it:
 
 1. **The gate**, the same as the back end's (`docs/ARCHITECTURE.md` section 8.1):
    `backend/.verify-ok` younger than 30 minutes, naming HEAD, written on a clean tree, and the
@@ -2720,7 +2755,7 @@ for every release. In order, stopping at the first failure:
    (`scripts/deploy-gate.sh`), not two copies. The stamp proves the back end and `shared/`;
    the front end's own checks (`npm run verify -w frontend`: typecheck, lint, unit tests, and
    `sam validate --lint` of the hosting's template; no Docker, about a minute) are run by the
-   command itself, here.
+   command itself, here, before anything is read from AWS.
 2. **Read the back end's stack** (`shared-calendar-api`, the name in `backend/samconfig.toml`;
    read-only `describe-stacks`, as `backend/scripts/target.sh` does): `ApiUrl` and
    `UserPoolClientId`. A missing stack or output stops the command and is named. So the back
@@ -2728,20 +2763,30 @@ for every release. In order, stopping at the first failure:
 3. **`sam deploy`** of `frontend/template.yaml` with `ApiDomain` = the host of `ApiUrl`
    (`frontend/samconfig.toml` holds the stack's name and region, nothing of a deployment). The
    change set is shown and confirmed, as for the back end. On a release that changes no
-   resource it says so and goes on.
+   resource it says so and goes on (`fail_on_empty_changeset = false`). There is no `sam build`
+   (the template has no code) and no bucket for artifacts (section 11, decision 155).
 4. **Read its own stack**: `BucketName`, `DistributionId`, `PageUrl`.
 5. **Build**: `npm run build -w frontend` with `API_URL=/api`,
    `COGNITO_URL=https://cognito-idp.<region>.amazonaws.com/` and `CLIENT_ID` in the
-   environment. No value of a stack is written in a committed file.
-6. **Upload** the four files of `frontend/dist/` by name, each with its content type and
-   `Cache-Control: no-cache`, `index.html` last.
-7. **Invalidate** `/*`.
+   environment. No value of a stack is written in a committed file. The command then
+   refuses to go on if one of the four files is missing or empty, if `app.js` holds
+   `localhost`, or if it lacks Cognito's address.
+6. **Upload** the four files of `frontend/dist/` by name (four `aws s3 cp`, never a `sync`,
+   never a delete), each with its content type and `Cache-Control: no-cache`, `index.html`
+   last.
+7. **Invalidate** `/*`, and wait until CloudFront says it is done.
 8. **Check**, with curl and no credentials, PASS or FAIL each: `/` answers 200 with the
    Content-Security-Policy of section 13.4; `/app.js` answers 200 as JavaScript; `/api/calendar`
-   answers 401 with the API's own JSON (the rule for `/api/*`, the function and the API are
-   in line); a path that is no route, `/api/no-such-route`, answers with the API's JSON and
-   not with a page.
+   answers 401 with the API's own JSON, `{"message":"Unauthorized"}` (the rule for `/api/*`,
+   the function and the API are in line); a path that is no route, `/api/no-such-route`,
+   answers 404 with the API's JSON, `{"message":"Not Found"}`, and not with a page. All four
+   run; one FAIL makes the command end with 1.
 9. Print `PageUrl`.
+
+**`--dry-run`** does points 1, 2 and 5 and says what points 3, 4 and 6 to 8 would do, with the
+names it knows (the hosting stack's, if it exists already: one more read). It creates and
+changes nothing in the cloud. It passes the gate like a real run: there is no switch that
+skips the gate.
 
 What the command never does: it takes no password and no token (so it cannot prove a
 signed-in call: the first login of the walk does); it never touches the stack
