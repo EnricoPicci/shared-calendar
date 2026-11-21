@@ -18,7 +18,8 @@ layer (`docs/FRONTEND_SERVICES.md`) and its view layer
 the login, the logic layer, the week calendar with booking, cancelling, the note and the change,
 a User's "My appointments" and the Administrator's settings, users and availability: the
 types, the weekly patterns and a single date; every screen of `docs/FRONTEND_VIEW_PLAN.md`
-section 3 exists and that plan is done, 2026-11-20; it runs locally and is deployed nowhere). Layout and placement rules:
+section 3 exists and that plan is done, 2026-11-20; it runs locally and is deployed nowhere yet:
+the hosting is decided and planned, `docs/FRONTEND_DEPLOY_PLAN.md`). Layout and placement rules:
 `docs/FOLDER_STRUCTURE.md`.
 
 ## Where the truth lives
@@ -32,7 +33,7 @@ section 3 exists and that plan is done, 2026-11-20; it runs locally and is deplo
 - `docs/SHARED_CALENDAR_SPEC.md` specifies the shared calendar (agreed with the Product Owner,
   brief 40, not yet implemented). It is the input for the calendar's plan steps; once merged into
   `ARCHITECTURE.md` (spec section 19), the architecture wins as usual.
-- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v12, **implemented**: the
+- `docs/FRONTEND_ARCHITECTURE.md` defines the front end's view layer (v13, **implemented**: the
   foundation, the week, booking, cancelling, the note, the change, "My appointments", the
   settings, the users and the availability, its types, its weekly patterns and a single date,
   plan steps 60 to 69): plain HTML and CSS with one TypeScript module script, the layers (services, logic,
@@ -62,9 +63,13 @@ section 3 exists and that plan is done, 2026-11-20; it runs locally and is deplo
   was needed nowhere; its section 3, rule 12 was reworded after it, to allow a file of
   helpers shared by the views of one screen, as `availability.parts.ts` is, with its bound) its
   section 7.2; where the keyboard is after each dialog closes is one table in its section 8.
-  Hosting, CORS, the session across a reload, the hosting's Content-Security-Policy, logout and
-  the size of the bundle are its open points (section 10): the only things between the front
-  end and a deployment.
+  It also defines **the hosting and the deployment** of the page (its section 13, decided
+  2026-11-21, **not built**): a private S3 bucket behind a CloudFront distribution in a stack
+  of its own, `shared-calendar-web`; one origin, the distribution passing `/api/…` on to the
+  API, so no CORS and no change to the back end; the Content-Security-Policy and the other
+  headers; the files' caching; `npm run deploy -w frontend` behind the back end's gate; the
+  direction for logout (`RevokeToken`). Still open (section 10), blocking nothing: the session
+  across a reload, the size of the bundle, a domain of our own.
   `docs/FRONTEND_SERVICES.md` stays the truth for the services;
   `docs/FRONTEND_VIEW_OPTIONS.md` is the record of why this option, not a source of truth.
 - `docs/FRONTEND_VIEW_PLAN.md` defines the order of work for the views (brief 82): steps 60–69,
@@ -84,6 +89,10 @@ section 3 exists and that plan is done, 2026-11-20; it runs locally and is deplo
   closing: the walk, the page read without a mouse, what the code became, the trial's
   prototypes deleted) are done (2026-11-20): **the plan is done**, and stays as the record of
   the order of work.
+- `docs/FRONTEND_DEPLOY_PLAN.md` defines the order of work for the hosting (brief 93): steps
+  70 (the hosting's template and the deploy command, no cloud), 71 (logout: design, then
+  code), 72 (the first deployment, needs explicit instruction) and 73 (the documents). None
+  is started.
 - `docs/FRONTEND_WALK.md` is the walk through every screen in a browser, as `alice` and as
   `admin`, at a desktop and at a phone width, from a fresh, seeded local stack: 102 numbered
   checks a person does by hand. **The check to repeat after a change to the view layer.** Not
@@ -243,7 +252,7 @@ form works the same. Paths below without a folder are relative to `backend/`.
   writes `frontend/dist/` (git-ignored, emptied first): `index.html`, `style.css`, `app.js`
   (minified) and `app.js.map`, and prints their sizes. The three values come from the environment
   only, never from a committed file; a missing one stops the build and is named. No deploy of the
-  front end exists (hosting is open point O1), and `backend`'s `build` is another thing
+  front end exists yet (it is `docs/FRONTEND_DEPLOY_PLAN.md` step 70), and `backend`'s `build` is another thing
   (`sam build`).
 - Stopping a background `dev` by name: `pkill -f 'node scripts/dev[.]mjs'`, in a command that
   holds no other text matching it (a shell whose command line matches is killed too).
@@ -478,8 +487,9 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
   - `package.json` (deps `rxjs`, `@shared-calendar/shared`; dev dep `happy-dom`; scripts `dev`,
     `build`, `seed:local`, `typecheck`, `lint`, `test:unit`, `test:integration`, `verify`; no
     `deploy` yet), `tsconfig.json` (ES2022 + DOM + DOM.Iterable, no node types),
-    `vitest.config.ts`. No `template.yaml` yet: the hosting waits for the open points of
-    `docs/FRONTEND_ARCHITECTURE.md` section 10.
+    `vitest.config.ts`. No `template.yaml` yet: the hosting is decided
+    (`docs/FRONTEND_ARCHITECTURE.md` section 13) and built at `docs/FRONTEND_DEPLOY_PLAN.md`
+    step 70.
   - `src/services/`: `session.store.ts`; `cognito.ts`, `api.ts` and `jwt.ts`, the building
     blocks; then one `<name>.service.ts` + `<name>.types.ts` per service: `login`, `refresh`,
     `hello`, `users`, `calendar-settings`, `availability-types`, `availability-rules`,

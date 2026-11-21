@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Status | v12 — **implemented** (2026-11-20). Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
-| Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders |
-| Not in scope | Hosting, the CORS gap, keeping the session across a reload, the Content-Security-Policy of the hosting, logout, the size of the bundle. They are the open points of section 10: the only things between the front end and a deployment |
-| Depends on | `docs/FRONTEND_SERVICES.md` v7 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work) |
+| Status | v13 — the view layer **implemented** (2026-11-20); **the hosting and the deployment decided, not built** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`; the order of work is `docs/FRONTEND_DEPLOY_PLAN.md`, steps 70 to 73). Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
+| Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders; and, since v13, how the page is hosted and deployed (section 13) |
+| Not in scope | Keeping the session across a reload, the size of the bundle, a domain of our own: open points of section 10, none of which blocks a deployment. The design of the logout service: its direction is in section 13.7, the design goes into `docs/FRONTEND_SERVICES.md` |
+| Depends on | `docs/FRONTEND_SERVICES.md` v7 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work of the views), `docs/FRONTEND_DEPLOY_PLAN.md` (the order of work of the hosting) |
 | Why this choice | `docs/FRONTEND_VIEW_OPTIONS.md` v3: the options compared (plain HTML/CSS, `lit-html`, Lit, React, Angular, Svelte) and the reasons. Not repeated here |
 
 ### Change log
@@ -27,6 +27,7 @@
 
 | v11 | 2026-11-20 | Plan step 69, the closing. Status: implemented. The text is brought to the present tense: it says what is, not what a step added. Section 3, rule 2: why nothing shows before the script decides. Section 4: the handlers of a view that was left; a slot and an appointment named with their day for a screen reader; the dialogs that ask described by their question; the sentence of an overlap among the windows of "this day only" said once, under "Start", with "End" marked (a field in fault with no words of its own). Section 6: the sequence from "Sign in" to the first week. Section 7: the new sections 7.1, what the code became, and 7.2, the verdict on the fallback, as a proposal. Section 8: the walk, a document of its own (`docs/FRONTEND_WALK.md`); the table of the dialogs and the focus; the two tests of `page.test.ts` on reading the page without a mouse. Section 10: every open point as it stands today. Section 12.1: the size at step 69 and the share of `zod`, measured again. Section 11: decision 106 closed, decision 123 as settled, decisions 129 to 136. The trial's code (`prototypes/`) is deleted; what was still true of its page on the loading sequence is in sections 3, 4 and 6. |
 | v12 | 2026-11-20 | The verdict of section 7.2 taken at the review of plan step 69: section 3, rule 12 and the third condition of section 7 are reworded to allow what `availability.parts.ts` is, a file of helpers shared by the views of one screen, with its bound. Section 7.2 says what was decided, no longer what was proposed. Section 11: decision 135 as taken, decision 137. No code changed. |
+| v13 | 2026-11-21 | The hosting and the deployment, decided (brief `prompts/93-deploy-frontend.md`); nothing built, no code changed. New section 13: what the browser talks to, the stack `shared-calendar-web` (a private bucket behind a CloudFront distribution), the API through the page's address (one origin, no CORS, the back end unchanged), the headers sent with the page, the files and their caching, the deploy command with its gate and its checks, the direction for logout, what is left out on purpose. Section 10: O1, O2 and O5 decided, O7 with its direction, new open point O10 (a domain of our own); what blocks a deployment now is work, not a decision. Section 12.1: where a deployment's values come from. Section 11: decisions 138 to 153. The order of work is a new document, `docs/FRONTEND_DEPLOY_PLAN.md` (steps 70 to 73). |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
 TypeScript module script**. The markup of every screen is in one `index.html`; the script
@@ -47,6 +48,9 @@ code of that view proves painful (section 7); no view needed it (section 7.2).
 - `docs/FRONTEND_VIEW_OPTIONS.md` is the record of why this option was chosen. It is not a source
   of truth: where it differs from this document, this document is right.
 - The order of work was that of `docs/FRONTEND_VIEW_PLAN.md` (steps 60 to 69, done).
+- It is also the source of truth for **the hosting and the deployment** of the page (section 13),
+  decided and not yet built; their order of work is `docs/FRONTEND_DEPLOY_PLAN.md` (steps 70 to
+  73).
 - `docs/FRONTEND_WALK.md` is the walk through every screen in a browser: the check to repeat
   after a later change. It is not a source of truth either: this document and the tests win.
 
@@ -2260,23 +2264,28 @@ frontend/
 Not decided. "Blocks" says what cannot be done before the point is settled. O4, O6 and O8 were
 decided with `docs/FRONTEND_VIEW_PLAN.md` (its section 2) and are no longer open: their rows
 say where the decision is written. Each open row ends with **what is true of it today**
-(2026-11-20, every view built and running against the local stack).
+(2026-11-20, every view built and running against the local stack). O1, O2 and O5 were decided on
+2026-11-21 (section 13), and O7 got its direction: their rows say so, and what they still block
+is the work of `docs/FRONTEND_DEPLOY_PLAN.md`, no longer a decision.
 
 | # | Point | Direction, where there is one | Blocks |
 |---|---|---|---|
-| O1 | **Hosting.** Static files on an S3 bucket behind CloudFront, or equivalent, in its own SAM template (`docs/FOLDER_STRUCTURE.md` section 7) | Fixed in principle there; the template, the domain and the deploy script are not designed. **Today:** `npm run build -w frontend` writes the three files a host would serve (`frontend/dist/`), with the three values of the configuration taken from the environment; nothing serves them outside this machine, and `frontend/` has no template and no `deploy` script | The first deployment |
-| O2 | **The CORS gap.** The API answers no cross-origin request (`docs/FRONTEND_SERVICES.md` section 10.3) | One origin for the page and the API (the hosting routes a path to the API), or a `CorsConfiguration` on the API naming the page's origin. Decided with O1. Locally the dev server passes the API's and Cognito's paths on, which gives one origin (section 12.2): the gap does not bite there, and is not solved. **Today:** every screen makes its calls through that one origin; the bundle's two addresses are whatever the build is given, so either direction needs no change to `frontend/src` | The first deployment |
+| O1 | **Hosting.** Static files on an S3 bucket behind CloudFront, in its own SAM template (`docs/FOLDER_STRUCTURE.md` section 7) | **Decided: a private bucket behind a CloudFront distribution**, stack `shared-calendar-web`, on the address AWS gives the distribution; deployed by `npm run deploy -w frontend`. Sections 13.1, 13.2 and 13.6. **Today:** not built; `frontend/` has no template and no `deploy` script | The first deployment, as work: `docs/FRONTEND_DEPLOY_PLAN.md` steps 70 and 72 |
+| O2 | **The CORS gap.** The API answers no cross-origin request (`docs/FRONTEND_SERVICES.md` section 10.3) | **Decided: one origin.** The distribution passes `/api/…` on to the API with the prefix removed, as the dev server does; the API gets no CORS configuration and the back end's template does not change. Section 13.3. **Today:** not built; the bundle's two addresses are whatever the build is given, so `frontend/src` does not change | The first deployment, as work: steps 70 and 72 |
 | O3 | **The session across a reload.** In memory only: a reload means signing in again (`docs/FRONTEND_SERVICES.md` section 9.6) | `sessionStorage` is the candidate named there. Decided with O5. **Today:** a reload shows the login (`docs/FRONTEND_WALK.md` check 101). The screens add to what a reload loses: the address is kept (the hash), but the week on show, the mode and the period of "My appointments", an appointment being moved and everything typed and not saved are in memory only | Nothing: the application works without it |
 | O4 | **The bundle command and the dev server**, and with them where the configuration comes from and where the built files go | **Decided: esbuild**, two Node scripts. Sections 12.1 and 12.2 | Nothing any more |
-| O5 | **The Content-Security-Policy of the hosting** | `default-src 'self'` works: the dev server sends it (section 12.2). To settle: `zod` probes for `eval` when it starts, which such a policy reports in the console (it is caught, and harmless). **Today:** the whole walk ran under that policy, at two widths, with that one report and no other: the views need no inline script, no inline style and no other origin (section 3, rule 6; `page.test.ts` holds the page to it) | The first deployment |
+| O5 | **The Content-Security-Policy of the hosting** | **Decided:** `default-src 'self'`, Cognito's address for the login, no frame, no `<base>`; sent by the distribution with three more headers; the dev server sends the same without Cognito's address. `zod`'s probe for `eval` stays reported and harmless. Section 13.4. **Today:** the dev server sends `default-src 'self'` alone, and the whole walk ran under it | The first deployment, as work: steps 70 and 72 |
 | O6 | **The DOM emulation for the views' tests and the coverage of the views** | **Decided: `happy-dom`, and the views inside the 100 % line coverage** of `frontend/src`. Section 12.3 | Nothing any more |
-| O7 | **Logout.** Not designed in the services layer (`docs/FRONTEND_SERVICES.md`, status line) | The shell needs it. Until then "Sign out" can only clear the `SessionStore`, which leaves the refresh token valid at Cognito. **Today:** that is what "Sign out" does (section 6, point 2). Everything of the person leaves the page and the memory with it (the session's objects are dropped, every view empties what it showed: the shell's test compares whole pages); what is left is at Cognito, not in the browser | The first deployment |
+| O7 | **Logout.** Not designed in the services layer (`docs/FRONTEND_SERVICES.md`, status line) | **Direction decided:** "Sign out" revokes the refresh token at Cognito (`RevokeToken`), then clears the `SessionStore` whatever Cognito answered. Section 13.7; the service's design is written in `docs/FRONTEND_SERVICES.md` at step 71. **Today:** "Sign out" only clears the `SessionStore` (section 6, point 2), which leaves the refresh token valid at Cognito | The first deployment: step 71 comes before step 72 |
 | O8 | **The language of the interface** and where its texts are kept | **Decided: English only**, no translation mechanism. Section 12.4 | Nothing any more |
 | O9 | **The size of the bundle.** Of the 490 kB of `app.js` at plan step 60, 454 are `zod`, and 264 of those are its messages in other languages, which the interface never shows (section 12.1). **Today:** 575 kB, 128 kB compressed, with every view; `zod` is still 454 kB of it, 79 %, and everything written for this front end (the services, the logic, the views) is 87 kB | Slimming it means changing how `shared/` brings `zod` in (which entry of `zod` its schemas import, or what `shared/` exports to the browser): a change to `shared/`, which the back end uses too, so a decision of its own | The first deployment. Nothing locally |
+| O10 | **A domain of our own** for the page, in the place of `<id>.cloudfront.net` | None yet. A certificate for a CloudFront distribution must be made in `us-east-1`, where the organization's policy lets this account do nothing (`docs/AWS_ACCOUNTS.md`); so it starts with that policy, or with another account (`docs/NEW_ACCOUNT.md`). The address is in no committed file and in no token, so a later change costs a deployment and telling the people | Nothing: the page works on the address AWS gives |
 
-**These are now the only things between the front end and a deployment.** O1, O2, O5 and O7
-block it; O9 should be looked at before it, since it decides what every person downloads; O3
-blocks nothing. No view waits for any of them, and none of them needs a view to change.
+**No decision stands between the front end and a deployment any more; the work of
+`docs/FRONTEND_DEPLOY_PLAN.md` does.** O1, O2 and O5 are decided (section 13) and built at its
+steps 70 and 72; O7 has its direction and is designed and built at its step 71. O3, O9 and O10
+block nothing: O9 is measured again at the first deployment (the page is sent compressed,
+128 kB; section 13.5). No view waits for any of them, and none of them needs a view to change.
 
 ## 11. Decisions and assumptions
 
@@ -2422,6 +2431,22 @@ than what the trial showed: these deserve the first look in a review.
 | 135 | The verdict on the fallback was written as a proposal (section 7.2) and taken at the review (decision 137): no condition of section 7 called for `lit-html`; `availability.parts.ts` meets the third condition by its letter and not by its reason; rule 12 should be reworded to allow what was built. Nothing was added or rewritten for it | Settled before step 69 that the verdict is proposed here and taken at the review, and that whatever it is, a view that should move is a step of its own | |
 | 136 | The trial's code, `prototypes/`, is deleted. Of its page on the loading sequence, three things that were still true of `frontend/` and said nowhere are in this document: why nothing shows before the script decides (section 3, rule 2), the handlers of a view that was left (section 4), and the sequence from "Sign in" to the first week, as a numbered list (section 6). Its diagram was not kept | `docs/FRONTEND_VIEW_PLAN.md` step 69. The rest of that page described the trial's own files, or said what sections 4, 6 and 12 already say (the selectors as the contract, `hidden` as the switch, a module script being deferred, the dev server and what it answers). The one diagram, from the request of the page to the login form, says nothing that the last paragraphs of section 6 do not | |
 | 137 | Section 3, rule 12 and the third condition of section 7 are reworded: the views of one screen may share a file of helpers that find elements once, set their values, texts and attributes, and fill copies of a `<template>` with `textContent`; such a helper never decides what is shown, never makes an element other than by copying a template, and keeps no state beyond rule 10's. The fallback is for the day a helper would compare the page with what it should be, or make markup from data without a template | Decided at the review of `docs/FRONTEND_VIEW_PLAN.md` step 69, as section 7.2 proposed. `availability.parts.ts` met the old words by their letter and not by their reason; changing the code to fit them meant some 60 lines written twice, or a move to `lit-html` that would replace about 25 lines. The bound is the review's to hold: no lint rule can | Yes |
+| 138 | The page is hosted as static files in a private S3 bucket behind a CloudFront distribution, in a stack of its own, `shared-calendar-web` (section 13.2) | `docs/FOLDER_STRUCTURE.md` section 7 fixed it in principle. HTTPS with nothing to run, patch or pay for at this size; a release of the page never changes the back end's stack | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 139 | One origin: the distribution passes `/api/…` on to the API, the prefix removed by a CloudFront Function; no CORS configuration on the API (section 13.3) | The deployed page then calls the API exactly as the local one does, the back end's template does not change, and the Content-Security-Policy needs no API address. The other way (a `CorsConfiguration` naming the page's origin) would make each stack need a value of the other | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 140 | The login and the refresh go to Cognito directly, not through the distribution | Cognito answers a browser from any origin already. Passing it through would be a second rule to keep right, for a password to cross one service more. It costs one address in the Content-Security-Policy | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 141 | The distribution replaces no failure with `index.html` and keeps no failure of the API: for each status CloudFront would keep, the time is zero (section 13.3, rules 2 and 3) | The navigation is the hash, so no path but `/` needs the page; and the cache policy `CachingDisabled` names no header in its key, so a failure kept for ten seconds could be one person's refusal given to another | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 142 | The bucket's policy names the four objects, not `…/*` (section 13.2) | The hard rule of `CLAUDE.md` (no wildcard resource) holds for the bucket too, and it can: the build writes four files with fixed names. A fifth file is a change to the template, on purpose | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 143 | The address is the one AWS gives the distribution; no domain of our own (open point O10) | It works today and needs no certificate. A certificate for CloudFront must be made in `us-east-1`, which the organization's policy blocks for this account | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 144 | The Content-Security-Policy of section 13.4; `frame-ancestors 'none'` and `base-uri 'none'` beside what the dev server sent until now; the dev server sends the same words without Cognito's address | The walk then runs locally under what the deployed page gets. The two additions cost nothing: the page is shown in no frame and has no `<base>` | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 145 | Every file is uploaded with `Cache-Control: no-cache`; the names stay fixed; the deploy command invalidates `/*` (section 13.5) | A name with a hash in it would mean rewriting `index.html` at build time, which is copied as it is and tested as it is. Three small files asked again at each load is a price nobody notices | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 146 | The source map is uploaded with the three files | The repository is public, so the map tells nothing new, and a failure in a person's console can then be read | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 147 | `npm run deploy -w frontend` stands behind the back end's gate (`backend/.verify-ok`), runs the front end's own `verify` itself, and the gate's check becomes one file both deploy scripts use (section 13.6, point 1) | The gate's promise is "what is deployed is a committed, checked state of the repository" (`docs/FOLDER_STRUCTURE.md` section 4.5), and there is one history. The stamp is written before the front end's checks run, so it does not prove them; they need no Docker and take a minute | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 148 | The deploy command reads `ApiUrl` and `UserPoolClientId` from the back end's stack and builds with them; nothing of a deployment is in a committed file (section 13.6, points 2 and 5) | `docs/FOLDER_STRUCTURE.md` section 7; the repository is public. It also fixes the order: the back end first | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 149 | The deploy command ends with four checks made with curl and no credentials; the signed-in call is proven by the walk's first login (section 13.6, point 8) | A script that signs in would need a password. The four checks prove the bucket, the headers, the rule for `/api/*`, the function and that a failure of the API arrives as the API sent it | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 150 | The size of the bundle (O9) does not block the first deployment | It is sent compressed: 128 kB, once per load of the page, answered "not changed" afterwards. Slimming it is a change to `shared/`, which the back end uses too: a decision of its own, and not one to take in a hurry before a release | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 151 | No root `deploy` script that runs both deployments; the order is a procedure of `docs/RUNBOOK.md` | The back end's deploy takes arguments of its own and asks to confirm a change set; the page is released alone more often than with the API | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 152 | "Sign out" revokes the refresh token and signs the person out of the page whatever Cognito answered (section 13.7) | A failed revocation must not keep someone signed in on a shared computer. The access token's last minutes are the limit already accepted for a deleted user (`docs/ARCHITECTURE.md` section 7.3) | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 153 | No logs of the distribution, no firewall, no second environment, no pipeline (section 13.8); the API's access log shows CloudFront's address for the page's calls | Each is a cost or a thing to keep for a question nobody has asked yet. The table of section 13.8 says when each would come | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 
 ## 12. The tooling (open points O4, O6 and O8, decided)
 
@@ -2449,7 +2474,7 @@ They are declared and read in `frontend/src/main.ts` and nowhere else; it hands 
 as one plain object (`docs/FRONTEND_SERVICES.md` section 2, rule 3). A build with one of the
 three variables missing stops and names it. No value is written in a committed file
 (`docs/FOLDER_STRUCTURE.md` section 7). Which values a deployment uses, and the script that reads
-them from the stack's outputs, belong to the hosting (section 10, open point O1).
+them from the stack's outputs, are in section 13.6.
 
 The build prints the size of each file, as it is and compressed. At plan step 60, with the login
 only: `app.js` 490 kB, 105 kB compressed. Of the 490 kB, 454 are `zod` (264 of them its messages
@@ -2529,3 +2554,240 @@ day", "Extra windows", "Add window", "Remove", "Delete") are in the page. The wo
 (`movingOf`); the fixed words around them ("Moving: … Choose a free time.", "From:", "To:") are
 in the page. No view shows the `message` of a
 service. The shell holds the two names of the roles.
+
+---
+
+## 13. The hosting and the deployment (open points O1, O2 and O5, decided)
+
+Decided on 2026-11-21 (brief `prompts/93-deploy-frontend.md`). **Nothing of this section is
+built yet**: the order of work is `docs/FRONTEND_DEPLOY_PLAN.md` (steps 70 to 73). The section
+says "is" for what the steps build; where a step finds it wrong, the step stops and proposes
+the change here.
+
+### 13.1 What a person's browser talks to
+
+One address for the page and for the API, and Cognito for the login:
+
+```
+browser ──► https://<id>.cloudfront.net/            the distribution (CloudFront)
+              │   /, /index.html, /style.css,
+              │   /app.js, /app.js.map       ──►  the bucket (S3, private): the built files
+              │   /api/…                     ──►  the API (API Gateway), the "/api" removed
+              │
+        ──► https://cognito-idp.<region>.amazonaws.com/    the login and the refresh, directly
+```
+
+- **CloudFront** is the AWS service that answers at an HTTPS address and fetches what it
+  answers from somewhere else: here from a bucket of files and from the API. A *distribution*
+  is one such address with its rules.
+- The page's address is the one AWS gives the distribution, `https://<id>.cloudfront.net`. It
+  comes with a certificate: nothing to buy, nothing to renew. A domain of our own is open
+  point O10.
+- The page calls the API at `/api/…` of its own address, exactly as it does under the dev
+  server (section 12.2). So the browser sees **one origin** and asks no cross-origin question:
+  the API needs no CORS configuration, and `backend/template.yaml` is not changed (O2).
+- The login (`InitiateAuth`) and the refresh go straight to Cognito, which answers a browser
+  from any origin (`docs/FRONTEND_SERVICES.md` section 10.3). They are not passed through the
+  distribution: a password then crosses one service less.
+
+Where the deployed page and the local one differ, and nowhere else:
+
+| | Under the dev server | Deployed |
+|---|---|---|
+| The page's files | Read from `frontend/`, `app.js` bundled at every request | The files of `frontend/dist/`, in the bucket |
+| `API_URL` | `/api`, passed on to `http://127.0.0.1:3000` | `/api`, passed on to the API of the stack `shared-calendar-api` |
+| `COGNITO_URL` | `/cognito/`, passed on to cognito-local | `https://cognito-idp.<region>.amazonaws.com/` |
+| `CLIENT_ID` | From `backend/env.local.json` | The output `UserPoolClientId` of the back end's stack |
+| Content-Security-Policy | Section 13.4, without Cognito's address | Section 13.4 |
+
+### 13.2 The stack `shared-calendar-web`
+
+One SAM template, `frontend/template.yaml`, and one stack, `shared-calendar-web`, in
+`eu-north-1`, beside the back end's and never part of it (`docs/FOLDER_STRUCTURE.md`
+section 7). It holds no function, no table and no role. Its resources, in plain words:
+
+| Resource | What it is | What is set |
+|---|---|---|
+| The bucket (`AWS::S3::Bucket`) | Where the four built files lie | Private: every kind of public access blocked, no web-site mode, encrypted at rest with S3's own key. Its name is left to CloudFormation |
+| The bucket's policy (`AWS::S3::BucketPolicy`) | Who may read the files | The CloudFront service, for this one distribution only (a condition on the distribution's ARN), action `s3:GetObject`, on **the four objects by name**: `index.html`, `style.css`, `app.js`, `app.js.map`. No wildcard (`CLAUDE.md`, hard rules) |
+| The origin access control (`AWS::CloudFront::OriginAccessControl`) | How the distribution proves to S3 that it is the one asking | Requests to the bucket are signed (SigV4), always |
+| The function (`AWS::CloudFront::Function`) | A few lines of JavaScript that CloudFront runs on a request for `/api/…` before passing it on | It removes the leading `/api` from the path, and does nothing else. Its code is in the template; it holds no value of a deployment |
+| The headers (`AWS::CloudFront::ResponseHeadersPolicy`) | What the distribution adds to every answer | Section 13.4 |
+| The distribution (`AWS::CloudFront::Distribution`) | The address, and the rules of section 13.3 and 13.5 | HTTP is redirected to HTTPS; `index.html` answers `/`; answers are compressed; the cheapest price class (Europe and North America) |
+
+One parameter, `ApiDomain`: the host name of the back end's API (`<id>.execute-api.<region>.amazonaws.com`),
+which the deploy command reads from the back end's stack (section 13.6). Three outputs:
+`PageUrl`, `BucketName`, `DistributionId`.
+
+The stack is created from `eu-north-1` like the other. CloudFront itself is a global service:
+it has no region to choose. The organization's policy allows regional services in `eu-north-1`
+only (`docs/AWS_ACCOUNTS.md`); on 2026-11-21 a read-only `aws cloudfront list-distributions`
+under the profile `shared-calendar-admin` was answered, not refused. That the account may also
+*create* a distribution is proven only by the first deployment
+(`docs/FRONTEND_DEPLOY_PLAN.md` step 72, and its section on risks for what is done otherwise).
+
+### 13.3 The API through the page's address
+
+The distribution has two rules (*cache behaviours*), chosen by the path:
+
+| Path | Goes to | Methods | Kept by CloudFront | Passed on |
+|---|---|---|---|---|
+| `/api/*` | The API, over HTTPS | All seven | Never (managed cache policy `CachingDisabled`) | Every header of the browser except `Host`, the query string, the body (managed origin request policy `AllViewerExceptHostHeader`); the path without `/api` |
+| Everything else | The bucket | `GET`, `HEAD` | Section 13.5 | Nothing of the browser's headers |
+
+Rules that are easy to break:
+
+1. **The `Authorization` header must reach the API.** CloudFront removes it unless told
+   otherwise; a policy that passes on all the browser's headers passes it on too, and one
+   cannot name it alone in a policy of one's own. `Host` is the one header not passed on: API
+   Gateway finds the API by it, and it must be the API's own.
+2. **No answer of the API is replaced.** The distribution has no "custom error response" that
+   swaps a 403 or a 404 for `index.html`, the usual trick of a single-page application. The
+   page needs none (its navigation is the URL's hash, section 6), and the trick would turn the
+   API's refusals into a page of HTML.
+3. **No answer of the API is kept, a failure neither.** CloudFront keeps some failures of an
+   origin for ten seconds by default, whatever the cache policy says of successes. For each
+   status it would keep, the distribution sets that time to zero and replaces nothing: a
+   refusal given to one person is never the answer to the next.
+4. The function touches the path only. It reads no header and no body.
+
+What this changes for the API, and what it does not:
+
+- **The API keeps its own address** (`ApiUrl`), and answers there as before: the smoke test,
+  the curl examples of `README.md` and the scripts use it. It was never a secret: every one of its
+  routes asks for a token.
+- **The access log's `ip`** (`backend/template.yaml`, `AccessLogSettings`) is CloudFront's
+  address for a call made by the page, no longer the person's. Accepted for now: the log is
+  for finding a failed request, and the request id and the time still do that.
+- The API's throttling (burst 10, 5 a second) is for the whole API, as before: the page's
+  calls and direct calls share it.
+- CloudFront waits 30 seconds for an origin; the API's functions answer or fail well inside
+  that.
+
+### 13.4 The headers sent with the page (O5)
+
+One response headers policy, on both rules, so every answer carries the same:
+
+| Header | Value | Why |
+|---|---|---|
+| `Content-Security-Policy` | `default-src 'self'; connect-src 'self' https://cognito-idp.<region>.amazonaws.com; frame-ancestors 'none'; base-uri 'none'` | The page loads its script and its style from its own address and nowhere else, and calls its own address and Cognito only (section 3, rule 6: nothing inline). No other site may show it in a frame |
+| `Strict-Transport-Security` | `max-age=31536000` | A browser that has been here once never asks over plain HTTP again |
+| `X-Content-Type-Options` | `nosniff` | A file is what its type says |
+| `Referrer-Policy` | `no-referrer` | The page's address is told to nobody |
+
+- The region in the policy is the stack's own (`AWS::Region`): the user pool is in the same
+  region as the hosting stack, and the deploy command builds `COGNITO_URL` from the same
+  value.
+- **The dev server sends the same policy without Cognito's address**, which it does not need
+  (`connect-src` is then left out and `default-src` decides): the walk
+  (`docs/FRONTEND_WALK.md`) runs locally under the words the deployed page gets. It sends the
+  policy only, not the other three headers, which are about HTTPS and other sites.
+- `zod`'s probe for `eval` is still reported once in the console under this policy. It is
+  caught and harmless (section 12.2); `'unsafe-eval'` is not added to silence it.
+
+### 13.5 The files and their caching
+
+The bucket holds four objects and never a fifth: the three files of the page and the source
+map (the repository is public, so the map tells nobody anything new, and it makes a failure
+in the console readable).
+
+The files' names are fixed (`app.js`, not `app.3f9a….js`): `index.html` is copied as it is
+(section 12.1) and `page.test.ts` holds it to one script and one style sheet by those names.
+So no file may be kept by a browser without asking:
+
+- Every object is uploaded with `Cache-Control: no-cache`: a browser keeps its copy but asks,
+  at every load, whether it is still the newest, and gets a short "not changed" when it is.
+- CloudFront keeps the files (managed cache policy `CachingOptimized`) and, since the files
+  say `no-cache`, asks the bucket again as well. After an upload the deploy command also
+  empties CloudFront's copies (an *invalidation* of `/*`), so that a release is there at once
+  and not a moment later.
+- An upload is four files one after the other, `index.html` last. A person who loads the
+  page in those seconds may get the new script with the old page; a reload ends it. Accepted
+  at this size.
+
+`app.js` is sent compressed (128 kB instead of 575 at plan step 69). Slimming it stays open
+point O9, which does not block a deployment (section 11, decision 150).
+
+### 13.6 The deploy command
+
+`npm run deploy -w frontend` (`frontend/scripts/deploy.sh`), a real cloud action: only when
+explicitly asked (`CLAUDE.md`, cloud safety). The same command for the first deployment and
+for every release. In order, stopping at the first failure:
+
+1. **The gate**, the same as the back end's (`docs/ARCHITECTURE.md` section 8.1):
+   `backend/.verify-ok` younger than 30 minutes, naming HEAD, written on a clean tree, and the
+   tree still clean. The check is one file both deploy scripts use
+   (`scripts/deploy-gate.sh`), not two copies. The stamp proves the back end and `shared/`;
+   the front end's own checks (`npm run verify -w frontend`: typecheck, lint, unit tests, and
+   `sam validate --lint` of the hosting's template; no Docker, about a minute) are run by the
+   command itself, here.
+2. **Read the back end's stack** (`shared-calendar-api`, the name in `backend/samconfig.toml`;
+   read-only `describe-stacks`, as `backend/scripts/target.sh` does): `ApiUrl` and
+   `UserPoolClientId`. A missing stack or output stops the command and is named. So the back
+   end is deployed first, always.
+3. **`sam deploy`** of `frontend/template.yaml` with `ApiDomain` = the host of `ApiUrl`
+   (`frontend/samconfig.toml` holds the stack's name and region, nothing of a deployment). The
+   change set is shown and confirmed, as for the back end. On a release that changes no
+   resource it says so and goes on.
+4. **Read its own stack**: `BucketName`, `DistributionId`, `PageUrl`.
+5. **Build**: `npm run build -w frontend` with `API_URL=/api`,
+   `COGNITO_URL=https://cognito-idp.<region>.amazonaws.com/` and `CLIENT_ID` in the
+   environment. No value of a stack is written in a committed file.
+6. **Upload** the four files of `frontend/dist/` by name, each with its content type and
+   `Cache-Control: no-cache`, `index.html` last.
+7. **Invalidate** `/*`.
+8. **Check**, with curl and no credentials, PASS or FAIL each: `/` answers 200 with the
+   Content-Security-Policy of section 13.4; `/app.js` answers 200 as JavaScript; `/api/calendar`
+   answers 401 with the API's own JSON (the rule for `/api/*`, the function and the API are
+   in line); a path that is no route, `/api/no-such-route`, answers with the API's JSON and
+   not with a page.
+9. Print `PageUrl`.
+
+What the command never does: it takes no password and no token (so it cannot prove a
+signed-in call: the first login of the walk does); it never touches the stack
+`shared-calendar-api`; it refuses a stack name given for the back end that is the old
+`hello-world-api`.
+
+**The deployment process**, then (`docs/RUNBOOK.md` gets it at step 72):
+`npm run verify` → `npm run deploy -w backend` → the smoke test → `npm run deploy -w frontend`.
+A release of the page alone is `npm run verify` and the last command. There is no root
+`deploy` script that runs both: the back end's deploy takes arguments of its own and asks to
+confirm a change set, and the two are released apart more often than together.
+
+### 13.7 Logout (O7): the direction
+
+"Sign out" first **revokes the refresh token at Cognito** (`RevokeToken`), then clears the
+`SessionStore` as it does today. Decided as a direction; the service's design is written in
+`docs/FRONTEND_SERVICES.md` at `docs/FRONTEND_DEPLOY_PLAN.md` step 71, before its code.
+What is known:
+
+- `RevokeToken` needs no AWS credentials and, for an app client without a secret, nothing but
+  the refresh token and the client id: a browser can call it as it calls `InitiateAuth`. The
+  app client already allows it (`EnableTokenRevocation`, `backend/template.yaml`). No change
+  to the back end.
+- **The person is signed out of the page whatever Cognito answers.** A failed revocation must
+  not keep someone signed in on a shared computer; what is then left is the refresh token at
+  Cognito, as today, for at most its seven days.
+- The limit that stays: the API's authorizer checks an access token's signature and expiry,
+  not whether it was revoked. A copied access token works for at most its 15 minutes after a
+  sign-out, plus the 5 minutes the authorizer remembers an answer. The same is accepted for a
+  deleted user (`docs/ARCHITECTURE.md` section 7.3).
+- To find out at the step: whether cognito-local implements `RevokeToken` (it lacks
+  `AdminUserGlobalSignOut`, `CLAUDE.md`), and so whether the integration journey can cover it
+  or only the cloud does.
+
+### 13.8 Left out on purpose
+
+| Not there | Why | When it would come |
+|---|---|---|
+| A domain of our own | A certificate for CloudFront must be made in `us-east-1`, which the organization's policy blocks for this account; and nothing asks for it yet | Open point O10 |
+| The session across a reload (O3) | Blocks nothing; `sessionStorage` would put tokens where a script injected into the page could read them, which the policy of section 13.4 is there to prevent but is a decision of its own | When asked |
+| The distribution's own logs | They need a bucket and a setting per distribution; the API's access log and the functions' logs already say what the application did | When a question arises that those logs cannot answer |
+| A firewall (AWS WAF) in front of the distribution | A monthly price, against the 1 USD budget; the API throttles and every route asks for a token | When the page has an audience beyond the people given a user |
+| A second environment (a test copy of the page) | The local stack is the test environment (`docs/ARCHITECTURE.md` N5) | With a second back-end stack, never alone |
+| A pipeline that deploys on a push | The back end has none either (`docs/IMPLEMENTATION_PLAN.md` section 6) | Together with the back end's |
+
+**Cost.** At this size the bucket and the distribution stay inside AWS's free allowances
+(CloudFront's is 1 TB and 10 million requests a month); The budget of 1 USD
+(`npm run budget -w backend`) has no filter by stack: it watches the whole account's bill, the
+hosting's included, and no second budget is made.

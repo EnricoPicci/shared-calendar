@@ -302,8 +302,8 @@ The front end is a browser single-page application in TypeScript built to static
 (decided 2026-11-04). Its own architecture document, `docs/FRONTEND_ARCHITECTURE.md`, fixes the
 view layer (2026-11-16: plain HTML and CSS with one TypeScript module script, no framework; the
 folders for the views in its section 9; 2026-11-19: the build and the dev server, its section 12)
-and will fix the hosting, which is among its open points (its section 10: they are the only
-things between the front end and a deployment). This section only fixes what the folder
+and, since 2026-11-21, the hosting and the deployment (its section 13: decided, not yet built;
+the order of work is `docs/FRONTEND_DEPLOY_PLAN.md`, steps 70 to 73). This section only fixes what the folder
 must look like so that it fits the repository:
 
 - `frontend/package.json`, name `frontend`, depends on `@shared-calendar/shared`; scripts
@@ -314,9 +314,10 @@ must look like so that it fits the repository:
   already a development dependency of the root): no Vite, no configuration file of a tool. It
   takes the API's URL, Cognito's URL and the client id from three environment variables
   (`docs/FRONTEND_ARCHITECTURE.md` section 12.1).
-- Its hosting (an S3 bucket behind CloudFront, or equivalent) is a **separate** SAM template
-  and stack, `frontend/template.yaml`, so that the back-end stack `shared-calendar-api` is never
-  changed by a UI release. The front end reads the back end's `ApiUrl`, `UserPoolId` and
+- Its hosting (a private S3 bucket behind CloudFront, `docs/FRONTEND_ARCHITECTURE.md`
+  section 13) is a **separate** SAM template and stack, `frontend/template.yaml`, stack
+  `shared-calendar-web`, so that the back-end stack `shared-calendar-api` is never
+  changed by a UI release. The front end's deploy command reads the back end's `ApiUrl` and
   `UserPoolClientId` from the back-end stack outputs at build time (the way
   `backend/scripts/target.sh` does), never from a file committed in the repository.
 - Local development: the front end's dev server (`npm run dev -w frontend`,
@@ -388,9 +389,11 @@ outside the workspaces, and were deleted at that step (they are in git history; 
 to repeat after a later change, is `docs/FRONTEND_WALK.md`; the script that ran it in a
 headless browser is not in the repository, and no end-to-end test tool is.
 
-What still waits for the open points of `docs/FRONTEND_ARCHITECTURE.md` section 10: the hosting,
-so no `template.yaml` and no `deploy` script (the root scripts use `--if-present`, so their
-absence is not an error).
+What is decided and not yet built (`docs/FRONTEND_ARCHITECTURE.md` section 13, 2026-11-21): the
+hosting, so no `template.yaml`, no `samconfig.toml` and no `deploy` script yet (the root scripts
+use `--if-present`, so their absence is not an error). They come with
+`docs/FRONTEND_DEPLOY_PLAN.md` step 70, together with `scripts/deploy-gate.sh` at the root, the
+check of the deploy gate (section 4.5) that both packages' deploy scripts then use.
 
 ---
 

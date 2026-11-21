@@ -1051,6 +1051,12 @@ either the API and the page share one origin (CloudFront in front of both, the A
 or the HTTP API gets a `CorsConfiguration` naming the page's origin. The back end is not changed
 by this design (decision 27). Cognito and cognito-local already answer the preflight (section 1.1).
 
+**Decided on 2026-11-21, not yet built:** one origin. The page's CloudFront distribution passes
+`/api/…` on to the API, so the API gets no `CorsConfiguration`
+(`docs/FRONTEND_ARCHITECTURE.md` section 13.3; the order of work is
+`docs/FRONTEND_DEPLOY_PLAN.md`). Nothing in the services changes: `apiUrl` is `/api`, as under
+the dev server.
+
 ### 10.4 Unit tests
 
 `cognito.test.ts` (most of the mapping is already exercised through `login.service.test.ts`,
