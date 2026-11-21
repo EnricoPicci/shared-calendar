@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`) |
+| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02) |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown on its screen, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which is deployed nowhere today (open point P7, section 2.2). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
@@ -73,14 +73,14 @@ this plan.
 
 Reading the architecture against the repository brought up six points it does not settle. They
 are not open points of the architecture yet. Each is raised in the step named, with a proposal,
-before the code that depends on it. F1 is closed, and F2 by half: step c02's "As done" note
-says how.
+before the code that depends on it. F1 and F3 are closed, and F2 by half: the "As done" notes
+of steps c02 and c03 say how.
 
 | # | Finding | Step |
 |---|---|---|
 | F1 | **Five things `docs/CONVERSATIONAL_ARCHITECTURE.md` section 7.2 and 6.1 take from Anthropic's documentation and nobody has tried**: a line with `role: "system"` inside `messages`. Adaptive thinking with `effort: "low"`. An answer constrained to a list (the language question). The two cache marks. The two error shapes of the spending limit. If one does not hold, the design of section 7.2 changes before the core is written on it. **Closed in step c02**: tried, with a sixth (the conversation sent back exactly as stored). One did not hold, the shapes of the spending limit, and `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 was changed | c02 |
 | F2 | **Nothing enforces the two import rules** (the Anthropic SDK only in `backend/src/lib/anthropic.ts`. `backend/src/assistant` never imports `lib/calendarDb.ts`). The root `eslint.config.js` restricts imports for `frontend/src` only. Proposal: two `no-restricted-imports` rules. **The first rule is in place since step c02**. The second is step c04's | c02, c04 |
-| F3 | **Coverage.** The back end's 100 % line threshold covers `src/lib` only. The architecture asks it for `backend/src/assistant` too (its section 12.2). The six handlers stay outside the threshold, as every handler does | c03 |
+| F3 | **Coverage.** The back end's 100 % line threshold covers `src/lib` only. The architecture asks it for `backend/src/assistant` too (its section 12.2). The six handlers stay outside the threshold, as every handler does. **Closed in step c03**: `backend/vitest.config.ts` holds `src/assistant` to 100 % lines | c03 |
 | F4 | **A handler called as a tool writes its own log line**, so one step of the assistant writes several lines with one request id, and a handler reads its environment as if it were alone in the function. Whether the lines can be told apart, and whether any handler keeps state that two calls in one function would share | c04 |
 | F5 | **What the two read-only functions carry.** To build a proposal they need the change tools' definitions and their fact reading, not the change handlers. Proposal: the part that runs a change is a module only `confirmProposal` imports, so the code that writes the calendar is not even in the other two bundles | c05 |
 | F6 | **Booking for a User, proposed by a function without `AdminGetUser`.** The proposal's facts can only come from the users' list (`ListUsersInGroup`). Whether that is enough for the confirmation to name the person, or the proposal goes out unchecked and the route refuses at the confirmation | c07 |
@@ -343,6 +343,40 @@ message kept; a token in neither group gets 403.
 **Acceptance:** the gate green; the journeys above with their pages; with the real key, one
 exchange by hand through `curl` in English and one in Italian, reported; the routes are in
 `docs/ARCHITECTURE.md` section 4.
+
+**As done** (2026-11-21). As written, with these differences:
+
+- **the spending limit's memory can be shortened by a variable**,
+  `ASSISTANT_BUDGET_MEMORY_SECONDS`, which only the local stack sets, to 0. Without it the
+  journey that plays a spending limit left the function answering "budget reached" for ten
+  minutes, to every journey after it and to the next run. `backend/src/lib/anthropic.ts`, of
+  step c02, reads it. The cloud keeps the ten minutes;
+- **the low limit of the local function is 10 messages a day**, written by `local:up` into
+  `env.local.json`, with `ASSISTANT_DAILY_MESSAGE_LIMIT` in the shell for another value. The
+  journeys read it from the file;
+- **the version mark is worked out**, not written in `prompt.ts`: a hash of the instructions,
+  the block about the person and the tools. Nobody can forget to move it, and a person whose
+  role changes starts a new conversation;
+- **a language question that cannot be asked saves nothing**: there is no conversation yet to
+  save the message in. The 503 is answered and the person sends the message again;
+- **a conversation left waiting for its step has no way on but "New conversation"** until
+  `continueAssistant` exists (step c04): a message while it waits answers `assistant_busy`, as
+  the contract says. The journeys end such a conversation;
+- **a request for a tool, which this step never offers, is answered as `assistant_unavailable`**
+  with the message saved and the step left to do. Step c04 replaces this with the error result
+  of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 7.4;
+- the core is four files: `config.ts`, `prompt.ts`, `conversation.ts` (reading, showing and
+  ending, without the Anthropic SDK, so the two functions that never ask Claude do not carry
+  it) and `exchange.ts` (a message and its one step);
+- the fake Claude gained one thing an answer can ask of it: the text `{{application-line}}` is
+  replaced by the last line of the application in the request. It lets the Italian journey read
+  what Claude was told when the person wrote in English;
+- the journey "a conversation whose version mark is not the deployed one" stays a unit test
+  here; step c09 plays it as a journey;
+- **found, for step c04:** a first message asks Claude twice in one request, the language
+  question and the step, each allowed 22 seconds, in a function of 29. When both are slow the
+  function is stopped and nothing is saved. Proposal for step c04, where `continue` exists:
+  after a slow language question, save the message and answer `working`.
 
 ---
 

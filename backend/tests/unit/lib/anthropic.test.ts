@@ -21,13 +21,14 @@ const MINUTE = 60_000;
 
 const plus = (instant: string, ms: number) => new Date(Date.parse(instant) + ms).toISOString();
 
-type Env = { model?: string; key?: string; keyParameter?: string; baseUrl?: string };
+type Env = { model?: string; key?: string; keyParameter?: string; baseUrl?: string; budgetMemorySeconds?: string };
 
 async function load(env: Env = {}): Promise<Lib> {
   vi.stubEnv('ASSISTANT_MODEL', env.model ?? MODEL);
   vi.stubEnv('ANTHROPIC_API_KEY', env.key ?? KEY);
   vi.stubEnv('ANTHROPIC_KEY_PARAMETER', env.keyParameter ?? '');
   vi.stubEnv('ANTHROPIC_BASE_URL', env.baseUrl ?? '');
+  vi.stubEnv('ASSISTANT_BUDGET_MEMORY_SECONDS', env.budgetMemorySeconds ?? '');
   vi.resetModules();
   return import('../../../src/lib/anthropic');
 }
@@ -314,6 +315,22 @@ describe('the ten minutes of the spending limit (6.1)', () => {
 
     await expect(lib.askStep(request(), plus(NOW, MINUTE))).resolves.toEqual({ kind: 'budget_reached' });
     expect(create).toHaveBeenCalledTimes(1);
+  });
+
+  it('lasts the seconds of ASSISTANT_BUDGET_MEMORY_SECONDS when the local stack sets them: with 0, Anthropic is asked again at once', async () => {
+    const lib = await load({ budgetMemorySeconds: '0' });
+    fails(TIER_CAP);
+    expect(await lib.askStep(request(), NOW)).toEqual({ kind: 'budget_reached' });
+
+    answers();
+    expect((await lib.askStep(request(), NOW)).kind).toBe('text');
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['-1', '1.5', 'soon'])('refuses ASSISTANT_BUDGET_MEMORY_SECONDS = %s as a broken deployment', async (budgetMemorySeconds) => {
+    const lib = await load({ budgetMemorySeconds });
+    await expect(lib.askStep(request(), NOW)).rejects.toMatchObject({ name: 'AnthropicConfigError' });
+    expect(create).not.toHaveBeenCalled();
   });
 
   it('does not read the key while it lasts', async () => {

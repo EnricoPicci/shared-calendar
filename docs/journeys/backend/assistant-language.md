@@ -1,0 +1,102 @@
+# The "the language of a conversation (4.2)" journey, in simple words
+
+| | |
+|---|---|
+| Test file | `backend/tests/integration/assistant.test.ts` |
+| `describe` | `the language of a conversation (4.2)` |
+| Tests | 1. "is set by the first message: Italian"<br>2. "stays Italian when the person then writes in English: Claude is told so again"<br>3. "is asked again for a new conversation: English this time" |
+| Runs against | the local stack: the API on port 3000 (`sam local`), cognito-local on port 9229, DynamoDB Local on `DYNAMODB_PORT`, the fake Claude on port 9230 (`RUN_INTEGRATION=1`) |
+
+Ideas used here, explained once for all journeys:
+[the assistant in the journeys](../concepts.md#the-assistant-in-the-journeys),
+[the fake Claude](../concepts.md#the-fake-claude),
+[the language of a conversation](../concepts.md#the-language-of-a-conversation),
+[the line of the application, and the gaps in `seq`](../concepts.md#the-line-of-the-application-and-the-gaps-in-seq),
+[the `assistant` table](../concepts.md#the-assistant-table),
+[the daily limit](../concepts.md#the-daily-limit).
+
+## What this block proves
+
+- The first message of a conversation sets its language
+  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 4.2).
+- Writing later in the other language does not switch it: at every message the server tells
+  Claude the conversation's language again, as an instruction of the application
+  (`docs/ARCHITECTURE.md` section 4, "The assistant's routes").
+- The language belongs to the conversation, not to the person: a new conversation is asked again.
+
+## Who takes part
+
+- **`chat-lingua`**: a throw-away User, the person of this block.
+- **The Administrator** (`admin`): only creates `chat-lingua`.
+- **The fake Claude**: answers the language question and the messages from its script.
+
+## Before the block starts
+
+The file's `beforeAll` signs in `admin`. The block's `beforeAll` creates `chat-lingua` again and
+signs it in (`newUser()`: `removeUserIfPresent()`, `POST /users` checked `201`, `signIn()`), then
+calls `DELETE /assistant/conversation` and checks `204`. A new account has no conversation, so the
+block does not depend on the block before it.
+
+## Test 1: Italian, from the first message
+
+`chat-lingua` sends `Buongiorno, mi sente?` with `POST /assistant/messages`. There is no
+conversation, so the server asks Claude for the language first; the fake's script says Italian
+for this text. The test checks `200`, `language` `it`, and two messages: `seq` 1 from `person`
+with the text sent, `seq` 3 from `assistant` with "Buongiorno. Sono l'assistente del calendario
+condiviso."
+
+## Test 2: an English message in the Italian conversation
+
+`chat-lingua` sends `fake: say the line of the application`, an English sentence. For this text
+the fake answers with the line of the application it received in the request, after the words
+"The application told me: ". It is the journey's way of seeing what the server told Claude, which
+a reply never shows.
+
+The test checks:
+
+- `200`, and `language` still `it`;
+- the text of the message from `assistant` starts with "The application told me: Now it is ";
+- it contains "The language of this conversation is Italian: answer in Italian, whatever language
+  the person writes in.";
+- `GET /assistant/conversation` answers `language` `it` too.
+
+The fake does not answer in Italian here: it is a script, not a model. The block proves that the
+instruction reaches Claude, not that a model obeys it.
+
+No language question is asked for this message: the server asks it only when it starts a
+conversation.
+
+## Test 3: a new conversation, English
+
+`chat-lingua` calls `DELETE /assistant/conversation` (the test checks `204`), then sends
+`Hello, can you hear me?`. The server starts a new conversation and asks for the language again;
+the fake says English. The test checks `language` `en` and two messages numbered 1 and 3, the
+second with "Hello. I am the assistant of the shared calendar."
+
+## What the block leaves
+
+`chat-lingua` is removed from cognito-local by the `afterAll`. In the `assistant` table its items
+stay, under a `sub` no account has any more: a `META` holding the English conversation, `idle`;
+the six messages of the Italian conversation and the three of the English one; one item of daily
+use with `messages` 3.
+
+## If the block fails halfway
+
+- A failed check skips the rest of its test only. Test 2 needs the Italian conversation of test
+  1: if test 1 did not start one, test 2 fails on the language. Test 3 ends whatever conversation
+  there is and stands on its own.
+- The `afterAll` removes `chat-lingua` whatever happened, and the next run removes it again
+  before creating it, straight in cognito-local (`removeUserIfPresent()`: no deleted-user marker,
+  nothing of the calendar touched). The new account has a new `sub`, so nothing of a failed run
+  is seen again.
+
+## Where in the code
+
+| What | Where |
+|---|---|
+| The route | `POST /assistant/messages`: `backend/src/handlers/sendAssistantMessage.ts`, then `sendMessage()` in `backend/src/assistant/exchange.ts`, which asks the language only when there is no conversation |
+| The language question | `askLanguage()` in `backend/src/lib/anthropic.ts` |
+| The line of the application | `timeLine()` in `backend/src/assistant/prompt.ts` |
+| The fake's part | `withApplicationLine()` in `backend/docker/fake-claude.mjs`; the texts and the languages in `backend/tests/integration/fake-claude/answers.json` |
+| Test helpers | in the file: `newUser()`, `say()`, `conversation()`, `startAgain()`; in `backend/tests/integration/setup.ts`: `api()`, `signIn()`, `removeUserIfPresent()` |
+| Constants | `HELLO`, `HELLO_ANSWER` |

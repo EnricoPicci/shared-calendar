@@ -11,6 +11,9 @@
 //              per step of the exchange it starts
 //   language   the same for the language question, and the answer for a text nobody scripted
 //   otherwise  the name of the answer for a message nobody scripted
+// One thing an answer can ask of the fake: the text {{application-line}} in it is replaced by the
+// last line of the application in the request (the entry of role "system" that follows a message
+// of the person), so that a journey can read what Claude was told about the time and the language.
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 
@@ -50,6 +53,16 @@ function choose(request, script) {
   return { kind: `step ${answered + 1}`, name: steps[Math.min(answered, steps.length - 1)] };
 }
 
+const LINE_MARK = '{{application-line}}';
+
+// The answer's body with the mark replaced, in its text blocks; any other body is given as it is.
+function withApplicationLine(body, request) {
+  if (!Array.isArray(body?.content) || !JSON.stringify(body.content).includes(LINE_MARK)) return body;
+  const lines = (Array.isArray(request.messages) ? request.messages : []).filter((entry) => entry?.role === 'system' && typeof entry.content === 'string');
+  const line = lines.length > 0 ? lines[lines.length - 1].content : '(no line of the application in the request)';
+  return { ...body, content: body.content.map((block) => (block?.type === 'text' ? { ...block, text: block.text.split(LINE_MARK).join(line) } : block)) };
+}
+
 const failure = (status, type, message) => ({ status, body: { type: 'error', error: { type, message }, request_id: 'req_fake' } });
 
 function answerTo(method, url, raw) {
@@ -71,7 +84,7 @@ function answerTo(method, url, raw) {
   if (typeof answer?.status !== 'number' || answer.body === undefined) {
     return { kind, name, ...failure(500, 'api_error', `The fake Claude has no answer named "${name}" in ${ANSWERS_FILE}.`) };
   }
-  return { kind, name, status: answer.status, body: answer.body };
+  return { kind, name, status: answer.status, body: withApplicationLine(answer.body, request ?? {}) };
 }
 
 const server = createServer((req, res) => {

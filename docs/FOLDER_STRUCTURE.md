@@ -63,8 +63,12 @@ stays at the root.
 │   │                            # fake-claude.mjs: the script of the fake Claude, plain Node)
 │   ├── tsconfig.json            # extends ../tsconfig.base.json; lib ES2022, node types
 │   ├── vitest.config.ts         # projects unit + integration; 100 % line coverage on src/lib
+│   │                            # and src/assistant
 │   ├── src/
 │   │   ├── handlers/            # one Lambda entry point per file
+│   │   ├── assistant/           # the assistant's core (docs/ARCHITECTURE.md section 12): takes an
+│   │   │                        # identity and a text, never an HTTP request; reaches the table and
+│   │   │                        # Claude through lib/ only
 │   │   └── lib/                 # the only place that touches the AWS SDK (calendarDb.ts:
 │   │                            # the calendar table's item layout and lock; calendarRules.ts:
 │   │                            # the calendar's checks, pure, no AWS; assistantDb.ts: the

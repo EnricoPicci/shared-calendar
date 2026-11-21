@@ -5,7 +5,8 @@ Description: >
   HTTP API with a Lambda authorizer; user administration and the Hello World route, which proves
   the chain API - authorizer - Lambda - DynamoDB works, with its table; and the shared calendar
   (docs/SHARED_CALENDAR_SPEC.md, being built in plan steps 41-59): its table, its shared
-  permission sets, one function per calendar route, and GET /users.
+  permission sets, one function per calendar route, and GET /users; and the assistant
+  (docs/CONVERSATIONAL_ARCHITECTURE.md, being built): its table and the functions of a conversation.
 
 # Values given at deploy time: samconfig.toml holds all but AlertEmail, which the first deploy
 # passes on the command line (public repository) and CloudFormation then keeps.
@@ -38,6 +39,22 @@ Parameters:
       CALENDAR_TIME_ZONE. Never change it once the calendar holds data: stored local dates and
       instants would no longer agree. The functions check it on first use; an invalid value makes
       every calendar request answer 500, which fires the 5xx alarm.
+  AssistantModel:
+    Type: String
+    Default: claude-sonnet-5-5
+    AllowedValues: [claude-sonnet-5-5, claude-opus-5-5, claude-haiku-5-5]
+    Description: >
+      The Claude model the assistant asks (docs/CONVERSATIONAL_ARCHITECTURE.md section 7.1), passed
+      to the function that calls Anthropic as ASSISTANT_MODEL. The three values are the models the
+      assistant's requests were tried on.
+  AssistantDailyMessageLimit:
+    Type: Number
+    Default: 30
+    MinValue: 1
+    Description: >
+      How many messages one person may send to the assistant in one day of the calendar's time
+      zone (docs/CONVERSATIONAL_ARCHITECTURE.md section 4.4). With the other limits it bounds what
+      one person can cost at Anthropic. Passed as ASSISTANT_DAILY_MESSAGE_LIMIT.
 
 # Settings shared by every function below, so each function only lists what differs.
 Globals:
@@ -300,7 +317,7 @@ Resources:
   # Shared permission sets on the assistant table, written once like the calendar's: a named list
   # of permissions that each assistant function's own role will list under ManagedPolicyArns.
   # Resource: the assistant table only. Two sets, so that a function that only shows a conversation
-  # gets the first alone and cannot write. No function uses them yet. There is no set to delete:
+  # gets the first alone and cannot write. There is no set to delete:
   # nothing deletes an item of this table but its time to live.
   AssistantReadPolicy:
     Type: AWS::IAM::ManagedPolicy
@@ -2102,6 +2119,237 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ChangeAppointmentLogGroup}:log-stream:*
+
+  # ---------------------------------------------------------------------------
+  # The assistant (docs/ARCHITECTURE.md section 4, "The assistant's routes")
+  # ---------------------------------------------------------------------------
+  # Three functions for a person's conversation with the assistant. None of them can touch the
+  # calendar table or Cognito: their roles name the assistant table only, through its two shared
+  # permission sets, and one of them the Anthropic API key. They get the calendar's time zone
+  # because a person's day, for the daily limit, is counted in it.
+
+  # GET /assistant/conversation (Administrator and Users): the caller's own conversation as a person
+  # reads it. It only reads the assistant table (AssistantReadPolicy alone), so this function
+  # cannot change a conversation even by mistake.
+  GetConversationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: getConversation.handler
+      Role: !GetAtt GetConversationRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref GetConversationLogGroup
+      Environment:
+        Variables:
+          ASSISTANT_TABLE: !Ref AssistantTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          ASSISTANT_DAILY_MESSAGE_LIMIT: !Ref AssistantDailyMessageLimit
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        GetConversation:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /assistant/conversation
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/getConversation.ts
+
+  GetConversationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-getConversation
+      RetentionInDays: 14
+
+  GetConversationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref AssistantReadPolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${GetConversationLogGroup}:log-stream:*
+
+  # DELETE /assistant/conversation (Administrator and Users): ends the caller's own conversation
+  # ("New conversation" on the screen). It reads the conversation, then marks it as ended with one
+  # UpdateItem (AssistantWritePolicy); nothing is deleted, the items expire by themselves.
+  EndConversationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: endConversation.handler
+      Role: !GetAtt EndConversationRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref EndConversationLogGroup
+      Environment:
+        Variables:
+          ASSISTANT_TABLE: !Ref AssistantTable
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        EndConversation:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: DELETE
+            Path: /assistant/conversation
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/endConversation.ts
+
+  EndConversationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-endConversation
+      RetentionInDays: 14
+
+  EndConversationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref AssistantReadPolicy
+        - !Ref AssistantWritePolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${EndConversationLogGroup}:log-stream:*
+
+  # POST /assistant/messages (Administrator and Users): a message of the person. The function saves
+  # it in the caller's conversation and asks Claude, at Anthropic, once. 29 seconds instead of the
+  # usual 10, just under the 30 that API Gateway allows a request: Claude may take up to 22.
+  # The Anthropic API key is not here. The function reads it, when it first needs it, from Parameter
+  # Store (AWS's free store for settings and secrets), where the operator puts it as an encrypted
+  # value named /<stack>/anthropic-api-key; ANTHROPIC_KEY_PARAMETER only carries that name, and the
+  # role may read that one parameter and no other. Until the key is there the assistant answers
+  # 503 assistant_unavailable and everything else works.
+  # ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL and ASSISTANT_BUDGET_MEMORY_SECONDS are declared empty on
+  # purpose: only the local stack fills them (env.local.json: the fake Claude's address, a
+  # placeholder key, no memory of a spending limit between two journeys). In the cloud they stay
+  # empty, so the key can only come from Parameter Store.
+  SendAssistantMessageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: sendAssistantMessage.handler
+      Role: !GetAtt SendAssistantMessageRole.Arn
+      Timeout: 29
+      LoggingConfig:
+        LogGroup: !Ref SendAssistantMessageLogGroup
+      Environment:
+        Variables:
+          ASSISTANT_TABLE: !Ref AssistantTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          ASSISTANT_DAILY_MESSAGE_LIMIT: !Ref AssistantDailyMessageLimit
+          DYNAMODB_ENDPOINT: ''
+          ASSISTANT_MODEL: !Ref AssistantModel
+          ANTHROPIC_KEY_PARAMETER: !Sub /${AWS::StackName}/anthropic-api-key
+          ANTHROPIC_API_KEY: ''
+          ANTHROPIC_BASE_URL: ''
+          ASSISTANT_BUDGET_MEMORY_SECONDS: ''
+      Events:
+        SendAssistantMessage:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /assistant/messages
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/sendAssistantMessage.ts
+
+  SendAssistantMessageLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-sendAssistantMessage
+      RetentionInDays: 14
+
+  SendAssistantMessageRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref AssistantReadPolicy
+        - !Ref AssistantWritePolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${SendAssistantMessageLogGroup}:log-stream:*
+        - PolicyName: read-anthropic-key
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/anthropic-api-key
 
   # ---------------------------------------------------------------------------
   # Error alarms (docs/ARCHITECTURE.md section 11)

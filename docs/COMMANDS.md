@@ -93,8 +93,17 @@ section; `ListUsersFunction` has a section of its own and no calendar variable).
 template): it comes from the parameter `CalendarTimeZone` (default `Europe/Rome`). An invalid
 zone makes every calendar request answer 500.
 
-`env.local.json` also sets `ASSISTANT_TABLE` in `Parameters`. No function declares that variable
-yet, so it reaches nobody: an assistant function will get the table's local name by declaring it.
+`env.local.json` also sets, in `Parameters`, what the assistant's functions declare:
+`ASSISTANT_TABLE` (and the `DYNAMODB_ENDPOINT` above), the two variables of section 3.4, and two
+settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
+
+- `ASSISTANT_DAILY_MESSAGE_LIMIT`: **10 messages a person a day**, not the template's 30, so
+  that a journey can reach the limit. For a long session by hand:
+  `ASSISTANT_DAILY_MESSAGE_LIMIT=30 DYNAMODB_PORT=8002 npm run local:up -w backend`, then restart
+  `local:api`. `local:up` says the value on its last line but two. The count is per person and
+  per day and is never reset: when `alice` has used hers, wait for tomorrow or raise the limit.
+- `ASSISTANT_BUDGET_MEMORY_SECONDS`: 0, so that a spending limit answered by the fake Claude is
+  not remembered for ten minutes by the function.
 
 ### 3.3 When the local stack misbehaves
 
@@ -112,7 +121,7 @@ yet, so it reaches nobody: an assistant function will get the table's local name
   network when it exits (Ctrl-C included); the emulators are untouched. After a `kill -9` or a
   closed terminal, remove them by hand:
   `docker rm -f $(docker ps -aq --filter label=sam.cli.container.type=lambda --filter network=shared-calendar-local)`.
-- **Weight.** With the 25 functions of the template: about 1.5 GB for the whole stack (36
+- **Weight.** Measured with 25 functions, three fewer than the template holds: about 1.5 GB for the whole stack (36
   containers after both packages' journeys, emulators included).
 - **The runtime image.** `samconfig.toml` sets `skip_pull_image = true` for `start-api`. Without
   it every warm container's start asks Docker for the runtime image's digest at public.ecr.aws
@@ -137,8 +146,19 @@ yet, so it reaches nobody: an assistant function will get the table's local name
   a letter, a digit, `-` or `_`. Do not `export` the variable: **a `local:up` without it takes
   the key out of the file again**, and that is the way back to the fake.
 - Either way, restart `local:api` afterwards: it reads `env.local.json` only when it starts.
-- No function declares the two variables in `template.yaml` yet, so they reach nobody until the
-  first assistant function exists.
+- `SendAssistantMessageFunction` declares the two variables, empty, in `template.yaml`: that is
+  what lets the file fill them. In the cloud they stay empty and the key comes from Parameter
+  Store.
+- **Talking to the assistant by hand**, with a token (`TOKEN=…`, an access token of `alice`):
+
+  ```
+  curl -s -X POST http://127.0.0.1:3000/assistant/messages -H "authorization: Bearer $TOKEN" \
+    -H 'content-type: application/json' -d '{"text":"Hello, can you hear me?"}'
+  curl -s http://127.0.0.1:3000/assistant/conversation -H "authorization: Bearer $TOKEN"
+  curl -s -X DELETE http://127.0.0.1:3000/assistant/conversation -H "authorization: Bearer $TOKEN"
+  ```
+
+  With the fake, only the sentences of `answers.json` get an answer of their own.
 - **Asking the fake by hand**, from the host on http://localhost:9230:
 
   ```
@@ -156,8 +176,12 @@ yet, so it reaches nobody: an assistant function will get the table's local name
 ## 4. The integration tests and the deploy gate
 
 - `RUN_INTEGRATION=1 npm run test:integration -w backend`: the journeys of
-  `docs/IMPLEMENTATION_PLAN.md` step 9 (`journeys.test.ts`) and the calendar's
-  (`calendar.test.ts`) against the running `local:up` + `local:api` stack. Pass the same
+  `docs/IMPLEMENTATION_PLAN.md` step 9 (`journeys.test.ts`), the calendar's
+  (`calendar.test.ts`) and the assistant's (`assistant.test.ts`: against the fake Claude, with
+  the throw-away accounts `chat-text`, `chat-lingua`, `chat-limit`, `chat-down` and
+  `chat-nobody`, removed first and last; it never touches the `calendar` table, and what it
+  leaves in the `assistant` table stays there, under accounts that no longer exist) against the running `local:up` +
+  `local:api` stack. Pass the same
   `DYNAMODB_PORT` as `local:up`. Without `RUN_INTEGRATION=1` it runs nothing and exits 0.
   Removes a leftover `carol` before starting, so it can be rerun after a failed run. **The
   journeys refuse to start when `env.local.json` wires the real Claude** (section 3.4), every

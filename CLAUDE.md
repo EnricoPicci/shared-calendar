@@ -111,8 +111,8 @@ test names, is `.claude/rules/comments.md`, which loads when a file of code is r
 - Prefer the simplest design that meets the architecture. Do not add libraries, abstractions or
   AWS services the architecture does not call for.
 - Tests: vitest with globals enabled (`describe`, `it`, `expect` need no import). 100 % line
-  coverage is enforced on `backend/src/lib`, `shared/src` and `frontend/src`: new code there
-  comes with its tests. Unit tests never reach a network or a real AWS endpoint.
+  coverage is enforced on `backend/src/lib`, `backend/src/assistant`, `shared/src` and
+  `frontend/src`: new code there comes with its tests. Unit tests reach no network and no AWS.
 
 ## Everyday commands
 
@@ -170,7 +170,7 @@ The annotated tree and where a new file goes: `docs/FOLDER_STRUCTURE.md` section
 - Root: the workspaces' `package.json`, the one `package-lock.json`, `tsconfig.base.json`,
   `eslint.config.js`, `docs/`, `prompts/`, `scripts/` (the comment check), `.claude/`.
 - `backend/`: the API. `src/handlers/` (one Lambda entry point per file), `src/lib/` (the only
-  place that touches the AWS SDK), `tests/`, `scripts/`, `template.yaml`.
+  place that touches the AWS SDK), `src/assistant/`, `tests/`, `scripts/`, `template.yaml`.
 - `frontend/`: `src/services/`, `src/logic/`, `src/views/`, `index.html`, `style.css`,
   `tests/`, `scripts/`.
 - `shared/`: the API contract types, `Role`/`resolveRole`, the username schemas, and the

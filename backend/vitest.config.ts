@@ -8,10 +8,11 @@ export default defineConfig({
   test: {
     // Without RUN_INTEGRATION the integration project selects no files; that is not a failure.
     passWithNoTests: !runIntegration,
-    // The shared libraries must stay at 100 % line coverage (docs/IMPLEMENTATION_PLAN.md step 4).
+    // The shared libraries must stay at 100 % line coverage (docs/IMPLEMENTATION_PLAN.md step 4),
+    // and so must the assistant's core (docs/CONVERSATIONAL_ARCHITECTURE.md section 12.2).
     coverage: {
       provider: 'v8',
-      include: ['src/lib/**/*.ts'],
+      include: ['src/lib/**/*.ts', 'src/assistant/**/*.ts'],
       reporter: ['text', 'html'],
       thresholds: { lines: 100 },
     },

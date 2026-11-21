@@ -22,21 +22,37 @@ export class AnthropicConfigError extends Error {
 
 // `apiKey` is the key given directly (the local stack); `keyParameter` the name of the Parameter
 // Store parameter that holds it (the cloud); `baseUrl` another address than Anthropic's (the local
-// fake). Each is null when its variable is unset or empty.
-type Config = { model: string; apiKey: string | null; keyParameter: string | null; baseUrl: string | null };
+// fake). Each is null when its variable is unset or empty. `budgetMemoryMs` is how long the
+// spending limit, once seen, is answered without asking Anthropic again.
+type Config = { model: string; apiKey: string | null; keyParameter: string | null; baseUrl: string | null; budgetMemoryMs: number };
 
 let config: Config | AnthropicConfigError | undefined;
 
+const MINUTE_MS = 60_000;
+// How long a key read from Parameter Store is kept, and how long the spending limit, once seen,
+// is answered without asking Anthropic again.
+export const KEY_MINUTES = 10;
+export const BUDGET_MINUTES = 10;
+
+function readConfig(): Config | AnthropicConfigError {
+  if (!process.env.ASSISTANT_MODEL) return new AnthropicConfigError('ASSISTANT_MODEL is not set');
+  // ASSISTANT_BUDGET_MEMORY_SECONDS is for the local stack only, where the journeys make the fake
+  // Claude answer a spending limit and the next journey must be asked about again at once
+  // (docs/ARCHITECTURE.md section 8). The cloud leaves it empty and gets the ten minutes.
+  const seconds = process.env.ASSISTANT_BUDGET_MEMORY_SECONDS ? Number(process.env.ASSISTANT_BUDGET_MEMORY_SECONDS) : BUDGET_MINUTES * 60;
+  if (!Number.isInteger(seconds) || seconds < 0) return new AnthropicConfigError('ASSISTANT_BUDGET_MEMORY_SECONDS is not a whole number of seconds');
+  return {
+    model: process.env.ASSISTANT_MODEL,
+    apiKey: process.env.ANTHROPIC_API_KEY || null,
+    keyParameter: process.env.ANTHROPIC_KEY_PARAMETER || null,
+    baseUrl: process.env.ANTHROPIC_BASE_URL || null,
+    budgetMemoryMs: seconds * 1000,
+  };
+}
+
 // Read once per container, on first use; a failure is kept too, so every request fails alike.
 function anthropicConfig(): Config {
-  config ??= process.env.ASSISTANT_MODEL
-    ? {
-        model: process.env.ASSISTANT_MODEL,
-        apiKey: process.env.ANTHROPIC_API_KEY || null,
-        keyParameter: process.env.ANTHROPIC_KEY_PARAMETER || null,
-        baseUrl: process.env.ANTHROPIC_BASE_URL || null,
-      }
-    : new AnthropicConfigError('ASSISTANT_MODEL is not set');
+  config ??= readConfig();
   if (config instanceof AnthropicConfigError) throw config;
   return config;
 }
@@ -111,12 +127,6 @@ const THINKING = { type: 'adaptive' } as const;
 const EFFORT = 'low' as const;
 const CACHE_MARK = { type: 'ephemeral' } as const;
 
-const MINUTE_MS = 60_000;
-// How long a key read from Parameter Store is kept, and how long the spending limit, once seen,
-// is answered without asking Anthropic again.
-export const KEY_MINUTES = 10;
-export const BUDGET_MINUTES = 10;
-
 // The key read from Parameter Store, the client made for the key in use, and the moment the
 // spending limit was last seen: the container's memory.
 let parameterKey: { value: string; readAt: number } | undefined;
@@ -173,7 +183,7 @@ type Body = Omit<Anthropic.MessageCreateParamsNonStreaming, 'model'>;
 async function send(body: Body, now: string): Promise<{ kind: 'message'; message: Anthropic.Message } | Unavailable | BudgetReached> {
   const cfg = anthropicConfig();
   const nowMs = Date.parse(now);
-  if (budgetReachedAt !== undefined && nowMs - budgetReachedAt < BUDGET_MINUTES * MINUTE_MS) return { kind: 'budget_reached' };
+  if (budgetReachedAt !== undefined && nowMs - budgetReachedAt < cfg.budgetMemoryMs) return { kind: 'budget_reached' };
 
   const key = await currentKey(cfg, nowMs);
   if (key === null) return { kind: 'unavailable', reason: 'key_missing' };

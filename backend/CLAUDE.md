@@ -12,6 +12,7 @@ Paths in this file are relative to `backend/`.
 - `package.json` (name `backend`, scripts), `template.yaml`, `samconfig.toml`,
   `docker-compose.yml`, `tsconfig.json`, `vitest.config.ts`.
 - `src/handlers/`: one Lambda entry point per file.
+- `src/assistant/`: the assistant's core, which the assistant's handlers call.
 - `src/lib/`: back-end modules; the only place that touches the AWS SDK.
 - `tests/unit/`: vitest unit tests, mirroring `src/` (e.g. `tests/unit/lib/http.test.ts`).
 - `tests/integration/`: end-to-end tests against the local Docker stack; they refuse to start
@@ -102,6 +103,29 @@ Paths in this file are relative to `backend/`.
 - `http.ts`: `parseJsonBody` for bodies, `parseQuery` for query strings (the object a
   `.strict()` query schema checks).
 
+## `src/assistant/`
+
+The assistant's core (`docs/ARCHITECTURE.md` section 4, "The assistant's routes"). It takes an
+identity (`sub`, username, role) and a text, never an event or a token, and returns a reply or a
+refusal with the fields of the log line; the handlers `getConversation`, `endConversation` and
+`sendAssistantMessage` turn that into a response and write the line.
+
+- `config.ts`: `coreConfig()`, read once per container: `CALENDAR_TIME_ZONE` and
+  `ASSISTANT_DAILY_MESSAGE_LIMIT`.
+- `prompt.ts`: `INSTRUCTIONS` (one English text, nothing in it that changes between requests),
+  `contextBlock`, `timeLine` (the line added after each message of the person: the time now and
+  the language) and `promptVersion`, the mark worked out from the three things a conversation
+  keeps the same. **Changing `INSTRUCTIONS` ends every conversation in progress.**
+- `conversation.ts`: no Claude here, so the functions that never ask it do not bundle the SDK.
+  `currentConversation` (absent when its mark is not the deployment's), `shown` (what a person
+  reads of a stored message; the person's own message is the `user` entry whose content is a
+  plain string), `replyOf`, `showConversation`, `closeConversation`, `REFUSALS`.
+- `exchange.ts`: `sendMessage` and the one step: one request to Claude, one write.
+- **Never log a text.** The log fields come back from the core as `log`; token counts are
+  `usage: { input, output, cacheRead, cacheWrite }`, because the logger blanks every field
+  whose name holds "token".
+- It reaches the calendar through a handler, never through `lib/calendarDb.ts`.
+
 ## `src/handlers/`, the calendar
 
 `getCalendarSettings.ts` and `updateCalendarSettings.ts` are the pattern the other calendar
@@ -158,7 +182,11 @@ a role of its own (root `CLAUDE.md`, "Hard rules from the design"). It needs no 
   (`tests/integration/**/*.test.ts`). The integration project only selects files when
   `RUN_INTEGRATION=1`; otherwise it runs nothing and exits 0.
 - Unit tests mock AWS with `aws-sdk-client-mock`, never real endpoints. `test:unit` fails below
-  100 % line coverage on `src/lib`.
+  100 % line coverage on `src/lib` and `src/assistant`.
+- The assistant's journeys (`assistant.test.ts`) run against the fake Claude: a sentence gets
+  the answer `tests/integration/fake-claude/answers.json` scripts for its exact text. A journey
+  that needs another answer adds it there. Each block plays its own throw-away User (a new
+  account has all of the day's messages; the local limit is 10).
 - Tests of the contract itself (what a schema accepts, `resolveRole`) live in `shared/`; the
   back end tests what it does with it (the 400 answer, the handlers).
 - The calendar journeys empty the local `calendar` table first (`resetCalendarTable()`, which

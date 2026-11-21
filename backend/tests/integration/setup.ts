@@ -1,5 +1,7 @@
 import {
+  AdminCreateUserCommand,
   AdminDeleteUserCommand,
+  AdminSetUserPasswordCommand,
   CognitoIdentityProviderClient,
   InitiateAuthCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
@@ -27,6 +29,7 @@ const DYNAMODB_PORT = process.env.DYNAMODB_PORT ?? '8000';
 const DYNAMODB_URL = `http://localhost:${DYNAMODB_PORT}`;
 const TABLE_NAME = 'hello-messages';
 const CALENDAR_TABLE = 'calendar';
+const ASSISTANT_TABLE = 'assistant';
 const ENV_FILE = 'env.local.json';
 // What `npm run local:up` writes into env.local.json when it wires the fake Claude of the Docker
 // stack (scripts/local-seed.sh), and the port the fake listens on.
@@ -107,6 +110,8 @@ export async function setup(): Promise<void> {
   } else if (!(await tableExists(CALENDAR_TABLE))) {
     // A stack started before the calendar table existed: local:up creates it (it is idempotent).
     missing.push(`no table ${CALENDAR_TABLE} on port ${DYNAMODB_PORT}: run npm run local:up again`);
+  } else if (!(await tableExists(ASSISTANT_TABLE))) {
+    missing.push(`no table ${ASSISTANT_TABLE} on port ${DYNAMODB_PORT}: run npm run local:up again`);
   }
   if (!(await portOpen(9229))) missing.push('cognito-local is not listening on port 9229 (npm run local:up)');
   if (!(await portOpen(FAKE_CLAUDE_PORT))) missing.push(`the fake Claude is not listening on port ${FAKE_CLAUDE_PORT} (npm run local:up)`);
@@ -251,4 +256,62 @@ export async function queryCalendarPartition(PK: string): Promise<CalendarItem[]
     startKey = page.LastEvaluatedKey;
   } while (startKey);
   return items;
+}
+
+// ── The assistant (docs/ARCHITECTURE.md section 4, "The assistant's routes") ──────────────────
+
+// The messages a person may send to the assistant in a day on the local stack: what
+// `npm run local:up` wrote into env.local.json (scripts/local-seed.sh).
+export function localDailyMessageLimit(): number {
+  const parameters = (JSON.parse(readFileSync(ENV_FILE, 'utf8')) as { Parameters: Record<string, string> }).Parameters;
+  return Number(parameters.ASSISTANT_DAILY_MESSAGE_LIMIT);
+}
+
+// The `sub` of an access token: the name under which the person's conversation is stored. Read
+// from the token's middle part, without checking the signature; for looking up stored items only.
+export function subOf(token: string): string {
+  const payload = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8')) as { sub: string };
+  return payload.sub;
+}
+
+export type AssistantItem = { PK: string; SK: string } & Record<string, unknown>;
+
+// Every item of one partition of the local assistant table (consistent), in SK order.
+export async function queryAssistantPartition(PK: string): Promise<AssistantItem[]> {
+  const client = await localCalendar();
+  const items: AssistantItem[] = [];
+  let startKey: Record<string, unknown> | undefined;
+  do {
+    const page = await client.send(
+      new QueryCommand({
+        TableName: ASSISTANT_TABLE,
+        KeyConditionExpression: 'PK = :pk',
+        ExpressionAttributeValues: { ':pk': PK },
+        ConsistentRead: true,
+        ExclusiveStartKey: startKey,
+      }),
+    );
+    items.push(...((page.Items ?? []) as AssistantItem[]));
+    startKey = page.LastEvaluatedKey;
+  } while (startKey);
+  return items;
+}
+
+// Forgets what a person used of the assistant so far, by deleting the items that count it. For the
+// seeded accounts only: they keep their `sub` from one run to the next, so without this a day of
+// runs would use up their messages. It is the one write a journey makes to this table directly.
+export async function forgetDailyUse(sub: string): Promise<void> {
+  const client = await localCalendar();
+  for (const item of await queryAssistantPartition(`USAGE#${sub}`)) {
+    await client.send(new DeleteCommand({ TableName: ASSISTANT_TABLE, Key: { PK: item.PK, SK: item.SK } }));
+  }
+}
+
+// Creates an account that is in neither group, straight in cognito-local: a state the API cannot
+// produce, since POST /users always puts the new user in the group `user`. The password is set as
+// permanent, as everywhere. Remove the account with removeUserIfPresent.
+export async function createUserInNoGroup(username: string, password: string): Promise<void> {
+  const UserPoolId = localPool().userPoolId;
+  await cognito.send(new AdminCreateUserCommand({ UserPoolId, Username: username, MessageAction: 'SUPPRESS' }));
+  await cognito.send(new AdminSetUserPasswordCommand({ UserPoolId, Username: username, Password: password, Permanent: true }));
 }

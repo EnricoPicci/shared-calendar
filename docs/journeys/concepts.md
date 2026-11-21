@@ -1,8 +1,9 @@
-# The calendar ideas the journeys use
+# The ideas the journeys use
 
 The journey pages (`docs/journeys/README.md`) link here for the ideas that several of them need.
-Each section explains one idea in simple words and names the part of `docs/SHARED_CALENDAR_SPEC.md`
-that defines it. On any conflict, the specification wins.
+Each section explains one idea in simple words and names the document that defines it:
+`docs/SHARED_CALENDAR_SPEC.md` for the calendar, `docs/ARCHITECTURE.md` and
+`docs/CONVERSATIONAL_ARCHITECTURE.md` for the assistant. On any conflict, that document wins.
 
 ## The people of the local stack
 
@@ -14,6 +15,8 @@ that defines it. On any conflict, the specification wins.
 | `dave`, `erin` | throw-away Users of the back end's calendar journeys | `backend/tests/integration/calendar.test.ts` |
 | `fe-calendar`, `fe-calendar-b` | throw-away Users of the front end's calendar journeys | `frontend/tests/integration/calendar.test.ts` |
 | `fe-journey` | a throw-away User of the front end's Hello World journeys | `frontend/tests/integration/journeys.test.ts` |
+| `chat-text`, `chat-lingua`, `chat-limit`, `chat-down` | throw-away Users of the assistant's journeys, one per block | `backend/tests/integration/assistant.test.ts` |
+| `chat-nobody` | a throw-away account in neither group, made straight in cognito-local | `backend/tests/integration/assistant.test.ts` |
 | `smoke-<epoch>` | the smoke test's throw-away User | `backend/scripts/smoke.sh` |
 
 Every test file removes its own throw-away Users before it starts and after it ends, so it can be
@@ -410,3 +413,80 @@ same `invalid_request` can therefore come from either side.
 A journey shows which side decided by counting the requests with a spy on `fetch`. The helper
 `noRequest()` of `frontend/tests/integration/calendar.test.ts` expects none; a test that expects
 the API to decide can expect exactly one.
+
+## The assistant in the journeys
+
+The assistant is the calendar used by conversation: a person writes a message, the server asks
+Claude (Anthropic's model) and answers with what Claude said. Its routes and their answers are
+defined in `docs/ARCHITECTURE.md` section 4 ("The assistant's routes"); what is not built yet is
+in `docs/CONVERSATIONAL_ARCHITECTURE.md`.
+
+- **One conversation per person**, found by the `sub` of the token. No route takes a conversation
+  id, so nobody can reach another person's conversation. `GET /assistant/conversation` reads it,
+  `POST /assistant/messages` adds a message to it (and starts it when there is none),
+  `DELETE /assistant/conversation` ends it.
+- **`AssistantReply`** is the answer of `GET` and `POST`: `conversationId`, `language`, `status`,
+  `messages`, `activity`, `proposal`, `remainingToday`. With no conversation, the first two are
+  `null`, `status` is `idle` and `messages` is empty.
+- **A new account starts clean.** A conversation and the day's count are stored under the `sub`,
+  and an account created again has a new `sub`. So each block plays its own throw-away User and
+  finds no conversation and all of the day's messages.
+
+### The fake Claude
+
+The local stack does not call Anthropic. A small server of the Docker stack, the fake Claude
+(`backend/docker/fake-claude.mjs`, port 9230), answers in its place
+(`docs/ARCHITECTURE.md` section 8). What it answers is scripted in
+`backend/tests/integration/fake-claude/answers.json`, by **the exact text of the person's
+message**. The texts the journeys send:
+
+| The person writes | The fake answers |
+|---|---|
+| `Hello, can you hear me?` | "Hello. I am the assistant of the shared calendar.", after a thinking block |
+| `Buongiorno, mi sente?` | "Buongiorno. Sono l'assistente del calendario condiviso." |
+| `fake: say the line of the application` | "The application told me: " followed by the line of the application it received (see below) |
+| `fake: a spending limit of our own`, `fake: overloaded` | an error, as Anthropic gives it for that case |
+| a text the file does not hold | "Fake Claude: no answer is scripted for this message." |
+
+The language question (below) is scripted the same way: of the texts the journeys send,
+`Buongiorno, mi sente?` is Italian and every other one is English.
+
+### The language of a conversation
+
+At the first message of a conversation the server asks Claude one extra question: in which of the
+supported languages, English or Italian, the message is written. The answer becomes the
+conversation's `language` and never changes (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 4.2).
+So a first message costs two requests to Claude, every later one a single request.
+
+### The line of the application, and the gaps in `seq`
+
+After each message of the person the server adds one line of its own to what Claude receives: the
+date and time now in the calendar's time zone, and the conversation's language as an instruction.
+It is stored as a message of the conversation, with its own `seq`, but a person never reads it.
+That is why the messages of a reply are numbered 1 and 3, then 4 and 6: 2 and 5 are lines of the
+application.
+
+### The `assistant` table
+
+The conversations live in a table of their own, `assistant` (`docs/ARCHITECTURE.md` section 5.4).
+The journeys read it with `queryAssistantPartition()` of `backend/tests/integration/setup.ts`.
+
+| Item | `PK` | `SK` | What it holds |
+|---|---|---|---|
+| Conversation | `CONV#<sub>` | `META` | one per person: `conversationId` (`null` when ended), `language`, `status`, `messageCount` (the person's messages), `nextSeq` |
+| Message | `CONV#<sub>` | `MSG#<conversationId>#<seq>`, `seq` on six digits | `content`: the JSON text of one entry as exchanged with Claude (`role` `user`, `system` for the line of the application, `assistant`) |
+| Daily use | `USAGE#<sub>` | the local date | `messages`, `inputTokens`, `outputTokens` of that day |
+
+The code never deletes an item: ending a conversation only sets `conversationId` to `null`, and
+the items carry a time to expire, which DynamoDB Local may never act on
+(`docs/ARCHITECTURE.md` section 8). Removing a User from Cognito leaves their items in the table,
+under a `sub` nobody has any more.
+
+### The daily limit
+
+A person may send a fixed number of messages a day, counted on the calendar's local date
+(`docs/ARCHITECTURE.md` section 4, "The assistant's routes"). The local stack sets it to 10, in
+`backend/env.local.json`, where the journeys read it with `localDailyMessageLimit()`; the pages
+call it `LIMIT`. `remainingToday` in a reply is what is left of it. A message counts when it is
+saved, whether Claude answered it or not; a refused request counts nothing. Ending a conversation
+does not give the messages back.

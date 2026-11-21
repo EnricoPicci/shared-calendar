@@ -24,6 +24,8 @@ FAKE_CLAUDE_URL="http://localhost:9230"
 # (tests/integration/setup.ts) looks for exactly these two values.
 FAKE_CLAUDE_BASE_URL="http://fake-claude:9230"
 FAKE_CLAUDE_KEY="not-a-key-the-fake-claude-checks-none"
+# The messages a person may send to the assistant in a day on the local stack.
+LOCAL_DAILY_MESSAGE_LIMIT=10
 TABLE_NAME="hello-messages"
 CALENDAR_TABLE="calendar"
 ASSISTANT_TABLE="assistant"
@@ -197,18 +199,29 @@ ensure_user alice "$ALICE_PASSWORD" user
 # DeleteUserFunction also declares the calendar variables (it cancels the deleted user's
 # appointments, docs/SHARED_CALENDAR_SPEC.md section 10.2) and gets the table and the endpoint from
 # "Parameters" too, beside its own section. ListUsersFunction reads Cognito only.
-# ASSISTANT_TABLE reaches nobody yet: no function declares that variable in template.yaml. It is
-# here so that an assistant function gets the table's local name by declaring it.
+# ASSISTANT_TABLE, like CALENDAR_TABLE, reaches every function that declares it in template.yaml:
+# an assistant function gets the table's local name by declaring the variable.
 #
 # Which Claude (docs/ARCHITECTURE.md section 8). By default the fake of the Docker stack:
 # ANTHROPIC_BASE_URL with its address and a placeholder key. With ANTHROPIC_API_KEY set in this
 # shell, the real Claude: that key and no ANTHROPIC_BASE_URL, so the SDK uses Anthropic's own
 # address. The real key then sits in env.local.json, which is git-ignored and readable by its owner
 # only; the next run without the variable writes the placeholder over it. Like ASSISTANT_TABLE,
-# the two variables reach nobody until a function declares them in template.yaml.
+# the two variables reach the functions that declare them in template.yaml.
+#
+# Two values only the local stack sets (docs/ARCHITECTURE.md section 8). The daily limit of
+# messages is low, so that a journey can reach it: $LOCAL_DAILY_MESSAGE_LIMIT, or the value of
+# ASSISTANT_DAILY_MESSAGE_LIMIT in this shell (for a long session by hand). And a spending limit,
+# once Anthropic answered it, is not remembered: the journeys make the fake Claude answer one, and
+# the next request must be asked about again at once.
 # The key is written by printf, a builtin of bash, and never through a here-document or a
 # command's argument: bash 3.2 keeps a here-document in a temporary file, and an argument shows in
 # ps. It is checked first, since a quote or a backslash in it would break the JSON.
+DAILY_MESSAGE_LIMIT="${ASSISTANT_DAILY_MESSAGE_LIMIT:-$LOCAL_DAILY_MESSAGE_LIMIT}"
+if [[ ! "$DAILY_MESSAGE_LIMIT" =~ ^[1-9][0-9]*$ ]]; then
+  echo "ERROR: ASSISTANT_DAILY_MESSAGE_LIMIT must be a whole number, 1 or more." >&2
+  exit 1
+fi
 REAL_CLAUDE_KEY="${ANTHROPIC_API_KEY:-}"
 if [[ -n "$REAL_CLAUDE_KEY" && ! "$REAL_CLAUDE_KEY" =~ ^[A-Za-z0-9_-]+$ ]]; then
   echo "ERROR: ANTHROPIC_API_KEY holds a character that is not a letter, a digit, '-' or '_'." >&2
@@ -223,6 +236,8 @@ rm -f env.local.json
   "Parameters": {
     "CALENDAR_TABLE": "$CALENDAR_TABLE",
     "ASSISTANT_TABLE": "$ASSISTANT_TABLE",
+    "ASSISTANT_DAILY_MESSAGE_LIMIT": "$DAILY_MESSAGE_LIMIT",
+    "ASSISTANT_BUDGET_MEMORY_SECONDS": "0",
 EOF
   if [[ -n "$REAL_CLAUDE_KEY" ]]; then
     printf '    "ANTHROPIC_API_KEY": "%s",\n' "$REAL_CLAUDE_KEY"
@@ -282,5 +297,6 @@ if [[ -n "$REAL_CLAUDE_KEY" ]]; then
 else
   echo "Claude: the fake of the Docker stack ($FAKE_CLAUDE_BASE_URL for the functions, $FAKE_CLAUDE_URL from here)."
 fi
+echo "Assistant: $DAILY_MESSAGE_LIMIT messages a person a day."
 echo
 echo "Local stack ready. DB browser: http://localhost:8001"

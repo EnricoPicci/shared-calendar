@@ -2,7 +2,8 @@
   "about": [
     "The scripted answers of the fake Claude (backend/docker/fake-claude.mjs), owned by the journeys beside this folder and read again at every request.",
     "answers: named answers, each a status and a body as Anthropic sends them. messages: the exact text of a message of the person -> the names of the answers, one per step of the exchange. language: the same for the language question. otherwise: the answer for a message nobody scripted.",
-    "source says where a body comes from: \"recorded\" from the real API (cut down to the fields a client reads), \"documentation\" when Anthropic's pages give the shape and it cannot be provoked, \"fake\" when it is the fake Claude speaking for itself."
+    "source says where a body comes from: \"recorded\" from the real API (cut down to the fields a client reads), \"documentation\" when Anthropic's pages give the shape and it cannot be provoked, \"fake\" when the text was written for a journey, in the shape of a recorded answer.",
+    "The text {{application-line}} in an answer is replaced by the fake with the last line of the application in the request (the entry of role \"system\" after a message of the person)."
   ],
   "answers": {
     "not-scripted": {
@@ -180,6 +181,93 @@
         },
         "request_id": "req_fake"
       }
+    },
+    "text-hello": {
+      "source": "fake",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_text_hello",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "",
+            "signature": "CAQSoAoKEAgUGAI4AUIIdGhpbmtpbmcSDB3B1cb0LYeey24gqxoMV+GVQc3T81XZtSCsIjBRRxsA5VRWAliS1bgt5mUKFd095kSqLgl8QOW/90lAyg2bCixDmbCQVn7ZMEsietIqvQkPBGtX2FDL3oynmi19cm5sSp6bzfmAUlp1JiYhRZ+nTOATskn8xqm4UmM+BG2eDB61l6D1eSBU8t7EPsRrFOKyGooAnLmdZHuiRlceQFuQxfC4fowc5K0V6VzguwEXD200xUaztFPVwBMZGplHxdfv0qU4X51i2SDXqRU9mliLJEH+7HRnHRdPcPM+oHYWvuiz+XR/DnQdbLBnBhd0jyM593vv7a1IVM8dwRSxvclCAd0fZUB53TjGx6xgDX15ZhrZgWAvgAfki+AvgzXtTDv3BMuM+JLucW89FvmYEq8+P1+QLSGqIlEw6MAVzJ69x86Dtt9Bg/gGRDM0WBsYR956Qa7Ex68x7GS14T6rdN/adKewBmSDx93nYqNZMkUvqVe7O8eS6fTGGyclKWsCOPbgKXkYP7NHe6RSPaMMquMkOzt/qzTGHSzw7a4UJttEgnx2m42dGgqLJM6SJh/Inz4zC1QmNiRfHt8E5PzSF7C0z7T/x7FPGjxXZmjTolskNSK6XkJgkTaF4+BtALnKRpv3qK66+PZrwzXnQGm//C6sUN4qbGwarjWAZI5hhkOcOL41ou2TpiM9KJHj/HwuxNERWAFKIlZBQyx2pLm24dXvBPvv5Zjs9Ukxlt2EDy2+GGaDXmL1/MTJc04IXOcPFY+AaK3/zqlqiaANcvLDrIog9EUTFzZ0u+fpuePl3VEmEBN1fQeuqhjoRMplrRl/xC8bOJo/WnUseHypkom3tT8qa5xdttrJjVLaXZYEeaR3QoEYbR1il/mL2LVGcoKggHcEwZFLSmAJHliLyvN8tMGSYq7vZ1s8stGTr8I1hYyeA5HzPadyeA4Bqw6hLc5S5u1xqTEoNBoCXh551zZTgQ0ul5Y4y8KufLnTo8hQWPe58FxY9yD7GYkUvZH+SXwOBPN+1Ry26/7pU7a2H9mfqKKFFsDcBBCbgjj/VU3/lFvZN2RlhPL1dnF/P0bPiYLqeYNyAtUGyq8J3Wv+7ai+DNoJW3efpWBw41gSgp31MGvTwzfTHAFh+ZgHS5FIT6HqM/p3tDRws1BVMz8016vR7tCDlTTSOPXazXHHWkifnJBGjQ7IliyLooYfGuregFM/ddBQtr4bU1yR56YM9fsqVD36K2io1WJCT5l9AmyR3XK5G7CLcRIbyj7cEnaFwkPXJuQZV9wrcTO8VDJLYKryVeWnRzLTIAzoVrK0Sl5+DBSHLkYdz3v9u10q44VC4EqXKvMo2mO4xstDpPftICv7s0JhYrfDxH7/QDJ2ghEa8RVCdoVHN0IW6I1c43w7xi0XPUi+k16VRwFtXMcbCap5JY03yEZmWQOAMLiiXOXwXKyU3GjbFNp6tYjCwU2flYWCdayDLqGEZAPWEXkzLhBuBQO+CX+TJR2NH9zqf58Y9/QDkwDt8OUNlLGw87+D0Bo8ybYfHS2b4l+DuUuCT5/6TM8B/+uikiFNVWPeWaqDXLzHZAjgu35ipn5R16CW6QFE/+HVZTC5LSoz+JQrSRx/w6pexNZvoIyxuTgDgh/ugTA38/eUoocTnQ9Qc9FbAD3VaqaFR+DIPtLmtit7gssciqCdXwriQpsmVjvDHOuVkpFe7d+iCL4MG4H2Jx+XwC9/GAE="
+          },
+          {
+            "type": "text",
+            "text": "Hello. I am the assistant of the shared calendar."
+          }
+        ],
+        "stop_reason": "end_turn",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 106,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 258
+        }
+      }
+    },
+    "text-buongiorno": {
+      "source": "fake",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_text_buongiorno",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "",
+            "signature": "CAQSoAoKEAgUGAI4AUIIdGhpbmtpbmcSDB3B1cb0LYeey24gqxoMV+GVQc3T81XZtSCsIjBRRxsA5VRWAliS1bgt5mUKFd095kSqLgl8QOW/90lAyg2bCixDmbCQVn7ZMEsietIqvQkPBGtX2FDL3oynmi19cm5sSp6bzfmAUlp1JiYhRZ+nTOATskn8xqm4UmM+BG2eDB61l6D1eSBU8t7EPsRrFOKyGooAnLmdZHuiRlceQFuQxfC4fowc5K0V6VzguwEXD200xUaztFPVwBMZGplHxdfv0qU4X51i2SDXqRU9mliLJEH+7HRnHRdPcPM+oHYWvuiz+XR/DnQdbLBnBhd0jyM593vv7a1IVM8dwRSxvclCAd0fZUB53TjGx6xgDX15ZhrZgWAvgAfki+AvgzXtTDv3BMuM+JLucW89FvmYEq8+P1+QLSGqIlEw6MAVzJ69x86Dtt9Bg/gGRDM0WBsYR956Qa7Ex68x7GS14T6rdN/adKewBmSDx93nYqNZMkUvqVe7O8eS6fTGGyclKWsCOPbgKXkYP7NHe6RSPaMMquMkOzt/qzTGHSzw7a4UJttEgnx2m42dGgqLJM6SJh/Inz4zC1QmNiRfHt8E5PzSF7C0z7T/x7FPGjxXZmjTolskNSK6XkJgkTaF4+BtALnKRpv3qK66+PZrwzXnQGm//C6sUN4qbGwarjWAZI5hhkOcOL41ou2TpiM9KJHj/HwuxNERWAFKIlZBQyx2pLm24dXvBPvv5Zjs9Ukxlt2EDy2+GGaDXmL1/MTJc04IXOcPFY+AaK3/zqlqiaANcvLDrIog9EUTFzZ0u+fpuePl3VEmEBN1fQeuqhjoRMplrRl/xC8bOJo/WnUseHypkom3tT8qa5xdttrJjVLaXZYEeaR3QoEYbR1il/mL2LVGcoKggHcEwZFLSmAJHliLyvN8tMGSYq7vZ1s8stGTr8I1hYyeA5HzPadyeA4Bqw6hLc5S5u1xqTEoNBoCXh551zZTgQ0ul5Y4y8KufLnTo8hQWPe58FxY9yD7GYkUvZH+SXwOBPN+1Ry26/7pU7a2H9mfqKKFFsDcBBCbgjj/VU3/lFvZN2RlhPL1dnF/P0bPiYLqeYNyAtUGyq8J3Wv+7ai+DNoJW3efpWBw41gSgp31MGvTwzfTHAFh+ZgHS5FIT6HqM/p3tDRws1BVMz8016vR7tCDlTTSOPXazXHHWkifnJBGjQ7IliyLooYfGuregFM/ddBQtr4bU1yR56YM9fsqVD36K2io1WJCT5l9AmyR3XK5G7CLcRIbyj7cEnaFwkPXJuQZV9wrcTO8VDJLYKryVeWnRzLTIAzoVrK0Sl5+DBSHLkYdz3v9u10q44VC4EqXKvMo2mO4xstDpPftICv7s0JhYrfDxH7/QDJ2ghEa8RVCdoVHN0IW6I1c43w7xi0XPUi+k16VRwFtXMcbCap5JY03yEZmWQOAMLiiXOXwXKyU3GjbFNp6tYjCwU2flYWCdayDLqGEZAPWEXkzLhBuBQO+CX+TJR2NH9zqf58Y9/QDkwDt8OUNlLGw87+D0Bo8ybYfHS2b4l+DuUuCT5/6TM8B/+uikiFNVWPeWaqDXLzHZAjgu35ipn5R16CW6QFE/+HVZTC5LSoz+JQrSRx/w6pexNZvoIyxuTgDgh/ugTA38/eUoocTnQ9Qc9FbAD3VaqaFR+DIPtLmtit7gssciqCdXwriQpsmVjvDHOuVkpFe7d+iCL4MG4H2Jx+XwC9/GAE="
+          },
+          {
+            "type": "text",
+            "text": "Buongiorno. Sono l'assistente del calendario condiviso."
+          }
+        ],
+        "stop_reason": "end_turn",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 106,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 258
+        }
+      }
+    },
+    "text-application-line": {
+      "source": "fake",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_text_application_line",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "",
+            "signature": "CAQSoAoKEAgUGAI4AUIIdGhpbmtpbmcSDB3B1cb0LYeey24gqxoMV+GVQc3T81XZtSCsIjBRRxsA5VRWAliS1bgt5mUKFd095kSqLgl8QOW/90lAyg2bCixDmbCQVn7ZMEsietIqvQkPBGtX2FDL3oynmi19cm5sSp6bzfmAUlp1JiYhRZ+nTOATskn8xqm4UmM+BG2eDB61l6D1eSBU8t7EPsRrFOKyGooAnLmdZHuiRlceQFuQxfC4fowc5K0V6VzguwEXD200xUaztFPVwBMZGplHxdfv0qU4X51i2SDXqRU9mliLJEH+7HRnHRdPcPM+oHYWvuiz+XR/DnQdbLBnBhd0jyM593vv7a1IVM8dwRSxvclCAd0fZUB53TjGx6xgDX15ZhrZgWAvgAfki+AvgzXtTDv3BMuM+JLucW89FvmYEq8+P1+QLSGqIlEw6MAVzJ69x86Dtt9Bg/gGRDM0WBsYR956Qa7Ex68x7GS14T6rdN/adKewBmSDx93nYqNZMkUvqVe7O8eS6fTGGyclKWsCOPbgKXkYP7NHe6RSPaMMquMkOzt/qzTGHSzw7a4UJttEgnx2m42dGgqLJM6SJh/Inz4zC1QmNiRfHt8E5PzSF7C0z7T/x7FPGjxXZmjTolskNSK6XkJgkTaF4+BtALnKRpv3qK66+PZrwzXnQGm//C6sUN4qbGwarjWAZI5hhkOcOL41ou2TpiM9KJHj/HwuxNERWAFKIlZBQyx2pLm24dXvBPvv5Zjs9Ukxlt2EDy2+GGaDXmL1/MTJc04IXOcPFY+AaK3/zqlqiaANcvLDrIog9EUTFzZ0u+fpuePl3VEmEBN1fQeuqhjoRMplrRl/xC8bOJo/WnUseHypkom3tT8qa5xdttrJjVLaXZYEeaR3QoEYbR1il/mL2LVGcoKggHcEwZFLSmAJHliLyvN8tMGSYq7vZ1s8stGTr8I1hYyeA5HzPadyeA4Bqw6hLc5S5u1xqTEoNBoCXh551zZTgQ0ul5Y4y8KufLnTo8hQWPe58FxY9yD7GYkUvZH+SXwOBPN+1Ry26/7pU7a2H9mfqKKFFsDcBBCbgjj/VU3/lFvZN2RlhPL1dnF/P0bPiYLqeYNyAtUGyq8J3Wv+7ai+DNoJW3efpWBw41gSgp31MGvTwzfTHAFh+ZgHS5FIT6HqM/p3tDRws1BVMz8016vR7tCDlTTSOPXazXHHWkifnJBGjQ7IliyLooYfGuregFM/ddBQtr4bU1yR56YM9fsqVD36K2io1WJCT5l9AmyR3XK5G7CLcRIbyj7cEnaFwkPXJuQZV9wrcTO8VDJLYKryVeWnRzLTIAzoVrK0Sl5+DBSHLkYdz3v9u10q44VC4EqXKvMo2mO4xstDpPftICv7s0JhYrfDxH7/QDJ2ghEa8RVCdoVHN0IW6I1c43w7xi0XPUi+k16VRwFtXMcbCap5JY03yEZmWQOAMLiiXOXwXKyU3GjbFNp6tYjCwU2flYWCdayDLqGEZAPWEXkzLhBuBQO+CX+TJR2NH9zqf58Y9/QDkwDt8OUNlLGw87+D0Bo8ybYfHS2b4l+DuUuCT5/6TM8B/+uikiFNVWPeWaqDXLzHZAjgu35ipn5R16CW6QFE/+HVZTC5LSoz+JQrSRx/w6pexNZvoIyxuTgDgh/ugTA38/eUoocTnQ9Qc9FbAD3VaqaFR+DIPtLmtit7gssciqCdXwriQpsmVjvDHOuVkpFe7d+iCL4MG4H2Jx+XwC9/GAE="
+          },
+          {
+            "type": "text",
+            "text": "The application told me: {{application-line}}"
+          }
+        ],
+        "stop_reason": "end_turn",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 106,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 258
+        }
+      }
     }
   },
   "otherwise": "not-scripted",
@@ -187,7 +275,8 @@
     "otherwise": "language-en",
     "texts": {
       "Quali appuntamenti ho la settimana prossima?": "language-it",
-      "ciao": "language-it"
+      "ciao": "language-it",
+      "Buongiorno, mi sente?": "language-it"
     }
   },
   "messages": {
@@ -211,6 +300,15 @@
     ],
     "fake: the key is refused": [
       "error-key-refused"
+    ],
+    "Hello, can you hear me?": [
+      "text-hello"
+    ],
+    "Buongiorno, mi sente?": [
+      "text-buongiorno"
+    ],
+    "fake: say the line of the application": [
+      "text-application-line"
     ]
   }
 }
