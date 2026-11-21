@@ -83,7 +83,7 @@ in `backend/` (from inside `backend/`, drop `-w backend` and the `--` before arg
 
 | Command | Does |
 |---|---|
-| `DYNAMODB_PORT=8002 npm run local:up -w backend` | Starts DynamoDB Local, dynamodb-admin and cognito-local in Docker and seeds them: table, pool, groups, users `admin` and `alice`. Idempotent. Drop `DYNAMODB_PORT` if port 8000 is free on your machine; whatever you choose, use the same value for every command below |
+| `DYNAMODB_PORT=8002 npm run local:up -w backend` | Starts DynamoDB Local, dynamodb-admin, cognito-local and a fake Claude in Docker and seeds them: table, pool, groups, users `admin` and `alice`. Idempotent. Drop `DYNAMODB_PORT` if port 8000 is free on your machine; whatever you choose, use the same value for every command below |
 | `npm run local:api -w backend` | Builds the functions and serves the API on `http://127.0.0.1:3000` (foreground; wait for `Running on http://127.0.0.1:3000`) |
 | `DYNAMODB_PORT=8002 npm run verify -w backend` | The deploy gate: typecheck, lint, audit, template lint, unit tests (of `backend` and `shared`), integration tests against the running local stack. On success writes `backend/.verify-ok` |
 | `npm run deploy -w backend` | Refuses unless `backend/.verify-ok` is younger than 30 minutes, names the current commit and says `clean`, and the tree is still clean. Then `sam build` and `sam deploy` (asks to confirm the change set). Uses your real AWS login |

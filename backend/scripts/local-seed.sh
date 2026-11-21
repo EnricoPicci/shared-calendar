@@ -7,7 +7,9 @@
 #   2. user pool local_pool and app client local_client on cognito-local
 #   3. groups admin and user
 #   4. user admin (group admin) and user alice (group user), permanent passwords
-#   5. env.local.json with the generated pool and client ids, for sam local
+#   5. env.local.json with the generated pool and client ids, for sam local, and with which Claude
+#      the assistant talks to: the fake of the Docker stack, or the real one when ANTHROPIC_API_KEY
+#      is set in the shell that runs this script
 #
 # Runs on the host, so it reaches the emulators on localhost. The Lambda containers reach them
 # by service name (dynamodb, cognito) instead, which is what env.local.json contains.
@@ -16,6 +18,12 @@ cd "$(dirname "$0")/.."
 
 DYNAMODB_URL="http://localhost:${DYNAMODB_PORT:-8000}"
 COGNITO_URL="http://localhost:9229"
+FAKE_CLAUDE_URL="http://localhost:9230"
+# What env.local.json holds when the fake Claude is wired: its address as the Lambda containers
+# reach it, and a key that is plainly not one (the fake checks none). The journeys' set-up
+# (tests/integration/setup.ts) looks for exactly these two values.
+FAKE_CLAUDE_BASE_URL="http://fake-claude:9230"
+FAKE_CLAUDE_KEY="not-a-key-the-fake-claude-checks-none"
 TABLE_NAME="hello-messages"
 CALENDAR_TABLE="calendar"
 ASSISTANT_TABLE="assistant"
@@ -70,9 +78,13 @@ check_service() {
 }
 check_service dynamodb 8000 "${DYNAMODB_PORT:-8000}"
 check_service cognito 9229 9229
+check_service fake-claude 9230 9230
 
 wait_for "DynamoDB Local ($DYNAMODB_URL)" ddb list-tables
 wait_for "cognito-local ($COGNITO_URL)" idp list-user-pools --max-results 1
+# Any message gets an answer from the fake Claude; an empty one gets its "not scripted" answer.
+wait_for "the fake Claude ($FAKE_CLAUDE_URL)" curl -sf -o /dev/null -X POST "$FAKE_CLAUDE_URL/v1/messages" \
+  -H 'content-type: application/json' -d '{}'
 
 # 1. Tables. The calendar table starts empty: until the Administrator saves settings, the
 # defaults apply (docs/SHARED_CALENDAR_SPEC.md R-SET-01). The calendar journeys empty it at their
@@ -187,11 +199,38 @@ ensure_user alice "$ALICE_PASSWORD" user
 # "Parameters" too, beside its own section. ListUsersFunction reads Cognito only.
 # ASSISTANT_TABLE reaches nobody yet: no function declares that variable in template.yaml. It is
 # here so that an assistant function gets the table's local name by declaring it.
-cat > env.local.json <<EOF
+#
+# Which Claude (docs/ARCHITECTURE.md section 8). By default the fake of the Docker stack:
+# ANTHROPIC_BASE_URL with its address and a placeholder key. With ANTHROPIC_API_KEY set in this
+# shell, the real Claude: that key and no ANTHROPIC_BASE_URL, so the SDK uses Anthropic's own
+# address. The real key then sits in env.local.json, which is git-ignored and readable by its owner
+# only; the next run without the variable writes the placeholder over it. Like ASSISTANT_TABLE,
+# the two variables reach nobody until a function declares them in template.yaml.
+# The key is written by printf, a builtin of bash, and never through a here-document or a
+# command's argument: bash 3.2 keeps a here-document in a temporary file, and an argument shows in
+# ps. It is checked first, since a quote or a backslash in it would break the JSON.
+REAL_CLAUDE_KEY="${ANTHROPIC_API_KEY:-}"
+if [[ -n "$REAL_CLAUDE_KEY" && ! "$REAL_CLAUDE_KEY" =~ ^[A-Za-z0-9_-]+$ ]]; then
+  echo "ERROR: ANTHROPIC_API_KEY holds a character that is not a letter, a digit, '-' or '_'." >&2
+  echo "       Nothing was written. Unset it to wire the fake Claude." >&2
+  exit 1
+fi
+umask 077
+rm -f env.local.json
+{
+  cat <<EOF
 {
   "Parameters": {
     "CALENDAR_TABLE": "$CALENDAR_TABLE",
     "ASSISTANT_TABLE": "$ASSISTANT_TABLE",
+EOF
+  if [[ -n "$REAL_CLAUDE_KEY" ]]; then
+    printf '    "ANTHROPIC_API_KEY": "%s",\n' "$REAL_CLAUDE_KEY"
+  else
+    printf '    "ANTHROPIC_BASE_URL": "%s",\n' "$FAKE_CLAUDE_BASE_URL"
+    printf '    "ANTHROPIC_API_KEY": "%s",\n' "$FAKE_CLAUDE_KEY"
+  fi
+  cat <<EOF
     "DYNAMODB_ENDPOINT": "http://dynamodb:8000"
   },
   "AuthorizerFunction": {
@@ -235,6 +274,13 @@ cat > env.local.json <<EOF
   }
 }
 EOF
+} > env.local.json
 echo "env.local.json: written (pool $POOL_ID, client $CLIENT_ID)"
+if [[ -n "$REAL_CLAUDE_KEY" ]]; then
+  echo "Claude: the REAL Anthropic API, with the key of ANTHROPIC_API_KEY (now in env.local.json)."
+  echo "        The journeys refuse to run. To go back to the fake: npm run local:up without the variable."
+else
+  echo "Claude: the fake of the Docker stack ($FAKE_CLAUDE_BASE_URL for the functions, $FAKE_CLAUDE_URL from here)."
+fi
 echo
 echo "Local stack ready. DB browser: http://localhost:8001"

@@ -2,6 +2,7 @@ import { ConditionalCheckFailedException, TransactionCanceledException, Transact
 import { GetCommand, QueryCommand, TransactWriteCommand, UpdateCommand, type TransactWriteCommandInput } from '@aws-sdk/lib-dynamodb';
 import { localDateOf, type AssistantLanguage, type AssistantStatus } from '@shared-calendar/shared';
 import { ulid } from 'ulid';
+import type { ConversationEntry } from './anthropic';
 import { documentClient } from './db';
 
 // The assistant table (docs/ARCHITECTURE.md section 5.4): a person's conversation with the
@@ -74,15 +75,19 @@ export type Conversation = {
 // of the server, shown to the person and never sent to Claude.
 export type MessageKind = 'model' | 'notice';
 
+// What a message holds. For `model` it is the entry as it is sent to Claude, in the Anthropic SDK's
+// own shape; the module stores it as JSON text and looks inside nothing.
+export type MessageBody = { kind: 'model'; content: ConversationEntry } | { kind: 'notice'; content: unknown };
+
 // One stored message. `content` comes back as it was given to the write.
-export type StoredMessage = { seq: number; kind: MessageKind; content: unknown; at: string };
+export type StoredMessage = { seq: number; at: string } & MessageBody;
 
 // What a read gives. `version` is the META item's (0 when the person has none) and is what the next
 // write must name, also when `conversation` is null: none yet, ended, or run out.
 export type ConversationRead = { version: number; conversation: Conversation | null; messages: StoredMessage[] };
 
 // A message to add. `fromPerson` marks the person's own text, which is what the limits count.
-export type NewMessage = { kind: MessageKind; content: unknown; fromPerson?: boolean };
+export type NewMessage = MessageBody & { fromPerson?: boolean };
 
 // What one step saves: the messages it added, the state it leaves, and what it used. The daily use
 // is counted on the calendar's local date, hence the time zone.
@@ -183,7 +188,7 @@ export async function readConversation(sub: string, now: string): Promise<Conver
         kind: item.kind as MessageKind,
         content: JSON.parse(item.content as string) as unknown,
         at: item.at as string,
-      });
+      } as StoredMessage);
     }
     startKey = page.LastEvaluatedKey;
   } while (startKey);

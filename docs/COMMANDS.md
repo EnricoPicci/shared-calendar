@@ -45,11 +45,12 @@ the scripts themselves win, and this document is fixed.
 
 ## 3. The local stack
 
-- `npm run local:up -w backend`: starts DynamoDB Local, dynamodb-admin (http://localhost:8001)
-  and cognito-local, then seeds them (tables `hello-messages`, `calendar` and `assistant`, the last two empty;
+- `npm run local:up -w backend`: starts DynamoDB Local, dynamodb-admin (http://localhost:8001),
+  cognito-local and the fake Claude, then seeds them (tables `hello-messages`, `calendar` and `assistant`, the last two empty;
   pool, client, groups, users `admin` / `Admin-Local-Pass-1!` and `alice` /
   `Alice-Local-Pass-1!`) and writes `env.local.json`. Idempotent; rerun it after a change to
-  `local-seed.sh`.
+  `local-seed.sh`. Its last line but one says which Claude it wired: the fake, or the real one
+  when `ANTHROPIC_API_KEY` is set in the shell (section 3.4).
 - `npm run local:api -w backend`: builds and serves the API on http://127.0.0.1:3000
   (foreground). Ready in about 11 s, build included.
 - `npm run local:down -w backend`: stops the stack. The table is in memory and is lost; Cognito
@@ -123,6 +124,35 @@ yet, so it reaches nobody: an assistant function will get the table's local name
 - **After `bootstrap-admin local`**, rerun `local:up` to restore `Admin-Local-Pass-1!`, or the
   integration tests fail.
 
+### 3.4 Claude: the fake and the real one
+
+- **By default `local:up` wires the fake Claude**, the service `fake-claude` of the Docker
+  stack (`docs/ARCHITECTURE.md` section 8). It writes into `env.local.json`, under `Parameters`,
+  `ANTHROPIC_BASE_URL` (`http://fake-claude:9230`, the fake as the Lambda containers reach it)
+  and `ANTHROPIC_API_KEY` with a placeholder that is plainly not a key.
+- **With `ANTHROPIC_API_KEY` set for that one command, it wires the real Claude**:
+  `ANTHROPIC_API_KEY=… DYNAMODB_PORT=8002 npm run local:up -w backend`. `env.local.json` then
+  holds the real key and no `ANTHROPIC_BASE_URL`. The file is git-ignored and readable by its
+  owner only. The script never prints the key, and refuses one holding a character that is not
+  a letter, a digit, `-` or `_`. Do not `export` the variable: **a `local:up` without it takes
+  the key out of the file again**, and that is the way back to the fake.
+- Either way, restart `local:api` afterwards: it reads `env.local.json` only when it starts.
+- No function declares the two variables in `template.yaml` yet, so they reach nobody until the
+  first assistant function exists.
+- **Asking the fake by hand**, from the host on http://localhost:9230:
+
+  ```
+  curl -s -X POST http://localhost:9230/v1/messages -H 'content-type: application/json' \
+    -d '{"messages":[{"role":"user","content":"What is the date today, and which weekday is it?"}]}'
+  ```
+
+  It answers `POST /v1/messages` only. What it answers is
+  `backend/tests/integration/fake-claude/answers.json`, read again at every request: a change
+  to that file needs no restart. A text the file does not script gets "Fake Claude: no answer
+  is scripted for this message." Its log, one line per request: `docker compose logs fake-claude`
+  (in `backend/`). After a change to the script `backend/docker/fake-claude.mjs`:
+  `docker compose restart fake-claude`.
+
 ## 4. The integration tests and the deploy gate
 
 - `RUN_INTEGRATION=1 npm run test:integration -w backend`: the journeys of
@@ -130,6 +160,10 @@ yet, so it reaches nobody: an assistant function will get the table's local name
   (`calendar.test.ts`) against the running `local:up` + `local:api` stack. Pass the same
   `DYNAMODB_PORT` as `local:up`. Without `RUN_INTEGRATION=1` it runs nothing and exits 0.
   Removes a leftover `carol` before starting, so it can be rerun after a failed run. **The
+  journeys refuse to start when `env.local.json` wires the real Claude** (section 3.4), every
+  one of them, the calendar's too: run `local:up` without `ANTHROPIC_API_KEY`, then restart
+  `local:api`. The check reads the file, which is what `local:api` was started with only if it
+  was restarted after the last `local:up`. **The
   calendar journeys empty the local `calendar` table first** (helper `resetCalendarTable()`,
   which refuses any endpoint but `localhost`/`127.0.0.1`): calendar data made by hand is lost
   when they run.

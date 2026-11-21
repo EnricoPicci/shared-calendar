@@ -66,8 +66,8 @@ const messageItem = (seq: number, content: unknown, kind = 'model') => ({
 });
 
 const step = (over: Partial<Step> = {}): Step => ({ messages: [], status: 'idle', proposal: null, timeZone: ZONE, ...over });
-const person = (text: string) => ({ kind: 'model' as const, content: { role: 'user', content: text }, fromPerson: true });
-const answer = (text: string) => ({ kind: 'model' as const, content: { role: 'assistant', content: text } });
+const person = (text: string) => ({ kind: 'model' as const, content: { role: 'user' as const, content: text }, fromPerson: true });
+const answer = (text: string) => ({ kind: 'model' as const, content: { role: 'assistant' as const, content: text } });
 
 const transactions = () => ddb.commandCalls(TransactWriteCommand).map((call) => call.args[0].input.TransactItems ?? []);
 const sent = () => transactions()[0] ?? [];

@@ -14,7 +14,8 @@ Paths in this file are relative to `backend/`.
 - `src/handlers/`: one Lambda entry point per file.
 - `src/lib/`: back-end modules; the only place that touches the AWS SDK.
 - `tests/unit/`: vitest unit tests, mirroring `src/` (e.g. `tests/unit/lib/http.test.ts`).
-- `tests/integration/`: end-to-end tests against the local Docker stack: `setup.ts` (helpers,
+- `tests/integration/`: end-to-end tests against the local Docker stack; they refuse to start
+  when `env.local.json` does not wire the fake Claude (`claudeWiringProblem()`): `setup.ts` (helpers,
   including `resetCalendarTable()`, `putCalendarItem()`, `getCalendarItem()`,
   `deleteCalendarItem()`, `queryCalendarPartition()`), `journeys.test.ts` (the journeys of
   `docs/IMPLEMENTATION_PLAN.md` step 9), `calendar.test.ts` (the calendar's journeys).
@@ -22,7 +23,9 @@ Paths in this file are relative to `backend/`.
   `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`, `budget.sh`, `check-sam.sh`;
   `target.sh` is sourced by `bootstrap-admin.sh`, `smoke.sh` and `budget.sh`; the first two of
   those call `cognito.mjs`).
-- `docker/`: files for the local stack (`cognito-local-config.json`).
+- `docker/`: files for the local stack (`cognito-local-config.json`; `fake-claude.mjs`, the
+  fake Claude, whose answers are `tests/integration/fake-claude/answers.json`:
+  `docs/ARCHITECTURE.md` section 8).
 - Generated, git-ignored: `env.local.json`, `.cognito/`, `.aws-sam/`, `.verify-ok`, `coverage/`.
 
 ## `src/lib/`
@@ -66,6 +69,15 @@ Paths in this file are relative to `backend/`.
   `AssistantBusyError`. `readConversation` (two reads; gives the `version` every write must
   name), `startConversation`, `saveStep`, `takeProposal` (`null` when not taken),
   `endConversation`, `readDailyUse`; "now" and the time zone are passed in.
+- `anthropic.ts` is the one door to Claude and **the only file that imports
+  `@anthropic-ai/sdk`** (`npm run lint` refuses it elsewhere, its unit test excepted).
+  `askStep` and `askLanguage` answer one of a closed list (`text`, `tool_requests`,
+  `cut_short`, `refusal`, `unavailable` with a reason, `budget_reached`) and never throw for
+  what Anthropic did: only `AnthropicConfigError` (`ASSISTANT_MODEL` missing). It logs nothing
+  and gives back nothing of Anthropic's own words. The key: `ANTHROPIC_API_KEY`, else the
+  parameter named in `ANTHROPIC_KEY_PARAMETER`, kept ten minutes. "now" is passed in.
+- `parameters.ts`: `readParameter(name)`, one decrypted read of Parameter Store, `null` when
+  the parameter does not exist. The value is a secret: never log it.
 - `calendarEvents.ts`: builds the `EVENT` item (`appointmentEvent`, the `AppointmentSnapshot`
   of the stored appointment; types `booked`, `cancelled`, `note_updated`, and `changed` with
   `previous`, the old appointment as stored after the change, a key the other types never

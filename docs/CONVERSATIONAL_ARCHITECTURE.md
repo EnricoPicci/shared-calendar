@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v4, under way: steps c00 and c01 of `docs/CONVERSATIONAL_PLAN.md` done |
+| Status | v5, under way: steps c00 to c02 of `docs/CONVERSATIONAL_PLAN.md` done |
 | Date | 2026-11-21 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
@@ -15,6 +15,7 @@
 | v2 | 2026-11-21 | **The spending limit reached** is told apart from an outage: its own code `assistant_budget_reached` and its own sentence for the person, in the conversation's language (sections 6.1, 7.4, 12, 14, 15) |
 | v3 | 2026-11-21 | **Under way.** Step c00 of `docs/CONVERSATIONAL_PLAN.md` is done: the contract of section 6, the languages of 4.2, the limits of 4.4 and the fixed texts exist in `shared/src/assistant/`, the seven codes in `shared/src/api.ts`. Section 1 says which document governs a part of the assistant once it is built. Section 6 names the field of a refused action: `error`, the route's error code, `null` on every other action. Section 4.2: the fixed Italian texts address the person with the formal "lei". No other change to the design |
 | v4 | 2026-11-21 | Step c01 of `docs/CONVERSATIONAL_PLAN.md` is done: the table and its module exist, and `docs/ARCHITECTURE.md` section 5.4 governs them from now on. Two changes decided with the Product Owner before the step. **Two permission sets** instead of one, `AssistantReadPolicy` and `AssistantWritePolicy`, so that a function that only reads cannot write (section 11.1). **A step reads the current conversation only, in two reads**, instead of the whole partition in one (section 9). Section 9 also says what the implementation fixed: a message's `content` is stored as JSON text, the `META` item stays when a conversation ends, the day's use is added inside the step's transaction |
+| v5 | 2026-11-21 | Step c02 of `docs/CONVERSATIONAL_PLAN.md` is done: the module that asks Claude, the read of the key and the fake Claude of the local stack exist. **What sections 6.1 and 7.2 took from Anthropic's documentation was tried with real requests** (section 7.2, "What was tried"): five of six assumptions hold on the three models. **The sixth did not, and section 6.1 changes**: the spending limit the operator sets (section 14) answers with status 400 and no code, not with the 429 this document assumed, so it is recognised by the start of its message, the one place where the words of a message are read. Decided with the Product Owner. Sections 4.2, 7.1, 7.4, 12.1 and 14 say what the implementation fixed: the request of the language question, the list of answers and of reasons, the fake's address and where its answers live |
 
 ---
 
@@ -182,7 +183,11 @@ and its fixed texts.
 
 1. At the first message the server asks Claude one small extra question, "which of the
    supported languages is this message written in?", with an answer constrained to the list
-   (structured output). A message in any other language gives `en`.
+   (structured output). A message in any other language gives `en`. The request: the question
+   as the `system` text, the person's message alone as the one `user` message, and
+   `output_config.format` with a JSON Schema of one field, `language`, whose values are the
+   list. The answer is read as JSON (its spacing varies between models). An answer outside the
+   list, or one that cannot be read, gives `en` too.
 2. The answer is stored with the conversation and never changes.
 3. Every request to Claude from then on states the conversation's language as an instruction
    of the application, not of the person, so writing later in the other language does not
@@ -513,11 +518,28 @@ Each has its own code, so that the screen can say what is true, kindly, instead 
 | `503 assistant_budget_reached` | **The spending limit of the Anthropic account is reached** (section 14): Anthropic refuses every request until the limit is raised or the month ends | "The assistant has reached its spending limit and cannot answer for now. Your calendar is not affected: everything can still be done from the other pages." |
 | `503 assistant_unavailable` | Anything else that is not the person's fault: Anthropic unreachable, slow or overloaded, the key missing or refused | "The assistant is not available at the moment. Please try again in a little while. Everything can still be done from the other pages." |
 
-- **How the spending limit is recognised.** Anthropic answers a request over the limit with an
-  error of its own kind, not with a time-out: status 429 with the detail
-  `enforced_spend_limit_reached`, or status 402 (`billing_error`) when the account's credit is
-  used up. `backend/src/lib/anthropic.ts` turns exactly these two into "budget reached";
-  an ordinary 429 (too many requests in a minute) stays `assistant_unavailable`.
+- **How the spending limit is recognised.** Anthropic answers a request over a limit with an
+  error of its own kind, not with a time-out, in three shapes. `backend/src/lib/anthropic.ts`
+  turns exactly these into "budget reached", by the SDK's error classes and the error's own
+  fields:
+  1. **Status 400, `invalid_request_error`, with no code, whose message starts "You have
+     reached your specified"**: a spending limit the account's owner set in the Anthropic
+     Console, on the organisation or on a workspace. This is the limit section 14 relies on.
+     Anthropic gives it no code, so the start of the message is all that tells it from a wrong
+     request: it is the one place where the words of a message are read. If Anthropic rewords
+     it, the answer falls back to `assistant_unavailable`, which is the safe failure. Any other
+     400 is `assistant_unavailable`.
+  2. **Status 429 whose detail `error.details.error_code`** (in the SDK's error: `errorCode`)
+     **is `enforced_spend_limit_reached`**, the monthly cap of the account's usage tier, or
+     `contract_spend_limit_reached`, the limit of a contract. An ordinary 429 (too many requests
+     in a minute) carries no code, or the code of a rate limit, and stays
+     `assistant_unavailable`.
+  3. **Status 402, `billing_error`**: a problem with the account's billing or payment. No retry
+     helps there either.
+
+  None of the three can be provoked at will: the shapes are those of Anthropic's documentation
+  ("Rate limits", "Errors") and of the SDK's types as read on 2026-11-21. The first can be tried
+  when the limit is set (step c15 of `docs/CONVERSATIONAL_PLAN.md`).
 - **Where the sentence comes from.** The three sentences are fixed texts in `shared/`, in every
   supported language, not written by the model (which, in two of the three cases, cannot be
   asked). The screen picks the one for the code in the conversation's language, and in English
@@ -529,7 +551,8 @@ Each has its own code, so that the screen can say what is true, kindly, instead 
   already confirmed is made and saved before the closing words are asked for; the proposal
   shows its outcomes even when Claude can no longer comment on them.
 - **No hammering.** Once a function has seen "budget reached" it answers the same for ten
-  minutes without asking Anthropic again.
+  minutes without asking Anthropic again, for a step and for the language question alike. The
+  memory is the container's: another container asks once and remembers in its turn.
 
 ---
 
@@ -538,8 +561,9 @@ Each has its own code, so that the screen can say what is true, kindly, instead 
 ### 7.1 The model
 
 `claude-sonnet-5-5` by default, the deployment parameter `AssistantModel`. Its allowed values
-are the models this design was written for, which all accept what section 7.2 sends:
-`claude-sonnet-5-5`, `claude-opus-5-5`, `claude-haiku-5-5`. Changing the model is changing the
+are the models this design was written for: `claude-sonnet-5-5`, `claude-opus-5-5`,
+`claude-haiku-5-5`. All three were tried with the line of the application, the thinking and
+effort settings and the language question of section 7.2, and accept them. Changing the model is changing the
 parameter and deploying; the evaluation of section 12.3 says whether the cheaper or the more
 capable one is worth it.
 
@@ -554,9 +578,12 @@ the Messages API:
 | `tools` | The tools of section 3 **for the caller's role**: a User's request does not even name the Administrator's tools. Each with a description and the JSON Schema of its input, made from the same `zod` schema that then checks what the model sent | No |
 | `system` | The fixed instructions (7.3), then one short block: the username, the role, the calendar's time zone | No |
 | `messages` | The stored conversation, exactly as stored. After each message of the person, one line of the application (a message with `role: "system"`): the date and time now in the calendar's zone, the weekday, and the conversation's language | Only added to |
-| Thinking and effort | Adaptive thinking, `effort: "low"`: Anthropic's starting point for a chat on this model, where it skips thinking on simple requests. To be confirmed by the evaluation | No |
+| Thinking and effort | Adaptive thinking, `effort: "low"`: Anthropic's starting point for a chat on this model. To be confirmed by the evaluation | No |
 | `max_tokens` | 8 000: room for the thinking and a long list | No |
-| Prompt caching | Two marks: after the fixed instructions (shared by every conversation of a role) and at the end of the conversation (reused by the next step). Repeated parts then cost a twentieth of the input price on Sonnet 5.5 | |
+| Prompt caching | Two marks. One on the block of the fixed instructions, which caches the tools with them (shared by every conversation of a role). One for the end of the conversation (reused by the next step): the request-level mark, which Anthropic places on the last entry by itself, so the stored conversation is sent without a change. Repeated parts then cost a twentieth of the input price on Sonnet 5.5. A part shorter than 512 tokens is not cached, without an error | |
+
+`system` is two blocks: the fixed instructions, carrying the first mark, then the short block
+about the person. The tools are left out of the request while there are none.
 
 The current time goes in the conversation and not in `system` on purpose: `system` must stay
 byte for byte the same for the whole conversation, both for the cache and for the thinking
@@ -564,6 +591,24 @@ blocks (section 4.3).
 
 The SDK's time-out is 22 seconds with no automatic retry: the function has 29 seconds in all
 (section 11.3), and the retry is the screen's `continue`, which the person sees and controls.
+No streaming: one request, one answer.
+
+**What was tried.** This section and section 6.1 rest on six things taken from Anthropic's
+documentation. Step c02 of `docs/CONVERSATIONAL_PLAN.md` tried them on 2026-11-21 with real
+requests (the SDK `@anthropic-ai/sdk` 1.12.0), on `claude-sonnet-5-5` and, for the first three,
+on `claude-opus-5-5` and `claude-haiku-5-5` too:
+
+| # | What | Result | What was seen |
+|---|---|---|---|
+| 1 | A message with `role: "system"` inside `messages` is accepted and obeyed | Holds, three models | An English question followed by a line saying the time and "answer in Italian" was answered in Italian with the date of the line. The line is accepted as the last entry after a `user` message, and when an `assistant` turn, a tool result and a later `user` message with its own line follow it: the shapes the stored conversation takes |
+| 2 | Adaptive thinking with `effort: "low"` and `max_tokens` 8 000 | Holds, three models | A step took 1.2 to 3.4 seconds, against the 22 allowed. An answer carries a thinking block even at this effort, with empty text and a signature |
+| 3 | The language question, with an answer constrained to the list | Holds, three models | English gave `en`, Italian `it`, German `en`. "ciao" gave `it`. 1.2 to 2.3 seconds and ten output tokens each |
+| 4 | The two cache marks | Holds | The second step of a conversation read from the cache everything the first had sent (6 337 tokens) and the third what the second had added. The first mark alone, tried with another person and another question, read the tools and the fixed instructions (6 176 tokens) |
+| 5 | The conversation sent back exactly as stored is accepted | Holds | Three steps, each sent after the conversation had been turned into JSON text and back, as the table does: thinking blocks, a tool request and its result included. This is the assumption of section 4.3 |
+| 6 | The two error shapes of the spending limit | **Did not hold as written** | Read, not provoked. The 429 with `enforced_spend_limit_reached` exists but is the cap of the usage tier. The limit an owner sets answers 400 with no code. The 402 is documented as a billing problem, not expressly as used-up credit. Section 6.1 was rewritten on this |
+
+A wrong key answers 401 `authentication_error`. The trial was 21 requests and cost about
+0.05 USD.
 
 ### 7.3 The instructions
 
@@ -601,6 +646,18 @@ conversation's language) say, in prose:
 | A refusal (`stop_reason: "refusal"`, Anthropic's safety filters) | A fixed sentence; the conversation is ended. Not expected for calendar talk. Anthropic's automatic fallback to another model is not switched on: it only covers categories that do not occur here, and the model it falls back to does not accept this design's requests |
 | An error or a time-out | `503 assistant_unavailable`; nothing saved but the person's message; `continue` tries again |
 | Anthropic's refusal for the spending limit (section 6.1) | `503 assistant_budget_reached`; nothing saved but the person's message; the screen shows the sentence of section 6.1 and does not call `continue` by itself |
+
+`backend/src/lib/anthropic.ts` gives the core these as one closed list: `text`,
+`tool_requests`, `cut_short`, `refusal`, `unavailable`, `budget_reached`. The first three carry
+Claude's answer exactly as Anthropic gave it, to be stored and sent back untouched, and what
+the core reads out of it (the text, or each tool request's id, name and input). All but the
+last two carry the token counts for the log: input, output, cached input read and written. The
+module never throws for something Anthropic did or failed to do, and logs nothing.
+`unavailable` carries a reason for the log line, from a fixed list and never Anthropic's own
+words: a time-out, no connection, overloaded (529), a rate limit (429), the key missing (not
+configured, not in Parameter Store, or the read refused), the key refused (401, after which the
+key kept in memory is dropped), the request refused (another 400), or anything else, among it a
+way of stopping this design never asks for.
 
 ---
 
@@ -802,6 +859,15 @@ Anthropic account.
 | The key | No Parameter Store locally. `env.local.json` (generated, git-ignored) gives the functions `ANTHROPIC_API_KEY` directly; the template declares that variable empty, so in the cloud the key always comes from Parameter Store. The same pattern as `SKIP_GLOBAL_SIGN_OUT` |
 | Claude | **A fake by default**: a small script in the Docker stack that answers the Messages API's address with scripted answers (a text; a read request; a change request), chosen by the text of the person's message. `env.local.json` points the SDK at it (`ANTHROPIC_BASE_URL`). With `ANTHROPIC_API_KEY` set in the shell when `local:up` runs, the local stack talks to the real Claude instead, for trying the feature by hand |
 
+The fake as built, which `docs/ARCHITECTURE.md` section 8 governs from now on: the service
+`fake-claude` of `backend/docker-compose.yml`, one script of plain Node
+(`backend/docker/fake-claude.mjs`), on port 9230 bound to `127.0.0.1`. What it answers is data
+the journeys own, `backend/tests/integration/fake-claude/answers.json`, read again at every
+request: named answers, and which of them the exact text of the person's last message gets at
+each step of its exchange. The answers are those recorded from the real API in step c02 of
+`docs/CONVERSATIONAL_PLAN.md`, cut down. The errors that cannot be provoked are written from
+Anthropic's documentation. A text nobody scripted gets one fixed, recognisable answer.
+
 ### 12.2 The tests
 
 | Level | What | Needs |
@@ -883,7 +949,8 @@ holds whatever happens:
 2. the daily use recorded per person (the `USAGE` items), readable in the table;
 3. **a monthly spend limit set in the Anthropic Console on the workspace of this
    application's key** (for example 10 USD). When it is reached the assistant answers
-   `503 assistant_budget_reached`: the person reads a kind sentence that says so and that the
+   `503 assistant_budget_reached` (Anthropic refuses with a status 400 of its own, section
+   6.1): the person reads a kind sentence that says so and that the
    calendar still works from the other pages (section 6.1), the operator gets the alarm's
    e-mail (section 15), and the application carries on without the assistant until the limit
    is raised or the month ends. The AWS budget alarm does not see Anthropic's bill.

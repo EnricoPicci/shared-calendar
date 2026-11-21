@@ -82,8 +82,8 @@ one that is fixed:
 - Nothing is ever deployed to the old stack `hello-world-api`: its tables would be replaced.
 - Cloud: stack `shared-calendar-api` in `eu-north-1`, profile `shared-calendar-admin`
   (`aws sso login --profile shared-calendar-admin --use-device-code` when the session expires).
-- Local development uses the Docker stack (DynamoDB Local, dynamodb-admin, cognito-local) and
-  `sam local start-api`, and needs no AWS account.
+- Local development uses the Docker stack (DynamoDB Local, dynamodb-admin, cognito-local, a
+  fake Claude) and `sam local start-api`, and needs no AWS account.
 
 ## Comments
 

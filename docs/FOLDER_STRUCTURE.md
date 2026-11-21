@@ -58,8 +58,9 @@ stays at the root.
 │   ├── package.json             # name "backend"; runtime deps; scripts build/verify/deploy/local:*
 │   ├── template.yaml            # all back-end infrastructure (SAM)
 │   ├── samconfig.toml           # SAM settings per environment (default = cloud, local = laptop)
-│   ├── docker-compose.yml       # DynamoDB Local, dynamodb-admin, cognito-local
-│   ├── docker/                  # files the local stack needs (cognito-local-config.json)
+│   ├── docker-compose.yml       # DynamoDB Local, dynamodb-admin, cognito-local, the fake Claude
+│   ├── docker/                  # files the local stack needs (cognito-local-config.json;
+│   │                            # fake-claude.mjs: the script of the fake Claude, plain Node)
 │   ├── tsconfig.json            # extends ../tsconfig.base.json; lib ES2022, node types
 │   ├── vitest.config.ts         # projects unit + integration; 100 % line coverage on src/lib
 │   ├── src/
@@ -67,10 +68,13 @@ stays at the root.
 │   │   └── lib/                 # the only place that touches the AWS SDK (calendarDb.ts:
 │   │                            # the calendar table's item layout and lock; calendarRules.ts:
 │   │                            # the calendar's checks, pure, no AWS; assistantDb.ts: the
-│   │                            # assistant table's item layout, its reads and conditional writes)
+│   │                            # assistant table's item layout, its reads and conditional writes;
+│   │                            # anthropic.ts: the one door to Claude, the only file that imports
+│   │                            # the Anthropic SDK; parameters.ts: one read of Parameter Store)
 │   ├── tests/
 │   │   ├── unit/                # mirrors src/
-│   │   └── integration/         # journeys against the local Docker stack
+│   │   └── integration/         # journeys against the local Docker stack; fake-claude/answers.json:
+│   │                            # the scripted answers of the fake Claude, owned by the journeys
 │   ├── scripts/                 # operator scripts (local stack, verify, deploy, smoke, budget…)
 │   └── (generated, git-ignored) env.local.json  .cognito/  .aws-sam/  .verify-ok  coverage/
 │
@@ -154,6 +158,8 @@ three folders the extra level would add nesting without adding information.
 Two rules carried over from the architecture, unchanged by the move:
 
 - Handlers never import the AWS SDK; only `backend/src/lib` does.
+- The Anthropic SDK is imported only by `backend/src/lib/anthropic.ts` and its unit test
+  (`docs/ARCHITECTURE.md` section 12; `npm run lint` refuses it anywhere else).
 - `shared/` imports **no** AWS SDK, no Node-only module (`node:crypto`, `node:fs`…), no DOM
   API and no UI framework. Allowed: TypeScript, `zod`. Anything else is a design discussion,
   because it would be bundled into both the Lambda functions and the browser.

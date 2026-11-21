@@ -22,6 +22,22 @@ export default tseslint.config(
     rules: { 'local/doc-references': 'error' },
   },
   {
+    // The Anthropic SDK is imported by one module only, backend/src/lib/anthropic.ts, the one door
+    // to Claude (docs/CONVERSATIONAL_ARCHITECTURE.md section 7.2), and by that module's unit test,
+    // which replaces the SDK's sending method. Everything else asks Claude through the module.
+    // This block comes before the front end's: for frontend/src the stricter list below applies.
+    files: ['**/*.ts', '**/*.js', '**/*.mjs'],
+    ignores: ['backend/src/lib/anthropic.ts', 'backend/tests/unit/lib/anthropic.test.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          regex: '^@anthropic-ai/sdk(/.*)?$',
+          message: 'The Anthropic SDK is imported only by backend/src/lib/anthropic.ts: ask Claude through that module.',
+        }],
+      }],
+    },
+  },
+  {
     // The front end's code runs in the browser (docs/FRONTEND_SERVICES.md section 2, rule 2). The
     // compiler cannot stop a Node import here: vitest's type declarations pull in @types/node.
     // So: only rxjs, @shared-calendar/shared and relative imports, and no Node globals. The

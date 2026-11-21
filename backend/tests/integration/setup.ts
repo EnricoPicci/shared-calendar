@@ -28,6 +28,11 @@ const DYNAMODB_URL = `http://localhost:${DYNAMODB_PORT}`;
 const TABLE_NAME = 'hello-messages';
 const CALENDAR_TABLE = 'calendar';
 const ENV_FILE = 'env.local.json';
+// What `npm run local:up` writes into env.local.json when it wires the fake Claude of the Docker
+// stack (scripts/local-seed.sh), and the port the fake listens on.
+const FAKE_CLAUDE_BASE_URL = 'http://fake-claude:9230';
+const FAKE_CLAUDE_KEY = 'not-a-key-the-fake-claude-checks-none';
+const FAKE_CLAUDE_PORT = 9230;
 
 // Dummy credentials: the emulators accept anything, and this keeps the SDK away from the real
 // AWS login of this machine.
@@ -71,10 +76,29 @@ async function tableExists(name: string): Promise<boolean> {
   }
 }
 
+// Why the journeys must not run, or null when the local stack is wired to the fake Claude. No
+// journey ever talks to the real Claude: it would cost money and answer differently every time
+// (docs/CONVERSATIONAL_ARCHITECTURE.md section 12.2). One rule for every journey, the calendar's
+// too. The file is what `npm run local:api` read when it started, hence the restart in the message.
+export function claudeWiringProblem(): string | null {
+  const parameters = (JSON.parse(readFileSync(ENV_FILE, 'utf8')) as { Parameters?: Record<string, string> }).Parameters ?? {};
+  if (parameters.ANTHROPIC_BASE_URL === FAKE_CLAUDE_BASE_URL && parameters.ANTHROPIC_API_KEY === FAKE_CLAUDE_KEY) return null;
+  return (
+    `${ENV_FILE} does not wire the fake Claude: the journeys never run against the real Claude. ` +
+    'Run npm run local:up in a shell where ANTHROPIC_API_KEY is not set, then restart npm run local:api ' +
+    '(it reads the file only when it starts)'
+  );
+}
+
 // vitest globalSetup: fail fast, with the command to run, when the local stack is not up.
 export async function setup(): Promise<void> {
   const missing: string[] = [];
-  if (!existsSync(ENV_FILE)) missing.push(`${ENV_FILE} is missing (npm run local:up)`);
+  if (!existsSync(ENV_FILE)) {
+    missing.push(`${ENV_FILE} is missing (npm run local:up)`);
+  } else {
+    const problem = claudeWiringProblem();
+    if (problem !== null) missing.push(problem);
+  }
   if (!(await portOpen(Number(DYNAMODB_PORT)))) {
     missing.push(`DynamoDB Local is not listening on port ${DYNAMODB_PORT} (npm run local:up; set DYNAMODB_PORT if it uses another port)`);
   } else if (!(await tableExists(TABLE_NAME))) {
@@ -85,6 +109,7 @@ export async function setup(): Promise<void> {
     missing.push(`no table ${CALENDAR_TABLE} on port ${DYNAMODB_PORT}: run npm run local:up again`);
   }
   if (!(await portOpen(9229))) missing.push('cognito-local is not listening on port 9229 (npm run local:up)');
+  if (!(await portOpen(FAKE_CLAUDE_PORT))) missing.push(`the fake Claude is not listening on port ${FAKE_CLAUDE_PORT} (npm run local:up)`);
   if (!(await portOpen(3000))) missing.push('the API is not listening on port 3000 (npm run local:api)');
   if (missing.length > 0) {
     // Printed as well as thrown: vitest 5 crashes while formatting an error thrown from a

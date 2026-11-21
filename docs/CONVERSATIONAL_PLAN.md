@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`) |
+| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`) |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown on its screen, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which is deployed nowhere today (open point P7, section 2.2). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
@@ -73,12 +73,13 @@ this plan.
 
 Reading the architecture against the repository brought up six points it does not settle. They
 are not open points of the architecture yet. Each is raised in the step named, with a proposal,
-before the code that depends on it.
+before the code that depends on it. F1 is closed, and F2 by half: step c02's "As done" note
+says how.
 
 | # | Finding | Step |
 |---|---|---|
-| F1 | **Five things `docs/CONVERSATIONAL_ARCHITECTURE.md` section 7.2 and 6.1 take from Anthropic's documentation and nobody has tried**: a line with `role: "system"` inside `messages`. Adaptive thinking with `effort: "low"`. An answer constrained to a list (the language question). The two cache marks. The two error shapes of the spending limit. If one does not hold, the design of section 7.2 changes before the core is written on it | c02 |
-| F2 | **Nothing enforces the two import rules** (the Anthropic SDK only in `backend/src/lib/anthropic.ts`. `backend/src/assistant` never imports `lib/calendarDb.ts`). The root `eslint.config.js` restricts imports for `frontend/src` only. Proposal: two `no-restricted-imports` rules | c02, c04 |
+| F1 | **Five things `docs/CONVERSATIONAL_ARCHITECTURE.md` section 7.2 and 6.1 take from Anthropic's documentation and nobody has tried**: a line with `role: "system"` inside `messages`. Adaptive thinking with `effort: "low"`. An answer constrained to a list (the language question). The two cache marks. The two error shapes of the spending limit. If one does not hold, the design of section 7.2 changes before the core is written on it. **Closed in step c02**: tried, with a sixth (the conversation sent back exactly as stored). One did not hold, the shapes of the spending limit, and `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 was changed | c02 |
+| F2 | **Nothing enforces the two import rules** (the Anthropic SDK only in `backend/src/lib/anthropic.ts`. `backend/src/assistant` never imports `lib/calendarDb.ts`). The root `eslint.config.js` restricts imports for `frontend/src` only. Proposal: two `no-restricted-imports` rules. **The first rule is in place since step c02**. The second is step c04's | c02, c04 |
 | F3 | **Coverage.** The back end's 100 % line threshold covers `src/lib` only. The architecture asks it for `backend/src/assistant` too (its section 12.2). The six handlers stay outside the threshold, as every handler does | c03 |
 | F4 | **A handler called as a tool writes its own log line**, so one step of the assistant writes several lines with one request id, and a handler reads its environment as if it were alone in the function. Whether the lines can be told apart, and whether any handler keeps state that two calls in one function would share | c04 |
 | F5 | **What the two read-only functions carry.** To build a proposal they need the change tools' definitions and their fact reading, not the change handlers. Proposal: the part that runs a change is a module only `confirmProposal` imports, so the code that writes the calendar is not even in the other two bundles | c05 |
@@ -281,6 +282,29 @@ ordinary 429 is `unavailable`, not `budget`; the ten minutes; no key, text or to
 line; `local:up` shows the fake running and a `curl` to it gets a scripted answer; with a real
 key in the shell, `local:up` wires the real Claude and the journeys refuse to start.
 
+**As done** (2026-11-21). As written, with these differences:
+
+- **F1 was tried as six assumptions, not five**, on the three models `AssistantModel` allows.
+  The sixth is that the conversation sent back exactly as stored is accepted. Five hold. The
+  shapes of the spending limit did not: the step stopped there, and
+  `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 was changed with the Product Owner before
+  any code was written. Its section 7.2 holds the results, line by line;
+- **the two template parameters and the declaration of `ANTHROPIC_API_KEY` moved to step
+  c03**, decided with the Product Owner before the step. A variable is declared on a function,
+  and the first assistant function is step c03's: `backend/template.yaml` did not change here;
+- the end of the conversation is marked for the cache by the request-level mark, which
+  Anthropic places on the last entry, so the stored conversation is sent without a change;
+- the module gives `unavailable` a reason for the log, among them one the list of this step
+  did not have, "request refused", for a 400 that is not the spending limit;
+- the model comes from the variable `ASSISTANT_MODEL`, the name of the Parameter Store
+  parameter from `ANTHROPIC_KEY_PARAMETER`. A missing model is the module's one configuration
+  error. A missing key is `unavailable`, not an error;
+- the fake chooses an answer by the exact text of the person's last message, and the step of
+  the exchange by the answers of Claude that follow it in the request, so it keeps nothing
+  between two requests. Its file holds no tool request yet: they come in step c04;
+- the module was run against the fake from the host, and once against the real API, outside
+  the tests: a mocked client does not prove that the fake speaks well enough for the SDK.
+
 ---
 
 ### Step c03 — The conversation, text only (≈ 7 h)
@@ -299,6 +323,12 @@ Files:
   function, role, log group and route in `backend/template.yaml`. `sendAssistantMessage` gets
   29 seconds, the assistant table and, in the cloud only, the read of the key. In plain terms:
   three more functions, none of which can touch the calendar yet;
+- what step c02 left to this one, in `backend/template.yaml`: the parameters `AssistantModel`
+  (three allowed values) and `AssistantDailyMessageLimit`. On the function that asks Claude,
+  the variables `backend/src/lib/anthropic.ts` reads: `ASSISTANT_MODEL` from the parameter,
+  `ANTHROPIC_KEY_PARAMETER` with the name `/<stack>/anthropic-api-key`, and `ANTHROPIC_API_KEY`
+  and `ANTHROPIC_BASE_URL` declared empty, so that `env.local.json` can fill them locally and
+  the cloud never does. Its role's statement `ssm:GetParameter` on that one parameter;
 - **finding F3**: `backend/vitest.config.ts` puts `src/assistant` under the 100 % threshold;
   `CLAUDE.md` and `backend/CLAUDE.md` say so.
 

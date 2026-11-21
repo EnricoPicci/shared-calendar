@@ -45,6 +45,26 @@ services:
     networks:
       - shared-calendar-local
 
+  # The fake Claude: a stand-in for Anthropic's API, so that the assistant runs and is tested
+  # without an Anthropic account. One small script of plain Node (docker/fake-claude.mjs) on the
+  # official Node image, which answers POST /v1/messages with the scripted answers of
+  # tests/integration/fake-claude/answers.json. Both folders are mounted read-only: the container
+  # can change nothing of the repository. The answers are read again at every request, so a change
+  # to them needs no restart; a change to the script needs `docker compose restart fake-claude`.
+  # From the host: http://localhost:9230. From the Lambda containers: http://fake-claude:9230.
+  fake-claude:
+    image: node:22.23.4-alpine3.23
+    command: node /fake/fake-claude.mjs
+    user: node
+    read_only: true
+    volumes:
+      - ./docker:/fake:ro
+      - ./tests/integration/fake-claude:/answers:ro
+    ports:
+      - 127.0.0.1:9230:9230
+    networks:
+      - shared-calendar-local
+
 # Fixed name (not prefixed by the project) so `sam local start-api --docker-network shared-calendar-local`
 # can attach the Lambda containers to it and reach the services above by name.
 networks:
