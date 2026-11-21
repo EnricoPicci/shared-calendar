@@ -18,10 +18,10 @@ layer (`docs/FRONTEND_SERVICES.md`) and its view layer
 the login, the logic layer, the week calendar with booking, cancelling, the note and the change,
 a User's "My appointments" and the Administrator's settings, users and availability: the
 types, the weekly patterns and a single date; every screen of `docs/FRONTEND_VIEW_PLAN.md`
-section 3 exists and that plan is done, 2026-11-20; it runs locally and is deployed nowhere yet:
-the hosting is decided, its template and deploy command are written
-(`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21), "Sign out" revokes the session at
-Cognito (its step 71, 2026-11-21), and nothing of it is in the cloud). Layout and placement rules:
+section 3 exists and that plan is done, 2026-11-20; it runs locally and **is deployed**: the
+stack `shared-calendar-web`, a private bucket behind a CloudFront distribution, since
+`docs/FRONTEND_DEPLOY_PLAN.md` step 72, 2026-11-21; the page's address is that stack's output
+`PageUrl`; "Sign out" revokes the session at Cognito, its step 71). Layout and placement rules:
 `docs/FOLDER_STRUCTURE.md`.
 
 ## Where the truth lives
@@ -66,18 +66,25 @@ Cognito (its step 71, 2026-11-21), and nothing of it is in the cloud). Layout an
   helpers shared by the views of one screen, as `availability.parts.ts` is, with its bound) its
   section 7.2; where the keyboard is after each dialog closes is one table in its section 8.
   It also defines **the hosting and the deployment** of the page (its section 13, decided
-  2026-11-21, **written, not deployed**: `frontend/template.yaml`, `frontend/scripts/deploy.sh`
-  and `scripts/deploy-gate.sh` exist; no stack `shared-calendar-web` does): a private S3 bucket behind a CloudFront distribution in a stack
+  2026-11-21, **written and deployed**: `frontend/template.yaml`, `frontend/scripts/deploy.sh`
+  and `scripts/deploy-gate.sh`; the stack `shared-calendar-web` exists since
+  `docs/FRONTEND_DEPLOY_PLAN.md` step 72, 2026-11-21, and the page's address is its output
+  `PageUrl`): a private S3 bucket behind a CloudFront distribution in a stack
   of its own, `shared-calendar-web`; one origin, the distribution passing `/api/…` on to the
   API, so no CORS and no change to the back end; the Content-Security-Policy and the other
   headers; the files' caching; `npm run deploy -w frontend` behind the back end's gate; and
   what logout means for the page (its section 13.7, **built**, `docs/FRONTEND_DEPLOY_PLAN.md`
   step 71: the page forgets the person at once, then Cognito is told with `RevokeToken`,
   given up after 10 seconds; the person sees the login and nothing else; the service's truth
-  is `docs/FRONTEND_SERVICES.md` section 20; that a browser may make the call from the
-  deployed page's address rests on nothing run until step 72). What rests on AWS's documentation alone until the
-  first deployment is said there (its section 13.3, rules 1 and 3: the `Authorization` header
-  through the managed policy, no failure of the API kept, with no `CustomErrorResponses`). Still open (section 10), blocking nothing: the session
+  is `docs/FRONTEND_SERVICES.md` section 20). **What the first deployment proved**
+  (2026-11-21, its sections 13.3, 13.5 and 13.7; the record is `docs/RUNBOOK.md` section
+  5.5): the `Authorization` header reaches the API through the managed policy; no failure of
+  the API is kept, with no `CustomErrorResponses`; a browser may call `RevokeToken` from the
+  page's address (answered 200); `app.js` is downloaded as 121 kB. **Corrected by it:** the
+  API's access log shows the caller's own address for the page's calls, not CloudFront's.
+  **Not yet looked at, at the deployed page** (open items of the runbook's section 5.5): a
+  refresh with the revoked token refused by the real Cognito, a session renewed after its
+  fifteen minutes, the console, the phone width, most of the walk. Still open (section 10), blocking nothing: the session
   across a reload, the size of the bundle, a domain of our own.
   `docs/FRONTEND_SERVICES.md` stays the truth for the services;
   `docs/FRONTEND_VIEW_OPTIONS.md` is the record of why this option, not a source of truth.
@@ -103,8 +110,10 @@ Cognito (its step 71, 2026-11-21), and nothing of it is in the cloud). Layout an
   code), 72 (the first deployment, needs explicit instruction) and 73 (the documents). Step 70
   is done (2026-11-21, brief 94; its dry run was run after the commit, on `0e695a7`, and
   passed; step 72 runs it again as its first command) and so is step 71 (2026-11-21, brief
-  95: the design reviewed, then the code); 72 and 73 are not started. Step 72, point 5, says
-  what the first deployment must prove of logout, as steps a person follows.
+  95: the design reviewed, then the code) and step 72 (2026-11-21, brief 96: the first
+  deployment, run by the operator from the branch `deploy-frontend`; of its checks in a
+  browser a part was done, the rest is listed under the step); 73 is not started. Step 72,
+  point 5, says what a deployment must prove of logout, as steps a person follows.
 - `docs/FRONTEND_WALK.md` is the walk through every screen in a browser, as `alice` and as
   `admin`, at a desktop and at a phone width, from a fresh, seeded local stack: 102 numbered
   checks a person does by hand. **The check to repeat after a change to the view layer.** Not
@@ -272,8 +281,9 @@ form works the same. Paths below without a folder are relative to `backend/`.
   runs it with the stack's values; `backend`'s `build` is another thing (`sam build`).
 - `npm run deploy -w frontend` (`frontend/scripts/deploy.sh`,
   `docs/FRONTEND_ARCHITECTURE.md` section 13.6): releases the page. **Real cloud action: only
-  when explicitly asked**, and never run yet (the first is `docs/FRONTEND_DEPLOY_PLAN.md`
-  step 72). In order: the deploy gate (the same stamp `backend/.verify-ok` as the back end's
+  when explicitly asked** (first run on 2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72;
+  the procedure is `docs/RUNBOOK.md` section 2, step 6). A release that changes no resource
+  of the hosting asks nothing: SAM says "No changes to deploy" and the script goes on. In order: the deploy gate (the same stamp `backend/.verify-ok` as the back end's
   deploy, the check being `scripts/deploy-gate.sh`, sourced by both), `npm run verify -w
   frontend`, a read of the back end's stack (`ApiUrl`, `UserPoolClientId`; stack name and
   region from the two `samconfig.toml`, which must name one region; `AWS_REGION` wins),
@@ -533,7 +543,8 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     `PageHeaders`, `Distribution`), one parameter `ApiDomain`, outputs `PageUrl`, `BucketName`,
     `DistributionId`. No role, no wildcard, no `CustomErrorResponses` (on purpose).
     `samconfig.toml`: the stack `shared-calendar-web`, the region, `confirm_changeset`,
-    `fail_on_empty_changeset = false`; nothing of a deployment. Deployed nowhere yet.
+    `fail_on_empty_changeset = false`; nothing of a deployment. Deployed as the stack
+    `shared-calendar-web` (`docs/RUNBOOK.md` section 5.5).
   - `src/services/`: `session.store.ts`; `cognito.ts`, `api.ts` and `jwt.ts`, the building
     blocks; then one `<name>.service.ts` + `<name>.types.ts` per service: `login`, `refresh`,
     `logout`, `hello`, `users`, `calendar-settings`, `availability-types`, `availability-rules`,

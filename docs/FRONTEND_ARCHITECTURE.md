@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v16 — the view layer **implemented** (2026-11-20); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`) **and written, not deployed**: the template, the deploy command and its gate exist since `docs/FRONTEND_DEPLOY_PLAN.md` step 70 (2026-11-21, brief `prompts/94-step-70-implementation.md`); nothing is in the cloud; **logout is built** (step 71, 2026-11-21, brief `prompts/95-step-71-implementation.md`: `docs/FRONTEND_SERVICES.md` v8, section 20; here sections 6 and 13.7), proven against the local stack and not yet against the real Cognito; the first deployment (step 72) is to do. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
+| Status | v17 — the view layer **implemented** (2026-11-20); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`), **written** (`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21, brief `prompts/94-step-70-implementation.md`: the template, the deploy command and its gate) **and deployed** (step 72, 2026-11-21, brief `prompts/96-step-72-implementation.md`): the stack `shared-calendar-web` exists and the page is in use at the address of its output `PageUrl`; what the first deployment proved, and what it has not yet looked at, is in sections 13.3, 13.5 and 13.7, and the rest of section 13 is brought to the present tense at step 73; **logout is built** (step 71, 2026-11-21, brief `prompts/95-step-71-implementation.md`: `docs/FRONTEND_SERVICES.md` v8, section 20; here sections 6 and 13.7), proven against the local stack, and at the deployed page as far as the revocation answered 200. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders; and, since v13, how the page is hosted and deployed (section 13) |
 | Not in scope | Keeping the session across a reload, the size of the bundle, a domain of our own: open points of section 10, none of which blocks a deployment. The design of the logout service: it is `docs/FRONTEND_SERVICES.md` section 20; section 13.7 here keeps the direction and what follows from it for the page |
 | Depends on | `docs/FRONTEND_SERVICES.md` v8 (the services the views use, the sign-out among them), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work of the views), `docs/FRONTEND_DEPLOY_PLAN.md` (the order of work of the hosting) |
@@ -31,6 +31,7 @@
 | v14 | 2026-11-21 | `docs/FRONTEND_DEPLOY_PLAN.md` step 70: the hosting's template, the deploy command and the gate's shared check are written; nothing is deployed. **Corrected after AWS's documentation:** section 13.3, rule 3 and decision 141: the cache policy `CachingDisabled` keeps no failure, so the distribution sets nothing for failures (no `CustomErrorResponses`); which failures CloudFront keeps elsewhere, and when. Section 13.2: what the template holds as written (no `Transform`, the names of its resources, the bucket's ownership setting). Section 13.4: the header for HTTPS names no sub-domain. Section 13.5: CloudFront's own copy lives a second. Section 13.6: the command as written (its one argument `--dry-run`, the build checked before an upload, the wait for the invalidation, the statuses of the four checks, what `sam deploy` needs and does not). Section 12.2: the dev server's policy. Section 10: O1, O2 and O5 as they stand. Section 11: decisions 141 and 147 corrected, decisions 154 to 158. |
 | v15 | 2026-11-21 | **The sign-out as designed** (`docs/FRONTEND_DEPLOY_PLAN.md` step 71, part A, brief `prompts/95-step-71-implementation.md`; `docs/FRONTEND_SERVICES.md` v8, section 20). No code changed: "Sign out" still only clears the `SessionStore`, and every changed place says so. **Corrected: the order of section 13.7 and of decision 152.** Version 13 wrote "revokes, then clears"; the decision taken with the design is the reverse: the page forgets the person at once and Cognito is told after, with a time limit, so that a slow or dead network never keeps a person signed in. Section 13.7 rewritten with it, and with what the step found: `RevokeToken` confirmed on AWS's pages (no credentials, no secret), cognito-local implements it, whether a browser may call it from another origin is not in the documentation and is proven at step 72. Section 6: the start-up will create a fourth page-wide object, the `LogoutService`, and hand the shell its one method (point 1); "Sign out" will call it and nothing else (point 2); the sequence of a sign-out with the reset before and the request after. Section 10, row O7: designed, not closed. |
 | v16 | 2026-11-21 | **The sign-out built** (`docs/FRONTEND_DEPLOY_PLAN.md` step 71, part B, brief `prompts/95-step-71-implementation.md`), as version 15 described it; no difference found while building. `shell.ts`: `runShell` creates the `LogoutService` with the store, the `LoginService` and the `RefreshService`; `mountShell` is handed its one method; the handler of "Sign out" calls it and nothing else. Sections 6 and 13.7 in the present tense; section 10, row O7 closed; section 8, what the shell's test gained. Checked in a browser against the local stack, also with the local Cognito stopped and with it silent (section 13.7). Section 13.1's table does not change: the local page and the deployed one sign out the same way. Section 7.1 is not measured again: it is the record of `docs/FRONTEND_VIEW_PLAN.md` step 69. |
+| v17 | 2026-11-21 | **The first deployment** (`docs/FRONTEND_DEPLOY_PLAN.md` step 72, brief `prompts/96-step-72-implementation.md`; the record is `docs/RUNBOOK.md` section 5.5). Only what the deployment proved or disproved is changed; the rest of section 13 still speaks as before it, until step 73. Section 13: the stack exists. Section 13.2: the account may create a distribution. Section 13.3: rule 1 (the `Authorization` header arrives) and rule 3 (no failure of the API is kept) are proven, each with how it was seen; **corrected: the API's access log shows the caller's own address for a call made by the page, not CloudFront's** (also decision 153), and a path that is no route leaves no line in it. Section 13.5: the sizes as downloaded, compressed with Brotli (open point O9). Section 13.7: the browser may call `RevokeToken` from the page's address (answered 200); that a refresh with the revoked token is then refused by the real Cognito was not tried. Section 10: one sentence on where the rows stand. No code changed. |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
 TypeScript module script**. The markup of every screen is in one `index.html`; the script
@@ -2295,7 +2296,10 @@ say where the decision is written. Each open row ends with **what is true of it 
 (2026-11-20, every view built and running against the local stack). O1, O2 and O5 were decided on
 2026-11-21 (section 13), and O7 was designed and built the same day (`docs/FRONTEND_SERVICES.md` section 20): their rows say so, and what they still block
 is the work of `docs/FRONTEND_DEPLOY_PLAN.md`, no longer a decision. Since that plan's step 70
-(2026-11-21) the template and the deploy command exist; nothing is deployed.
+(2026-11-21) the template and the deploy command exist. **Since its step 72 (2026-11-21) the page is
+deployed**: the rows below still say "not deployed" and "unproven" where they were written before it;
+what the deployment proved is in sections 13.2, 13.3, 13.5 and 13.7, and the rows are brought up to
+date at step 73. O9 was measured: `app.js` is downloaded as 121 kB (section 13.5).
 
 | # | Point | Direction, where there is one | Blocks |
 |---|---|---|---|
@@ -2475,7 +2479,7 @@ than what the trial showed: these deserve the first look in a review.
 | 150 | The size of the bundle (O9) does not block the first deployment | It is sent compressed: 128 kB, once per load of the page, answered "not changed" afterwards. Slimming it is a change to `shared/`, which the back end uses too: a decision of its own, and not one to take in a hurry before a release | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 151 | No root `deploy` script that runs both deployments; the order is a procedure of `docs/RUNBOOK.md` | The back end's deploy takes arguments of its own and asks to confirm a change set; the page is released alone more often than with the API | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 152 | "Sign out" signs the person out of the page at once and then tells Cognito to revoke the refresh token; what Cognito answers, or that it does not answer, changes nothing of the sign-out (section 13.7). ~~Version 13: "revokes the refresh token and signs the person out of the page whatever Cognito answered", in that order~~ | A failed revocation must not keep someone signed in on a shared computer, and neither must a slow one: with the old order a dead network kept the person's frame on screen for as long as the request lasted. The access token's last minutes are the limit already accepted for a deleted user (`docs/ARCHITECTURE.md` section 7.3) | Yes: decided with brief `prompts/93-deploy-frontend.md`; the order decided with the user before the design of step 71 (`docs/FRONTEND_SERVICES.md` section 8, decision 47) |
-| 153 | No logs of the distribution, no firewall, no second environment, no pipeline (section 13.8); the API's access log shows CloudFront's address for the page's calls | Each is a cost or a thing to keep for a question nobody has asked yet. The table of section 13.8 says when each would come | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 153 | No logs of the distribution, no firewall, no second environment, no pipeline (section 13.8). ~~The API's access log shows CloudFront's address for the page's calls~~ **Corrected at the first deployment (2026-11-21):** the log shows the caller's own address for a call made through the page (section 13.3) | Each is a cost or a thing to keep for a question nobody has asked yet. The table of section 13.8 says when each would come | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 154 | The distribution has no `CustomErrorResponses` at all. Version 13 of this document asked for one entry per status CloudFront keeps, with the time at zero | AWS's page on the failures CloudFront keeps says: "If you're using the CachingDisabled managed cache policy, CloudFront won't cache these status codes or custom error pages." The entries would have done nothing on `/api/*`, and they belong to the whole distribution, so their one effect would have been on the files' rule. The page also says which failures are kept where caching is on: 404, 414 and 500 to 504 always, 400, 403 and 405 only when the origin says for how long, 401 never. Proven at the first deployment by a 404 asked twice, which the API must answer twice (`docs/FRONTEND_DEPLOY_PLAN.md` step 72, point 5) | Yes: found at `docs/FRONTEND_DEPLOY_PLAN.md` step 70, taken before the template was written |
 | 155 | `frontend/template.yaml` has no `Transform` line: it is plain CloudFormation, which `sam validate` and `sam deploy` read as it is. `frontend/samconfig.toml` names no bucket for artifacts (`resolve_s3`) and no `capabilities`, and sets `fail_on_empty_changeset = false` | Nothing in it is one of SAM's short forms. SAM CLI sends a template with nothing to package and under 51,200 bytes as it is (read in the source of SAM CLI 1.171.0, `samcli/commands/deploy/deploy_context.py`; not tried by deploying), so no managed bucket is created for it; it creates no role. A release of the page that changes no resource must go on to the upload | |
 | 156 | The deploy command takes one argument, `--dry-run`, and refuses any other; it passes the stack's name, the region and the template to `sam deploy` itself. After a build it refuses to upload a bundle that holds `localhost` or lacks Cognito's address. The third and fourth checks ask for the API's exact answers: 401 `{"message":"Unauthorized"}` and 404 `{"message":"Not Found"}`, as JSON | The back end's deploy hands its arguments to `sam deploy` because its first deployment needs a parameter; this one reads its only parameter itself, so an argument could only point it somewhere else. The two answers were read from the API's own address on 2026-11-21, without credentials | |
@@ -2600,14 +2604,17 @@ service. The shell holds the two names of the roles.
 ## 13. The hosting and the deployment (open points O1, O2 and O5, decided)
 
 Decided on 2026-11-21 (brief `prompts/93-deploy-frontend.md`); the order of work is
-`docs/FRONTEND_DEPLOY_PLAN.md` (steps 70 to 73). **Written at its step 70, deployed nowhere
-yet:** `frontend/template.yaml` and `frontend/samconfig.toml` (section 13.2 to 13.5),
-`frontend/scripts/deploy.sh` and `scripts/deploy-gate.sh` (section 13.6) exist, the template
-passes `sam validate --lint`, and the command's refusals were tried by hand. No stack
-`shared-calendar-web` exists: everything this section says of CloudFront rests on AWS's
-documentation until that plan's step 72. Logout (section 13.7) was its step 71 and is built. Where a
-step finds the section wrong, the step stops and proposes the change here; step 70 did once
-(section 13.3, rule 3).
+`docs/FRONTEND_DEPLOY_PLAN.md` (steps 70 to 73). **Written at its step 70:**
+`frontend/template.yaml` and `frontend/samconfig.toml` (section 13.2 to 13.5),
+`frontend/scripts/deploy.sh` and `scripts/deploy-gate.sh` (section 13.6). **Deployed at its
+step 72 (2026-11-21):** the stack `shared-calendar-web` exists, with the six resources of
+section 13.2, and the page is in use at the address of its output `PageUrl`; the record of
+that deployment is `docs/RUNBOOK.md` section 5.5. What this section said on the strength of
+AWS's documentation alone is now marked, where it stands, as proven, as corrected, or as not
+yet looked at; the rest of its wording is brought to the present tense at step 73. Logout
+(section 13.7) was step 71 and is built. Where a step finds the section wrong, the step stops
+and proposes the change here; step 70 did once (section 13.3, rule 3), and step 72 found one
+sentence wrong (section 13.3, the access log's `ip`).
 
 ### 13.1 What a person's browser talks to
 
@@ -2673,9 +2680,9 @@ AWS's pages on 2026-11-21: `CachingDisabled` `4135ea2d-6df8-44a3-9df3-4b5a84be39
 The stack is created from `eu-north-1` like the other. CloudFront itself is a global service:
 it has no region to choose. The organization's policy allows regional services in `eu-north-1`
 only (`docs/AWS_ACCOUNTS.md`); on 2026-11-21 a read-only `aws cloudfront list-distributions`
-under the profile `shared-calendar-admin` was answered, not refused. That the account may also
-*create* a distribution is proven only by the first deployment
-(`docs/FRONTEND_DEPLOY_PLAN.md` step 72, and its section on risks for what is done otherwise).
+under the profile `shared-calendar-admin` was answered, not refused. **The account may also
+create one: the first deployment did** (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72;
+the stack was complete three and a half minutes after the change set was confirmed).
 
 ### 13.3 The API through the page's address
 
@@ -2694,8 +2701,11 @@ Rules that are easy to break:
    Gateway finds the API by it, and it must be the API's own. AWS's pages say of
    `AllViewerExceptHostHeader` that it is "intended for use with Amazon API Gateway" and passes
    on every header but `Host`; where they speak of `Authorization` they name its sibling
-   `AllViewer`. So the first sign-in at the deployed page is the proof
-   (`docs/FRONTEND_DEPLOY_PLAN.md` section 4).
+   `AllViewer`. So the first sign-in at the deployed page was the proof. **Proven on
+   2026-11-21:** the Administrator and a User signed in at the page and the API answered
+   their calls 200 and 201 through the distribution (the week, the users, the availability,
+   bookings), each of which the authorizer lets through only with the token; seen on the
+   page and in the API's access log.
 2. **No answer of the API is replaced.** The distribution has no "custom error response" that
    swaps a 403 or a 404 for `index.html`, the usual trick of a single-page application. The
    page needs none (its navigation is the URL's hash, section 6), and the trick would turn the
@@ -2707,8 +2717,12 @@ Rules that are easy to break:
    AWS's page says: "If you're using the CachingDisabled managed cache policy, CloudFront won't
    cache these status codes or custom error pages." So the distribution has no
    `CustomErrorResponses` at all, which is also what rule 2 asks (section 11, decision 154).
+   **Proven on 2026-11-21:** `/api/no-such-route` asked twice within a second answered 404
+   twice with two different `apigw-requestid` headers: the API answered both, nothing was
+   kept.
    On the files' rule the bucket answers 403 for any name that is not one of the four files
-   (listing is not granted, so S3 does not say 404), which CloudFront does not keep either;
+   (listing is not granted, so S3 does not say 404; seen at the first deployment, with S3's
+   own XML and the four headers of section 13.4), which CloudFront does not keep either;
    whatever it did keep there would be the same answer for everybody, and nobody's data.
 4. The function touches the path only. It reads no header and no body.
 
@@ -2717,9 +2731,12 @@ What this changes for the API, and what it does not:
 - **The API keeps its own address** (`ApiUrl`), and answers there as before: the smoke test,
   the curl examples of `README.md` and the scripts use it. It was never a secret: every one of its
   routes asks for a token.
-- **The access log's `ip`** (`backend/template.yaml`, `AccessLogSettings`) is CloudFront's
-  address for a call made by the page, no longer the person's. Accepted for now: the log is
-  for finding a failed request, and the request id and the time still do that.
+- **The access log's `ip`** (`backend/template.yaml`, `AccessLogSettings`) **is still the
+  caller's own address for a call made by the page**, not CloudFront's. Versions 13 to 16 of
+  this document said the opposite; the first deployment showed it (2026-11-21: the calls
+  made with curl through the page's address were logged with the address of the machine that
+  made them). Nothing had to change for it. Also seen there: a request for a path that is no
+  route of the API (answered 404) leaves no line in the access log.
 - The API's throttling (burst 10, 5 a second) is for the whole API, as before: the page's
   calls and direct calls share it.
 - CloudFront waits 30 seconds for an origin; the API's functions answer or fail well inside
@@ -2769,8 +2786,20 @@ So no file may be kept by a browser without asking:
   page in those seconds may get the new script with the old page; a reload ends it. Accepted
   at this size.
 
-`app.js` is sent compressed (128 kB instead of 575 at plan step 69). Slimming it stays open
-point O9, which does not block a deployment (section 11, decision 150).
+`app.js` is sent compressed. **As downloaded from the deployed page** (2026-11-21, with
+curl, which a browser's network panel shows with a few hundred bytes of headers more):
+
+| File | As built | Downloaded (Brotli, what a browser gets) | With gzip only |
+|---|---|---|---|
+| `index.html` | 30,677 bytes | 5,095 | 5,398 |
+| `style.css` | 16,676 | 4,578 | 4,897 |
+| `app.js` | 578,155 | 121,188 | 130,771 |
+
+CloudFront chooses Brotli for a client that accepts it, which every current browser does. So
+a first load of the page is about 131 kB, and a later one three short "not changed" answers.
+Slimming `app.js` stays open point O9, which did not block the deployment (section 11,
+decision 150). The source map (2.2 MB) is fetched only by a browser whose developer tools
+are open.
 
 ### 13.6 The deploy command
 
@@ -2888,11 +2917,16 @@ Cognito was waited for. The order above was decided before the design (section 1
 | Cognito silent (the request held and never answered) | The same for the person; another person signed in meanwhile and got a frame of their own; the request was aborted after 10 seconds and nothing of the page changed |
 | The console otherwise | `zod`'s one report (section 12.2); no token in any line |
 
-**Rests on nothing run yet, until the first deployment** (step 72): that a browser may make
-the call from the page's address. AWS's pages do not speak of it. Cognito answers a browser
-for the login, and this call goes to the same address with the same headers. It must be
-looked at on purpose, in the browser's network panel: a refused call would sign the person
-out all the same, and nothing on the page would show it.
+**At the deployed page** (step 72, 2026-11-21): **a browser may make the call from the
+page's address.** AWS's pages do not speak of it; in the browser's network panel the request
+to Cognito sent at "Sign out" (`X-Amz-Target` ending in `RevokeToken`) was answered 200, not
+blocked. It has to be looked at there on purpose, after any change to the policy of section
+13.4 or to the call: a refused call would sign the person out all the same, and nothing on
+the page would show it.
+
+**Not yet looked at, at the deployed page:** that the real Cognito then refuses a refresh
+with the revoked token (the local emulator does; `docs/FRONTEND_SERVICES.md` section 20.9),
+and "Sign out" with the network off. Both are open items of `docs/RUNBOOK.md` section 5.5.
 
 ### 13.8 Left out on purpose
 
