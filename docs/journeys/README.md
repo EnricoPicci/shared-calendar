@@ -106,6 +106,7 @@ The pages written so far. Which pages are still to come, and in which order, is 
 | [`backend/calendar-booking.md`](backend/calendar-booking.md) | `backend/tests/integration/calendar.test.ts`, `booking (route 17)` |
 | [`backend/assistant-text.md`](backend/assistant-text.md) | `backend/tests/integration/assistant.test.ts`, `a conversation in text (5.6, 6)` |
 | [`backend/assistant-language.md`](backend/assistant-language.md) | `backend/tests/integration/assistant.test.ts`, `the language of a conversation (4.2)` |
+| [`backend/assistant-reading.md`](backend/assistant-reading.md) | `backend/tests/integration/assistant.test.ts`, `reading the calendar (5.1, 8)` |
 | [`backend/assistant-daily-limit.md`](backend/assistant-daily-limit.md) | `backend/tests/integration/assistant.test.ts`, `the daily limit (4.4, 6.1)` |
 | [`backend/assistant-cannot-answer.md`](backend/assistant-cannot-answer.md) | `backend/tests/integration/assistant.test.ts`, `when Claude cannot answer (6.1, 7.4)` |
 | [`backend/assistant-who-may.md`](backend/assistant-who-may.md) | `backend/tests/integration/assistant.test.ts`, `who may talk to the assistant (6)` |

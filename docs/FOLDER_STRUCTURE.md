@@ -67,8 +67,11 @@ stays at the root.
 │   ├── src/
 │   │   ├── handlers/            # one Lambda entry point per file
 │   │   ├── assistant/           # the assistant's core (docs/ARCHITECTURE.md section 12): takes an
-│   │   │                        # identity and a text, never an HTTP request; reaches the table and
-│   │   │                        # Claude through lib/ only
+│   │   │   │                    # identity and a text, never an HTTP request; reaches the table and
+│   │   │   │                    # Claude through lib/ only, and the calendar through a handler only
+│   │   │   └── tools/           # tool.ts (what a tool is), one file per tool, list.ts (the tools
+│   │   │                        # in the order Claude gets them), event.ts (the event a handler is
+│   │   │                        # called with), result.ts (a result made small), run.ts (one read)
 │   │   └── lib/                 # the only place that touches the AWS SDK (calendarDb.ts:
 │   │                            # the calendar table's item layout and lock; calendarRules.ts:
 │   │                            # the calendar's checks, pure, no AWS; assistantDb.ts: the
@@ -317,6 +320,11 @@ and `assistantTexts(language)`), `texts.en.ts` and `texts.it.ts` (one object of 
 `api.ts` gained the assistant's seven error codes. A text the server or the screen says in the
 conversation's language goes into both language files. The words of the front end's own pages do
 not: they stay English, in `frontend/`.
+
+Step c04 of `docs/CONVERSATIONAL_PLAN.md` (2026-11-21) added to `texts.ts` the kinds of read
+(`ASSISTANT_READ_KINDS`: settings, types, calendar, appointments) and to both language files the
+line of progress of each (`reading`). In the back end it added `src/assistant/tools/`, where a new
+tool is one new file and one line in `list.ts`, and `src/handlers/continueAssistant.ts`.
 
 What stays out of `shared/`: the DynamoDB item shape (`MessageItem`), the authorizer context,
 the logger, the password generator (server-side secret handling), and everything that imports

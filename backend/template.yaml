@@ -2273,6 +2273,12 @@ Resources:
   # purpose: only the local stack fills them (env.local.json: the fake Claude's address, a
   # placeholder key, no memory of a spending limit between two journeys). In the cloud they stay
   # empty, so the key can only come from Parameter Store.
+  # When Claude asks to read the calendar (the settings, the types, a period, the appointments),
+  # the function runs the code of that calendar route itself, inside this same function, with the
+  # identity of the person who wrote. So it needs what those four routes need: the name of the
+  # calendar table (CALENDAR_TABLE) and the permission to read it (CalendarReadPolicy, the same
+  # read-only set the calendar's own read functions have). It may not write the calendar and has
+  # no access to Cognito.
   SendAssistantMessageFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -2284,6 +2290,7 @@ Resources:
       Environment:
         Variables:
           ASSISTANT_TABLE: !Ref AssistantTable
+          CALENDAR_TABLE: !Ref CalendarTable
           CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
           ASSISTANT_DAILY_MESSAGE_LIMIT: !Ref AssistantDailyMessageLimit
           DYNAMODB_ENDPOINT: ''
@@ -2333,6 +2340,7 @@ Resources:
       ManagedPolicyArns:
         - !Ref AssistantReadPolicy
         - !Ref AssistantWritePolicy
+        - !Ref CalendarReadPolicy
       Policies:
         - PolicyName: write-own-logs
           PolicyDocument:
@@ -2343,6 +2351,92 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${SendAssistantMessageLogGroup}:log-stream:*
+        - PolicyName: read-anthropic-key
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/anthropic-api-key
+
+  # POST /assistant/continue (Administrator and Users): the next step of the caller's conversation
+  # when one is waiting, after Claude asked to read the calendar or could not be reached. It does
+  # what the function above does after a message, without a new message: it asks Claude once and
+  # runs the reads Claude asks for. So it is given exactly the same: 29 seconds, the assistant's
+  # table to read and write, the calendar's table to read only, the one parameter that holds the
+  # Anthropic key, and the three variables that only the local stack fills.
+  ContinueAssistantFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: continueAssistant.handler
+      Role: !GetAtt ContinueAssistantRole.Arn
+      Timeout: 29
+      LoggingConfig:
+        LogGroup: !Ref ContinueAssistantLogGroup
+      Environment:
+        Variables:
+          ASSISTANT_TABLE: !Ref AssistantTable
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          ASSISTANT_DAILY_MESSAGE_LIMIT: !Ref AssistantDailyMessageLimit
+          DYNAMODB_ENDPOINT: ''
+          ASSISTANT_MODEL: !Ref AssistantModel
+          ANTHROPIC_KEY_PARAMETER: !Sub /${AWS::StackName}/anthropic-api-key
+          ANTHROPIC_API_KEY: ''
+          ANTHROPIC_BASE_URL: ''
+          ASSISTANT_BUDGET_MEMORY_SECONDS: ''
+      Events:
+        ContinueAssistant:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /assistant/continue
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/continueAssistant.ts
+
+  ContinueAssistantLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-continueAssistant
+      RetentionInDays: 14
+
+  ContinueAssistantRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref AssistantReadPolicy
+        - !Ref AssistantWritePolicy
+        - !Ref CalendarReadPolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ContinueAssistantLogGroup}:log-stream:*
         - PolicyName: read-anthropic-key
           PolicyDocument:
             Version: '2012-10-17'

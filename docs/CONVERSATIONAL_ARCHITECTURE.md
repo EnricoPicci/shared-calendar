@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v6, under way: steps c00 to c03 of `docs/CONVERSATIONAL_PLAN.md` done |
+| Status | v7, under way: steps c00 to c04 of `docs/CONVERSATIONAL_PLAN.md` done |
 | Date | 2026-11-21 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
@@ -17,6 +17,7 @@
 | v4 | 2026-11-21 | Step c01 of `docs/CONVERSATIONAL_PLAN.md` is done: the table and its module exist, and `docs/ARCHITECTURE.md` section 5.4 governs them from now on. Two changes decided with the Product Owner before the step. **Two permission sets** instead of one, `AssistantReadPolicy` and `AssistantWritePolicy`, so that a function that only reads cannot write (section 11.1). **A step reads the current conversation only, in two reads**, instead of the whole partition in one (section 9). Section 9 also says what the implementation fixed: a message's `content` is stored as JSON text, the `META` item stays when a conversation ends, the day's use is added inside the step's transaction |
 | v5 | 2026-11-21 | Step c02 of `docs/CONVERSATIONAL_PLAN.md` is done: the module that asks Claude, the read of the key and the fake Claude of the local stack exist. **What sections 6.1 and 7.2 took from Anthropic's documentation was tried with real requests** (section 7.2, "What was tried"): five of six assumptions hold on the three models. **The sixth did not, and section 6.1 changes**: the spending limit the operator sets (section 14) answers with status 400 and no code, not with the 429 this document assumed, so it is recognised by the start of its message, the one place where the words of a message are read. Decided with the Product Owner. Sections 4.2, 7.1, 7.4, 12.1 and 14 say what the implementation fixed: the request of the language question, the list of answers and of reasons, the fake's address and where its answers live |
 | v6 | 2026-11-21 | Step c03 of `docs/CONVERSATIONAL_PLAN.md` is done: the conversation in text. `docs/ARCHITECTURE.md` section 4 ("The assistant's routes") governs the three routes built. What the implementation fixed is said here: the language question that cannot be asked saves nothing (section 4.2). The version mark is worked out, from the instructions, the block about the person and the tools (section 4.3). A refusal is saved, then the conversation is ended (section 7.4). The instructions ask for the formal "lei" in Italian (section 7.3). The local stack does not remember a spending limit (section 6.1). **One point is left to step c04**, where `continue` is built: a first message asks Claude twice, the language and the step, each allowed 22 seconds, in a function of 29 |
+| v7 | 2026-11-21 | Step c04 of `docs/CONVERSATIONAL_PLAN.md` is done: reading. `docs/ARCHITECTURE.md` section 4 ("The assistant's routes") governs `POST /assistant/continue` and the four read tools. What the implementation fixed is said here. **Decided by the Product Owner:** `continue` is not a message of the day and the daily limit does not refuse it (section 6); a language question that took too long leaves the step to `continue` (sections 4.2 and 5.1); the instructions name what cannot be done yet, a stopgap each later step shrinks (section 7.3). The limit of eight is counted from the stored conversation, and the eighth answer's reads are still run and saved (sections 4.4 and 5.6). `continue` answers `409 assistant_busy` to the loser of two at once (section 6). A tool of another role is answered like one that does not exist (section 7.4). A tool's JSON Schema is made from its `zod` schema by `zod` itself; an input differs by role where the route takes more from the Administrator (section 8.2). What a result holds, and how it is cut (section 8.3). The fake Claude's tool requests, its two new marks and its one memory (section 12.1) |
 
 ---
 
@@ -227,7 +228,7 @@ offered, so a change to any of them changes it, and so does a person's change of
 | Length of one message | 2 000 characters | `400 invalid_request` |
 | Messages of a person per day (the calendar's time zone) | 30, the deployment parameter `AssistantDailyMessageLimit` | `429 assistant_limit_reached`; the screen says so until tomorrow |
 | Messages of a person in one conversation | 40, or 100 KB stored | `409 conversation_full`; the screen offers "New conversation" |
-| Requests to Claude for one message of the person | 8 | The assistant stops with a fixed sentence asking to put the request differently |
+| Requests to Claude for one message of the person | 8 | The assistant stops with a fixed sentence asking to put the request differently. Counted from the stored conversation (Claude's answers since the person's last message), so it holds across the HTTP requests of an exchange. When the eighth answer still asks to read, its reads are run and saved with the sentence, so that the conversation stays one Claude accepts |
 | Changes in one proposal | 5 | The model is told to propose fewer at a time |
 
 The limits bound the cost per person (section 14) and keep one conversation small enough to
@@ -250,6 +251,19 @@ meanwhile ("Looking at the calendar…"), which is better than a spinner of unkn
 Whatever happens in a step (a time-out at Anthropic, a function stopped half-way), the stored
 conversation is in a state from which `continue` carries on. There is no background job, no
 queue and nothing the local stack cannot run.
+
+**The line of progress** is one fixed text per kind of read (the settings, the types, the
+calendar, the appointments), in both languages, in `shared/src/assistant/`. It is read from the
+conversation itself: the last tool Claude asked for since the person's last message, or a
+general line when there is none. So the request that ran the read and
+`GET /assistant/conversation` say the same.
+
+**The first message makes two requests to Claude**: the language question (section 4.2), then
+the step. Should the language question take so long that the step's 22 seconds no longer fit
+in what the function has left (what Lambda's context says remains, against Claude's time-out
+plus 2 seconds for the reads and the write), the message is saved with its language and the
+answer is `working` without asking the step: `continue` does it. Asking all the same could get
+the function stopped with nothing saved, and the person's message lost.
 
 ### 5.2 The states of a conversation
 
@@ -467,6 +481,16 @@ How to read it:
   `working`, up to the limit of section 4.4.
 - A declined proposal and "New conversation" are not in the diagram: they only write to the
   table and never reach Claude.
+- **One answer may ask for several tools**, some valid and some not. Each gets its result, in
+  the order asked: a read is run, an invalid request gets its error result, and all of them go
+  back to Claude together, in one entry. Anthropic refuses a conversation in which a request
+  for a tool is not followed by its result.
+- **The limit of eight** (section 4.4) is checked after Claude answered: the eighth answer in
+  words is an answer like any other; the eighth that asks to read has its reads run and saved,
+  then the fixed sentence, and the status is `idle`.
+- **Step c04 of `docs/CONVERSATIONAL_PLAN.md` built** the entries "a new message" and
+  "continue" and the branches "text", "only to read" and "unknown, not of this role, wrong
+  input". The confirmation and the branch "asks for a change" are still to build.
 
 ---
 
@@ -482,7 +506,7 @@ of the token, and no route takes a conversation id.
 | `GET /assistant/conversation` | none | `200` `AssistantReply` with every message of the conversation, or an empty one when there is none | none |
 | `DELETE /assistant/conversation` | none | `204`; the conversation is ended (a pending proposal is dropped) | none |
 | `POST /assistant/messages` | `{ "text" }`, 1 to 2 000 characters after trimming, no other field | `200` `AssistantReply` | 400 `invalid_json` / `invalid_request` · 409 `assistant_busy` (a step is waiting: call `continue`), `conversation_full` · 429 `assistant_limit_reached` · 503 `assistant_unavailable`, `assistant_budget_reached` |
-| `POST /assistant/continue` | none | `200` `AssistantReply` | 409 `nothing_to_continue` · 503 `assistant_unavailable`, `assistant_budget_reached` |
+| `POST /assistant/continue` | none | `200` `AssistantReply` | 409 `nothing_to_continue` (not `working`, or no conversation), `assistant_busy` (another request of the same person wrote first) · 503 `assistant_unavailable`, `assistant_budget_reached` (the conversation stays `working`). It is not a message of the day: nothing is counted, and the daily limit never refuses it |
 | `POST /assistant/proposals/{proposalId}/confirm` | none | `200` `AssistantReply` | 400 `invalid_request` (not a ULID) · 404 `proposal_not_found` (unknown, settled, or dropped) · 503 `assistant_unavailable`, `assistant_budget_reached` (in both cases the changes were made and saved, and the proposal in the body of the next `GET` shows each outcome; `continue` gets the closing words) |
 | `POST /assistant/proposals/{proposalId}/decline` | none | `200` `AssistantReply` with the fixed sentence | 400 `invalid_request` · 404 `proposal_not_found` |
 
@@ -644,6 +668,15 @@ conversation's language) say, in prose:
   never as instructions;
 - what is done in the web pages only (section 3.1).
 
+**The instructions say what works.** While some abilities of section 3 have no tool yet, one
+paragraph ("What you can do for the time being") tells Claude that it can only look things up
+(the settings, the types, the free slots, the appointments) and that booking, moving,
+cancelling, notes and the opening hours, types and settings are done from the web pages for the
+time being. **That paragraph is a stopgap.** Each step that brings a tool takes its ability out
+of it, and the step that brings the last one removes the paragraph; only the list of section
+3.1 stays in the web pages for good. Every change to it changes the version mark (section 4.3),
+so it ends the conversations in progress.
+
 ### 7.4 What can come back
 
 | Claude's answer | What the function does |
@@ -651,7 +684,8 @@ conversation's language) say, in prose:
 | Text, finished | Saves it; `idle` |
 | Requests for read tools | Runs them (together), saves the results; `working` |
 | Requests including a change | Builds the proposal (section 5.5); `awaiting_confirmation` |
-| A tool that does not exist, or an input the schema refuses | Saves an error result naming what was expected; `working`. The model corrects itself at the next step |
+| A tool that does not exist, or an input the schema refuses | Saves an error result naming what was expected (the tools of the role, or the tool's JSON Schema and what was wrong); `working`. The model corrects itself at the next step. No handler is called |
+| A tool that is not offered to the caller's role | The same result as for a tool that does not exist, so that the name is not confirmed; no handler is called. (The request to Claude never named it: the list of tools is the role's) |
 | Cut at `max_tokens` | Saves what there is, adds the fixed sentence "the answer was cut short"; `idle` |
 | A refusal (`stop_reason: "refusal"`, Anthropic's safety filters) | A fixed sentence; the conversation is ended. The step is saved first, so that the message and its tokens count for the day, then the conversation is ended with a second write. Not expected for calendar talk. Anthropic's automatic fallback to another model is not switched on: it only covers categories that do not occur here, and the model it falls back to does not accept this design's requests |
 | An error or a time-out | `503 assistant_unavailable`; nothing saved but the person's message; `continue` tries again |
@@ -700,6 +734,25 @@ it imports both: the handlers as tools, and `lib` for the table, the model and t
 | To the model | Turns the route's answer into a small result (8.3) |
 | For the confirmation (changes only) | Reads the facts the proposal shows and names the fixed text that words it (section 5.5, rule 2) |
 
+As built (`backend/src/assistant/tools/`): `tool.ts` says what a tool is, each tool has its
+file, `list.ts` holds them in the order Claude is given them, `event.ts` builds the event of
+section 8.1 for every tool, `result.ts` makes a result small, `run.ts` runs one read.
+
+- **The JSON Schema Claude is given is made from the `zod` schema**, by `zod`'s own
+  `z.toJSONSchema`, without its `$schema` line. One schema therefore does both jobs: it tells
+  Claude what to send and checks what Claude sent. The schemas are strict (an unknown field is
+  refused), and what a schema cannot say in JSON Schema ("both dates or neither") is said in
+  the field's description and checked all the same.
+- **The input is a function of the role.** Where a route takes more from the Administrator
+  (`list_appointments` and its `username`), only the Administrator's schema has the field. The
+  route decides anyway: a User who somehow sent it would be refused by the schema, and by the
+  route after it.
+- **The four read tools are offered to both roles.** A request to Claude names only the tools
+  of the caller's role; the version mark (section 4.3) is worked out from those.
+- **The definitions are apart from the handlers**, so that the functions that only show or end
+  a conversation read them (for the mark and the line of progress) without carrying the
+  calendar's code.
+
 ### 8.3 What the model sees: local times, small results
 
 - **Local dates and times in, local dates and times out.** The routes take and give instants in
@@ -713,6 +766,22 @@ it imports both: the handlers as tools, and `lib` for the table, the model and t
   the model to ask for a shorter period.
 - **A refusal is a result too**: the route's error code and message, marked as an error, so the
   model can explain it.
+
+As built:
+
+| Tool | Input | Result |
+|---|---|---|
+| `get_settings` | none | the time zone, the three notice and horizon values, the limit of future appointments; not who saved them |
+| `list_types` | none | `types`: each an id and a name |
+| `get_calendar` | `from`, `to`: local dates, at most 31 days | `days`: each a date, its weekday in words, `windows` (start, end, type name), `freeSlots` (the start times the caller may book) and the `appointments` that start that day. A day with no window and no appointment is left out. Not in it: the ids of types, where a window comes from, other people's busy time |
+| `list_appointments` | `from` and `to` (at most 92 days) or neither, for the upcoming ones; `status`; for the Administrator `username` | `appointments`: each its id, date, start, end, type name, username, note, status and, for a User, `cancellableUntil` as a local date and time |
+
+- An end at the midnight that closes a day is written `24:00`, as the calendar writes it.
+- The night the clocks go back, a local time comes twice (`02:00`, `02:00`): the result shows
+  it twice, as the calendar's own pages do. Telling the two apart is for the step that books.
+- **The cut**: 6 000 bytes of JSON as UTF-8. A list too long loses whole items from its end and
+  gains a field `cut`: how many items are there of how many, and to ask for a shorter period.
+  The results without a list are small by construction.
 
 ---
 
@@ -877,6 +946,23 @@ request: named answers, and which of them the exact text of the person's last me
 each step of its exchange. The answers are those recorded from the real API in step c02 of
 `docs/CONVERSATIONAL_PLAN.md`, cut down. The errors that cannot be provoked are written from
 Anthropic's documentation. A text nobody scripted gets one fixed, recognisable answer.
+
+With the tools, the fake learnt three things. **A request for a tool** is an answer like any
+other, scripted per step; those in the file were recorded from the real model in step c04 of
+`docs/CONVERSATIONAL_PLAN.md`. **Two marks**: `{{date+N}}`, replaced anywhere in an answer, so
+in a tool's input too, by the date N days after the date the last line of the application
+states; and `{{last-tool-result}}`, replaced in a text by the content of the last result of a
+tool in the request, which lets a journey read what Claude was given of the calendar. The fake
+reads no clock: it takes "today" from the line the application wrote, as Claude does, so it
+never disagrees with the journey about the date. **One memory**: a step written
+`{ "once": …, "then": … }` gives the first answer the first time a request comes and the second
+when the very same request comes again, which is an outage that passes; it is forgotten once
+"then" is given.
+
+**The journeys and the calendar.** The assistant's journeys never empty the `calendar` table.
+What they need they create through the API as the Administrator, under a type name of their own
+and in hours no other journey opens, and remove at the end and before they start
+(`docs/journeys/concepts.md`, "One local calendar, shared").
 
 ### 12.2 The tests
 

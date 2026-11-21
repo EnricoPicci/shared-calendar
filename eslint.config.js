@@ -38,6 +38,28 @@ export default tseslint.config(
     },
   },
   {
+    // The assistant's core reaches the calendar through a route's handler only, so that every
+    // rule of the calendar stays in one place (docs/CONVERSATIONAL_ARCHITECTURE.md section 8.1):
+    // it imports neither the module that knows the calendar table nor the two that hold the
+    // calendar's checks and events. A block that sets this rule replaces the one above for the
+    // files it matches, so the Anthropic SDK is refused here again.
+    files: ['backend/src/assistant/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [
+          {
+            regex: '^@anthropic-ai/sdk(/.*)?$',
+            message: 'The Anthropic SDK is imported only by backend/src/lib/anthropic.ts: ask Claude through that module.',
+          },
+          {
+            regex: '(^|/)lib/(calendarDb|calendarRules|calendarEvents)(\\.[jt]s)?$',
+            message: "The assistant's core reaches the calendar through a route's handler (backend/src/handlers), never through the calendar's own modules.",
+          },
+        ],
+      }],
+    },
+  },
+  {
     // The front end's code runs in the browser (docs/FRONTEND_SERVICES.md section 2, rule 2). The
     // compiler cannot stop a Node import here: vitest's type declarations pull in @types/node.
     // So: only rxjs, @shared-calendar/shared and relative imports, and no Node globals. The

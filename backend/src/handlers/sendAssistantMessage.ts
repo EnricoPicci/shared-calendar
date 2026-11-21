@@ -1,5 +1,5 @@
 import { AssistantMessageBody, resolveRole } from '@shared-calendar/shared';
-import type { APIGatewayProxyEventV2 } from 'aws-lambda';
+import type { APIGatewayProxyEventV2, Context } from 'aws-lambda';
 import { REFUSALS } from '../assistant/conversation';
 import { sendMessage } from '../assistant/exchange';
 import { getClaims } from '../lib/auth';
@@ -10,9 +10,10 @@ import { validate } from '../lib/validation';
 // POST /assistant/messages (docs/ARCHITECTURE.md section 4): the Administrator and the Users. A
 // message of the person to the assistant: it is checked, added to the person's conversation, and
 // Claude is asked once. One log line per request with the conversation, the outcome of the step,
-// the token counts and the durations, never a text (docs/CONVERSATIONAL_ARCHITECTURE.md section
-// 10.1).
-export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
+// the tools it ran, the token counts and the durations, never a text
+// (docs/CONVERSATIONAL_ARCHITECTURE.md section 10.1). The core is told how long the function may
+// still run, as Lambda's context says it.
+export const handler = async (event: APIGatewayProxyEventV2, context?: Context): Promise<HttpResponse> => {
   const started = Date.now();
   // "Now" is read once per request.
   const now = new Date(started).toISOString();
@@ -36,7 +37,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   if (!body.ok) return done('invalid_request', body.response, caller);
 
   try {
-    const result = await sendMessage({ sub: claims.value.sub, username: claims.value.username, role }, body.value.text, now);
+    const request = { requestId, remainingMs: context ? () => context.getRemainingTimeInMillis() : null };
+    const result = await sendMessage({ sub: claims.value.sub, username: claims.value.username, role }, body.value.text, now, request);
     if (result.ok) return done(result.log.outcome, ok(200, result.reply), { ...caller, ...result.log });
     const { status, message } = REFUSALS[result.refusal];
     return done(result.log.outcome, error(status, result.refusal, message), { ...caller, ...result.log });

@@ -77,7 +77,7 @@ describe('sendAssistantMessage handler (6)', () => {
   ])('gives the core the identity of the token ($role), the trimmed text and the request\'s now, and answers its reply', async ({ groups, role }) => {
     const response = await handler(caller('alice', groups, { text: `  ${TEXT}\n` }));
 
-    expect(core.sendMessage).toHaveBeenCalledWith({ sub: 'sub-alice', username: 'alice', role }, TEXT, NOW);
+    expect(core.sendMessage).toHaveBeenCalledWith({ sub: 'sub-alice', username: 'alice', role }, TEXT, NOW, { requestId: 'req-1', remainingMs: null });
     expect(response.statusCode).toBe(200);
     expect(response.headers).toEqual({ 'content-type': 'application/json' });
     expect(body(response)).toEqual(REPLY);
@@ -155,6 +155,13 @@ describe('sendAssistantMessage handler (6)', () => {
     expect(response.statusCode).toBe(500);
     expect(body(response)).toEqual({ error: 'internal_error', message: 'The assistant could not handle the message' });
     expect(logLine()).toMatchObject({ level: 'error', outcome: 'error', status: 500, reason: { name: 'Error', message: 'ASSISTANT_MODEL is not set' } });
+  });
+
+  it("gives the core the time the function may still run, as Lambda's context says it", async () => {
+    await handler(caller('alice', ['user']), { getRemainingTimeInMillis: () => 12_345 } as never);
+    const request = core.sendMessage.mock.calls[0]?.[3] as { requestId: string; remainingMs: () => number };
+    expect(request.requestId).toBe('req-1');
+    expect(request.remainingMs()).toBe(12_345);
   });
 
   it('measures the whole request', async () => {

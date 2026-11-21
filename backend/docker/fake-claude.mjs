@@ -7,13 +7,27 @@
 // (backend/tests/integration/fake-claude/answers.json), read again at every request, so a change
 // to it needs no restart. The file has four parts:
 //   answers    named answers, each a status and a body as Anthropic would send them
-//   messages   the exact text of a message of the person -> the names of the answers to give, one
-//              per step of the exchange it starts
+//   messages   the exact text of a message of the person -> the steps of the exchange it starts,
+//              one per request to Claude; the last one is given again if more requests come
 //   language   the same for the language question, and the answer for a text nobody scripted
 //   otherwise  the name of the answer for a message nobody scripted
-// One thing an answer can ask of the fake: the text {{application-line}} in it is replaced by the
-// last line of the application in the request (the entry of role "system" that follows a message
-// of the person), so that a journey can read what Claude was told about the time and the language.
+// A step is the name of an answer, or { "once": name, "then": name }: the first answer the first
+// time a request is made, the second when the very same request comes again. That is an outage
+// that passes: the application asks again with nothing changed. It is the one thing the fake
+// remembers between two requests, and it forgets it as soon as "then" is given.
+//
+// Three marks an answer can hold, each replaced from the request it answers:
+//   {{application-line}}  in a text: the last line of the application in the request (the entry
+//                         of role "system" that follows a message of the person), so that a
+//                         journey can read what Claude was told about the time and the language.
+//   {{date+N}}            anywhere, so in the input of a tool request too: the date N days after
+//                         the date that line states, as YYYY-MM-DD. The fake knows no time zone
+//                         and reads no clock: like the real Claude, it works a date out from the
+//                         line the application wrote, so a journey and the fake always agree on
+//                         what "today" is.
+//   {{last-tool-result}}  in a text: the content of the last result of a tool in the request, so
+//                         that a journey can read what Claude was given of the calendar.
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 
@@ -50,17 +64,69 @@ function choose(request, script) {
   // The step is counted from the conversation itself: one answer of Claude after the person's
   // message means the second step is asked for. The fake keeps nothing between two requests.
   const answered = entries.slice(last + 1).filter((entry) => entry?.role === 'assistant').length;
-  return { kind: `step ${answered + 1}`, name: steps[Math.min(answered, steps.length - 1)] };
+  return { kind: `step ${answered + 1}`, name: onceThen(steps[Math.min(answered, steps.length - 1)], request) };
+}
+
+// The requests that were given the "once" answer of a step and have not come again yet.
+const givenOnce = new Set();
+
+// The name a step gives this request: its own when it is a name, else "once" the first time this
+// exact request is seen and "then" the second.
+function onceThen(step, request) {
+  if (typeof step === 'string' || typeof step?.once !== 'string' || typeof step?.then !== 'string') return step;
+  const key = createHash('sha256').update(JSON.stringify([request.system, request.messages])).digest('hex');
+  if (givenOnce.delete(key)) return step.then;
+  givenOnce.add(key);
+  return step.once;
 }
 
 const LINE_MARK = '{{application-line}}';
+const RESULT_MARK = '{{last-tool-result}}';
+const DATE_MARK = /\{\{date\+(\d+)\}\}/g;
 
-// The answer's body with the mark replaced, in its text blocks; any other body is given as it is.
-function withApplicationLine(body, request) {
-  if (!Array.isArray(body?.content) || !JSON.stringify(body.content).includes(LINE_MARK)) return body;
+// The last line of the application in the request, or null.
+function applicationLine(request) {
   const lines = (Array.isArray(request.messages) ? request.messages : []).filter((entry) => entry?.role === 'system' && typeof entry.content === 'string');
-  const line = lines.length > 0 ? lines[lines.length - 1].content : '(no line of the application in the request)';
-  return { ...body, content: body.content.map((block) => (block?.type === 'text' ? { ...block, text: block.text.split(LINE_MARK).join(line) } : block)) };
+  return lines.length > 0 ? lines[lines.length - 1].content : null;
+}
+
+// The content of the last result of a tool in the request, as text, or null.
+function lastToolResult(request) {
+  const results = (Array.isArray(request.messages) ? request.messages : [])
+    .flatMap((entry) => (entry?.role === 'user' && Array.isArray(entry.content) ? entry.content : []))
+    .filter((block) => block?.type === 'tool_result');
+  if (results.length === 0) return null;
+  const { content } = results[results.length - 1];
+  return typeof content === 'string' ? content : JSON.stringify(content);
+}
+
+// The date `days` after a date written YYYY-MM-DD. Plain calendar arithmetic: no time zone is involved.
+function daysAfter(date, days) {
+  const [year, month, day] = date.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+// Every string of a value, however deep, passed through `change`.
+function mapStrings(value, change) {
+  if (typeof value === 'string') return change(value);
+  if (Array.isArray(value)) return value.map((item) => mapStrings(item, change));
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, mapStrings(item, change)]));
+  return value;
+}
+
+// The answer's body with its marks replaced; a body without content (an error) is given as it is.
+function withMarks(body, request) {
+  if (!Array.isArray(body?.content)) return body;
+  const line = applicationLine(request);
+  const today = line?.match(/\((\d{4}-\d{2}-\d{2})\)/)?.[1];
+  const dated = mapStrings(body.content, (text) => text.replace(DATE_MARK, (mark, days) => (today ? daysAfter(today, Number(days)) : mark)));
+  const inText = (text) =>
+    text
+      .split(LINE_MARK)
+      .join(line ?? '(no line of the application in the request)')
+      .split(RESULT_MARK)
+      .join(lastToolResult(request) ?? '(no result of a tool in the request)');
+  return { ...body, content: dated.map((block) => (block?.type === 'text' ? { ...block, text: inText(block.text) } : block)) };
 }
 
 const failure = (status, type, message) => ({ status, body: { type: 'error', error: { type, message }, request_id: 'req_fake' } });
@@ -84,7 +150,7 @@ function answerTo(method, url, raw) {
   if (typeof answer?.status !== 'number' || answer.body === undefined) {
     return { kind, name, ...failure(500, 'api_error', `The fake Claude has no answer named "${name}" in ${ANSWERS_FILE}.`) };
   }
-  return { kind, name, status: answer.status, body: withApplicationLine(answer.body, request ?? {}) };
+  return { kind, name, status: answer.status, body: withMarks(answer.body, request ?? {}) };
 }
 
 const server = createServer((req, res) => {

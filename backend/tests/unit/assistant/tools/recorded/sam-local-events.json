@@ -1,0 +1,92 @@
+{
+  "withQuery": {
+    "body": "",
+    "cookies": [],
+    "headers": {
+      "Accept": "*/*",
+      "Host": "127.0.0.1:3977",
+      "User-Agent": "curl/8.7.1",
+      "X-Forwarded-Port": "3977",
+      "X-Forwarded-Proto": "http"
+    },
+    "isBase64Encoded": false,
+    "pathParameters": {},
+    "queryStringParameters": {
+      "from": "2026-11-23",
+      "to": "2026-11-29"
+    },
+    "rawPath": "/calendar",
+    "rawQueryString": "from=2026-11-23&to=2026-11-29",
+    "requestContext": {
+      "accountId": "123456789012",
+      "apiId": "1234567890",
+      "authorizer": {
+        "lambda": {
+          "groups": "[\"user\"]",
+          "sub": "sub-alice",
+          "username": "alice"
+        }
+      },
+      "domainName": "localhost",
+      "domainPrefix": "localhost",
+      "http": {
+        "method": "GET",
+        "path": "/calendar",
+        "protocol": "HTTP/1.1",
+        "sourceIp": "127.0.0.1",
+        "userAgent": "Custom User Agent String"
+      },
+      "requestId": "1f2c7b89-c69f-4e29-b07d-1b6117342985",
+      "routeKey": "GET /calendar",
+      "stage": "$default",
+      "time": "21/Nov/2026:14:47:51 +0000",
+      "timeEpoch": 1795272471
+    },
+    "routeKey": "GET /calendar",
+    "stageVariables": null,
+    "version": "2.0"
+  },
+  "withoutQuery": {
+    "body": "",
+    "cookies": [],
+    "headers": {
+      "Accept": "*/*",
+      "Host": "127.0.0.1:3977",
+      "User-Agent": "curl/8.7.1",
+      "X-Forwarded-Port": "3977",
+      "X-Forwarded-Proto": "http"
+    },
+    "isBase64Encoded": false,
+    "pathParameters": {},
+    "rawPath": "/calendar/settings",
+    "rawQueryString": "",
+    "requestContext": {
+      "accountId": "123456789012",
+      "apiId": "1234567890",
+      "authorizer": {
+        "lambda": {
+          "groups": "[\"user\"]",
+          "sub": "sub-alice",
+          "username": "alice"
+        }
+      },
+      "domainName": "localhost",
+      "domainPrefix": "localhost",
+      "http": {
+        "method": "GET",
+        "path": "/calendar/settings",
+        "protocol": "HTTP/1.1",
+        "sourceIp": "127.0.0.1",
+        "userAgent": "Custom User Agent String"
+      },
+      "requestId": "1f2c7b89-c69f-4e29-b07d-1b6117342985",
+      "routeKey": "GET /calendar/settings",
+      "stage": "$default",
+      "time": "21/Nov/2026:14:47:51 +0000",
+      "timeEpoch": 1795272471
+    },
+    "routeKey": "GET /calendar/settings",
+    "stageVariables": null,
+    "version": "2.0"
+  }
+}

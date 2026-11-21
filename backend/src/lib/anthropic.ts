@@ -118,7 +118,7 @@ export type LanguageAnswer = { kind: 'language'; language: AssistantLanguage; us
 // One request, one answer, no streaming: 22 seconds and no retry of the SDK's own, because the
 // function has 29 seconds in all and the retry is the screen's (docs/CONVERSATIONAL_ARCHITECTURE.md
 // section 7.2).
-const TIMEOUT_MS = 22_000;
+export const STEP_TIMEOUT_MS = 22_000;
 // Room for the thinking and a long list.
 const STEP_MAX_TOKENS = 8_000;
 // The language answer is ten tokens; the rest is room for thinking the model may do first.
@@ -188,7 +188,7 @@ async function send(body: Body, now: string): Promise<{ kind: 'message'; message
   const key = await currentKey(cfg, nowMs);
   if (key === null) return { kind: 'unavailable', reason: 'key_missing' };
   if (client?.key !== key) {
-    client = { key, anthropic: new Anthropic({ apiKey: key, baseURL: cfg.baseUrl, timeout: TIMEOUT_MS, maxRetries: 0 }) };
+    client = { key, anthropic: new Anthropic({ apiKey: key, baseURL: cfg.baseUrl, timeout: STEP_TIMEOUT_MS, maxRetries: 0 }) };
   }
 
   try {

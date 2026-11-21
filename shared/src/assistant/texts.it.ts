@@ -23,4 +23,10 @@ export const ASSISTANT_TEXTS_IT: AssistantTexts = {
   confirmLabel: 'Conferma',
   declineLabel: 'Non lo faccia',
   working: 'Ci sto lavorando…',
+  reading: {
+    settings: 'Sto guardando le impostazioni del calendario…',
+    types: 'Sto guardando i tipi di appuntamento…',
+    calendar: 'Sto guardando il calendario…',
+    appointments: 'Sto guardando gli appuntamenti…',
+  },
 };

@@ -56,6 +56,10 @@ const MESSAGES: StoredMessage[] = [
   },
 ];
 
+// A request for a tool and a result, as they are stored.
+const USE = (name: string) => ({ type: 'tool_use' as const, id: `toolu_${name}`, name, input: {} });
+const RESULT = { type: 'tool_result' as const, tool_use_id: 'toolu_1', content: '{}' };
+
 beforeEach(() => {
   vi.resetAllMocks();
   db.readDailyUse.mockResolvedValue({ messages: 4, inputTokens: 0, outputTokens: 0 });
@@ -136,6 +140,31 @@ describe('showConversation (GET /assistant/conversation, 6)', () => {
     expect(reply.activity).toBe('Ci sto lavorando…');
   });
 
+  it('says, after a read, the line of that read, the same line the step that ran it answered (5.1)', async () => {
+    const core = await load();
+    const mark = await markOf(core);
+    const messages: StoredMessage[] = [
+      ...MESSAGES,
+      { seq: 4, at: AT, kind: 'model', content: { role: 'user', content: 'Quali appuntamenti ho?' } },
+      { seq: 5, at: AT, kind: 'model', content: { role: 'system', content: 'Now it is Saturday.' } },
+      { seq: 6, at: AT, kind: 'model', content: { role: 'assistant', content: [{ type: 'text', text: 'Guardo subito.' }, USE('get_calendar'), USE('list_appointments')] } },
+      { seq: 7, at: AT, kind: 'model', content: { role: 'user', content: [RESULT, RESULT] } },
+    ];
+    db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: mark, status: 'working', nextSeq: 8 }), messages });
+
+    const { reply } = await core.showConversation(ALICE, NOW);
+
+    expect(reply.activity).toBe('Sto guardando gli appuntamenti…');
+    // What the person reads of it: their two messages and Claude's two texts. The lines of the
+    // application (2, 5) and the results (7) are stored and never shown, so the numbers skip.
+    expect(reply.messages.map((message) => [message.seq, message.from, message.text])).toEqual([
+      [1, 'person', 'Buongiorno, mi sente?'],
+      [3, 'assistant', 'Buongiorno.'],
+      [4, 'person', 'Quali appuntamenti ho?'],
+      [6, 'assistant', 'Guardo subito.'],
+    ]);
+  });
+
   it('treats a conversation started under other instructions as over (4.3)', async () => {
     const core = await load();
     db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: 'an-older-mark' }), messages: MESSAGES });
@@ -160,6 +189,46 @@ describe('showConversation (GET /assistant/conversation, 6)', () => {
     db.readConversation.mockResolvedValueOnce({ version: 0, conversation: null, messages: [] });
     const admin = await core.currentConversation({ ...ALICE, role: 'admin' }, NOW, { timeZone: 'Europe/Rome', dailyMessageLimit: 10 });
     expect(admin.mark).not.toBe(mark);
+  });
+});
+
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('activityLine: the line of progress (5.1)', () => {
+  const person = { kind: 'model' as const, content: { role: 'user' as const, content: 'Which slots are free?' } };
+  const line = { kind: 'model' as const, content: { role: 'system' as const, content: 'Now it is Saturday.' } };
+  const asks = (...names: string[]) => ({ kind: 'model' as const, content: { role: 'assistant' as const, content: names.map(USE) } });
+  const results = { kind: 'model' as const, content: { role: 'user' as const, content: [RESULT] } };
+  const says = (text: string) => ({ kind: 'model' as const, content: { role: 'assistant' as const, content: [{ type: 'text' as const, text }] } });
+
+  it.each([
+    ['get_settings', "Looking at the calendar's settings…"],
+    ['list_types', 'Looking at the appointment types…'],
+    ['get_calendar', 'Looking at the calendar…'],
+    ['list_appointments', 'Looking at the appointments…'],
+  ])('after %s', async (name, expected) => {
+    const core = await load();
+    const { DEFINITIONS } = await import('../../../src/assistant/tools/list');
+    expect(core.activityLine([person, line, asks(name), results], DEFINITIONS, 'user', 'en')).toBe(expected);
+  });
+
+  it('is the line of the last tool asked for, of the last answer that asked', async () => {
+    const core = await load();
+    const { DEFINITIONS } = await import('../../../src/assistant/tools/list');
+    const messages = [person, line, asks('get_settings'), results, asks('list_types', 'get_calendar'), results, { kind: 'notice' as const, content: 'A notice.' }];
+    expect(core.activityLine(messages, DEFINITIONS, 'user', 'it')).toBe('Sto guardando il calendario…');
+  });
+
+  it('is the general line when no tool was asked for since the person wrote, or the tool is not one of the role', async () => {
+    const core = await load();
+    const { DEFINITIONS } = await import('../../../src/assistant/tools/list');
+    // A step left to `continue`: the message and its line only.
+    expect(core.activityLine([asks('get_calendar'), results, says('Free at 10:00.'), person, line], DEFINITIONS, 'user', 'en')).toBe('Working…');
+    expect(core.activityLine([], DEFINITIONS, 'user', 'en')).toBe('Working…');
+    expect(core.activityLine([person, line, asks('made_up')], DEFINITIONS, 'user', 'en')).toBe('Working…');
+    expect(core.activityLine([person, line, says('One moment.'), { kind: 'model', content: { role: 'assistant', content: 'plain' } }], DEFINITIONS, 'user', 'en')).toBe('Working…');
+    const adminOnly = DEFINITIONS.map((definition) => ({ ...definition, roles: ['admin' as const] }));
+    expect(core.activityLine([person, line, asks('get_calendar')], adminOnly, 'user', 'en')).toBe('Working…');
+    expect(core.activityLine([person, line, asks('get_calendar')], adminOnly, 'admin', 'en')).toBe('Looking at the calendar…');
   });
 });
 
@@ -219,6 +288,7 @@ describe('the refusals (6)', () => {
     expect(Object.fromEntries(Object.entries(REFUSALS).map(([code, { status }]) => [code, status]))).toEqual({
       assistant_busy: 409,
       conversation_full: 409,
+      nothing_to_continue: 409,
       assistant_limit_reached: 429,
       assistant_unavailable: 503,
       assistant_budget_reached: 503,

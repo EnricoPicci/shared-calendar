@@ -21,4 +21,10 @@ export const ASSISTANT_TEXTS_EN: AssistantTexts = {
   confirmLabel: 'Confirm',
   declineLabel: "Don't",
   working: 'Working…',
+  reading: {
+    settings: "Looking at the calendar's settings…",
+    types: 'Looking at the appointment types…',
+    calendar: 'Looking at the calendar…',
+    appointments: 'Looking at the appointments…',
+  },
 };

@@ -15,7 +15,7 @@ Each section explains one idea in simple words and names the document that defin
 | `dave`, `erin` | throw-away Users of the back end's calendar journeys | `backend/tests/integration/calendar.test.ts` |
 | `fe-calendar`, `fe-calendar-b` | throw-away Users of the front end's calendar journeys | `frontend/tests/integration/calendar.test.ts` |
 | `fe-journey` | a throw-away User of the front end's Hello World journeys | `frontend/tests/integration/journeys.test.ts` |
-| `chat-text`, `chat-lingua`, `chat-limit`, `chat-down` | throw-away Users of the assistant's journeys, one per block | `backend/tests/integration/assistant.test.ts` |
+| `chat-text`, `chat-lingua`, `chat-read`, `chat-limit`, `chat-down` | throw-away Users of the assistant's journeys, one per block | `backend/tests/integration/assistant.test.ts` |
 | `chat-nobody` | a throw-away account in neither group, made straight in cognito-local | `backend/tests/integration/assistant.test.ts` |
 | `smoke-<epoch>` | the smoke test's throw-away User | `backend/scripts/smoke.sh` |
 
@@ -32,6 +32,10 @@ All journeys and the smoke test use the same local `calendar` table. They treat 
   they create only types named `fe-calendar …`, use only dates with nothing on them, from today +
   330 days, and remove what they made.
 - **The smoke test** uses a type `smoke-<epoch>` and a free 03:00–04:00 from 50 days ahead.
+- **The assistant's journeys never reset it either.** One block reads the calendar: it creates a
+  type named `assistant journey` and a one-off window 05:00–07:00 on the 25th day from today,
+  hours no other journey opens, and removes both at its end and, should a run have been
+  interrupted, before it starts. It checks only what it made, whatever else that day holds.
 
 Appointments cannot be deleted through the API, only cancelled. So cancelled appointments, their
 events and the deleted-user markers of removed Users stay in the table as history.
@@ -418,14 +422,15 @@ the API to decide can expect exactly one.
 
 The assistant is the calendar used by conversation: a person writes a message, the server asks
 Claude (Anthropic's model) and answers with what Claude said. Its routes and their answers are
-defined in `docs/ARCHITECTURE.md` section 4 ("The assistant's routes"); what is not built yet is
-in `docs/CONVERSATIONAL_ARCHITECTURE.md`.
+defined in `docs/ARCHITECTURE.md` section 4 ("The assistant's routes"); what is not built yet
+(changing the calendar by conversation) is in `docs/CONVERSATIONAL_ARCHITECTURE.md`.
 
 - **One conversation per person**, found by the `sub` of the token. No route takes a conversation
   id, so nobody can reach another person's conversation. `GET /assistant/conversation` reads it,
   `POST /assistant/messages` adds a message to it (and starts it when there is none),
+  `POST /assistant/continue` does its next step when one is waiting,
   `DELETE /assistant/conversation` ends it.
-- **`AssistantReply`** is the answer of `GET` and `POST`: `conversationId`, `language`, `status`,
+- **`AssistantReply`** is the answer of `GET` and of the two `POST`s: `conversationId`, `language`, `status`,
   `messages`, `activity`, `proposal`, `remainingToday`. With no conversation, the first two are
   `null`, `status` is `idle` and `messages` is empty.
 - **A new account starts clean.** A conversation and the day's count are stored under the `sub`,
@@ -438,14 +443,17 @@ The local stack does not call Anthropic. A small server of the Docker stack, the
 (`backend/docker/fake-claude.mjs`, port 9230), answers in its place
 (`docs/ARCHITECTURE.md` section 8). What it answers is scripted in
 `backend/tests/integration/fake-claude/answers.json`, by **the exact text of the person's
-message**. The texts the journeys send:
+message**, one answer per step of the exchange that message starts (see "Steps, `continue` and
+the tools" below). The texts the journeys send:
 
 | The person writes | The fake answers |
 |---|---|
 | `Hello, can you hear me?` | "Hello. I am the assistant of the shared calendar.", after a thinking block |
 | `Buongiorno, mi sente?` | "Buongiorno. Sono l'assistente del calendario condiviso." |
 | `fake: say the line of the application` | "The application told me: " followed by the line of the application it received (see below) |
-| `fake: a spending limit of our own`, `fake: overloaded` | an error, as Anthropic gives it for that case |
+| `fake: a spending limit of our own`, `fake: overloaded` | an error, as Anthropic gives it for that case, at every step |
+| `fake: what is open on the day of the journey?` | first a request for the tool `get_calendar`, for the one day 25 days after today; then, as its text, the result of that tool word for word |
+| `fake: an outage after the read` | first a request for the tool `get_settings`; then an error the first time, and the second time the result of that tool as its text |
 | a text the file does not hold | "Fake Claude: no answer is scripted for this message." |
 
 The language question (below) is scripted the same way: of the texts the journeys send,
@@ -465,6 +473,44 @@ date and time now in the calendar's time zone, and the conversation's language a
 It is stored as a message of the conversation, with its own `seq`, but a person never reads it.
 That is why the messages of a reply are numbered 1 and 3, then 4 and 6: 2 and 5 are lines of the
 application.
+
+A read makes the gap wider. Claude's request for a tool and the result of the tool are stored
+too, each as an entry with its own `seq`, and a person reads neither. So an exchange with one read
+shows 1 (the person) and 5 (the answer): 2 is the line of the application, 3 Claude's request, 4
+the result. Had Claude written some words beside its request, entry 3 would be shown as those
+words.
+
+### Steps, `continue` and the tools
+
+One HTTP request asks Claude for at most one step (`docs/CONVERSATIONAL_ARCHITECTURE.md` section
+5.1); the first message of a conversation asks the language question before it.
+An answer that needs the calendar therefore takes several requests:
+
+1. `POST /assistant/messages`: Claude does not answer in words but asks for a **tool**, one of
+   four reads (`get_settings`, `list_types`, `get_calendar`, `list_appointments`). The server runs
+   it: it calls the code of the calendar's own route, with the identity of the person, so the
+   person gets from the assistant exactly what they may see in the pages. It saves Claude's
+   request and the result, and answers `status` `working` with `activity`, a line such as
+   "Looking at the calendar…".
+2. `POST /assistant/continue`, with no body: the server asks Claude again, now with the result.
+   Claude answers in words (`status` `idle`), or asks for another read (`working` again).
+
+While the `status` is `working`, a new message is refused with `409 assistant_busy`. `continue`
+with no step waiting is `409 nothing_to_continue`. `continue` is not a message: it counts nothing
+for the day.
+
+What Claude is given of the calendar is not the route's answer as it is: dates and times are
+local, in the calendar's time zone (`05:00`, not an instant), a window's type is its name, and
+the internal fields are left out: a window carries no id. An appointment keeps its id, and so
+does a type in the list of types, since a later request must be able to name them
+(`docs/CONVERSATIONAL_ARCHITECTURE.md` section 8.3).
+
+The fake has three **marks**, texts it replaces in a scripted answer. `{{application-line}}`
+becomes the line of the application. `{{date+25}}` becomes the date 25 days after the date that
+line states, so the fake can ask for a day the journey prepared without knowing the date itself.
+`{{last-tool-result}}` becomes the result of the last tool, which is how a journey reads what
+Claude was given. And a step may be written to fail once: an error the first time a request
+comes, the answer when the very same request comes again.
 
 ### The `assistant` table
 

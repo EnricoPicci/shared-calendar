@@ -1,0 +1,678 @@
+{
+  "user": {
+    "settings": {
+      "timeZone": "Europe/Rome",
+      "cancellationNoticeHours": 24,
+      "minBookingNoticeHours": 0,
+      "bookingHorizonDays": 56,
+      "maxFutureAppointmentsPerUser": null,
+      "updatedAt": null,
+      "updatedBy": null
+    },
+    "types": {
+      "types": [
+        {
+          "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+          "name": "Trial visit",
+          "createdAt": "2026-11-21T14:54:05.224Z",
+          "updatedAt": "2026-11-21T14:54:05.224Z"
+        }
+      ]
+    },
+    "calendar": {
+      "timeZone": "Europe/Rome",
+      "from": "2026-11-23",
+      "to": "2026-11-29",
+      "generatedAt": "2026-11-21T14:54:06.531Z",
+      "days": [
+        {
+          "date": "2026-11-23",
+          "weekday": 1,
+          "windows": [
+            {
+              "start": "2026-11-23T08:00:00.000Z",
+              "end": "2026-11-23T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "typeName": "Trial visit"
+            }
+          ],
+          "slots": [
+            {
+              "start": "2026-11-23T08:00:00.000Z",
+              "end": "2026-11-23T09:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            },
+            {
+              "start": "2026-11-23T09:00:00.000Z",
+              "end": "2026-11-23T10:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            },
+            {
+              "start": "2026-11-23T10:00:00.000Z",
+              "end": "2026-11-23T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            }
+          ],
+          "busy": []
+        },
+        {
+          "date": "2026-11-24",
+          "weekday": 2,
+          "windows": [
+            {
+              "start": "2026-11-24T08:00:00.000Z",
+              "end": "2026-11-24T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "typeName": "Trial visit"
+            }
+          ],
+          "slots": [
+            {
+              "start": "2026-11-24T08:00:00.000Z",
+              "end": "2026-11-24T09:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            },
+            {
+              "start": "2026-11-24T10:00:00.000Z",
+              "end": "2026-11-24T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            }
+          ],
+          "busy": []
+        },
+        {
+          "date": "2026-11-25",
+          "weekday": 3,
+          "windows": [
+            {
+              "start": "2026-11-25T08:00:00.000Z",
+              "end": "2026-11-25T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "typeName": "Trial visit"
+            }
+          ],
+          "slots": [
+            {
+              "start": "2026-11-25T08:00:00.000Z",
+              "end": "2026-11-25T09:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            },
+            {
+              "start": "2026-11-25T09:00:00.000Z",
+              "end": "2026-11-25T10:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            }
+          ],
+          "busy": [
+            {
+              "start": "2026-11-25T10:00:00.000Z",
+              "end": "2026-11-25T11:00:00.000Z"
+            }
+          ]
+        },
+        {
+          "date": "2026-11-26",
+          "weekday": 4,
+          "windows": [
+            {
+              "start": "2026-11-26T08:00:00.000Z",
+              "end": "2026-11-26T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "typeName": "Trial visit"
+            }
+          ],
+          "slots": [
+            {
+              "start": "2026-11-26T09:00:00.000Z",
+              "end": "2026-11-26T10:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            },
+            {
+              "start": "2026-11-26T10:00:00.000Z",
+              "end": "2026-11-26T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            }
+          ],
+          "busy": []
+        },
+        {
+          "date": "2026-11-27",
+          "weekday": 5,
+          "windows": [
+            {
+              "start": "2026-11-27T08:00:00.000Z",
+              "end": "2026-11-27T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "typeName": "Trial visit"
+            }
+          ],
+          "slots": [
+            {
+              "start": "2026-11-27T08:00:00.000Z",
+              "end": "2026-11-27T09:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            },
+            {
+              "start": "2026-11-27T09:00:00.000Z",
+              "end": "2026-11-27T10:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            },
+            {
+              "start": "2026-11-27T10:00:00.000Z",
+              "end": "2026-11-27T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            }
+          ],
+          "busy": []
+        },
+        {
+          "date": "2026-11-28",
+          "weekday": 6,
+          "windows": [],
+          "slots": [],
+          "busy": []
+        },
+        {
+          "date": "2026-11-29",
+          "weekday": 7,
+          "windows": [],
+          "slots": [],
+          "busy": []
+        }
+      ],
+      "appointments": [
+        {
+          "appointmentId": "01M7Z9KAW21NGBYF14RES3C89G",
+          "username": "alice",
+          "start": "2026-11-24T09:00:00.000Z",
+          "end": "2026-11-24T10:00:00.000Z",
+          "date": "2026-11-24",
+          "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+          "typeName": "Trial visit",
+          "note": "Bring the forms",
+          "status": "booked",
+          "createdAt": "2026-11-21T14:54:06.180Z",
+          "createdBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "updatedAt": "2026-11-21T14:54:06.180Z",
+          "updatedBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "cancelledAt": null,
+          "cancelledBy": null,
+          "cancelReason": null,
+          "replaces": null,
+          "replacedBy": null,
+          "cancellableUntil": "2026-11-23T09:00:00.000Z"
+        },
+        {
+          "appointmentId": "01M7Z9KAY26BWT91TYBQ44D438",
+          "username": "alice",
+          "start": "2026-11-26T08:00:00.000Z",
+          "end": "2026-11-26T09:00:00.000Z",
+          "date": "2026-11-26",
+          "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+          "typeName": "Trial visit",
+          "note": null,
+          "status": "booked",
+          "createdAt": "2026-11-21T14:54:06.271Z",
+          "createdBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "updatedAt": "2026-11-21T14:54:06.271Z",
+          "updatedBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "cancelledAt": null,
+          "cancelledBy": null,
+          "cancelReason": null,
+          "replaces": null,
+          "replacedBy": null,
+          "cancellableUntil": "2026-11-25T08:00:00.000Z"
+        }
+      ]
+    },
+    "appointments": {
+      "appointments": [
+        {
+          "appointmentId": "01M7Z9KAW21NGBYF14RES3C89G",
+          "username": "alice",
+          "start": "2026-11-24T09:00:00.000Z",
+          "end": "2026-11-24T10:00:00.000Z",
+          "date": "2026-11-24",
+          "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+          "typeName": "Trial visit",
+          "note": "Bring the forms",
+          "status": "booked",
+          "createdAt": "2026-11-21T14:54:06.180Z",
+          "createdBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "updatedAt": "2026-11-21T14:54:06.180Z",
+          "updatedBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "cancelledAt": null,
+          "cancelledBy": null,
+          "cancelReason": null,
+          "replaces": null,
+          "replacedBy": null,
+          "cancellableUntil": "2026-11-23T09:00:00.000Z"
+        },
+        {
+          "appointmentId": "01M7Z9KAY26BWT91TYBQ44D438",
+          "username": "alice",
+          "start": "2026-11-26T08:00:00.000Z",
+          "end": "2026-11-26T09:00:00.000Z",
+          "date": "2026-11-26",
+          "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+          "typeName": "Trial visit",
+          "note": null,
+          "status": "booked",
+          "createdAt": "2026-11-21T14:54:06.271Z",
+          "createdBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "updatedAt": "2026-11-21T14:54:06.271Z",
+          "updatedBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "cancelledAt": null,
+          "cancelledBy": null,
+          "cancelReason": null,
+          "replaces": null,
+          "replacedBy": null,
+          "cancellableUntil": "2026-11-25T08:00:00.000Z"
+        }
+      ]
+    }
+  },
+  "admin": {
+    "settings": {
+      "timeZone": "Europe/Rome",
+      "cancellationNoticeHours": 24,
+      "minBookingNoticeHours": 0,
+      "bookingHorizonDays": 56,
+      "maxFutureAppointmentsPerUser": null,
+      "updatedAt": null,
+      "updatedBy": null
+    },
+    "types": {
+      "types": [
+        {
+          "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+          "name": "Trial visit",
+          "createdAt": "2026-11-21T14:54:05.224Z",
+          "updatedAt": "2026-11-21T14:54:05.224Z"
+        }
+      ]
+    },
+    "calendar": {
+      "timeZone": "Europe/Rome",
+      "from": "2026-11-23",
+      "to": "2026-11-29",
+      "generatedAt": "2026-11-21T14:54:06.832Z",
+      "days": [
+        {
+          "date": "2026-11-23",
+          "weekday": 1,
+          "windows": [
+            {
+              "start": "2026-11-23T08:00:00.000Z",
+              "end": "2026-11-23T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "typeName": "Trial visit",
+              "source": "one_off",
+              "sourceId": "01M7Z9KA73FXEN5ATY1120BZX9"
+            }
+          ],
+          "slots": [
+            {
+              "start": "2026-11-23T08:00:00.000Z",
+              "end": "2026-11-23T09:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            },
+            {
+              "start": "2026-11-23T09:00:00.000Z",
+              "end": "2026-11-23T10:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            },
+            {
+              "start": "2026-11-23T10:00:00.000Z",
+              "end": "2026-11-23T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            }
+          ],
+          "busy": [],
+          "hasOverride": false
+        },
+        {
+          "date": "2026-11-24",
+          "weekday": 2,
+          "windows": [
+            {
+              "start": "2026-11-24T08:00:00.000Z",
+              "end": "2026-11-24T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "typeName": "Trial visit",
+              "source": "one_off",
+              "sourceId": "01M7Z9KA96JK6HGEZ7SA1ZECY4"
+            }
+          ],
+          "slots": [
+            {
+              "start": "2026-11-24T08:00:00.000Z",
+              "end": "2026-11-24T09:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            },
+            {
+              "start": "2026-11-24T10:00:00.000Z",
+              "end": "2026-11-24T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            }
+          ],
+          "busy": [],
+          "hasOverride": false
+        },
+        {
+          "date": "2026-11-25",
+          "weekday": 3,
+          "windows": [
+            {
+              "start": "2026-11-25T08:00:00.000Z",
+              "end": "2026-11-25T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "typeName": "Trial visit",
+              "source": "one_off",
+              "sourceId": "01M7Z9KABHD0DW2NNYET56ZZ37"
+            }
+          ],
+          "slots": [
+            {
+              "start": "2026-11-25T08:00:00.000Z",
+              "end": "2026-11-25T09:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            },
+            {
+              "start": "2026-11-25T09:00:00.000Z",
+              "end": "2026-11-25T10:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            }
+          ],
+          "busy": [],
+          "hasOverride": false
+        },
+        {
+          "date": "2026-11-26",
+          "weekday": 4,
+          "windows": [
+            {
+              "start": "2026-11-26T08:00:00.000Z",
+              "end": "2026-11-26T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "typeName": "Trial visit",
+              "source": "one_off",
+              "sourceId": "01M7Z9KACVY5K2RM46PZF5DF5P"
+            }
+          ],
+          "slots": [
+            {
+              "start": "2026-11-26T09:00:00.000Z",
+              "end": "2026-11-26T10:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            },
+            {
+              "start": "2026-11-26T10:00:00.000Z",
+              "end": "2026-11-26T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            }
+          ],
+          "busy": [],
+          "hasOverride": false
+        },
+        {
+          "date": "2026-11-27",
+          "weekday": 5,
+          "windows": [
+            {
+              "start": "2026-11-27T08:00:00.000Z",
+              "end": "2026-11-27T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "typeName": "Trial visit",
+              "source": "one_off",
+              "sourceId": "01M7Z9KAEVC20RZW8S0FGHPMXV"
+            }
+          ],
+          "slots": [
+            {
+              "start": "2026-11-27T08:00:00.000Z",
+              "end": "2026-11-27T09:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            },
+            {
+              "start": "2026-11-27T09:00:00.000Z",
+              "end": "2026-11-27T10:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            },
+            {
+              "start": "2026-11-27T10:00:00.000Z",
+              "end": "2026-11-27T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+            }
+          ],
+          "busy": [],
+          "hasOverride": false
+        },
+        {
+          "date": "2026-11-28",
+          "weekday": 6,
+          "windows": [],
+          "slots": [],
+          "busy": [],
+          "hasOverride": false
+        },
+        {
+          "date": "2026-11-29",
+          "weekday": 7,
+          "windows": [],
+          "slots": [],
+          "busy": [],
+          "hasOverride": false
+        }
+      ],
+      "appointments": [
+        {
+          "appointmentId": "01M7Z9KAW21NGBYF14RES3C89G",
+          "username": "alice",
+          "start": "2026-11-24T09:00:00.000Z",
+          "end": "2026-11-24T10:00:00.000Z",
+          "date": "2026-11-24",
+          "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+          "typeName": "Trial visit",
+          "note": "Bring the forms",
+          "status": "booked",
+          "createdAt": "2026-11-21T14:54:06.180Z",
+          "createdBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "updatedAt": "2026-11-21T14:54:06.180Z",
+          "updatedBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "cancelledAt": null,
+          "cancelledBy": null,
+          "cancelReason": null,
+          "replaces": null,
+          "replacedBy": null,
+          "cancellableUntil": null
+        },
+        {
+          "appointmentId": "01M7Z9KAZDYHH47PB6FJDHRSZP",
+          "username": "trialbob",
+          "start": "2026-11-25T10:00:00.000Z",
+          "end": "2026-11-25T11:00:00.000Z",
+          "date": "2026-11-25",
+          "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+          "typeName": "Trial visit",
+          "note": "First visit",
+          "status": "booked",
+          "createdAt": "2026-11-21T14:54:06.313Z",
+          "createdBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "updatedAt": "2026-11-21T14:54:06.313Z",
+          "updatedBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "cancelledAt": null,
+          "cancelledBy": null,
+          "cancelReason": null,
+          "replaces": null,
+          "replacedBy": null,
+          "cancellableUntil": null
+        },
+        {
+          "appointmentId": "01M7Z9KAY26BWT91TYBQ44D438",
+          "username": "alice",
+          "start": "2026-11-26T08:00:00.000Z",
+          "end": "2026-11-26T09:00:00.000Z",
+          "date": "2026-11-26",
+          "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+          "typeName": "Trial visit",
+          "note": null,
+          "status": "booked",
+          "createdAt": "2026-11-21T14:54:06.271Z",
+          "createdBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "updatedAt": "2026-11-21T14:54:06.271Z",
+          "updatedBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "cancelledAt": null,
+          "cancelledBy": null,
+          "cancelReason": null,
+          "replaces": null,
+          "replacedBy": null,
+          "cancellableUntil": null
+        }
+      ]
+    },
+    "appointments": {
+      "appointments": [
+        {
+          "appointmentId": "01M7Z9KAW21NGBYF14RES3C89G",
+          "username": "alice",
+          "start": "2026-11-24T09:00:00.000Z",
+          "end": "2026-11-24T10:00:00.000Z",
+          "date": "2026-11-24",
+          "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+          "typeName": "Trial visit",
+          "note": "Bring the forms",
+          "status": "booked",
+          "createdAt": "2026-11-21T14:54:06.180Z",
+          "createdBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "updatedAt": "2026-11-21T14:54:06.180Z",
+          "updatedBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "cancelledAt": null,
+          "cancelledBy": null,
+          "cancelReason": null,
+          "replaces": null,
+          "replacedBy": null,
+          "cancellableUntil": null
+        },
+        {
+          "appointmentId": "01M7Z9KAZDYHH47PB6FJDHRSZP",
+          "username": "trialbob",
+          "start": "2026-11-25T10:00:00.000Z",
+          "end": "2026-11-25T11:00:00.000Z",
+          "date": "2026-11-25",
+          "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+          "typeName": "Trial visit",
+          "note": "First visit",
+          "status": "booked",
+          "createdAt": "2026-11-21T14:54:06.313Z",
+          "createdBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "updatedAt": "2026-11-21T14:54:06.313Z",
+          "updatedBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "cancelledAt": null,
+          "cancelledBy": null,
+          "cancelReason": null,
+          "replaces": null,
+          "replacedBy": null,
+          "cancellableUntil": null
+        },
+        {
+          "appointmentId": "01M7Z9KAY26BWT91TYBQ44D438",
+          "username": "alice",
+          "start": "2026-11-26T08:00:00.000Z",
+          "end": "2026-11-26T09:00:00.000Z",
+          "date": "2026-11-26",
+          "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+          "typeName": "Trial visit",
+          "note": null,
+          "status": "booked",
+          "createdAt": "2026-11-21T14:54:06.271Z",
+          "createdBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "updatedAt": "2026-11-21T14:54:06.271Z",
+          "updatedBy": {
+            "username": "admin",
+            "role": "admin"
+          },
+          "cancelledAt": null,
+          "cancelledBy": null,
+          "cancelReason": null,
+          "replaces": null,
+          "replacedBy": null,
+          "cancellableUntil": null
+        }
+      ]
+    }
+  },
+  "refusals": {
+    "calendar": {
+      "status": 400,
+      "body": {
+        "error": "invalid_request",
+        "message": "Invalid input: to"
+      }
+    },
+    "appointments": {
+      "status": 403,
+      "body": {
+        "error": "forbidden",
+        "message": "A User can list only their own appointments"
+      }
+    }
+  }
+}

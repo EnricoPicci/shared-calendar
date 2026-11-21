@@ -1,3 +1,6 @@
+import { assistantTexts } from '@shared-calendar/shared';
+import { z } from 'zod';
+import { toolsForClaude, type Tool } from '../../../src/assistant/tools/tool';
 import type { Conversation, StoredMessage } from '../../../src/lib/assistantDb';
 
 // Claude and the table are replaced: nothing reaches a network. The core reads its configuration
@@ -13,7 +16,7 @@ const db = vi.hoisted(() => {
     endConversation: vi.fn(),
   };
 });
-const claude = vi.hoisted(() => ({ askStep: vi.fn(), askLanguage: vi.fn(), assistantModel: vi.fn() }));
+const claude = vi.hoisted(() => ({ askStep: vi.fn(), askLanguage: vi.fn(), assistantModel: vi.fn(), STEP_TIMEOUT_MS: 22_000 }));
 vi.mock('../../../src/lib/assistantDb', () => db);
 vi.mock('../../../src/lib/anthropic', () => claude);
 
@@ -22,7 +25,9 @@ type Prompt = typeof import('../../../src/assistant/prompt');
 
 let exchange: Exchange;
 let prompt: Prompt;
-// The mark the deployed instructions give alice.
+// The tools a User is offered, as Claude is given them, and the mark the deployed instructions
+// and those tools give alice.
+let offered: unknown[];
 let mark: string;
 
 async function load(limit = '10'): Promise<void> {
@@ -31,7 +36,11 @@ async function load(limit = '10'): Promise<void> {
   vi.resetModules();
   exchange = await import('../../../src/assistant/exchange');
   prompt = await import('../../../src/assistant/prompt');
-  mark = prompt.promptVersion(prompt.INSTRUCTIONS, prompt.contextBlock(ALICE, 'Europe/Rome'), []);
+  const { DEFINITIONS } = await import('../../../src/assistant/tools/list');
+  const { toolsForClaude } = await import('../../../src/assistant/tools/tool');
+  const tools = toolsForClaude(DEFINITIONS, 'user');
+  offered = tools;
+  mark = prompt.promptVersion(prompt.INSTRUCTIONS, prompt.contextBlock(ALICE, 'Europe/Rome'), tools);
 }
 
 const NOW = '2026-11-21T14:05:00.000Z';
@@ -117,7 +126,7 @@ describe('sendMessage: the first message of a conversation (4.2, 5.6)', () => {
     expect(claude.askStep).toHaveBeenCalledTimes(1);
     expect(claude.askStep).toHaveBeenCalledWith(
       {
-        tools: [],
+        tools: offered,
         instructions: prompt.INSTRUCTIONS,
         context: 'The person writing to you has the username "alice" and is a User. The calendar\'s time zone is Europe/Rome.',
         conversation: [
@@ -174,6 +183,7 @@ describe('sendMessage: the first message of a conversation (4.2, 5.6)', () => {
         languageMs: 0,
         newConversation: true,
         tools: [],
+        steps: 1,
       },
     });
     expectNoText(result.log);
@@ -409,12 +419,7 @@ describe('the step: each answer of Claude (7.4)', () => {
   it.each([
     [{ kind: 'budget_reached' }, 'assistant_budget_reached', { outcome: 'budget_reached' }],
     [{ kind: 'unavailable', reason: 'overloaded' }, 'assistant_unavailable', { outcome: 'unavailable', reason: 'overloaded' }],
-    [
-      { kind: 'tool_requests', content: [{ type: 'tool_use', id: 'toolu_1', name: 'get_calendar', input: {} }], requests: [], usage: USAGE },
-      'assistant_unavailable',
-      { outcome: 'tool_requests', reason: 'tool_not_offered' },
-    ],
-  ])('Claude cannot be asked, or asks what was not offered (%j): the message is saved alone, waiting for its step', async (answer, refusal, log) => {
+  ])('Claude cannot be asked (%j): the message is saved alone, waiting for its step', async (answer, refusal, log) => {
     inConversation();
     claude.askStep.mockResolvedValue(answer);
 
@@ -465,5 +470,401 @@ describe('the step: the one write (9)', () => {
     inConversation();
     db.saveStep.mockRejectedValue(new Error('DynamoDB is down'));
     await expect(exchange.sendMessage(ALICE, TEXT, NOW)).rejects.toThrow('DynamoDB is down');
+  });
+});
+
+// The step of the one write of a test, whichever describe it is in.
+const writtenStep = () => db.saveStep.mock.calls[0]?.[2] as { messages: { kind: string; content: unknown; fromPerson?: boolean }[]; status: string };
+
+// Stand-ins for tools, given to the core in place of the deployment's: the handler of each is a
+// mock, so no route of the calendar runs. `everyone` is offered to the Administrator only.
+const ADMIN = { sub: 'sub-admin', username: 'admin', role: 'admin' as const };
+const calendarHandler = vi.fn();
+const appointmentsHandler = vi.fn();
+const everyoneHandler = vi.fn();
+const standIn = (name: string, handler: Tool['toHandler']['handler'], reads: Tool['definition']['reads'], roles: Tool['definition']['roles'] = ['admin', 'user']): Tool => ({
+  definition: { name, description: `The ${name} of the test.`, kind: 'read', roles, input: () => z.object({ from: z.string() }).strict(), reads },
+  toHandler: { handler, request: (input) => ({ routeKey: `GET /${name}`, path: `/${name}`, query: input as Record<string, string> }) },
+  toModel: (body) => ({ fields: body as Record<string, unknown> }),
+});
+const READS = [standIn('calendar', calendarHandler, 'calendar'), standIn('appointments', appointmentsHandler, 'appointments')];
+const WITH_ADMIN_ONLY = [...READS, standIn('everyone', everyoneHandler, 'appointments', ['admin'])];
+
+// The mark of a conversation started with these tools, for this person.
+const markFor = (tools: readonly Tool[], person: typeof ALICE | typeof ADMIN = ALICE) =>
+  prompt.promptVersion(prompt.INSTRUCTIONS, prompt.contextBlock(person, 'Europe/Rome'), toolsForClaude(tools.map((tool) => tool.definition), person.role));
+
+const REQUEST = { requestId: 'req-9', remainingMs: null };
+const use = (id: string, name: string, input: unknown = { from: '2026-11-23' }) => ({ type: 'tool_use', id, name, input });
+// An answer of Claude that asks for tools, as the door to Claude gives it.
+const asksFor = (...blocks: ReturnType<typeof use>[]) => ({
+  kind: 'tool_requests',
+  content: [{ type: 'thinking', thinking: '', signature: 'sig' }, { type: 'text', text: 'Let me look.' }, ...blocks],
+  requests: blocks.map(({ id, name, input }) => ({ id, name, input })),
+  usage: USAGE,
+});
+const routeAnswer = (body: unknown, statusCode = 200) => Promise.resolve({ statusCode, body: JSON.stringify(body) });
+const NOTE = 'Bring the forms';
+
+// A conversation in which the person's last message has already taken `answers` requests to
+// Claude, each a read with its result, and now waits for the next step.
+const waitingAfter = (answers: number, over: Partial<Conversation> = {}) => {
+  const messages: StoredMessage[] = [
+    { seq: 1, at: AT, kind: 'model', content: { role: 'user', content: 'Buongiorno, mi sente?' } },
+    { seq: 2, at: AT, kind: 'model', content: { role: 'assistant', content: [{ type: 'text', text: 'Buongiorno.' }] } },
+    { seq: 3, at: AT, kind: 'model', content: { role: 'user', content: TEXT } },
+    { seq: 4, at: AT, kind: 'model', content: { role: 'system', content: 'A line of the application.' } },
+  ];
+  for (let i = 0; i < answers; i++) {
+    messages.push({ seq: 5 + 2 * i, at: AT, kind: 'model', content: { role: 'assistant', content: [use(`toolu_${i}`, 'calendar')] as never } });
+    messages.push({ seq: 6 + 2 * i, at: AT, kind: 'model', content: { role: 'user', content: [{ type: 'tool_result', tool_use_id: `toolu_${i}`, content: '{}' }] } });
+  }
+  const read = conversation({ status: 'working', nextSeq: 5 + 2 * answers, promptVersion: markFor(READS), ...over });
+  db.readConversation.mockResolvedValue({ version: 3, conversation: read, messages });
+  return { read, messages };
+};
+
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('the step: Claude asks to read (5.1, 7.4, 8.1)', () => {
+  beforeEach(() => {
+    calendarHandler.mockImplementation(() => routeAnswer({ days: [{ date: '2026-11-24', freeSlots: ['09:00'] }] }));
+    appointmentsHandler.mockImplementation(() => routeAnswer({ appointments: [{ username: 'trialbob', note: NOTE }] }));
+    everyoneHandler.mockImplementation(() => routeAnswer({ everyone: true }));
+  });
+
+  it('runs every read in the order asked, for the person of the request, and saves the answer and all the results in one write', async () => {
+    db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: markFor(READS) }), messages: STORED });
+    const answer = asksFor(use('toolu_a', 'calendar'), use('toolu_b', 'appointments', { from: '2026-11-24' }));
+    claude.askStep.mockResolvedValue(answer);
+
+    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, READS);
+
+    // Each handler once, calendar before appointments, with alice's identity and the request's id.
+    expect(calendarHandler).toHaveBeenCalledTimes(1);
+    expect(appointmentsHandler).toHaveBeenCalledTimes(1);
+    expect(calendarHandler.mock.invocationCallOrder[0]).toBeLessThan(appointmentsHandler.mock.invocationCallOrder[0] ?? 0);
+    expect(calendarHandler.mock.calls[0]?.[0]).toMatchObject({
+      routeKey: 'GET /calendar',
+      queryStringParameters: { from: '2026-11-23' },
+      requestContext: { requestId: 'req-9', authorizer: { lambda: { sub: 'sub-alice', username: 'alice', groups: '["user"]' } } },
+    });
+    expect(appointmentsHandler.mock.calls[0]?.[0]).toMatchObject({ queryStringParameters: { from: '2026-11-24' } });
+
+    // One request to Claude and one write, which holds everything.
+    expect(claude.askStep).toHaveBeenCalledTimes(1);
+    expect(db.saveStep).toHaveBeenCalledTimes(1);
+    expect(db.startConversation).not.toHaveBeenCalled();
+    const step = writtenStep();
+    expect(step.status).toBe('working');
+    expect(step.messages).toEqual([
+      { kind: 'model', content: { role: 'user', content: TEXT }, fromPerson: true },
+      { kind: 'model', content: { role: 'system', content: expect.any(String) } },
+      { kind: 'model', content: { role: 'assistant', content: answer.content } },
+      {
+        kind: 'model',
+        content: {
+          role: 'user',
+          content: [
+            { type: 'tool_result', tool_use_id: 'toolu_a', content: '{"days":[{"date":"2026-11-24","freeSlots":["09:00"]}]}' },
+            { type: 'tool_result', tool_use_id: 'toolu_b', content: `{"appointments":[{"username":"trialbob","note":"${NOTE}"}]}` },
+          ],
+        },
+      },
+    ]);
+    // Claude's answer exactly as given: the very blocks, thinking and signature included.
+    expect((step.messages[2] as { content: { content: unknown } }).content.content).toBe(answer.content);
+
+    expect(result).toMatchObject({
+      ok: true,
+      reply: {
+        status: 'working',
+        // The line of the last read, in the language of the conversation.
+        activity: 'Sto guardando gli appuntamenti…',
+        // The person reads their own message and the text Claude wrote beside its requests: the
+        // line of the application (6) and the results (8) are stored and not shown.
+        messages: [
+          { seq: 5, from: 'person', text: TEXT },
+          { seq: 7, from: 'assistant', text: 'Let me look.' },
+        ],
+        remainingToday: 5,
+      },
+      log: {
+        outcome: 'tool_requests',
+        tools: [
+          { name: 'calendar', status: 200, ms: 0 },
+          { name: 'appointments', status: 200, ms: 0 },
+        ],
+        steps: 1,
+      },
+    });
+  });
+
+  it("the log line names the tools and nothing of what they were asked or answered: no note, no other person's username", async () => {
+    db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: markFor(WITH_ADMIN_ONLY, ADMIN) }), messages: STORED });
+    claude.askStep.mockResolvedValue(asksFor(use('toolu_a', 'appointments', { from: 'trialbob' }), use('toolu_b', 'made_up_by_claude')));
+
+    const result = await exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST, WITH_ADMIN_ONLY);
+
+    const line = JSON.stringify(result.log);
+    expect(line).toContain('"tools":[{"name":"appointments","status":200,"ms":0},{"name":null,"notRun":"unknown_tool"}]');
+    for (const secret of [NOTE, 'trialbob', 'made_up_by_claude', 'Let me look', '2026-11-23']) expect(line).not.toContain(secret);
+    expectNoText(result.log);
+  });
+
+  it('gives Claude the tools of the role only: a User is not told of a tool of the Administrator', async () => {
+    noConversation();
+    await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, WITH_ADMIN_ONLY);
+    noConversation();
+    await exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST, WITH_ADMIN_ONLY);
+
+    const names = (call: number) => (claude.askStep.mock.calls[call]?.[0].tools as { name: string }[]).map((tool) => tool.name);
+    expect(names(0)).toEqual(['calendar', 'appointments']);
+    expect(names(1)).toEqual(['calendar', 'appointments', 'everyone']);
+    expect(claude.askStep.mock.calls[0]?.[0].tools[0]).toEqual({
+      name: 'calendar',
+      description: 'The calendar of the test.',
+      input_schema: { type: 'object', properties: { from: { type: 'string' } }, required: ['from'], additionalProperties: false },
+    });
+  });
+
+  it.each([
+    ['a tool that does not exist', use('toolu_x', 'delete_everything'), 'unknown_tool', null],
+    ['a tool of the Administrator, for a User', use('toolu_x', 'everyone'), 'not_offered', 'everyone'],
+    ['an input the schema refuses', use('toolu_x', 'calendar', { from: 23 }), 'invalid_input', 'calendar'],
+  ])('%s: Claude gets an error result, no handler is called, and the step goes on', async (_what, block, why, name) => {
+    db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: markFor(WITH_ADMIN_ONLY) }), messages: STORED });
+    claude.askStep.mockResolvedValue(asksFor(block, use('toolu_ok', 'calendar')));
+
+    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, WITH_ADMIN_ONLY);
+
+    expect(everyoneHandler).not.toHaveBeenCalled();
+    // The read asked for beside it is still run.
+    expect(calendarHandler).toHaveBeenCalledTimes(1);
+    const results = (writtenStep().messages[3] as { content: { content: { tool_use_id: string; is_error?: boolean; content: string }[] } }).content.content;
+    expect(results.map((r) => [r.tool_use_id, r.is_error ?? false])).toEqual([
+      ['toolu_x', true],
+      ['toolu_ok', false],
+    ]);
+    expect(JSON.parse(results[0]?.content ?? '')).toMatchObject({ error: why });
+    expect(writtenStep().status).toBe('working');
+    expect(result).toMatchObject({ ok: true, reply: { status: 'working' }, log: { tools: [{ name, notRun: why }, { name: 'calendar', status: 200 }] } });
+  });
+
+  it('a refusal of the route goes to Claude as a result, and the step goes on', async () => {
+    waitingAfter(0);
+    calendarHandler.mockImplementation(() => routeAnswer({ error: 'invalid_request', message: 'Invalid input: to' }, 400));
+    claude.askStep.mockResolvedValue(asksFor(use('toolu_a', 'calendar')));
+
+    const result = await exchange.continueExchange(ALICE, NOW, REQUEST, READS);
+
+    expect(writtenStep().messages[1]).toEqual({
+      kind: 'model',
+      content: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_a', content: '{"error":"invalid_request","message":"Invalid input: to"}', is_error: true }] },
+    });
+    expect(result).toMatchObject({ ok: true, reply: { status: 'working', activity: 'Sto guardando il calendario…' }, log: { tools: [{ name: 'calendar', status: 400 }] } });
+  });
+
+  it('an answer that stopped for tools and asks for none is an answer: nothing waits', async () => {
+    waitingAfter(0);
+    claude.askStep.mockResolvedValue({ ...asksFor(), requests: [] });
+    const result = await exchange.continueExchange(ALICE, NOW, REQUEST, READS);
+    expect(writtenStep()).toMatchObject({ status: 'idle', messages: [{ kind: 'model', content: { role: 'assistant' } }] });
+    expect(result).toMatchObject({ ok: true, reply: { status: 'idle', activity: null }, log: { tools: [] } });
+  });
+});
+
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('the step: at most eight requests to Claude for one message (5.6)', () => {
+  beforeEach(() => calendarHandler.mockImplementation(() => routeAnswer({ days: [] })));
+
+  it('the seventh answer that asks to read leaves the conversation waiting', async () => {
+    waitingAfter(6);
+    claude.askStep.mockResolvedValue(asksFor(use('toolu_n', 'calendar')));
+    const result = await exchange.continueExchange(ALICE, NOW, REQUEST, READS);
+    expect(writtenStep().status).toBe('working');
+    expect(result).toMatchObject({ ok: true, reply: { status: 'working' }, log: { outcome: 'tool_requests', steps: 7 } });
+  });
+
+  it('the eighth is still run and saved, then the fixed sentence is added and the conversation waits for the person', async () => {
+    waitingAfter(7);
+    claude.askStep.mockResolvedValue(asksFor(use('toolu_n', 'calendar')));
+
+    const result = await exchange.continueExchange(ALICE, NOW, REQUEST, READS);
+
+    expect(calendarHandler).toHaveBeenCalledTimes(1);
+    expect(db.saveStep).toHaveBeenCalledTimes(1);
+    const step = writtenStep();
+    expect(step.status).toBe('idle');
+    // Claude's requests keep their results, so the conversation can be given to Claude again.
+    expect(step.messages).toEqual([
+      { kind: 'model', content: { role: 'assistant', content: expect.any(Array) } },
+      { kind: 'model', content: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_n', content: '{"days":[]}' }] } },
+      { kind: 'notice', content: assistantTexts('it').tooManySteps },
+    ]);
+    expect(result).toMatchObject({
+      ok: true,
+      reply: { status: 'idle', activity: null, messages: [{ from: 'assistant', text: 'Let me look.' }, { seq: 21, from: 'notice', text: assistantTexts('it').tooManySteps }] },
+      log: { outcome: 'step_limit', steps: 8 },
+    });
+  });
+
+  it('an eighth answer in words is an answer like any other', async () => {
+    waitingAfter(7);
+    const result = await exchange.continueExchange(ALICE, NOW, REQUEST, READS);
+    expect(result).toMatchObject({ ok: true, reply: { status: 'idle', messages: [{ from: 'assistant', text: ANSWER }] }, log: { outcome: 'text', steps: 8 } });
+  });
+
+  it('counts from the last message of the person: the answers before it do not count', async () => {
+    db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: markFor(READS) }), messages: waitingAfter(7).messages });
+    claude.askStep.mockResolvedValue(asksFor(use('toolu_n', 'calendar')));
+    const result = await exchange.sendMessage(ALICE, 'And the week after?', NOW, REQUEST, READS);
+    expect(result).toMatchObject({ ok: true, reply: { status: 'working' }, log: { steps: 1 } });
+  });
+});
+
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('sendMessage: a language question that took too long (5.6)', () => {
+  // Claude's time-out and what a step needs after Claude answered.
+  const ROOM = 22_000 + 2_000;
+
+  it('with less time left than a step may take, the message is saved with its language and the step is left to continue', async () => {
+    noConversation();
+    const remainingMs = vi.fn(() => ROOM - 1);
+
+    const result = await exchange.sendMessage(ALICE, TEXT, NOW, { requestId: 'req-9', remainingMs });
+
+    expect(claude.askLanguage).toHaveBeenCalledTimes(1);
+    expect(claude.askStep).not.toHaveBeenCalled();
+    expect(db.startConversation).toHaveBeenCalledWith(
+      'sub-alice',
+      0,
+      { language: 'en', promptVersion: mark },
+      {
+        messages: [
+          { kind: 'model', content: { role: 'user', content: TEXT }, fromPerson: true },
+          { kind: 'model', content: { role: 'system', content: LINE_EN } },
+        ],
+        status: 'working',
+        proposal: null,
+        timeZone: 'Europe/Rome',
+        // The language question was answered, and is counted.
+        inputTokens: 300,
+        outputTokens: 10,
+      },
+      NOW,
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      reply: { status: 'working', activity: 'Working…', language: 'en', messages: [{ seq: 1, from: 'person', text: TEXT }], remainingToday: 5 },
+      log: { outcome: 'step_left_to_continue', steps: 0, tools: [], languageUsage: { input: 300, output: 10, cacheRead: 0, cacheWrite: 0 } },
+    });
+    expect(result.log).not.toHaveProperty('usage');
+    // The time left is read after the language question, not before.
+    expect(remainingMs.mock.invocationCallOrder[0]).toBeGreaterThan(claude.askLanguage.mock.invocationCallOrder[0] ?? Infinity);
+  });
+
+  it('with exactly the time a step may take, Claude is asked', async () => {
+    noConversation();
+    const result = await exchange.sendMessage(ALICE, TEXT, NOW, { requestId: 'req-9', remainingMs: () => ROOM });
+    expect(claude.askStep).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({ ok: true, reply: { status: 'idle' }, log: { outcome: 'text' } });
+  });
+
+  it('a later message asked no language question: the time left is not looked at', async () => {
+    inConversation();
+    const remainingMs = vi.fn(() => 1);
+    await exchange.sendMessage(ALICE, TEXT, NOW, { requestId: 'req-9', remainingMs });
+    expect(remainingMs).not.toHaveBeenCalled();
+    expect(claude.askStep).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('continueExchange (POST /assistant/continue, 5.1, 6)', () => {
+  it.each([
+    ['there is no conversation', null, null],
+    ['the conversation waits for the person', 'idle', ID],
+    ['the conversation waits for a confirmation', 'awaiting_confirmation', ID],
+  ] as const)('refuses when %s: nothing to continue, Claude not asked, nothing written', async (_what, status, conversationId) => {
+    if (status) inConversation({ status });
+    else noConversation();
+
+    expect(await exchange.continueExchange(ALICE, NOW)).toEqual({ ok: false, refusal: 'nothing_to_continue', log: { conversationId, outcome: 'nothing_to_continue' } });
+    expect(claude.askStep).not.toHaveBeenCalled();
+    expect(db.saveStep).not.toHaveBeenCalled();
+    expect(db.startConversation).not.toHaveBeenCalled();
+  });
+
+  it('asks Claude with the conversation as stored, results included and nothing added, and saves the answer', async () => {
+    const { read, messages } = waitingAfter(1);
+
+    const result = await exchange.continueExchange(ALICE, NOW, REQUEST, READS);
+
+    expect(claude.askLanguage).not.toHaveBeenCalled();
+    expect(claude.askStep).toHaveBeenCalledTimes(1);
+    expect(claude.askStep.mock.calls[0]?.[0].conversation).toEqual(messages.map((message) => message.content));
+    expect(db.saveStep).toHaveBeenCalledWith(
+      'sub-alice',
+      read,
+      { messages: [{ kind: 'model', content: { role: 'assistant', content: CONTENT } }], status: 'idle', proposal: null, timeZone: 'Europe/Rome', inputTokens: 6400, outputTokens: 40 },
+      NOW,
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      reply: { status: 'idle', activity: null, messages: [{ seq: 7, from: 'assistant', text: ANSWER, at: NOW }] },
+      log: { outcome: 'text', steps: 2, tools: [], newConversation: false },
+    });
+  });
+
+  it('is not a message of the day: nothing is counted, and the daily limit does not stop it', async () => {
+    waitingAfter(1);
+    usedToday(10);
+
+    const result = await exchange.continueExchange(ALICE, NOW, REQUEST, READS);
+
+    expect(result).toMatchObject({ ok: true, reply: { status: 'idle', remainingToday: 0 } });
+    expect(writtenStep().messages.some((message) => message.fromPerson)).toBe(false);
+  });
+
+  it('does the step a slow language question left: the conversation holds the message only', async () => {
+    const stored: StoredMessage[] = [
+      { seq: 1, at: AT, kind: 'model', content: { role: 'user', content: TEXT } },
+      { seq: 2, at: AT, kind: 'model', content: { role: 'system', content: LINE_EN } },
+    ];
+    db.readConversation.mockResolvedValue({ version: 1, conversation: conversation({ language: 'en', status: 'working', nextSeq: 3 }), messages: stored });
+
+    const result = await exchange.continueExchange(ALICE, NOW);
+
+    expect(claude.askStep.mock.calls[0]?.[0].conversation).toEqual(stored.map((message) => message.content));
+    expect(result).toMatchObject({ ok: true, reply: { status: 'idle', messages: [{ seq: 3, from: 'assistant', text: ANSWER }] }, log: { steps: 1 } });
+  });
+
+  it.each([
+    [{ kind: 'budget_reached' }, 'assistant_budget_reached'],
+    [{ kind: 'unavailable', reason: 'timeout' }, 'assistant_unavailable'],
+  ])('Claude cannot be asked (%j): the conversation is left waiting, and continue is the way on', async (answer, refusal) => {
+    const { read } = waitingAfter(1);
+    claude.askStep.mockResolvedValue(answer);
+
+    const result = await exchange.continueExchange(ALICE, NOW, REQUEST, READS);
+
+    expect(db.saveStep).toHaveBeenCalledWith('sub-alice', read, expect.objectContaining({ messages: [], status: 'working', inputTokens: 0, outputTokens: 0 }), NOW);
+    expect(db.endConversation).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: false, refusal, log: { conversationId: ID, outcome: answer.kind, steps: 1 } });
+  });
+
+  it('two at once: the one that wrote second is busy, and nothing of its step is shown', async () => {
+    waitingAfter(1);
+    db.saveStep.mockRejectedValue(new db.AssistantBusyError());
+    expect(await exchange.continueExchange(ALICE, NOW, REQUEST, READS)).toEqual({
+      ok: false,
+      refusal: 'assistant_busy',
+      log: { conversationId: ID, outcome: 'lost_the_race', model: 'claude-sonnet-5-5', modelMs: 0 },
+    });
+  });
+
+  it('a conversation started under other tools is over: there is nothing to continue', async () => {
+    waitingAfter(1, { promptVersion: mark });
+    expect(await exchange.continueExchange(ALICE, NOW, REQUEST, READS)).toMatchObject({ ok: false, refusal: 'nothing_to_continue', log: { conversationId: null } });
   });
 });

@@ -154,10 +154,14 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
   ```
   curl -s -X POST http://127.0.0.1:3000/assistant/messages -H "authorization: Bearer $TOKEN" \
     -H 'content-type: application/json' -d '{"text":"Hello, can you hear me?"}'
+  curl -s -X POST http://127.0.0.1:3000/assistant/continue -H "authorization: Bearer $TOKEN"
   curl -s http://127.0.0.1:3000/assistant/conversation -H "authorization: Bearer $TOKEN"
   curl -s -X DELETE http://127.0.0.1:3000/assistant/conversation -H "authorization: Bearer $TOKEN"
   ```
 
+  When an answer says `"status":"working"`, a step is still to do: call `continue`, again and
+  again, until the status is `idle`. `continue` takes no body, is also the way on after a 503,
+  and answers `409 nothing_to_continue` when no step waits.
   With the fake, only the sentences of `answers.json` get an answer of their own.
 - **Asking the fake by hand**, from the host on http://localhost:9230:
 
@@ -169,7 +173,14 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
   It answers `POST /v1/messages` only. What it answers is
   `backend/tests/integration/fake-claude/answers.json`, read again at every request: a change
   to that file needs no restart. A text the file does not script gets "Fake Claude: no answer
-  is scripted for this message." Its log, one line per request: `docker compose logs fake-claude`
+  is scripted for this message." A sentence's entry lists one answer per step of its exchange,
+  and an answer may ask for a tool. Two marks besides `{{application-line}}`: `{{date+N}}`,
+  anywhere in an answer, becomes the date N days after the date the application's last line
+  states (so a tool's input can name a day the journey prepared); `{{last-tool-result}}`, in a
+  text, becomes the last result of a tool in the request. A step written
+  `{ "once": "error-overloaded", "then": "…" }` fails the first time and answers the second
+  time the same request comes: the only thing the fake remembers, lost when its container
+  restarts. Its log, one line per request: `docker compose logs fake-claude`
   (in `backend/`). After a change to the script `backend/docker/fake-claude.mjs`:
   `docker compose restart fake-claude`.
 
@@ -178,8 +189,10 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
 - `RUN_INTEGRATION=1 npm run test:integration -w backend`: the journeys of
   `docs/IMPLEMENTATION_PLAN.md` step 9 (`journeys.test.ts`), the calendar's
   (`calendar.test.ts`) and the assistant's (`assistant.test.ts`: against the fake Claude, with
-  the throw-away accounts `chat-text`, `chat-lingua`, `chat-limit`, `chat-down` and
-  `chat-nobody`, removed first and last; it never touches the `calendar` table, and what it
+  the throw-away accounts `chat-text`, `chat-lingua`, `chat-read`, `chat-limit`, `chat-down` and
+  `chat-nobody`, removed first and last; it never empties the `calendar` table: its one block
+  that reads the calendar creates the type `assistant journey` and a window 05:00–07:00 on the
+  25th day from today through the API, and removes both first and last; what it
   leaves in the `assistant` table stays there, under accounts that no longer exist) against the running `local:up` +
   `local:api` stack. Pass the same
   `DYNAMODB_PORT` as `local:up`. Without `RUN_INTEGRATION=1` it runs nothing and exits 0.

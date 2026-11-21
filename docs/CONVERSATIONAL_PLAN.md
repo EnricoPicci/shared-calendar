@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02) |
+| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`) |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown on its screen, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which is deployed nowhere today (open point P7, section 2.2). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
@@ -73,15 +73,15 @@ this plan.
 
 Reading the architecture against the repository brought up six points it does not settle. They
 are not open points of the architecture yet. Each is raised in the step named, with a proposal,
-before the code that depends on it. F1 and F3 are closed, and F2 by half: the "As done" notes
-of steps c02 and c03 say how.
+before the code that depends on it. F1, F2, F3 and F4 are closed: the "As done" notes of steps
+c02, c03 and c04 say how.
 
 | # | Finding | Step |
 |---|---|---|
 | F1 | **Five things `docs/CONVERSATIONAL_ARCHITECTURE.md` section 7.2 and 6.1 take from Anthropic's documentation and nobody has tried**: a line with `role: "system"` inside `messages`. Adaptive thinking with `effort: "low"`. An answer constrained to a list (the language question). The two cache marks. The two error shapes of the spending limit. If one does not hold, the design of section 7.2 changes before the core is written on it. **Closed in step c02**: tried, with a sixth (the conversation sent back exactly as stored). One did not hold, the shapes of the spending limit, and `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 was changed | c02 |
-| F2 | **Nothing enforces the two import rules** (the Anthropic SDK only in `backend/src/lib/anthropic.ts`. `backend/src/assistant` never imports `lib/calendarDb.ts`). The root `eslint.config.js` restricts imports for `frontend/src` only. Proposal: two `no-restricted-imports` rules. **The first rule is in place since step c02**. The second is step c04's | c02, c04 |
+| F2 | **Nothing enforces the two import rules** (the Anthropic SDK only in `backend/src/lib/anthropic.ts`. `backend/src/assistant` never imports `lib/calendarDb.ts`). The root `eslint.config.js` restricts imports for `frontend/src` only. Proposal: two `no-restricted-imports` rules. **The first rule is in place since step c02**. **Closed in step c04**: the second rule refuses `lib/calendarDb`, `lib/calendarRules` and `lib/calendarEvents` under `backend/src/assistant` | c02, c04 |
 | F3 | **Coverage.** The back end's 100 % line threshold covers `src/lib` only. The architecture asks it for `backend/src/assistant` too (its section 12.2). The six handlers stay outside the threshold, as every handler does. **Closed in step c03**: `backend/vitest.config.ts` holds `src/assistant` to 100 % lines | c03 |
-| F4 | **A handler called as a tool writes its own log line**, so one step of the assistant writes several lines with one request id, and a handler reads its environment as if it were alone in the function. Whether the lines can be told apart, and whether any handler keeps state that two calls in one function would share | c04 |
+| F4 | **A handler called as a tool writes its own log line**, so one step of the assistant writes several lines with one request id, and a handler reads its environment as if it were alone in the function. Whether the lines can be told apart, and whether any handler keeps state that two calls in one function would share. **Closed in step c04**: nothing to change. The lines share the request id and differ by `route`; the only state is the calendar's configuration and the DynamoDB client, the same for every caller | c04 |
 | F5 | **What the two read-only functions carry.** To build a proposal they need the change tools' definitions and their fact reading, not the change handlers. Proposal: the part that runs a change is a module only `confirmProposal` imports, so the code that writes the calendar is not even in the other two bundles | c05 |
 | F6 | **Booking for a User, proposed by a function without `AdminGetUser`.** The proposal's facts can only come from the users' list (`ListUsersInGroup`). Whether that is enough for the confirmation to name the person, or the proposal goes out unchecked and the route refuses at the confirmation | c07 |
 
@@ -413,6 +413,60 @@ an outage in the middle, then `continue` carries on.
 are free next week?" and "quali appuntamenti ho?" by hand against a seeded week, with the tools
 asked for and the seconds per step reported.
 
+**As done** (2026-11-21). As written, with these differences and findings:
+
+- **finding F4: nothing to change.** A read handler's log line carries the route it stands for
+  (`GET /calendar`) and the request id it was given, which is the one of the assistant's
+  request: the two lines of a step share the id and differ by `route`. The handler's line names
+  the person and says nothing of the assistant. The handlers keep no state between calls but
+  the calendar's configuration, read once per container and the same for everyone. They read
+  `CALENDAR_TABLE`, `CALENDAR_TIME_ZONE` and `DYNAMODB_ENDPOINT`; none uses Cognito;
+- **finding F2 closed**: the lint rule also refuses `lib/calendarRules` and
+  `lib/calendarEvents` under `backend/src/assistant`. Nothing there needs them;
+- **decided by the Product Owner: `continue` is not a message of the day**, and the daily limit
+  never refuses it. An exchange that started is not stopped half-way;
+- **decided by the Product Owner: a slow language question leaves the step to `continue`** (the
+  finding of step c03). The threshold is what Lambda says the function has left, against
+  Claude's 22 seconds plus 2;
+- **decided by the Product Owner: the instructions say what works.** `INSTRUCTIONS` gained the
+  paragraph "What you can do for the time being": only looking things up works here, and
+  booking, moving, cancelling, notes, opening hours, types and settings are done from the web
+  pages for the time being. **This paragraph is a stopgap. Every later step that brings a tool
+  takes its ability out of the paragraph, and the step that brings the last tool removes it**;
+  only the list of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1 stays in the web pages.
+  The paragraphs on changes and on blocking time were kept, with a sentence that they apply to
+  a change that has a tool, so that no later step writes them again;
+- the tools are nine files in `backend/src/assistant/tools/`: `tool.ts`, the four tools,
+  `list.ts`, `event.ts`, `result.ts`, `run.ts`. **A tool is written as a plain object**: built
+  through a helper function, the bundler kept the calendar's handlers in `getConversation` and
+  `endConversation`, which only read the definitions;
+- **the limit of eight is counted from the stored conversation**, Claude's answers since the
+  person's last message. The eighth answer that still asks to read has its reads run and saved
+  before the fixed sentence, because Anthropic refuses a conversation in which a request for a
+  tool has no result;
+- **a tool of another role is answered like a tool that does not exist**; of two `continue` at
+  once, the loser answers `409 assistant_busy`;
+- the line of progress is read from the conversation (the last tool asked for), so `GET` and
+  the step agree without anything new stored;
+- the night the clocks go back, `get_calendar` shows a local time twice, as the calendar does.
+  A step that books must tell the two apart;
+- **the fake Claude remembers one thing**: a step written `{ "once", "then" }` fails the first
+  time a request comes and answers the second. Without it an outage that passes cannot be
+  played: the request after the outage is the same request. Its two new marks are `{{date+N}}`
+  and `{{last-tool-result}}`. The two tool requests in its file are the blocks the real model
+  sent in this step's trial; the envelope around them is written in the shape of the recorded
+  answers, since only Claude's content is stored;
+- **the reading journey's day is 25 days ahead, 05:00–07:00**, not far ahead: the calendar's
+  journeys leave bookings open 30 days, and beyond that a User is shown no slot;
+- the access journey gained `POST /assistant/continue` (401 and 403);
+- the trial with the real model (`claude-sonnet-5-5`), against a week made through the API and
+  removed after: "Which slots are free next week?" asked `get_calendar` for Monday to Sunday,
+  4.2 s then 2.1 s; "Quali appuntamenti ho?" asked `list_appointments` with no input, 2.5 s then
+  1.7 s, answered in Italian with the formal "lei"; the Administrator's question about another
+  person asked `list_appointments` with that `username` and `get_settings` in one answer, 3.3 s
+  then 2.2 s. All three answers were right, and the two English ones added, without being asked,
+  that changes are done from the web pages for now.
+
 ---
 
 ### Step c05 — A change: the proposal and booking (≈ 9 h, the largest step)
@@ -421,6 +475,14 @@ asked for and the seconds per step reported.
 the server's words, confirmed with a button, run once, or declined, or dropped.
 
 **First: finding F5**, which decides the layout of the files below.
+
+What step c04 left ready: what a tool is, with its fourth part typed and empty
+(`ToolConfirmation` in `backend/src/assistant/tools/tool.ts`) and its kind `change`, which
+`runRead` already refuses to run; the event built for any route, body and path parameters
+included; `continue`; the definitions kept apart from the handlers. What this step must also do:
+give `ToolConfirmation` its shape; **take booking out of the stopgap paragraph of
+`INSTRUCTIONS`**; tell the two 02:00 of the night the clocks go back apart in a booking's input;
+decide what `continue` answers while a proposal waits (today `409 nothing_to_continue`).
 
 Files:
 

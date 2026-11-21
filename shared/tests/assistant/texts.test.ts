@@ -1,5 +1,6 @@
 import {
   ASSISTANT_LANGUAGES,
+  ASSISTANT_READ_KINDS,
   ASSISTANT_LIMITS,
   ASSISTANT_TEXTS_EN,
   ASSISTANT_TEXTS_IT,
@@ -83,5 +84,13 @@ describe('assistantTexts', () => {
     expect(proposalQuestion(1)).not.toMatch(/\d/);
     expect(proposalQuestion(3)).toContain('3');
     expect(proposalQuestion(3)).not.toBe(proposalQuestion(2));
+  });
+
+  it.each(ASSISTANT_LANGUAGES)('in %s each kind of read has its own line of progress, none the general one', (language) => {
+    const { reading, working } = assistantTexts(language);
+    expect(Object.keys(reading).sort()).toEqual([...ASSISTANT_READ_KINDS].sort());
+    const lines = ASSISTANT_READ_KINDS.map((kind) => reading[kind]);
+    expect(new Set([...lines, working]).size).toBe(ASSISTANT_READ_KINDS.length + 1);
+    for (const line of lines) expect(line.endsWith('…')).toBe(true);
   });
 });

@@ -1,3 +1,4 @@
+import { addDays, localDateOf } from '@shared-calendar/shared';
 import { api, createUserInNoGroup, forgetDailyUse, localDailyMessageLimit, queryAssistantPartition, removeUserIfPresent, signIn, subOf } from './setup';
 
 // The assistant's journeys (docs/CONVERSATIONAL_ARCHITECTURE.md section 12.2), end to end through
@@ -6,9 +7,14 @@ import { api, createUserInNoGroup, forgetDailyUse, localDailyMessageLimit, query
 // fake-claude/answers.json, beside this file.
 //
 // Each block plays its own throw-away User, created through POST /users. A new account has a new
-// `sub`, so it starts with no conversation and with all of today's messages. The file never
-// touches the calendar table, and writes the assistant table through the API only, but for the
-// Administrator's count of the day (forgetDailyUse).
+// `sub`, so it starts with no conversation and with all of today's messages. The file writes the
+// assistant table through the API only, but for the Administrator's count of the day
+// (forgetDailyUse).
+//
+// The calendar table is never emptied here, and nothing another file left in it is relied on.
+// The one block that needs the calendar creates what it reads through the API, as the
+// Administrator, under a type name of its own and in hours no other journey opens, and removes it
+// at the end and, should an interrupted run have left it, before it starts.
 //
 // Secrets: tokens and passwords stay in variables; no assertion prints one.
 
@@ -28,6 +34,16 @@ async function newUser(username: string): Promise<string> {
 const say = (token: string, text: string) => api('POST', '/assistant/messages', token, { text });
 const conversation = (token: string) => api('GET', '/assistant/conversation', token);
 const startAgain = (token: string) => api('DELETE', '/assistant/conversation', token);
+const goOn = (token: string) => api('POST', '/assistant/continue', token);
+
+// The entries of the person's conversation in progress, as stored: each message item of that
+// conversation, in order, its content read as the JSON text it is kept as. The partition also
+// holds the messages of the person's earlier conversations, which are left out.
+async function storedEntries(token: string): Promise<{ role: string; content: unknown }[]> {
+  const items = await queryAssistantPartition(`CONV#${subOf(token)}`);
+  const id = items.find((item) => item.SK === 'META')?.conversationId as string;
+  return items.filter((item) => item.SK.startsWith(`MSG#${id}#`)).map((item) => JSON.parse(item.content as string) as { role: string; content: unknown });
+}
 
 // What the routes answer while the person has no conversation.
 const none = (remainingToday: number) => ({
@@ -200,6 +216,122 @@ describe('the language of a conversation (4.2)', () => {
   });
 });
 
+// Explained in simple words in docs/journeys/backend/assistant-reading.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('reading the calendar (5.1, 8)', () => {
+  const TYPE = 'assistant journey';
+  const ASK = 'fake: what is open on the day of the journey?';
+  // The day the fake asks the calendar for: 25 days after today's date in the calendar's zone,
+  // the date its answer file names as {{date+25}}. 05:00 to 07:00 are hours no other journey opens.
+  let day: string;
+  let token: string;
+  let typeId: string;
+  let windowId: string;
+
+  type Window = { typeName: string; source?: string; sourceId?: string };
+
+  // Removes the journey's window and type, when they are there.
+  async function removeWhatTheJourneyMade(): Promise<void> {
+    const view = await api('GET', `/calendar?from=${day}&to=${day}`, adminToken);
+    expect(view.status).toBe(200);
+    const windows = (view.body?.days as { windows: Window[] }[])[0]?.windows ?? [];
+    for (const window of windows.filter((w) => w.typeName === TYPE && w.source === 'one_off')) {
+      expect((await api('DELETE', `/calendar/windows/${window.sourceId}`, adminToken)).status).toBe(204);
+    }
+    const types = (await api('GET', '/calendar/types', adminToken)).body?.types as { typeId: string; name: string }[];
+    for (const type of types.filter((t) => t.name === TYPE)) {
+      expect((await api('DELETE', `/calendar/types/${type.typeId}`, adminToken)).status).toBe(204);
+    }
+  }
+
+  beforeAll(async () => {
+    const settings = await api('GET', '/calendar/settings', adminToken);
+    day = addDays(localDateOf(new Date().toISOString(), settings.body?.timeZone as string), 25);
+    token = await newUser('chat-read');
+    await removeWhatTheJourneyMade();
+
+    const type = await api('POST', '/calendar/types', adminToken, { name: TYPE });
+    expect(type.status).toBe(201);
+    typeId = type.body?.typeId as string;
+    const window = await api('POST', '/calendar/windows', adminToken, { date: day, start: '05:00', end: '07:00', typeId });
+    expect(window.status).toBe(201);
+    windowId = window.body?.windowId as string;
+  });
+
+  afterAll(async () => {
+    await removeWhatTheJourneyMade();
+    await removeUserIfPresent('chat-read');
+  });
+
+  it('a question that needs the calendar: Claude asks to read, the read is run, and the answer is "working" with the line of that read', async () => {
+    const res = await say(token, ASK);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      conversationId: expect.any(String),
+      language: 'en',
+      status: 'working',
+      activity: 'Looking at the calendar…',
+      proposal: null,
+      remainingToday: LIMIT - 1,
+    });
+    // Nothing of the read is shown: the person's message only.
+    expect(res.body?.messages).toEqual([{ seq: 1, from: 'person', text: ASK, at: expect.any(String) }]);
+  });
+
+  it('the conversation, read back, says the same line while the step waits', async () => {
+    const res = await conversation(token);
+    expect(res.body).toMatchObject({ status: 'working', activity: 'Looking at the calendar…' });
+    expect(res.body?.messages).toEqual([{ seq: 1, from: 'person', text: ASK, at: expect.any(String) }]);
+  });
+
+  it('another message while the step waits is refused: busy', async () => {
+    expect(await say(token, HELLO)).toMatchObject({ status: 409, body: { error: 'assistant_busy' } });
+  });
+
+  it('continue does the next step: Claude answers from what the calendar gave, the window and the free slots of the journey', async () => {
+    const res = await goOn(token);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'idle', activity: null, remainingToday: LIMIT - 1 });
+    const messages = res.body?.messages as { seq: number; from: string; text: string }[];
+    expect(messages.map((message) => [message.seq, message.from])).toEqual([[5, 'assistant']]);
+
+    // The fake answers with the result of the tool, word for word: what Claude was given.
+    const given = JSON.parse(messages[0]?.text ?? '') as { from: string; to: string; days: { date: string; windows: object[]; freeSlots: string[] }[] };
+    expect(given.from).toBe(day);
+    expect(given.to).toBe(day);
+    const days = given.days.filter((d) => d.date === day);
+    expect(days).toHaveLength(1);
+    // Local times, the type by its name; whatever else that day holds is not looked at.
+    expect(days[0]?.windows).toContainEqual({ start: '05:00', end: '07:00', type: TYPE });
+    expect(days[0]?.freeSlots).toEqual(expect.arrayContaining(['05:00', '06:00']));
+    // Nothing internal: no id of the window or of the type.
+    expect(messages[0]?.text).not.toContain(windowId);
+    expect(messages[0]?.text).not.toContain(typeId);
+  });
+
+  it('stored the exchange as five entries, of which the person reads two, and counted one message', async () => {
+    const stored = await storedEntries(token);
+    expect(stored.map((entry) => entry.role)).toEqual(['user', 'system', 'assistant', 'user', 'assistant']);
+    // Claude's request for the tool, and its result in an entry of its own.
+    expect(stored[2]?.content).toContainEqual(expect.objectContaining({ type: 'tool_use', name: 'get_calendar', input: { from: day, to: day } }));
+    expect(stored[3]?.content).toEqual([expect.objectContaining({ type: 'tool_result', content: expect.stringContaining(TYPE) })]);
+
+    const read = (await conversation(token)).body;
+    expect((read?.messages as { seq: number; from: string }[]).map((message) => [message.seq, message.from])).toEqual([
+      [1, 'person'],
+      [5, 'assistant'],
+    ]);
+    expect(read?.remainingToday).toBe(LIMIT - 1);
+  });
+
+  it('continue with nothing to continue is refused, with a conversation that waits for the person and with none', async () => {
+    expect(await goOn(token)).toEqual({ status: 409, body: { error: 'nothing_to_continue', message: expect.any(String) } });
+    expect((await startAgain(token)).status).toBe(204);
+    expect(await goOn(token)).toMatchObject({ status: 409, body: { error: 'nothing_to_continue' } });
+    expect((await conversation(token)).body).toEqual(none(LIMIT - 1));
+  });
+});
+
 // Explained in simple words in docs/journeys/backend/assistant-daily-limit.md.
 // Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
 describe('the daily limit (4.4, 6.1)', () => {
@@ -275,6 +407,36 @@ describe('when Claude cannot answer (6.1, 7.4)', () => {
     // The step is still to do: another message is not taken meanwhile.
     expect(await say(token, HELLO)).toMatchObject({ status: 409, body: { error: 'assistant_busy' } });
 
+    // `continue` is the way on. The trouble has not passed: the same 503, and the step still waits.
+    expect(await goOn(token)).toEqual({ status: 503, body: { error: code, message: expect.any(String) } });
+    expect((await conversation(token)).body).toMatchObject({ status: 'working', messages: [{ seq: 1, from: 'person', text }] });
+
+    // Giving the step up is the other way out.
+    expect((await startAgain(token)).status).toBe(204);
+  });
+
+  it('an outage in the middle of an exchange passes: continue fails once, then carries on from where the exchange was', async () => {
+    const text = 'fake: an outage after the read';
+    // The first step goes well: Claude asks for the settings, and they are read.
+    const first = await say(token, text);
+    expect(first.status).toBe(200);
+    expect(first.body).toMatchObject({ status: 'working', activity: "Looking at the calendar's settings…" });
+
+    // The second step meets the outage. Nothing is lost: the read and its result are kept.
+    expect(await goOn(token)).toMatchObject({ status: 503, body: { error: 'assistant_unavailable' } });
+    expect((await conversation(token)).body).toMatchObject({ status: 'working', activity: "Looking at the calendar's settings…" });
+
+    // The same call again, once Anthropic answers: the exchange ends with what the read gave.
+    const third = await goOn(token);
+    expect(third.status).toBe(200);
+    expect(third.body).toMatchObject({ status: 'idle', activity: null });
+    const messages = third.body?.messages as { seq: number; from: string; text: string }[];
+    expect(messages.map((message) => [message.seq, message.from])).toEqual([[5, 'assistant']]);
+    expect(JSON.parse(messages[0]?.text ?? '')).toMatchObject({ timeZone: expect.any(String), cancellationNoticeHours: expect.any(Number) });
+
+    // The settings were read once: the step that failed did not run the read again.
+    const roles = (await storedEntries(token)).map((entry) => entry.role);
+    expect(roles).toEqual(['user', 'system', 'assistant', 'user', 'assistant']);
     expect((await startAgain(token)).status).toBe(204);
   });
 
@@ -284,8 +446,9 @@ describe('when Claude cannot answer (6.1, 7.4)', () => {
     expect(res.body).toMatchObject({ status: 'idle', messages: [{ from: 'person' }, { from: 'assistant', text: HELLO_ANSWER }] });
   });
 
-  it('counted the two messages that got no answer: they were saved', async () => {
-    expect((await conversation(token)).body?.remainingToday).toBe(LIMIT - 3);
+  it('counted every message that was saved, answered or not, and no continue', async () => {
+    // Two that got no answer, the one of the outage that passed, and the hello: four.
+    expect((await conversation(token)).body?.remainingToday).toBe(LIMIT - 4);
   });
 });
 
@@ -309,6 +472,7 @@ describe('who may talk to the assistant (6)', () => {
     ['GET', '/assistant/conversation', undefined],
     ['DELETE', '/assistant/conversation', undefined],
     ['POST', '/assistant/messages', { text: HELLO }],
+    ['POST', '/assistant/continue', undefined],
   ])('%s %s without a token is 401 (API Gateway answers)', async (method, path, body) => {
     const res = await api(method, path, undefined, body);
     expect(res.status).toBe(401);
@@ -318,6 +482,7 @@ describe('who may talk to the assistant (6)', () => {
     ['GET', '/assistant/conversation', undefined],
     ['DELETE', '/assistant/conversation', undefined],
     ['POST', '/assistant/messages', { text: HELLO }],
+    ['POST', '/assistant/continue', undefined],
   ])('%s %s with the token of an account in neither group is 403', async (method, path, body) => {
     const res = await api(method, path, nobodyToken, body);
     expect(res.status).toBe(403);

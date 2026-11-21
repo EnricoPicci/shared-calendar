@@ -12,8 +12,8 @@ export type AssistantCannotAnswerCode = Extract<
 
 // The texts the server and the screen say themselves, never the model: one object of this type
 // per language, so that a language with a text missing does not compile. A text that carries a
-// value is a function of that value. The wording of each change and the progress line of each
-// read are not here: they belong to the tool they describe.
+// value is a function of that value. The wording of each change is not here: it belongs to the
+// tool it describes.
 export type AssistantTexts = {
   // What the person reads where the answer would have been, by the error code of the route
   // (docs/CONVERSATIONAL_ARCHITECTURE.md section 6.1). None promises a moment the server cannot
@@ -39,7 +39,15 @@ export type AssistantTexts = {
   declineLabel: string;
   // The line of progress of a step that has none of its own.
   working: string;
+  // The line of progress after a read, by what was read: the screen shows it while the next step
+  // is asked for.
+  reading: Record<AssistantReadKind, string>;
 };
+
+// What a read tool of the assistant looks at: each kind has its own line of progress
+// (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.1).
+export const ASSISTANT_READ_KINDS = ['settings', 'types', 'calendar', 'appointments'] as const;
+export type AssistantReadKind = (typeof ASSISTANT_READ_KINDS)[number];
 
 const TEXTS: Record<AssistantLanguage, AssistantTexts> = { en: ASSISTANT_TEXTS_EN, it: ASSISTANT_TEXTS_IT };
 

@@ -106,25 +106,25 @@ Paths in this file are relative to `backend/`.
 ## `src/assistant/`
 
 The assistant's core (`docs/ARCHITECTURE.md` section 4, "The assistant's routes"). It takes an
-identity (`sub`, username, role) and a text, never an event or a token, and returns a reply or a
-refusal with the fields of the log line; the handlers `getConversation`, `endConversation` and
-`sendAssistantMessage` turn that into a response and write the line.
+identity (`sub`, username, role), never an event or a token, and returns a reply or a refusal
+with the fields of the log line; the handlers `getConversation`, `endConversation`,
+`sendAssistantMessage` and `continueAssistant` turn that into a response and write the line.
 
-- `config.ts`: `coreConfig()`, read once per container: `CALENDAR_TIME_ZONE` and
-  `ASSISTANT_DAILY_MESSAGE_LIMIT`.
-- `prompt.ts`: `INSTRUCTIONS` (one English text, nothing in it that changes between requests),
-  `contextBlock`, `timeLine` (the line added after each message of the person: the time now and
-  the language) and `promptVersion`, the mark worked out from the three things a conversation
-  keeps the same. **Changing `INSTRUCTIONS` ends every conversation in progress.**
-- `conversation.ts`: no Claude here, so the functions that never ask it do not bundle the SDK.
-  `currentConversation` (absent when its mark is not the deployment's), `shown` (what a person
-  reads of a stored message; the person's own message is the `user` entry whose content is a
-  plain string), `replyOf`, `showConversation`, `closeConversation`, `REFUSALS`.
-- `exchange.ts`: `sendMessage` and the one step: one request to Claude, one write.
-- **Never log a text.** The log fields come back from the core as `log`; token counts are
-  `usage: { input, output, cacheRead, cacheWrite }`, because the logger blanks every field
-  whose name holds "token".
-- It reaches the calendar through a handler, never through `lib/calendarDb.ts`.
+- `config.ts`: `coreConfig()`. `prompt.ts`: `INSTRUCTIONS`, `contextBlock`, `timeLine` and
+  `promptVersion`, the mark of the instructions, the block about the person and the role's
+  tools. **Changing `INSTRUCTIONS`, or a tool's name, description or schema, ends every
+  conversation in progress.**
+- **The paragraph "What you can do for the time being" of `INSTRUCTIONS` is a stopgap**: a step
+  that adds a tool takes its ability out of it, and the step that adds the last one removes it.
+- `conversation.ts`: no Claude and no handler here, so two functions bundle neither.
+  `exchange.ts`: a message, `continue`, and the one step: Claude once, its reads, one write.
+- `tools/`: `tool.ts` (what a tool is), one file per tool, `list.ts` (`DEFINITIONS` without
+  the handlers, `TOOLS` with them), `event.ts`, `result.ts`, `run.ts`.
+- **It reaches the calendar by calling a route's handler, never through `lib/calendarDb.ts`,
+  `lib/calendarRules.ts` or `lib/calendarEvents.ts`** (`npm run lint` refuses the import).
+- **Never log a text, a tool's input or a tool's result.** The log fields come back from the
+  core as `log`; token counts are `usage: { input, output, cacheRead, cacheWrite }`, because the
+  logger blanks every field whose name holds "token".
 
 ## `src/handlers/`, the calendar
 
@@ -184,9 +184,9 @@ a role of its own (root `CLAUDE.md`, "Hard rules from the design"). It needs no 
 - Unit tests mock AWS with `aws-sdk-client-mock`, never real endpoints. `test:unit` fails below
   100 % line coverage on `src/lib` and `src/assistant`.
 - The assistant's journeys (`assistant.test.ts`) run against the fake Claude: a sentence gets
-  the answer `tests/integration/fake-claude/answers.json` scripts for its exact text. A journey
-  that needs another answer adds it there. Each block plays its own throw-away User (a new
-  account has all of the day's messages; the local limit is 10).
+  the answers `tests/integration/fake-claude/answers.json` scripts for its exact text, one per
+  step. Each block plays its own throw-away User. **They never empty the `calendar` table**:
+  what they need they create through the API and remove, before and after.
 - Tests of the contract itself (what a schema accepts, `resolveRole`) live in `shared/`; the
   back end tests what it does with it (the 400 answer, the handlers).
 - The calendar journeys empty the local `calendar` table first (`resetCalendarTable()`, which
