@@ -470,411 +470,61 @@ Full annotated tree: `docs/FOLDER_STRUCTURE.md` section 2.
     `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`, `budget.sh`, `check-sam.sh`; `target.sh` is
     sourced by the last three; the first two of those call `cognito.mjs`).
   - `docker/`: files for the local stack (`cognito-local-config.json`).
-- `frontend/`: package `frontend`: the services layer and the view layer's foundation
-  (`docs/FOLDER_STRUCTURE.md` section 7). `package.json` (deps `rxjs`, `@shared-calendar/shared`;
-  dev dep `happy-dom`; scripts `dev`, `build`, `seed:local`, `typecheck`, `lint`, `test:unit`,
-  `test:integration`, `verify`; no `deploy` yet), `tsconfig.json` (ES2022 + DOM + DOM.Iterable, no
-  node types), `vitest.config.ts`, `src/services/` (`session.store.ts`; `cognito.ts` and `api.ts`, the
-  building blocks the services share (`api.ts`: methods `GET`/`POST`/`PUT`/`PATCH`/`DELETE`,
-  `query`, `conflicts` on `availability_conflict`, and the helpers `invalidRequest`,
-  `unexpectedAnswer`, `hasString`); `login`, `refresh`, `hello`, `users` (with `listUsers`),
-  `calendar-settings`, `availability-types`, `availability-rules`, `calendar`, `appointments` as
-  `<name>.service.ts` +
-  `<name>.types.ts`; `jwt.ts`), `tests/unit/services/` mirroring `src/` (plus `fixtures.ts`, and
-  `suite.ts`: `describeMethod`, the unit tests every API method gets; its `other` is optional, for
-  a service whose methods share one pending call), `tests/integration/`
-  (`local.ts` helper with `outcome()`, `login.service.test.ts`, `journeys.test.ts`,
-  `calendar.test.ts`). Calendar services (plan steps 53–54; the services layer is complete):
-  `calendar-settings`, `availability-types`, `availability-rules`, `calendar` (`CalendarService`:
-  `load(from, to)` and `reload()`, which re-runs the last load's range, one pair of streams and one
-  pending call for both) and `appointments` (`AppointmentsService`: `list`, `book`, `cancel`,
-  `change`, `updateNote`; streams `appointmentsResult$` and `updateNoteResult$`, not the spec's
-  `listResult$`/`noteResult$`, `docs/FRONTEND_SERVICES.md` section 8, decision 40). One result/state
-  pair per method; `pending` carries the call's arguments under the contract's names; input checked
-  with the shared schemas before sending (`invalid_request` with the field, no request), zod's
-  parsed output sent; nothing checked that depends on the role or on the server's data; codes per
-  route from `docs/ARCHITECTURE.md` section 4. `src/`
-  imports only `rxjs`, `rxjs/fetch`, `rxjs/operators` and `@shared-calendar/shared`; configuration
-  comes through the constructor, the `SessionStore` as the second argument. Tokens live only in
-  the `SessionStore` (rule 9): no result, state or service field holds one.
-  The view layer (`docs/FRONTEND_ARCHITECTURE.md`; no framework): `index.html` (all the markup,
-  everything `hidden`: the login `#login`; the frame `#app` with the header, an empty `nav`, the
-  template of a navigation link and `main.screen`, which holds one element per screen: so far
-  `#week`, `#appointments`, `#settings`, `#users` and `#availability`. `#week` has the toolbar, the failure (`role="alert"`), the banner `.moving` of an appointment
-  being moved (its words `.moving-what`, the button `.keep`), the time zone's sentence, the
-  legend, the hours, the days, its two native dialogs `dialog.book` (a form: what is booked, the
-  part `.choices` for the Administrator with the lists `username`, `start` and `end` (labelled
-  "For", "Start" and "End"), the note
-  with `maxlength` 500, the failure; in its second mode it confirms a change: the elements
-  marked `in-booking` are shown in the first mode only, the User's choice `.user` among them,
-  those marked `in-change` in the second only, the old time `.old` among them), and its eight
-  templates `tpl-legend-item`, `tpl-hour`, `tpl-day`,
-  `tpl-window`, `tpl-busy`, `tpl-slot` and `tpl-appointment` (both `<button type="button">`),
-  `tpl-option`. `#appointments` has the two buttons of its modes, `.upcoming` and `.history`
-  (`aria-pressed`), the period's form `.period` (`novalidate`; the date fields `from` and `to`,
-  "Show", the refusal), the failure, the sentence `.empty`, the list `.list` and the template
-  `tpl-appointment-row` (an `<li>` holding one `<button type="button" class="row">` with the
-  date, the time, the type, the note and the status). `#settings` has the read's failure
-  `.unread` with "Try again", and the form `form.settings` (`novalidate`): four `.field`
-  elements, each a label with its `<input type="number">` (`cancellationNoticeHours`,
-  `minBookingNoticeHours`, `bookingHorizonDays`, `maxFutureAppointmentsPerUser`), the words of
-  its range `.range` and its refusal `.refusal` (`role="alert"`), the last one also with the
-  checkbox `noLimit`; then the time zone, the line `.last-saved`, the save's failure, "Settings
-  saved." and "Save". No range is written in the page: the script sets the words and the
-  fields' `min`, `max` and `step`. `#users` has the form `form.create` (`novalidate`): one
-  `.field` with the text input `username` (`autocomplete="off"`, `autocapitalize="none"`,
-  `spellcheck="false"`), its hint `.hint` and its refusal `.refusal` (`role="alert"`), then the
-  create's failure and "Create user"; the read's failure `.unread` with "Try again", the
-  sentence `.empty`, the list `.list` and the template `tpl-user-row` (an `<li>` with the
-  username and one `<button type="button">` "Delete"); and its two native dialogs:
-  `dialog.created` (`closedby="none"`: the Escape key does not close it; the heading, which
-  takes the keyboard at the opening, the username, the password in `.password`, the sentence
-  that it cannot be shown again, and the one button `.understood`, "I have noted the
-  password") and `dialog.delete` (the question `.question`, which describes the dialog for a
-  screen reader, `aria-describedby`, as in the availability's; the failure, "Keep" and "Delete
-  user"). Each of the page's five "Try again" buttons says what it reads again
-  (`aria-label`). No pattern and no length of a username is written in the page. `#availability`
-  has three parts; the first two, `section.types` and `section.patterns`, each with its form that creates
-  (`form.create-type`: one `.field` with the text input `name`, its hint `.name-hint` and its
-  refusal; `form.create-pattern`: six `.field` elements, the lists `weekday`, `start`, `end`
-  and `typeId` and the date fields `validFrom` and `validUntil`, labelled "Weekday", "Start",
-  "End", "Type", "Valid from" and "Valid until", the type's with its hint `.type-hint`, then
-  the failure and the conflicts list `.conflicts`, hidden: the sentence `.conflicts-count`
-  and the list `.conflicts-list`), the read's failure `.unread` with "Try again", the
-  sentence `.empty` and its list (`ul.list`; `div.groups`); five templates, `tpl-type-row`
-  (the name, "Rename", "Delete"), `tpl-pattern-group` (an `<h4>` and a `ul.list`),
-  `tpl-pattern-row` (the time, the type, the validity, the word "ended", hidden, "Change",
-  "Delete"), `tpl-conflict` (date, time, username) and `tpl-choice` (an `<option>`); and
-  three native dialogs: `dialog.rename` (a form: the name field, its hint, its refusal, the
-  failure, "Close", "Rename"), `dialog.change` (a form: the same six fields, the failure, the
-  conflicts list, "Close", "Change") and `dialog.delete` ("Please confirm": the
-  question, the failure, the conflicts list, "Keep", "Confirm"), which confirms the deletion
-  of a type, of a pattern and of an extra window, the way back to the weekly patterns and
-  "not available". The third part, `section.one-date`, "A single date": its own "Loading…";
-  the form `form.choose` (`novalidate`: the date field `date`, its refusal, "Show"); the
-  read's failure `.unread` with "Try again"; and the day, `.shown`, hidden: the date in
-  words `.date-words`; `.given` ("As the weekly patterns give it": the sentence `.none`, the
-  list `.given-rows`); `.as-now` ("As it is now": the sentence `.which`, the list
-  `.own-rows`, the buttons `.edit`, "This day only…", `.make-closed`, "Not available on this
-  day", and `.back`, "Back to the weekly patterns"); `.draft`, hidden ("This day only": the
-  sentence `.draft-empty`, the list `.draft-rows`, the form `form.add-draft` with the lists
-  `start`, `end` and `typeId`, its failure and "Add", then the save's failure
-  `.save-failure`, a conflicts list, "Discard" and "Save this day"); `.extras` ("Extra
-  windows": the sentence `.none`, the list `.extra-rows`, the form `form.add-window` with
-  the same three lists, its failure and "Add window"); and three templates, each an
-  `<li class="window-row">` with the hours and the type: `tpl-date-window`, `tpl-draft-row`
-  (with "Remove") and `tpl-extra-row` (with "Delete"). No row of the part holds a field.
-  No list of the screen has a choice written in the page: the script sets them all.
-  After `main.screen`, in no screen,
-  `dialog#detail` (class `detail`: the fields, the note as a text in `.noted` or in the form
-  `.note-form` with "Save note", `.booked`, `.hint`, the failure, "Change", "Cancel
-  appointment"), which the view of the screen on show mounts. One module script `app.js`, one
-  style sheet, nothing inline), `style.css` (also
-  the six type colours `type-0` … `type-5`, the lanes `lane-0-of-2`, `lane-1-of-2`, the rows of
-  the list with `is-booked`, `is-ended`, `is-cancelled`, `is-changed`, a field in fault
-  (`.field input[aria-invalid="true"]`), the hint of a field hidden while its refusal shows,
-  the rows of the users, the generated password in a fixed-width face, the availability's
-  fields side by side while there is room, its rows (a pattern's is a grid, `is-ended` for one
-  whose validity is over) and its conflicts list, a single date's form, its day, its rows
-  (`window-row`) and the box of the windows being put together (`.draft`), the dialogs and
-  the focus ring; a new class of the page is looked for in the style sheet first: the tests apply
-  no style, and `dialog .noted` once hid a button that had taken that name; a class of the page must not hold the word `admin`: the shell's test looks
-  for that name in the whole document after a sign-out),
-  `src/main.ts` (the bundle's entry, one statement: the only file that knows the three constants
-  `API_URL`, `COGNITO_URL`, `CLIENT_ID`, which esbuild's `define` puts in), `src/views/`:
-  `shell.ts` (`runShell(config)` creates the `SessionStore`, the `LoginService` and the
-  `RefreshService`, starts the refresh and calls `mountShell(root, { config, store, login })`,
-  which shows the login on `null` and the frame on a session, reduced to `Person` = username and
-  role before anything else sees it; `distinctUntilChanged` on the two, so a refresh mounts
-  nothing and loads nothing; `enter(person)` fills the header, creates the session's objects
-  (`sessionObjects`: the role, a new `CalendarService`, `AppointmentsService`, `UsersService`,
-  `CalendarSettingsService`, `AvailabilityTypesService`, `AvailabilityRulesService`,
-  `WeekScreen`, `AppointmentsScreen`, `SettingsScreen`, `UsersScreen`,
-  `AvailabilityScreen` and `DateScreen`, which is given the `AvailabilityScreen`'s `known$`
-  and a second `CalendarService` of its own, never the week's, per
-  person, dropped when the person leaves, and the stream of the page becoming visible, from the document's
-  `visibilitychange`, handed to the week, the list, the users and the availability screens
-  and to the `DateScreen`), fills the navigation from the table `SCREENS` (an
-  entry: `hash`, `label`, `roles`, `element`, `show`, which mounts the view and then starts its
-  logic object; five entries so far, `#/week` for both roles, `#/appointments`, "My
-  appointments", for a User only, whose `show` also hands the view `showWeek`, a function that
-  sets the address to the week's, and `#/settings`, "Settings", `#/users`, "Users", and
-  `#/availability`, "Availability", for the Administrator only, whose `show` mounts the
-  dialog that confirms (`mountConfirm`) and the screen's two views, `mountAvailability` and
-  `mountDate`, each handed that dialog, then starts the `AvailabilityScreen`, then the
-  `DateScreen`; `mountShell` takes another table as the optional `screens`,
-  for its test) and
-  follows the URL's hash (`fromEvent(window, 'hashchange')` from the current hash): an empty,
-  unknown or forbidden hash shows the role's first screen and the address is put right with
-  `history.replaceState`, the link on show carries `aria-current="page"`, a change of hash
-  leaves one screen and mounts the next; "Sign out" only clears the store and leaves the
-  address), `login.view.ts` (`mountLogin(root, login)`, with `LoginDeps`, the part of the service
-  it uses; a failure is shown through `failureText(reason)`, never the service's `message`) and
-  `detail.view.ts` (`mountDetail(root, { detail, appointments, change })`, with `DetailDeps`:
-  how the screen answers the detail of an appointment by its id, the parts of the
-  `AppointmentsService` for the note and the cancellation, and what "Change" does on that
-  screen; it wires `dialog#detail` and returns `{ subscription, open }`: the view of the screen
-  on show mounts it, calls `open(appointmentId)` and ends it with its own subscription; which
-  appointment is shown and an "asked" for each of its two actions are local variables),
-  `appointments.view.ts` (`mountAppointments(root, { screen, appointments, showWeek })`, with
-  `AppointmentsDeps`: of the `AppointmentsScreen` `list$`, `upcoming`, `history`, `show`,
-  `detail` and `move`; it redraws the rows only when the list object changed and sets the two
-  dates only when the period object changed; a row opens the detail; "Change" there calls
-  `screen.move(appointmentId)`, then `showWeek()`),
-  `settings.view.ts` (`mountSettings(root, screen)`, with `SettingsDeps`: of the
-  `SettingsScreen` `settings$`, `save`, `edited` and `retry`; it sets the ranges at the mount,
-  fills the form only when the fields object changed, sends the fields as text at "Save",
-  tells of an edit from the form's `input` and the checkbox's `change`, and at every
-  notification shows or clears each field's refusal and `aria-invalid`; "No limit" disabling
-  its number field is its one pure view action),
-  `users.view.ts` (`mountUsers(root, { screen, users })`, with `UsersDeps`: of the
-  `UsersScreen` `users$`, `create` and `retry`; of the `UsersService` `createUserState$`,
-  `deleteUser` and `deleteUserState$`; it sets the hint under the field at the mount, sends
-  the field as text at "Create user", redraws the rows only when the list object changed and
-  empties the field only when the field object changed; **the generated password** is taken
-  from `createUserState$`, for a create asked for from this mount only, put in one element
-  with `textContent` when `dialog.created` opens, and taken out by the dialog's button and by
-  the teardown, never by a `close` handler; the `cancel` event of that dialog is refused; a
-  row's "Delete" opens `dialog.delete`, whose "Delete user" calls the service and which shows
-  a failure and stays open, with whom it is about and an "asked" as local variables and no
-  `close` handler),
-  `availability.view.ts` (`mountAvailability(root, { screen, types, rules, confirm })`, with
-  `AvailabilityDeps`: of the `AvailabilityScreen` `availability$`, `createType`, `rename`,
-  `createPattern`, `change`, `retryTypes`, `retryPatterns` and `conflicts`; of the
-  `AvailabilityTypesService` `remove` and `removeState$`; of the `AvailabilityRulesService`
-  `deletePattern` and `deletePatternState$`; and `open` of the dialog that confirms. Its four forms (the two that create, the two
-  dialogs) have one shape and are kept by the names of their outcomes in the stream,
-  `typeCreate`, `rename`, `patternCreate`, `change`; it sets the choices of the weekday and
-  of the two times and the hint of a name at the mount, sends a form's fields as text,
-  redraws a list only when its object changed, fills a form that creates only when its
-  fields object changed, and rebuilds the choices of the type only when theirs changed,
-  putting back what was chosen (a chosen type that is gone leaves none chosen). A form that
-  creates shows its outcome as it is; **a dialog shows an outcome only when it asked since
-  it opened and the outcome's `about` is the id the dialog is about**, and closes when it is
-  done. A row's "Rename" and "Change" open their dialog with the row's values; a row's
-  "Delete" opens the dialog that confirms with its question and with what its button does
-  (`types.remove` or `rules.deletePattern`), and tells that opening of the state of that
-  kind only. The conflicts list is drawn in the form that creates a pattern and in the
-  change dialog from the stream, in the dialog that confirms from `screen.conflicts(…)` of
-  the failure's list. No dialog has a `close` handler),
-  `availability.parts.ts` (what the screen's two views share, on `#availability`:
-  `availabilityParts(root)` gives `copy`, `choices` (the `<option>`s of a list),
-  `showConflicts` (a conflicts list in a place) and `form(selector, names)`, a form whose
-  fields are checked, found once, with `held()`, `fill(values)` and `say(outcome)`;
-  `mountConfirm(root)` wires `dialog.delete` and returns `{ subscription, open }`:
-  `open(question, busy, confirmed)` returns `Tell`, the function through which the view
-  that opened the dialog says what the action is doing (`busy`, `failure`, `conflicts`,
-  `done`); **after the next opening, by either view, an earlier `Tell` says nothing**; a
-  failure is shown and a success closes the dialog only when that opening's button was
-  pressed; no `close` handler),
-  `date.view.ts` (`mountDate(root, { screen, confirm })`, with `DateDeps`: of the
-  `DateScreen` `date$` and its eleven methods; mounted on `#availability` too, it looks its
-  own elements up under `.one-date` only. It sets the choices of the two times at the
-  mount, sends the fields of its three forms as text, fills the date field and the two
-  forms that add a window only when their object changed, redraws the day's lists only
-  when the day object changed and the rows being put together only when theirs did, shows
-  the day's three buttons as `offers` says, and opens the dialog that confirms for "not
-  available" (`about` `'close'`), the way back (`'back'`) and an extra window (its id),
-  telling it the stream's `confirm` only while that is about what it opened the dialog
-  for; a row's "Remove" calls `screen.remove(index)`) and
-  `week.view.ts` (`mountWeek(root, { screen, appointments, users, role })`, with `WeekDeps`: the
-  parts it uses of the `WeekScreen` (`week$`, the three changes of week, `detail`, `move`,
-  `keep`), of the `AppointmentsService` (`book`, `cancel`, `change`, `updateNote` and their
-  state streams) and of the `UsersService` (`listUsers` and its state stream), and the role;
-  copies the templates, sets `top` and `height` as properties and the lane and the type colour
-  as classes, gives every slot and appointment a name for a screen reader that starts with its
-  day (`aria-label`), redraws the days only when the week object changed; it mounts the detail dialog
-  with `screen.detail` and `screen.move`; a slot opens the book dialog, an appointment its
-  detail, in which the note is saved and which can cancel it or start its move; while `week$` carries a move the banner shows, every appointment's button is disabled
-  and a slot opens the book dialog as the confirmation of the change, with no list of users
-  asked for; what the open book dialog is about (also the move it confirms) and
-  whether its action was asked for since it opened are local variables, a result is shown only
-  in the dialog that asked for it and, in the book dialog, only in the mode that asked, an
-  opening resets the form and replaces what the dialog is about, a close does nothing (no
-  dialog has a `close` handler: a browser sends that event after the close, perhaps after the
-  next opening), a week that arrives behind an open dialog
-  leaves it as it is: `docs/FRONTEND_ARCHITECTURE.md` section 4). A view is
-  `mount<Name>(root, deps): Subscription` with a teardown that wipes what it put in the page.
-  The logic layer, `src/logic/` (`docs/FRONTEND_ARCHITECTURE.md` section 5.1; no DOM, lint
-  refuses `document` and `window` there): `texts.ts` (pure: `dateText`, `timeText`, `rangeText`,
-  `dateTimeText`, `weekLabel`, `offsetText`, `offsetChangesOn`, all through `shared/`'s time
-  helpers and the zone given, never the browser's; `failureText(reason)`, the failure in plain
-  words, with one general sentence for a reason it does not know: a new route's codes get their
-  sentences here; it has those of the login, of `GET /calendar`, of a booking, of a cancellation,
-  of a change, of a note and of the list of users, which also cover the list of appointments and
-  the read and the save of the settings, those of a user created and deleted
-  (`user_exists`, `cannot_delete_admin`) and those of the availability (`type_name_exists`,
-  `type_in_use`, `type_not_found`, `pattern_not_found`, `availability_overlap`,
-  `availability_conflict`, `limit_reached`, and of a single date `date_in_past`,
-  `override_not_found`, `window_not_found`); its optional second argument says what was
-  attempted, for the reasons whose words depend on it: `cancellation_notice_too_short` and
-  `appointment_limit_reached` after `'change'`, `limit_reached` after `'type'`, after
-  `'pattern'` and after `'window'`, with the numbers of `CALENDAR_LIMITS`, and
-  `availability_overlap` after `'patterns-back'`; and `longDateText`, a date with its
-  year, "20 November 2026"), `week.model.ts` (pure:
-  `weekModel(view, role)`, the week ready to draw: days of windows, slots, busy blocks and
-  appointments, each with `top`, `height`, `time`, `lane` and `lanes`; a slot also with its
-  `start`, `end`, `day`, `typeName` and the instants of its `window` (through `shared/`'s
-  `effectiveWindows`), an appointment with its `appointmentId`; the hours shown, 08:00 to
-  18:00 widened to hold everything; the legend; `colourOf(typeId)`, 0 to 5; on a day whose UTC
-  offset changes every time carries its offset, and two blocks of one kind in the same place on
-  the clock get lanes 0 and 1 of 2) , `booking.ts` (pure, for the book dialog: `bookingText(slot)`;
-  `timeChoice(slot, zone)`, the Administrator's local times on the 15-minute grid over the
-  slot's window; `userChoice(state)`, the names, the message and "ready" from the state of
-  `listUsers`; `bookingFor(slot, zone, role, fields)`, the argument of `book`: a User sends the
-  start and the note only, the Administrator the User and both instants, the slot's own while
-  the times were not changed; `changeFor(slot, zone, role, fields)`, the argument of `change`
-  when the dialog confirms a move: the same times, never a `username`, and the note always, as
-  the field holds it), `appointment.detail.ts` (pure:
-  `appointmentDetail(appointment, role, now, zone)`, the detail dialog's texts, the note as a
-  text (`note`) and as a field's value (`noteValue`), `canEditNote`, `canChange`, `canCancel`
-  and the one sentence, which says first what the appointment is (moved to another time,
-  cancelled, ended) and, for one still to end, until when a User can change or cancel it; `movingOf(detail, role)`, the `Moving`
-  copy in words of an appointment being moved: `appointmentId`, `when`, `what`, `note`),
-  `appointments.model.ts` (pure, for "My appointments": `appointmentRows(appointments, now,
-  zone)`, a row per appointment in the order given, with `date`, `time`, `typeName`, `note`,
-  `kind` (`booked`, `ended`, `cancelled`, `changed`) and `status`, its words; `emptyText(mode)`;
-  `defaultPeriod(now, zone)`, the 30 days that end today; `periodRefusal(from, to)`, the
-  period's own checks with `CALENDAR_LIMITS.appointmentListDays`),
-  `appointments.screen.ts` (`AppointmentsScreen(settings, appointments, week, role, now,
-  visible$)`: `list$` = mode, period, loading, failure, refusal, rows, empty; `start()`,
-  `upcoming()`, `history()`, `show(from, to)`, `detail(appointmentId)`, `move(appointmentId)`;
-  each `start()` reads the settings for the calendar's time zone, then lists; the mode and the
-  period last as long as the object, the zone and the list end with the subscription of
-  `start()`; another mode or period forgets the list on show; it loads its list again at every
-  result of `cancelResult$` and `updateNoteResult$` and at every notification of `visible$`,
-  not for a result already there at `start()`; `move` hands the appointment's `Moving` copy and
-  its date over to the `WeekScreen`),
-  `settings.model.ts` (pure, for the settings form: `SETTING_FIELDS`, the four names in the
-  form's order; `settingsFields(settings)`, the four values as text and `noLimit`;
-  `settingsInfo(settings)`, the time zone and the line about the last save, in the calendar's
-  zone; `settingRange(field)`, `min`, `max` and the words, from `SETTINGS_RANGES`;
-  `settingsFor(fields)`, the body of the save or the refusals, one sentence per field in
-  fault: a value is accepted when written with digits only, spaces aside, and inside its
-  range),
-  `settings.screen.ts` (`SettingsScreen(settings)`: `settings$` = loading, unread, fields,
-  info, saving, refusals, failure, saved; `start()`, `retry()`, `save(fields)`, `edited()`;
-  `start()` reads the settings; `save` checks the fields and calls `update` only when none is
-  in fault; after every result of a save it reads again; `fields` becomes another object only
-  at the first read and after a save that succeeded, so what was typed stays after a failure;
-  no result that was there before `start()` is taken),
-  `users.model.ts` (pure, for the users screen: `userRows(users)`, a row per user in the
-  order given, with `username` and `deleteLabel`, the name of its button for a screen reader;
-  `NO_USERS`, the sentence of an empty list; `USERNAME_HINT`, what a username is, both the
-  hint under the field and its refusal; `usernameFor(text)`, the username to create, spaces
-  around it removed, or the refusal, decided by the shared `Username` schema and nothing
-  else; `deleteQuestion(username)`, the words of the delete dialog),
-  `users.screen.ts` (`UsersScreen(users, visible$)`: `users$` = loading, unread, rows, empty,
-  field, creating, refusal, failure, created; `start()`, `retry()`, `create(text)`; `start()`
-  reads the list; `create` checks the text and calls `createUser` only when it is accepted;
-  the list is read again at every result of a create and of a delete, a failure included,
-  and at every notification of `visible$`, not for a result already there at `start()`; a
-  read that fails takes the list away; the same users read again keep the same `rows`
-  object; `field` becomes another object only after a create that succeeded; **no password
-  passes through it**: it reads a create's result as `CreateOutcome`, a type that does not
-  name one),
-  `availability.model.ts` (pure, for the availability screen: `typeRows(types)`, a row per
-  type in the order given, with `renameLabel` and `deleteLabel`; `NO_TYPES`;
-  `TYPE_NAME_HINT`, what a name is, both the hint and the refusal, its number from
-  `CALENDAR_LIMITS.typeNameLength`; `typeNameFor(text)`, the name, spaces around it removed,
-  or the refusal, decided by the shared `TypeName` schema; `deleteTypeQuestion(row)`;
-  `WEEKDAY_CHOICES`, `START_CHOICES` (00:00 to 23:45), `END_CHOICES` (00:15 to 24:00) and
-  `typeChoices(types)`, the choices of the pattern form's lists as `{ value, label }`;
-  `NO_TYPE_YET`; `PATTERN_FIELDS`, the six names in the form's order; `startingFields(today)`,
-  Monday, 09:00 to 10:00, no type, valid from today; `patternFields(pattern)`, a pattern's
-  fields as text; `patternFor(fields)`, the body of a create or of a change, or the refusals,
-  one sentence per field in fault that starts with the words of its label: the end not after
-  the start, no type, "valid from" not a date, "valid until" not a date or before "valid
-  from"; `patternGroups(patterns, types, today)`, the groups Monday to Sunday, an empty
-  weekday left out, a group by start, end and "valid from", a row with `time` ("09:00 –
-  13:00"), `typeName` (joined from the types, `UNKNOWN_TYPE` when they do not hold it),
-  `validity`, `ended` (the validity ended before today; one that ends today has not),
-  `what`, `changeLabel`, `deleteLabel` and `fields`; `NO_PATTERNS`;
-  `deletePatternQuestion(row)`),
-  `conflicts.ts` (pure: `conflictList(conflicts, zone)`, the appointments in the way of a
-  refused change of availability, by start and then by username, each with `date`, `time`
-  (the offsets on a day the clocks change) and `username`, under the sentence that counts
-  them; `null` for no list and for an empty one; personal data, for the page only),
-  `availability.screen.ts` (`AvailabilityScreen(settings, types, rules, now, visible$)`:
-  `availability$` = loading, typesUnread, types, typesEmpty, patternsUnread, groups,
-  patternsEmpty, choices, typeHint, typeField, patternFields and the four outcomes
-  `typeCreate`, `rename`, `patternCreate`, `change`, each an `Ask`: `about` (the id it was
-  asked for, empty for a create), `busy`, `refusals`, `failure`, `conflicts`, `done`;
-  `start()`, `retryTypes()`, `retryPatterns()`, `createType(text)`, `rename(typeId, text)`,
-  `createPattern(fields)`, `change(patternId, fields)`, `conflicts(list)`; `start()` reads
-  the settings, for the calendar's time zone, the types and the patterns at once; the
-  patterns are listed once both they and the zone are known; each list fails and is tried
-  again by itself, and one that could not be read again is taken off, while the types as
-  last read stay as the choices and as the names in the patterns' rows; the same lists read
-  again keep the same objects; a write is checked and its call made only when nothing is in
-  fault; **while a write of a kind is under way another of that kind is not taken**; the
-  types are read again at every result of a create, a rename and a delete of a type, the
-  patterns at every result of a create, a change and a delete of a pattern, a failure
-  included, the types too when a pattern's write answers `type_not_found`, and both at every
-  notification of `visible$`, not for a result already there at `start()`; `typeField`
-  becomes another object after a create that succeeded, `patternFields` then too and when
-  the settings first say the zone; the two deletes are the view's to call; **`known$`** is
-  what it hands the `DateScreen`: `zone`, `zoneWhy` (why the settings could not be read),
-  `types` as last read and `patterns`, notified after every read answered and, with nothing
-  known, when the subscription ends; the file also exports `QUIET` and `kept`),
-  `date.model.ts` (pure, for a single date: `dateFor(text, today)`, the date to show or
-  the refusal, `DATE_NEEDED` or `PAST_DATE`; `ZONE_PENDING` and `DRAFT_OPEN`, the two other
-  refusals of "Show"; `dateWords(date)`, "Monday 23 November 2026"; `dayModel(date,
-  patterns, types, day, zone)`, what the part shows: `patterns`, the day as the weekly
-  patterns give it, through `shared/`'s `definedWindows`, `which`, the sentence of which of
-  the three the day is, `own`, `extras` (each with `windowId`, `deleteLabel` and
-  `question`), `hasOverride` and the two questions `closeQuestion` and `reopenQuestion`; a
-  window's hours are local times of the date, "09:00 – 13:00", an end at midnight "24:00";
-  `startingWindows(date, day, zone)`, what "this day only" starts from: the view's windows
-  that are not extra ones; `draftModel(windows, types)`, the rows with `removeLabel`, and
-  `empty`; `draftAdd(windows, fields)`, one window more, by start, or the refusals (the two
-  of a pattern's form, and for an overlap, through `shared/`'s `overlaps`, `OVERLAPS_DRAFT`
-  under `start` and `IN_FAULT_TOO`, the empty sentence, under `end`: **a field named with an
-  empty sentence is in fault with no words of its own**, marked by `say` with nothing written
-  under it) or the failure `DRAFT_FULL`; `windowFor(date, fields)`, an extra window's
-  body or the refusals; `WINDOW_FIELDS`, `STARTING_WINDOW`),
-  `date.screen.ts` (`DateScreen(known$, calendar, types, rules, now, visible$)`: `date$` =
-  loading, field, refusal, unread, day, offers, choices, draft, addFields, add, save,
-  windowFields, window, confirm; `start()`, `show(text)`, `retry()`, `edit()`,
-  `add(fields)`, `remove(index)`, `discard()`, `save()`, `addWindow(fields)`, `close()`,
-  `back()`, `removeWindow(windowId)`; `start()` reads nothing and takes what is known; the
-  date field starts on today, the calendar's; `show` is refused, with no request, while
-  the list of "this day only" is open, while the zone is not known (with `zoneWhy`), and
-  for a text that is not a date or a date before today; a date shown is read with
-  `calendar.load(date, date)`, on a `CalendarService` that is not the week's; **the date on
-  show is read again** at every result of its four writes, of the six writes to a type and
-  to a pattern, a failure included, and at every notification of `visible$`, not for a
-  result already there at `start()`; a read that fails takes the day off; the list of
-  "this day only" is its state and keeps its windows through all of that; **a save and
-  "not available" are the same call**, `setOverride`, and the object knows whose answer
-  arrives; while one of them, or an action of the dialog, or the create of an extra window
-  is under way another of its kind is not taken; "not available" and the way back are not
-  taken, nor offered, while the list is open) and
-  `week.screen.ts`
-  (`WeekScreen(calendar, appointments, role, now, visible$)`: `week$` = label, loading, failure,
-  the last week loaded, and `moving`, the appointment being moved or `null`; `start()`,
-  `previous()`, `next()`, `today()`, `detail(appointmentId)`, `move(appointmentId)`,
-  `handOver(moving, date)`, `keep()`;
-  "now" is passed in, and "today" for the week to open on is taken in `DEFAULT_TIME_ZONE`, the
-  one place the default zone is used; between `start()` and the end of its subscription it
-  calls `calendar.reload()` at every result of `bookResult$`, `cancelResult$`,
-  `updateNoteResult$` and `changeResult$`, a failure included, and at every notification of
-  `visible$`, but not for a result that was already there at `start()`; a move ends at a
-  change's success, at `keep()` and at the end of that subscription, never at a refusal; an
-  appointment handed over by the list screen is taken once, at the next `start()` or at once
-  when started: its week is loaded and it is being moved). `scripts/` (Node, outside the browser's lint rules): `bundle.mjs` (the
-  esbuild options the two share), `build.mjs`, `dev.mjs`, `seed-local.mjs`.
-  `tests/unit/logic/` (project `unit`): `zone.ts`, `fixtures.ts`, `texts.test.ts`,
-  `week.model.test.ts`, `booking.test.ts`, `appointment.detail.test.ts`, `week.screen.test.ts`,
-  `appointments.model.test.ts`, `appointments.screen.test.ts`, `settings.model.test.ts`,
-  `settings.screen.test.ts`, `users.model.test.ts`, `users.screen.test.ts`,
-  `availability.model.test.ts`, `conflicts.test.ts`, `availability.screen.test.ts`,
-  `date.model.test.ts`, `date.screen.test.ts`. `tests/unit/views/` (project `views`): `page.ts`
-  (`useRealPage()`, `find`, `submit`), `page.test.ts`, `login.view.test.ts`,
-  `week.view.test.ts`, `detail.view.test.ts`, `appointments.view.test.ts`,
-  `settings.view.test.ts`, `users.view.test.ts`, `availability.view.test.ts`,
-  `availability.parts.test.ts`, `date.view.test.ts`, `shell.test.ts`. No `template.yaml` yet: the hosting
-  waits for the open points of `docs/FRONTEND_ARCHITECTURE.md` section 10.
+- `frontend/`: package `frontend`: the services layer and the view layer, both complete
+  (`docs/FOLDER_STRUCTURE.md` section 7). What each file holds is in the documents, not here:
+  the services in `docs/FRONTEND_SERVICES.md`, the page, the views and the shell in
+  `docs/FRONTEND_ARCHITECTURE.md` sections 4 and 6, the logic layer in its section 5.1 (one
+  row per file), the sizes in its section 7.1.
+  - `package.json` (deps `rxjs`, `@shared-calendar/shared`; dev dep `happy-dom`; scripts `dev`,
+    `build`, `seed:local`, `typecheck`, `lint`, `test:unit`, `test:integration`, `verify`; no
+    `deploy` yet), `tsconfig.json` (ES2022 + DOM + DOM.Iterable, no node types),
+    `vitest.config.ts`. No `template.yaml` yet: the hosting waits for the open points of
+    `docs/FRONTEND_ARCHITECTURE.md` section 10.
+  - `src/services/`: `session.store.ts`; `cognito.ts`, `api.ts` and `jwt.ts`, the building
+    blocks; then one `<name>.service.ts` + `<name>.types.ts` per service: `login`, `refresh`,
+    `hello`, `users`, `calendar-settings`, `availability-types`, `availability-rules`,
+    `calendar`, `appointments`. One result/state pair per method; input checked with the
+    shared schemas before sending. `src/` imports only `rxjs`, `rxjs/fetch`, `rxjs/operators`
+    and `@shared-calendar/shared`. Tokens live only in the `SessionStore`: no result, state
+    or service field holds one.
+  - `index.html`: all the markup, everything `hidden`: the login `#login`; the frame `#app`
+    with the header, the navigation and `main.screen`, which holds one element per screen
+    (`#week`, `#appointments`, `#settings`, `#users`, `#availability`), each with its dialogs
+    and its `<template>`s; and `dialog#detail`, in no screen. One module script `app.js`, one
+    style sheet, nothing inline. No range, pattern, length or choice of a list is written in
+    the page: the script sets them.
+  - `style.css`: the one style sheet. **A new class of the page is looked for there first**
+    (the tests apply no style; `dialog .noted` once hid a button that had taken that name),
+    and no class may hold the word `admin` (the shell's test looks for that name in the
+    whole document).
+  - `src/main.ts`: the bundle's entry, one statement, the only file that knows `API_URL`,
+    `COGNITO_URL` and `CLIENT_ID`.
+  - `src/views/`: `shell.ts` (`runShell`, `mountShell`, the table `SCREENS`, `sessionObjects`:
+    new services and logic objects per person, a second `CalendarService` for a single
+    date, never the week's); one `<name>.view.ts` per view, `mount<Name>(root, deps):
+    Subscription`: `login`, `week`, `appointments`, `settings`, `users`, `availability` and
+    `date` (two views of one screen); `detail.view.ts`, the dialog two views mount;
+    `availability.parts.ts`, the helpers the availability's two views share, with
+    `mountConfirm`. Rules that are easy to break: a view never sees a token; text goes in
+    through `textContent`; **no dialog has a `close` handler**; a result is shown only in the
+    dialog that asked for it; a teardown wipes what the view put in the page; **the
+    generated password** is in one element of `dialog.created` and nowhere else, and never
+    passes through the logic layer.
+  - `src/logic/`: no DOM (lint refuses `document` and `window`), "now" passed in, dates and
+    times through `shared/`'s helpers in the calendar's zone. Pure models (`texts.ts`,
+    `week.model.ts`, `booking.ts`, `appointment.detail.ts`, `appointments.model.ts`,
+    `settings.model.ts`, `users.model.ts`, `availability.model.ts`, `conflicts.ts`,
+    `date.model.ts`) and one class per screen with one stream and `start()`
+    (`week.screen.ts`, `appointments.screen.ts`, `settings.screen.ts`, `users.screen.ts`,
+    `availability.screen.ts`, `date.screen.ts`). A new route's failure codes get their
+    sentences in `texts.ts` (`failureText`).
+  - `scripts/` (Node, outside the browser's lint rules): `bundle.mjs`, `build.mjs`, `dev.mjs`,
+    `seed-local.mjs`.
+  - `tests/unit/services/`, `tests/unit/logic/` (project `unit`, in node; `zone.ts`,
+    `fixtures.ts`) and `tests/unit/views/` (project `views`, `happy-dom`; `page.ts`,
+    `page.test.ts`, `shell.test.ts`) mirror `src/`; `tests/integration/` (`local.ts`,
+    `login.service.test.ts`, `journeys.test.ts`, `calendar.test.ts`) runs the services
+    against the local stack.
 - `shared/`: package `@shared-calendar/shared`, no build step (`exports` points at
   `src/index.ts`; each consumer bundles it). `src/api.ts` (response and error body types,
   `ApiErrorCode`), `src/roles.ts` (`Role`, `resolveRole`), `src/username.ts` (the username
