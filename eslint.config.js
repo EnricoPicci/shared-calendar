@@ -55,8 +55,80 @@ export default tseslint.config(
             regex: '(^|/)lib/(calendarDb|calendarRules|calendarEvents)(\\.[jt]s)?$',
             message: "The assistant's core reaches the calendar through a route's handler (backend/src/handlers), never through the calendar's own modules.",
           },
+          {
+            regex: '(^|/)handlers/(bookAppointment|cancelAppointment|changeAppointment|updateAppointmentNote|createAvailabilityType|renameAvailabilityType|deleteAvailabilityType|createPattern|updatePattern|deletePattern|setOverride|deleteOverride|createOneOffWindow|deleteOneOffWindow|updateCalendarSettings|createUser|deleteUser)(\\.[jt]s)?$',
+            message: "A handler that changes the calendar is imported only by backend/src/assistant/tools/changeHandlers.ts: no function that reads free text or asks Claude may carry it.",
+          },
+          {
+            regex: '(^|/)changeHandlers(\\.[jt]s)?$',
+            message: 'The handlers that change the calendar are reached only from backend/src/assistant/confirm.ts, the confirmation of a proposal.',
+          },
+          {
+            regex: '(^|/)confirm(\\.[jt]s)?$',
+            message: 'The confirmation of a proposal is imported only by its handler, backend/src/handlers/confirmProposal.ts.',
+          },
         ],
       }],
+    },
+  },
+  {
+    // No request of Claude and no text anybody typed runs a change
+    // (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5, rule 1): the handlers of the routes that
+    // change the calendar are imported by one module of the assistant, changeHandlers.ts, and
+    // that module by one other, confirm.ts, which only the handler of the confirmation imports.
+    // The rule above refuses both imports everywhere else in the assistant; these two blocks
+    // open each of the two doors and repeat the rest, since a block that sets the rule replaces
+    // the ones before it.
+    files: ['backend/src/assistant/tools/changeHandlers.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [
+          {
+            regex: '^@anthropic-ai/sdk(/.*)?$',
+            message: 'The Anthropic SDK is imported only by backend/src/lib/anthropic.ts: ask Claude through that module.',
+          },
+          {
+            regex: '(^|/)lib/(calendarDb|calendarRules|calendarEvents)(\\.[jt]s)?$',
+            message: "The assistant's core reaches the calendar through a route's handler (backend/src/handlers), never through the calendar's own modules.",
+          },
+      ] }],
+    },
+  },
+  {
+    files: ['backend/src/assistant/confirm.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [
+          {
+            regex: '^@anthropic-ai/sdk(/.*)?$',
+            message: 'The Anthropic SDK is imported only by backend/src/lib/anthropic.ts: ask Claude through that module.',
+          },
+          {
+            regex: '(^|/)lib/(calendarDb|calendarRules|calendarEvents)(\\.[jt]s)?$',
+            message: "The assistant's core reaches the calendar through a route's handler (backend/src/handlers), never through the calendar's own modules.",
+          },
+          {
+            regex: '(^|/)handlers/(bookAppointment|cancelAppointment|changeAppointment|updateAppointmentNote|createAvailabilityType|renameAvailabilityType|deleteAvailabilityType|createPattern|updatePattern|deletePattern|setOverride|deleteOverride|createOneOffWindow|deleteOneOffWindow|updateCalendarSettings|createUser|deleteUser)(\\.[jt]s)?$',
+            message: "A handler that changes the calendar is imported only by backend/src/assistant/tools/changeHandlers.ts: no function that reads free text or asks Claude may carry it.",
+          },
+      ] }],
+    },
+  },
+  {
+    // The confirmation's core is imported by its handler alone: the other handlers of the
+    // assistant, which take free text or ask Claude on their own, must not reach the code that
+    // changes the calendar.
+    files: ['backend/src/handlers/*.ts'],
+    ignores: ['backend/src/handlers/confirmProposal.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [
+          {
+            regex: '^@anthropic-ai/sdk(/.*)?$',
+            message: 'The Anthropic SDK is imported only by backend/src/lib/anthropic.ts: ask Claude through that module.',
+          },
+          {
+            regex: '(^|/)assistant/(confirm|tools/changeHandlers)(\\.[jt]s)?$',
+            message: 'Only backend/src/handlers/confirmProposal.ts imports the confirmation of a proposal.',
+          },
+      ] }],
     },
   },
   {

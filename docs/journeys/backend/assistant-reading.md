@@ -44,21 +44,26 @@ Ideas used here, explained once for all journeys:
 
 ## Before the block starts
 
-The file's `beforeAll` signs in `admin`. The block's `beforeAll`:
+The file's `beforeAll` signs in `admin` and removes what an interrupted run of any of the four
+blocks that use the calendar left on a day still to come (`removeFromCalendar()` for each name of
+`JOURNEY_TYPES`). The block's `beforeAll`:
 
-1. reads the settings as `admin` and works out **the day**: 25 days after today's date in the
-   calendar's time zone. It is the day the fake asks for: its script names it `{{date+25}}`,
+1. works out **the day** (`dayOfJourney(25)`): 25 days after today's date in the calendar's
+   time zone, which it reads from the settings as `admin`. It is the day the fake asks for: its script names it `{{date+25}}`,
    counted from the date the server tells Claude at the message of test 1. The two agree unless
    local midnight falls between the `beforeAll` and test 1;
 2. creates `chat-read` again and signs it in (`newUser()`);
-3. removes what an interrupted run may have left (`removeWhatTheJourneyMade()`): on the day, every
-   one-off window whose type is named `assistant journey`, then every type of that name;
+3. removes again what its own earlier run may have left (`removeFromCalendar()`): on every day
+   from tomorrow to 28 days ahead, every one-off window whose type is named `assistant journey`,
+   then every type of that name. The helper first cancels the booked appointments of that type;
+   this block books none;
 4. creates the type `assistant journey` and, on the day, a one-off window 05:00–07:00 of that
-   type, and checks `201` for both. It keeps their ids.
+   type (`openWindow()`), and checks `201` for both. It keeps their ids.
 
 The window gives the day two slots of one hour: 05:00 and 06:00. The day is 25 days ahead so that
 a User may book it under the settings any other journey leaves (the calendar's journeys leave
-bookings open 30 days ahead), and the hours are ones no other journey opens. The `calendar` table
+bookings open 30 days ahead), and the hours are ones no journey opens on that day: the other blocks of this file open early
+hours too, each on a day of its own. The `calendar` table
 is not emptied: the day may hold other things, and the block looks only at its own.
 
 ## Test 1: a question that needs the calendar
@@ -137,7 +142,7 @@ The test reads the table first and the conversation after it.
 
 ## What the block leaves
 
-The `afterAll` removes the window and the type (`removeWhatTheJourneyMade()`), then `chat-read`
+The `afterAll` removes the window and the type (`removeFromCalendar()`), then `chat-read`
 from cognito-local. The `calendar` table holds nothing of the block but the calendar lock, which
 its four writes moved on: a one-off window and a type are deleted for good, and the block books
 nothing.
@@ -149,7 +154,9 @@ daily use with `messages` 1.
 ## If the block fails halfway
 
 - The `beforeAll` fails, and every test with it, when the window cannot be created: for example
-  when something else already opens 05:00–07:00 on the day. No other journey does.
+  when something else already opens 05:00–07:00 on the day. The other blocks of this file open
+  these early hours on other days, and the file's `beforeAll` has removed what an interrupted
+  run of theirs left; no other journey opens them.
 - The tests build on one another: test 4 needs the step test 1 left waiting, test 5 the exchange
   finished, test 6 a conversation that is `idle`. So a failed test 1, or a `continue` that did
   not finish in test 4, takes the later ones down. A failed check in test 2 or 3, or in test 4
@@ -158,10 +165,10 @@ daily use with `messages` 1.
   fewer than 25 days ahead (`bookingHorizonDays`), set by hand or left by a calendar journey
   that stopped while it had lowered it.
 - The `afterAll` removes the window, the type and `chat-read` whatever happened. If the run is
-  stopped before it, the next run's `beforeAll` removes them first: the window and the type by
-  the name `assistant journey`, on the day of that run. A run started on a later date looks at a
-  later day: a window left on the earlier day would stay, and its type could then not be deleted,
-  which fails the `beforeAll` until the window is removed by hand or its day has passed.
+  stopped before it, the next run removes the window and the type first, by the name
+  `assistant journey`, in the file's `beforeAll` and again in the block's: `removeFromCalendar()`
+  looks at every day from tomorrow to 28 days ahead, so a run started on a later date finds them
+  too.
 
 ## Where in the code
 
@@ -174,6 +181,6 @@ daily use with `messages` 1.
 | The line of progress | `activityLine()` in `backend/src/assistant/conversation.ts`, with the texts `reading` of `shared/src/assistant/` |
 | The two codes | `assistant_busy` and `nothing_to_continue` in `REFUSALS`, `backend/src/assistant/conversation.ts` |
 | The fake's answers | the sentence, `tool-get-calendar-day` and `text-last-tool-result` in `backend/tests/integration/fake-claude/answers.json`; the marks in `backend/docker/fake-claude.mjs` |
-| Preparing the calendar | `POST /calendar/types`, `POST /calendar/windows`, `DELETE /calendar/windows/{windowId}`, `DELETE /calendar/types/{typeId}`, `GET /calendar`, `GET /calendar/types`, `GET /calendar/settings`, as `admin` |
-| Test helpers | in the file: `newUser()`, `say()`, `conversation()`, `startAgain()`, `goOn()`, `storedEntries()`, the block's `removeWhatTheJourneyMade()`; in `backend/tests/integration/setup.ts`: `api()`, `signIn()`, `removeUserIfPresent()`, `subOf()`, `queryAssistantPartition()`, `localDailyMessageLimit()`; from `shared/`: `addDays()`, `localDateOf()` |
-| Constants | the block's `TYPE` and `ASK`; `HELLO`, `LIMIT` |
+| Preparing the calendar | `POST /calendar/types`, `POST /calendar/windows`, `DELETE /calendar/windows/{windowId}`, `DELETE /calendar/types/{typeId}`, `GET /calendar`, `GET /calendar/types`, `GET /calendar/appointments`, `GET /calendar/settings`, as `admin` |
+| Test helpers | in the file: `newUser()`, `say()`, `conversation()`, `startAgain()`, `goOn()`, `storedEntries()`, `dayOfJourney()`, `openWindow()`, `removeFromCalendar()`; in `backend/tests/integration/setup.ts`: `api()`, `signIn()`, `removeUserIfPresent()`, `subOf()`, `queryAssistantPartition()`, `localDailyMessageLimit()`; from `shared/`: `addDays()`, `localDateOf()` |
+| Constants | the block's `TYPE` and `ASK`; `JOURNEY_TYPES`, `HELLO`, `LIMIT` |

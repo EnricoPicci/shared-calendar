@@ -2445,6 +2445,169 @@ Resources:
                 Action: ssm:GetParameter
                 Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/anthropic-api-key
 
+  # POST /assistant/proposals/{proposalId}/confirm (Administrator and Users): the person pressed
+  # the button to confirm what the assistant proposed. This is the one function of the assistant
+  # that can change the calendar: it books the appointment by running the booking route's own
+  # code with the caller's identity, saves what came of it, and asks Claude once for the closing
+  # words. So it has what the two functions above have (29 seconds, the assistant's table to read
+  # and write, the calendar's table to read, the one parameter that holds the Anthropic key, the
+  # three variables that only the local stack fills) and, on top, the two permission sets a
+  # booking needs: writing to the calendar's table (CalendarWritePolicy) and the check that the
+  # slot is still free (CalendarBookPolicy). It cannot delete anything from the calendar's table
+  # and cannot reach Cognito: a User books for themself, and the route then needs neither.
+  ConfirmProposalFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: confirmProposal.handler
+      Role: !GetAtt ConfirmProposalRole.Arn
+      Timeout: 29
+      LoggingConfig:
+        LogGroup: !Ref ConfirmProposalLogGroup
+      Environment:
+        Variables:
+          ASSISTANT_TABLE: !Ref AssistantTable
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          ASSISTANT_DAILY_MESSAGE_LIMIT: !Ref AssistantDailyMessageLimit
+          DYNAMODB_ENDPOINT: ''
+          ASSISTANT_MODEL: !Ref AssistantModel
+          ANTHROPIC_KEY_PARAMETER: !Sub /${AWS::StackName}/anthropic-api-key
+          ANTHROPIC_API_KEY: ''
+          ANTHROPIC_BASE_URL: ''
+          ASSISTANT_BUDGET_MEMORY_SECONDS: ''
+      Events:
+        ConfirmProposal:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /assistant/proposals/{proposalId}/confirm
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/confirmProposal.ts
+
+  ConfirmProposalLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-confirmProposal
+      RetentionInDays: 14
+
+  ConfirmProposalRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref AssistantReadPolicy
+        - !Ref AssistantWritePolicy
+        - !Ref CalendarReadPolicy
+        - !Ref CalendarWritePolicy
+        - !Ref CalendarBookPolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ConfirmProposalLogGroup}:log-stream:*
+        - PolicyName: read-anthropic-key
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ssm:GetParameter
+                Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/anthropic-api-key
+
+  # POST /assistant/proposals/{proposalId}/decline (Administrator and Users): the person pressed
+  # the button to decline. Nothing is changed and Claude is not asked: the function reads the
+  # caller's conversation and writes that the proposal was declined. So it has the usual 10
+  # seconds and the assistant's table only: nothing of the calendar's table, no Cognito, and no
+  # access to the Anthropic key. It gets the calendar's time zone and the daily limit because the
+  # answer says how many messages the person has left today, counted on the calendar's date.
+  DeclineProposalFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: declineProposal.handler
+      Role: !GetAtt DeclineProposalRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref DeclineProposalLogGroup
+      Environment:
+        Variables:
+          ASSISTANT_TABLE: !Ref AssistantTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          ASSISTANT_DAILY_MESSAGE_LIMIT: !Ref AssistantDailyMessageLimit
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        DeclineProposal:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /assistant/proposals/{proposalId}/decline
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/declineProposal.ts
+
+  DeclineProposalLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-declineProposal
+      RetentionInDays: 14
+
+  DeclineProposalRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref AssistantReadPolicy
+        - !Ref AssistantWritePolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeclineProposalLogGroup}:log-stream:*
+
   # ---------------------------------------------------------------------------
   # Error alarms (docs/ARCHITECTURE.md section 11)
   # ---------------------------------------------------------------------------

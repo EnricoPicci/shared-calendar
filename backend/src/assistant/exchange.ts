@@ -1,17 +1,21 @@
 import { ASSISTANT_LIMITS, assistantTexts, type AssistantLanguage, type AssistantStatus } from '@shared-calendar/shared';
 import { askLanguage, askStep, assistantModel, STEP_TIMEOUT_MS, type ConversationEntry, type StepAnswer, type TokenCounts } from '../lib/anthropic';
+import { ulid } from 'ulid';
 import { AssistantBusyError, endConversation as endStored, saveStep, startConversation, type Conversation, type NewMessage } from '../lib/assistantDb';
 import { coreConfig, type CoreConfig } from './config';
 import { activityLine, currentConversation, remaining, replyOf, type CoreResult, type Current, type Identity, type Refusal, type StepLog } from './conversation';
 import { INSTRUCTIONS, timeLine } from './prompt';
 import { TOOLS } from './tools/list';
-import { runRead, type ToolLog } from './tools/run';
-import type { Tool } from './tools/tool';
+import { asUnknown, isWaiting, proposalOf, settledWithout, takenState, type Proposal, type ProposedChange } from './proposal';
+import { asksForChange, notRun, proposeChange, runRead, type ToolLog } from './tools/run';
+import type { Tool, ToolResultBlock } from './tools/tool';
 
 // The part of the assistant's core that asks Claude (docs/CONVERSATIONAL_ARCHITECTURE.md section
 // 5.6): what a new message of the person adds to the conversation, then one step, which is one
 // request to Claude, the reads Claude asked for, and one write of everything that came of it.
-// `continue` is the same step with nothing added.
+// `continue` is the same step with nothing added. A change Claude asks for is never run here: it
+// becomes a proposal (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5, rule 1), and this module
+// imports no handler of a route that changes the calendar.
 
 // What the core needs of the request in progress besides who sent it: its id, which a tool's
 // handler writes in its own log line, and how long the function may still run. `remainingMs` is
@@ -20,7 +24,7 @@ export type RequestInfo = { requestId: string; remainingMs: (() => number) | nul
 const UNKNOWN_REQUEST: RequestInfo = { requestId: 'unknown', remainingMs: null };
 
 // What a step may take after Claude answered: the reads Claude asked for and the write.
-const AFTER_CLAUDE_MS = 2_000;
+export const AFTER_CLAUDE_MS = 2_000;
 
 // The token counts as a log line carries them. The names hold no "token": the logger blanks every
 // field whose name does.
@@ -47,7 +51,15 @@ function answersSinceThePerson(entries: ConversationEntry[]): number {
 
 /**
  * A new message of the person. In order: the conversation must be waiting for the person, the
- * person must have messages left today, and the conversation must have room. The first message of
+ * person must have messages left today, and the conversation must have room.
+ *
+ * A message sent while a proposal waits drops the proposal
+ * (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5, rule 5): Claude's request is answered with
+ * "nothing was changed", the message is added after it, and Claude is asked, all in one write.
+ * Whatever the message says, a typed "yes" too, it runs nothing. A message that is refused
+ * leaves the proposal waiting. A proposal a confirmation has taken stops the message while that
+ * confirmation may still be running; once it no longer can be, the message settles the proposal
+ * with each outcome unknown (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5, rule 6). The first message of
  * a conversation is first shown to Claude alone, to ask which supported language it is written
  * in; that language is the conversation's for good. Then the message, the line with the time now
  * and the language, and one step.
@@ -63,7 +75,11 @@ export async function sendMessage(identity: Identity, text: string, now: string,
   const { conversation } = current;
   const conversationId = conversation?.conversationId ?? null;
 
-  if (conversation && conversation.status !== 'idle') return { ok: false, refusal: 'assistant_busy', log: { conversationId, outcome: 'busy' } };
+  const busy: CoreResult = { ok: false, refusal: 'assistant_busy', log: { conversationId, outcome: 'busy' } };
+  if (conversation?.status === 'working') return busy;
+  const waiting = conversation?.status === 'awaiting_confirmation' ? proposalOf(conversation) : null;
+  const taken = conversation ? takenState(conversation, now) : 'free';
+  if (waiting && taken === 'under_way') return busy;
   if (current.usedToday >= config.dailyMessageLimit) {
     return { ok: false, refusal: 'assistant_limit_reached', log: { conversationId, outcome: 'daily_limit' } };
   }
@@ -90,33 +106,52 @@ export async function sendMessage(identity: Identity, text: string, now: string,
   }
 
   const added: NewMessage[] = [
+    // The proposal the message drops: its entry of results comes first, since it answers the
+    // answer of Claude the conversation ends with.
+    ...(waiting ? [settledWithout(waiting, taken === 'abandoned' ? 'unknown' : 'dropped')] : []),
     { kind: 'model', content: { role: 'user', content: text }, fromPerson: true },
     { kind: 'model', content: { role: 'system', content: timeLine(now, config.timeZone, language) } },
   ];
   // Only a request that asked the language question has spent time on Claude already.
   const room = asking !== null && request.remainingMs !== null ? request.remainingMs() : Infinity;
   const ask = room >= STEP_TIMEOUT_MS + AFTER_CLAUDE_MS;
-  return runStep({ identity, current, language, added, asking, ask, model, now, config, request, tools });
+  return runStep({ identity, current, language, added, asking, ask, model, now, config, request, tools, proposal: null, dropped: waiting !== null });
 }
 
 /**
  * The next step of a conversation that waits for one: after a read, whose results Claude has not
- * seen yet, and after a step that could not be done because Claude could not be asked. Nothing is
- * added to the conversation and nothing is counted for the day: the person's message was counted
- * when it was saved, so the daily limit does not stop an exchange half-way.
+ * seen yet, after a confirmation, whose outcomes Claude has not seen yet, and after a step that
+ * could not be done because Claude could not be asked. Nothing is added to the conversation and
+ * nothing is counted for the day: the person's message was counted when it was saved, so the
+ * daily limit does not stop an exchange half-way.
+ *
+ * It is also the request that settles a proposal whose confirmation stopped without saving what
+ * came of it (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5, rule 6): each change is recorded
+ * with the outcome unknown, and Claude is told to read the calendar. While that confirmation may
+ * still be running, the conversation is busy. A proposal that simply waits for the person has
+ * nothing to continue.
  */
 export async function continueExchange(identity: Identity, now: string, request: RequestInfo = UNKNOWN_REQUEST, tools: readonly Tool[] = TOOLS): Promise<CoreResult> {
   const config = coreConfig();
   const model = assistantModel();
   const current = await currentConversation(identity, now, config, tools.map((tool) => tool.definition));
   const { conversation } = current;
-  if (!conversation || conversation.status !== 'working') {
-    return { ok: false, refusal: 'nothing_to_continue', log: { conversationId: conversation?.conversationId ?? null, outcome: 'nothing_to_continue' } };
+  const conversationId = conversation?.conversationId ?? null;
+  const step = { identity, current, asking: null, ask: true, model, now, config, request, tools, dropped: false };
+  const taken = conversation ? takenState(conversation, now) : 'free';
+  const waiting = conversation?.status === 'awaiting_confirmation' ? proposalOf(conversation) : null;
+  if (conversation && waiting && taken !== 'free') {
+    if (taken === 'under_way') return { ok: false, refusal: 'assistant_busy', log: { conversationId, outcome: 'busy' } };
+    return runStep({ ...step, language: conversation.language, added: [settledWithout(waiting, 'unknown')], proposal: asUnknown(waiting), settledUnknown: true });
   }
-  return runStep({ identity, current, language: conversation.language, added: [], asking: null, ask: true, model, now, config, request, tools });
+  if (!conversation || conversation.status !== 'working') {
+    return { ok: false, refusal: 'nothing_to_continue', log: { conversationId, outcome: 'nothing_to_continue' } };
+  }
+  // A settled proposal stays with the conversation until the person's next message.
+  return runStep({ ...step, language: conversation.language, added: [], proposal: proposalOf(conversation) });
 }
 
-type StepInput = {
+export type StepInput = {
   identity: Identity;
   current: Current;
   language: AssistantLanguage;
@@ -131,16 +166,26 @@ type StepInput = {
   config: CoreConfig;
   request: RequestInfo;
   tools: readonly Tool[];
+  // The settled proposal the conversation keeps showing after this step, unless the step makes a
+  // new one: null when the step starts from a message of the person.
+  proposal: Proposal | null;
+  // Whether the entry dropped a waiting proposal, and whether it recorded one as of unknown
+  // outcome: for the log line.
+  dropped: boolean;
+  settledUnknown?: boolean;
 };
 
 /**
  * One step: asks Claude with the stored conversation and what the entry added, runs the reads
  * Claude asked for, and saves the additions and everything that came back in one write, on the
- * condition that nobody wrote the conversation meanwhile. When Claude cannot be asked, the
+ * condition that nobody wrote the conversation meanwhile. A change Claude asks for is not run:
+ * its facts are read and it is saved as a proposal, with Claude's answer, in that same write;
+ * the reads of the same answer are run and their results kept back in the proposal. When Claude cannot be asked, the
  * additions are saved alone and the conversation is left waiting for its step, so that nothing
  * the person wrote is lost.
  */
-async function runStep({ identity, current, language, added, asking, ask, model, now, config, request, tools }: StepInput): Promise<CoreResult> {
+export async function runStep(input: StepInput): Promise<CoreResult> {
+  const { identity, current, language, added, asking, ask, model, now, config, request, tools } = input;
   const texts = assistantTexts(language);
   const languageUsage = asking?.usage ?? null;
   const conversation = [...entriesOf(current.messages), ...entriesOf(added)];
@@ -158,6 +203,7 @@ async function runStep({ identity, current, language, added, asking, ask, model,
   let refusal: Refusal | null = null;
   let reason: string | undefined;
   const ran: ToolLog[] = [];
+  let proposal = input.proposal;
   // Anthropic's safety filters refused: the person reads a fixed sentence and the conversation is over.
   let over = false;
   // An answer of Claude is stored exactly as given. One without content has nothing to store, and
@@ -193,14 +239,46 @@ async function runStep({ identity, current, language, added, asking, ask, model,
       keep(answer.content);
       // An answer that stopped for tools and asks for none has nothing to wait for.
       if (answer.requests.length === 0) break;
-      // Every read asked for, in the order asked, each for the person of this request. The results
-      // go back to Claude together, as one entry: a request left without its result would make the
-      // conversation one Anthropic no longer accepts.
-      const results = [];
+      // Every request is answered in the order asked, each for the person of this request. A
+      // read is run. A change is not: its facts are read and it becomes a proposal. The results
+      // go back to Claude together, as one entry: a request left without its result would make
+      // the conversation one Anthropic no longer accepts.
+      const caller = { ...identity, requestId: request.requestId };
+      const context = { timeZone: config.timeZone, role: identity.role };
+      const changesAsked = answer.requests.filter((asked) => asksForChange(asked, tools, caller)).length;
+      const results: ToolResultBlock[] = [];
+      const changes: ProposedChange[] = [];
       for (const asked of answer.requests) {
-        const done = await runRead(asked, tools, { ...identity, requestId: request.requestId }, { timeZone: config.timeZone, role: identity.role }, now);
-        results.push(done.result);
-        ran.push(done.log);
+        if (!asksForChange(asked, tools, caller)) {
+          const done = await runRead(asked, tools, caller, context, now);
+          results.push(done.result);
+          ran.push(done.log);
+          continue;
+        }
+        // A proposal holds one change: asked for several in one answer, Claude is told to ask
+        // for one, and none is proposed.
+        if (changesAsked > 1) {
+          const refused = notRun(asked.id, asked.name, 'one_change_at_a_time', 'Ask for one change at a time: nothing was proposed. Call the tool for the first change alone.');
+          results.push(refused.result);
+          ran.push(refused.log);
+          continue;
+        }
+        const proposed = await proposeChange(asked, tools, caller, context, texts, now);
+        if (!proposed.ok) {
+          results.push(proposed.outcome.result);
+          ran.push(proposed.outcome.log);
+          continue;
+        }
+        ran.push(proposed.log);
+        changes.push({ toolUseId: asked.id, tool: proposed.tool, call: proposed.call, summary: proposed.summary, outcome: null, error: null });
+      }
+      if (changes.length > 0) {
+        // The conversation now ends with an answer of Claude whose results are not all there:
+        // the entry of results is written when the person settles the proposal.
+        proposal = { proposalId: ulid(), changes, keptBack: results };
+        status = 'awaiting_confirmation';
+        outcome = 'proposal';
+        break;
       }
       messages.push({ kind: 'model', content: { role: 'user', content: results } });
       if (steps >= ASSISTANT_LIMITS.modelRequestsPerMessage) {
@@ -219,7 +297,7 @@ async function runStep({ identity, current, language, added, asking, ask, model,
   const step = {
     messages,
     status,
-    proposal: null,
+    proposal,
     timeZone: config.timeZone,
     inputTokens: inputOf(usage) + inputOf(languageUsage),
     outputTokens: (usage?.outputTokens ?? 0) + (languageUsage?.outputTokens ?? 0),
@@ -247,6 +325,10 @@ async function runStep({ identity, current, language, added, asking, ask, model,
     newConversation: current.conversation === null,
     tools: ran,
     steps,
+    // The names of the changes a proposal made by this step holds, never their input or wording.
+    ...(proposal && isWaiting(proposal) && { proposalId: proposal.proposalId, proposed: proposal.changes.map((change) => change.tool) }),
+    ...(input.dropped && { droppedProposal: true }),
+    ...(input.settledUnknown && { settledUnknown: true }),
   };
   if (refusal) return { ok: false, refusal, log };
 
@@ -254,5 +336,5 @@ async function runStep({ identity, current, language, added, asking, ask, model,
   const stored = messages.map((message, i) => ({ ...message, seq: firstSeq + i, at: now }));
   const fromPerson = added.filter((message) => message.fromPerson).length;
   const activity = activityLine([...current.messages, ...messages], tools.map((tool) => tool.definition), identity.role, language);
-  return { ok: true, reply: replyOf(over ? null : saved, stored, remaining(config, current.usedToday + fromPerson), activity), log };
+  return { ok: true, reply: replyOf(over ? null : { ...saved, proposal }, stored, remaining(config, current.usedToday + fromPerson), activity), log };
 }

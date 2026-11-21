@@ -1,29 +1,42 @@
-import type { AssistantReadKind } from '@shared-calendar/shared';
+import type { AssistantReadKind, AssistantTexts } from '@shared-calendar/shared';
 import { z } from 'zod';
 import type { ToolRequest } from '../../lib/anthropic';
 import { toolEvent, type ToolCaller } from './event';
 import { cappedJson } from './result';
-import { forClaude, type Tool, type ToolContext } from './tool';
+import {
+  forClaude,
+  isChange,
+  type CallRoute,
+  type ChangeTool,
+  type ReadTool,
+  type RouteAnswer,
+  type RouteHandler,
+  type Tool,
+  type ToolCall,
+  type ToolContext,
+  type ToolResultBlock,
+} from './tool';
 
-// Running one read Claude asked for (docs/CONVERSATIONAL_ARCHITECTURE.md sections 7.4 and 8): the
-// request is checked, the route's handler is called with the person's identity, and its answer
-// becomes the result Claude gets. Whatever happens, Claude gets a result for the request: a
-// request without its result would make the conversation one Anthropic no longer accepts.
+// Answering one tool request of Claude (docs/CONVERSATIONAL_ARCHITECTURE.md sections 7.4 and 8):
+// the request is checked, then a read is run by calling its route's handler with the person's
+// identity, and a change is not run: the facts its proposal shows are read. Whatever happens,
+// Claude gets a result for the request: a request without its result would make the conversation
+// one Anthropic no longer accepts.
 
-// The result of one tool request, as the Messages API takes it back.
-export type ToolResultBlock = { type: 'tool_result'; tool_use_id: string; content: string; is_error?: true };
+export type { ToolResultBlock } from './tool';
 
-// Why a request was answered without calling any handler.
-export type NotRun = 'unknown_tool' | 'not_offered' | 'not_a_read' | 'invalid_input';
+// Why a request was answered without calling the handler of its route.
+export type NotRun = 'unknown_tool' | 'not_offered' | 'not_a_read' | 'invalid_input' | 'one_change_at_a_time' | 'not_possible';
 
 // What the log line says of one tool request: the tool's name with the status its route answered
-// and how long it took, or why it was not run. Never the input and never the result. A name Claude
+// and how long it took, or why it was not run. For a change that was proposed, the status and the
+// time are those of the read of its facts. Never the input and never the result. A name Claude
 // made up is not a tool's name and is not logged.
-export type ToolLog = { name: string; status: number; ms: number } | { name: string | null; notRun: NotRun };
+export type ToolLog = { name: string; status: number; ms: number; proposed?: true } | { name: string | null; notRun: NotRun; status?: number; ms?: number };
 
 export type ToolOutcome = { result: ToolResultBlock; log: ToolLog; reads: AssistantReadKind | null };
 
-const errorResult = (id: string, error: string, message: string): ToolResultBlock => ({
+export const errorResult = (id: string, error: string, message: string): ToolResultBlock => ({
   type: 'tool_result',
   tool_use_id: id,
   content: JSON.stringify({ error, message }),
@@ -39,55 +52,130 @@ const parsed = (body: string | undefined): unknown => {
 };
 
 /**
- * Runs one read tool for the person of the request in progress. A tool that does not exist, one
- * not offered to the person's role, one that is not a read, and an input its schema refuses are
- * answered to Claude with an error result that says what was expected, and no handler is called.
- * A refusal of the route is a result too: its error code and message, marked as an error.
+ * Calls the handler of a route inside this function, with the event API Gateway would have built
+ * for the person of the request in progress. A handler answers its own failures; one that throws
+ * all the same is given as a 500 without a body.
  */
-export async function runRead(request: ToolRequest, tools: readonly Tool[], caller: ToolCaller, context: ToolContext, now: string): Promise<ToolOutcome> {
+export async function callRoute(handler: RouteHandler, call: ToolCall, caller: ToolCaller, now: string): Promise<RouteAnswer> {
+  try {
+    const response = await handler(toolEvent(call, caller, now));
+    return { status: response.statusCode ?? 500, body: parsed(response.body) };
+  } catch {
+    return { status: 500, body: null };
+  }
+}
+
+/** Whether a route answered with a success. */
+export const succeeded = (answer: RouteAnswer): boolean => answer.status >= 200 && answer.status <= 299;
+
+/**
+ * The error code and the message of a route's refusal, as its body gives them; a refusal without
+ * that shape, a handler that threw among them, is told as a failure of the route.
+ */
+export function refusalOf(answer: RouteAnswer, failure: string): { error: string; message: string } {
+  const refusal = z.object({ error: z.string(), message: z.string() }).safeParse(answer.body);
+  return refusal.success ? refusal.data : { error: 'internal_error', message: failure };
+}
+
+// A request that passed the checks every request gets: the tool it names, and the input its schema gave.
+export type Checked = { ok: true; tool: Tool; input: unknown } | { ok: false; outcome: ToolOutcome };
+
+/**
+ * Checks one request of Claude before anything is called: the tool must exist, be offered to the
+ * person's role, and its input must be one its schema accepts. Each failure is answered to Claude
+ * with an error result that says what was expected.
+ */
+export function checkRequest(request: ToolRequest, tools: readonly Tool[], caller: ToolCaller): Checked {
   const offered = tools.filter((candidate) => candidate.definition.roles.includes(caller.role));
   const names = offered.map((candidate) => candidate.definition.name).join(', ');
   const found = tools.find((candidate) => candidate.definition.name === request.name);
-  const notRun = (name: string | null, why: NotRun, message: string): ToolOutcome => ({
-    result: errorResult(request.id, why, message),
-    log: { name, notRun: why },
-    reads: null,
-  });
 
   // A tool of another role is answered like one that does not exist: its name is not confirmed.
   if (!found || !offered.includes(found)) {
-    return notRun(found ? found.definition.name : null, found ? 'not_offered' : 'unknown_tool', `There is no tool with this name. The tools are: ${names}.`);
+    return {
+      ok: false,
+      outcome: notRun(request.id, found ? found.definition.name : null, found ? 'not_offered' : 'unknown_tool', `There is no tool with this name. The tools are: ${names}.`),
+    };
   }
   const { definition } = found;
-  if (definition.kind !== 'read') return notRun(definition.name, 'not_a_read', 'This tool cannot be used here.');
-
   const input = definition.input(caller.role).safeParse(request.input);
   if (!input.success) {
     const problems = input.error.issues.map((issue) => `${issue.path.join('.') || 'the input'}: ${issue.message}`).join('; ');
     const expected = JSON.stringify(forClaude(definition, caller.role).input_schema);
-    return notRun(definition.name, 'invalid_input', `The input of ${definition.name} is not valid (${problems}). It must match this JSON Schema: ${expected}`);
+    return {
+      ok: false,
+      outcome: notRun(request.id, definition.name, 'invalid_input', `The input of ${definition.name} is not valid (${problems}). It must match this JSON Schema: ${expected}`),
+    };
   }
+  return { ok: true, tool: found, input: input.data };
+}
 
+/** The answer to a request whose route's handler is not called: an error result with the reason. */
+export function notRun(id: string, name: string | null, why: NotRun, message: string): ToolOutcome {
+  return { result: errorResult(id, why, message), log: { name, notRun: why }, reads: null };
+}
+
+/**
+ * Runs a read whose request passed `checkRequest`, for the person of the request in progress. A
+ * refusal of the route is a result too: its error code and message, marked as an error.
+ */
+export async function runChecked(id: string, tool: ReadTool, input: unknown, caller: ToolCaller, context: ToolContext, now: string): Promise<ToolOutcome> {
+  const { definition } = tool;
   const started = Date.now();
-  const log = (status: number): ToolLog => ({ name: definition.name, status, ms: Date.now() - started });
-  let status: number;
-  let body: unknown;
-  try {
-    const response = await found.toHandler.handler(toolEvent(found.toHandler.request(input.data, context), caller, now));
-    status = response.statusCode ?? 500;
-    body = parsed(response.body);
-  } catch {
-    // A handler answers its own failures; one that throws all the same is told to Claude as a failure of the route.
-    return { result: errorResult(request.id, 'internal_error', 'The calendar could not be read.'), log: log(500), reads: definition.reads };
+  const answer = await callRoute(tool.toHandler.handler, tool.toHandler.request(input, context), caller, now);
+  const log: ToolLog = { name: definition.name, status: answer.status, ms: Date.now() - started };
+  if (!succeeded(answer)) {
+    const { error, message } = refusalOf(answer, 'The calendar could not be read.');
+    return { result: errorResult(id, error, message), log, reads: definition.reads };
   }
-  if (status < 200 || status > 299) {
-    const refusal = z.object({ error: z.string(), message: z.string() }).safeParse(body);
-    const { error, message } = refusal.success ? refusal.data : { error: 'internal_error', message: 'The calendar could not be read.' };
-    return { result: errorResult(request.id, error, message), log: log(status), reads: definition.reads };
-  }
-  return {
-    result: { type: 'tool_result', tool_use_id: request.id, content: cappedJson(found.toModel(body, context)) },
-    log: log(status),
-    reads: definition.reads,
+  return { result: { type: 'tool_result', tool_use_id: id, content: cappedJson(tool.toModel(answer.body, context)) }, log, reads: definition.reads };
+}
+
+/**
+ * Runs one read tool for the person of the request in progress. A tool that does not exist, one
+ * not offered to the person's role, one that is not a read, and an input its schema refuses are
+ * answered to Claude with an error result that says what was expected, and no handler is called.
+ */
+export async function runRead(request: ToolRequest, tools: readonly Tool[], caller: ToolCaller, context: ToolContext, now: string): Promise<ToolOutcome> {
+  const checked = checkRequest(request, tools, caller);
+  if (!checked.ok) return checked.outcome;
+  if (isChange(checked.tool)) return notRun(request.id, checked.tool.definition.name, 'not_a_read', 'This tool cannot be used here.');
+  return runChecked(request.id, checked.tool as ReadTool, checked.input, caller, context, now);
+}
+
+/** Whether a request names a tool that changes the calendar and is offered to the person's role. */
+export function asksForChange(request: ToolRequest, tools: readonly Tool[], caller: ToolCaller): boolean {
+  return tools.some((tool) => tool.definition.name === request.name && isChange(tool) && tool.definition.roles.includes(caller.role));
+}
+
+// A change that can be proposed: the tool, what its route will be sent at the confirmation, and
+// the server's own words for it in the conversation's language.
+export type Proposable = { ok: true; tool: string; call: ToolCall; summary: string; log: ToolLog } | { ok: false; outcome: ToolOutcome };
+
+/**
+ * Answers a request for a change without running it: the input is checked, then the facts the
+ * proposal shows are read through a route that only reads, with the person's identity, and the
+ * change is worded with the fixed text of the conversation's language. When the input is wrong,
+ * or the facts cannot be read or say the change cannot be made, Claude gets an error result with
+ * the reason and nothing is proposed.
+ */
+export async function proposeChange(request: ToolRequest, tools: readonly Tool[], caller: ToolCaller, context: ToolContext, texts: AssistantTexts, now: string): Promise<Proposable> {
+  const checked = checkRequest(request, tools, caller);
+  if (!checked.ok) return { ok: false, outcome: checked.outcome };
+  const tool = checked.tool as ChangeTool;
+  const { name, reads } = tool.definition;
+  const started = Date.now();
+  // The status of the last route the confirmation called, for the log line.
+  let status = 0;
+  const route: CallRoute = async (handler, call) => {
+    const answer = await callRoute(handler, call, caller, now);
+    status = answer.status;
+    return answer;
   };
+  const read = await tool.confirmation.read(checked.input, context, route);
+  const ms = Date.now() - started;
+  if (!read.ok) {
+    return { ok: false, outcome: { result: errorResult(request.id, read.error, read.message), log: { name, notRun: 'not_possible', status, ms }, reads } };
+  }
+  return { ok: true, tool: name, call: read.call, summary: tool.confirmation.summary(texts, read.facts), log: { name, status, ms, proposed: true } };
 }

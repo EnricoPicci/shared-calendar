@@ -19,20 +19,22 @@ const ADMIN = { timeZone: ROME, role: 'admin' as const };
 
 // Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
 describe('the list of tools (3, 8.2)', () => {
-  it('holds the four reads, each for both roles, the definitions in the same order as the tools', () => {
-    expect(DEFINITIONS.map((definition) => definition.name)).toEqual(['get_settings', 'list_types', 'get_calendar', 'list_appointments']);
+  it('holds the four reads, each for both roles, then the booking for Users, the definitions in the same order as the tools', () => {
+    expect(DEFINITIONS.map((definition) => definition.name)).toEqual(['get_settings', 'list_types', 'get_calendar', 'list_appointments', 'book_appointment']);
     expect(TOOLS.map((tool) => tool.definition)).toEqual([...DEFINITIONS]);
-    for (const definition of DEFINITIONS) {
+    for (const definition of DEFINITIONS.slice(0, 4)) {
       expect(definition.kind).toBe('read');
       expect(definition.roles).toEqual(['admin', 'user']);
       expect(definition.description.length).toBeGreaterThan(80);
     }
-    expect(offeredTo(DEFINITIONS, 'user')).toHaveLength(4);
+    expect(DEFINITIONS[4]).toMatchObject({ kind: 'change', roles: ['user'] });
+    expect(offeredTo(DEFINITIONS, 'user')).toHaveLength(5);
+    expect(offeredTo(DEFINITIONS, 'admin')).toHaveLength(4);
   });
 
   it('gives Claude each tool as a name, a description and the JSON Schema of its input', () => {
     const tools = toolsForClaude(DEFINITIONS, 'user');
-    expect(tools.map((tool) => Object.keys(tool))).toEqual(Array(4).fill(['name', 'description', 'input_schema']));
+    expect(tools.map((tool) => Object.keys(tool))).toEqual(Array(5).fill(['name', 'description', 'input_schema']));
     expect(tools[0]?.input_schema).toEqual({ type: 'object', properties: {}, additionalProperties: false });
     expect(tools[1]?.input_schema).toEqual({ type: 'object', properties: {}, additionalProperties: false });
     expect(tools[2]?.input_schema).toEqual({
@@ -170,11 +172,11 @@ describe('get_calendar (3, 8.3)', () => {
     ]);
   });
 
-  it('the night the clocks go back (25 October 2026): 02:00 comes twice, as the calendar itself has it', () => {
+  it('the night the clocks go back (25 October 2026): 02:00 comes twice, and the second one says so', () => {
     const view = day('2026-10-25', 7, '2026-10-24T22:00:00.000Z', '2026-10-25T23:00:00.000Z', ['2026-10-24T23:00:00.000Z', '2026-10-25T00:00:00.000Z', '2026-10-25T01:00:00.000Z', '2026-10-25T02:00:00.000Z']);
     expect(getCalendar.toModel(view, USER).list?.items[0]).toMatchObject({
       windows: [{ start: '00:00', end: '24:00', type: 'Visit' }],
-      freeSlots: ['01:00', '02:00', '02:00', '03:00'],
+      freeSlots: ['01:00', '02:00', '02:00 (second)', '03:00'],
     });
   });
 });

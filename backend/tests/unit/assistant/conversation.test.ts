@@ -289,6 +289,7 @@ describe('the refusals (6)', () => {
       assistant_busy: 409,
       conversation_full: 409,
       nothing_to_continue: 409,
+      proposal_not_found: 404,
       assistant_limit_reached: 429,
       assistant_unavailable: 503,
       assistant_budget_reached: 503,

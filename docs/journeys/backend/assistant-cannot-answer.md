@@ -43,7 +43,8 @@ Ideas used here, explained once for all journeys:
 
 ## Before the block starts
 
-The file's `beforeAll` signs in `admin`. The block's `beforeAll` creates `chat-down` again and
+The file's `beforeAll` signs in `admin`; what else it does concerns the blocks that use the
+calendar, not this one. The block's `beforeAll` creates `chat-down` again and
 signs it in (`newUser()`), then calls `DELETE /assistant/conversation` and checks `204`.
 
 ## Tests 1 and 2: a 503, twice

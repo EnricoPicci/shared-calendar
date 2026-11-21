@@ -1,7 +1,7 @@
 import type { ListTypesResponse } from '@shared-calendar/shared';
 import { z } from 'zod';
 import { handler } from '../../handlers/listAvailabilityTypes';
-import type { Tool, ToolDefinition } from './tool';
+import type { ReadTool, ToolDefinition } from './tool';
 
 // The tool for GET /calendar/types (docs/CONVERSATIONAL_ARCHITECTURE.md section 3): the kinds of
 // appointment the Administrator offers. Both roles; the route answers them alike.
@@ -19,7 +19,7 @@ export const listTypesDefinition: ToolDefinition = {
   reads: 'types',
 };
 
-const parts: Tool<z.infer<typeof Input>> = {
+const parts: ReadTool<z.infer<typeof Input>> = {
   definition: listTypesDefinition,
   toHandler: { handler, request: () => ({ routeKey: 'GET /calendar/types', path: '/calendar/types' }) },
   toModel: (body) => ({
@@ -27,4 +27,4 @@ const parts: Tool<z.infer<typeof Input>> = {
     list: { name: 'types', items: (body as ListTypesResponse).types.map((type) => ({ id: type.typeId, name: type.name })) },
   }),
 };
-export const listTypes = parts as Tool;
+export const listTypes = parts as ReadTool;

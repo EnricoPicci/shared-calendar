@@ -1,4 +1,11 @@
+import { weekdayOf } from '../calendar/time';
 import type { AssistantTexts } from './texts';
+
+const WEEKDAYS = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
+const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+
+// A local date written out in full: "martedì 24 novembre 2026".
+const fullDate = (date: string) => `${WEEKDAYS[weekdayOf(date) - 1]} ${Number(date.slice(8, 10))} ${MONTHS[Number(date.slice(5, 7)) - 1]} ${date.slice(0, 4)}`;
 
 // The fixed texts in Italian, key by key the ones of the English object. The person is addressed
 // with the formal "lei" throughout. The second button is not "Annulla": in a calendar that word
@@ -22,6 +29,12 @@ export const ASSISTANT_TEXTS_IT: AssistantTexts = {
   proposalQuestion: (changes) => (changes === 1 ? 'Conferma questa modifica?' : `Conferma queste ${changes} modifiche?`),
   confirmLabel: 'Conferma',
   declineLabel: 'Non lo faccia',
+  changes: {
+    bookAppointment: ({ date, start, end, type, note, secondTime }) =>
+      `Prenotare un appuntamento per ${fullDate(date)}, dalle ${start} alle ${end} (${type}).` +
+      (secondTime ? ` È la seconda volta che quella notte l'orologio segna le ${start}: torna l'ora solare.` : '') +
+      (note === null ? '' : ` Nota: «${note}»`),
+  },
   working: 'Ci sto lavorando…',
   reading: {
     settings: 'Sto guardando le impostazioni del calendario…',

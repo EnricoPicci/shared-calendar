@@ -12,8 +12,7 @@ export type AssistantCannotAnswerCode = Extract<
 
 // The texts the server and the screen say themselves, never the model: one object of this type
 // per language, so that a language with a text missing does not compile. A text that carries a
-// value is a function of that value. The wording of each change is not here: it belongs to the
-// tool it describes.
+// value is a function of that value.
 export type AssistantTexts = {
   // What the person reads where the answer would have been, by the error code of the route
   // (docs/CONVERSATIONAL_ARCHITECTURE.md section 6.1). None promises a moment the server cannot
@@ -37,12 +36,24 @@ export type AssistantTexts = {
   // The labels of a proposal's two buttons.
   confirmLabel: string;
   declineLabel: string;
+  // What a proposal says of each change it holds, one text per kind of change: the server's own
+  // words for what will be done, filled with the facts the server read
+  // (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5, rule 2).
+  changes: {
+    bookAppointment: (booking: BookingSummary) => string;
+  };
   // The line of progress of a step that has none of its own.
   working: string;
   // The line of progress after a read, by what was read: the screen shows it while the next step
   // is asked for.
   reading: Record<AssistantReadKind, string>;
 };
+
+// What the proposal of a booking shows: the day as a local date, the two wall-clock times, the
+// name of the type the slot belongs to and the note, as they will be sent to the route.
+// `secondTime` marks the second of the two times a clock shows the same hour on the night the
+// clocks go back.
+export type BookingSummary = { date: string; start: string; end: string; type: string; note: string | null; secondTime: boolean };
 
 // What a read tool of the assistant looks at: each kind has its own line of progress
 // (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.1).

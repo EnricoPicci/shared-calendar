@@ -2,7 +2,7 @@ import { LocalDate, Username, type ListAppointmentsResponse, type Role } from '@
 import { z } from 'zod';
 import { handler } from '../../handlers/listAppointments';
 import { appointmentForModel } from './result';
-import type { Tool, ToolDefinition } from './tool';
+import type { ReadTool, ToolDefinition } from './tool';
 
 // The tool for GET /calendar/appointments (docs/CONVERSATIONAL_ARCHITECTURE.md section 3): the
 // appointments of a period, or the upcoming ones. Both roles. A User only ever gets their own, by
@@ -41,7 +41,7 @@ export const listAppointmentsDefinition: ToolDefinition = {
   reads: 'appointments',
 };
 
-const parts: Tool<z.infer<typeof AdminInput>> = {
+const parts: ReadTool<z.infer<typeof AdminInput>> = {
   definition: listAppointmentsDefinition,
   toHandler: {
     handler,
@@ -60,4 +60,4 @@ const parts: Tool<z.infer<typeof AdminInput>> = {
     list: { name: 'appointments', items: (body as ListAppointmentsResponse).appointments.map((appointment) => appointmentForModel(appointment, timeZone)) },
   }),
 };
-export const listAppointments = parts as Tool;
+export const listAppointments = parts as ReadTool;

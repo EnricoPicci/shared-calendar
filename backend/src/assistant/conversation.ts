@@ -12,6 +12,7 @@ import type { ToolDefinition as ClaudeTool } from '../lib/anthropic';
 import { coreConfig, type CoreConfig } from './config';
 import { contextBlock, INSTRUCTIONS, promptVersion } from './prompt';
 import { DEFINITIONS } from './tools/list';
+import { proposalOf, shownProposal, takenState, type Taken } from './proposal';
 import { offeredTo, toolsForClaude, type ToolDefinition } from './tools/tool';
 
 // The part of the assistant's core that never asks Claude anything: who is speaking, the person's
@@ -27,7 +28,7 @@ export type Identity = { sub: string; username: string; role: Role };
 // its route answers (docs/CONVERSATIONAL_ARCHITECTURE.md section 6).
 export type Refusal = Extract<
   ApiErrorCode,
-  'assistant_busy' | 'conversation_full' | 'nothing_to_continue' | 'assistant_limit_reached' | 'assistant_unavailable' | 'assistant_budget_reached'
+  'assistant_busy' | 'conversation_full' | 'nothing_to_continue' | 'proposal_not_found' | 'assistant_limit_reached' | 'assistant_unavailable' | 'assistant_budget_reached'
 >;
 
 // The status and the message of each refusal. The message is for a developer reading the answer:
@@ -36,6 +37,7 @@ export const REFUSALS: Record<Refusal, { status: number; message: string }> = {
   assistant_busy: { status: 409, message: 'A step of this conversation is waiting or under way' },
   conversation_full: { status: 409, message: 'This conversation is full; start a new one' },
   nothing_to_continue: { status: 409, message: 'No step of this conversation is waiting' },
+  proposal_not_found: { status: 404, message: 'No such proposal is waiting for an answer' },
   assistant_limit_reached: { status: 429, message: "Today's limit of messages to the assistant is reached" },
   assistant_unavailable: { status: 503, message: 'The assistant is not available at the moment' },
   assistant_budget_reached: { status: 503, message: 'The assistant has reached its spending limit' },
@@ -133,23 +135,31 @@ export function activityLine(
 }
 
 /**
- * The answer of a route: the state of the conversation, or of none, and the messages to show.
- * `activity` is the line of progress of a conversation that is `working`; without one, the
- * general line.
+ * The answer of a route: the state of the conversation, or of none, the messages to show, and the
+ * conversation's proposal, waiting or settled. `activity` is the line of progress of a
+ * conversation that is `working`; without one, the general line.
+ *
+ * A proposal a confirmation has taken is not shown as waiting, whatever is stored: the
+ * conversation is shown as `working`, so that the screen offers no button for it. When the
+ * confirmation that took it has stopped without saving what came of it, each change is shown with
+ * the outcome `unknown`.
  */
 export function replyOf(
-  conversation: Pick<Conversation, 'conversationId' | 'language' | 'status'> | null,
+  conversation: (Pick<Conversation, 'conversationId' | 'language' | 'status'> & Partial<Pick<Conversation, 'proposal'>>) | null,
   messages: StoredMessage[],
   remainingToday: number,
   activity?: string,
+  taken: Taken = 'free',
 ): AssistantReply {
+  const status = conversation ? (taken === 'free' ? conversation.status : 'working') : 'idle';
+  const proposal = conversation?.proposal ? shownProposal(proposalOf({ proposal: conversation.proposal })!, conversation.language) : null;
   return {
     conversationId: conversation?.conversationId ?? null,
     language: conversation?.language ?? null,
-    status: conversation?.status ?? 'idle',
+    status,
     messages: messages.map(shown).filter(notNull),
-    activity: conversation?.status === 'working' ? (activity ?? assistantTexts(conversation.language).working) : null,
-    proposal: null,
+    activity: conversation && status === 'working' ? (activity ?? assistantTexts(conversation.language).working) : null,
+    proposal: proposal && taken === 'abandoned' ? { ...proposal, actions: proposal.actions.map(({ summary }) => ({ summary, outcome: 'unknown' as const, error: null })) } : proposal,
     remainingToday,
   };
 }
@@ -168,7 +178,7 @@ export async function showConversation(
   const { conversation } = current;
   const activity = conversation ? activityLine(current.messages, definitions, identity.role, conversation.language) : undefined;
   return {
-    reply: replyOf(conversation, current.messages, remaining(config, current.usedToday), activity),
+    reply: replyOf(conversation, current.messages, remaining(config, current.usedToday), activity, conversation ? takenState(conversation, now) : 'free'),
     log: { conversationId: current.conversation?.conversationId ?? null, outcome: 'shown' },
   };
 }

@@ -32,7 +32,8 @@ Ideas used here, explained once for all journeys:
 
 ## Before the block starts
 
-The file's `beforeAll` signs in `admin`. The block's `beforeAll` creates `chat-lingua` again and
+The file's `beforeAll` signs in `admin`; what else it does concerns the blocks that use the
+calendar, not this one. The block's `beforeAll` creates `chat-lingua` again and
 signs it in (`newUser()`: `removeUserIfPresent()`, `POST /users` checked `201`, `signIn()`), then
 calls `DELETE /assistant/conversation` and checks `204`. A new account has no conversation, so the
 block does not depend on the block before it.

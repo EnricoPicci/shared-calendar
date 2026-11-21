@@ -1,7 +1,7 @@
 import type { CalendarSettings } from '@shared-calendar/shared';
 import { z } from 'zod';
 import { handler } from '../../handlers/getCalendarSettings';
-import type { Tool, ToolDefinition } from './tool';
+import type { ReadTool, ToolDefinition } from './tool';
 
 // The tool for GET /calendar/settings (docs/CONVERSATIONAL_ARCHITECTURE.md section 3): the rules
 // every booking and cancellation follows. Both roles; the route answers them alike.
@@ -20,7 +20,7 @@ export const getSettingsDefinition: ToolDefinition = {
   reads: 'settings',
 };
 
-const parts: Tool<z.infer<typeof Input>> = {
+const parts: ReadTool<z.infer<typeof Input>> = {
   definition: getSettingsDefinition,
   toHandler: { handler, request: () => ({ routeKey: 'GET /calendar/settings', path: '/calendar/settings' }) },
   // Who saved the settings last, and when, is not something an answer needs.
@@ -37,4 +37,4 @@ const parts: Tool<z.infer<typeof Input>> = {
     };
   },
 };
-export const getSettings = parts as Tool;
+export const getSettings = parts as ReadTool;

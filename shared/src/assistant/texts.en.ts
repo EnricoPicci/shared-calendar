@@ -1,4 +1,11 @@
+import { weekdayOf } from '../calendar/time';
 import type { AssistantTexts } from './texts';
+
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+// A local date written out in full: "Tuesday 24 November 2026".
+const fullDate = (date: string) => `${WEEKDAYS[weekdayOf(date) - 1]} ${Number(date.slice(8, 10))} ${MONTHS[Number(date.slice(5, 7)) - 1]} ${date.slice(0, 4)}`;
 
 // The fixed texts in English. The three sentences of `cannotAnswer` are those of
 // docs/CONVERSATIONAL_ARCHITECTURE.md section 6.1, word for word.
@@ -20,6 +27,12 @@ export const ASSISTANT_TEXTS_EN: AssistantTexts = {
   proposalQuestion: (changes) => (changes === 1 ? 'Make this change?' : `Make these ${changes} changes?`),
   confirmLabel: 'Confirm',
   declineLabel: "Don't",
+  changes: {
+    bookAppointment: ({ date, start, end, type, note, secondTime }) =>
+      `Book an appointment on ${fullDate(date)}, from ${start} to ${end} (${type}).` +
+      (secondTime ? ` This is the second ${start} of that night: the clocks go back.` : '') +
+      (note === null ? '' : ` Note: "${note}"`),
+  },
   working: 'Working…',
   reading: {
     settings: "Looking at the calendar's settings…",

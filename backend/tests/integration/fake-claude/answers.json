@@ -3,7 +3,8 @@
     "The scripted answers of the fake Claude (backend/docker/fake-claude.mjs), owned by the journeys beside this folder and read again at every request.",
     "answers: named answers, each a status and a body as Anthropic sends them. messages: the exact text of a message of the person -> the steps of the exchange it starts, one per request to Claude; a step is the name of an answer, or { once, then }: the first name the first time a request comes, the second when the very same request comes again (an outage that passes). language: the same for the language question. otherwise: the answer for a message nobody scripted.",
     "source says where a body comes from: \"recorded\" from the real API (cut down to the fields a client reads), \"documentation\" when Anthropic's pages give the shape and it cannot be provoked, \"fake\" when the text was written for a journey, in the shape of a recorded answer. The two requests for a tool are the content blocks the real model sent in the trial of the step that built the tools (the block with its id, name and caller), one block each, with the dates of the calendar request replaced by a mark; the envelope around them (id, usage) is written in the shape of the recorded answers.",
-    "The text {{application-line}} in an answer is replaced by the fake with the last line of the application in the request (the entry of role \"system\" after a message of the person). {{date+N}}, anywhere in an answer, is replaced by the date N days after the date that line states. {{last-tool-result}}, in a text, is replaced by the content of the last result of a tool in the request."
+    "The text {{application-line}} in an answer is replaced by the fake with the last line of the application in the request (the entry of role \"system\" after a message of the person). {{date+N}}, anywhere in an answer, is replaced by the date N days after the date that line states. {{last-tool-result}}, in a text, is replaced by the content of the last result of a tool in the request.",
+    "The requests for a booking (tool-book-day…) are the one content block the real model sent for \"book me Tuesday at 10\" in the trial of the step that built the proposal (its id, name and caller; an input of a date and a time, nothing else), with the date replaced by a mark and the time by the hour each journey opens. A step after a proposal is counted like any other: the confirmation's request for the closing words is the second request since the person's message. The message \"yes\" is scripted to ask for the same booking again, as the real model did when a person typed it instead of pressing the button."
   ],
   "answers": {
     "not-scripted": {
@@ -353,6 +354,166 @@
           "output_tokens": 0
         }
       }
+    },
+    "tool-book-day26-0500": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_book_day26_0500",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01XF26pfEQp8jac5UPVq5t51",
+            "name": "book_appointment",
+            "input": {
+              "date": "{{date+26}}",
+              "time": "05:00"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-book-day27-0500": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_book_day27_0500",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01XF26pfEQp8jac5UPVq5t51",
+            "name": "book_appointment",
+            "input": {
+              "date": "{{date+27}}",
+              "time": "05:00"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-book-day28-0400": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_book_day28_0400",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01XF26pfEQp8jac5UPVq5t51",
+            "name": "book_appointment",
+            "input": {
+              "date": "{{date+28}}",
+              "time": "04:00"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-book-day28-0500": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_book_day28_0500",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01XF26pfEQp8jac5UPVq5t51",
+            "name": "book_appointment",
+            "input": {
+              "date": "{{date+28}}",
+              "time": "05:00"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-book-day28-0600": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_book_day28_0600",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01XF26pfEQp8jac5UPVq5t51",
+            "name": "book_appointment",
+            "input": {
+              "date": "{{date+28}}",
+              "time": "06:00"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
     }
   },
   "otherwise": "not-scripted",
@@ -403,6 +564,33 @@
       "tool-get-settings",
       {
         "once": "error-overloaded",
+        "then": "text-last-tool-result"
+      }
+    ],
+    "fake: book me the slot of the booking journey": [
+      "tool-book-day26-0500",
+      "text-last-tool-result"
+    ],
+    "fake: book me the slot of the declining journey": [
+      "tool-book-day27-0500",
+      "text-last-tool-result"
+    ],
+    "yes": [
+      "tool-book-day27-0500",
+      "text-last-tool-result"
+    ],
+    "fake: book me the slot somebody else takes": [
+      "tool-book-day28-0400",
+      "text-last-tool-result"
+    ],
+    "fake: book me the slot confirmed twice": [
+      "tool-book-day28-0500",
+      "text-last-tool-result"
+    ],
+    "fake: book me a slot when the money runs out": [
+      "tool-book-day28-0600",
+      {
+        "once": "error-own-spend-limit",
         "then": "text-last-tool-result"
       }
     ]

@@ -1,4 +1,4 @@
-import type { AssistantReadKind, Role } from '@shared-calendar/shared';
+import type { AssistantReadKind, AssistantTexts, Role } from '@shared-calendar/shared';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { z } from 'zod';
 import type { ToolDefinition as ClaudeTool } from '../../lib/anthropic';
@@ -28,7 +28,8 @@ export type ToolDefinition = {
   // Administrator, the Administrator's schema offers more. The same schema gives Claude its JSON
   // Schema and checks what Claude sent.
   input: (role: Role) => z.ZodType;
-  // What the tool looks at, which chooses the line of progress shown after it ran.
+  // What the tool looks at: for a read, it chooses the line of progress shown after it ran; for a
+  // change, it is what its confirmation reads.
   reads: AssistantReadKind;
 };
 
@@ -54,14 +55,38 @@ export type RouteHandler = (event: APIGatewayProxyEventV2) => Promise<HttpRespon
 // list, its items under one name, so that a result too long can be cut at a whole item.
 export type ToolResult = { fields: Record<string, unknown>; list?: { name: string; items: unknown[] } };
 
-// The fourth part, of a change tool only. No tool has it yet: the type keeps its place, so that a
-// change tool is added without touching what a tool is.
-export type ToolConfirmation = Record<string, never>;
+// The result of one tool request, as the Messages API takes it back.
+export type ToolResultBlock = { type: 'tool_result'; tool_use_id: string; content: string; is_error?: true };
+
+// What a route's handler answered when it was called in-process: its status and its parsed body,
+// null when the body is not JSON. A handler that threw is given as a 500 without a body.
+export type RouteAnswer = { status: number; body: unknown };
+
+// How a tool's confirmation calls a route: the core gives it this function, which builds the
+// event with the identity of the person of the request in progress.
+export type CallRoute = (handler: RouteHandler, call: ToolCall) => Promise<RouteAnswer>;
+
+// What reading the facts of a change gives. When the change can be proposed: the request its route
+// will be sent at the confirmation, exactly, and the facts the proposal shows. When it cannot (the
+// facts could not be read, or they say the change cannot be made): a code and a sentence for
+// Claude, and nothing is proposed.
+export type ConfirmationRead<Facts> = { ok: true; call: ToolCall; facts: Facts } | { ok: false; error: string; message: string };
+
+// The fourth part, of a change tool only (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5, rule
+// 2): it reads the facts a proposal shows, through the handler of a route that only reads, and
+// names the fixed text that words them. Nothing of what Claude wrote reaches the proposal but the
+// checked input.
+export type ToolConfirmation<Input, Facts> = {
+  read: (input: Input, context: ToolContext, route: CallRoute) => Promise<ConfirmationRead<Facts>>;
+  summary: (texts: AssistantTexts, facts: Facts) => string;
+};
 
 // `Input` is what the tool's schema gives once it accepted Claude's input. A tool's file writes
 // its parts as a plain object, not through a helper function: the bundler then leaves the tool,
 // and with it the calendar's handler, out of the functions that only read the definitions.
-export type Tool<Input = unknown> = {
+
+// A tool that only reads: it is run at once, by calling the handler of its route.
+export type ReadTool<Input = unknown> = {
   definition: ToolDefinition;
   toHandler: {
     // The exported handler of the tool's route, called inside the function that runs the tool.
@@ -70,8 +95,23 @@ export type Tool<Input = unknown> = {
   };
   // `body` is the parsed body of a 2xx answer of the route.
   toModel: (body: unknown, context: ToolContext) => ToolResult;
-  confirmation?: ToolConfirmation;
 };
+
+// A tool that changes the calendar. It does not hold the handler of its route: the functions that
+// build a proposal must not carry the code that changes the calendar, so the handlers of the
+// change routes are in a module of their own, `changeHandlers.ts`, which only the confirmation
+// imports. What the route will be sent comes from `confirmation.read`.
+export type ChangeTool<Input = unknown, Facts = unknown> = {
+  definition: ToolDefinition;
+  confirmation: ToolConfirmation<Input, Facts>;
+  // `body` is the parsed body of the 2xx answer the change route gave at the confirmation.
+  toModel: (body: unknown, context: ToolContext) => ToolResult;
+};
+
+export type Tool<Input = unknown> = ReadTool<Input> | ChangeTool<Input>;
+
+/** Whether a tool is one that changes the calendar. */
+export const isChange = (tool: Tool): tool is ChangeTool => tool.definition.kind === 'change';
 
 /** The definitions offered to a role, in the order of the list. */
 export function offeredTo(definitions: readonly ToolDefinition[], role: Role): ToolDefinition[] {

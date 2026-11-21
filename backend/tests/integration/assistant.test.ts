@@ -1,4 +1,4 @@
-import { addDays, localDateOf } from '@shared-calendar/shared';
+import { addDays, assistantTexts, localDateOf } from '@shared-calendar/shared';
 import { api, createUserInNoGroup, forgetDailyUse, localDailyMessageLimit, queryAssistantPartition, removeUserIfPresent, signIn, subOf } from './setup';
 
 // The assistant's journeys (docs/CONVERSATIONAL_ARCHITECTURE.md section 12.2), end to end through
@@ -12,9 +12,13 @@ import { api, createUserInNoGroup, forgetDailyUse, localDailyMessageLimit, query
 // (forgetDailyUse).
 //
 // The calendar table is never emptied here, and nothing another file left in it is relied on.
-// The one block that needs the calendar creates what it reads through the API, as the
-// Administrator, under a type name of its own and in hours no other journey opens, and removes it
-// at the end and, should an interrupted run have left it, before it starts.
+// Each block that needs the calendar creates what it uses through the API, as the Administrator:
+// one window on a day of its own (25 to 28 days after today), under a type name of its own and in
+// hours no other journey opens. It removes the window and the type at the end and, should an
+// interrupted run have left them, before it starts; the appointments it booked are cancelled
+// first, so what stays in the table is those cancelled appointments and their events, which keep
+// no slot busy. Before any block starts, the file removes what an interrupted run of any of them
+// left on a day still to come.
 //
 // Secrets: tokens and passwords stay in variables; no assertion prints one.
 
@@ -36,13 +40,14 @@ const conversation = (token: string) => api('GET', '/assistant/conversation', to
 const startAgain = (token: string) => api('DELETE', '/assistant/conversation', token);
 const goOn = (token: string) => api('POST', '/assistant/continue', token);
 
-// The entries of the person's conversation in progress, as stored: each message item of that
-// conversation, in order, its content read as the JSON text it is kept as. The partition also
-// holds the messages of the person's earlier conversations, which are left out.
+// The entries of the person's conversation in progress that Claude is given, as stored: each
+// message item of that conversation, in order, its content read as the JSON text it is kept as.
+// A notice, which only the person reads, is left out, and so are the messages of the person's
+// earlier conversations, which the partition also holds.
 async function storedEntries(token: string): Promise<{ role: string; content: unknown }[]> {
   const items = await queryAssistantPartition(`CONV#${subOf(token)}`);
   const id = items.find((item) => item.SK === 'META')?.conversationId as string;
-  return items.filter((item) => item.SK.startsWith(`MSG#${id}#`)).map((item) => JSON.parse(item.content as string) as { role: string; content: unknown });
+  return items.filter((item) => item.SK.startsWith(`MSG#${id}#`) && item.kind === 'model').map((item) => JSON.parse(item.content as string) as { role: string; content: unknown });
 }
 
 // What the routes answer while the person has no conversation.
@@ -56,11 +61,79 @@ const none = (remainingToday: number) => ({
   remainingToday,
 });
 
+// The date `days` after today's date in the calendar's zone: the date the fake's answer file
+// names as {{date+N}}.
+async function dayOfJourney(days: number): Promise<string> {
+  const settings = await api('GET', '/calendar/settings', adminToken);
+  return addDays(localDateOf(new Date().toISOString(), settings.body?.timeZone as string), days);
+}
+
+type JourneyWindow = { typeName: string; source?: string; sourceId?: string };
+type Booked = { appointmentId: string; typeName: string; start: string; username: string; status: string; note: string | null; createdBy: { username: string; role: string } };
+
+// The type names of the journeys that use the calendar, one per block.
+const JOURNEY_TYPES = ['assistant journey', 'assistant booking journey', 'assistant declining journey', 'assistant trouble journey'];
+
+// Removes what the journeys made in the calendar under one of their type names, when it is there:
+// the appointments booked under that type are cancelled, then its windows and the type are
+// deleted. It looks at every day a journey can have used and that is still to come, tomorrow to
+// 28 days ahead, so that what a run interrupted on an earlier date left is removed too.
+async function removeFromCalendar(typeName: string): Promise<void> {
+  const from = await dayOfJourney(1);
+  const to = await dayOfJourney(28);
+  const booked = await api('GET', `/calendar/appointments?from=${from}&to=${to}`, adminToken);
+  expect(booked.status).toBe(200);
+  for (const appointment of (booked.body?.appointments as Booked[]).filter((a) => a.typeName === typeName)) {
+    expect((await api('POST', `/calendar/appointments/${appointment.appointmentId}/cancel`, adminToken, {})).status).toBe(200);
+  }
+  const view = await api('GET', `/calendar?from=${from}&to=${to}`, adminToken);
+  expect(view.status).toBe(200);
+  const windows = (view.body?.days as { windows: JourneyWindow[] }[]).flatMap((d) => d.windows);
+  for (const window of windows.filter((w) => w.typeName === typeName && w.source === 'one_off')) {
+    expect((await api('DELETE', `/calendar/windows/${window.sourceId}`, adminToken)).status).toBe(204);
+  }
+  const types = (await api('GET', '/calendar/types', adminToken)).body?.types as { typeId: string; name: string }[];
+  for (const type of types.filter((t) => t.name === typeName)) {
+    expect((await api('DELETE', `/calendar/types/${type.typeId}`, adminToken)).status).toBe(204);
+  }
+}
+
+// Opens the journey's window on its day under a new type of the journey's name.
+async function openWindow(day: string, typeName: string, start: string, end: string): Promise<{ typeId: string; windowId: string }> {
+  const type = await api('POST', '/calendar/types', adminToken, { name: typeName });
+  expect(type.status).toBe(201);
+  const typeId = type.body?.typeId as string;
+  const window = await api('POST', '/calendar/windows', adminToken, { date: day, start, end, typeId });
+  expect(window.status).toBe(201);
+  return { typeId, windowId: window.body?.windowId as string };
+}
+
+const confirm = (token: string, proposalId: string) => api('POST', `/assistant/proposals/${proposalId}/confirm`, token);
+const decline = (token: string, proposalId: string) => api('POST', `/assistant/proposals/${proposalId}/decline`, token);
+// The person's own appointments that have not ended, booked ones only, as the calendar's route gives them.
+const appointmentsOf = async (token: string) => (await api('GET', '/calendar/appointments?upcoming=true', token)).body?.appointments as Booked[];
+
+// A proposal of one booking as the screen gets it: the question and the two labels are the fixed
+// texts of the conversation's language, the summary is the server's own sentence.
+const bookingProposal = (day: string, start: string, end: string, type: string, outcome: string | null = null, error: string | null = null) => ({
+  proposalId: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
+  question: 'Make this change?',
+  confirmLabel: 'Confirm',
+  declineLabel: "Don't",
+  actions: [{ summary: assistantTexts('en').changes.bookAppointment({ date: day, start, end, type, note: null, secondTime: false }), outcome, error }],
+});
+
+// A well-formed id that names no proposal.
+const NO_PROPOSAL = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
+
 const HELLO = 'Hello, can you hear me?';
 const HELLO_ANSWER = 'Hello. I am the assistant of the shared calendar.';
 
 beforeAll(async () => {
   adminToken = await signIn('admin', ADMIN_PASSWORD);
+  // The blocks open the same early hours on neighbouring days, so what an interrupted run of one
+  // left could stand in the way of another a day later: all of it is removed before any starts.
+  for (const typeName of JOURNEY_TYPES) await removeFromCalendar(typeName);
 });
 
 // Explained in simple words in docs/journeys/backend/assistant-text.md.
@@ -228,38 +301,15 @@ describe('reading the calendar (5.1, 8)', () => {
   let typeId: string;
   let windowId: string;
 
-  type Window = { typeName: string; source?: string; sourceId?: string };
-
-  // Removes the journey's window and type, when they are there.
-  async function removeWhatTheJourneyMade(): Promise<void> {
-    const view = await api('GET', `/calendar?from=${day}&to=${day}`, adminToken);
-    expect(view.status).toBe(200);
-    const windows = (view.body?.days as { windows: Window[] }[])[0]?.windows ?? [];
-    for (const window of windows.filter((w) => w.typeName === TYPE && w.source === 'one_off')) {
-      expect((await api('DELETE', `/calendar/windows/${window.sourceId}`, adminToken)).status).toBe(204);
-    }
-    const types = (await api('GET', '/calendar/types', adminToken)).body?.types as { typeId: string; name: string }[];
-    for (const type of types.filter((t) => t.name === TYPE)) {
-      expect((await api('DELETE', `/calendar/types/${type.typeId}`, adminToken)).status).toBe(204);
-    }
-  }
-
   beforeAll(async () => {
-    const settings = await api('GET', '/calendar/settings', adminToken);
-    day = addDays(localDateOf(new Date().toISOString(), settings.body?.timeZone as string), 25);
+    day = await dayOfJourney(25);
     token = await newUser('chat-read');
-    await removeWhatTheJourneyMade();
-
-    const type = await api('POST', '/calendar/types', adminToken, { name: TYPE });
-    expect(type.status).toBe(201);
-    typeId = type.body?.typeId as string;
-    const window = await api('POST', '/calendar/windows', adminToken, { date: day, start: '05:00', end: '07:00', typeId });
-    expect(window.status).toBe(201);
-    windowId = window.body?.windowId as string;
+    await removeFromCalendar(TYPE);
+    ({ typeId, windowId } = await openWindow(day, TYPE, '05:00', '07:00'));
   });
 
   afterAll(async () => {
-    await removeWhatTheJourneyMade();
+    await removeFromCalendar(TYPE);
     await removeUserIfPresent('chat-read');
   });
 
@@ -329,6 +379,267 @@ describe('reading the calendar (5.1, 8)', () => {
     expect((await startAgain(token)).status).toBe(204);
     expect(await goOn(token)).toMatchObject({ status: 409, body: { error: 'nothing_to_continue' } });
     expect((await conversation(token)).body).toEqual(none(LIMIT - 1));
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/assistant-booking.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('booking through the assistant (5.4, 5.5, 6)', () => {
+  const TYPE = 'assistant booking journey';
+  const ASK = 'fake: book me the slot of the booking journey';
+  // The day the fake asks to book on: {{date+26}} of its answer file, at 05:00.
+  let day: string;
+  let token: string;
+  let proposalId: string;
+  let appointmentId: string;
+
+  beforeAll(async () => {
+    day = await dayOfJourney(26);
+    token = await newUser('chat-book');
+    await removeFromCalendar(TYPE);
+    await openWindow(day, TYPE, '05:00', '07:00');
+  });
+
+  afterAll(async () => {
+    await removeFromCalendar(TYPE);
+    await removeUserIfPresent('chat-book');
+  });
+
+  it('a request to book: Claude asks for the change, nothing is booked, and the answer holds the proposal in the words of the server', async () => {
+    const res = await say(token, ASK);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      conversationId: expect.any(String),
+      language: 'en',
+      status: 'awaiting_confirmation',
+      messages: [{ seq: 1, from: 'person', text: ASK, at: expect.any(String) }],
+      activity: null,
+      proposal: bookingProposal(day, '05:00', '06:00', TYPE),
+      remainingToday: LIMIT - 1,
+    });
+    proposalId = (res.body?.proposal as { proposalId: string }).proposalId;
+    expect(await appointmentsOf(token)).toEqual([]);
+  });
+
+  it('the conversation, read back, shows the same proposal waiting, and there is no step to continue', async () => {
+    const read = (await conversation(token)).body;
+    expect(read).toMatchObject({ status: 'awaiting_confirmation', activity: null, proposal: { ...bookingProposal(day, '05:00', '06:00', TYPE), proposalId } });
+    expect(await goOn(token)).toMatchObject({ status: 409, body: { error: 'nothing_to_continue' } });
+  });
+
+  it('an id that is not one is refused, and so is the id of no proposal: the proposal keeps waiting', async () => {
+    expect(await confirm(token, 'not-an-id')).toMatchObject({ status: 400, body: { error: 'invalid_request' } });
+    expect(await decline(token, 'not-an-id')).toMatchObject({ status: 400, body: { error: 'invalid_request' } });
+    expect(await confirm(token, NO_PROPOSAL)).toEqual({ status: 404, body: { error: 'proposal_not_found', message: expect.any(String) } });
+    expect(await decline(token, NO_PROPOSAL)).toEqual({ status: 404, body: { error: 'proposal_not_found', message: expect.any(String) } });
+    expect((await conversation(token)).body).toMatchObject({ status: 'awaiting_confirmation', proposal: { proposalId } });
+    expect(await appointmentsOf(token)).toEqual([]);
+  });
+
+  it('confirm books it: the proposal is shown as done, and Claude is told the person confirmed and what was booked', async () => {
+    const res = await confirm(token, proposalId);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      status: 'idle',
+      activity: null,
+      proposal: { ...bookingProposal(day, '05:00', '06:00', TYPE, 'done'), proposalId },
+      remainingToday: LIMIT - 1,
+    });
+    const messages = res.body?.messages as { seq: number; from: string; text: string }[];
+    expect(messages.map((message) => [message.seq, message.from])).toEqual([[5, 'assistant']]);
+    // The fake answers with the result of the change, word for word: what Claude was given.
+    const given = JSON.parse(messages[0]?.text ?? '') as { outcome: string; message: string; appointment: Record<string, unknown> };
+    expect(given.outcome).toBe('done');
+    expect(given.message).toContain('pressed the confirm button');
+    expect(given.appointment).toMatchObject({ date: day, start: '05:00', end: '06:00', type: TYPE, username: 'chat-book', note: null, status: 'booked' });
+    appointmentId = given.appointment.id as string;
+  });
+
+  it("the calendar's own route shows the appointment, booked by the User themself", async () => {
+    const booked = await appointmentsOf(token);
+    expect(booked).toHaveLength(1);
+    expect(booked[0]).toMatchObject({ appointmentId, typeName: TYPE, username: 'chat-book', status: 'booked', note: null, createdBy: { username: 'chat-book', role: 'user' } });
+  });
+
+  it('the same proposal cannot be confirmed or declined again, and nothing more is booked', async () => {
+    expect(await confirm(token, proposalId)).toMatchObject({ status: 404, body: { error: 'proposal_not_found' } });
+    expect(await decline(token, proposalId)).toMatchObject({ status: 404, body: { error: 'proposal_not_found' } });
+    expect(await appointmentsOf(token)).toHaveLength(1);
+  });
+
+  it('stored the exchange as five entries, counted one message, and shows the settled proposal until the next message', async () => {
+    const stored = await storedEntries(token);
+    expect(stored.map((entry) => entry.role)).toEqual(['user', 'system', 'assistant', 'user', 'assistant']);
+    expect(stored[2]?.content).toEqual([expect.objectContaining({ type: 'tool_use', name: 'book_appointment', input: { date: day, time: '05:00' } })]);
+    expect(stored[3]?.content).toEqual([expect.objectContaining({ type: 'tool_result', content: expect.stringContaining('"outcome":"done"') })]);
+
+    expect((await conversation(token)).body).toMatchObject({ status: 'idle', proposal: { proposalId, actions: [{ outcome: 'done', error: null }] }, remainingToday: LIMIT - 1 });
+    expect((await say(token, HELLO)).body).toMatchObject({ status: 'idle', proposal: null, remainingToday: LIMIT - 2 });
+    expect((await conversation(token)).body?.proposal).toBeNull();
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/assistant-not-confirmed.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('a proposal that is not confirmed (5.5, 6)', () => {
+  const TYPE = 'assistant declining journey';
+  const ASK = 'fake: book me the slot of the declining journey';
+  // The day the fake asks to book on: {{date+27}} of its answer file, at 05:00.
+  let day: string;
+  let token: string;
+  let proposalId: string;
+
+  const proposalIdOf = (body: Record<string, unknown> | undefined) => (body?.proposal as { proposalId: string }).proposalId;
+  // The results of tools Claude was given, as stored, in order.
+  const storedResults = async () =>
+    (await storedEntries(token))
+      .filter((entry) => entry.role === 'user' && Array.isArray(entry.content))
+      .flatMap((entry) => entry.content as { type: string; content: string }[])
+      .map((block) => JSON.parse(block.content) as { outcome: string });
+
+  beforeAll(async () => {
+    day = await dayOfJourney(27);
+    token = await newUser('chat-decline');
+    await removeFromCalendar(TYPE);
+    await openWindow(day, TYPE, '05:00', '07:00');
+  });
+
+  afterAll(async () => {
+    await removeFromCalendar(TYPE);
+    await removeUserIfPresent('chat-decline');
+  });
+
+  it('decline: nothing is booked, a notice says so, Claude is not asked, and the conversation waits for the person', async () => {
+    const asked = await say(token, ASK);
+    expect(asked.body).toMatchObject({ status: 'awaiting_confirmation', proposal: bookingProposal(day, '05:00', '06:00', TYPE) });
+
+    const res = await decline(token, proposalIdOf(asked.body));
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'idle', activity: null, proposal: null, remainingToday: LIMIT - 1 });
+    expect(res.body?.messages).toEqual([{ seq: 5, from: 'notice', text: 'Nothing was changed.', at: expect.any(String) }]);
+
+    // What Claude will read at its next step: the change was declined. No answer of Claude follows.
+    expect((await storedEntries(token)).map((entry) => entry.role)).toEqual(['user', 'system', 'assistant', 'user']);
+    expect((await storedResults()).map((result) => result.outcome)).toEqual(['declined']);
+    expect(await appointmentsOf(token)).toEqual([]);
+    // A declined proposal is gone: it can be neither confirmed nor declined again.
+    expect(await confirm(token, proposalIdOf(asked.body))).toMatchObject({ status: 404, body: { error: 'proposal_not_found' } });
+  });
+
+  it('the same request again makes a new proposal', async () => {
+    const res = await say(token, ASK);
+    expect(res.body).toMatchObject({ status: 'awaiting_confirmation', proposal: bookingProposal(day, '05:00', '06:00', TYPE), remainingToday: LIMIT - 2 });
+    proposalId = proposalIdOf(res.body);
+  });
+
+  it('a message that is refused while the proposal waits changes nothing: the proposal keeps waiting', async () => {
+    expect(await say(token, '   ')).toMatchObject({ status: 400, body: { error: 'invalid_request' } });
+    expect((await conversation(token)).body).toMatchObject({ status: 'awaiting_confirmation', proposal: { proposalId }, remainingToday: LIMIT - 2 });
+  });
+
+  it('a typed "yes" confirms nothing: the proposal is dropped, Claude asks again, and a new proposal waits', async () => {
+    const res = await say(token, 'yes');
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'awaiting_confirmation', proposal: bookingProposal(day, '05:00', '06:00', TYPE), remainingToday: LIMIT - 3 });
+    expect(res.body?.messages).toEqual([{ seq: expect.any(Number), from: 'person', text: 'yes', at: expect.any(String) }]);
+    expect(proposalIdOf(res.body)).not.toBe(proposalId);
+    expect(await appointmentsOf(token)).toEqual([]);
+
+    // The dropped proposal is gone, and Claude was told it was not confirmed.
+    expect(await confirm(token, proposalId)).toMatchObject({ status: 404, body: { error: 'proposal_not_found' } });
+    expect((await storedResults()).map((result) => result.outcome)).toEqual(['declined', 'not_confirmed']);
+    proposalId = proposalIdOf(res.body);
+  });
+
+  it('any other message drops the proposal too, and is answered as usual', async () => {
+    const res = await say(token, HELLO);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'idle', proposal: null, remainingToday: LIMIT - 4 });
+    expect((res.body?.messages as { from: string; text: string }[]).map((message) => [message.from, message.text])).toEqual([
+      ['person', HELLO],
+      ['assistant', HELLO_ANSWER],
+    ]);
+    expect((await storedResults()).map((result) => result.outcome)).toEqual(['declined', 'not_confirmed', 'not_confirmed']);
+    expect(await confirm(token, proposalId)).toMatchObject({ status: 404, body: { error: 'proposal_not_found' } });
+    expect(await appointmentsOf(token)).toEqual([]);
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/assistant-confirm-trouble.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('a confirmation that meets trouble (5.4, 7.4)', () => {
+  const TYPE = 'assistant trouble journey';
+  // The day the fake asks to book on: {{date+28}} of its answer file, at 04:00, 05:00 and 06:00,
+  // one hour for each of the three troubles.
+  let day: string;
+  let token: string;
+  let rivalToken: string;
+  let typeId: string;
+
+  const propose = async (text: string): Promise<string> => {
+    const res = await say(token, text);
+    expect(res.body).toMatchObject({ status: 'awaiting_confirmation' });
+    return (res.body?.proposal as { proposalId: string }).proposalId;
+  };
+
+  beforeAll(async () => {
+    day = await dayOfJourney(28);
+    token = await newUser('chat-trouble');
+    rivalToken = await newUser('chat-rival');
+    await removeFromCalendar(TYPE);
+    ({ typeId } = await openWindow(day, TYPE, '04:00', '07:00'));
+  });
+
+  afterAll(async () => {
+    await removeFromCalendar(TYPE);
+    await removeUserIfPresent('chat-trouble');
+    await removeUserIfPresent('chat-rival');
+  });
+
+  it('the slot is taken between the proposal and the confirmation: the booking is refused by the calendar, shown as refused with its code, and Claude is told', async () => {
+    const proposalId = await propose('fake: book me the slot somebody else takes');
+    // Somebody else books the proposed hour through the calendar's own route.
+    const slots = ((await api('GET', `/calendar?from=${day}&to=${day}`, rivalToken)).body?.days as { slots: { start: string; typeId: string }[] }[])[0]!.slots;
+    const first = slots.find((slot) => slot.typeId === typeId)!;
+    expect((await api('POST', '/calendar/appointments', rivalToken, { start: first.start })).status).toBe(201);
+
+    const res = await confirm(token, proposalId);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'idle', proposal: { ...bookingProposal(day, '04:00', '05:00', TYPE, 'refused', 'slot_taken'), proposalId } });
+    const messages = res.body?.messages as { from: string; text: string }[];
+    expect(messages.map((message) => message.from)).toEqual(['assistant']);
+    expect(JSON.parse(messages[0]?.text ?? '')).toMatchObject({ error: 'slot_taken' });
+    expect(await appointmentsOf(token)).toEqual([]);
+    expect(await appointmentsOf(rivalToken)).toHaveLength(1);
+    expect((await startAgain(token)).status).toBe(204);
+  });
+
+  it('two confirmations of one proposal at the same moment: one books, the other finds no proposal, and there is one appointment', async () => {
+    const proposalId = await propose('fake: book me the slot confirmed twice');
+    const answers = await Promise.all([confirm(token, proposalId), confirm(token, proposalId)]);
+    expect(answers.map((answer) => answer.status).sort()).toEqual([200, 404]);
+    expect(answers.find((answer) => answer.status === 404)?.body).toMatchObject({ error: 'proposal_not_found' });
+    expect(answers.find((answer) => answer.status === 200)?.body).toMatchObject({ proposal: { proposalId, actions: [{ outcome: 'done' }] } });
+    expect(await appointmentsOf(token)).toHaveLength(1);
+    expect((await startAgain(token)).status).toBe(204);
+  });
+
+  it("Anthropic's spending limit is met after the change was made: the booking stays, the answer is 503, and continue gets the closing words without booking again", async () => {
+    const proposalId = await propose('fake: book me a slot when the money runs out');
+    const res = await confirm(token, proposalId);
+    expect(res).toEqual({ status: 503, body: { error: 'assistant_budget_reached', message: expect.any(String) } });
+
+    // The change was made and saved before Claude was asked: two appointments, and the proposal done.
+    expect(await appointmentsOf(token)).toHaveLength(2);
+    expect((await conversation(token)).body).toMatchObject({ status: 'working', proposal: { proposalId, actions: [{ outcome: 'done', error: null }] } });
+    expect(await confirm(token, proposalId)).toMatchObject({ status: 404, body: { error: 'proposal_not_found' } });
+
+    const next = await goOn(token);
+    expect(next.status).toBe(200);
+    expect(next.body).toMatchObject({ status: 'idle', proposal: { proposalId, actions: [{ outcome: 'done' }] } });
+    const messages = next.body?.messages as { from: string; text: string }[];
+    expect(JSON.parse(messages[0]?.text ?? '')).toMatchObject({ outcome: 'done', appointment: { date: day, start: '06:00' } });
+    expect(await appointmentsOf(token)).toHaveLength(2);
   });
 });
 
@@ -473,6 +784,8 @@ describe('who may talk to the assistant (6)', () => {
     ['DELETE', '/assistant/conversation', undefined],
     ['POST', '/assistant/messages', { text: HELLO }],
     ['POST', '/assistant/continue', undefined],
+    ['POST', `/assistant/proposals/${NO_PROPOSAL}/confirm`, undefined],
+    ['POST', `/assistant/proposals/${NO_PROPOSAL}/decline`, undefined],
   ])('%s %s without a token is 401 (API Gateway answers)', async (method, path, body) => {
     const res = await api(method, path, undefined, body);
     expect(res.status).toBe(401);
@@ -483,6 +796,8 @@ describe('who may talk to the assistant (6)', () => {
     ['DELETE', '/assistant/conversation', undefined],
     ['POST', '/assistant/messages', { text: HELLO }],
     ['POST', '/assistant/continue', undefined],
+    ['POST', `/assistant/proposals/${NO_PROPOSAL}/confirm`, undefined],
+    ['POST', `/assistant/proposals/${NO_PROPOSAL}/decline`, undefined],
   ])('%s %s with the token of an account in neither group is 403', async (method, path, body) => {
     const res = await api(method, path, nobodyToken, body);
     expect(res.status).toBe(403);

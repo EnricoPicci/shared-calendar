@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v7, under way: steps c00 to c04 of `docs/CONVERSATIONAL_PLAN.md` done |
+| Status | v8, under way: steps c00 to c05 of `docs/CONVERSATIONAL_PLAN.md` done |
 | Date | 2026-11-21 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
@@ -18,6 +18,7 @@
 | v5 | 2026-11-21 | Step c02 of `docs/CONVERSATIONAL_PLAN.md` is done: the module that asks Claude, the read of the key and the fake Claude of the local stack exist. **What sections 6.1 and 7.2 took from Anthropic's documentation was tried with real requests** (section 7.2, "What was tried"): five of six assumptions hold on the three models. **The sixth did not, and section 6.1 changes**: the spending limit the operator sets (section 14) answers with status 400 and no code, not with the 429 this document assumed, so it is recognised by the start of its message, the one place where the words of a message are read. Decided with the Product Owner. Sections 4.2, 7.1, 7.4, 12.1 and 14 say what the implementation fixed: the request of the language question, the list of answers and of reasons, the fake's address and where its answers live |
 | v6 | 2026-11-21 | Step c03 of `docs/CONVERSATIONAL_PLAN.md` is done: the conversation in text. `docs/ARCHITECTURE.md` section 4 ("The assistant's routes") governs the three routes built. What the implementation fixed is said here: the language question that cannot be asked saves nothing (section 4.2). The version mark is worked out, from the instructions, the block about the person and the tools (section 4.3). A refusal is saved, then the conversation is ended (section 7.4). The instructions ask for the formal "lei" in Italian (section 7.3). The local stack does not remember a spending limit (section 6.1). **One point is left to step c04**, where `continue` is built: a first message asks Claude twice, the language and the step, each allowed 22 seconds, in a function of 29 |
 | v7 | 2026-11-21 | Step c04 of `docs/CONVERSATIONAL_PLAN.md` is done: reading. `docs/ARCHITECTURE.md` section 4 ("The assistant's routes") governs `POST /assistant/continue` and the four read tools. What the implementation fixed is said here. **Decided by the Product Owner:** `continue` is not a message of the day and the daily limit does not refuse it (section 6); a language question that took too long leaves the step to `continue` (sections 4.2 and 5.1); the instructions name what cannot be done yet, a stopgap each later step shrinks (section 7.3). The limit of eight is counted from the stored conversation, and the eighth answer's reads are still run and saved (sections 4.4 and 5.6). `continue` answers `409 assistant_busy` to the loser of two at once (section 6). A tool of another role is answered like one that does not exist (section 7.4). A tool's JSON Schema is made from its `zod` schema by `zod` itself; an input differs by role where the route takes more from the Administrator (section 8.2). What a result holds, and how it is cut (section 8.3). The fake Claude's tool requests, its two new marks and its one memory (section 12.1) |
+| v8 | 2026-11-21 | Step c05 of `docs/CONVERSATIONAL_PLAN.md` is done: a change, with its proposal, and one change tool, `book_appointment`, for Users. `docs/ARCHITECTURE.md` section 4 ("The assistant's routes") governs the two routes built, `confirm` and `decline`. **Decided with the Product Owner:** `book_appointment` is offered to Users only until the Administrator's booking is built, and the function that confirms gets only the permissions a User's booking needs (section 11.3). The stored proposal is a list of changes from the start, of which one is accepted for now (section 5.5, rule 4). What the implementation fixed is said here. A message while a proposal waits drops it and is read in the same request (section 5.5, rule 5). What each request does when it finds a proposal a confirmation took, and how old such a proposal must be to count as left (section 5.5, rule 6). The result of a change that was made says that the person confirmed, because the real model otherwise spoke of a proposal still waiting (section 5.4). A change the route failed on has the outcome `unknown` (section 5.4). How long a settled proposal is shown (section 6). The night the clocks go back: which of two equal times (section 8.2). The change handlers are reachable from the confirming function alone, which a lint rule keeps so (section 8.2). The stored shape of a proposal (section 9) |
 
 ---
 
@@ -291,6 +292,12 @@ flowchart LR
 | 6 | `awaiting_confirmation` | `idle` | Decline: "Nothing was changed" |
 | 7 | `awaiting_confirmation` | `working` | The person writes instead: the proposal is dropped |
 
+Arrow 7 and the step after it happen in one request: the message that drops the proposal is
+read by Claude at once, so the answer of that request is already `idle`, `working` or a new
+`awaiting_confirmation`. Between arrow 5 and the saving of the outcomes the stored status is
+still `awaiting_confirmation`, with the mark that a confirmation took the proposal; every route
+shows that conversation as `working` (section 5.5, rule 6).
+
 ### 5.3 A question that only reads
 
 ```mermaid
@@ -358,6 +365,38 @@ sequenceDiagram
     K-->>V: 200 { status: "idle", messages, proposal with its outcome }
 ```
 
+As built (`backend/src/assistant/`: `exchange.ts` makes the proposal, `confirm.ts` and
+`decline.ts` settle it, `proposal.ts` holds its stored shape):
+
+- **The step in which Claude asks for a change** runs no change. The reads Claude asked for in
+  the same answer are run, and their results kept back with the proposal. Claude's answer and
+  the proposal are saved in one write, and the status is `awaiting_confirmation`. It is one
+  request to Claude like any other step, and counts among the eight of section 4.4.
+- **The facts are read through the route's handler.** For a booking the server calls the code
+  of `GET /calendar` for that day with the caller's identity, finds the free slot that starts
+  at the time asked for, and takes its end and the name of its type from the answer. No slot,
+  or a time that the day does not have, is an error result and the step goes on as after a
+  read: there is no proposal.
+- **Confirming** takes the proposal, runs each change through its route's handler with the
+  identity of the request that confirms (not one stored with the proposal), and saves the
+  outcomes before Claude is asked anything. Then it asks Claude once, for the closing words,
+  with the same code as every step. When Claude cannot be reached the answer is the 503 of
+  section 6.1, the changes stay made and saved, the status is `working`, and `continue` gets
+  the closing words. The same holds when too little of the function's time is left to ask:
+  the answer is then `200` with the status `working`.
+- **The outcome of a change** is `done` when its route answered a success, `refused` with the
+  route's error code when it answered a refusal, and `unknown` when the route failed (a status
+  of 500 or more, or a handler that threw): nobody knows then whether the write happened, and
+  Claude is told to read the calendar before saying anything.
+- **What Claude is given for a change that was made** is what the route answered, made small
+  (section 8.3), after the words "the person pressed the confirm button and the change was
+  made". Without them the real model, seeing only an appointment, told the person that the
+  booking was still waiting for their confirmation.
+- **Declining** asks Claude nothing: it saves the result "declined, nothing was changed" for
+  each change, with the results kept back, and the fixed notice. The function has no key and
+  the project's 10 seconds.
+- **A confirmation or a decline is not a message of the day.**
+
 ### 5.5 The rules of a proposal
 
 1. **The model cannot make a change.** A change tool asked for by the model is never run in
@@ -379,16 +418,36 @@ sequenceDiagram
    together, run in order, each with its own outcome (one refused does not stop the others;
    the calendar's routes are independent). Reads asked for in the same answer are run at once
    and their results kept back until the proposal is settled.
+   **For the time being a proposal holds one change**: when the model asks for more than one
+   in an answer, none is proposed and each gets the error result "one change at a time", so
+   the model asks for the first alone. The stored proposal is a list all the same, and the
+   screen's `actions` too, so that the step that brings the other change tools only lifts
+   this limit.
 5. **Writing instead of pressing drops the proposal.** A new message while a proposal waits
    ("no, at eleven") declines it; the model is told nothing was changed and reads the new
    message. That includes a typed "yes": the model then proposes again and the screen shows
    the buttons again. It is the price of rule 1, and it keeps a channel-independent meaning to
-   "confirm" (section 16).
+   "confirm" (section 16). The message that drops a proposal is saved in one write with the
+   results "not confirmed" and is read by Claude in the same request: one request to Claude,
+   one message of the day. A message that is refused (the daily limit, a full conversation, a
+   body that is not valid) saves nothing, and the proposal keeps waiting.
 6. **A confirmation runs once.** Taking the proposal is a conditional write on the
    conversation: of two confirmations at the same moment, one wins and the other answers
    `404 proposal_not_found`. If a function stops after taking it and before saving the
    outcomes, the next request records "outcome unknown" for those changes, and the model is
    told to read the calendar before saying anything about them.
+
+**A proposal a confirmation took** (rule 6) is found by a later request in one of two ages. A
+confirming function lives 29 seconds at most, so a proposal taken less than 31 seconds ago may
+still be under way, and one taken earlier was left by a function that stopped.
+
+| Request | Taken less than 31 s ago | Taken 31 s ago or more |
+|---|---|---|
+| `POST /assistant/messages` | `409 assistant_busy` | records each change as `unknown`, then reads the message |
+| `POST /assistant/continue` | `409 assistant_busy` | records each change as `unknown`, then asks Claude |
+| `POST …/confirm`, `POST …/decline` | `404 proposal_not_found`, nothing written | the same |
+| `GET /assistant/conversation` | status `working`, the proposal without outcomes, no button to offer | status `working`, each change shown as `unknown`; it writes nothing, the next message or `continue` records it |
+| `DELETE /assistant/conversation` | ends the conversation | the same |
 
 ### 5.6 The assistant's logic, in one diagram
 
@@ -488,9 +547,8 @@ How to read it:
 - **The limit of eight** (section 4.4) is checked after Claude answered: the eighth answer in
   words is an answer like any other; the eighth that asks to read has its reads run and saved,
   then the fixed sentence, and the status is `idle`.
-- **Step c04 of `docs/CONVERSATIONAL_PLAN.md` built** the entries "a new message" and
-  "continue" and the branches "text", "only to read" and "unknown, not of this role, wrong
-  input". The confirmation and the branch "asks for a change" are still to build.
+- **Everything in the diagram is built.** For the time being a proposal holds one change
+  (section 5.5, rule 4), so the loop of the confirmation runs once.
 
 ---
 
@@ -505,9 +563,9 @@ of the token, and no route takes a conversation id.
 |---|---|---|---|
 | `GET /assistant/conversation` | none | `200` `AssistantReply` with every message of the conversation, or an empty one when there is none | none |
 | `DELETE /assistant/conversation` | none | `204`; the conversation is ended (a pending proposal is dropped) | none |
-| `POST /assistant/messages` | `{ "text" }`, 1 to 2 000 characters after trimming, no other field | `200` `AssistantReply` | 400 `invalid_json` / `invalid_request` · 409 `assistant_busy` (a step is waiting: call `continue`), `conversation_full` · 429 `assistant_limit_reached` · 503 `assistant_unavailable`, `assistant_budget_reached` |
-| `POST /assistant/continue` | none | `200` `AssistantReply` | 409 `nothing_to_continue` (not `working`, or no conversation), `assistant_busy` (another request of the same person wrote first) · 503 `assistant_unavailable`, `assistant_budget_reached` (the conversation stays `working`). It is not a message of the day: nothing is counted, and the daily limit never refuses it |
-| `POST /assistant/proposals/{proposalId}/confirm` | none | `200` `AssistantReply` | 400 `invalid_request` (not a ULID) · 404 `proposal_not_found` (unknown, settled, or dropped) · 503 `assistant_unavailable`, `assistant_budget_reached` (in both cases the changes were made and saved, and the proposal in the body of the next `GET` shows each outcome; `continue` gets the closing words) |
+| `POST /assistant/messages` | `{ "text" }`, 1 to 2 000 characters after trimming, no other field | `200` `AssistantReply` | 400 `invalid_json` / `invalid_request` · 409 `assistant_busy` (a step is waiting: call `continue`; or a confirmation is under way), `conversation_full` · 429 `assistant_limit_reached` · 503 `assistant_unavailable`, `assistant_budget_reached` |
+| `POST /assistant/continue` | none | `200` `AssistantReply` | 409 `nothing_to_continue` (not `working`, or no conversation; a proposal that waits for the person is not a step to continue), `assistant_busy` (another request of the same person wrote first, or a confirmation is under way) · 503 `assistant_unavailable`, `assistant_budget_reached` (the conversation stays `working`). It is not a message of the day: nothing is counted, and the daily limit never refuses it |
+| `POST /assistant/proposals/{proposalId}/confirm` | none | `200` `AssistantReply` | 400 `invalid_request` (not a ULID) · 404 `proposal_not_found` (unknown, settled, dropped, or taken by another confirmation) · 409 `assistant_busy` (the conversation was ended or written while the changes were being made: they were made, their outcomes are not saved) · 503 `assistant_unavailable`, `assistant_budget_reached` (in both cases the changes were made and saved, and the proposal in the body of the next `GET` shows each outcome; `continue` gets the closing words) |
 | `POST /assistant/proposals/{proposalId}/decline` | none | `200` `AssistantReply` with the fixed sentence | 400 `invalid_request` · 404 `proposal_not_found` |
 
 `AssistantReply` (types in `shared/`):
@@ -534,6 +592,20 @@ server's fixed notices. Claude's tool requests, the tools' results and the think
 never leave the server. `POST` routes answer the messages added by that request; `GET` answers
 them all. Text is plain text: the screen shows it as written, line breaks kept, nothing
 interpreted.
+
+**How long a proposal is shown.** `proposal` is the proposal that waits, with every `outcome`
+`null`, or the one just settled by a confirmation, with its outcomes. The settled one stays in
+every answer (the confirmation's, each `continue` that follows, `GET`) until the person's next
+message is saved or the conversation ends. A declined or dropped proposal is not shown again:
+the answer that declines or drops it already holds `null`. Neither `confirm` nor `decline` is a
+message of the day.
+
+**The words of a proposal** are the server's: `question` and the two labels are fixed texts of
+the conversation's language, and each `summary` is a sentence the server writes from the facts
+it read, by a function of `shared/src/assistant/`. For a booking: "Book an appointment on
+Tuesday 24 November 2026, from 10:00 to 11:00 (Visit)." and, in Italian, "Prenotare un
+appuntamento per martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Visit).", followed by the
+note when there is one.
 
 The new codes start in `shared/src/api.ts`, as the project's rule asks.
 
@@ -669,10 +741,12 @@ conversation's language) say, in prose:
 - what is done in the web pages only (section 3.1).
 
 **The instructions say what works.** While some abilities of section 3 have no tool yet, one
-paragraph ("What you can do for the time being") tells Claude that it can only look things up
-(the settings, the types, the free slots, the appointments) and that booking, moving,
-cancelling, notes and the opening hours, types and settings are done from the web pages for the
-time being. **That paragraph is a stopgap.** Each step that brings a tool takes its ability out
+paragraph ("What you can do for the time being") tells Claude that it can look things up
+(the settings, the types, the free slots, the appointments), that a User can book an
+appointment for themself, and that moving, cancelling, notes and the opening hours, types and
+settings are done from the web pages for the time being, as is the Administrator's booking for
+a User. It is one paragraph for both roles: the tools a request names already differ by
+role. **That paragraph is a stopgap.** Each step that brings a tool takes its ability out
 of it, and the step that brings the last one removes the paragraph; only the list of section
 3.1 stays in the web pages for good. Every change to it changes the version mark (section 4.3),
 so it ends the conversations in progress.
@@ -736,7 +810,28 @@ it imports both: the handlers as tools, and `lib` for the table, the model and t
 
 As built (`backend/src/assistant/tools/`): `tool.ts` says what a tool is, each tool has its
 file, `list.ts` holds them in the order Claude is given them, `event.ts` builds the event of
-section 8.1 for every tool, `result.ts` makes a result small, `run.ts` runs one read.
+section 8.1 for every tool, `result.ts` makes a result small, `run.ts` runs one read and works
+out one proposed change, `changeHandlers.ts` names the handler of each change tool.
+
+- **A read tool and a change tool are two shapes.** A read tool has the first three parts. A
+  change tool has no "to the handler" part of its own: its confirmation reads the facts and
+  answers the request to run (the route, the path, the body) together with them, and that
+  request is stored in the proposal and run as stored. So what is confirmed is what is run.
+- **Only the confirming function carries a change handler.** A change tool's file imports no
+  handler that changes the calendar. `changeHandlers.ts` is the one module that does, `confirm.ts`
+  the one module of the core that imports it, and the handler of the confirm route the one
+  handler that imports `confirm.ts`. The functions that take a message, continue, decline,
+  show or end a conversation are therefore built without the code that books, and a lint rule
+  refuses an import that would bring it in. Their bundles were searched for the calendar's
+  write under the lock: it is in the confirming function's only.
+- **`book_appointment`**, for Users: a day, a local start time, an optional note. No end, no
+  type and no username: the server takes the end and the type from the slot, and the person
+  from the token. **On the night the clocks go back** an hour comes twice. `get_calendar`
+  writes the second of two equal free times as "02:00 (second)", and the tool takes an
+  optional `occurrence`, `first` or `second`. A time that comes twice asked without it is an
+  error result that tells Claude to ask the person, and the proposal of the second one says
+  so in words. A time the day does not have (the night the clocks go forward) is an error
+  result too.
 
 - **The JSON Schema Claude is given is made from the `zod` schema**, by `zod`'s own
   `z.toJSONSchema`, without its `$schema` line. One schema therefore does both jobs: it tells
@@ -802,7 +897,7 @@ so that the calendar's shared permission sets stay as they are.
 
 | Item | `PK` | `SK` | Attributes |
 |---|---|---|---|
-| Conversation | `CONV#<sub>` | `META` | `conversationId` (ULID), `language`, `status`, `startedAt`, `lastActivityAt`, `messageCount`, `storedBytes`, `nextSeq`, `promptVersion`, `proposal` (the changes asked for, their input, the facts shown, the kept-back read results) or `null`, `executing` (the proposal taken and when) or `null`, `version` (N), `expiresAt` |
+| Conversation | `CONV#<sub>` | `META` | `conversationId` (ULID), `language`, `status`, `startedAt`, `lastActivityAt`, `messageCount`, `storedBytes`, `nextSeq`, `promptVersion`, `proposal` (its id; its changes, each with the tool, the id of Claude's request, the request to run, the summary shown, the outcome and the error code; the kept-back read results) or `null`, `executing` (the proposal taken and when) or `null`, `version` (N), `expiresAt` |
 | Message | `CONV#<sub>` | `MSG#<conversationId>#<seq>` | `kind` (`model`: one entry of the conversation exactly as exchanged with Claude; `notice`: a fixed text of the server, shown and never sent to Claude), `content`, `at`, `expiresAt` |
 | Daily use | `USAGE#<sub>` | `<local date>` | `messages` (N), `inputTokens`, `outputTokens` (N), `expiresAt` (35 days) |
 
@@ -914,10 +1009,18 @@ key and a monthly spend limit (section 14).
 |---|---|---|---|
 | `getConversation` | `GET /assistant/conversation` | 10 s | assistant table: read |
 | `endConversation` | `DELETE /assistant/conversation` | 10 s | assistant table |
-| `declineProposal` | `POST …/decline` | 10 s | assistant table |
+| `declineProposal` | `POST …/decline` | 10 s | assistant table (no key: it never asks Claude) |
 | `sendAssistantMessage` | `POST /assistant/messages` | 29 s | assistant table; `CalendarReadPolicy`; Cognito `ListUsersInGroup` (the tool `list_users`); `ssm:GetParameter` on the key |
 | `continueAssistant` | `POST /assistant/continue` | 29 s | as `sendAssistantMessage` |
 | `confirmProposal` | `POST …/confirm` | 29 s | as `sendAssistantMessage`, plus `CalendarWritePolicy`, `CalendarDeletePolicy`, `CalendarBookPolicy` and Cognito `AdminGetUser`, `AdminListGroupsForUser` (booking for a User) |
+
+**As built, `confirmProposal` has less than the row above**: the assistant table, the key,
+and of the calendar `CalendarReadPolicy`, `CalendarWritePolicy` and `CalendarBookPolicy`, which
+is what a User's booking needs. `CalendarDeletePolicy` and the two Cognito actions come with
+the tools that need them (the changes that delete, and the Administrator's booking for a User).
+`sendAssistantMessage` and `continueAssistant` gained nothing: a proposal's facts are read with
+the calendar's read set they already had. They have no Cognito permission yet either, as
+`list_users` is not built.
 
 The three functions that run tools receive the environment the calendar's handlers read (the
 table's name, the time zone, the user pool). 29 seconds stays under API Gateway's 30; the
@@ -959,10 +1062,22 @@ never disagrees with the journey about the date. **One memory**: a step written
 when the very same request comes again, which is an outage that passes; it is forgotten once
 "then" is given.
 
+**With the proposal the fake learnt nothing new.** Its way of choosing an answer, the text of
+the person's last message and the count of Claude's answers since it, is enough: the closing
+words after a confirmation are the second answer since the message that asked, the same
+sentence sent again after a decline is a new last message and starts at the first answer, and
+a typed "yes" is a sentence of its own in the file. The request for a booking in the file is
+the block the real model sent in step c05 of `docs/CONVERSATIONAL_PLAN.md`.
+
 **The journeys and the calendar.** The assistant's journeys never empty the `calendar` table.
 What they need they create through the API as the Administrator, under a type name of their own
 and in hours no other journey opens, and remove at the end and before they start
-(`docs/journeys/concepts.md`, "One local calendar, shared").
+(`docs/journeys/concepts.md`, "One local calendar, shared"). The journeys that book each have a
+day of their own, 26 to 28 days ahead, and cancel their appointments before removing the
+window: the cancelled appointments and their events stay in the table and keep no slot busy,
+so a second run the same day finds the same free slots. The blocks open the same early hours on
+neighbouring days, so before any of them starts the file removes what an interrupted run of any
+left on a day from tomorrow to 28 days ahead.
 
 ### 12.2 The tests
 
@@ -1137,7 +1252,7 @@ Not built now. What the design already gives it, and what it would add:
 | P3 | **The capacity of the `assistant` table** under a long conversation | Measure the units a step uses in the journeys; lower the 100 KB bound or the result cap if the burst allowance is not enough | Nothing |
 | P4 | **Effort level and model** | The first evaluation run decides, on quality, seconds per step and cents per exchange | Nothing |
 | P5 | **Blocking time by an override the model works out** | If the evaluation shows wrong hours, add one composed tool, `block_time`, where the server takes the interval out of the day's windows with a pure function in `shared/` | Nothing |
-| P6 | **A typed "yes" drops the proposal** (section 5.5, rule 5) | If the walk shows people type more than they press, accept a typed confirmation only through a fixed list of words matched in code, never through the model | Nothing |
+| P6 | **A typed "yes" drops the proposal** (section 5.5, rule 5) | If the walk shows people type more than they press, accept a typed confirmation only through a fixed list of words matched in code, never through the model. Built as stated; in the trial with the real model a typed "yes" made it ask for the same change again, so the buttons came back | Nothing |
 | P7 | **The front end is deployed nowhere** (`docs/FRONTEND_ARCHITECTURE.md` section 10) | Unchanged by this feature: the screen needs the same origin or CORS answer as every other screen | The first deployment of the front end, as today |
 
 ---

@@ -1,6 +1,6 @@
 import { assistantTexts } from '@shared-calendar/shared';
 import { z } from 'zod';
-import { toolsForClaude, type Tool } from '../../../src/assistant/tools/tool';
+import { toolsForClaude, type ReadTool, type Tool } from '../../../src/assistant/tools/tool';
 import type { Conversation, StoredMessage } from '../../../src/lib/assistantDb';
 
 // Claude and the table are replaced: nothing reaches a network. The core reads its configuration
@@ -296,7 +296,9 @@ describe('sendMessage: what stops it before Claude is asked (4.4, 6)', () => {
     expect(db.saveStep).not.toHaveBeenCalled();
   };
 
-  it.each(['working', 'awaiting_confirmation'] as const)('a conversation that is %s is busy', async (status) => {
+  // A conversation that waits for a confirmation is not busy: the message drops the proposal,
+  // which tests/unit/assistant/proposals.test.ts covers.
+  it.each(['working'] as const)('a conversation that is %s is busy', async (status) => {
     inConversation({ status });
     expect(await exchange.sendMessage(ALICE, TEXT, NOW)).toEqual({ ok: false, refusal: 'assistant_busy', log: { conversationId: ID, outcome: 'busy' } });
     untouched();
@@ -482,7 +484,7 @@ const ADMIN = { sub: 'sub-admin', username: 'admin', role: 'admin' as const };
 const calendarHandler = vi.fn();
 const appointmentsHandler = vi.fn();
 const everyoneHandler = vi.fn();
-const standIn = (name: string, handler: Tool['toHandler']['handler'], reads: Tool['definition']['reads'], roles: Tool['definition']['roles'] = ['admin', 'user']): Tool => ({
+const standIn = (name: string, handler: ReadTool['toHandler']['handler'], reads: Tool['definition']['reads'], roles: Tool['definition']['roles'] = ['admin', 'user']): Tool => ({
   definition: { name, description: `The ${name} of the test.`, kind: 'read', roles, input: () => z.object({ from: z.string() }).strict(), reads },
   toHandler: { handler, request: (input) => ({ routeKey: `GET /${name}`, path: `/${name}`, query: input as Record<string, string> }) },
   toModel: (body) => ({ fields: body as Record<string, unknown> }),

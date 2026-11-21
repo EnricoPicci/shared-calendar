@@ -38,6 +38,30 @@ export function localDateTime(instant: string, zone: string): string {
   return `${localDateOf(instant, zone)} ${localTimeOf(instant, zone)}`;
 }
 
+const HOUR_MS = 3_600_000;
+
+/** The instant `hours` after an instant. */
+export function hoursAfter(instant: string, hours: number): string {
+  return new Date(Date.parse(instant) + hours * HOUR_MS).toISOString();
+}
+
+/**
+ * Whether an instant is the second of the two moments at which the clock of the zone shows the
+ * same time, on the night the clocks go back: an hour earlier the clock showed that time already.
+ */
+export function isSecondTime(instant: string, zone: string): boolean {
+  return localTimeOf(hoursAfter(instant, -1), zone) === localTimeOf(instant, zone);
+}
+
+/**
+ * The start of a free slot as Claude sees it: its wall-clock time, followed by " (second)" for
+ * the second of two slots that start at the same wall-clock time, so that the two can be told
+ * apart when one of them is booked.
+ */
+export function slotTime(start: string, zone: string): string {
+  return localTimeOf(start, zone) + (isSecondTime(start, zone) ? ' (second)' : '');
+}
+
 /**
  * The wall-clock time at which something that started on the local date `date` ends. An end at
  * the midnight that closes that date is "24:00", as the calendar writes the end of a window.

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`) |
+| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`) |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown on its screen, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which is deployed nowhere today (open point P7, section 2.2). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
@@ -73,8 +73,8 @@ this plan.
 
 Reading the architecture against the repository brought up six points it does not settle. They
 are not open points of the architecture yet. Each is raised in the step named, with a proposal,
-before the code that depends on it. F1, F2, F3 and F4 are closed: the "As done" notes of steps
-c02, c03 and c04 say how.
+before the code that depends on it. F1, F2, F3, F4 and F5 are closed: the "As done" notes of steps
+c02, c03, c04 and c05 say how.
 
 | # | Finding | Step |
 |---|---|---|
@@ -82,7 +82,7 @@ c02, c03 and c04 say how.
 | F2 | **Nothing enforces the two import rules** (the Anthropic SDK only in `backend/src/lib/anthropic.ts`. `backend/src/assistant` never imports `lib/calendarDb.ts`). The root `eslint.config.js` restricts imports for `frontend/src` only. Proposal: two `no-restricted-imports` rules. **The first rule is in place since step c02**. **Closed in step c04**: the second rule refuses `lib/calendarDb`, `lib/calendarRules` and `lib/calendarEvents` under `backend/src/assistant` | c02, c04 |
 | F3 | **Coverage.** The back end's 100 % line threshold covers `src/lib` only. The architecture asks it for `backend/src/assistant` too (its section 12.2). The six handlers stay outside the threshold, as every handler does. **Closed in step c03**: `backend/vitest.config.ts` holds `src/assistant` to 100 % lines | c03 |
 | F4 | **A handler called as a tool writes its own log line**, so one step of the assistant writes several lines with one request id, and a handler reads its environment as if it were alone in the function. Whether the lines can be told apart, and whether any handler keeps state that two calls in one function would share. **Closed in step c04**: nothing to change. The lines share the request id and differ by `route`; the only state is the calendar's configuration and the DynamoDB client, the same for every caller | c04 |
-| F5 | **What the two read-only functions carry.** To build a proposal they need the change tools' definitions and their fact reading, not the change handlers. Proposal: the part that runs a change is a module only `confirmProposal` imports, so the code that writes the calendar is not even in the other two bundles | c05 |
+| F5 | **What the two read-only functions carry.** To build a proposal they need the change tools' definitions and their fact reading, not the change handlers. Proposal: the part that runs a change is a module only `confirmProposal` imports, so the code that writes the calendar is not even in the other two bundles. **Closed in step c05**: it holds, without touching a calendar handler or `lib/calendarDb.ts`. `tools/changeHandlers.ts` is the one module that imports a change handler, `confirm.ts` the one that imports it, `handlers/confirmProposal.ts` the one handler that imports `confirm.ts`; a lint rule refuses any other such import; after a build, the calendar's write under the lock and the booking handler are in the bundle of `ConfirmProposalFunction` and in none of the other five | c05 |
 | F6 | **Booking for a User, proposed by a function without `AdminGetUser`.** The proposal's facts can only come from the users' list (`ListUsersInGroup`). Whether that is enough for the confirmation to name the person, or the proposal goes out unchecked and the route refuses at the confirmation | c07 |
 
 ## 3. What is built
@@ -510,11 +510,80 @@ at once, one appointment; the spending limit after a confirmed change.
 and `continueAssistant` hold no write on the calendar; no wildcard; with the real key, one
 booking by hand from the sentence to the appointment.
 
+**As done** (2026-11-21). As written, with these differences and findings:
+
+- **finding F5 holds** (section 2.3), and decided the layout: `proposal.ts` (the stored shape,
+  what Claude is told when a proposal is settled), `confirm.ts`, `decline.ts`,
+  `tools/bookAppointment.ts`, `tools/changeHandlers.ts`. A tool is now one of two shapes,
+  `ReadTool` and `ChangeTool`: a change tool has no "to the handler" part, its confirmation
+  answers the facts and the request to run together, and the request is stored and run as
+  stored;
+- **decided with the Product Owner: `book_appointment` is offered to Users only.** The
+  Administrator's booking for a User is step c07, with finding F6;
+- **decided with the Product Owner: `confirmProposal`'s role holds what a User's booking
+  needs**, not what this step's text lists: the assistant table's two sets, the read of the
+  key, and the calendar's read, write and book sets. No `CalendarDeletePolicy` and no Cognito
+  statement: step c06 brings the first with the changes that need it, step c07 the second.
+  `sendAssistantMessage` and `continueAssistant` gained nothing;
+- **decided with the Product Owner: the stored proposal is a list from the start**, of which
+  one change is accepted: more than one in an answer makes no proposal, and each gets the error
+  "one change at a time";
+- **the night the clocks go back**: `get_calendar` writes the second of two equal free times as
+  "02:00 (second)", and `book_appointment` takes an optional `occurrence`, `first` or `second`;
+  a time that comes twice asked without it is an error that tells Claude to ask. A time the day
+  does not have is an error too;
+- **a proposal a confirmation took**: under way (taken less than 31 seconds ago, the function's
+  29 plus 2) a message and `continue` answer `409 assistant_busy`; left (older) the next message
+  or `continue` records each change as `unknown` first. A second `confirm` and a `decline`
+  answer `404` in both cases, `GET` shows `working`, `DELETE` ends the conversation;
+- **`continue` while a proposal waits stays `409 nothing_to_continue`**; a settled proposal is
+  shown until the person's next message;
+- **a change whose route failed** (a status of 500 or more, or a handler that threw) has the
+  outcome `unknown`, not `refused`: nobody knows whether the write happened;
+- **the stopgap paragraph of `INSTRUCTIONS`** is one for both roles: a User can book for
+  themself; moving, cancelling, notes, opening hours, types and settings are done from the web
+  pages, and so is the Administrator's booking for a User;
+- **the local wiring needed no change**: the two functions get their environment from the
+  `Parameters` block of `env.local.json`, which `local:up` already writes;
+- **the fake Claude learnt nothing new**: the text of the person's last message and the count of
+  Claude's answers since it are enough. Five booking answers were added, each the block the real
+  model sent, with the date as a mark and the hour of its journey;
+- **the journeys** are three new blocks, each with its own User, its own day (26, 27 and 28 days
+  ahead, 05:00–07:00, and 04:00–07:00 for the third) and its own type name; they cancel what
+  they booked and remove their window and type before and after. The file first removes what an
+  interrupted run of any block left on a day from tomorrow to 28 days ahead: the blocks open
+  the same early hours on neighbouring days, and a window left by one would stand in the way of
+  another a day later. The access journey gained the
+  two routes;
+- **found in the trial with the real model** (`claude-sonnet-5-5`, 15 requests): after a
+  confirmed booking, Claude's closing words said the booking still waited for the person's
+  confirmation, because the result it was given held the appointment and nothing about the
+  button. **Fixed in this step**: the result of a change that was made starts with "the person
+  pressed the confirm button and the change was made". After the fix: "book me Wednesday at 9,
+  note: bring the documents" read the day (4.1 s), asked for the booking (1.8 s), and after the
+  confirmation said what was booked (2.0 s). A decline asked Claude nothing. A typed "yes" made
+  Claude ask for the same booking again, and nothing was booked (open point P6 of
+  `docs/CONVERSATIONAL_ARCHITECTURE.md` section 18.2). A slot taken between the proposal and
+  the confirmation was shown `refused` with `slot_taken`. The Administrator asking to book a
+  User was told that it is done from the web pages. The model never asked to book a slot it had
+  just read as busy, so the tool's own "no free slot" error was not seen in the trial.
+
 ---
 
 ### Step c06 — The other appointment changes (≈ 6 h)
 
 **Goal:** cancel, move and note; several changes in one proposal.
+
+What step c05 left ready: the whole mechanism on one tool. A change tool is a definition, a
+confirmation (`read` answers the facts and the request to run, `summary` words them through a
+function of `shared/src/assistant/`) and what Claude gets of the route's answer; its handler is
+one line in `tools/changeHandlers.ts`. The stored proposal and the screen's `actions` are lists
+already, and the confirmation runs each change in order with its own outcome. What this step
+must also do: lift the limit of one change per proposal (`asksForChange` and the branch of the
+step in `exchange.ts`), with the limit of five; give `confirmProposal`'s role
+`CalendarDeletePolicy` if one of the three routes needs it; take moving, cancelling and notes
+out of the stopgap paragraph of `INSTRUCTIONS`; extend the lint rule's list of change handlers
+only if a handler's file name is not in it.
 
 Files: `cancel_appointment`, `change_appointment`, `set_appointment_note`, each with its four
 parts and its texts in both languages; a proposal of up to five changes, listed one by one,
@@ -538,6 +607,13 @@ can do by conversation works locally.
 **Goal:** the Administrator's simpler tools.
 
 **First: finding F6**, on what the confirmation of a booking for a User can show.
+
+What step c05 left ready: `book_appointment` exists for Users, with its roles list holding
+`user` alone and its input without a username; a unit test shows that an Administrator's
+request to Claude never names it. `confirmProposal`'s role has no Cognito statement, and the
+booking handler asks Cognito only when the Administrator books for a User: this step gives the
+role `AdminGetUser` and `AdminListGroupsForUser`, and takes the Administrator's booking out of
+the stopgap paragraph of `INSTRUCTIONS`.
 
 Files: `list_users`, `list_patterns`, `update_settings`, `create_type`, `rename_type`,
 `delete_type`, with their texts; `book_appointment` for a named User; the three functions get

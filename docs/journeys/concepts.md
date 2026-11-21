@@ -15,7 +15,8 @@ Each section explains one idea in simple words and names the document that defin
 | `dave`, `erin` | throw-away Users of the back end's calendar journeys | `backend/tests/integration/calendar.test.ts` |
 | `fe-calendar`, `fe-calendar-b` | throw-away Users of the front end's calendar journeys | `frontend/tests/integration/calendar.test.ts` |
 | `fe-journey` | a throw-away User of the front end's Hello World journeys | `frontend/tests/integration/journeys.test.ts` |
-| `chat-text`, `chat-lingua`, `chat-read`, `chat-limit`, `chat-down` | throw-away Users of the assistant's journeys, one per block | `backend/tests/integration/assistant.test.ts` |
+| `chat-text`, `chat-lingua`, `chat-read`, `chat-book`, `chat-decline`, `chat-trouble`, `chat-limit`, `chat-down` | throw-away Users of the assistant's journeys, one per block |
+| `chat-rival` | a second throw-away User of one assistant journey, who books through the calendar's own route | `backend/tests/integration/assistant.test.ts` | `backend/tests/integration/assistant.test.ts` |
 | `chat-nobody` | a throw-away account in neither group, made straight in cognito-local | `backend/tests/integration/assistant.test.ts` |
 | `smoke-<epoch>` | the smoke test's throw-away User | `backend/scripts/smoke.sh` |
 
@@ -32,10 +33,17 @@ All journeys and the smoke test use the same local `calendar` table. They treat 
   they create only types named `fe-calendar …`, use only dates with nothing on them, from today +
   330 days, and remove what they made.
 - **The smoke test** uses a type `smoke-<epoch>` and a free 03:00–04:00 from 50 days ahead.
-- **The assistant's journeys never reset it either.** One block reads the calendar: it creates a
-  type named `assistant journey` and a one-off window 05:00–07:00 on the 25th day from today,
-  hours no other journey opens, and removes both at its end and, should a run have been
-  interrupted, before it starts. It checks only what it made, whatever else that day holds.
+- **The assistant's journeys never reset it either.** Four blocks need the calendar. Each creates
+  a type of its own name (`assistant journey`, `assistant booking journey`,
+  `assistant declining journey`, `assistant trouble journey`) and a one-off window in the early
+  morning, hours no other journey opens, on a day of its own: the 25th, 26th, 27th and 28th from
+  today. Each removes its window and its type at its end (the file's helpers `openWindow()` and
+  `removeFromCalendar()`). Before any block starts, the file removes what an interrupted run of
+  any of the four left on a day from tomorrow to 28 days ahead, so that a window left by one
+  block never stands in the way of another a day later.
+  The blocks that book cancel their appointments first, as the Administrator; a cancelled
+  appointment keeps no slot busy, so a second run the same day finds the same free slots. Each
+  block checks only what it made, whatever else its day holds.
 
 Appointments cannot be deleted through the API, only cancelled. So cancelled appointments, their
 events and the deleted-user markers of removed Users stay in the table as history.
@@ -423,14 +431,15 @@ the API to decide can expect exactly one.
 The assistant is the calendar used by conversation: a person writes a message, the server asks
 Claude (Anthropic's model) and answers with what Claude said. Its routes and their answers are
 defined in `docs/ARCHITECTURE.md` section 4 ("The assistant's routes"); what is not built yet
-(changing the calendar by conversation) is in `docs/CONVERSATIONAL_ARCHITECTURE.md`.
+(the changes other than a User's booking) is in `docs/CONVERSATIONAL_ARCHITECTURE.md`.
 
 - **One conversation per person**, found by the `sub` of the token. No route takes a conversation
   id, so nobody can reach another person's conversation. `GET /assistant/conversation` reads it,
   `POST /assistant/messages` adds a message to it (and starts it when there is none),
   `POST /assistant/continue` does its next step when one is waiting,
-  `DELETE /assistant/conversation` ends it.
-- **`AssistantReply`** is the answer of `GET` and of the two `POST`s: `conversationId`, `language`, `status`,
+  `POST /assistant/proposals/{proposalId}/confirm` and `…/decline` answer a proposal (see "A
+  proposal, and its two buttons" below), `DELETE /assistant/conversation` ends it.
+- **`AssistantReply`** is the answer of `GET` and of the four `POST`s: `conversationId`, `language`, `status`,
   `messages`, `activity`, `proposal`, `remainingToday`. With no conversation, the first two are
   `null`, `status` is `idle` and `messages` is empty.
 - **A new account starts clean.** A conversation and the day's count are stored under the `sub`,
@@ -454,6 +463,9 @@ the tools" below). The texts the journeys send:
 | `fake: a spending limit of our own`, `fake: overloaded` | an error, as Anthropic gives it for that case, at every step |
 | `fake: what is open on the day of the journey?` | first a request for the tool `get_calendar`, for the one day 25 days after today; then, as its text, the result of that tool word for word |
 | `fake: an outage after the read` | first a request for the tool `get_settings`; then an error the first time, and the second time the result of that tool as its text |
+| `fake: book me the slot of the booking journey`, `fake: book me the slot of the declining journey`, `fake: book me the slot somebody else takes`, `fake: book me the slot confirmed twice` | first a request for the tool `book_appointment`, for a day 26, 27 or 28 days after today at a fixed hour; then, as its text, the last result of a tool it was given |
+| `yes` | the same two answers as the sentence of the declining journey |
+| `fake: book me a slot when the money runs out` | first a request for `book_appointment`; then an error (a spending limit) the first time, and the second time the last result of a tool as its text |
 | a text the file does not hold | "Fake Claude: no answer is scripted for this message." |
 
 The language question (below) is scripted the same way: of the texts the journeys send,
@@ -512,6 +524,48 @@ line states, so the fake can ask for a day the journey prepared without knowing 
 Claude was given. And a step may be written to fail once: an error the first time a request
 comes, the answer when the very same request comes again.
 
+### A proposal, and its two buttons
+
+Claude cannot change the calendar (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 5.5). When it
+asks for a tool that changes something (for now one, `book_appointment`, offered to Users only),
+the server changes nothing. It reads the facts itself, through the code of `GET /calendar` with
+the person's identity: the free slot at the time asked for, its end, the name of its type. Then
+it saves a **proposal** and answers `status` `awaiting_confirmation`, with:
+
+```
+proposal: { proposalId, question, confirmLabel, declineLabel,
+            actions: [ { summary, outcome, error } ] }
+```
+
+`question` and the two labels are fixed texts ("Make this change?", "Confirm", "Don't").
+`summary` is the server's own sentence, written from the facts it read, not Claude's words:
+"Book an appointment on Tuesday 24 November 2026, from 10:00 to 11:00 (Visit)." While the
+proposal waits, `outcome` and `error` are `null`. What happens next is the person's choice:
+
+- **`POST /assistant/proposals/{proposalId}/confirm`** is the only way the change is made. The
+  server takes the proposal, so that a second confirmation finds none, and calls the code of the
+  change's own route (`POST /calendar/appointments`) with the identity of the request: every
+  rule of the calendar is checked again at that moment. It saves the outcome (`done`; `refused`
+  with the route's error code in `error`; `unknown`), then asks Claude once for its closing
+  words. The settled proposal stays in the replies, with its outcome, until the person's next
+  message.
+- **`POST /assistant/proposals/{proposalId}/decline`** changes nothing and does not ask Claude:
+  the reply holds the notice "Nothing was changed.", `proposal` `null` and `status` `idle`.
+- **A message instead** drops the proposal, a typed "yes" included: no text is a confirmation.
+  The message is then read as usual, in the same request.
+
+An id that names no waiting proposal of the person (never made, settled, declined, dropped) is
+`404 proposal_not_found`; one that is not a ULID is `400 invalid_request`. Neither route takes a
+body, and neither counts as a message of the day. `POST /assistant/continue` while a proposal
+waits is `409 nothing_to_continue`: the conversation waits for the person, not for Claude.
+
+Anthropic wants every request for a tool followed by its result, so the server stores one for
+the change in each case, as an entry of role `user`. Claude reads it at its next step, and the
+journeys read its `outcome` in the table: `done` after a confirmation (with what the route
+answered, and the words that the person pressed the button), `declined` after a decline,
+`not_confirmed` when a message dropped the proposal. A refused change is stored as the route's
+`error` and message.
+
 ### The `assistant` table
 
 The conversations live in a table of their own, `assistant` (`docs/ARCHITECTURE.md` section 5.4).
@@ -519,8 +573,8 @@ The journeys read it with `queryAssistantPartition()` of `backend/tests/integrat
 
 | Item | `PK` | `SK` | What it holds |
 |---|---|---|---|
-| Conversation | `CONV#<sub>` | `META` | one per person: `conversationId` (`null` when ended), `language`, `status`, `messageCount` (the person's messages), `nextSeq` |
-| Message | `CONV#<sub>` | `MSG#<conversationId>#<seq>`, `seq` on six digits | `content`: the JSON text of one entry as exchanged with Claude (`role` `user`, `system` for the line of the application, `assistant`) |
+| Conversation | `CONV#<sub>` | `META` | one per person: `conversationId` (`null` when ended), `language`, `status`, `messageCount` (the person's messages), `nextSeq`, `proposal` (the proposal waiting or settled, or `null`) |
+| Message | `CONV#<sub>` | `MSG#<conversationId>#<seq>`, `seq` on six digits | `kind` `model`, with `content` the JSON text of one entry as exchanged with Claude (`role` `user`, `system` for the line of the application, `assistant`); or `kind` `notice`, a fixed text of the server that the person reads and Claude never gets. The file's helper `storedEntries()` gives the `model` entries of the conversation in progress |
 | Daily use | `USAGE#<sub>` | the local date | `messages`, `inputTokens`, `outputTokens` of that day |
 
 The code never deletes an item: ending a conversation only sets `conversationId` to `null`, and

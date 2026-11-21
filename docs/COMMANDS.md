@@ -155,13 +155,18 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
   curl -s -X POST http://127.0.0.1:3000/assistant/messages -H "authorization: Bearer $TOKEN" \
     -H 'content-type: application/json' -d '{"text":"Hello, can you hear me?"}'
   curl -s -X POST http://127.0.0.1:3000/assistant/continue -H "authorization: Bearer $TOKEN"
+  curl -s -X POST http://127.0.0.1:3000/assistant/proposals/$PROPOSAL/confirm -H "authorization: Bearer $TOKEN"
+  curl -s -X POST http://127.0.0.1:3000/assistant/proposals/$PROPOSAL/decline -H "authorization: Bearer $TOKEN"
   curl -s http://127.0.0.1:3000/assistant/conversation -H "authorization: Bearer $TOKEN"
   curl -s -X DELETE http://127.0.0.1:3000/assistant/conversation -H "authorization: Bearer $TOKEN"
   ```
 
   When an answer says `"status":"working"`, a step is still to do: call `continue`, again and
   again, until the status is `idle`. `continue` takes no body, is also the way on after a 503,
-  and answers `409 nothing_to_continue` when no step waits.
+  and answers `409 nothing_to_continue` when no step waits. When it says
+  `"status":"awaiting_confirmation"`, nothing was changed yet: `PROPOSAL` is the `proposalId` of
+  the answer's `proposal`, and `confirm` makes the change while `decline`, or any new message,
+  drops it. Neither takes a body.
   With the fake, only the sentences of `answers.json` get an answer of their own.
 - **Asking the fake by hand**, from the host on http://localhost:9230:
 
@@ -189,11 +194,14 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
 - `RUN_INTEGRATION=1 npm run test:integration -w backend`: the journeys of
   `docs/IMPLEMENTATION_PLAN.md` step 9 (`journeys.test.ts`), the calendar's
   (`calendar.test.ts`) and the assistant's (`assistant.test.ts`: against the fake Claude, with
-  the throw-away accounts `chat-text`, `chat-lingua`, `chat-read`, `chat-limit`, `chat-down` and
-  `chat-nobody`, removed first and last; it never empties the `calendar` table: its one block
-  that reads the calendar creates the type `assistant journey` and a window 05:00–07:00 on the
-  25th day from today through the API, and removes both first and last; what it
-  leaves in the `assistant` table stays there, under accounts that no longer exist) against the running `local:up` +
+  the throw-away accounts `chat-text`, `chat-lingua`, `chat-read`, `chat-book`, `chat-decline`,
+  `chat-trouble`, `chat-rival`, `chat-limit`, `chat-down` and `chat-nobody`, removed first and
+  last; it never empties the `calendar` table: each of its four blocks that need the calendar
+  creates a type of its own name (`assistant journey`, `assistant booking journey`,
+  `assistant declining journey`, `assistant trouble journey`) and a window in the early morning
+  on a day of its own, the 25th to the 28th from today, through the API, and removes both first
+  and last; the appointments it books it cancels, and those stay in the `calendar` table,
+  cancelled; what it leaves in the `assistant` table stays there, under accounts that no longer exist) against the running `local:up` +
   `local:api` stack. Pass the same
   `DYNAMODB_PORT` as `local:up`. Without `RUN_INTEGRATION=1` it runs nothing and exits 0.
   Removes a leftover `carol` before starting, so it can be rerun after a failed run. **The

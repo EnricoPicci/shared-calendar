@@ -68,10 +68,14 @@ stays at the root.
 │   │   ├── handlers/            # one Lambda entry point per file
 │   │   ├── assistant/           # the assistant's core (docs/ARCHITECTURE.md section 12): takes an
 │   │   │   │                    # identity and a text, never an HTTP request; reaches the table and
-│   │   │   │                    # Claude through lib/ only, and the calendar through a handler only
+│   │   │   │                    # Claude through lib/ only, and the calendar through a handler only;
+│   │   │   │                    # proposal.ts (a proposal as stored), confirm.ts and decline.ts
+│   │   │   │                    # (the two answers to one)
 │   │   │   └── tools/           # tool.ts (what a tool is), one file per tool, list.ts (the tools
 │   │   │                        # in the order Claude gets them), event.ts (the event a handler is
-│   │   │                        # called with), result.ts (a result made small), run.ts (one read)
+│   │   │                        # called with), result.ts (a result made small), run.ts (one read,
+│   │   │                        # one proposed change), changeHandlers.ts (the handler of each
+│   │   │                        # change tool, imported by confirm.ts alone)
 │   │   └── lib/                 # the only place that touches the AWS SDK (calendarDb.ts:
 │   │                            # the calendar table's item layout and lock; calendarRules.ts:
 │   │                            # the calendar's checks, pure, no AWS; assistantDb.ts: the
@@ -325,6 +329,14 @@ Step c04 of `docs/CONVERSATIONAL_PLAN.md` (2026-11-21) added to `texts.ts` the k
 (`ASSISTANT_READ_KINDS`: settings, types, calendar, appointments) and to both language files the
 line of progress of each (`reading`). In the back end it added `src/assistant/tools/`, where a new
 tool is one new file and one line in `list.ts`, and `src/handlers/continueAssistant.ts`.
+
+Step c05 of `docs/CONVERSATIONAL_PLAN.md` (2026-11-21) added to `texts.ts` the sentences of a
+proposal (`changes`, one function per change tool, which words the facts the server read) with
+the booking's in both language files. In the back end it added `src/assistant/proposal.ts`,
+`confirm.ts` and `decline.ts`, `src/assistant/tools/bookAppointment.ts` and
+`tools/changeHandlers.ts`, and the handlers `confirmProposal.ts` and `declineProposal.ts`. A new
+change tool is one new file, one line in `list.ts`, one line in `changeHandlers.ts` and one
+function of `changes` in each language.
 
 What stays out of `shared/`: the DynamoDB item shape (`MessageItem`), the authorizer context,
 the logger, the password generator (server-side secret handling), and everything that imports

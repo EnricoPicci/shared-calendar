@@ -1,3 +1,4 @@
+import { bookAppointment, bookAppointmentDefinition } from './bookAppointment';
 import { getCalendar, getCalendarDefinition } from './getCalendar';
 import { getSettings, getSettingsDefinition } from './getSettings';
 import { listAppointments, listAppointmentsDefinition } from './listAppointments';
@@ -10,7 +11,14 @@ import type { Tool, ToolDefinition } from './tool';
 
 // The definitions alone, for the functions that never run a tool: they need them to work out the
 // mark of a conversation and its line of progress, and must not carry the calendar's handlers.
-export const DEFINITIONS: readonly ToolDefinition[] = [getSettingsDefinition, listTypesDefinition, getCalendarDefinition, listAppointmentsDefinition];
+export const DEFINITIONS: readonly ToolDefinition[] = [
+  getSettingsDefinition,
+  listTypesDefinition,
+  getCalendarDefinition,
+  listAppointmentsDefinition,
+  bookAppointmentDefinition,
+];
 
-// The tools whole, for the functions that run them.
-export const TOOLS: readonly Tool[] = [getSettings, listTypes, getCalendar, listAppointments];
+// The tools whole, for the functions that run the reads and build the proposals. A tool that
+// changes the calendar is here without the handler of its route, which is in `changeHandlers.ts`.
+export const TOOLS: readonly Tool[] = [getSettings, listTypes, getCalendar, listAppointments, bookAppointment];

@@ -22,8 +22,7 @@ Paths in this file are relative to `backend/`.
   `docs/IMPLEMENTATION_PLAN.md` step 9), `calendar.test.ts` (the calendar's journeys).
 - `scripts/`: shell scripts behind the npm scripts (`local-seed.sh`, `local-api.sh`,
   `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`, `budget.sh`, `check-sam.sh`;
-  `target.sh` is sourced by `bootstrap-admin.sh`, `smoke.sh` and `budget.sh`; the first two of
-  those call `cognito.mjs`).
+  `target.sh` and `cognito.mjs` are helpers of those).
 - `docker/`: files for the local stack (`cognito-local-config.json`; `fake-claude.mjs`, the
   fake Claude, whose answers are `tests/integration/fake-claude/answers.json`:
   `docs/ARCHITECTURE.md` section 8).
@@ -46,24 +45,18 @@ Paths in this file are relative to `backend/`.
     marker, whose failure `withCalendarLock` answers through the plan's `onConditionFailed`,
     without a retry).
   - Appointments by id (`readAppointment`, internal: `GetItem APPTID#<id>` → `GetItem APPT`,
-    inside the locked attempt; a pointer without its item is absent): `cancelAppointment` and
-    `updateAppointmentNote` (check callback on the appointment or `null`; three items: lock, an
-    `Update` of the changed `APPT` attributes without a condition, `EVENT`; an unchanged note
-    writes nothing).
-  - `changeAppointment` (settings, state and the old appointment by id read inside the attempt,
-    check callback on the three; six items: lock, an `Update` of the old `APPT` (`changed`,
-    `replacedBy`), `Put` of the new `APPT` (`replaces`, built by the booking's
-    `newAppointment`) and its `APPTID`, `EVENT`, the marker `ConditionCheck` on the old one's
-    `userId`, last).
+    inside the locked attempt): `cancelAppointment` and `updateAppointmentNote` (check callback
+    on the appointment or `null`; three items: lock, an `Update` of the changed `APPT`
+    attributes, `EVENT`; an unchanged note writes nothing).
+  - `changeAppointment` (settings, state and the old appointment read inside the attempt,
+    check callback on the three; six items: lock, an `Update` of the old `APPT`, `Put` of the
+    new `APPT` and its `APPTID`, `EVENT`, the marker `ConditionCheck` on the old one's `userId`).
   - User deletion: `markUserDeleted` (`docs/SHARED_CALENDAR_SPEC.md` section 10.2; chunks of
-    `DELETION_CHUNK` = 40, each under the lock: `APPT` from now − 24 h read inside the attempt,
-    kept by `userId` = the `sub`, `booked`, `end > now`; the first chunk also writes the
-    `DELETEDUSER#<sub>` marker, a plain `Put`; per appointment an `Update` with `cancelReason`
-    `user_deleted` and `Put EVENT`; one event id per appointment on first sight, kept across
-    retries and chunks).
-  - `listAppointments` (`docs/SHARED_CALENDAR_SPEC.md` section 11.1, route 16, a read: a range
-    `SK BETWEEN` as the view, or upcoming `SK ≥ now − 24 h` with `end > now`; owner by `userId`
-    or stored `username`; status; by start).
+    `DELETION_CHUNK` = 40, each under the lock: the `sub`'s `booked` `APPT` with `end > now`;
+    the first chunk also writes the `DELETEDUSER#<sub>` marker; per appointment an `Update`
+    with `cancelReason` `user_deleted` and `Put EVENT`, its event id kept across retries).
+  - `listAppointments` (a read: a range as the view, or upcoming `SK ≥ now − 24 h` with
+    `end > now`; owner by `userId` or stored `username`; status; by start).
 - `assistantDb.ts` is the only module that knows the `assistant` table's item layout
   (`docs/ARCHITECTURE.md` section 5.4); `assistantConfig()` is read once per container. It
   never deletes, never retries and never logs: a writer that lost the race gets
@@ -107,8 +100,8 @@ Paths in this file are relative to `backend/`.
 
 The assistant's core (`docs/ARCHITECTURE.md` section 4, "The assistant's routes"). It takes an
 identity (`sub`, username, role), never an event or a token, and returns a reply or a refusal
-with the fields of the log line; the handlers `getConversation`, `endConversation`,
-`sendAssistantMessage` and `continueAssistant` turn that into a response and write the line.
+with the fields of the log line; the six assistant handlers turn that into a response and write
+the line.
 
 - `config.ts`: `coreConfig()`. `prompt.ts`: `INSTRUCTIONS`, `contextBlock`, `timeLine` and
   `promptVersion`, the mark of the instructions, the block about the person and the role's
@@ -117,9 +110,18 @@ with the fields of the log line; the handlers `getConversation`, `endConversatio
 - **The paragraph "What you can do for the time being" of `INSTRUCTIONS` is a stopgap**: a step
   that adds a tool takes its ability out of it, and the step that adds the last one removes it.
 - `conversation.ts`: no Claude and no handler here, so two functions bundle neither.
-  `exchange.ts`: a message, `continue`, and the one step: Claude once, its reads, one write.
+  `exchange.ts`: a message, `continue`, and the one step: Claude once, its reads or a proposal,
+  one write. `proposal.ts`, `confirm.ts`, `decline.ts`: a proposal stored and settled.
 - `tools/`: `tool.ts` (what a tool is), one file per tool, `list.ts` (`DEFINITIONS` without
-  the handlers, `TOOLS` with them), `event.ts`, `result.ts`, `run.ts`.
+  the handlers, `TOOLS` with them), `event.ts`, `result.ts`, `run.ts`, `changeHandlers.ts`.
+- **A change tool** is a file with its definition (`kind: 'change'`), its `confirmation` (`read`
+  gets the facts through a read handler and answers them with the request to run; `summary`
+  words them with a function of `shared/src/assistant/`, both languages) and `toModel`; then one
+  line in `list.ts` and one in `changeHandlers.ts`. Its file imports no handler that changes
+  the calendar.
+- **No request of the model and no text anybody typed runs a change**: only `confirm.ts` does,
+  reached from `handlers/confirmProposal.ts` alone (`npm run lint` refuses any other import of
+  it, of `changeHandlers.ts`, or of a change handler under `src/assistant`).
 - **It reaches the calendar by calling a route's handler, never through `lib/calendarDb.ts`,
   `lib/calendarRules.ts` or `lib/calendarEvents.ts`** (`npm run lint` refuses the import).
 - **Never log a text, a tool's input or a tool's result.** The log fields come back from the
@@ -186,14 +188,12 @@ a role of its own (root `CLAUDE.md`, "Hard rules from the design"). It needs no 
 - The assistant's journeys (`assistant.test.ts`) run against the fake Claude: a sentence gets
   the answers `tests/integration/fake-claude/answers.json` scripts for its exact text, one per
   step. Each block plays its own throw-away User. **They never empty the `calendar` table**:
-  what they need they create through the API and remove, before and after.
+  each creates what it needs through the API on a day of its own, and removes it before and after.
 - Tests of the contract itself (what a schema accepts, `resolveRole`) live in `shared/`; the
   back end tests what it does with it (the 400 answer, the handlers).
 - The calendar journeys empty the local `calendar` table first (`resetCalendarTable()`, which
   refuses any endpoint but `localhost`/`127.0.0.1`); integration files run one at a time and in
   no fixed order, so every file prepares its own state.
-- When a journey changes, its page under `docs/journeys/` changes in the same commit; the
-  `describe` carries the pointer comment
-  `// Explained in simple words in docs/journeys/<package>/<page>.md.` (format and list of
-  pages: `docs/journeys/README.md`; pages still to write: `docs/journeys/PLAN.md`; the project
-  skill `explain-journey` writes, checks and refreshes a page).
+- When a journey changes, its page under `docs/journeys/` changes in the same commit, written
+  and checked with the project skill `explain-journey` (format, pointer comment and list of
+  pages: `docs/journeys/README.md`).
