@@ -34,14 +34,14 @@ die() {
   exit 1
 }
 
-# The old stack hello-world-api is kept untouched as the way back until it is retired
-# (docs/RENAME_PLAN.md section 6.3): this command refuses any argument that names it, as the
-# back end's deploy does, and below it refuses to read the API's address from it.
+# No stack is named hello-world-api: the project's first stack had that name and is deleted
+# (docs/RENAME_PLAN.md section 6.3). This command refuses any argument that names it, as the
+# back end's deploy does, and below it refuses a backend/samconfig.toml that names it.
 OLD_STACK=hello-world-api
 for arg in "$@"; do
   if [[ "$arg" == "$OLD_STACK" || "$arg" == *"=$OLD_STACK" ]]; then
-    echo "Deploy refused: the page must not be deployed against the old stack $OLD_STACK." >&2
-    echo "It is kept unchanged as the way back until it is retired (docs/RENAME_PLAN.md section 6.3)." >&2
+    echo "Deploy refused: the page must not be deployed against a stack named $OLD_STACK." >&2
+    echo "That was the project's first stack and is deleted (docs/RENAME_PLAN.md section 6.3)." >&2
     exit 1
   fi
 done
@@ -80,7 +80,7 @@ WEB_STACK=$(setting samconfig.toml stack_name)
 [[ -n "$API_STACK" ]] || die "no stack_name in backend/samconfig.toml."
 [[ -n "$WEB_STACK" ]] || die "no stack_name in frontend/samconfig.toml."
 [[ "$API_STACK" != "$OLD_STACK" ]] ||
-  die "backend/samconfig.toml names the old stack $OLD_STACK: the page is never deployed against it."
+  die "backend/samconfig.toml names $OLD_STACK, the deleted first stack: the page is never deployed against it."
 [[ "$WEB_STACK" != "$API_STACK" ]] ||
   die "frontend/samconfig.toml and backend/samconfig.toml name the same stack, $API_STACK."
 

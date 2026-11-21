@@ -13,7 +13,7 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
 | Region | `eu-north-1` (the only region the AWS organization allows for regional services) |
 | CLI profile | `shared-calendar-admin` (IAM Identity Center, role `AdministratorAccess`) |
 | Alerts to | the `AlertEmail` stack parameter |
-| Old stack | `hello-world-api` (profile `hello-admin`): replaced by `shared-calendar-api` in `docs/IMPLEMENTATION_PLAN.md` step 57 (2026-11-16); it stays, untouched, as the way back until step 58 (`docs/RENAME_PLAN.md` section 4.2). Never deploy to it: `deploy.sh` refuses |
+| Old stack | `hello-world-api` (profile `hello-admin`): replaced by `shared-calendar-api` in `docs/IMPLEMENTATION_PLAN.md` step 57 (2026-11-16); **deleted on 2026-11-21** (step 58, section 5.4), with its tables, its user pool and its budget. There is no way back to it (`docs/RENAME_PLAN.md` section 4.3). Both `deploy.sh` still refuse its name |
 
 ---
 
@@ -455,6 +455,45 @@ with `npm run deploy -w backend` and no extra argument.
     `DataUnavailableException: Insufficient amount of historical data` (not yet visible, section
     5.3). The account's provisioned tables are now the two stacks' four: 22 read and 22 write
     units, inside the free 25/25 (`docs/RENAME_PLAN.md` section 7).
+
+- Plan step 58 (2026-11-21): **the old stack `hello-world-api` retired**, on the Product Owner's
+  instruction, five days after step 57 (the plan named a week as the least; the Product Owner
+  decided). No export: its tables held smoke history only. The commands were run in the session
+  with Claude Code, under the profile `shared-calendar-admin`, each resource read back first.
+  - **Before** (read-only): the stack `UPDATE_COMPLETE`, untouched since 2026-11-16 09:56 UTC,
+    118 resources, no termination protection; `hello-messages` 4 rows and `calendar` 6 items,
+    deletion protection on, both confirmed as the old stack's through its resources
+    (`MessagesTable`, `CalendarTable`); the user pool `eu-north-1_1DOUiHwSk`, protection
+    `ACTIVE`, one user, `admin`.
+  - **Protection lifted**: `aws dynamodb update-table … --no-deletion-protection-enabled` on
+    `hello-messages` and on `calendar`; `aws cognito-idp update-user-pool … --deletion-protection
+    INACTIVE` on the old pool, with its password policy, admin-only creation, recovery setting,
+    MFA off, tier and verification template repeated in the same call (the call resets what it
+    is not given). The new stack's two tables and its pool were read after each: protection on.
+  - **Deleted**: `aws cloudformation delete-stack --stack-name hello-world-api` at 15:19:36 UTC;
+    gone by 15:21:08 UTC, with no `DELETE_FAILED`. `describe-stacks` answers "does not exist".
+  - **After** (read-only): the region's tables are `shared-calendar-api-calendar` and
+    `shared-calendar-api-hello-messages` only; one user pool, the new one; no function and no
+    log group with the old name; the alarms are the new stack's two, `OK`; the old API's
+    address no longer answers. `shared-calendar-api` and `shared-calendar-web`
+    `CREATE_COMPLETE` with their `LastUpdatedTime` unchanged; without a token the API answers
+    401 at its own address and through the page's, and the page answers 200.
+  - **The budget** `hello-world-api-monthly` deleted (`aws budgets delete-budget`), on a go of
+    its own; `shared-calendar-api-monthly` is the one left, and watches the whole account.
+  - **Smoke test** of `shared-calendar-api`, run by the operator after the deletion: reported
+    as passed; its output was not seen in the session.
+  - **The old build artifacts** deleted, on a go of their own: in SAM's upload bucket (stack
+    `aws-sam-cli-managed-default`; the bucket keeps versions) the 36 objects under the prefix
+    `hello-world-api/`, 29 MB, every version of each, by key and version id; no version and no
+    delete marker is left under the prefix. The 26 objects under `shared-calendar-api/` were
+    not touched.
+  - **The deploy scripts** (`backend/scripts/deploy.sh`, `frontend/scripts/deploy.sh`) still
+    refuse the name `hello-world-api`; their comments and the words of the refusal say that
+    the stack is deleted, no longer that it is kept. Both refusals tried by hand.
+  - **Not done:** the sections `[profile hello-admin]` and `[sso-session hello]` are still in
+    the operator's `~/.aws/config`.
+  - **Cost:** the provisioned tables are the new stack's two again, 11 read and 11 write
+    units of the free 25/25.
 
 ### 5.5 The page's first deployment (`docs/FRONTEND_DEPLOY_PLAN.md` step 72, 2026-11-21)
 

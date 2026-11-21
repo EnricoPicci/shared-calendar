@@ -343,6 +343,6 @@ the page.
 Suggested checkpoints to commit: after step 70, after step 71, and before step 72 in any case
 (the deploy needs a clean, committed tree).
 
-This plan does not wait for `docs/IMPLEMENTATION_PLAN.md` step 58 (the old stack
-`hello-world-api` retired), and that step does not wait for this plan: the page talks to
-`shared-calendar-api` only.
+This plan did not wait for `docs/IMPLEMENTATION_PLAN.md` step 58 (the old stack
+`hello-world-api` retired, done on 2026-11-21 after this plan's last step), and that step did not
+wait for this plan: the page talks to `shared-calendar-api` only.

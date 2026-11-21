@@ -6,8 +6,9 @@ when you do them.
 
 This repository is public. Account ids, e-mail addresses and the access portal URL are
 deliberately not written here. Find them in `~/.aws/config` (profile `shared-calendar-admin`, section
-`sso-session shared-calendar`; until `docs/IMPLEMENTATION_PLAN.md` step 58 also the old
-`hello-admin` / `sso-session hello`, same values) or in the console.
+`sso-session shared-calendar`) or in the console. A machine set up before 2026-11-16 may still
+hold the old sections `hello-admin` / `sso-session hello`, with the same values: the stack they
+were named after is deleted, and they can be removed.
 
 ---
 
@@ -28,7 +29,7 @@ The console's multi-account setup created an AWS Organization with three account
 | Account | Contains | Who signs in there |
 |---|---|---|
 | Management account | Billing, the Organization, IAM Identity Center (home region `us-east-1`). **Not the stack.** | Root, rarely |
-| **"Identity Delegated Admin"** | **The stack `shared-calendar-api`** (and, until `docs/IMPLEMENTATION_PLAN.md` step 58, the old `hello-world-api`) in `eu-north-1`: Lambda functions, HTTP API, Cognito user pool, DynamoDB tables, alarms. **The stack `shared-calendar-web`**, the hosting of the browser page: an S3 bucket in `eu-north-1` and a CloudFront distribution (a global service) | Identity Center user, role `AdministratorAccess` |
+| **"Identity Delegated Admin"** | **The stack `shared-calendar-api`** in `eu-north-1`: Lambda functions, HTTP API, Cognito user pool, DynamoDB tables, alarms. **The stack `shared-calendar-web`**, the hosting of the browser page: an S3 bucket in `eu-north-1` and a CloudFront distribution (a global service) | Identity Center user, role `AdministratorAccess` |
 | "Side Quest Accepted" | Nothing | Nobody |
 
 How the daily login reaches the stack:

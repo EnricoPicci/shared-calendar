@@ -63,9 +63,9 @@ Two stacks, in one region and one account: the API's and the page's. The page's 
 the API's: a release of the page changes nothing of the API.
 
 The API's stack is `shared-calendar-api`, created on 2026-11-16 by `docs/IMPLEMENTATION_PLAN.md`
-step 57. The old stack `hello-world-api` (profile `hello-admin`) stays, untouched, as the way back
-until step 58 retires it (`docs/RENAME_PLAN.md` section 4.2); its ids keep working until then, but
-nothing new goes there.
+step 57. The old stack `hello-world-api`, which it replaced, was deleted on 2026-11-21
+(`docs/IMPLEMENTATION_PLAN.md` step 58; the record is `docs/RUNBOOK.md` section 5.4): its
+address and its ids no longer exist.
 
 | | |
 |---|---|
