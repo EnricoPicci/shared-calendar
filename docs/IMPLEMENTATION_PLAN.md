@@ -19,7 +19,7 @@ Conventions used throughout:
 - Effort figures are indicative, for a developer who knows TypeScript but is new to SAM. Total: roughly 3 working days.
 - The architecture document is the source of truth for behaviour. Where this plan quotes a value (token lifetime, password policy, IAM action), the architecture wins if they ever differ.
 - The shared calendar (steps 41–59) has its own conventions, paths from the repository root, and the rule for which document governs while it is built: section 3, "Shared calendar".
-- The steps after 59 are in documents of their own: the view layer (steps 60–69) in `docs/FRONTEND_VIEW_PLAN.md`, the conversational interface (steps 70–86) in `docs/CONVERSATIONAL_PLAN.md`.
+- The steps after 59 are in documents of their own: the view layer (steps 60–69) in `docs/FRONTEND_VIEW_PLAN.md`, the conversational interface (steps c00–c16) in `docs/CONVERSATIONAL_PLAN.md`.
 
 ### 1.1 Requirement traceability
 

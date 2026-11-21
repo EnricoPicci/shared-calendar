@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v1, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). **Nothing of it is built.** Steps 70 to 86 |
+| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`) |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown on its screen, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which is deployed nowhere today (open point P7, section 2.2). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
@@ -11,14 +11,16 @@
 
 | Version | Date | Change |
 |---|---|---|
-| v1 | 2026-11-21 | First version: steps 70 to 86 |
+| v1 | 2026-11-21 | First version: seventeen steps, numbered 70 to 86 |
+| v2 | 2026-11-21 | **The steps renamed** c00 to c16, in order: c00 is the former 70, c16 the former 86. The letter and the two digits keep them apart from the numbered steps of the other plans and from the briefs in `prompts/` (`a1-…`, `a2-…`). Commits and briefs written before this version use the numbers. No step changes |
 
 ---
 
 ## 1. How to use this plan
 
-The plan is a sequence of **steps**, numbered after the last step of
-`docs/FRONTEND_VIEW_PLAN.md` (69). It follows the working rhythm of `CLAUDE.md`: one step at a
+The plan is a sequence of **steps**, named c00 to c16: a series of their own, told apart by
+its letter from the numbered steps of `docs/IMPLEMENTATION_PLAN.md` and
+`docs/FRONTEND_VIEW_PLAN.md`. It follows the working rhythm of `CLAUDE.md`: one step at a
 time, its acceptance check, an honest report (failures included), then a stop for review. Commit
 only when asked.
 
@@ -31,7 +33,7 @@ only when asked.
 - **An open point is closed in its step, in front of the Product Owner, never on the way.**
   Section 2 says which step holds which point. A step that holds one reports the evidence and a
   proposal, and the decision is the review's.
-- **No cloud command before step 85.** Steps 70 to 84 need Docker and, where said, an Anthropic
+- **No cloud command before step c15.** Steps c00 to c14 need Docker and, where said, an Anthropic
   API key in the shell. Nothing is deployed, and no `aws` command that changes something is run,
   without an explicit instruction in the request of that step.
 - **The calendar is not changed.** No rule, route or handler of the calendar changes in this
@@ -47,9 +49,9 @@ Decided in the clarification round of the brief
 
 | Question | Decision | What it means for the plan |
 |---|---|---|
-| Where the plan lives | A document of its own, steps numbered from 70 | This file. `docs/IMPLEMENTATION_PLAN.md` gets a pointer and no step |
-| An Anthropic API key during the build | **Available from the start** | The assumptions about Anthropic's API are tried with one real request in step 72, and the evaluation (step 80) comes before the screen, as `docs/CONVERSATIONAL_ARCHITECTURE.md` section 19 orders it |
-| Cloud deployments | **One, at the end** (step 85) | Everything is proven locally first. P2 is closed there: it has a known fix either way |
+| Where the plan lives | A document of its own, steps named from c00 | This file. `docs/IMPLEMENTATION_PLAN.md` gets a pointer and no step |
+| An Anthropic API key during the build | **Available from the start** | The assumptions about Anthropic's API are tried with one real request in step c02, and the evaluation (step c10) comes before the screen, as `docs/CONVERSATIONAL_ARCHITECTURE.md` section 19 orders it |
+| Cloud deployments | **One, at the end** (step c15) | Everything is proven locally first. P2 is closed there: it has a known fix either way |
 | Anthropic's data terms (P1) | A check of the deployment step | No prerequisite step. The feature is built before the terms are read; real users are not invited before |
 
 ### 2.2 The open points of the architecture, each in its step
@@ -59,13 +61,13 @@ this plan.
 
 | # | Point | Step | How it is closed there |
 |---|---|---|---|
-| P1 | Anthropic's data terms for the account in use | 85 | The operator reads the account's settings and terms. The result is written in `docs/CONVERSATIONAL_ARCHITECTURE.md` section 10.2. Until then nobody but the operator is invited |
-| P2 | Whether reading the key needs `kms:Decrypt` | 85 | The deployment is made without the statement. The smoke test's exchange tells. If the key cannot be read: one statement naming the key, a second deployment, each with its own go |
-| P3 | The capacity of the `assistant` table under a long conversation | 79 | A journey fills a conversation to its bound and records the read and write units of each step. The report compares them with 8 / 6 and the burst allowance and proposes to keep or lower the 100 KB bound and the 6 KB cap |
-| P4 | Effort level and model | 80 | The first evaluation run, at two effort levels and on two models: quality, seconds per step, cents per exchange. The Product Owner chooses |
-| P5 | Blocking time by an override the model works out | 80 | The evaluation's blocking requests. If the hours come out wrong, the tool `block_time` is proposed, and built only after the Product Owner's go, as an addition to step 80 |
-| P6 | A typed "yes" drops the proposal | 83 | The walk with the real model, by the Product Owner too. If people type more than they press, the fixed list of words matched in code is proposed, and built only after the go |
-| P7 | The front end is deployed nowhere | 86 | **Stays open**, on purpose: this plan does not deploy the front end. Step 82 makes the screen work locally through the dev server. Step 86 adds the assistant's routes to what `docs/FRONTEND_ARCHITECTURE.md` section 10 says a deployment must cover |
+| P1 | Anthropic's data terms for the account in use | c15 | The operator reads the account's settings and terms. The result is written in `docs/CONVERSATIONAL_ARCHITECTURE.md` section 10.2. Until then nobody but the operator is invited |
+| P2 | Whether reading the key needs `kms:Decrypt` | c15 | The deployment is made without the statement. The smoke test's exchange tells. If the key cannot be read: one statement naming the key, a second deployment, each with its own go |
+| P3 | The capacity of the `assistant` table under a long conversation | c09 | A journey fills a conversation to its bound and records the read and write units of each step. The report compares them with 8 / 6 and the burst allowance and proposes to keep or lower the 100 KB bound and the 6 KB cap |
+| P4 | Effort level and model | c10 | The first evaluation run, at two effort levels and on two models: quality, seconds per step, cents per exchange. The Product Owner chooses |
+| P5 | Blocking time by an override the model works out | c10 | The evaluation's blocking requests. If the hours come out wrong, the tool `block_time` is proposed, and built only after the Product Owner's go, as an addition to step c10 |
+| P6 | A typed "yes" drops the proposal | c13 | The walk with the real model, by the Product Owner too. If people type more than they press, the fixed list of words matched in code is proposed, and built only after the go |
+| P7 | The front end is deployed nowhere | c16 | **Stays open**, on purpose: this plan does not deploy the front end. Step c12 makes the screen work locally through the dev server. Step c16 adds the assistant's routes to what `docs/FRONTEND_ARCHITECTURE.md` section 10 says a deployment must cover |
 
 ### 2.3 What planning found, each in its step
 
@@ -75,26 +77,26 @@ before the code that depends on it.
 
 | # | Finding | Step |
 |---|---|---|
-| F1 | **Five things `docs/CONVERSATIONAL_ARCHITECTURE.md` section 7.2 and 6.1 take from Anthropic's documentation and nobody has tried**: a line with `role: "system"` inside `messages`. Adaptive thinking with `effort: "low"`. An answer constrained to a list (the language question). The two cache marks. The two error shapes of the spending limit. If one does not hold, the design of section 7.2 changes before the core is written on it | 72 |
-| F2 | **Nothing enforces the two import rules** (the Anthropic SDK only in `backend/src/lib/anthropic.ts`. `backend/src/assistant` never imports `lib/calendarDb.ts`). The root `eslint.config.js` restricts imports for `frontend/src` only. Proposal: two `no-restricted-imports` rules | 72, 74 |
-| F3 | **Coverage.** The back end's 100 % line threshold covers `src/lib` only. The architecture asks it for `backend/src/assistant` too (its section 12.2). The six handlers stay outside the threshold, as every handler does | 73 |
-| F4 | **A handler called as a tool writes its own log line**, so one step of the assistant writes several lines with one request id, and a handler reads its environment as if it were alone in the function. Whether the lines can be told apart, and whether any handler keeps state that two calls in one function would share | 74 |
-| F5 | **What the two read-only functions carry.** To build a proposal they need the change tools' definitions and their fact reading, not the change handlers. Proposal: the part that runs a change is a module only `confirmProposal` imports, so the code that writes the calendar is not even in the other two bundles | 75 |
-| F6 | **Booking for a User, proposed by a function without `AdminGetUser`.** The proposal's facts can only come from the users' list (`ListUsersInGroup`). Whether that is enough for the confirmation to name the person, or the proposal goes out unchecked and the route refuses at the confirmation | 77 |
+| F1 | **Five things `docs/CONVERSATIONAL_ARCHITECTURE.md` section 7.2 and 6.1 take from Anthropic's documentation and nobody has tried**: a line with `role: "system"` inside `messages`. Adaptive thinking with `effort: "low"`. An answer constrained to a list (the language question). The two cache marks. The two error shapes of the spending limit. If one does not hold, the design of section 7.2 changes before the core is written on it | c02 |
+| F2 | **Nothing enforces the two import rules** (the Anthropic SDK only in `backend/src/lib/anthropic.ts`. `backend/src/assistant` never imports `lib/calendarDb.ts`). The root `eslint.config.js` restricts imports for `frontend/src` only. Proposal: two `no-restricted-imports` rules | c02, c04 |
+| F3 | **Coverage.** The back end's 100 % line threshold covers `src/lib` only. The architecture asks it for `backend/src/assistant` too (its section 12.2). The six handlers stay outside the threshold, as every handler does | c03 |
+| F4 | **A handler called as a tool writes its own log line**, so one step of the assistant writes several lines with one request id, and a handler reads its environment as if it were alone in the function. Whether the lines can be told apart, and whether any handler keeps state that two calls in one function would share | c04 |
+| F5 | **What the two read-only functions carry.** To build a proposal they need the change tools' definitions and their fact reading, not the change handlers. Proposal: the part that runs a change is a module only `confirmProposal` imports, so the code that writes the calendar is not even in the other two bundles | c05 |
+| F6 | **Booking for a User, proposed by a function without `AdminGetUser`.** The proposal's facts can only come from the users' list (`ListUsersInGroup`). Whether that is enough for the confirmation to name the person, or the proposal goes out unchecked and the route refuses at the confirmation | c07 |
 
 ## 3. What is built
 
 | Part | Where | Steps |
 |---|---|---|
-| The contract: codes, `AssistantReply`, languages, limits, fixed texts | `shared/src/assistant/`, `shared/src/api.ts` | 70 |
-| The table `assistant` and its module | `backend/template.yaml`, `backend/scripts/local-seed.sh`, `backend/src/lib/assistantDb.ts` | 71 |
-| The model's module, the key, the fake Claude | `backend/src/lib/anthropic.ts`, `backend/docker/`, `backend/docker-compose.yml` | 72 |
-| The core and the six functions | `backend/src/assistant/`, `backend/src/handlers/` | 73 to 75 |
-| The tools | `backend/src/assistant/tools/` | 74 to 78 |
-| The journeys and their pages | `backend/tests/integration/assistant.test.ts`, `docs/journeys/backend/` | 73 to 79 |
-| The evaluation | `backend/scripts/`, `backend/tests/eval/` | 80 |
-| The screen | `frontend/src/services/`, `frontend/src/logic/`, `frontend/src/views/`, `frontend/index.html` | 81 to 83 |
-| The operator's tooling and the deployment | `backend/scripts/assistant-key.sh`, `backend/scripts/smoke.sh`, `docs/RUNBOOK.md` | 84, 85 |
+| The contract: codes, `AssistantReply`, languages, limits, fixed texts | `shared/src/assistant/`, `shared/src/api.ts` | c00 |
+| The table `assistant` and its module | `backend/template.yaml`, `backend/scripts/local-seed.sh`, `backend/src/lib/assistantDb.ts` | c01 |
+| The model's module, the key, the fake Claude | `backend/src/lib/anthropic.ts`, `backend/docker/`, `backend/docker-compose.yml` | c02 |
+| The core and the six functions | `backend/src/assistant/`, `backend/src/handlers/` | c03 to c05 |
+| The tools | `backend/src/assistant/tools/` | c04 to c08 |
+| The journeys and their pages | `backend/tests/integration/assistant.test.ts`, `docs/journeys/backend/` | c03 to c09 |
+| The evaluation | `backend/scripts/`, `backend/tests/eval/` | c10 |
+| The screen | `frontend/src/services/`, `frontend/src/logic/`, `frontend/src/views/`, `frontend/index.html` | c11 to c13 |
+| The operator's tooling and the deployment | `backend/scripts/assistant-key.sh`, `backend/scripts/smoke.sh`, `docs/RUNBOOK.md` | c14, c15 |
 
 The order: the contract, then the three modules everything stands on, then the conversation
 with nothing but text, then reading, then the mechanism of a change with one change, then the
@@ -107,13 +109,13 @@ tools that are not going to move.
 **The gate of every step** is the root `DYNAMODB_PORT=8002 npm run verify`: the back end's gate
 (typecheck, lint, audit, `sam validate --lint`, unit tests, journeys, with `shared/`), then the
 front end's. It needs `npm run local:up -w backend` and `npm run local:api -w backend` running,
-**with the fake Claude**: from step 72 the journeys refuse to start otherwise. `local:api` is
+**with the fake Claude**: from step c02 the journeys refuse to start otherwise. `local:api` is
 restarted after every step that adds a function.
 
 Beside the gate, every step:
 
 1. **Keeps the coverage.** 100 % lines on `shared/src`, `backend/src/lib`, `frontend/src` and,
-   from step 73, `backend/src/assistant`. Unit tests reach no network: `lib/anthropic` is mocked
+   from step c03, `backend/src/assistant`. Unit tests reach no network: `lib/anthropic` is mocked
    in the core's tests, and the Anthropic SDK's client in the tests of `lib/anthropic` itself.
 2. **Uses a fixed "now"** in the unit tests (`vi.setSystemTime`), and dates counted from the
    real today with the shared time helpers in the journeys, as the calendar's steps do.
@@ -127,8 +129,8 @@ Beside the gate, every step:
 5. **Merges what it built** into the document that governs it from then on, in the same change:
    routes, table, roles and security rows into `docs/ARCHITECTURE.md`. The service into
    `docs/FRONTEND_SERVICES.md`. The screen into `docs/FRONTEND_ARCHITECTURE.md`. New files into
-   `docs/FOLDER_STRUCTURE.md`, new commands into `docs/COMMANDS.md`. Step 70 opens the merge
-   and step 86 closes it. `docs/CONVERSATIONAL_ARCHITECTURE.md` keeps what is not built yet,
+   `docs/FOLDER_STRUCTURE.md`, new commands into `docs/COMMANDS.md`. Step c00 opens the merge
+   and step c16 closes it. `docs/CONVERSATIONAL_ARCHITECTURE.md` keeps what is not built yet,
    and a finding of a step is corrected there.
 6. **Reports** the gate's result, the step's own checks line by line, every finding, and the
    state of the open point or finding the step holds.
@@ -141,7 +143,7 @@ their own, and remove them at the end.
 
 ## 5. Steps
 
-### Step 70 — Shared: the contract (≈ 4 h)
+### Step c00 — Shared: the contract (≈ 4 h)
 
 **Goal:** what the back end and the screen agree on exists as types, schemas and texts, before
 any code uses it.
@@ -163,7 +165,7 @@ Files, in `shared/src/assistant/` (exported by `shared/src/index.ts`), with the 
   labels of the two buttons, the progress lines. A test fails when a text exists in one
   language and not in the other.
 
-The texts of each tool's confirmation are added by the step that adds the tool (75 to 78).
+The texts of each tool's confirmation are added by the step that adds the tool (c05 to c08).
 
 Documents: `docs/CONVERSATIONAL_ARCHITECTURE.md` status "under way" and a line on where the
 truth lives while the assistant is built; `docs/ARCHITECTURE.md` a change-log entry that opens
@@ -172,9 +174,25 @@ the merge; `shared/CLAUDE.md` if the new folder needs a line.
 **Acceptance:** the gate green; 100 % lines on `shared/src`; `shared/` still imports only
 TypeScript and `zod`; the test on the two languages passes.
 
+**As done** (2026-11-21). As written, with these differences, each asked by the step's brief:
+
+- the texts are one object per language of one type, `AssistantTexts`, so a text missing in
+  one language already fails the typecheck. The test checks at run time what the compiler
+  does not: the same keys, and no text empty;
+- of "the progress lines" only the general one ("Working…") is here. The line of each read
+  arrives with its tool (steps c04 to c08), like the wording of each change;
+- two texts more than listed above: the sentence of a conversation that is full, and the
+  opening words of a proposal's question, for one change and for several;
+- a refused action carries its route's error code in a field `error`, `null` on every other
+  action, named in `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6 at the review;
+- the Italian texts address the person with the formal "lei", decided at the review
+  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 4.2);
+- `docs/ARCHITECTURE.md`: v12 closed and v13 opened for the assistant's merge, and the seven
+  codes listed in its section 4.
+
 ---
 
-### Step 71 — The table and its module (≈ 6 h)
+### Step c01 — The table and its module (≈ 6 h)
 
 **Goal:** a conversation can be stored, read, moved from state to state and left to expire,
 with no model anywhere.
@@ -205,7 +223,7 @@ section 10.
 
 ---
 
-### Step 72 — The model's module, the key and the fake Claude (≈ 7 h)
+### Step c02 — The model's module, the key and the fake Claude (≈ 7 h)
 
 **Goal:** one module can ask Claude and say what came back; locally a fake answers in its
 place; the architecture's assumptions about Anthropic's API are tried.
@@ -252,7 +270,7 @@ key in the shell, `local:up` wires the real Claude and the journeys refuse to st
 
 ---
 
-### Step 73 — The conversation, text only (≈ 7 h)
+### Step c03 — The conversation, text only (≈ 7 h)
 
 **Goal:** a person writes, Claude answers in text, the conversation is remembered, the limits
 hold. No tool yet. The first end-to-end path, and the place where the core's shape is fixed.
@@ -285,7 +303,7 @@ exchange by hand through `curl` in English and one in Italian, reported; the rou
 
 ---
 
-### Step 74 — Reading: the tools mechanism and the four read tools (≈ 8 h)
+### Step c04 — Reading: the tools mechanism and the four read tools (≈ 8 h)
 
 **Goal:** "which slots are free next week?" is answered from the calendar, step by step.
 
@@ -320,7 +338,7 @@ asked for and the seconds per step reported.
 
 ---
 
-### Step 75 — A change: the proposal and booking (≈ 9 h, the largest step)
+### Step c05 — A change: the proposal and booking (≈ 9 h, the largest step)
 
 **Goal:** the whole mechanism of a change, on one tool, `book_appointment`: proposed, shown in
 the server's words, confirmed with a button, run once, or declined, or dropped.
@@ -355,7 +373,7 @@ booking by hand from the sentence to the appointment.
 
 ---
 
-### Step 76 — The other appointment changes (≈ 6 h)
+### Step c06 — The other appointment changes (≈ 6 h)
 
 **Goal:** cancel, move and note; several changes in one proposal.
 
@@ -376,7 +394,7 @@ can do by conversation works locally.
 
 ---
 
-### Step 77 — The Administrator: users' list, settings, types, booking for a User (≈ 6 h)
+### Step c07 — The Administrator: users' list, settings, types, booking for a User (≈ 6 h)
 
 **Goal:** the Administrator's simpler tools.
 
@@ -393,12 +411,12 @@ Journeys: **a User not offered an Administrator's tool** (the fake asks for one:
 refuses before any handler is called); a setting changed and read back, then put back; a
 booking for a User found in that User's list.
 
-**Acceptance:** the gate green; the journeys with their pages; the roles' review of step 75
+**Acceptance:** the gate green; the journeys with their pages; the roles' review of step c05
 repeated for what changed.
 
 ---
 
-### Step 78 — The Administrator: availability and blocking time (≈ 8 h)
+### Step c08 — The Administrator: availability and blocking time (≈ 8 h)
 
 **Goal:** patterns, date overrides, one-off windows, and "block Tuesday from 14:00 to 16:00".
 
@@ -410,7 +428,7 @@ way made small for the model.
 
 Blocking is built here as `docs/CONVERSATIONAL_ARCHITECTURE.md` section 3 describes it: the
 model works out what is left of the day. Whether that is good enough is open point P5, judged
-in step 80, not here.
+in step c10, not here.
 
 Tests: each tool; the day before and after in the confirmation, for a day of patterns, a day
 already overridden and a day closed; an empty list closes the day.
@@ -425,7 +443,7 @@ blocking requests by hand, the proposed hours reported as they came. Checkpoint:
 
 ---
 
-### Step 79 — Back end closing: capacity, logs, repeatability (≈ 5 h)
+### Step c09 — Back end closing: capacity, logs, repeatability (≈ 5 h)
 
 **Goal:** the back end is finished as a whole; **open point P3** has its numbers.
 
@@ -449,7 +467,7 @@ in `docs/CONVERSATIONAL_ARCHITECTURE.md` section 9 and 18.2; the log search empt
 
 ---
 
-### Step 80 — The evaluation with the real model (≈ 8 h, needs the key, costs money)
+### Step c10 — The evaluation with the real model (≈ 8 h, needs the key, costs money)
 
 **Goal:** to know whether Claude, with these instructions and tools, understands people; **open
 points P4 and P5** decided on evidence.
@@ -488,7 +506,7 @@ written as decided in `docs/CONVERSATIONAL_ARCHITECTURE.md` sections 7.1, 7.2 an
 
 ---
 
-### Step 81 — Front end: `AssistantService` (≈ 5 h)
+### Step c11 — Front end: `AssistantService` (≈ 5 h)
 
 **Goal:** the six calls, by the pattern of `docs/FRONTEND_SERVICES.md`.
 
@@ -507,7 +525,7 @@ Documents: `docs/FRONTEND_SERVICES.md`, a section for the service.
 
 ---
 
-### Step 82 — Front end: the screen (≈ 9 h)
+### Step c12 — Front end: the screen (≈ 9 h)
 
 **Goal:** the screen "Assistant", for both roles, running in a browser against the local stack.
 
@@ -533,7 +551,7 @@ Files, in the order of `docs/FRONTEND_VIEW_PLAN.md` section 4:
 - the shell: the address, the navigation entry, the session's objects made and dropped with
   the session;
 - `frontend/scripts/dev.mjs` passes `/assistant` on to the local API, as it does the other
-  paths. This is what open point P7 means locally; P7 itself stays open (step 86).
+  paths. This is what open point P7 means locally; P7 itself stays open (step c16).
 
 Tests: the logic's, without a DOM; the view's DOM test against the real `index.html`, with a
 text containing `<script>` shown as text and nothing left behind on leaving.
@@ -551,11 +569,11 @@ booking and its cancellation); `docs/FRONTEND_ARCHITECTURE.md` has the screen.
 
 ---
 
-### Step 83 — The walk, with the real model (≈ 5 h, needs the key)
+### Step c13 — The walk, with the real model (≈ 5 h, needs the key)
 
 **Goal:** the screen is walked by people, with the real Claude; **open point P6** decided.
 
-- `docs/FRONTEND_WALK.md` gains the assistant's checks: those of step 82 against the fake, as
+- `docs/FRONTEND_WALK.md` gains the assistant's checks: those of step c12 against the fake, as
   the check to repeat after a change, and a short list to do with the real model.
 - **Reading the screen without a mouse**: a new message announced, the proposal's two buttons
   reached in order, the focus after a confirmation and after a decline.
@@ -565,7 +583,7 @@ booking and its cancellation); `docs/FRONTEND_ARCHITECTURE.md` has the screen.
   step proposes the fixed list of words matched in code, never through the model
   (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 18.2). **Built only after the go**, as an
   addition of about 3 hours in the back end, with its tests and journey.
-- What the walk shows about the instructions goes back through the evaluation of step 80, not
+- What the walk shows about the instructions goes back through the evaluation of step c10, not
   straight into `prompt.ts`.
 
 **Acceptance:** the root gate green on a fresh stack; then, on a second fresh stack, the seed
@@ -574,15 +592,15 @@ and the whole walk, line by line; P6 written as decided in
 
 ---
 
-### Step 84 — Before the deployment: the key's script, the smoke test, the runbook (≈ 4 h, no cloud change)
+### Step c14 — Before the deployment: the key's script, the smoke test, the runbook (≈ 4 h, no cloud change)
 
-**Goal:** everything the operator needs for step 85 exists and is tried as far as it can be
+**Goal:** everything the operator needs for step c15 exists and is tried as far as it can be
 without the cloud.
 
 - `backend/scripts/assistant-key.sh` and `npm run assistant-key -w backend -- <stack>`: asks
   for the key with hidden input and stores it as the `SecureString`
   `/<stack>/anthropic-api-key`. The key is never an argument, never printed, never on disk.
-  It refuses the old stack `hello-world-api`. It can only be run in step 85.
+  It refuses the old stack `hello-world-api`. It can only be run in step c15.
 - `backend/scripts/smoke.sh` gains one exchange of the assistant, a read, as the throw-away
   user: a message, `continue` until `idle`, the conversation ended. Status and code printed,
   never a text. `npm run smoke -w backend -- local` passes against the fake.
@@ -599,7 +617,7 @@ Owner.
 
 ---
 
-### Step 85 — Cloud deployment (≈ 3 h, needs explicit instruction)
+### Step c15 — Cloud deployment (≈ 3 h, needs explicit instruction)
 
 **Each cloud command needs its own go in the request of this step.** The target is the stack
 `shared-calendar-api`, profile `shared-calendar-admin`, region `eu-north-1`. Nothing goes to
@@ -634,7 +652,7 @@ AWS bill's forecast is unchanged.
 
 ---
 
-### Step 86 — Documentation and hand-over (≈ 3 h)
+### Step c16 — Documentation and hand-over (≈ 3 h)
 
 **Goal:** the repository says what exists, in one place each.
 
@@ -665,56 +683,56 @@ to a section that moved); no document says the assistant is a proposal; the chec
 ## 6. Order of work and checkpoints
 
 ```
-70 contract ─► 71 table ─► 72 model, key, fake ─► 73 text only ─► 74 reading
+c00 contract ─► c01 table ─► c02 model, key, fake ─► c03 text only ─► c04 reading
                                                                       │
-   79 back end closing ◄─ 78 availability ◄─ 77 admin ◄─ 76 changes ◄─ 75 proposal, booking
+   c09 back end closing ◄─ c08 availability ◄─ c07 admin ◄─ c06 changes ◄─ c05 proposal, booking
         │
         ▼
-80 evaluation ─► 81 service ─► 82 screen ─► 83 walk ─► 84 before deploying ─► 85 deployment ─► 86 hand-over
+c10 evaluation ─► c11 service ─► c12 screen ─► c13 walk ─► c14 before deploying ─► c15 deployment ─► c16 hand-over
 ```
 
 The steps are done in this order. Two moves are possible if the review asks:
 
-- steps 81 and 82 need only step 76, so the screen can come before the Administrator's tools.
-  Step 83, the walk with the real model, still waits for step 80;
-- steps 77 and 78 can change places.
+- steps c11 and c12 need only step c06, so the screen can come before the Administrator's tools.
+  Step c13, the walk with the real model, still waits for step c10;
+- steps c07 and c08 can change places.
 
-Suggested commits: after step 72 (the three modules), 74 (reading works), 76 (everything a User
-does), 79 (the back end), 80 (the model judged), 83 (the screen), 85 (deployed), 86.
+Suggested commits: after step c02 (the three modules), c04 (reading works), c06 (everything a User
+does), c09 (the back end), c10 (the model judged), c13 (the screen), c15 (deployed), c16.
 
 | Open point | P1 | P2 | P3 | P4 | P5 | P6 | P7 |
 |---|---|---|---|---|---|---|---|
-| Step | 85 | 85 | 79 | 80 | 80 | 83 | 86, stays open |
+| Step | c15 | c15 | c09 | c10 | c10 | c13 | c16, stays open |
 
 ## 7. Risks
 
 | Risk | What is done about it |
 |---|---|
-| An assumption about Anthropic's API does not hold (F1) | Tried with real requests in step 72, before the core is written. The step stops if one fails |
-| The fake Claude drifts from the real one, and the journeys prove a behaviour the model never has | The fake's answers are copied from real ones recorded in step 72; every step from 73 to 78 does its main path once by hand with the real key; step 80 judges the real model on forty requests |
-| The proposal mechanism is wrong and twelve tools are built on it | Step 75 builds it on one tool, with every rule of section 5.5 tested, before step 76 adds the next |
-| A read-only function ends up able to write the calendar | The roles are reviewed statement by statement at steps 75 and 77; finding F5 keeps the code that writes out of those bundles |
-| A step takes more than 29 seconds locally, where a container starts cold | Step 74 reports the seconds per step locally and with the real model. A cold start is the local stack's, not the cloud's; the journeys' time-out is 60 seconds |
-| The evaluation costs more than expected | Step 80 states its ceiling before the first run and waits for the go; the workspace's spend limit holds whatever happens |
-| The model words blocked time wrongly (P5) and nobody notices | The confirmation shows the day as it is and as it would become, in the server's words (step 78); step 80 reads the blocking requests one by one |
-| Text of a conversation reaches a log | Every test asserts the log line (section 4); the search of step 79 over a whole run; the cloud's lines read in step 85 |
+| An assumption about Anthropic's API does not hold (F1) | Tried with real requests in step c02, before the core is written. The step stops if one fails |
+| The fake Claude drifts from the real one, and the journeys prove a behaviour the model never has | The fake's answers are copied from real ones recorded in step c02; every step from c03 to c08 does its main path once by hand with the real key; step c10 judges the real model on forty requests |
+| The proposal mechanism is wrong and twelve tools are built on it | Step c05 builds it on one tool, with every rule of section 5.5 tested, before step c06 adds the next |
+| A read-only function ends up able to write the calendar | The roles are reviewed statement by statement at steps c05 and c07; finding F5 keeps the code that writes out of those bundles |
+| A step takes more than 29 seconds locally, where a container starts cold | Step c04 reports the seconds per step locally and with the real model. A cold start is the local stack's, not the cloud's; the journeys' time-out is 60 seconds |
+| The evaluation costs more than expected | Step c10 states its ceiling before the first run and waits for the go; the workspace's spend limit holds whatever happens |
+| The model words blocked time wrongly (P5) and nobody notices | The confirmation shows the day as it is and as it would become, in the server's words (step c08); step c10 reads the blocking requests one by one |
+| Text of a conversation reaches a log | Every test asserts the log line (section 4); the search of step c09 over a whole run; the cloud's lines read in step c15 |
 | The back end's calendar journeys and the assistant's disturb each other on one local table | One file at a time, as today; the assistant's journeys own their types, dates and people (section 4) |
-| `CLAUDE.md` outgrows its 200 lines with the new rules | Step 86 moves what concerns one package into that package's file and reports what moved |
-| The spending limit is never set, and the daily limits are the only bound | It is a line of the runbook (step 84) and a line of step 85's acceptance |
+| `CLAUDE.md` outgrows its 200 lines with the new rules | Step c16 moves what concerns one package into that package's file and reports what moved |
+| The spending limit is never set, and the daily limits are the only bound | It is a line of the runbook (step c14) and a line of step c15's acceptance |
 
 ## 8. Decisions and assumptions
 
 | # | Decision or assumption | Why |
 |---|---|---|
-| 1 | The plan is a document of its own, steps 70 to 86 | Clarification round. One numbering keeps "step N" unambiguous in briefs and commits |
+| 1 | The plan is a document of its own, steps c00 to c16 | Clarification round. The letter keeps "step cNN" apart from the numbered steps of the other plans, in briefs and commits |
 | 2 | The key is available from the start; one deployment at the end; P1 in the deployment step | Clarification round (section 2.1) |
 | 3 | The nine items of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 19 became seventeen steps | Its items 4 and 5 are each several days of work. A step is one thing that can be reviewed: text only, then reading, then one change, then the others |
-| 4 | The script `assistant-key` is written in step 84, not with the model's module (item 3 of that outline) | It can only be run against the cloud. Written beside the deployment it is tried a step after it is written, not twelve |
-| 5 | The mechanism of a change is built on `book_appointment` alone (step 75) | The riskiest part of the design gets a step to itself and the simplest tool that exercises all of it |
+| 4 | The script `assistant-key` is written in step c14, not with the model's module (item 3 of that outline) | It can only be run against the cloud. Written beside the deployment it is tried a step after it is written, not twelve |
+| 5 | The mechanism of a change is built on `book_appointment` alone (step c05) | The riskiest part of the design gets a step to itself and the simplest tool that exercises all of it |
 | 6 | The evaluation comes after all the tools and before the screen | It judges the instructions and the tools as a whole, and what it changes would otherwise change under the screen |
-| 7 | Every step from 73 to 78 does its main path once by hand with the real model | The fake proves the code, not the model. A surprise is cheaper in the step that causes it than in step 80 |
+| 7 | Every step from c03 to c08 does its main path once by hand with the real model | The fake proves the code, not the model. A surprise is cheaper in the step that causes it than in step c10 |
 | 8 | The assistant's journeys are one new file with one `describe` per theme, each with its page | As the calendar's; the pages are part of the step (`CLAUDE.md`) |
 | 9 | Each step merges what it built into the governing documents | `docs/CONVERSATIONAL_ARCHITECTURE.md` section 1 asks it, as the calendar did with its specification |
 | 10 | `block_time` (P5) and the typed confirmation (P6) are not planned as steps | Each exists only if its evidence asks for it. Planned as steps they would be built by default |
-| 11 | Assumed: the old stack `hello-world-api` may still exist at step 85 | `docs/IMPLEMENTATION_PLAN.md` step 58 is the Product Owner's to call. Nothing here depends on it or touches it |
-| 12 | Assumed: about ten people, as everywhere in the project | The capacity of step 79 and the cost of step 80 are judged against it |
+| 11 | Assumed: the old stack `hello-world-api` may still exist at step c15 | `docs/IMPLEMENTATION_PLAN.md` step 58 is the Product Owner's to call. Nothing here depends on it or touches it |
+| 12 | Assumed: about ten people, as everywhere in the project | The capacity of step c09 and the cost of step c10 are judged against it |

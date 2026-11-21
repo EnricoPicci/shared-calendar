@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2, a proposal: nothing of it is built. Input for an implementation plan |
+| Status | v3, under way: step c00 of `docs/CONVERSATIONAL_PLAN.md` done |
 | Date | 2026-11-21 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
@@ -13,6 +13,7 @@
 |---|---|---|
 | v1 | 2026-11-21 | First draft, after the clarification round with the Product Owner (section 1.2) |
 | v2 | 2026-11-21 | **The spending limit reached** is told apart from an outage: its own code `assistant_budget_reached` and its own sentence for the person, in the conversation's language (sections 6.1, 7.4, 12, 14, 15) |
+| v3 | 2026-11-21 | **Under way.** Step c00 of `docs/CONVERSATIONAL_PLAN.md` is done: the contract of section 6, the languages of 4.2, the limits of 4.4 and the fixed texts exist in `shared/src/assistant/`, the seven codes in `shared/src/api.ts`. Section 1 says which document governs a part of the assistant once it is built. Section 6 names the field of a refused action: `error`, the route's error code, `null` on every other action. Section 4.2: the fixed Italian texts address the person with the formal "lei". No other change to the design |
 
 ---
 
@@ -31,8 +32,11 @@ terms.
 document governs the assistant until its parts are built; each plan step then merges what it
 built into `docs/ARCHITECTURE.md` (routes, table, roles, security rows, cost), into
 `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` (the screen), as the calendar
-did with `docs/SHARED_CALENDAR_SPEC.md`. Nothing here changes a rule of the calendar: the
-assistant is a second way to reach the same routes, with the same checks.
+did with `docs/SHARED_CALENDAR_SPEC.md`. From step c00 of `docs/CONVERSATIONAL_PLAN.md` on, each
+part of the assistant is governed by `docs/ARCHITECTURE.md` and the two front-end documents from
+the step that merges it into them (the change log of `docs/ARCHITECTURE.md`, v13, says which
+step merged what). Nothing here changes a rule of the calendar: the assistant is a second way to
+reach the same routes, with the same checks.
 
 ### 1.1 Requirements
 
@@ -183,7 +187,8 @@ and its fixed texts.
    of the application, not of the person, so writing later in the other language does not
    switch it; the assistant keeps answering in the conversation's language.
 4. The texts the server writes itself (the confirmation, "nothing was changed", "the daily
-   limit is reached") come from one file of fixed texts per language in `shared/`.
+   limit is reached") come from one file of fixed texts per language in `shared/`. The Italian
+   ones address the person with the formal "lei".
 
 To talk in the other language the person starts a new conversation.
 
@@ -482,7 +487,8 @@ of the token, and no route takes a conversation id.
 }
 proposal: {
   proposalId, question, confirmLabel, declineLabel,
-  actions: [ { summary, outcome } ]  // outcome: null | 'done' | 'refused' | 'unknown'; a refused one carries the route's error code
+  actions: [ { summary, outcome, error } ]  // outcome: null | 'done' | 'refused' | 'unknown'
+                                            // error: the route's error code when refused, else null
 }
 ```
 

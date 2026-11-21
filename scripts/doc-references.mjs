@@ -20,7 +20,8 @@ const ITEMS = [
   /§\s*\d/g,
   /\bdecisions?\s+[A-Z]?\d+/gi,
   /\brules?\s+\d+/gi,
-  /\bsteps?\s+\d+/gi,
+  // A step is a number, or the letter `c` and a number (the steps of docs/CONVERSATIONAL_PLAN.md).
+  /\bsteps?\s+c?\d+/gi,
   /\bjourneys?\s+\d+/gi,
   /\broutes?\s+\d+/gi,
   /\bR-[A-Z]+-\d+/g,
@@ -53,7 +54,7 @@ const REFUSED = [
   // A document's nickname before an item: write its path instead.
   {
     kind: 'nickname',
-    re: /\b(?:spec|specification|architecture|plan|the services document)(?:'s)?\s+(?:section\s+|step\s+|decision\s+|rule\s+)?(?:\d|R-|AC-|[DT]\d)/gi,
+    re: /\b(?:spec|specification|architecture|plan|the services document)(?:'s)?\s+(?:section\s+|step\s+|decision\s+|rule\s+)?(?:\d|c\d|R-|AC-|[DT]\d)/gi,
     why: 'document named by a nickname: write its path (docs/<NAME>.md)',
   },
 ];

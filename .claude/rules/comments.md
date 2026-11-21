@@ -23,7 +23,8 @@ config files.
   every time: `docs/FRONTEND_SERVICES.md section 10.2`, `docs/FRONTEND_SERVICES.md section 8,
   decision 30`, `docs/FRONTEND_SERVICES.md section 2, rule 9`, `docs/SHARED_CALENDAR_SPEC.md
   R-BOOK-02`, `docs/SHARED_CALENDAR_SPEC.md decision D7`, `docs/SHARED_CALENDAR_SPEC.md AC-36`,
-  `docs/SHARED_CALENDAR_SPEC.md section 11.1, route 16`, `docs/IMPLEMENTATION_PLAN.md step 9`.
+  `docs/SHARED_CALENDAR_SPEC.md section 11.1, route 16`, `docs/IMPLEMENTATION_PLAN.md step 9`,
+  `docs/CONVERSATIONAL_PLAN.md step c00`.
   The labelled items count too: requirements `F…` and `N…` (`docs/ARCHITECTURE.md N6`),
   assumptions `A…` and open points `O…` (`docs/SHARED_CALENDAR_SPEC.md section 22, assumption
   A5`), approved changes `P…` (`docs/IMPLEMENTATION_PLAN.md`), decisions `D…` and `T…`.

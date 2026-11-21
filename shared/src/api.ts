@@ -33,7 +33,15 @@ export type ApiErrorCode =
   | 'appointment_limit_reached' // 409, docs/SHARED_CALENDAR_SPEC.md R-BOOK-09
   | 'appointment_not_active' // 409, docs/SHARED_CALENDAR_SPEC.md R-CAN-02, R-NOTE-01
   | 'cancellation_notice_too_short' // 403, docs/SHARED_CALENDAR_SPEC.md R-CAN-03: too little notice
-  | 'concurrent_update'; // 409, the calendar lock was busy three times in a row; the client may retry
+  | 'concurrent_update' // 409, the calendar lock was busy three times in a row; the client may retry
+  // The assistant's codes, with the route that answers each one (docs/CONVERSATIONAL_ARCHITECTURE.md section 6).
+  | 'assistant_busy' // 409, a step of the exchange is waiting: the client calls `continue`
+  | 'conversation_full' // 409, the conversation holds all the messages it may: a new one must be started
+  | 'nothing_to_continue' // 409, `continue` was called while no step was waiting
+  | 'proposal_not_found' // 404: unknown, already settled, or dropped
+  | 'assistant_limit_reached' // 429, the person has sent their messages for today
+  | 'assistant_unavailable' // 503, Claude cannot be reached or asked, for a reason that is not the person's
+  | 'assistant_budget_reached'; // 503, the spending limit of the Anthropic account is reached
 
 // An appointment that an availability write would leave outside the availability
 // (docs/SHARED_CALENDAR_SPEC.md R-AV-03).

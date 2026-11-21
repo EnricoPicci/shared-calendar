@@ -30,7 +30,7 @@ part you touch.
   view (its section 3), the shape of a dialog and of a form (4), the logic layer (5.1), the
   shell (6), the tests (8), the open points before a deployment (10), the tooling (12).
 - `docs/FOLDER_STRUCTURE.md`: the layout and where a new file goes.
-- `docs/CONVERSATIONAL_ARCHITECTURE.md`, `docs/CONVERSATIONAL_PLAN.md`: the assistant, not built.
+- `docs/CONVERSATIONAL_ARCHITECTURE.md`, `docs/CONVERSATIONAL_PLAN.md`: the assistant, under way.
 - `docs/RENAME_PLAN.md`: the move from the "hello-world" names to "shared-calendar". The stack
   in use is `shared-calendar-api`; the old stack `hello-world-api` (profile `hello-admin`)
   stays untouched as the way back until `docs/IMPLEMENTATION_PLAN.md` step 58. The Hello World

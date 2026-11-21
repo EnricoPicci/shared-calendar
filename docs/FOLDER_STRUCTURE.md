@@ -117,11 +117,15 @@ stays at the root.
     │   ├── api.ts               # response bodies, error body, error codes (architecture section 4)
     │   ├── roles.ts             # Role, resolveRole (architecture section 3, "admin wins")
     │   ├── username.ts          # the username rule and the zod schemas built on it
-    │   └── calendar/            # the shared calendar's contract (docs/SHARED_CALENDAR_SPEC.md 12):
-    │                            # time.ts (time-zone helpers, Intl only), schemas.ts (primitives,
-    │                            # bodies, parameters), types.ts (responses, events), rules.ts (pure
-    │                            # availability and slot rules), defaults.ts (defaults, limits, ranges)
-    └── tests/                   # mirrors src/ (tests/calendar/ too)
+    │   ├── calendar/            # the shared calendar's contract (docs/SHARED_CALENDAR_SPEC.md 12):
+    │   │                        # time.ts (time-zone helpers, Intl only), schemas.ts (primitives,
+    │   │                        # bodies, parameters), types.ts (responses, events), rules.ts (pure
+    │   │                        # availability and slot rules), defaults.ts (defaults, limits, ranges)
+    │   └── assistant/           # the assistant's contract (docs/CONVERSATIONAL_ARCHITECTURE.md 6):
+    │                            # types.ts (AssistantReply and its parts), schemas.ts (the body of
+    │                            # a message), limits.ts, languages.ts (en, it), texts.ts with
+    │                            # texts.en.ts and texts.it.ts (the fixed texts, one object each)
+    └── tests/                   # mirrors src/ (tests/calendar/ and tests/assistant/ too)
 ```
 
 Names are plain words, as in the brief, rather than the `apps/` + `packages/` convention: with
@@ -292,6 +296,16 @@ Plan step 42 (2026-11-12) completed the contract: `api.ts` gained the calendar's
 the path and query parameters; `calendar/types.ts` (new, types only) the response and event types;
 `calendar/rules.ts` (new) the pure functions both sides use (defined and effective windows, slots,
 overlap, the local-time grids, `cancellableUntil`); `calendar/defaults.ts` the settings ranges.
+
+Step c00 of `docs/CONVERSATIONAL_PLAN.md` (2026-11-21) added `shared/src/assistant/` for the
+assistant (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 6): `types.ts` (`AssistantReply`, its
+messages, its proposal and the outcome of each action, types only), `schemas.ts` (the body of
+`POST /assistant/messages`), `limits.ts` (the limits of a conversation), `languages.ts` (the list
+`en`, `it`, its default and its schema) and the fixed texts: `texts.ts` (the type `AssistantTexts`
+and `assistantTexts(language)`), `texts.en.ts` and `texts.it.ts` (one object of that type each).
+`api.ts` gained the assistant's seven error codes. A text the server or the screen says in the
+conversation's language goes into both language files. The words of the front end's own pages do
+not: they stay English, in `frontend/`.
 
 What stays out of `shared/`: the DynamoDB item shape (`MessageItem`), the authorizer context,
 the logger, the password generator (server-side secret handling), and everything that imports
