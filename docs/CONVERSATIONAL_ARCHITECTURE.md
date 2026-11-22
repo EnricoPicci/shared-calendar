@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v9, under way: steps c00 to c06 of `docs/CONVERSATIONAL_PLAN.md` done |
+| Status | v10, under way: steps c00 to c07 of `docs/CONVERSATIONAL_PLAN.md` done |
 | Date | 2026-11-22 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
@@ -20,6 +20,7 @@
 | v7 | 2026-11-21 | Step c04 of `docs/CONVERSATIONAL_PLAN.md` is done: reading. `docs/ARCHITECTURE.md` section 4 ("The assistant's routes") governs `POST /assistant/continue` and the four read tools. What the implementation fixed is said here. **Decided by the Product Owner:** `continue` is not a message of the day and the daily limit does not refuse it (section 6); a language question that took too long leaves the step to `continue` (sections 4.2 and 5.1); the instructions name what cannot be done yet, a stopgap each later step shrinks (section 7.3). The limit of eight is counted from the stored conversation, and the eighth answer's reads are still run and saved (sections 4.4 and 5.6). `continue` answers `409 assistant_busy` to the loser of two at once (section 6). A tool of another role is answered like one that does not exist (section 7.4). A tool's JSON Schema is made from its `zod` schema by `zod` itself; an input differs by role where the route takes more from the Administrator (section 8.2). What a result holds, and how it is cut (section 8.3). The fake Claude's tool requests, its two new marks and its one memory (section 12.1) |
 | v8 | 2026-11-21 | Step c05 of `docs/CONVERSATIONAL_PLAN.md` is done: a change, with its proposal, and one change tool, `book_appointment`, for Users. `docs/ARCHITECTURE.md` section 4 ("The assistant's routes") governs the two routes built, `confirm` and `decline`. **Decided with the Product Owner:** `book_appointment` is offered to Users only until the Administrator's booking is built, and the function that confirms gets only the permissions a User's booking needs (section 11.3). The stored proposal is a list of changes from the start, of which one is accepted for now (section 5.5, rule 4). What the implementation fixed is said here. A message while a proposal waits drops it and is read in the same request (section 5.5, rule 5). What each request does when it finds a proposal a confirmation took, and how old such a proposal must be to count as left (section 5.5, rule 6). The result of a change that was made says that the person confirmed, because the real model otherwise spoke of a proposal still waiting (section 5.4). A change the route failed on has the outcome `unknown` (section 5.4). How long a settled proposal is shown (section 6). The night the clocks go back: which of two equal times (section 8.2). The change handlers are reachable from the confirming function alone, which a lint rule keeps so (section 8.2). The stored shape of a proposal (section 9) |
 | v9 | 2026-11-22 | Step c06 of `docs/CONVERSATIONAL_PLAN.md` is done: the other appointment changes, `cancel_appointment`, `change_appointment` and `set_appointment_note`, for both roles, and several changes in one proposal. **Decided with the Product Owner:** the three tools are offered to the Administrator too, and the sentence then names whose appointment it is; more than five changes in one answer propose none; when one change of an answer cannot be proposed, none is (section 5.5, rule 4); `book_appointment` no longer asks for one booking at a time. What the implementation fixed is said here. The appointment an id stands for is read through the list of the appointments that have not ended, as the calendar has no route that reads one (section 5.4). Two changes of one answer on the same appointment or into the same slot are not proposed, nor is a change that changes nothing (section 5.5, rule 4). The changes of one answer share one reading of the calendar (section 5.4). A note is a text or `null`, never left out (section 8.2). The confirming function needed no new permission: section 11.3 named `CalendarDeletePolicy` by mistake. The fake's third mark, for an appointment's id (section 12.1) |
+| v10 | 2026-11-22 | Step c07 of `docs/CONVERSATIONAL_PLAN.md` is done: the Administrator's simpler tools, `list_users`, `list_patterns`, `update_settings`, `create_type`, `rename_type` and `delete_type`, and `book_appointment` for a named User. **Finding F6 of the plan is answered** (section 5.4): the confirmation of a booking for a User checks the username against the users' list, read through the handler of `GET /users`. **Decided with the Product Owner:** the sentences of the new proposals; a tool of the other role is answered with the very result of a tool that does not exist, code included (section 7.4); a confirmed change of settings writes the four values read at the proposal (section 5.4). What the implementation fixed is said here: what each new tool checks at the proposal and what only its route can check (sections 5.4 and 8.2), the two new results (8.3), the instructions (7.3), the permissions and the environment of the three functions that run tools (11.3), the journeys (12.1) |
 
 ---
 
@@ -158,6 +159,11 @@ blocked interval out, and proposes `set_date_override` with what is left (an emp
 the day). The confirmation shows the day as it is and as it would become. If an appointment
 lies in the blocked time the route refuses, with the list of the appointments in the way, as it
 does from the web page.
+
+As built, of the Administrator's tools: the two reads, the settings, the three type tools, and
+`book_appointment` with a username. The tools of the patterns' writes, the overrides and the
+one-off windows are not built yet, and neither is blocking. `list_patterns` calls
+`GET /calendar/types` too, to give each pattern the name of its type.
 
 ### 3.1 What stays in the web pages only
 
@@ -395,6 +401,33 @@ As built (`backend/src/assistant/`: `exchange.ts` makes the proposal, `confirm.t
   changes of one answer is called once: "cancel all five" reads the list once.
 - **What is not checked at the proposal**: the notice for cancelling. The route checks it at
   the confirmation, and a change inside the notice is shown as refused there.
+- **A booking for a User, by the Administrator**, is checked against the users' list first.
+  The server calls the code of `GET /users` with the Administrator's identity; a username that
+  is not in the list gets no proposal, with the booking route's code `user_not_found`. Then
+  the day is read as for a User's booking, as the Administrator sees it, and the sentence
+  names the person. What the list cannot tell: an administrator's username, or an account in
+  no group, is only "not in the list", where the route would answer `target_not_user`, so an
+  administrator's name is not confirmed; an account deleted between the proposal and the
+  confirmation is refused by the route at the confirmation. The list costs two calls to
+  Cognito for each answer of Claude that books for somebody, shared by the bookings of that
+  answer. A User cannot cause it: a User's input has no username, and `GET /users` refuses a
+  User. The booking notice, the horizon and the limit of upcoming appointments do not bind the
+  Administrator, so none is looked at. The Administrator books a free hourly slot, as a User
+  does.
+- **A change of settings** names only the settings to change. The server calls the code of
+  `GET /calendar/settings`, and the request it stores holds all four values: those asked for,
+  and the others as read. The sentence shows each setting that changes as it is and as it
+  would become, and no other. Values out of range are refused by the schema, and a request
+  that changes nothing gets no proposal. **Between the proposal and the confirmation** the
+  stored request does not change: a setting it does not name, changed from the web page in
+  that time, goes back to the value read at the proposal, as it would from the web form of
+  an Administrator who had it open.
+- **A type** is named by its id, and the server calls the code of `GET /calendar/types` to
+  find its name for the sentence. Found at the proposal, with the routes' codes where they
+  have one: an id that names no type, a name another type has, a name the route would refuse,
+  and a rename to the name the type already has. **Left to the route at the confirmation**: a
+  type still in use (`type_in_use`, shown as refused), because no route that reads says
+  whether a type is in use, and the limit of 20 types.
 - **Confirming** takes the proposal, runs each change through its route's handler with the
   identity of the request that confirms (not one stored with the proposal), and saves the
   outcomes before Claude is asked anything. Then it asks Claude once, for the closing words,
@@ -766,10 +799,13 @@ conversation's language) say, in prose:
 paragraph ("What you can do for the time being") tells Claude that it can look things up
 (the settings, the types, the free slots, the appointments), that a User can book an
 appointment for themself, that an appointment can be cancelled, moved or have its note set or
-removed (a User's own, and anybody's for the Administrator), and that the opening hours,
-types and settings are done from the web pages for the time being, as is the Administrator's
-booking for a User. The paragraph on changes also says to name an appointment by the id a
-read gave, never a guessed one, and to ask for several changes in one answer, five at most. It is one paragraph for both roles: the tools a request names already differ by
+removed (a User's own, and anybody's for the Administrator), that the Administrator can also
+see who the Users are, book for a User, change the settings, create, rename and delete types
+and look at the weekly patterns, to offer only what there is a tool for, and that changing
+the opening hours is done from the web pages for the time being. The paragraph on changes
+also says to name an appointment by the id a read gave, never a guessed one, a type by its id
+and a User by the exact username of the list, and to ask for several changes in one answer,
+five at most. It is one paragraph for both roles: the tools a request names already differ by
 role. **That paragraph is a stopgap.** Each step that brings a tool takes its ability out
 of it, and the step that brings the last one removes the paragraph; only the list of section
 3.1 stays in the web pages for good. Every change to it changes the version mark (section 4.3),
@@ -783,7 +819,7 @@ so it ends the conversations in progress.
 | Requests for read tools | Runs them (together), saves the results; `working` |
 | Requests including a change | Builds the proposal (section 5.5); `awaiting_confirmation` |
 | A tool that does not exist, or an input the schema refuses | Saves an error result naming what was expected (the tools of the role, or the tool's JSON Schema and what was wrong); `working`. The model corrects itself at the next step. No handler is called |
-| A tool that is not offered to the caller's role | The same result as for a tool that does not exist, so that the name is not confirmed; no handler is called. (The request to Claude never named it: the list of tools is the role's) |
+| A tool that is not offered to the caller's role | The same result as for a tool that does not exist, code and sentence alike, so that the name is not confirmed; no handler is called and nothing is read. Only the log line tells the two apart. (The request to Claude never named it: the list of tools is the role's) |
 | Cut at `max_tokens` | Saves what there is, adds the fixed sentence "the answer was cut short"; `idle` |
 | A refusal (`stop_reason: "refusal"`, Anthropic's safety filters) | A fixed sentence; the conversation is ended. The step is saved first, so that the message and its tokens count for the day, then the conversation is ended with a second write. Not expected for calendar talk. Anthropic's automatic fallback to another model is not switched on: it only covers categories that do not occur here, and the model it falls back to does not accept this design's requests |
 | An error or a time-out | `503 assistant_unavailable`; nothing saved but the person's message; `continue` tries again |
@@ -848,9 +884,11 @@ out one proposed change, `changeHandlers.ts` names the handler of each change to
   show or end a conversation are therefore built without the code that books, and a lint rule
   refuses an import that would bring it in. Their bundles were searched for the calendar's
   write under the lock: it is in the confirming function's only.
-- **`book_appointment`**, for Users: a day, a local start time, an optional note. No end, no
-  type and no username: the server takes the end and the type from the slot, and the person
-  from the token. **On the night the clocks go back** an hour comes twice. `get_calendar`
+- **`book_appointment`**, for both roles: a day, a local start time, an optional note. No end
+  and no type: the server takes them from the slot. A User's input has no username, and the
+  person is the one of the token. The Administrator's input has a required `username`, as the
+  route refuses an Administrator's booking that names nobody; the sentence of the description
+  that speaks of it is given to the Administrator only. **On the night the clocks go back** an hour comes twice. `get_calendar`
   writes the second of two equal free times as "02:00 (second)", and the tool takes an
   optional `occurrence`, `first` or `second`. A time that comes twice asked without it is an
   error result that tells Claude to ask the person, and the proposal of the second one says
@@ -866,6 +904,13 @@ out one proposed change, `changeHandlers.ts` names the handler of each change to
   appointments the caller may touch.
 - **What Claude gets of a move** is the new appointment, which has a new id, and which one it
   replaces (its id, day, times and the status `cancelled`).
+- **`update_settings`**, for the Administrator: any of the four settings, at least one, each
+  within the range the route accepts; `null` lifts the limit of upcoming appointments. The
+  time zone is not among them, and the description says so.
+- **`create_type`**, **`rename_type`** and **`delete_type`**, for the Administrator: a name,
+  an id and a name, an id. A type is never named by its name in an input.
+- **A read tool may ask a second route** after the first answered: `list_patterns` asks for
+  the types to turn each pattern's type id into a name.
 
 - **The JSON Schema Claude is given is made from the `zod` schema**, by `zod`'s own
   `z.toJSONSchema`, without its `$schema` line. One schema therefore does both jobs: it tells
@@ -876,8 +921,9 @@ out one proposed change, `changeHandlers.ts` names the handler of each change to
   (`list_appointments` and its `username`), only the Administrator's schema has the field. The
   route decides anyway: a User who somehow sent it would be refused by the schema, and by the
   route after it.
-- **The four read tools are offered to both roles.** A request to Claude names only the tools
-  of the caller's role; the version mark (section 4.3) is worked out from those.
+- **Four read tools and the four appointment changes are offered to both roles, the other
+  six tools to the Administrator only.** A request to Claude names only the tools of the
+  caller's role; the version mark (section 4.3) is worked out from those.
 - **The definitions are apart from the handlers**, so that the functions that only show or end
   a conversation read them (for the mark and the line of progress) without carrying the
   calendar's code.
@@ -904,6 +950,11 @@ As built:
 | `list_types` | none | `types`: each an id and a name |
 | `get_calendar` | `from`, `to`: local dates, at most 31 days | `days`: each a date, its weekday in words, `windows` (start, end, type name), `freeSlots` (the start times the caller may book) and the `appointments` that start that day. A day with no window and no appointment is left out. Not in it: the ids of types, where a window comes from, other people's busy time |
 | `list_appointments` | `from` and `to` (at most 92 days) or neither, for the upcoming ones; `status`; for the Administrator `username` | `appointments`: each its id, date, start, end, type name, username, note, status and, for a User, `cancellableUntil` as a local date and time |
+| `list_users` | none | `users`: the usernames, nothing else of an account |
+| `list_patterns` | none | `patterns`: each its id, its weekday in words, start, end, type name, and the dates it holds from and until |
+
+A change of settings gives back the settings as `get_settings` does, a type created or renamed
+its id and name, a type deleted the word that it was.
 
 - An end at the midnight that closes a day is written `24:00`, as the calendar writes it.
 - The night the clocks go back, a local time comes twice (`02:00`, `02:00`): the result shows
@@ -1048,15 +1099,14 @@ key and a monthly spend limit (section 14).
 | `continueAssistant` | `POST /assistant/continue` | 29 s | as `sendAssistantMessage` |
 | `confirmProposal` | `POST …/confirm` | 29 s | as `sendAssistantMessage`, plus `CalendarWritePolicy`, `CalendarBookPolicy`, the further calendar sets the availability tools need, and Cognito `AdminGetUser`, `AdminListGroupsForUser` (booking for a User) |
 
-**As built, `confirmProposal` has less than the row above**: the assistant table, the key,
-and of the calendar `CalendarReadPolicy`, `CalendarWritePolicy` and `CalendarBookPolicy`, which
-is what a User's booking needs, and also all that cancelling, moving and a note need: those
-three routes' own roles hold the read and write sets, and the move the book set too. The two
-Cognito actions come with the Administrator's booking for a User, and any further calendar set
-with the availability tool whose route needs it.
-`sendAssistantMessage` and `continueAssistant` gained nothing: a proposal's facts are read with
-the calendar's read set they already had. They have no Cognito permission yet either, as
-`list_users` is not built.
+**As built, `confirmProposal` has the row above but for what the availability tools need**:
+the assistant table, the key, the four calendar sets (`CalendarReadPolicy`,
+`CalendarWritePolicy`, `CalendarBookPolicy`, and `CalendarDeletePolicy` for deleting a type),
+Cognito's `ListUsersInGroup` for the users' list and `AdminGetUser` with
+`AdminListGroupsForUser` for the booking route's look at the User it books for.
+`sendAssistantMessage` and `continueAssistant` have `ListUsersInGroup` beside the calendar's
+read set. Every Cognito statement names the one user pool. None of the three can create or
+delete a user, set a password or change a group.
 
 The three functions that run tools receive the environment the calendar's handlers read (the
 table's name, the time zone, the user pool). 29 seconds stays under API Gateway's 30; the
@@ -1107,16 +1157,25 @@ words after a confirmation are the second answer since the message that asked, t
 sentence sent again after a decline is a new last message and starts at the first answer, and
 a typed "yes" is a sentence of its own in the file. The request for a booking in the file is
 the block the real model sent in step c05 of `docs/CONVERSATIONAL_PLAN.md`.
+**With the Administrator's tools it learnt nothing either**: the requests for a setting and
+for a booking with a username are the blocks the real model sent in step c07, and the same
+request for a setting is scripted for a User, to show what the server answers.
 
 **The journeys and the calendar.** The assistant's journeys never empty the `calendar` table.
 What they need they create through the API as the Administrator, under a type name of their own
 and in hours no other journey opens, and remove at the end and before they start
 (`docs/journeys/concepts.md`, "One local calendar, shared"). The journeys that book each have a
-day of their own, 26 to 28 days ahead, and cancel their appointments before removing the
+day of their own, 21 to 28 days ahead, and cancel their appointments before removing the
 window: the cancelled appointments and their events stay in the table and keep no slot busy,
 so a second run the same day finds the same free slots. The blocks open the same early hours on
 neighbouring days, so before any of them starts the file removes what an interrupted run of any
 left on a day from tomorrow to 28 days ahead.
+
+**The journeys and the settings.** One journey changes a setting through the assistant, as
+the seeded Administrator: the booking horizon, to 57 days, which no journey's booking comes
+near. It puts the settings back at its end, whatever happened; a run killed before that
+leaves the horizon at 57, and the next run starts by setting it to 56. The three blocks that
+talk as the Administrator each start that account's count of the day again.
 
 ### 12.2 The tests
 

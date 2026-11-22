@@ -1,11 +1,13 @@
 import { ASSISTANT_TEXTS_EN, ASSISTANT_TEXTS_IT, type BookingSummary } from '@shared-calendar/shared';
 import { bookAppointment, bookAppointmentDefinition } from '../../../../src/assistant/tools/bookAppointment';
 import { handler as getCalendar } from '../../../../src/handlers/getCalendar';
+import { handler as listUsers } from '../../../../src/handlers/listUsers';
 import { forClaude, isChange, type ChangeTool, type RouteAnswer } from '../../../../src/assistant/tools/tool';
 
 // The route GET /calendar is replaced by `route`, the function a confirmation is given to call a
 // route with: no handler runs and nothing is read. The calendar's zone is Europe/Rome.
 const USER = { timeZone: 'Europe/Rome', role: 'user' as const };
+const ADMIN = { timeZone: 'Europe/Rome', role: 'admin' as const };
 const tool = bookAppointment as ChangeTool<Record<string, unknown>, BookingSummary>;
 const route = vi.fn<(handler: unknown, call: unknown) => Promise<RouteAnswer>>();
 
@@ -36,10 +38,33 @@ beforeEach(() => {
 
 // Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
 describe('book_appointment: what Claude is given (3, 8.2)', () => {
-  it('is a change, offered to Users only, and holds no handler of the booking route', () => {
-    expect(bookAppointmentDefinition).toMatchObject({ name: 'book_appointment', kind: 'change', roles: ['user'], reads: 'calendar' });
+  it('is a change, offered to both roles, and holds no handler of the booking route', () => {
+    expect(bookAppointmentDefinition).toMatchObject({ name: 'book_appointment', kind: 'change', roles: ['admin', 'user'], reads: 'calendar' });
     expect(isChange(bookAppointment)).toBe(true);
     expect(bookAppointment).not.toHaveProperty('toHandler');
+  });
+
+  it("the Administrator's input has a required username, a User's has none: the two schemas", () => {
+    const admin = forClaude(bookAppointmentDefinition, 'admin').input_schema;
+    expect(Object.keys(admin.properties as object)).toEqual(['username', 'date', 'time', 'occurrence', 'note']);
+    expect(admin.required).toEqual(['username', 'date', 'time']);
+    expect(admin.additionalProperties).toBe(false);
+
+    const forAdmin = bookAppointmentDefinition.input('admin');
+    expect(forAdmin.safeParse({ username: 'alice', date: '2026-11-24', time: '10:00' }).success).toBe(true);
+    // The route refuses an Administrator's booking that names nobody, so the schema does too.
+    expect(forAdmin.safeParse({ date: '2026-11-24', time: '10:00' }).success).toBe(false);
+    expect(forAdmin.safeParse({ username: 'Not A Username', date: '2026-11-24', time: '10:00' }).success).toBe(false);
+    expect(bookAppointmentDefinition.input('user').safeParse({ username: 'alice', date: '2026-11-24', time: '10:00' }).success).toBe(false);
+  });
+
+  it('only the Administrator is told about booking for a User', () => {
+    const forUser = forClaude(bookAppointmentDefinition, 'user').description;
+    const forAdmin = forClaude(bookAppointmentDefinition, 'admin').description;
+    expect(forUser).toBe(bookAppointmentDefinition.description);
+    expect(forUser).not.toContain('username');
+    expect(forAdmin).toBe(`${bookAppointmentDefinition.description} ${bookAppointmentDefinition.descriptionForAdmin}`);
+    expect(forAdmin).toContain('list_users');
   });
 
   it('asks for a day and a start time, with an optional note and an optional occurrence: no end, no type, no username', () => {
@@ -85,7 +110,7 @@ describe('book_appointment: the facts of the confirmation (5.5 rule 2)', () => {
       call: { routeKey: 'POST /calendar/appointments', path: '/calendar/appointments', body: { start: '2026-11-24T09:00:00.000Z' } },
       // What another change of the same answer must not also fill.
       subjects: ['slot 2026-11-24T09:00:00.000Z'],
-      facts: { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', note: null, secondTime: false },
+      facts: { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', note: null, secondTime: false, username: null },
     });
   });
 
@@ -128,6 +153,51 @@ describe('book_appointment: the facts of the confirmation (5.5 rule 2)', () => {
     expect(await read({ date: '2026-11-24', time: '10:00' })).toEqual({ ok: false, error: 'invalid_request', message: 'Invalid input: from' });
     route.mockResolvedValue({ status: 500, body: null });
     expect(await read({ date: '2026-11-24', time: '10:00' })).toEqual({ ok: false, error: 'internal_error', message: 'The calendar could not be read.' });
+  });
+});
+
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('book_appointment for a User, by the Administrator (5.4, 5.5 rule 2)', () => {
+  const USERS = { status: 200, body: { users: [{ username: 'alice', createdAt: '2026-11-01T10:00:00.000Z' }, { username: 'bob', createdAt: '2026-11-02T10:00:00.000Z' }] } };
+  const asAdmin = (input: Record<string, unknown>) => tool.confirmation.read(input, ADMIN, route);
+  // The users' list for GET /users, the day for GET /calendar.
+  const routes = (users: RouteAnswer = USERS) => route.mockImplementation((_handler, call) => Promise.resolve((call as { routeKey: string }).routeKey === 'GET /users' ? users : TUESDAY));
+
+  it('reads the users through the handler of GET /users, then the day, and sends the route the username', async () => {
+    routes();
+    const result = await asAdmin({ username: 'alice', date: '2026-11-24', time: '10:00', note: 'First visit' });
+
+    expect(route.mock.calls).toEqual([
+      [listUsers, { routeKey: 'GET /users', path: '/users' }],
+      [getCalendar, { routeKey: 'GET /calendar', path: '/calendar', query: { from: '2026-11-24', to: '2026-11-24' } }],
+    ]);
+    expect(result).toEqual({
+      ok: true,
+      call: { routeKey: 'POST /calendar/appointments', path: '/calendar/appointments', body: { start: '2026-11-24T09:00:00.000Z', username: 'alice', note: 'First visit' } },
+      subjects: ['slot 2026-11-24T09:00:00.000Z'],
+      facts: { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', note: 'First visit', secondTime: false, username: 'alice' },
+    });
+  });
+
+  it('a username that is not in the list makes no proposal: the code of the route, and the day is not read', async () => {
+    routes();
+    const result = await asAdmin({ username: 'carol', date: '2026-11-24', time: '10:00' });
+    expect(result).toMatchObject({ ok: false, error: 'user_not_found' });
+    expect(result.ok === false && result.message).toContain('list_users');
+    expect(route).toHaveBeenCalledTimes(1);
+  });
+
+  it('no proposal when the users cannot be read: the refusal of the route, or a failure without one', async () => {
+    routes({ status: 403, body: { error: 'forbidden', message: 'Admins only' } });
+    expect(await asAdmin({ username: 'alice', date: '2026-11-24', time: '10:00' })).toEqual({ ok: false, error: 'forbidden', message: 'Admins only' });
+    routes({ status: 500, body: null });
+    expect(await asAdmin({ username: 'alice', date: '2026-11-24', time: '10:00' })).toEqual({ ok: false, error: 'internal_error', message: 'The users could not be read.' });
+  });
+
+  it("a User's booking never reads the users", async () => {
+    await read({ date: '2026-11-24', time: '10:00' });
+    expect(route).toHaveBeenCalledTimes(1);
+    expect(route).not.toHaveBeenCalledWith(listUsers, expect.anything());
   });
 });
 
@@ -185,11 +255,20 @@ describe('book_appointment: the two nights the clocks change (8.3)', () => {
 
 // Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
 describe('book_appointment: the words of the proposal and the result (5.5 rule 2, 8.3)', () => {
-  const FACTS: BookingSummary = { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', note: 'Bring the forms', secondTime: false };
+  const FACTS: BookingSummary = { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', note: 'Bring the forms', secondTime: false, username: null };
 
   it('the summary is the fixed text of the language, filled with the facts', () => {
     expect(tool.confirmation.summary(ASSISTANT_TEXTS_EN, FACTS)).toBe('Book an appointment on Tuesday 24 November 2026, from 10:00 to 11:00 (Visit). Note: "Bring the forms"');
     expect(tool.confirmation.summary(ASSISTANT_TEXTS_IT, FACTS)).toBe('Prenotare un appuntamento per martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Visit). Nota: «Bring the forms»');
+  });
+
+  it('the summary of a booking by the Administrator names the person', () => {
+    expect(tool.confirmation.summary(ASSISTANT_TEXTS_EN, { ...FACTS, username: 'alice' })).toBe(
+      'Book an appointment for alice on Tuesday 24 November 2026, from 10:00 to 11:00 (Visit). Note: "Bring the forms"',
+    );
+    expect(tool.confirmation.summary(ASSISTANT_TEXTS_IT, { ...FACTS, username: 'alice' })).toBe(
+      'Prenotare per alice un appuntamento per martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Visit). Nota: «Bring the forms»',
+    );
   });
 
   it('gives Claude the appointment as booked, in local times, with its id', () => {

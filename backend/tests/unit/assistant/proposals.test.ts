@@ -21,11 +21,15 @@ const db = vi.hoisted(() => {
   };
 });
 const claude = vi.hoisted(() => ({ askStep: vi.fn(), askLanguage: vi.fn(), assistantModel: vi.fn(), STEP_TIMEOUT_MS: 22_000 }));
-// The two routes the real appointment tools read their facts through, for the tests that give the
-// core the tools of the deployment.
-const readRoutes = vi.hoisted(() => ({ listAppointments: vi.fn(), getCalendar: vi.fn() }));
+// The routes the real tools read through, for the tests that give the core the tools of the
+// deployment.
+const readRoutes = vi.hoisted(() => ({ listAppointments: vi.fn(), getCalendar: vi.fn(), getSettings: vi.fn(), listTypes: vi.fn(), listUsers: vi.fn(), listPatterns: vi.fn() }));
 vi.mock('../../../src/handlers/listAppointments', () => ({ handler: readRoutes.listAppointments }));
 vi.mock('../../../src/handlers/getCalendar', () => ({ handler: readRoutes.getCalendar }));
+vi.mock('../../../src/handlers/getCalendarSettings', () => ({ handler: readRoutes.getSettings }));
+vi.mock('../../../src/handlers/listAvailabilityTypes', () => ({ handler: readRoutes.listTypes }));
+vi.mock('../../../src/handlers/listUsers', () => ({ handler: readRoutes.listUsers }));
+vi.mock('../../../src/handlers/listPatterns', () => ({ handler: readRoutes.listPatterns }));
 vi.mock('../../../src/lib/assistantDb', () => db);
 vi.mock('../../../src/lib/anthropic', () => claude);
 
@@ -584,31 +588,67 @@ describe('the step: Claude asks for a change (5.4, 7.4)', () => {
 });
 
 // Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
-describe('book_appointment and the roles (3)', () => {
-  it("a User's request names book_appointment, the Administrator's never does", async () => {
+describe('the tools and the roles (3, 7.4)', () => {
+  const ADMIN_ONLY = ['list_users', 'list_patterns', 'update_settings', 'create_type', 'rename_type', 'delete_type'];
+
+  it("a User's request to Claude names none of the Administrator's tools, the Administrator's names them all, and each has its own book_appointment", async () => {
     const { DEFINITIONS } = await import('../../../src/assistant/tools/list');
     const real = (person: typeof ALICE | typeof ADMIN) => prompt.promptVersion(prompt.INSTRUCTIONS, prompt.contextBlock(person, 'Europe/Rome'), toolsForClaude(DEFINITIONS, person.role));
-    const namesGiven = () => (claude.askStep.mock.calls.at(-1)?.[0] as { tools: { name: string }[] }).tools.map((tool) => tool.name);
+    const given = () => (claude.askStep.mock.calls.at(-1)?.[0] as { tools: { name: string; description: string; input_schema: { properties: object } }[] }).tools;
 
     db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: real(ALICE) }), messages: EARLIER });
     await exchange.sendMessage(ALICE, TEXT, NOW);
-    expect(namesGiven()).toContain('book_appointment');
+    const forUser = given();
+    expect(forUser.map((tool) => tool.name)).toEqual(['get_settings', 'list_types', 'get_calendar', 'list_appointments', 'book_appointment', 'cancel_appointment', 'change_appointment', 'set_appointment_note']);
+    expect(JSON.stringify(forUser)).not.toContain('list_users');
+    expect(Object.keys(forUser[4]!.input_schema.properties)).not.toContain('username');
 
     db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: real(ADMIN) }), messages: EARLIER });
     await exchange.sendMessage(ADMIN, 'Book alice on Tuesday at 10', NOW);
-    expect(namesGiven()).toEqual(['get_settings', 'list_types', 'get_calendar', 'list_appointments', 'cancel_appointment', 'change_appointment', 'set_appointment_note']);
+    const forAdmin = given();
+    expect(forAdmin.map((tool) => tool.name)).toEqual([...forUser.map((tool) => tool.name), ...ADMIN_ONLY]);
+    expect(Object.keys(forAdmin[4]!.input_schema.properties)).toContain('username');
   });
 
-  it('asked for by Claude for the Administrator all the same, book_appointment is answered as a tool that does not exist: no proposal', async () => {
-    const { DEFINITIONS } = await import('../../../src/assistant/tools/list');
+  it.each([
+    ['list_users', {}],
+    ['list_patterns', {}],
+    ['update_settings', { cancellationNoticeHours: 1 }],
+    ['create_type', { name: 'Phone call' }],
+    ['rename_type', { typeId: '01JD00000000000000000TYPE1', name: 'Phone call' }],
+    ['delete_type', { typeId: '01JD00000000000000000TYPE1' }],
+  ])("%s asked for by Claude for a User is answered as a tool that does not exist: no handler is called, nothing is read, no proposal", async (name, input) => {
+    const { DEFINITIONS, TOOLS: deployed } = await import('../../../src/assistant/tools/list');
+    const mark = prompt.promptVersion(prompt.INSTRUCTIONS, prompt.contextBlock(ALICE, 'Europe/Rome'), toolsForClaude(DEFINITIONS, 'user'));
+    db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: mark }), messages: EARLIER });
+    claude.askStep.mockResolvedValue(asksFor(use('toolu_admin', name, input)));
+
+    const result = await exchange.sendMessage(ALICE, 'Change the cancellation notice to 1 hour', NOW, REQUEST, deployed);
+
+    for (const handler of Object.values(readRoutes)) expect(handler).not.toHaveBeenCalled();
+    expect(steps()[0]).toMatchObject({ status: 'working', proposal: null });
+    const results = (steps()[0]?.messages.at(-1)?.content as { content: { content: string; is_error?: boolean }[] }).content;
+    expect(results).toHaveLength(1);
+    expect(results[0]?.is_error).toBe(true);
+    // The very words a made-up name gets: the list of the tools of a User, which names none of the Administrator's.
+    expect(JSON.parse(results[0]!.content)).toEqual({
+      error: 'unknown_tool',
+      message: 'There is no tool with this name. The tools are: get_settings, list_types, get_calendar, list_appointments, book_appointment, cancel_appointment, change_appointment, set_appointment_note.',
+    });
+    expect(result).toMatchObject({ ok: true, reply: { proposal: null }, log: { tools: [{ name, notRun: 'not_offered' }] } });
+  });
+
+  it('an Administrator who asks to book without a username is refused by the schema: no handler is called, no proposal', async () => {
+    const { DEFINITIONS, TOOLS: deployed } = await import('../../../src/assistant/tools/list');
     const mark = prompt.promptVersion(prompt.INSTRUCTIONS, prompt.contextBlock(ADMIN, 'Europe/Rome'), toolsForClaude(DEFINITIONS, 'admin'));
     db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: mark }), messages: EARLIER });
     claude.askStep.mockResolvedValue(asksFor(use('toolu_book', 'book_appointment', { date: '2026-11-24', time: '10:00' })));
 
-    const result = await exchange.sendMessage(ADMIN, 'Book alice on Tuesday at 10', NOW);
+    const result = await exchange.sendMessage(ADMIN, 'Book Tuesday at 10', NOW, REQUEST, deployed);
 
+    for (const handler of Object.values(readRoutes)) expect(handler).not.toHaveBeenCalled();
     expect(steps()[0]).toMatchObject({ status: 'working', proposal: null });
-    expect(result).toMatchObject({ ok: true, reply: { proposal: null }, log: { tools: [{ name: 'book_appointment', notRun: 'not_offered' }] } });
+    expect(result).toMatchObject({ ok: true, reply: { proposal: null }, log: { tools: [{ name: 'book_appointment', notRun: 'invalid_input' }] } });
   });
 });
 
@@ -854,6 +894,10 @@ describe('confirmProposal (POST /assistant/proposals/{proposalId}/confirm, 5.4, 
       cancel_appointment: (await import('../../../src/handlers/cancelAppointment')).handler,
       change_appointment: (await import('../../../src/handlers/changeAppointment')).handler,
       set_appointment_note: (await import('../../../src/handlers/updateAppointmentNote')).handler,
+      update_settings: (await import('../../../src/handlers/updateCalendarSettings')).handler,
+      create_type: (await import('../../../src/handlers/createAvailabilityType')).handler,
+      rename_type: (await import('../../../src/handlers/renameAvailabilityType')).handler,
+      delete_type: (await import('../../../src/handlers/deleteAvailabilityType')).handler,
     });
     expect(Object.keys(CHANGE_HANDLERS)).toEqual(deployed.filter((tool) => tool.definition.kind === 'change').map((tool) => tool.definition.name));
   });
@@ -1156,5 +1200,125 @@ describe('the log lines of a proposal (10.1)', () => {
       ],
     });
     clean(confirmed.log);
+  });
+
+  // The tools of the deployment, their read routes replaced: the Administrator asks, in one
+  // answer, to create a type, change a setting, book for a User, delete a type and rename one.
+  it("with the Administrator's tools: one proposal mixes them, a type in use is refused at the confirmation, and the lines hold no username but the caller's, no setting's value, no type's name and no summary", async () => {
+    const { DEFINITIONS } = await import('../../../src/assistant/tools/list');
+    const VISIT = '01JD00000000000000000TYPE1';
+    const CHECKUP = '01JD00000000000000000TYPE2';
+    const MADE = '01JD00000000000000000TYPE3';
+    const type = (typeId: string, name: string) => ({ typeId, name, createdAt: AT, updatedAt: AT });
+    const settings = { timeZone: 'Europe/Rome', cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: null, updatedAt: null, updatedBy: null };
+    readRoutes.listTypes.mockImplementation(() => routeAnswer({ types: [type(CHECKUP, 'Checkup'), type(VISIT, 'Visit')] }));
+    readRoutes.getSettings.mockImplementation(() => routeAnswer(settings));
+    readRoutes.listUsers.mockImplementation(() => routeAnswer({ users: [{ username: 'roberta', createdAt: AT }] }));
+    readRoutes.getCalendar.mockImplementation(() =>
+      routeAnswer({
+        days: [{ date: '2026-11-27', weekday: 5, windows: [{ start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T11:00:00.000Z', typeId: VISIT, typeName: 'Visit' }], slots: [{ start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T09:00:00.000Z', typeId: VISIT }], busy: [] }],
+      }),
+    );
+    const mark = prompt.promptVersion(prompt.INSTRUCTIONS, prompt.contextBlock(ADMIN, 'Europe/Rome'), toolsForClaude(DEFINITIONS, 'admin'));
+    db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: mark }), messages: EARLIER });
+    claude.askStep.mockResolvedValue(
+      asksFor(
+        use('toolu_create', 'create_type', { name: 'Telefonata' }),
+        use('toolu_settings', 'update_settings', { bookingHorizonDays: 317 }),
+        use('toolu_book', 'book_appointment', { username: 'roberta', date: '2026-11-27', time: '09:00' }),
+        use('toolu_delete', 'delete_type', { typeId: VISIT }),
+        use('toolu_rename', 'rename_type', { typeId: CHECKUP, name: 'Controllo' }),
+      ),
+    );
+    const forbidden = ['roberta', 'Telefonata', 'Controllo', 'Checkup', 'Visit', '317', VISIT, CHECKUP, MADE, '2026-11-2', 'novembre', 'impostazioni', CLAUDE_SAID, TEXT];
+    const clean = (log: unknown) => {
+      for (const text of forbidden) expect(JSON.stringify(log)).not.toContain(text);
+    };
+
+    const proposed = await exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST);
+
+    // The three changes of types read the types once between them.
+    expect(readRoutes.listTypes).toHaveBeenCalledTimes(1);
+    expect(readRoutes.getSettings).toHaveBeenCalledTimes(1);
+    expect(readRoutes.listUsers).toHaveBeenCalledTimes(1);
+    expect(readRoutes.getCalendar).toHaveBeenCalledTimes(1);
+    const stored = steps()[0]?.proposal as Proposal;
+    expect(stored.changes.map((change) => change.summary)).toEqual([
+      'Creare il tipo di appuntamento «Telefonata».',
+      'Modificare le impostazioni. Orizzonte di prenotazione: da 56 giorni a 317 giorni.',
+      'Prenotare per roberta un appuntamento per venerdì 27 novembre 2026, dalle 09:00 alle 10:00 (Visit).',
+      'Eliminare il tipo di appuntamento «Visit».',
+      'Rinominare il tipo di appuntamento «Checkup» in «Controllo».',
+    ]);
+    const NAMES = ['create_type', 'update_settings', 'book_appointment', 'delete_type', 'rename_type'];
+    expect(proposed.log).toMatchObject({ outcome: 'proposal', proposed: NAMES, tools: NAMES.map((name) => ({ name, status: 200, ms: 0, proposed: true })) });
+    clean(proposed.log);
+
+    const read = conversation({ promptVersion: mark, status: 'awaiting_confirmation', proposal: stored, nextSeq: 7 });
+    db.readConversation.mockResolvedValue({ version: 3, conversation: read, messages: WAITING_MESSAGES });
+    db.takeProposal.mockResolvedValue({ ...read, executing: { proposalId: stored.proposalId, at: NOW } });
+    const create = vi.fn(() => routeAnswer(type(MADE, 'Telefonata'), 201));
+    const save = vi.fn(() => routeAnswer({ ...settings, bookingHorizonDays: 317 }));
+    const book = vi.fn(() => routeAnswer({ appointmentId: '01JD0000000000000000APPT01', username: 'roberta', date: '2026-11-27', start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T09:00:00.000Z', typeId: VISIT, typeName: 'Visit', note: null, status: 'booked', cancellableUntil: null }, 201));
+    // The type is in use, by the appointment just booked: the route says so, under its lock.
+    const remove = vi.fn(() => routeAnswer({ error: 'type_in_use', message: 'The type is still used by availability or by appointments that have not ended' }, 409));
+    const rename = vi.fn(() => routeAnswer(type(CHECKUP, 'Controllo')));
+    const confirmed = await confirm.confirmProposal(ADMIN, stored.proposalId, NOW, REQUEST, undefined, { create_type: create, update_settings: save, book_appointment: book, delete_type: remove, rename_type: rename });
+
+    // Each route was sent exactly what the proposal stored, with the Administrator's identity.
+    expect(create.mock.calls[0]).toMatchObject([{ routeKey: 'POST /calendar/types', body: JSON.stringify({ name: 'Telefonata' }) }]);
+    expect(save.mock.calls[0]).toMatchObject([
+      { routeKey: 'PUT /calendar/settings', body: JSON.stringify({ cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 317, maxFutureAppointmentsPerUser: null }) },
+    ]);
+    expect(book.mock.calls[0]).toMatchObject([{ routeKey: 'POST /calendar/appointments', body: JSON.stringify({ start: '2026-11-27T08:00:00.000Z', username: 'roberta' }) }]);
+    expect(remove.mock.calls[0]).toMatchObject([{ routeKey: 'DELETE /calendar/types/{typeId}', pathParameters: { typeId: VISIT } }]);
+    expect(rename.mock.calls[0]).toMatchObject([{ routeKey: 'PUT /calendar/types/{typeId}', pathParameters: { typeId: CHECKUP }, body: JSON.stringify({ name: 'Controllo' }) }]);
+    expect(getClaims((book.mock.calls[0] as unknown[])[0] as Parameters<typeof getClaims>[0])).toEqual({ ok: true, value: { sub: 'sub-admin', username: 'admin', groups: ['admin'] } });
+
+    // One change refused does not stop the others: each has its own outcome.
+    const settled = steps().at(1)?.proposal as Proposal;
+    expect(settled.changes.map((change) => [change.tool, change.outcome, change.error])).toEqual([
+      ['create_type', 'done', null],
+      ['update_settings', 'done', null],
+      ['book_appointment', 'done', null],
+      ['delete_type', 'refused', 'type_in_use'],
+      ['rename_type', 'done', null],
+    ]);
+    expect(confirmed.log).toMatchObject({
+      proposalId: stored.proposalId,
+      changes: [
+        { name: 'create_type', status: 201, ms: 0 },
+        { name: 'update_settings', status: 200, ms: 0 },
+        { name: 'book_appointment', status: 201, ms: 0 },
+        { name: 'delete_type', status: 409, ms: 0 },
+        { name: 'rename_type', status: 200, ms: 0 },
+      ],
+    });
+    clean(confirmed.log);
+  });
+
+  it("two changes of one answer on the same type, or to the same name, or two of the settings, are not proposed", async () => {
+    const { DEFINITIONS } = await import('../../../src/assistant/tools/list');
+    const VISIT = '01JD00000000000000000TYPE1';
+    readRoutes.listTypes.mockImplementation(() => routeAnswer({ types: [{ typeId: VISIT, name: 'Visit', createdAt: AT, updatedAt: AT }] }));
+    readRoutes.getSettings.mockImplementation(() => routeAnswer({ timeZone: 'Europe/Rome', cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: null }));
+    const mark = prompt.promptVersion(prompt.INSTRUCTIONS, prompt.contextBlock(ADMIN, 'Europe/Rome'), toolsForClaude(DEFINITIONS, 'admin'));
+    const ask = async (...blocks: ReturnType<typeof use>[]) => {
+      db.saveStep.mockClear();
+      db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: mark }), messages: EARLIER });
+      claude.askStep.mockResolvedValue(asksFor(...blocks));
+      return (await exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST)).log;
+    };
+
+    expect(await ask(use('a', 'rename_type', { typeId: VISIT, name: 'Check-up' }), use('b', 'delete_type', { typeId: VISIT }))).toMatchObject({
+      tools: [{ name: 'rename_type', notRun: 'not_proposed' }, { name: 'delete_type', notRun: 'same_thing_twice' }],
+    });
+    expect(await ask(use('a', 'create_type', { name: 'Check-up' }), use('b', 'rename_type', { typeId: VISIT, name: 'check-UP' }))).toMatchObject({
+      tools: [{ name: 'create_type', notRun: 'not_proposed' }, { name: 'rename_type', notRun: 'same_thing_twice' }],
+    });
+    expect(await ask(use('a', 'update_settings', { bookingHorizonDays: 40 }), use('b', 'update_settings', { cancellationNoticeHours: 72 }))).toMatchObject({
+      tools: [{ name: 'update_settings', notRun: 'not_proposed' }, { name: 'update_settings', notRun: 'same_thing_twice' }],
+    });
+    expect(steps()[0]).toMatchObject({ status: 'working', proposal: null });
   });
 });

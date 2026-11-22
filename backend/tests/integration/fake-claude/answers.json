@@ -5,7 +5,8 @@
     "source says where a body comes from: \"recorded\" from the real API (cut down to the fields a client reads), \"documentation\" when Anthropic's pages give the shape and it cannot be provoked, \"fake\" when the text was written for a journey, in the shape of a recorded answer. The two requests for a tool are the content blocks the real model sent in the trial of the step that built the tools (the block with its id, name and caller), one block each, with the dates of the calendar request replaced by a mark; the envelope around them (id, usage) is written in the shape of the recorded answers.",
     "The text {{application-line}} in an answer is replaced by the fake with the last line of the application in the request (the entry of role \"system\" after a message of the person). {{date+N}}, anywhere in an answer, is replaced by the date N days after the date that line states. {{last-tool-result}}, in a text, is replaced by the content of the last result of a tool in the request. {{appointment-id-N}}, anywhere in an answer, is replaced by the id of the Nth appointment in the last result of a tool in the request, when that result is a list of appointments: the server makes an appointment's id, so no answer can hold one.",
     "The requests for a booking (tool-book-day…) are the one content block the real model sent for \"book me Tuesday at 10\" in the trial of the step that built the proposal (its id, name and caller; an input of a date and a time, nothing else), with the date replaced by a mark and the time by the hour each journey opens. A step after a proposal is counted like any other: the confirmation's request for the closing words is the second request since the person's message. The message \"yes\" is scripted to ask for the same booking again, as the real model did when a person typed it instead of pressing the button.",
-    "The requests to cancel, move and annotate an appointment (tool-cancel-…, tool-change-…, tool-set-note-…) and the requests for the list that come before them (tool-list-appointments-day…) are the content blocks the real model sent in the trial of the step that built those three tools: \"cancel both my appointments of next week\" was answered with a request for the list of that week, then with two requests to cancel in one answer. The ids of the appointments and the dates are replaced by marks, and the hour of the move by the hour its journey opens."
+    "The requests to cancel, move and annotate an appointment (tool-cancel-…, tool-change-…, tool-set-note-…) and the requests for the list that come before them (tool-list-appointments-day…) are the content blocks the real model sent in the trial of the step that built those three tools: \"cancel both my appointments of next week\" was answered with a request for the list of that week, then with two requests to cancel in one answer. The ids of the appointments and the dates are replaced by marks, and the hour of the move by the hour its journey opens.",
+    "The request to change a setting (tool-update-settings-horizon-57) and the request to book for a User (tool-book-for-user-…) are the content blocks the real model sent, as the Administrator, in the trial of the step that built the Administrator's tools: \"set the booking horizon to 40 days\" and \"book alice on Thursday at 14:00\" (the block with its id, name and caller; an input of the one setting, and of a username, a date and a time). The number of days is replaced by the one the settings journey uses, the username by the journey's own User, the date by a mark and the time by the hour the journey opens. The same request for the setting is scripted for a User, who is not offered that tool: the real model never sent it for a User, and the journey shows what the server answers if it did."
   ],
   "answers": {
     "not-scripted": {
@@ -718,6 +719,70 @@
           "output_tokens": 0
         }
       }
+    },
+    "tool-update-settings-horizon-57": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_update_settings_horizon_57",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01Lajguf9ppSJMdRYQ4WCTVT",
+            "name": "update_settings",
+            "input": {
+              "bookingHorizonDays": 57
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-book-for-user-day21-0500": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_book_for_user_day21_0500",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01SUAgCNMBwAN5UZgLLe3ESR",
+            "name": "book_appointment",
+            "input": {
+              "username": "chat-booked",
+              "date": "{{date+21}}",
+              "time": "05:00"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
     }
   },
   "otherwise": "not-scripted",
@@ -811,6 +876,18 @@
     "fake: cancel both my appointments of the cancelling journey": [
       "tool-list-appointments-day24",
       "tool-cancel-first-and-second",
+      "text-last-tool-result"
+    ],
+    "fake: set the booking horizon of the settings journey": [
+      "tool-update-settings-horizon-57",
+      "text-last-tool-result"
+    ],
+    "fake: change a setting, which a User cannot": [
+      "tool-update-settings-horizon-57",
+      "text-last-tool-result"
+    ],
+    "fake: book the slot of the journey for its User": [
+      "tool-book-for-user-day21-0500",
       "text-last-tool-result"
     ]
   }

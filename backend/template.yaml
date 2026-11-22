@@ -2277,8 +2277,12 @@ Resources:
   # the function runs the code of that calendar route itself, inside this same function, with the
   # identity of the person who wrote. So it needs what those four routes need: the name of the
   # calendar table (CALENDAR_TABLE) and the permission to read it (CalendarReadPolicy, the same
-  # read-only set the calendar's own read functions have). It may not write the calendar and has
-  # no access to Cognito.
+  # read-only set the calendar's own read functions have). It may not write the calendar.
+  # For the Administrator it also runs the code of GET /users, to list the Users and to check the
+  # User an appointment is proposed for. That code asks Cognito for the members of the two groups,
+  # so the function gets the user pool's id (USER_POOL_ID) and one permission on that pool,
+  # ListUsersInGroup, which only reads. It cannot read one account, create, change or delete one.
+  # COGNITO_ENDPOINT is empty in the cloud: only the local stack fills it, with the emulator's address.
   SendAssistantMessageFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -2299,6 +2303,8 @@ Resources:
           ANTHROPIC_API_KEY: ''
           ANTHROPIC_BASE_URL: ''
           ASSISTANT_BUDGET_MEMORY_SECONDS: ''
+          USER_POOL_ID: !Ref UserPool
+          COGNITO_ENDPOINT: ''
       Events:
         SendAssistantMessage:
           Type: HttpApi
@@ -2358,13 +2364,22 @@ Resources:
               - Effect: Allow
                 Action: ssm:GetParameter
                 Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/anthropic-api-key
+        - PolicyName: list-users
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:ListUsersInGroup
+                Resource: !GetAtt UserPool.Arn
 
   # POST /assistant/continue (Administrator and Users): the next step of the caller's conversation
   # when one is waiting, after Claude asked to read the calendar or could not be reached. It does
   # what the function above does after a message, without a new message: it asks Claude once and
   # runs the reads Claude asks for. So it is given exactly the same: 29 seconds, the assistant's
   # table to read and write, the calendar's table to read only, the one parameter that holds the
-  # Anthropic key, and the three variables that only the local stack fills.
+  # Anthropic key, the user pool's id with the permission to list the members of its groups, and
+  # the variables that only the local stack fills.
   ContinueAssistantFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -2385,6 +2400,8 @@ Resources:
           ANTHROPIC_API_KEY: ''
           ANTHROPIC_BASE_URL: ''
           ASSISTANT_BUDGET_MEMORY_SECONDS: ''
+          USER_POOL_ID: !Ref UserPool
+          COGNITO_ENDPOINT: ''
       Events:
         ContinueAssistant:
           Type: HttpApi
@@ -2444,17 +2461,31 @@ Resources:
               - Effect: Allow
                 Action: ssm:GetParameter
                 Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/anthropic-api-key
+        - PolicyName: list-users
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:ListUsersInGroup
+                Resource: !GetAtt UserPool.Arn
 
   # POST /assistant/proposals/{proposalId}/confirm (Administrator and Users): the person pressed
   # the button to confirm what the assistant proposed. This is the one function of the assistant
-  # that can change the calendar: it books the appointment by running the booking route's own
-  # code with the caller's identity, saves what came of it, and asks Claude once for the closing
-  # words. So it has what the two functions above have (29 seconds, the assistant's table to read
-  # and write, the calendar's table to read, the one parameter that holds the Anthropic key, the
-  # three variables that only the local stack fills) and, on top, the two permission sets a
-  # booking needs: writing to the calendar's table (CalendarWritePolicy) and the check that the
-  # slot is still free (CalendarBookPolicy). It cannot delete anything from the calendar's table
-  # and cannot reach Cognito: a User books for themself, and the route then needs neither.
+  # that can change the calendar: it runs the code of the route of each proposed change with the
+  # caller's identity, saves what came of it, and asks Claude once for the closing words. So it has
+  # what the two functions above have (29 seconds, the assistant's table to read and write, the
+  # calendar's table to read, the one parameter that holds the Anthropic key, the user pool's id
+  # with ListUsersInGroup, the variables that only the local stack fills) and, on top, what the
+  # routes it runs need:
+  # - writing to the calendar's table (CalendarWritePolicy): a booking, a cancellation, a move, a
+  #   note, the settings, a type created or renamed;
+  # - the check that the User of a booking was not deleted meanwhile (CalendarBookPolicy);
+  # - deleting an item of the calendar's table (CalendarDeletePolicy): a type deleted, the one
+  #   change that removes an item;
+  # - reading one account of the user pool and its groups (AdminGetUser, AdminListGroupsForUser):
+  #   the booking route checks with them that the User the Administrator books for exists and is
+  #   not an administrator. Both only read. The function cannot create, change or delete an account.
   ConfirmProposalFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -2475,6 +2506,8 @@ Resources:
           ANTHROPIC_API_KEY: ''
           ANTHROPIC_BASE_URL: ''
           ASSISTANT_BUDGET_MEMORY_SECONDS: ''
+          USER_POOL_ID: !Ref UserPool
+          COGNITO_ENDPOINT: ''
       Events:
         ConfirmProposal:
           Type: HttpApi
@@ -2519,6 +2552,7 @@ Resources:
         - !Ref CalendarReadPolicy
         - !Ref CalendarWritePolicy
         - !Ref CalendarBookPolicy
+        - !Ref CalendarDeletePolicy
       Policies:
         - PolicyName: write-own-logs
           PolicyDocument:
@@ -2536,6 +2570,23 @@ Resources:
               - Effect: Allow
                 Action: ssm:GetParameter
                 Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${AWS::StackName}/anthropic-api-key
+        - PolicyName: list-users
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:ListUsersInGroup
+                Resource: !GetAtt UserPool.Arn
+        - PolicyName: read-booking-target
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:AdminListGroupsForUser
+                Resource: !GetAtt UserPool.Arn
 
   # POST /assistant/proposals/{proposalId}/decline (Administrator and Users): the person pressed
   # the button to decline. Nothing is changed and Claude is not asked: the function reads the

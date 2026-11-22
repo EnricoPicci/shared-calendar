@@ -1,6 +1,7 @@
 import type { ListTypesResponse } from '@shared-calendar/shared';
 import { z } from 'zod';
 import { handler } from '../../handlers/listAvailabilityTypes';
+import { typeForModel } from './result';
 import type { ReadTool, ToolDefinition } from './tool';
 
 // The tool for GET /calendar/types (docs/CONVERSATIONAL_ARCHITECTURE.md section 3): the kinds of
@@ -24,7 +25,7 @@ const parts: ReadTool<z.infer<typeof Input>> = {
   toHandler: { handler, request: () => ({ routeKey: 'GET /calendar/types', path: '/calendar/types' }) },
   toModel: (body) => ({
     fields: {},
-    list: { name: 'types', items: (body as ListTypesResponse).types.map((type) => ({ id: type.typeId, name: type.name })) },
+    list: { name: 'types', items: (body as ListTypesResponse).types.map(typeForModel) },
   }),
 };
 export const listTypes = parts as ReadTool;

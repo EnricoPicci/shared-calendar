@@ -9,11 +9,12 @@ import { api, createUserInNoGroup, forgetDailyUse, localDailyMessageLimit, query
 // Each block plays its own throw-away User, created through POST /users. A new account has a new
 // `sub`, so it starts with no conversation and with all of today's messages. The file writes the
 // assistant table through the API only, but for the Administrator's count of the day
-// (forgetDailyUse).
+// (forgetDailyUse): the three blocks that talk as the seeded Administrator, the same account at
+// every run, each start its count again and send one message.
 //
 // The calendar table is never emptied here, and nothing another file left in it is relied on.
 // Each block that needs the calendar creates what it uses through the API, as the Administrator:
-// one window on a day of its own (22 to 28 days after today), under a type name of its own and in
+// one window on a day of its own (21 to 28 days after today), under a type name of its own and in
 // hours no other journey opens. It removes the window and the type at the end and, should an
 // interrupted run have left them, before it starts; the appointments it booked are cancelled
 // first, so what stays in the table is those cancelled appointments and their events, which keep
@@ -80,6 +81,7 @@ const JOURNEY_TYPES = [
   'assistant note journey',
   'assistant moving journey',
   'assistant cancelling journey',
+  'assistant booking for a user journey',
 ];
 
 // Removes what the journeys made in the calendar under one of their type names, when it is there:
@@ -128,7 +130,7 @@ const bookingProposal = (day: string, start: string, end: string, type: string, 
   question: 'Make this change?',
   confirmLabel: 'Confirm',
   declineLabel: "Don't",
-  actions: [{ summary: assistantTexts('en').changes.bookAppointment({ date: day, start, end, type, note: null, secondTime: false }), outcome, error }],
+  actions: [{ summary: assistantTexts('en').changes.bookAppointment({ date: day, start, end, type, note: null, secondTime: false, username: null }), outcome, error }],
 });
 
 // Books, through the calendar's own route and as the person, the slot of the journey's type that
@@ -1099,5 +1101,181 @@ describe('who may talk to the assistant (6)', () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ language: 'en', messages: [{ seq: 1, from: 'person' }, { seq: 3, from: 'assistant', text: HELLO_ANSWER }] });
     expect((await startAgain(adminToken)).status).toBe(204);
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/assistant-admin-tools-refused.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe("a User is not offered the Administrator's tools (3, 7.4)", () => {
+  // The fake answers this sentence with a request for update_settings, whoever sends it.
+  const ASK = 'fake: change a setting, which a User cannot';
+  const FOR_A_USER = 'get_settings, list_types, get_calendar, list_appointments, book_appointment, cancel_appointment, change_appointment, set_appointment_note';
+  let token: string;
+  let before: Record<string, unknown> | undefined;
+
+  beforeAll(async () => {
+    token = await newUser('chat-notadmin');
+    before = (await api('GET', '/calendar/settings', adminToken)).body;
+  });
+
+  afterAll(async () => {
+    await removeUserIfPresent('chat-notadmin');
+  });
+
+  it('Claude asks for a tool of the Administrator: no proposal is made, and the exchange goes on', async () => {
+    const res = await say(token, ASK);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'working', activity: assistantTexts('en').working, proposal: null, remainingToday: LIMIT - 1 });
+  });
+
+  it('Claude was answered as for a tool that does not exist, with the tools of a User and none of the Administrator', async () => {
+    const res = await goOn(token);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'idle', proposal: null });
+    // The fake answers with the result it was given, word for word.
+    const messages = res.body?.messages as { from: string; text: string }[];
+    expect(JSON.parse(messages[0]?.text ?? '')).toEqual({ error: 'unknown_tool', message: `There is no tool with this name. The tools are: ${FOR_A_USER}.` });
+    expect(await storedToolResults(token)).toEqual([{ error: 'unknown_tool', message: `There is no tool with this name. The tools are: ${FOR_A_USER}.` }]);
+  });
+
+  it('the settings are as they were, and there is nothing to confirm', async () => {
+    expect((await api('GET', '/calendar/settings', adminToken)).body).toEqual(before);
+    expect((await conversation(token)).body).toMatchObject({ status: 'idle', proposal: null });
+    expect(await confirm(token, NO_PROPOSAL)).toMatchObject({ status: 404, body: { error: 'proposal_not_found' } });
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/assistant-settings.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('a setting changed through the assistant (3, 5.4, 5.5)', () => {
+  const ASK = 'fake: set the booking horizon of the settings journey';
+  // The value the fake asks for. No journey of this file books further ahead than 28 days, and
+  // the other files' journeys write the settings they need, so a run that stops before the
+  // settings are put back leaves a horizon that refuses none of them.
+  const ASKED = 57;
+  type Settings = { cancellationNoticeHours: number; minBookingNoticeHours: number; bookingHorizonDays: number; maxFutureAppointmentsPerUser: number | null };
+  const writable = (body: Record<string, unknown> | undefined): Settings => {
+    const { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser } = body as Settings;
+    return { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser };
+  };
+  const readSettings = async () => writable((await api('GET', '/calendar/settings', adminToken)).body);
+  let before: Settings;
+  let summary: string;
+  let proposalId: string;
+
+  beforeAll(async () => {
+    before = await readSettings();
+    // A run stopped before the end left the asked value: there would be nothing to change.
+    if (before.bookingHorizonDays === ASKED) {
+      before = { ...before, bookingHorizonDays: 56 };
+      expect((await api('PUT', '/calendar/settings', adminToken, before)).status).toBe(200);
+    }
+    summary = assistantTexts('en').changes.updateSettings({ changes: [{ setting: 'bookingHorizonDays', from: before.bookingHorizonDays, to: ASKED }] });
+    await forgetDailyUse(subOf(adminToken));
+    expect((await startAgain(adminToken)).status).toBe(204);
+  });
+
+  afterAll(async () => {
+    // Whatever happened above, the settings go back to what they were.
+    expect((await api('PUT', '/calendar/settings', adminToken, before)).status).toBe(200);
+    await startAgain(adminToken);
+  });
+
+  it('a request to change a setting: the proposal shows that setting as it is and as it would become, and nothing is changed', async () => {
+    const res = await say(adminToken, ASK);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ language: 'en', status: 'awaiting_confirmation', activity: null, proposal: proposalOf([summary]), remainingToday: LIMIT - 1 });
+    expect(summary).toMatch(/^Change the settings\. Booking horizon: from \d+ days? to 57 days\.$/);
+    proposalId = (res.body?.proposal as { proposalId: string }).proposalId;
+    expect(await readSettings()).toEqual(before);
+  });
+
+  it('confirm changes it: the proposal is shown as done, and Claude is told the settings as saved', async () => {
+    const res = await confirm(adminToken, proposalId);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'idle', proposal: { ...proposalOf([summary], [['done', null]]), proposalId } });
+    const messages = res.body?.messages as { from: string; text: string }[];
+    const given = JSON.parse(messages[0]?.text ?? '') as { outcome: string; settings: Record<string, unknown> };
+    expect(given.outcome).toBe('done');
+    expect(given.settings).toEqual({ timeZone: expect.any(String), ...before, bookingHorizonDays: ASKED });
+  });
+
+  it("the calendar's own route gives the new value back, the other settings as they were, changed by the Administrator", async () => {
+    const read = (await api('GET', '/calendar/settings', adminToken)).body;
+    expect(writable(read)).toEqual({ ...before, bookingHorizonDays: ASKED });
+    expect(read?.updatedBy).toEqual({ username: 'admin', role: 'admin' });
+  });
+
+  it('Claude asked for the one setting, and nothing else', async () => {
+    const stored = await storedEntries(adminToken);
+    expect(stored.map((entry) => entry.role)).toEqual(['user', 'system', 'assistant', 'user', 'assistant']);
+    expect(stored[2]?.content).toEqual([expect.objectContaining({ type: 'tool_use', name: 'update_settings', input: { bookingHorizonDays: ASKED } })]);
+  });
+
+  it("put back through the calendar's own route, the settings are as before the journey", async () => {
+    expect((await api('PUT', '/calendar/settings', adminToken, before)).status).toBe(200);
+    expect(await readSettings()).toEqual(before);
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/assistant-booking-for-user.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('the Administrator books for a User through the assistant (3, 5.4, 5.5)', () => {
+  const TYPE = 'assistant booking for a user journey';
+  const ASK = 'fake: book the slot of the journey for its User';
+  // The User the fake asks to book for, by the username its answer file holds.
+  const USER = 'chat-booked';
+  // The day the fake asks to book on: {{date+21}} of its answer file, at 05:00.
+  let day: string;
+  let userToken: string;
+  let summary: string;
+  let proposalId: string;
+  let appointmentId: string;
+
+  beforeAll(async () => {
+    day = await dayOfJourney(21);
+    userToken = await newUser(USER);
+    await removeFromCalendar(TYPE);
+    await openWindow(day, TYPE, '05:00', '07:00');
+    summary = assistantTexts('en').changes.bookAppointment({ date: day, start: '05:00', end: '06:00', type: TYPE, note: null, secondTime: false, username: USER });
+    await forgetDailyUse(subOf(adminToken));
+    expect((await startAgain(adminToken)).status).toBe(204);
+  });
+
+  afterAll(async () => {
+    await startAgain(adminToken);
+    await removeFromCalendar(TYPE);
+    await removeUserIfPresent(USER);
+  });
+
+  it('a request to book for a User: the proposal names the person, and nothing is booked', async () => {
+    const res = await say(adminToken, ASK);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'awaiting_confirmation', activity: null, proposal: proposalOf([summary]), remainingToday: LIMIT - 1 });
+    expect(summary).toContain(`Book an appointment for ${USER} on `);
+    proposalId = (res.body?.proposal as { proposalId: string }).proposalId;
+    expect(await appointmentsOf(userToken)).toEqual([]);
+  });
+
+  it('confirm books it: the proposal is shown as done, and Claude is told the appointment and whose it is', async () => {
+    const res = await confirm(adminToken, proposalId);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'idle', proposal: { ...proposalOf([summary], [['done', null]]), proposalId } });
+    const messages = res.body?.messages as { from: string; text: string }[];
+    const given = JSON.parse(messages[0]?.text ?? '') as { outcome: string; appointment: Record<string, unknown> };
+    expect(given.outcome).toBe('done');
+    expect(given.appointment).toMatchObject({ date: day, start: '05:00', end: '06:00', type: TYPE, username: USER, note: null, status: 'booked' });
+    appointmentId = given.appointment.id as string;
+  });
+
+  it("the User finds the appointment in their own list, through the calendar's own route, booked by the Administrator", async () => {
+    const booked = await appointmentsOf(userToken);
+    expect(booked).toHaveLength(1);
+    expect(booked[0]).toMatchObject({ appointmentId, typeName: TYPE, username: USER, status: 'booked', note: null, createdBy: { username: 'admin', role: 'admin' } });
+  });
+
+  it('Claude asked for the booking with the username, a day and a time, and nothing else', async () => {
+    const stored = await storedEntries(adminToken);
+    expect(stored[2]?.content).toEqual([expect.objectContaining({ type: 'tool_use', name: 'book_appointment', input: { username: USER, date: day, time: '05:00' } })]);
   });
 });

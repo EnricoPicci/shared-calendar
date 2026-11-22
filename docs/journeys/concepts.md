@@ -15,8 +15,9 @@ Each section explains one idea in simple words and names the document that defin
 | `dave`, `erin` | throw-away Users of the back end's calendar journeys | `backend/tests/integration/calendar.test.ts` |
 | `fe-calendar`, `fe-calendar-b` | throw-away Users of the front end's calendar journeys | `frontend/tests/integration/calendar.test.ts` |
 | `fe-journey` | a throw-away User of the front end's Hello World journeys | `frontend/tests/integration/journeys.test.ts` |
-| `chat-text`, `chat-lingua`, `chat-read`, `chat-book`, `chat-decline`, `chat-trouble`, `chat-note`, `chat-move`, `chat-cancel`, `chat-limit`, `chat-down` | throw-away Users of the assistant's journeys, one per block | `backend/tests/integration/assistant.test.ts` |
+| `chat-text`, `chat-lingua`, `chat-read`, `chat-book`, `chat-decline`, `chat-trouble`, `chat-note`, `chat-move`, `chat-cancel`, `chat-limit`, `chat-down`, `chat-notadmin` | throw-away Users of the assistant's journeys, one per block | `backend/tests/integration/assistant.test.ts` |
 | `chat-rival` | a second throw-away User of one assistant journey, who books through the calendar's own route | `backend/tests/integration/assistant.test.ts` |
+| `chat-booked` | the throw-away User the Administrator books for through the assistant; it only reads its own list | `backend/tests/integration/assistant.test.ts` |
 | `chat-nobody` | a throw-away account in neither group, made straight in cognito-local | `backend/tests/integration/assistant.test.ts` |
 | `smoke-<epoch>` | the smoke test's throw-away User | `backend/scripts/smoke.sh` |
 
@@ -33,9 +34,9 @@ All journeys and the smoke test use the same local `calendar` table. They treat 
   they create only types named `fe-calendar …`, use only dates with nothing on them, from today +
   330 days, and remove what they made.
 - **The smoke test** uses a type `smoke-<epoch>` and a free 03:00–04:00 from 50 days ahead.
-- **The assistant's journeys never reset it either.** Seven blocks need the calendar. Each creates
+- **The assistant's journeys never reset it either.** Eight blocks need the calendar. Each creates
   a type of its own name (the file's `JOURNEY_TYPES`) and a one-off window in the early
-  morning, hours no other journey opens, on a day of its own: the 22nd to the 28th from
+  morning, hours no other journey opens, on a day of its own: the 21st to the 28th from
   today. Each removes its window and its type at its end (the file's helpers `openWindow()` and
   `removeFromCalendar()`). Before any block starts, the file removes what an interrupted run of
   any of them left on a day from tomorrow to 28 days ahead, so that a window left by one
@@ -430,8 +431,8 @@ the API to decide can expect exactly one.
 The assistant is the calendar used by conversation: a person writes a message, the server asks
 Claude (Anthropic's model) and answers with what Claude said. Its routes and their answers are
 defined in `docs/ARCHITECTURE.md` section 4 ("The assistant's routes"); what is not built yet
-(the Administrator's changes: the settings, the types, the opening hours, a booking for a
-User) is in `docs/CONVERSATIONAL_ARCHITECTURE.md`.
+(the Administrator's changes to the opening hours) is in
+`docs/CONVERSATIONAL_ARCHITECTURE.md`.
 
 - **One conversation per person**, found by the `sub` of the token. No route takes a conversation
   id, so nobody can reach another person's conversation. `GET /assistant/conversation` reads it,
@@ -467,6 +468,8 @@ the tools" below). The texts the journeys send:
 | `yes` | the same two answers as the sentence of the declining journey |
 | `fake: book me a slot when the money runs out` | first a request for `book_appointment`; then an error (a spending limit) the first time, and the second time the last result of a tool as its text |
 | `fake: add a note to my appointment of the note journey`, `fake: move my appointment of the moving journey`, `fake: cancel both my appointments of the cancelling journey` | first a request for `list_appointments`, for the day 22, 23 or 24 days after today; then a request for the change (`set_appointment_note`, `change_appointment`, or two `cancel_appointment` in one answer), with the id of the first appointment of that list, and of the second for the second cancellation; then the last result of a tool as its text |
+| `fake: set the booking horizon of the settings journey`, `fake: change a setting, which a User cannot` | first a request for the tool `update_settings`, for a booking horizon of 57 days; then, as its text, the last result of a tool word for word |
+| `fake: book the slot of the journey for its User` | first a request for the tool `book_appointment` with the username `chat-booked`, for the day 21 days after today at 05:00; then, as its text, the last result of a tool word for word |
 | a text the file does not hold | "Fake Claude: no answer is scripted for this message." |
 
 The language question (below) is scripted the same way: of the texts the journeys send,
@@ -500,7 +503,8 @@ One HTTP request asks Claude for at most one step (`docs/CONVERSATIONAL_ARCHITEC
 An answer that needs the calendar therefore takes several requests:
 
 1. `POST /assistant/messages`: Claude does not answer in words but asks for a **tool**, one of
-   four reads (`get_settings`, `list_types`, `get_calendar`, `list_appointments`). The server runs
+   four reads (`get_settings`, `list_types`, `get_calendar`, `list_appointments`; the
+   Administrator has two more, `list_users` and `list_patterns`). The server runs
    it: it calls the code of the calendar's own route, with the identity of the person, so the
    person gets from the assistant exactly what they may see in the pages. It saves Claude's
    request and the result, and answers `status` `working` with `activity`, a line such as
@@ -530,12 +534,16 @@ comes, the answer when the very same request comes again.
 ### A proposal, and its two buttons
 
 Claude cannot change the calendar (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 5.5). When it
-asks for a tool that changes something (`book_appointment`, offered to Users only, and
-`cancel_appointment`, `change_appointment` and `set_appointment_note`, offered to everybody),
+asks for a tool that changes something (`book_appointment`, `cancel_appointment`,
+`change_appointment` and `set_appointment_note`, offered to everybody, and `update_settings`,
+`create_type`, `rename_type` and `delete_type`, offered to the Administrator only),
 the server changes nothing. It reads the facts itself, with the person's identity. For a
 booking, through the code of `GET /calendar`: the free slot at the time asked for, its end, the
 name of its type. For the other three, through the code of `GET /calendar/appointments`: the
-appointment the id stands for, among the person's appointments that have not ended. Several
+appointment the id stands for, among the person's appointments that have not ended. For the
+Administrator's booking for a User, first through the code of `GET /users`: the username must
+be in the list. For a change of settings, through the code of `GET /calendar/settings`: the
+values as they are. Several
 changes asked for in one answer of Claude make one proposal, with one line in `actions` for
 each, five at most; if one of them cannot be proposed, none is. Then
 it saves a **proposal** and answers `status` `awaiting_confirmation`, with:
@@ -575,6 +583,42 @@ journeys read its `outcome` in the table: `done` after a confirmation (with what
 answered, and the words that the person pressed the button), `declined` after a decline,
 `not_confirmed` when a message dropped the proposal. A refused change is stored as the route's
 `error` and message.
+
+### The Administrator's tools
+
+A tool belongs to one role or to both (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3). Eight
+are offered to everybody: the four reads and the four changes of an appointment. The
+Administrator is offered more: the reads `list_users` and `list_patterns`, and the changes
+`update_settings`, `create_type`, `rename_type` and `delete_type`. The server names to Claude
+only the tools of the person's role.
+
+Should Claude ask for a tool the person's role is not offered, the server answers exactly as for
+a tool that does not exist: the error `unknown_tool` and a sentence that lists the tools of the
+role, so that the name is not confirmed. No handler is called and nothing is proposed
+(`docs/CONVERSATIONAL_ARCHITECTURE.md` section 7.4).
+
+`book_appointment` is offered to both roles with a different input. A User gives a day and a
+time and books for themself. The Administrator must also give the `username` of the User the
+appointment is for, and never books for themself (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-01).
+Before the proposal the server checks that name against the Users the code of `GET /users`
+lists, with the Administrator's identity; the proposal's sentence then names the person: "Book
+an appointment for alice on …".
+
+`update_settings` takes only the settings to change. The server reads the four values through
+the code of `GET /calendar/settings`, shows in the proposal those that would change, each as it
+is and as it would become, and at the confirmation sends all four to `PUT /calendar/settings`,
+the others as it read them (`docs/SHARED_CALENDAR_SPEC.md` R-SET-02). Asked for the values the
+settings already have, it proposes nothing.
+
+### The Administrator's conversation in the journeys
+
+Three blocks of `backend/tests/integration/assistant.test.ts` talk to the assistant as the
+seeded Administrator, `admin`. Unlike a throw-away User, that account keeps its `sub` from one
+run to the next, so it does not start clean by itself. Each of those blocks first deletes the
+Administrator's items of daily use (`forgetDailyUse()` of `backend/tests/integration/setup.ts`,
+the one write a journey makes to the `assistant` table directly) and ends their conversation
+(`DELETE /assistant/conversation`); it sends one message, and ends the conversation again when
+it is done.
 
 ### The `assistant` table
 

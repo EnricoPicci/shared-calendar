@@ -187,8 +187,8 @@ a role of its own (root `CLAUDE.md`, "Hard rules from the design"). It needs no 
   100 % line coverage on `src/lib` and `src/assistant`.
 - The assistant's journeys (`assistant.test.ts`) run against the fake Claude: a sentence gets
   the answers `tests/integration/fake-claude/answers.json` scripts for its exact text, one per
-  step. Each block plays its own throw-away User. **They never empty the `calendar` table**:
-  each creates what it needs through the API on a day of its own, and removes it before and after.
+  step. Each block plays its own throw-away User, or `admin`. **They never empty the `calendar`
+  table**: each creates what it needs through the API on a day of its own, and removes it after.
 - Tests of the contract itself (what a schema accepts, `resolveRole`) live in `shared/`; the
   back end tests what it does with it (the 400 answer, the handlers).
 - The calendar journeys empty the local `calendar` table first (`resetCalendarTable()`, which

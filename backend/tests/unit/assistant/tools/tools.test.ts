@@ -19,35 +19,22 @@ const ADMIN = { timeZone: ROME, role: 'admin' as const };
 
 // Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
 describe('the list of tools (3, 8.2)', () => {
-  it('holds the four reads, each for both roles, then the booking for Users and the three other appointment changes for both roles, the definitions in the same order as the tools', () => {
-    expect(DEFINITIONS.map((definition) => definition.name)).toEqual([
-      'get_settings',
-      'list_types',
-      'get_calendar',
-      'list_appointments',
-      'book_appointment',
-      'cancel_appointment',
-      'change_appointment',
-      'set_appointment_note',
-    ]);
+  it('holds the four reads and the four appointment changes for both roles, then the two reads and the four changes of the Administrator, the definitions in the same order as the tools', () => {
+    const FOR_BOTH = ['get_settings', 'list_types', 'get_calendar', 'list_appointments', 'book_appointment', 'cancel_appointment', 'change_appointment', 'set_appointment_note'];
+    const FOR_ADMIN = ['list_users', 'list_patterns', 'update_settings', 'create_type', 'rename_type', 'delete_type'];
+    expect(DEFINITIONS.map((definition) => definition.name)).toEqual([...FOR_BOTH, ...FOR_ADMIN]);
     expect(TOOLS.map((tool) => tool.definition)).toEqual([...DEFINITIONS]);
     for (const definition of DEFINITIONS.slice(0, 4)) {
       expect(definition.kind).toBe('read');
       expect(definition.roles).toEqual(['admin', 'user']);
       expect(definition.description.length).toBeGreaterThan(80);
     }
-    expect(DEFINITIONS[4]).toMatchObject({ kind: 'change', roles: ['user'] });
-    for (const definition of DEFINITIONS.slice(5)) expect(definition).toMatchObject({ kind: 'change', roles: ['admin', 'user'] });
-    expect(offeredTo(DEFINITIONS, 'user')).toHaveLength(8);
-    expect(offeredTo(DEFINITIONS, 'admin').map((definition) => definition.name)).toEqual([
-      'get_settings',
-      'list_types',
-      'get_calendar',
-      'list_appointments',
-      'cancel_appointment',
-      'change_appointment',
-      'set_appointment_note',
-    ]);
+    for (const definition of DEFINITIONS.slice(4, 8)) expect(definition).toMatchObject({ kind: 'change', roles: ['admin', 'user'] });
+    for (const definition of DEFINITIONS.slice(8, 10)) expect(definition).toMatchObject({ kind: 'read', roles: ['admin'] });
+    for (const definition of DEFINITIONS.slice(10)) expect(definition).toMatchObject({ kind: 'change', roles: ['admin'] });
+    // A User is offered none of the Administrator's tools; the Administrator is offered every tool.
+    expect(offeredTo(DEFINITIONS, 'user').map((definition) => definition.name)).toEqual(FOR_BOTH);
+    expect(offeredTo(DEFINITIONS, 'admin').map((definition) => definition.name)).toEqual([...FOR_BOTH, ...FOR_ADMIN]);
   });
 
   it('gives Claude each tool as a name, a description and the JSON Schema of its input', () => {

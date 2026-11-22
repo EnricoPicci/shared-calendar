@@ -647,7 +647,8 @@ describe('the step: Claude asks to read (5.1, 7.4, 8.1)', () => {
       ['toolu_x', true],
       ['toolu_ok', false],
     ]);
-    expect(JSON.parse(results[0]?.content ?? '')).toMatchObject({ error: why });
+    // A tool of another role is told to Claude as one that does not exist; only the log tells them apart.
+    expect(JSON.parse(results[0]?.content ?? '')).toMatchObject({ error: why === 'not_offered' ? 'unknown_tool' : why });
     expect(writtenStep().status).toBe('working');
     expect(result).toMatchObject({ ok: true, reply: { status: 'working' }, log: { tools: [{ name, notRun: why }, { name: 'calendar', status: 200 }] } });
   });

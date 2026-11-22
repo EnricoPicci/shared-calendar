@@ -1,15 +1,30 @@
-import { localDateOf, localTimeOf, toInstant, type Appointment, type AppointmentSummary, type CalendarView, type ListAppointmentsResponse } from '@shared-calendar/shared';
+import {
+  localDateOf,
+  localTimeOf,
+  toInstant,
+  type Appointment,
+  type AppointmentSummary,
+  type AvailabilityType,
+  type CalendarSettings,
+  type CalendarView,
+  type ListAppointmentsResponse,
+  type ListTypesResponse,
+  type ListUsersResponse,
+} from '@shared-calendar/shared';
 import { handler as getCalendar } from '../../handlers/getCalendar';
+import { handler as getSettings } from '../../handlers/getCalendarSettings';
 import { handler as listAppointments } from '../../handlers/listAppointments';
+import { handler as listTypes } from '../../handlers/listAvailabilityTypes';
+import { handler as listUsers } from '../../handlers/listUsers';
 import { hoursAfter, localEndTime } from './result';
 import { refusalOf, succeeded } from './run';
 import type { CallRoute, ToolContext } from './tool';
 
-// The facts the confirmations of the appointment changes read
-// (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5, rule 2), shared by the tools that book, cancel,
-// move and annotate: the instant a local date and time stand for, the free slot that starts at an
-// instant, and the appointment an id stands for. Each is read through the handler of a route that
-// only reads, with the identity of the person, so it is what that person may see.
+// The facts the confirmations of the changes read (docs/CONVERSATIONAL_ARCHITECTURE.md section
+// 5.5, rule 2), shared by the tools: the instant a local date and time stand for, the free slot
+// that starts at an instant, the appointment an id stands for, the User a username names, the
+// settings as they are and the appointment types. Each is read through the handler of a route
+// that only reads, with the identity of the person, so it is what that person may see.
 
 // What could not be read, or what the facts say cannot be done: a code and a sentence for Claude.
 export type NotPossible = { ok: false; error: string; message: string };
@@ -107,7 +122,62 @@ export function summaryOf(appointment: Appointment, { timeZone, role }: ToolCont
   };
 }
 
-// What two changes of one answer of Claude must not share: the appointment a change acts on, and
-// the slot a change would fill.
+/**
+ * Whether a username names a User the Administrator can book for, as GET /users answers: the
+ * accounts that are Users and not administrators. A name that is not in that list is not found,
+ * whatever the reason: no such account, an administrator's account, or an account in no group. The
+ * list cannot tell the three apart and the answer does not either, so an administrator's username
+ * is never confirmed. Only the Administrator can ask: the route refuses a User.
+ */
+export async function plainUser(route: CallRoute, username: string): Promise<{ ok: true } | NotPossible> {
+  const answer = await route(listUsers, { routeKey: 'GET /users', path: '/users' });
+  if (!succeeded(answer)) return { ok: false, ...refusalOf(answer, 'The users could not be read.') };
+  if (!(answer.body as ListUsersResponse).users.some((user) => user.username === username)) {
+    return { ok: false, error: 'user_not_found', message: `There is no User with the username "${username}". Use list_users to see the Users an appointment can be booked for, and ask the person which one they mean.` };
+  }
+  return { ok: true };
+}
+
+/** The settings as they are, as GET /calendar/settings answers. */
+export async function presentSettings(route: CallRoute): Promise<{ ok: true; settings: CalendarSettings } | NotPossible> {
+  const answer = await route(getSettings, { routeKey: 'GET /calendar/settings', path: '/calendar/settings' });
+  if (!succeeded(answer)) return { ok: false, ...refusalOf(answer, 'The settings could not be read.') };
+  return { ok: true, settings: answer.body as CalendarSettings };
+}
+
+/** The appointment types, as GET /calendar/types answers. */
+export async function presentTypes(route: CallRoute): Promise<{ ok: true; types: AvailabilityType[] } | NotPossible> {
+  const answer = await route(listTypes, { routeKey: 'GET /calendar/types', path: '/calendar/types' });
+  if (!succeeded(answer)) return { ok: false, ...refusalOf(answer, 'The appointment types could not be read.') };
+  return { ok: true, types: (answer.body as ListTypesResponse).types };
+}
+
+/** The type an id stands for among the types read, or the refusal the types' routes answer. */
+export function typeById(types: AvailabilityType[], typeId: string): { ok: true; type: AvailabilityType } | NotPossible {
+  const type = types.find((candidate) => candidate.typeId === typeId);
+  if (!type) {
+    return { ok: false, error: 'type_not_found', message: 'There is no appointment type with this id. Never guess an id: use list_types to find the type the person means.' };
+  }
+  return { ok: true, type };
+}
+
+/**
+ * What two type names are compared by: trimmed, in lower case. Two names that differ only in
+ * their capitals are one name to the calendar (docs/ARCHITECTURE.md section 4, `AvailabilityType`).
+ */
+export const typeNameKey = (name: string): string => name.trim().toLowerCase();
+
+/** The refusal for a name another type has. */
+export const nameTaken = (name: string): NotPossible => ({
+  ok: false,
+  error: 'type_name_exists',
+  message: `An appointment type with the name "${name}" already exists; names that differ only in their capitals count as the same. Tell the person, and ask for another name.`,
+});
+
+// What two changes of one answer of Claude must not share: the appointment a change acts on, the
+// slot a change would fill, the settings, a type, and the name a type would get.
 export const appointmentSubject = (appointmentId: string) => `appointment ${appointmentId}`;
 export const slotSubject = (start: string) => `slot ${start}`;
+export const SETTINGS_SUBJECT = 'settings';
+export const typeSubject = (typeId: string) => `type ${typeId}`;
+export const typeNameSubject = (name: string) => `type name ${typeNameKey(name)}`;

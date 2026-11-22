@@ -11,9 +11,11 @@ import {
 
 // A booking as its proposal words it: a Tuesday, with a note and without, and the second 02:00 of
 // the night the clocks go back in Europe/Rome.
-const BOOKING = { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', note: null, secondTime: false };
+const BOOKING = { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', note: null, secondTime: false, username: null };
 const BOOKING_WITH_NOTE = { ...BOOKING, note: 'Bring the documents' };
-const BOOKING_SECOND_TIME = { date: '2026-10-25', start: '02:00', end: '03:00', type: 'Visit', note: null, secondTime: true };
+// The same booking made by the Administrator for a User.
+const BOOKING_FOR_ALICE = { ...BOOKING_WITH_NOTE, username: 'alice' };
+const BOOKING_SECOND_TIME = { date: '2026-10-25', start: '02:00', end: '03:00', type: 'Visit', note: null, secondTime: true, username: null };
 
 // An appointment as the proposal of a change names it: a User's own, which names nobody, and
 // alice's as the Administrator is shown it. A move to a slot of another type, and to the second
@@ -26,15 +28,32 @@ const NOTE_SET = { appointment: OWN, note: 'Bring the documents', previous: null
 const NOTE_REPLACED = { appointment: OF_ALICE, note: 'Bring the documents', previous: 'First visit' };
 const NOTE_REMOVED = { appointment: OWN, note: null, previous: 'First visit' };
 
+// Changes to the settings as their proposal words them: one setting, every setting at once with
+// a limit set where there was none, and values of one hour, one day and no limit.
+const ONE_SETTING = { changes: [{ setting: 'cancellationNoticeHours' as const, from: 24, to: 72 }] };
+const ALL_SETTINGS = {
+  changes: [
+    { setting: 'cancellationNoticeHours' as const, from: 24, to: 1 },
+    { setting: 'minBookingNoticeHours' as const, from: 0, to: 2 },
+    { setting: 'bookingHorizonDays' as const, from: 56, to: 1 },
+    { setting: 'maxFutureAppointmentsPerUser' as const, from: null, to: 3 },
+  ],
+};
+const LIMIT_LIFTED = { changes: [{ setting: 'maxFutureAppointmentsPerUser' as const, from: 1, to: null }] };
+
 // The arguments each text that is a function is tried with: every number of changes a proposal
 // may hold, and each shape of a booking. A new function among the texts needs its entry here, or
 // the test below fails.
 const SAMPLES: Record<string, unknown[][]> = {
   proposalQuestion: Array.from({ length: ASSISTANT_LIMITS.changesPerProposal }, (_, i) => [i + 1]),
-  'changes.bookAppointment': [[BOOKING], [BOOKING_WITH_NOTE], [BOOKING_SECOND_TIME]],
+  'changes.bookAppointment': [[BOOKING], [BOOKING_WITH_NOTE], [BOOKING_SECOND_TIME], [BOOKING_FOR_ALICE]],
   'changes.cancelAppointment': [[OWN], [OF_ALICE]],
   'changes.changeAppointment': [[{ appointment: OWN, to: TO }], [{ appointment: OF_ALICE, to: TO }], [{ appointment: OWN, to: TO_SECOND_TIME }]],
   'changes.setAppointmentNote': [[NOTE_SET], [NOTE_REPLACED], [NOTE_REMOVED]],
+  'changes.updateSettings': [[ONE_SETTING], [ALL_SETTINGS], [LIMIT_LIFTED]],
+  'changes.createType': [[{ name: 'Phone call' }]],
+  'changes.renameType': [[{ from: 'Visit', to: 'Check-up' }]],
+  'changes.deleteType': [[{ name: 'Visit' }]],
 };
 
 // Every text of one language as `path -> the strings it gives`: a string as itself, a function
@@ -177,5 +196,43 @@ describe('assistantTexts', () => {
       "Impostare la nota dell'appuntamento di alice di martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Visit): «Bring the documents» Sostituisce la nota: «First visit»",
     );
     expect(it_(NOTE_REMOVED)).toBe("Togliere la nota dell'appuntamento di martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Visit). La nota è: «First visit»");
+  });
+
+  it('a booking by the Administrator names the User it is for: both languages', () => {
+    expect(ASSISTANT_TEXTS_EN.changes.bookAppointment(BOOKING_FOR_ALICE)).toBe(
+      'Book an appointment for alice on Tuesday 24 November 2026, from 10:00 to 11:00 (Visit). Note: "Bring the documents"',
+    );
+    expect(ASSISTANT_TEXTS_IT.changes.bookAppointment(BOOKING_FOR_ALICE)).toBe(
+      'Prenotare per alice un appuntamento per martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Visit). Nota: «Bring the documents»',
+    );
+  });
+
+  it('a change to the settings shows each changed setting as it is and as it would become, in the words of the settings page: English', () => {
+    const { updateSettings } = ASSISTANT_TEXTS_EN.changes;
+    expect(updateSettings(ONE_SETTING)).toBe('Change the settings. Cancellation notice: from 24 hours to 72 hours.');
+    expect(updateSettings(ALL_SETTINGS)).toBe(
+      'Change the settings. Cancellation notice: from 24 hours to 1 hour. Minimum booking notice: from 0 hours to 2 hours. ' +
+        'Booking horizon: from 56 days to 1 day. Maximum upcoming appointments per person: from no limit to 3 appointments.',
+    );
+    expect(updateSettings(LIMIT_LIFTED)).toBe('Change the settings. Maximum upcoming appointments per person: from 1 appointment to no limit.');
+  });
+
+  it('the same in Italian, without addressing the person', () => {
+    const { updateSettings } = ASSISTANT_TEXTS_IT.changes;
+    expect(updateSettings(ONE_SETTING)).toBe("Modificare le impostazioni. Preavviso per l'annullamento: da 24 ore a 72 ore.");
+    expect(updateSettings(ALL_SETTINGS)).toBe(
+      "Modificare le impostazioni. Preavviso per l'annullamento: da 24 ore a 1 ora. Preavviso minimo per la prenotazione: da 0 ore a 2 ore. " +
+        'Orizzonte di prenotazione: da 56 giorni a 1 giorno. Numero massimo di appuntamenti futuri per persona: da nessun limite a 3 appuntamenti.',
+    );
+    expect(updateSettings(LIMIT_LIFTED)).toBe('Modificare le impostazioni. Numero massimo di appuntamenti futuri per persona: da 1 appuntamento a nessun limite.');
+  });
+
+  it('a type created, renamed and deleted is named by its name, a rename by the old and the new: both languages', () => {
+    expect(ASSISTANT_TEXTS_EN.changes.createType({ name: 'Phone call' })).toBe('Create the appointment type "Phone call".');
+    expect(ASSISTANT_TEXTS_EN.changes.renameType({ from: 'Visit', to: 'Check-up' })).toBe('Rename the appointment type "Visit" to "Check-up".');
+    expect(ASSISTANT_TEXTS_EN.changes.deleteType({ name: 'Visit' })).toBe('Delete the appointment type "Visit".');
+    expect(ASSISTANT_TEXTS_IT.changes.createType({ name: 'Phone call' })).toBe('Creare il tipo di appuntamento «Phone call».');
+    expect(ASSISTANT_TEXTS_IT.changes.renameType({ from: 'Visit', to: 'Check-up' })).toBe('Rinominare il tipo di appuntamento «Visit» in «Check-up».');
+    expect(ASSISTANT_TEXTS_IT.changes.deleteType({ name: 'Visit' })).toBe('Eliminare il tipo di appuntamento «Visit».');
   });
 });

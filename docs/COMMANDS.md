@@ -88,7 +88,10 @@ in `template.yaml`. `env.local.json` sets `CALENDAR_TABLE` and `DYNAMODB_ENDPOIN
 calendar function needs no seed line, unless it also calls Cognito (`BookAppointmentFunction`
 has its own section with `USER_POOL_ID`, `COGNITO_ENDPOINT` and the dummy credentials, like
 `CreateUserFunction`; `DeleteUserFunction` declares the calendar variables too and keeps its own
-section; `ListUsersFunction` has a section of its own and no calendar variable).
+section; `ListUsersFunction` has a section of its own and no calendar variable; the three
+assistant functions that run tools, `SendAssistantMessageFunction`, `ContinueAssistantFunction`
+and `ConfirmProposalFunction`, each have one, because their tools call the users' list and the
+booking route, which ask Cognito).
 `CALENDAR_TIME_ZONE` is deliberately not in the file (a value there would win over the
 template): it comes from the parameter `CalendarTimeZone` (default `Europe/Rome`). An invalid
 zone makes every calendar request answer 500.

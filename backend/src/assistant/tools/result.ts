@@ -1,4 +1,4 @@
-import { localDateOf, localTimeOf, type Appointment } from '@shared-calendar/shared';
+import { localDateOf, localTimeOf, type Appointment, type AvailabilityType, type CalendarSettings } from '@shared-calendar/shared';
 import type { ToolResult } from './tool';
 
 // What Claude is given of a route's answer (docs/CONVERSATIONAL_ARCHITECTURE.md section 8.3):
@@ -89,3 +89,20 @@ export function appointmentForModel(appointment: Appointment, zone: string): Rec
     ...(appointment.cancellableUntil !== null && { cancellableUntil: localDateTime(appointment.cancellableUntil, zone) }),
   };
 }
+
+/**
+ * The settings as Claude sees them: the time zone and the four values the Administrator can
+ * change. Who saved them last, and when, is not something an answer needs.
+ */
+export function settingsForModel(settings: CalendarSettings): Record<string, unknown> {
+  return {
+    timeZone: settings.timeZone,
+    cancellationNoticeHours: settings.cancellationNoticeHours,
+    minBookingNoticeHours: settings.minBookingNoticeHours,
+    bookingHorizonDays: settings.bookingHorizonDays,
+    maxFutureAppointmentsPerUser: settings.maxFutureAppointmentsPerUser,
+  };
+}
+
+/** An appointment type as Claude sees it: its id, which a later change will name, and its name. */
+export const typeForModel = (type: AvailabilityType): Record<string, unknown> => ({ id: type.typeId, name: type.name });

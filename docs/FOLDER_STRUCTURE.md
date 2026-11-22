@@ -344,6 +344,12 @@ Step c06 of `docs/CONVERSATIONAL_PLAN.md` (2026-11-22) added `tools/cancelAppoin
 `changes`, and `tools/facts.ts`: what the confirmations read in common (the instant of a local
 date and time, the free slot at an instant, the appointment an id stands for).
 
+Step c07 of `docs/CONVERSATIONAL_PLAN.md` (2026-11-22) added the Administrator's tools,
+`tools/listUsers.ts`, `tools/listPatterns.ts`, `tools/updateSettings.ts`, `tools/createType.ts`,
+`tools/renameType.ts` and `tools/deleteType.ts`, with their four sentences in `changes` and two
+kinds of read (users, patterns). `tools/facts.ts` gained the reads of the present settings, the
+present types and the users' list.
+
 What stays out of `shared/`: the DynamoDB item shape (`MessageItem`), the authorizer context,
 the logger, the password generator (server-side secret handling), and everything that imports
 `aws-lambda` types or the AWS SDK.

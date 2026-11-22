@@ -44,6 +44,10 @@ export type AssistantTexts = {
     cancelAppointment: (appointment: AppointmentSummary) => string;
     changeAppointment: (move: MoveSummary) => string;
     setAppointmentNote: (change: NoteSummary) => string;
+    updateSettings: (change: SettingsSummary) => string;
+    createType: (type: { name: string }) => string;
+    renameType: (rename: { from: string; to: string }) => string;
+    deleteType: (type: { name: string }) => string;
   };
   // The line of progress of a step that has none of its own.
   working: string;
@@ -55,8 +59,9 @@ export type AssistantTexts = {
 // What the proposal of a booking shows: the day as a local date, the two wall-clock times, the
 // name of the type the slot belongs to and the note, as they will be sent to the route.
 // `secondTime` marks the second of the two times a clock shows the same hour on the night the
-// clocks go back.
-export type BookingSummary = { date: string; start: string; end: string; type: string; note: string | null; secondTime: boolean };
+// clocks go back. `username` is the User the appointment is for when the Administrator books it,
+// and null when a User books for themself: the sentence then names nobody.
+export type BookingSummary = { date: string; start: string; end: string; type: string; note: string | null; secondTime: boolean; username: string | null };
 
 // An existing appointment as a proposal names it: its day as a local date, its two wall-clock
 // times and the name of its type. `username` is whose it is, given only when the person asked is
@@ -73,9 +78,21 @@ export type MoveSummary = { appointment: AppointmentSummary; to: { date: string;
 // and the note it has, which the new one replaces.
 export type NoteSummary = { appointment: AppointmentSummary; note: string | null; previous: string | null };
 
+// The settings the Administrator can change (docs/SHARED_CALENDAR_SPEC.md section 9), in the order
+// the settings page lists them.
+export const ASSISTANT_SETTING_NAMES = ['cancellationNoticeHours', 'minBookingNoticeHours', 'bookingHorizonDays', 'maxFutureAppointmentsPerUser'] as const;
+export type AssistantSettingName = (typeof ASSISTANT_SETTING_NAMES)[number];
+
+// What the proposal of a change to the settings shows: each setting that would change, with its
+// value as it is and as it would become, and no setting that stays as it is. A value is a number
+// of hours, of days or of appointments; null is "no limit", which only the highest number of
+// future appointments can be.
+export type SettingChange = { setting: AssistantSettingName; from: number | null; to: number | null };
+export type SettingsSummary = { changes: SettingChange[] };
+
 // What a read tool of the assistant looks at: each kind has its own line of progress
 // (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.1).
-export const ASSISTANT_READ_KINDS = ['settings', 'types', 'calendar', 'appointments'] as const;
+export const ASSISTANT_READ_KINDS = ['settings', 'types', 'calendar', 'appointments', 'users', 'patterns'] as const;
 export type AssistantReadKind = (typeof ASSISTANT_READ_KINDS)[number];
 
 const TEXTS: Record<AssistantLanguage, AssistantTexts> = { en: ASSISTANT_TEXTS_EN, it: ASSISTANT_TEXTS_IT };

@@ -1,5 +1,5 @@
 import { weekdayOf } from '../calendar/time';
-import type { AppointmentSummary, AssistantTexts } from './texts';
+import type { AppointmentSummary, AssistantSettingName, AssistantTexts, SettingChange } from './texts';
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -11,6 +11,21 @@ const fullDate = (date: string) => `${WEEKDAYS[weekdayOf(date) - 1]} ${Number(da
 // 2026, from 10:00 to 11:00 (Visit)", without "of alice" when it is the person's own.
 const theAppointment = ({ date, start, end, type, username }: AppointmentSummary) =>
   `the appointment${username === null ? '' : ` of ${username}`} on ${fullDate(date)}, from ${start} to ${end} (${type})`;
+
+// A setting in the words of its label on the settings page, and what it counts, one and several.
+const SETTINGS: Record<AssistantSettingName, { name: string; one: string; many: string }> = {
+  cancellationNoticeHours: { name: 'Cancellation notice', one: 'hour', many: 'hours' },
+  minBookingNoticeHours: { name: 'Minimum booking notice', one: 'hour', many: 'hours' },
+  bookingHorizonDays: { name: 'Booking horizon', one: 'day', many: 'days' },
+  maxFutureAppointmentsPerUser: { name: 'Maximum upcoming appointments per person', one: 'appointment', many: 'appointments' },
+};
+
+// One setting as it is and as it would become: "Cancellation notice: from 24 hours to 72 hours."
+const settingChange = ({ setting, from, to }: SettingChange) => {
+  const { name, one, many } = SETTINGS[setting];
+  const value = (count: number | null) => (count === null ? 'no limit' : `${count} ${count === 1 ? one : many}`);
+  return `${name}: from ${value(from)} to ${value(to)}.`;
+};
 
 // The fixed texts in English. The three sentences of `cannotAnswer` are those of
 // docs/CONVERSATIONAL_ARCHITECTURE.md section 6.1, word for word.
@@ -33,8 +48,8 @@ export const ASSISTANT_TEXTS_EN: AssistantTexts = {
   confirmLabel: 'Confirm',
   declineLabel: "Don't",
   changes: {
-    bookAppointment: ({ date, start, end, type, note, secondTime }) =>
-      `Book an appointment on ${fullDate(date)}, from ${start} to ${end} (${type}).` +
+    bookAppointment: ({ date, start, end, type, note, secondTime, username }) =>
+      `Book an appointment${username === null ? '' : ` for ${username}`} on ${fullDate(date)}, from ${start} to ${end} (${type}).` +
       (secondTime ? ` This is the second ${start} of that night: the clocks go back.` : '') +
       (note === null ? '' : ` Note: "${note}"`),
     cancelAppointment: (appointment) => `Cancel ${theAppointment(appointment)}.`,
@@ -45,6 +60,10 @@ export const ASSISTANT_TEXTS_EN: AssistantTexts = {
       note === null
         ? `Remove the note of ${theAppointment(appointment)}. The note is: "${previous ?? ''}"`
         : `Set the note of ${theAppointment(appointment)}, to: "${note}"` + (previous === null ? '' : ` It replaces the note: "${previous}"`),
+    updateSettings: ({ changes }) => ['Change the settings.', ...changes.map(settingChange)].join(' '),
+    createType: ({ name }) => `Create the appointment type "${name}".`,
+    renameType: ({ from, to }) => `Rename the appointment type "${from}" to "${to}".`,
+    deleteType: ({ name }) => `Delete the appointment type "${name}".`,
   },
   working: 'Working…',
   reading: {
@@ -52,5 +71,7 @@ export const ASSISTANT_TEXTS_EN: AssistantTexts = {
     types: 'Looking at the appointment types…',
     calendar: 'Looking at the calendar…',
     appointments: 'Looking at the appointments…',
+    users: 'Looking at the users…',
+    patterns: 'Looking at the weekly patterns…',
   },
 };

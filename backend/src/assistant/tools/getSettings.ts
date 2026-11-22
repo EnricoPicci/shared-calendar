@@ -1,6 +1,7 @@
 import type { CalendarSettings } from '@shared-calendar/shared';
 import { z } from 'zod';
 import { handler } from '../../handlers/getCalendarSettings';
+import { settingsForModel } from './result';
 import type { ReadTool, ToolDefinition } from './tool';
 
 // The tool for GET /calendar/settings (docs/CONVERSATIONAL_ARCHITECTURE.md section 3): the rules
@@ -23,18 +24,6 @@ export const getSettingsDefinition: ToolDefinition = {
 const parts: ReadTool<z.infer<typeof Input>> = {
   definition: getSettingsDefinition,
   toHandler: { handler, request: () => ({ routeKey: 'GET /calendar/settings', path: '/calendar/settings' }) },
-  // Who saved the settings last, and when, is not something an answer needs.
-  toModel: (body) => {
-    const settings = body as CalendarSettings;
-    return {
-      fields: {
-        timeZone: settings.timeZone,
-        cancellationNoticeHours: settings.cancellationNoticeHours,
-        minBookingNoticeHours: settings.minBookingNoticeHours,
-        bookingHorizonDays: settings.bookingHorizonDays,
-        maxFutureAppointmentsPerUser: settings.maxFutureAppointmentsPerUser,
-      },
-    };
-  },
+  toModel: (body) => ({ fields: settingsForModel(body as CalendarSettings) }),
 };
 export const getSettings = parts as ReadTool;

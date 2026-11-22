@@ -20,6 +20,9 @@ export type ToolDefinition = {
   name: string;
   // For Claude: what the tool gives and when to use it.
   description: string;
+  // What the description adds for the Administrator, where the tool takes more from that role:
+  // a User's request to Claude does not hold it.
+  descriptionForAdmin?: string;
   kind: ToolKind;
   // The roles the tool is offered to. A request of another role does not name it, and the core
   // refuses it before any handler is called.
@@ -94,9 +97,12 @@ export type ReadTool<Input = unknown> = {
     // The exported handler of the tool's route, called inside the function that runs the tool.
     handler: RouteHandler;
     request: (input: Input, context: ToolContext) => ToolCall;
+    // A second route the result needs, called after the first with the same identity: its answer
+    // gives the names the first route's answer only has the ids of.
+    also?: { handler: RouteHandler; call: ToolCall };
   };
-  // `body` is the parsed body of a 2xx answer of the route.
-  toModel: (body: unknown, context: ToolContext) => ToolResult;
+  // `body` is the parsed body of a 2xx answer of the route, `also` that of the second route.
+  toModel: (body: unknown, context: ToolContext, also?: unknown) => ToolResult;
 };
 
 // A tool that changes the calendar. It does not hold the handler of its route: the functions that
@@ -106,8 +112,10 @@ export type ReadTool<Input = unknown> = {
 export type ChangeTool<Input = unknown, Facts = unknown> = {
   definition: ToolDefinition;
   confirmation: ToolConfirmation<Input, Facts>;
-  // `body` is the parsed body of the 2xx answer the change route gave at the confirmation.
-  toModel: (body: unknown, context: ToolContext) => ToolResult;
+  // `body` is the parsed body of the 2xx answer the change route gave at the confirmation. The
+  // third argument is never given to a change: it is here so that both shapes of tool turn an
+  // answer into a result with one signature.
+  toModel: (body: unknown, context: ToolContext, also?: unknown) => ToolResult;
 };
 
 export type Tool<Input = unknown> = ReadTool<Input> | ChangeTool<Input>;
@@ -128,7 +136,8 @@ export function offeredTo(definitions: readonly ToolDefinition[], role: Role): T
 export function forClaude(definition: ToolDefinition, role: Role): ClaudeTool {
   const schema: Record<string, unknown> = { ...z.toJSONSchema(definition.input(role)) };
   delete schema.$schema;
-  return { name: definition.name, description: definition.description, input_schema: schema as ClaudeTool['input_schema'] };
+  const description = definition.description + (role === 'admin' && definition.descriptionForAdmin ? ` ${definition.descriptionForAdmin}` : '');
+  return { name: definition.name, description, input_schema: schema as ClaudeTool['input_schema'] };
 }
 
 /** The tools a request to Claude names for a role. */

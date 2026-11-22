@@ -1,7 +1,11 @@
 import { handler as bookAppointment } from '../../handlers/bookAppointment';
 import { handler as cancelAppointment } from '../../handlers/cancelAppointment';
 import { handler as changeAppointment } from '../../handlers/changeAppointment';
+import { handler as createType } from '../../handlers/createAvailabilityType';
+import { handler as deleteType } from '../../handlers/deleteAvailabilityType';
+import { handler as renameType } from '../../handlers/renameAvailabilityType';
 import { handler as setAppointmentNote } from '../../handlers/updateAppointmentNote';
+import { handler as updateSettings } from '../../handlers/updateCalendarSettings';
 import type { RouteHandler } from './tool';
 
 // The handlers of the routes that change the calendar, by the name of the tool that stands for
@@ -14,4 +18,8 @@ export const CHANGE_HANDLERS: Readonly<Record<string, RouteHandler>> = {
   cancel_appointment: cancelAppointment,
   change_appointment: changeAppointment,
   set_appointment_note: setAppointmentNote,
+  update_settings: updateSettings,
+  create_type: createType,
+  rename_type: renameType,
+  delete_type: deleteType,
 };

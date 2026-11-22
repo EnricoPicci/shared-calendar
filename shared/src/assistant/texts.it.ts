@@ -1,5 +1,5 @@
 import { weekdayOf } from '../calendar/time';
-import type { AppointmentSummary, AssistantTexts } from './texts';
+import type { AppointmentSummary, AssistantSettingName, AssistantTexts, SettingChange } from './texts';
 
 const WEEKDAYS = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
 const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
@@ -11,6 +11,21 @@ const fullDate = (date: string) => `${WEEKDAYS[weekdayOf(date) - 1]} ${Number(da
 // 2026, dalle 10:00 alle 11:00 (Visit)", without "di alice" when it is the person's own.
 const theAppointment = ({ date, start, end, type, username }: AppointmentSummary) =>
   `l'appuntamento${username === null ? '' : ` di ${username}`} di ${fullDate(date)}, dalle ${start} alle ${end} (${type})`;
+
+// A setting by its name, and what it counts, one and several.
+const SETTINGS: Record<AssistantSettingName, { name: string; one: string; many: string }> = {
+  cancellationNoticeHours: { name: "Preavviso per l'annullamento", one: 'ora', many: 'ore' },
+  minBookingNoticeHours: { name: 'Preavviso minimo per la prenotazione', one: 'ora', many: 'ore' },
+  bookingHorizonDays: { name: 'Orizzonte di prenotazione', one: 'giorno', many: 'giorni' },
+  maxFutureAppointmentsPerUser: { name: 'Numero massimo di appuntamenti futuri per persona', one: 'appuntamento', many: 'appuntamenti' },
+};
+
+// One setting as it is and as it would become: "Preavviso per l'annullamento: da 24 ore a 72 ore."
+const settingChange = ({ setting, from, to }: SettingChange) => {
+  const { name, one, many } = SETTINGS[setting];
+  const value = (count: number | null) => (count === null ? 'nessun limite' : `${count} ${count === 1 ? one : many}`);
+  return `${name}: da ${value(from)} a ${value(to)}.`;
+};
 
 // The fixed texts in Italian, key by key the ones of the English object. The person is addressed
 // with the formal "lei" throughout. The second button is not "Annulla": in a calendar that word
@@ -35,8 +50,8 @@ export const ASSISTANT_TEXTS_IT: AssistantTexts = {
   confirmLabel: 'Conferma',
   declineLabel: 'Non lo faccia',
   changes: {
-    bookAppointment: ({ date, start, end, type, note, secondTime }) =>
-      `Prenotare un appuntamento per ${fullDate(date)}, dalle ${start} alle ${end} (${type}).` +
+    bookAppointment: ({ date, start, end, type, note, secondTime, username }) =>
+      `Prenotare${username === null ? '' : ` per ${username}`} un appuntamento per ${fullDate(date)}, dalle ${start} alle ${end} (${type}).` +
       (secondTime ? ` È la seconda volta che quella notte l'orologio segna le ${start}: torna l'ora solare.` : '') +
       (note === null ? '' : ` Nota: «${note}»`),
     cancelAppointment: (appointment) => `Annullare ${theAppointment(appointment)}.`,
@@ -47,6 +62,10 @@ export const ASSISTANT_TEXTS_IT: AssistantTexts = {
       note === null
         ? `Togliere la nota del${theAppointment(appointment)}. La nota è: «${previous ?? ''}»`
         : `Impostare la nota del${theAppointment(appointment)}: «${note}»` + (previous === null ? '' : ` Sostituisce la nota: «${previous}»`),
+    updateSettings: ({ changes }) => ['Modificare le impostazioni.', ...changes.map(settingChange)].join(' '),
+    createType: ({ name }) => `Creare il tipo di appuntamento «${name}».`,
+    renameType: ({ from, to }) => `Rinominare il tipo di appuntamento «${from}» in «${to}».`,
+    deleteType: ({ name }) => `Eliminare il tipo di appuntamento «${name}».`,
   },
   working: 'Ci sto lavorando…',
   reading: {
@@ -54,5 +73,7 @@ export const ASSISTANT_TEXTS_IT: AssistantTexts = {
     types: 'Sto guardando i tipi di appuntamento…',
     calendar: 'Sto guardando il calendario…',
     appointments: 'Sto guardando gli appuntamenti…',
+    users: 'Sto guardando gli utenti…',
+    patterns: 'Sto guardando gli orari settimanali…',
   },
 };

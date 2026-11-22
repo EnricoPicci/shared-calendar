@@ -199,6 +199,10 @@ ensure_user alice "$ALICE_PASSWORD" user
 # DeleteUserFunction also declares the calendar variables (it cancels the deleted user's
 # appointments, docs/SHARED_CALENDAR_SPEC.md section 10.2) and gets the table and the endpoint from
 # "Parameters" too, beside its own section. ListUsersFunction reads Cognito only.
+# The three assistant functions that run tools (SendAssistantMessageFunction,
+# ContinueAssistantFunction, ConfirmProposalFunction) call Cognito too, through the code of
+# GET /users and of the booking route, when the Administrator lists the Users or books for one:
+# each gets the same section, beside what "Parameters" gives it.
 # ASSISTANT_TABLE, like CALENDAR_TABLE, reaches every function that declares it in template.yaml:
 # an assistant function gets the table's local name by declaring the variable.
 #
@@ -282,6 +286,24 @@ EOF
     "AWS_SECRET_ACCESS_KEY": "local"
   },
   "ListUsersFunction": {
+    "USER_POOL_ID": "$POOL_ID",
+    "COGNITO_ENDPOINT": "http://cognito:9229",
+    "AWS_ACCESS_KEY_ID": "local",
+    "AWS_SECRET_ACCESS_KEY": "local"
+  },
+  "SendAssistantMessageFunction": {
+    "USER_POOL_ID": "$POOL_ID",
+    "COGNITO_ENDPOINT": "http://cognito:9229",
+    "AWS_ACCESS_KEY_ID": "local",
+    "AWS_SECRET_ACCESS_KEY": "local"
+  },
+  "ContinueAssistantFunction": {
+    "USER_POOL_ID": "$POOL_ID",
+    "COGNITO_ENDPOINT": "http://cognito:9229",
+    "AWS_ACCESS_KEY_ID": "local",
+    "AWS_SECRET_ACCESS_KEY": "local"
+  },
+  "ConfirmProposalFunction": {
     "USER_POOL_ID": "$POOL_ID",
     "COGNITO_ENDPOINT": "http://cognito:9229",
     "AWS_ACCESS_KEY_ID": "local",

@@ -72,11 +72,12 @@ describe('runRead (7.4, 8.1)', () => {
     expect(outcome.reads).toBeNull();
   });
 
-  it("a tool of the Administrator asked for a User: the same sentence, which does not confirm the name, and no handler called", async () => {
+  it("a tool of the Administrator asked for a User: the very result of a tool that does not exist, which does not confirm the name, and no handler called", async () => {
     const outcome = await runRead(ask('look_at_everyone'), TOOLS, ALICE, USER_CONTEXT, NOW);
 
     expect(handler).not.toHaveBeenCalled();
-    expect(JSON.parse(outcome.result.content)).toEqual({ error: 'not_offered', message: 'There is no tool with this name. The tools are: look, book.' });
+    expect(outcome.result).toEqual((await runRead(ask('delete_everything'), TOOLS, ALICE, USER_CONTEXT, NOW)).result);
+    expect(JSON.parse(outcome.result.content)).toEqual({ error: 'unknown_tool', message: 'There is no tool with this name. The tools are: look, book.' });
     expect(outcome.result.is_error).toBe(true);
     expect(outcome.log).toEqual({ name: 'look_at_everyone', notRun: 'not_offered' });
 
@@ -139,5 +140,39 @@ describe('runRead (7.4, 8.1)', () => {
       is_error: true,
     });
     expect(outcome.log).toMatchObject({ name: 'look', status });
+  });
+
+  // A tool whose result needs a second route: the first gives ids, the second their names.
+  const second = vi.fn();
+  const both: Tool = {
+    definition: fake('look_with_names').definition,
+    toHandler: { handler, request: () => ({ routeKey: 'GET /things', path: '/things' }), also: { handler: second, call: { routeKey: 'GET /names', path: '/names' } } },
+    toModel: (body, _context, also) => ({ fields: { got: body, names: also } }),
+  };
+
+  it("a tool that needs a second route calls it after the first, with the same identity, and gives both answers to the result", async () => {
+    second.mockResolvedValue(answer(200, { names: 2 }));
+    const outcome = await runRead(ask('look_with_names'), [both], ADMIN, { ...USER_CONTEXT, role: 'admin' }, NOW);
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
+    const event = second.mock.calls[0]?.[0];
+    expect(getClaims(event)).toEqual({ ok: true, value: { sub: 'sub-admin', username: 'admin', groups: ['admin'] } });
+    expect(event).toMatchObject({ routeKey: 'GET /names', requestContext: { requestId: 'req-8' } });
+    expect(outcome.result.content).toBe('{"got":{"days":7},"names":{"names":2}}');
+    expect(outcome.log).toEqual({ name: 'look_with_names', status: 200, ms: 0 });
+  });
+
+  it('the second route is not asked when the first refused, and its own refusal is the result', async () => {
+    handler.mockResolvedValue(answer(403, { error: 'forbidden', message: 'Admins only' }));
+    const refused = await runRead(ask('look_with_names'), [both], ADMIN, { ...USER_CONTEXT, role: 'admin' }, NOW);
+    expect(second).not.toHaveBeenCalled();
+    expect(refused.result.content).toBe('{"error":"forbidden","message":"Admins only"}');
+
+    handler.mockResolvedValue(answer(200, { days: 7 }));
+    second.mockResolvedValue(answer(500, { error: 'internal_error', message: 'Could not read the types' }));
+    const failed = await runRead(ask('look_with_names'), [both], ADMIN, { ...USER_CONTEXT, role: 'admin' }, NOW);
+    expect(failed.result).toMatchObject({ content: '{"error":"internal_error","message":"Could not read the types"}', is_error: true });
+    expect(failed.log).toEqual({ name: 'look_with_names', status: 500, ms: 0 });
   });
 });

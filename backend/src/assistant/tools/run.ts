@@ -90,12 +90,11 @@ export function checkRequest(request: ToolRequest, tools: readonly Tool[], calle
   const names = offered.map((candidate) => candidate.definition.name).join(', ');
   const found = tools.find((candidate) => candidate.definition.name === request.name);
 
-  // A tool of another role is answered like one that does not exist: its name is not confirmed.
+  // A tool of another role is answered like one that does not exist, code and sentence alike:
+  // its name is not confirmed. Only the log line tells the two apart.
   if (!found || !offered.includes(found)) {
-    return {
-      ok: false,
-      outcome: notRun(request.id, found ? found.definition.name : null, found ? 'not_offered' : 'unknown_tool', `There is no tool with this name. The tools are: ${names}.`),
-    };
+    const log: ToolLog = found ? { name: found.definition.name, notRun: 'not_offered' } : { name: null, notRun: 'unknown_tool' };
+    return { ok: false, outcome: { result: errorResult(request.id, 'unknown_tool', `There is no tool with this name. The tools are: ${names}.`), log, reads: null } };
   }
   const { definition } = found;
   const input = definition.input(caller.role).safeParse(request.input);
@@ -122,13 +121,18 @@ export function notRun(id: string, name: string | null, why: NotRun, message: st
 export async function runChecked(id: string, tool: ReadTool, input: unknown, caller: ToolCaller, context: ToolContext, now: string): Promise<ToolOutcome> {
   const { definition } = tool;
   const started = Date.now();
-  const answer = await callRoute(tool.toHandler.handler, tool.toHandler.request(input, context), caller, now);
+  const { handler, request, also } = tool.toHandler;
+  const first = await callRoute(handler, request(input, context), caller, now);
+  // The second route is asked only when the first answered: the status of the log line is that
+  // of the last route called.
+  const second = also && succeeded(first) ? await callRoute(also.handler, also.call, caller, now) : null;
+  const answer = second ?? first;
   const log: ToolLog = { name: definition.name, status: answer.status, ms: Date.now() - started };
   if (!succeeded(answer)) {
     const { error, message } = refusalOf(answer, 'The calendar could not be read.');
     return { result: errorResult(id, error, message), log, reads: definition.reads };
   }
-  return { result: { type: 'tool_result', tool_use_id: id, content: cappedJson(tool.toModel(answer.body, context)) }, log, reads: definition.reads };
+  return { result: { type: 'tool_result', tool_use_id: id, content: cappedJson(tool.toModel(first.body, context, second?.body)) }, log, reads: definition.reads };
 }
 
 /**

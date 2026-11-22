@@ -21,10 +21,18 @@ describe('the fixed instructions (7.3)', () => {
     ['reading works for the time being, and booking for a User', 'a User can book an appointment for themself'],
     ['an appointment can be cancelled, moved or annotated, by its User or by the Administrator', "can be cancelled, moved to another free slot, or have its note set or removed: a User's own appointments, and for the Administrator anybody's"],
     ['several changes at once are asked for in one answer, five at most', 'call the tool once for each change in the same answer, five at most'],
-    ['the Administrator books for a User from the web pages', 'neither can the Administrator book an appointment for a User here'],
+    ['the Administrator books for a User, changes the settings and the types', 'book an appointment for a User, change the settings, create, rename and delete appointment types'],
+    ['the opening hours are done from the web pages for the time being', 'Changing the opening hours (the weekly patterns, the hours of a single day, blocking time) cannot be done in this conversation yet'],
     ['a change is done from the web pages for the time being', 'for the time being it is done from the web pages'],
+    ['a type is named by its id and a User by the exact username', 'An appointment type is named by its id too'],
+    ['a type in use cannot be deleted', 'an appointment type cannot be deleted while opening hours or appointments still use it'],
   ])('say that %s', (_what, words) => {
     expect(INSTRUCTIONS).toContain(words);
+  });
+
+  it('no longer say that the settings, the types or a booking for a User are done from the web pages', () => {
+    expect(INSTRUCTIONS).not.toContain('the appointment types or the settings cannot be done');
+    expect(INSTRUCTIONS).not.toContain('neither can the Administrator book');
   });
 
   it('hold nothing that changes from one request to the next: no date and no username', () => {

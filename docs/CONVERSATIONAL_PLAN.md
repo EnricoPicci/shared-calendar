@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`) |
+| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`) |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown on its screen, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which is deployed nowhere today (open point P7, section 2.2). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
@@ -83,7 +83,7 @@ c02, c03, c04 and c05 say how.
 | F3 | **Coverage.** The back end's 100 % line threshold covers `src/lib` only. The architecture asks it for `backend/src/assistant` too (its section 12.2). The six handlers stay outside the threshold, as every handler does. **Closed in step c03**: `backend/vitest.config.ts` holds `src/assistant` to 100 % lines | c03 |
 | F4 | **A handler called as a tool writes its own log line**, so one step of the assistant writes several lines with one request id, and a handler reads its environment as if it were alone in the function. Whether the lines can be told apart, and whether any handler keeps state that two calls in one function would share. **Closed in step c04**: nothing to change. The lines share the request id and differ by `route`; the only state is the calendar's configuration and the DynamoDB client, the same for every caller | c04 |
 | F5 | **What the two read-only functions carry.** To build a proposal they need the change tools' definitions and their fact reading, not the change handlers. Proposal: the part that runs a change is a module only `confirmProposal` imports, so the code that writes the calendar is not even in the other two bundles. **Closed in step c05**: it holds, without touching a calendar handler or `lib/calendarDb.ts`. `tools/changeHandlers.ts` is the one module that imports a change handler, `confirm.ts` the one that imports it, `handlers/confirmProposal.ts` the one handler that imports `confirm.ts`; a lint rule refuses any other such import; after a build, the calendar's write under the lock and the booking handler are in the bundle of `ConfirmProposalFunction` and in none of the other five | c05 |
-| F6 | **Booking for a User, proposed by a function without `AdminGetUser`.** The proposal's facts can only come from the users' list (`ListUsersInGroup`). Whether that is enough for the confirmation to name the person, or the proposal goes out unchecked and the route refuses at the confirmation | c07 |
+| F6 | **Booking for a User, proposed by a function without `AdminGetUser`.** The proposal's facts can only come from the users' list (`ListUsersInGroup`). Whether that is enough for the confirmation to name the person, or the proposal goes out unchecked and the route refuses at the confirmation. **Closed in step c07**: it is enough, without a new route, a change to a handler or to `lib/cognito.ts`, or a permission beyond the plan's. The confirmation reads the users' list through the handler of `GET /users` with the Administrator's identity; a username that is not in it gets no proposal, with the route's code `user_not_found`. What that read cannot tell: an administrator's username, or an account in no group, is only "not in the list" (where the booking route would say `409 target_not_user`), so an administrator's name is not confirmed either; an account deleted between the proposal and the confirmation is refused by the route at the confirmation. What it costs: two `ListUsersInGroup` calls, one per group, for each answer of Claude that books for somebody, shared by the bookings of that answer. A User can never cause it: a User's input has no username, the list is read only when one is given, and `GET /users` refuses a User | c07 |
 
 ## 3. What is built
 
@@ -675,6 +675,100 @@ booking for a User found in that User's list.
 
 **Acceptance:** the gate green; the journeys with their pages; the roles' review of step c05
 repeated for what changed.
+
+**As done** (2026-11-22). As written, with these differences and findings:
+
+- **finding F6 is closed** (section 2.3): the confirmation of a booking for a User checks the
+  username against the users' list, read through the handler of `GET /users`;
+- **a tool of the other role is now answered exactly as a tool that does not exist.** The
+  result held the code `not_offered` where a made-up name got `unknown_tool`, which told the
+  two apart against `docs/CONVERSATIONAL_ARCHITECTURE.md` section 7.4. Both get `unknown_tool`
+  and the same sentence; only the log line says `not_offered`. Found in the step, agreed by the
+  Product Owner;
+- **the three functions that run tools had no user pool in their environment**: the template
+  gives them `USER_POOL_ID` and `COGNITO_ENDPOINT`, and `scripts/local-seed.sh` a section each
+  in `env.local.json` (the pool, cognito-local's address, placeholder credentials);
+- **the roles**, reviewed statement by statement. `SendAssistantMessageRole` and
+  `ContinueAssistantRole` gained one statement, `cognito-idp:ListUsersInGroup` on the user
+  pool: it lets them read who the Users are, and nothing else of Cognito.
+  `ConfirmProposalRole` gained that statement, a second one with `cognito-idp:AdminGetUser` and
+  `cognito-idp:AdminListGroupsForUser` on the user pool (the booking route looks up the User it
+  books for and checks the account is a plain User), and `CalendarDeletePolicy` (deleting a
+  type deletes an item of the `calendar` table). No wildcard, no other resource. The other
+  three assistant roles did not change;
+- **the bundles**, after a build, read from their source maps: the confirming function holds
+  the four new change handlers with the four of the appointments, and no handler of patterns,
+  overrides or windows; the other five hold no change handler. `lib/cognito.ts` creates its
+  client when it is loaded, so the bundler keeps it and Cognito's SDK in all six, the three
+  that never call it included (about 130 KB each). Weights before and after, in bytes:
+  `sendAssistantMessage` 1 730 262 → 1 867 010, `continueAssistant` 1 728 151 → 1 864 898,
+  `confirmProposal` 1 872 241 → 1 893 485, `declineProposal` 1 036 825 → 1 166 032,
+  `getConversation` 1 031 926 → 1 161 133, `endConversation` 1 012 742 → 1 136 026;
+- **decided with the Product Owner:** the sentences of the five new proposals in both
+  languages, the settings named in the words of the settings page; a confirmation of
+  `update_settings` writes the four values read at the proposal, so a setting it does not name,
+  changed from the web page in between, goes back to the value read (as the web form does);
+- **decided in the step:**
+  - the Administrator books a free hourly slot for a User, as a User does: no free start and
+    end times by conversation. None of the booking notice, the horizon and the limit of
+    upcoming appointments binds the Administrator's booking, so none is looked at;
+  - `book_appointment` has a second description sentence only the Administrator is given, so a
+    User's tools name neither a username nor `list_users`;
+  - `list_patterns` asks two routes, the patterns and the types, to give each pattern its
+    type's name: a read tool may name a second route (`also`);
+  - a type is named by its id. At the proposal: an unknown id is `type_not_found`, a name
+    another type has is `type_name_exists` (the route's codes), the name the type already has
+    is `name_unchanged`, a name the route would refuse `invalid_name`; a rename that only
+    changes capitals is proposed, as the route takes it. **A type in use is found only at the
+    confirmation** (`refused`, `type_in_use`): no read route says whether a type is in use.
+    The limit of 20 types is left to the route too;
+  - settings: an input out of range is refused by the schema, an input that changes nothing is
+    `settings_unchanged`. Claude is told in the tool's description that the time zone is not a
+    setting it can change;
+  - two changes of one answer on the same type, to the same type name, or two of the settings,
+    are not proposed;
+  - the instructions: the stopgap paragraph lost the settings, the types and the
+    Administrator's booking and keeps the opening hours; one sentence says a type is named by
+    its id and a User by the exact username, one that a type in use cannot be deleted;
+- **tests changed, and why.** `tools/run.test.ts` and `exchange.test.ts`: the result's code of
+  a tool of the other role. `prompt.test.ts`: the stopgap paragraph. `proposals.test.ts`: the
+  block "book_appointment and the roles" (the Administrator was not offered it) is replaced by
+  "the tools and the roles", and the list of change handlers holds eight.
+  `tools/bookAppointment.test.ts` and `tools/tools.test.ts`: the roles, the two schemas, the
+  list of fourteen tools. `shared/tests/assistant/texts.test.ts` and the journeys' helper: a
+  booking's facts hold a username, or none;
+- **the journeys**, three blocks. A User of its own is refused `update_settings`. The settings
+  block asks, as `admin`, for a booking horizon of 57 days and puts the settings back at its
+  end: no journey books further than 28 days ahead, so a run killed in between leaves a
+  horizon of 57 that fails no block, and the next run starts from 56. The booking for a User
+  uses day 21, 05:00 to 07:00, its own type and User. No new mark in the fake. The journeys
+  send three messages a run as `admin`, each block starting the count of the day again. What
+  they leave in the local tables: the cancelled appointment of the booking block with its
+  events, the ended conversations, and the settings as they were. Their three pages were
+  written and then checked in a fresh context: five points, none serious, each answered in
+  the pages;
+- **the trial with the real model** (`claude-sonnet-5-5`, 29 requests). As `admin`: "who are
+  the users?" (the list, 3.4 s and 1.5 s); "book alice on Thursday 26 November at 14:00" (the
+  day read, then the request with the username, 1.5 s each; confirmed, found in alice's list
+  as booked by `admin`); "book giovanna …" (no tool asked for: Claude had the list and said she
+  is no User; in a new conversation it read the list and the day first, and said the same);
+  the cancellation notice raised to 72 hours and put back by conversation; a type created,
+  renamed and deleted, the id taken from the result of the creation; a type in use deleted
+  (proposed, refused at the confirmation with `type_in_use`, and Claude said why); "create the
+  type Trial yoga and set the booking horizon to 40 days" (one answer with two requests, one
+  proposal of two, both done). As `alice`: "change the cancellation notice to 1 hour" and "who
+  are the users?" were each answered in words, with no tool asked for, saying only the
+  Administrator can. No fault was found. **Seen, not changed:** the tool's own
+  `user_not_found` was not provoked, as the model read the list first; of a type in use Claude
+  said "weekly opening hours or appointments" where a one-off window held it.
+
+What step c08 finds ready: a read tool can ask two routes; `tools/facts.ts` reads the present
+types and finds one by id (`presentTypes`, `typeById`), and `result.ts` makes a type and the
+settings small for the model; `list_patterns` gives each pattern with its id; the three roles
+can list the Users, and `ConfirmProposalRole` holds every calendar policy
+(`CalendarReadPolicy`, `CalendarWritePolicy`, `CalendarBookPolicy`, `CalendarDeletePolicy`);
+the stopgap paragraph of `INSTRUCTIONS` holds the opening hours alone, which step c08 removes
+with the paragraph.
 
 ---
 

@@ -116,3 +116,6 @@ The pages written so far. Which pages are still to come, and in which order, is 
 | [`backend/assistant-daily-limit.md`](backend/assistant-daily-limit.md) | `backend/tests/integration/assistant.test.ts`, `the daily limit (4.4, 6.1)` |
 | [`backend/assistant-cannot-answer.md`](backend/assistant-cannot-answer.md) | `backend/tests/integration/assistant.test.ts`, `when Claude cannot answer (6.1, 7.4)` |
 | [`backend/assistant-who-may.md`](backend/assistant-who-may.md) | `backend/tests/integration/assistant.test.ts`, `who may talk to the assistant (6)` |
+| [`backend/assistant-admin-tools-refused.md`](backend/assistant-admin-tools-refused.md) | `backend/tests/integration/assistant.test.ts`, `a User is not offered the Administrator's tools (3, 7.4)` |
+| [`backend/assistant-settings.md`](backend/assistant-settings.md) | `backend/tests/integration/assistant.test.ts`, `a setting changed through the assistant (3, 5.4, 5.5)` |
+| [`backend/assistant-booking-for-user.md`](backend/assistant-booking-for-user.md) | `backend/tests/integration/assistant.test.ts`, `the Administrator books for a User through the assistant (3, 5.4, 5.5)` |
