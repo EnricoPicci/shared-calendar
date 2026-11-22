@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`). **Step c09 done** 2026-11-22 (brief `prompts/a11-step-c09-implementation.md`). **Step c10 done** 2026-11-22 (brief `prompts/a12-step-c10-implementation.md`). **Step c11 done** 2026-11-22 (brief `prompts/a13-step-c11-implementation.md`) |
-| Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown on its screen, deployed to `shared-calendar-api` and smoke-tested |
+| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`). **Step c09 done** 2026-11-22 (brief `prompts/a11-step-c09-implementation.md`). **Step c10 done** 2026-11-22 (brief `prompts/a12-step-c10-implementation.md`). **Step c11 done** 2026-11-22 (brief `prompts/a13-step-c11-implementation.md`). **Step c12 done** 2026-11-22 (brief `prompts/a14-step-c12-implementation.md`): the assistant is a panel at the bottom of every screen, not a screen, by a decision of the Product Owner |
+| Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown in its panel, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which is deployed nowhere today (open point P7, section 2.2). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
 
@@ -67,7 +67,7 @@ this plan.
 | P4 | Effort level and model | c10 | **Closed** 2026-11-22: `claude-sonnet-5-5` at effort `low`, chosen by the Product Owner on three runs of the evaluation (the note under step c10) |
 | P5 | Blocking time by an override the model works out | c10 | **Closed** 2026-11-22: no `block_time` tool. The nine blocking requests of the evaluation proposed the right hours (the note under step c10) |
 | P6 | A typed "yes" drops the proposal | c13 | The walk with the real model, by the Product Owner too. If people type more than they press, the fixed list of words matched in code is proposed, and built only after the go |
-| P7 | The front end is deployed nowhere | c16 | **Stays open**, on purpose: this plan does not deploy the front end. Step c12 makes the screen work locally through the dev server. Step c16 adds the assistant's routes to what `docs/FRONTEND_ARCHITECTURE.md` section 10 says a deployment must cover |
+| P7 | The front end is deployed nowhere | c16 | **Stays open**, on purpose: this plan does not deploy the front end. Step c12 makes the panel work locally through the dev server. Step c16 adds the assistant's routes to what `docs/FRONTEND_ARCHITECTURE.md` section 10 says a deployment must cover |
 
 ### 2.3 What planning found, each in its step
 
@@ -96,13 +96,13 @@ c02, c03, c04, c05 and c07 say how.
 | The tools | `backend/src/assistant/tools/` | c04 to c08 |
 | The journeys and their pages | `backend/tests/integration/assistant.test.ts`, `docs/journeys/backend/` | c03 to c09 |
 | The evaluation | `backend/scripts/`, `backend/tests/eval/` | c10 |
-| The screen | `frontend/src/services/`, `frontend/src/logic/`, `frontend/src/views/`, `frontend/index.html` | c11 to c13 |
+| The panel | `frontend/src/services/`, `frontend/src/logic/`, `frontend/src/views/`, `frontend/index.html` | c11 to c13 |
 | The operator's tooling and the deployment | `backend/scripts/assistant-key.sh`, `backend/scripts/smoke.sh`, `docs/RUNBOOK.md` | c14, c15 |
 
 The order: the contract, then the three modules everything stands on, then the conversation
 with nothing but text, then reading, then the mechanism of a change with one change, then the
 other changes. A change is built once, on the simplest case, before twelve tools depend on it.
-The model is judged before the screen is built, so that the screen is built on instructions and
+The model is judged before the panel is built, so that the panel is built on instructions and
 tools that are not going to move.
 
 ## 4. What every step does
@@ -129,7 +129,7 @@ Beside the gate, every step:
    created through `POST /users`, and end those people's conversations at the start.
 5. **Merges what it built** into the document that governs it from then on, in the same change:
    routes, table, roles and security rows into `docs/ARCHITECTURE.md`. The service into
-   `docs/FRONTEND_SERVICES.md`. The screen into `docs/FRONTEND_ARCHITECTURE.md`. New files into
+   `docs/FRONTEND_SERVICES.md`. The panel into `docs/FRONTEND_ARCHITECTURE.md`. New files into
    `docs/FOLDER_STRUCTURE.md`, new commands into `docs/COMMANDS.md`. Step c00 opens the merge
    and step c16 closes it. `docs/CONVERSATIONAL_ARCHITECTURE.md` keeps what is not built yet,
    and a finding of a step is corrected there.
@@ -1360,57 +1360,161 @@ message, the other calls the messages added); the fake's three sentences and the
 
 ---
 
-### Step c12 — Front end: the screen (≈ 9 h)
+### Step c12 — Front end: the panel (≈ 9 h)
 
-**Goal:** the screen "Assistant", for both roles, running in a browser against the local stack.
+**Goal:** the assistant in the web pages, for both roles, running in a browser against the
+local stack: **a panel at the bottom of every screen**, not a screen. The Product Owner decided
+it before any code, with the choices no document had made; they are written in
+`docs/FRONTEND_ARCHITECTURE.md` section 6.1 and its decisions 138 to 147, and in
+`docs/CONVERSATIONAL_ARCHITECTURE.md` section 13:
 
-**First, with the Product Owner, before any code**, as the view layer's steps did: the choices
-about the screen that no document has made. At least: where the screen sits in the navigation;
-what a settled proposal looks like in the list of messages; what the input does while a step
-is working; what is shown when the conversation has run out or is full; where the line about
-Anthropic stands and what it says; whether "New conversation" asks first. The step's text is
-then rewritten with what was decided.
+1. the panel on every screen once signed in, collapsed to one bar after every load of the
+   page, open to about half the window (most of it on a phone); the conversation read at the
+   first opening;
+2. the line about Anthropic under the heading of the open panel;
+3. a proposal shown once, in place, and once settled the same block without buttons, each
+   action with its outcome;
+4. while the assistant works the field stays writable, "Send" is out of use, nothing is queued;
+5. the loop on `working`, at most `ASSISTANT_LIMITS.modelRequestsPerMessage` times a message;
+6. a failure as one announced line, the text kept in the field; the day's limit and a full
+   conversation put "Send" out of use; a read of the conversation after `assistant_busy`,
+   `proposal_not_found` and `nothing_to_continue`;
+7. "N messages left today" by the field;
+8. "New conversation" does not ask first;
+9. after a change the screen on show loads again with no press;
+10. the page's dialogs come first.
 
 Files, in the order of `docs/FRONTEND_VIEW_PLAN.md` section 4:
 
-- logic `frontend/src/logic/assistant.screen.ts`: the conversation on show; sending; the loop
-  that calls `continue` while the status is `working`, at most the limit; the proposal waiting
-  and settled; the three sentences of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1, the
-  spending limit without a `continue`; the week and the list told to reload after an action
-  `done`. No DOM;
-- the markup in `frontend/index.html`, the styles in `frontend/style.css`, one markup for a
-  phone and a desktop;
+- logic `frontend/src/logic/assistant.screen.ts`, with the pure
+  `frontend/src/logic/assistant.model.ts`: every rule above, one state on one stream, open or
+  collapsed included. No DOM;
+- the markup in `frontend/index.html`, after the screens and in none; the styles in
+  `frontend/style.css`, one markup for a phone and a desktop, the screens given room at their
+  bottom;
 - the view `frontend/src/views/assistant.view.ts`, by the rules of
   `docs/FRONTEND_ARCHITECTURE.md` section 3: every text set as plain text, the live region,
   Enter sends;
-- the shell: the address, the navigation entry, the session's objects made and dropped with
-  the session;
-- `frontend/scripts/dev.mjs` passes `/assistant` on to the local API, as it does the other
-  paths. This is what open point P7 means locally; P7 itself stays open (step c16).
+- the shell: no address and no navigation entry; the panel mounted once with the session and
+  unmounted with it; the session's objects made and dropped with the session; the screens
+  handed the stream on which they load again;
+- `frontend/scripts/dev.mjs` needs no change: it passes every path under `/api/` on to the
+  local API, `/assistant` among them. This is what open point P7 means locally; P7 itself
+  stays open (step c16).
 
 Tests: the logic's, without a DOM; the view's DOM test against the real `index.html`, with a
-text containing `<script>` shown as text and nothing left behind on leaving.
+text containing `<script>` shown as text and nothing left behind on unmounting; the shell's,
+with the panel on every screen of both roles and gone with the session.
 
-**Browser check**, against the fake, as `alice` and as `admin`, at a desktop and at a phone
-width: a read with its progress line; a booking confirmed, then the week shows it without a
-reload of the page; a decline; a message that drops a proposal; each of the three sentences
-of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1; a reload of the page shows the same
-conversation; signing out and in as someone else shows nothing of the first person's; the
-console shows no error.
+**Browser check**, against the fake, as a throw-away User, as `alice` and as `admin`, at a
+desktop and at a phone width: no panel at the login, the bar on every screen, no request
+before the first opening; a read with its progress line; moving between screens and a reload
+of the page; a booking confirmed with the week on show, which then shows it with no press; a
+dialog over the panel; a decline; a message that drops a proposal; each of the three
+sentences of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1; a text with markup; signing out
+and in as someone else shows nothing of the first person's; the keyboard alone; the console
+shows no error.
 
 **Acceptance:** `npm run verify -w frontend` green with 100 % lines on `frontend/src`; the
-browser check line by line; the earlier screens' checks in short (sign in, the week, one
-booking and its cancellation); `docs/FRONTEND_ARCHITECTURE.md` has the screen.
+browser check line by line; the front end's journeys and the root gate green;
+`docs/FRONTEND_ARCHITECTURE.md` and `docs/CONVERSATIONAL_ARCHITECTURE.md` have the panel.
+
+#### As done (2026-11-22)
+
+Brief `prompts/a14-step-c12-implementation.md`. Nothing changed in `backend/`, `shared/`,
+`frontend/src/services/`, the fake or the journeys.
+
+**What was built.** `assistant.model.ts` (245 lines) and `assistant.screen.ts` (380 lines) in
+the logic layer; `assistant.view.ts` (165 lines), which listens to **one stream**; the element
+`#assistant` of `index.html` with two templates; the styles; the shell's part. `texts.ts`
+gained the sentences of `assistant_busy`, `proposal_not_found` and `nothing_to_continue` and
+the one for a message refused before the request (so the line of `frontend/CLAUDE.md` on a new
+route's failure codes holds for the assistant too; the three sentences of
+`docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 and `conversation_full` stay in `shared/`).
+
+**What the shell does for a view that is not a screen.** No row in `SCREENS`, no address, no
+link: `enter(person)` shows `#assistant`, mounts the view, then starts the logic object, once;
+the session's end unmounts it and hides the element. `sessionObjects` makes the
+`AssistantService` and the `AssistantScreen` per person.
+
+**How the screens load again after a change.** Every screen that loads again when the tab is
+shown takes one stream in its constructor: the shell hands them
+`merge(visible$, assistant.changed$)`. No screen's file changed. The settings screen has no
+such stream: its row of `SCREENS` ends its `start()` and starts it again, so values typed and
+not saved are lost.
+
+**Where the ten choices could not be applied as written, or were added to**
+(`docs/FRONTEND_ARCHITECTURE.md` section 11, decisions 140 and 148 to 151):
+
+- choice 3 said "the server's `error` sentence as given": the contract carries an error code
+  there. The outcome reads "Not done." with the page's sentence for that code, and a sentence
+  of the page for an outcome that is not known. Agreed with the Product Owner during the step;
+- a message that drops a proposal brings **no notice** of the server: the block goes with the
+  reply, and that is all the page shows;
+- after a confirmation that got one of the two `503` answers the conversation is read once, to
+  show the outcomes; after one answered `assistant_busy` the screens load again; the read after
+  the three codes of choice 6 continues a conversation found `working`; a message refused as
+  busy that the server already holds counts as taken;
+- the failure line is an alert, marked by a bar at its side and not written in red.
+
+**`dev.mjs`**: no change was needed. It already passes every `/api/…` path to the local API;
+the sentence of this step that said otherwise is corrected above.
+
+**`page.test.ts`**: the fields counted go from 36 to 37 (the message), the places of a failure
+from 48 to 49, the news that are no "Loading…" from three to four (`.news`), the templates
+gain `tpl-message` and `tpl-proposed`; a block of six tests checks the panel's markup.
+`shell.test.ts` gained a block of twelve tests and none of its earlier tests changed.
+
+**As run**, on the final state:
+
+- `npm run verify -w frontend`: green. Typecheck, lint, 2 386 tests (2 234 before), 100 % of
+  the lines of `frontend/src` (2 478 of 2 478).
+- **The browser check**, in a headless Chromium kept outside the repository, on
+  `npm run dev -w frontend`, against the fake, at 1280 and at 390 pixels of width: every line
+  passed. Run as the throw-away Users `chk-c12-4712` and `chk-c12-4713`, with the type
+  `chk-c12-4712 check` and its three windows, all removed at the end (a first run, `…-4711`,
+  stopped at the reload and was removed too). What it showed that the documents did not say:
+  - **a reload of the page signs out** (the session is in memory only), so "a reload" is a
+    reload and a sign-in; the panel is then collapsed, and its first opening shows the same
+    conversation after one request;
+  - a message that got `503` **is counted** by the server against the day's limit, and the
+    line "N messages left today" is one too high until the next reply (decision 151);
+  - after `fake: overloaded` the conversation stays at work on the server and the fake can
+    never finish it: the check pressed "New conversation" before its next sentence;
+  - the slot of the booking journey was taken by then, so the message that drops a proposal
+    was checked with the declining journey's sentence;
+  - the day's limit was reached by a reply that counted no message left, not by a refusal;
+  - one defect found and fixed: collapsing with "Close" by the keyboard left the keyboard on
+    nothing, because a browser takes it from a button that is hidden; the emulated page of the
+    unit tests does not;
+  - the console held the browser's own line for each `503` answer and the line of the
+    Content-Security-Policy that zod causes at each load, nothing else.
+- `RUN_INTEGRATION=1 npm run test:integration -w frontend`: green, 65 tests in 4 files.
+- `DYNAMODB_PORT=8002 npm run verify`: green. The stack is left on the fake; the back end's
+  journeys emptied the local calendar, so a walk needs a fresh stack and the seed.
+
+Documents: `docs/CONVERSATIONAL_ARCHITECTURE.md` v15 (section 13 rewritten, "the screen" become
+"the panel", decision 13, the separate screen among the alternatives);
+`docs/FRONTEND_ARCHITECTURE.md` v13 (section 6.1, two rows of section 5.1, section 9, decisions
+138 to 151); `docs/FOLDER_STRUCTURE.md`; `frontend/CLAUDE.md`; `.claude/rules/frontend-views.md`
+(the two counts). `docs/FRONTEND_SERVICES.md` section 20.6 and `docs/COMMANDS.md`: nothing
+proved wrong.
+
+What step c13 finds ready: the panel on every screen, checked against the fake; the list of
+the browser check above, to turn into the checks of `docs/FRONTEND_WALK.md`; the three things
+only a person with the real model can judge (how the answers read in the panel's width, what
+a screen reader says of `.news`, whether people type instead of pressing: P6); and the two
+points of decision 151, to look at again with real answers.
 
 ---
 
 ### Step c13 — The walk, with the real model (≈ 5 h, needs the key)
 
-**Goal:** the screen is walked by people, with the real Claude; **open point P6** decided.
+**Goal:** the panel is walked by people, with the real Claude; **open point P6** decided.
 
 - `docs/FRONTEND_WALK.md` gains the assistant's checks: those of step c12 against the fake, as
   the check to repeat after a change, and a short list to do with the real model.
-- **Reading the screen without a mouse**: a new message announced, the proposal's two buttons
+- **Reading the panel without a mouse**: a new message announced, the proposal's two buttons
   reached in order, the focus after a confirmation and after a decline.
 - **P6.** The Product Owner, and whoever else is at hand, uses the assistant locally with the
   real model for a session each, in both languages. The step records how often a proposal was
@@ -1523,17 +1627,17 @@ c00 contract ─► c01 table ─► c02 model, key, fake ─► c03 text only �
    c09 back end closing ◄─ c08 availability ◄─ c07 admin ◄─ c06 changes ◄─ c05 proposal, booking
         │
         ▼
-c10 evaluation ─► c11 service ─► c12 screen ─► c13 walk ─► c14 before deploying ─► c15 deployment ─► c16 hand-over
+c10 evaluation ─► c11 service ─► c12 panel ─► c13 walk ─► c14 before deploying ─► c15 deployment ─► c16 hand-over
 ```
 
 The steps are done in this order. Two moves are possible if the review asks:
 
-- steps c11 and c12 need only step c06, so the screen can come before the Administrator's tools.
+- steps c11 and c12 need only step c06, so the panel can come before the Administrator's tools.
   Step c13, the walk with the real model, still waits for step c10;
 - steps c07 and c08 can change places.
 
 Suggested commits: after step c02 (the three modules), c04 (reading works), c06 (everything a User
-does), c09 (the back end), c10 (the model judged), c13 (the screen), c15 (deployed), c16.
+does), c09 (the back end), c10 (the model judged), c13 (the panel), c15 (deployed), c16.
 
 | Open point | P1 | P2 | P3 | P4 | P5 | P6 | P7 |
 |---|---|---|---|---|---|---|---|
@@ -1564,7 +1668,7 @@ does), c09 (the back end), c10 (the model judged), c13 (the screen), c15 (deploy
 | 3 | The nine items of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 19 became seventeen steps | Its items 4 and 5 are each several days of work. A step is one thing that can be reviewed: text only, then reading, then one change, then the others |
 | 4 | The script `assistant-key` is written in step c14, not with the model's module (item 3 of that outline) | It can only be run against the cloud. Written beside the deployment it is tried a step after it is written, not twelve |
 | 5 | The mechanism of a change is built on `book_appointment` alone (step c05) | The riskiest part of the design gets a step to itself and the simplest tool that exercises all of it |
-| 6 | The evaluation comes after all the tools and before the screen | It judges the instructions and the tools as a whole, and what it changes would otherwise change under the screen |
+| 6 | The evaluation comes after all the tools and before the panel | It judges the instructions and the tools as a whole, and what it changes would otherwise change under the screen |
 | 7 | Every step from c03 to c08 does its main path once by hand with the real model | The fake proves the code, not the model. A surprise is cheaper in the step that causes it than in step c10 |
 | 8 | The assistant's journeys are one new file with one `describe` per theme, each with its page | As the calendar's; the pages are part of the step (`CLAUDE.md`) |
 | 9 | Each step merges what it built into the governing documents | `docs/CONVERSATIONAL_ARCHITECTURE.md` section 1 asks it, as the calendar did with its specification |

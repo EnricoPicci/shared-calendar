@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Status | v12 — **implemented** (2026-11-20). Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
+| Status | v13 — **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12). Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders |
 | Not in scope | Hosting, the CORS gap, keeping the session across a reload, the Content-Security-Policy of the hosting, logout, the size of the bundle. They are the open points of section 10: the only things between the front end and a deployment |
-| Depends on | `docs/FRONTEND_SERVICES.md` v7 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work) |
+| Depends on | `docs/FRONTEND_SERVICES.md` v8 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work) |
 | Why this choice | `docs/FRONTEND_VIEW_OPTIONS.md` v3: the options compared (plain HTML/CSS, `lit-html`, Lit, React, Angular, Svelte) and the reasons. Not repeated here |
 
 ### Change log
@@ -27,6 +27,7 @@
 
 | v11 | 2026-11-20 | Plan step 69, the closing. Status: implemented. The text is brought to the present tense: it says what is, not what a step added. Section 3, rule 2: why nothing shows before the script decides. Section 4: the handlers of a view that was left; a slot and an appointment named with their day for a screen reader; the dialogs that ask described by their question; the sentence of an overlap among the windows of "this day only" said once, under "Start", with "End" marked (a field in fault with no words of its own). Section 6: the sequence from "Sign in" to the first week. Section 7: the new sections 7.1, what the code became, and 7.2, the verdict on the fallback, as a proposal. Section 8: the walk, a document of its own (`docs/FRONTEND_WALK.md`); the table of the dialogs and the focus; the two tests of `page.test.ts` on reading the page without a mouse. Section 10: every open point as it stands today. Section 12.1: the size at step 69 and the share of `zod`, measured again. Section 11: decision 106 closed, decision 123 as settled, decisions 129 to 136. The trial's code (`prototypes/`) is deleted; what was still true of its page on the loading sequence is in sections 3, 4 and 6. |
 | v12 | 2026-11-20 | The verdict of section 7.2 taken at the review of plan step 69: section 3, rule 12 and the third condition of section 7 are reworded to allow what `availability.parts.ts` is, a file of helpers shared by the views of one screen, with its bound. Section 7.2 says what was decided, no longer what was proposed. Section 11: decision 135 as taken, decision 137. No code changed. |
+| v13 | 2026-11-22 | Step c12 of `docs/CONVERSATIONAL_PLAN.md`: the assistant's panel, a view that is no screen and lives across the screens, as the Product Owner decided. New section 6.1: what the panel is, what the shell does for it, its logic object and its view, how the screens are told to load again, what its tests hold. Section 5.1: two files more, `assistant.model.ts` and `assistant.screen.ts`. Section 6, point 4: the session's objects include the `AssistantService` and the `AssistantScreen`, and the screens are handed one stream to load again on. Section 9: the new files. Section 11: decisions 138 to 151. The numbers of section 7.1 are those of plan step 69 and are not measured again; the panel's are in section 6.1 |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
 TypeScript module script**. The markup of every screen is in one `index.html`; the script
@@ -821,9 +822,10 @@ Its rules:
 7. **Tested like the services**: unit tests with no network and no DOM, inside the 100 % line
    coverage of `frontend/src`.
 
-### 5.1 As built: sixteen files
+### 5.1 As built: eighteen files
 
-`frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` steps 61 to 68), each with its test in
+`frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` steps 61 to 68, and
+`docs/CONVERSATIONAL_PLAN.md` step c12 for the assistant's two), each with its test in
 `frontend/tests/unit/logic/`:
 
 | File | What it holds |
@@ -844,6 +846,8 @@ Its rules:
 | `availability.screen.ts` | The class `AvailabilityScreen`: the settings (for the time zone), the types and the patterns read when the screen is shown, the four writes that have a check, and the lists read again after every write and when the page becomes visible; and `known$`, what it knows, for the object of a single date |
 | `date.model.ts` | Pure, for a single date: the date chosen checked (`dateFor`), a date in words (`dateWords`), the day as the weekly patterns give it and as it is now, with the three questions of the dialog (`dayModel`), the windows "this day only" starts from (`startingWindows`), those windows ready to draw (`draftModel`), one more of them or why not (`draftAdd`), and an extra window's body from its form (`windowFor`) |
 | `date.screen.ts` | The class `DateScreen`: the date on show, its day read from the calendar view and read again after every write, the windows of "this day only" being put together, and the five writes on a date |
+| `assistant.model.ts` | Pure, for the assistant's panel (section 6.1): the conversation put together from the replies with no message twice (`joined`) and ready to draw (`messageRows`); what a reply added for a screen reader (`newsOf`); the proposal with what became of each change and whether its buttons are offered (`proposalShown`); whether a change was made (`changeMade`); the line that counts the messages left (`remainingText`); and, one function per call, what the panel says and does about each reason of a failure (`loadTrouble`, `sendTrouble`, `continueTrouble`, `confirmTrouble`, `declineTrouble`): a `switch` over the call's closed list of reasons with no default, so a code added to a route does not compile until it is named |
+| `assistant.screen.ts` | The class `AssistantScreen`: whether the panel is open, the first read at the first opening, the conversation on show, the loop that calls `continue`, the proposal, the failure line, what is in use, one state on one stream (`assistant$`), and `changed$`, which tells the shell that a change was made. Its methods: `open`, `close`, `toggle`, `send`, `confirm`, `decline`, `end` |
 
 **"Now" is passed in.** Nothing in `logic/` reads the clock by itself. `WeekScreen` receives a
 function `now: () => Date` through its constructor (the shell passes `() => new Date()`, a test a
@@ -1645,7 +1649,8 @@ API's configuration and the whole store because it creates the API services of e
    reduced to the username and the role before anything else sees it (section 3, rule 11).
 4. **New API services and logic objects for every session.** They are created when a session
    starts and dropped when it ends, so that nothing of one person's data can be replayed to the
-   next (the services' result streams replay their last value). One function of the shell,
+   next (the services' result streams replay their last value). The `AssistantService` and the
+   `AssistantScreen` of the panel are among them (section 6.1). One function of the shell,
    `sessionObjects`, creates them when a person enters: the `CalendarService`, the
    `AppointmentsService`, the `UsersService` (for both roles; a User's view never calls it),
    the `CalendarSettingsService` (read by the list screen for the time zone, read and saved by
@@ -1743,6 +1748,103 @@ Signing out is the same sequence backwards: the store is cleared, `session$` say
 shell unsubscribes the person's one subscription, which ends the logic object's and the
 view's and runs the view's teardown, hides `#app`, shows `#login` and mounts the login view on
 the same, emptied, form.
+
+### 6.1 The assistant's panel: a view that lives across the screens
+
+The assistant (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 13) is **not a screen**. It is a
+panel at the bottom of the window, on every screen of both roles, and it stays as it is while
+the person moves from one screen to another. It is the one view of the page that is neither
+the login, nor a screen, nor a dialog. The thirteen rules of section 3 hold for it as for any
+view; what differs is who mounts it and for how long.
+
+**What the shell does for a view that is not a screen.**
+
+- The panel has **no row in `SCREENS`**, no address and no link in the navigation. Its element,
+  `#assistant`, is in the frame `#app`, after `main.screen` and the detail dialog, and inside no
+  screen.
+- `sessionObjects` creates an `AssistantService` and an `AssistantScreen` per person, as it
+  does every other object of a session.
+- `enter(person)` **mounts the panel once**: it shows `#assistant`, calls
+  `mountAssistant(panel, assistant)` and then `assistant.start()`, view first (section 3, rule
+  8). The subscription is ended when the session ends, after the screen's, and the element is
+  hidden again. Moving between screens touches neither: the conversation is not read again and
+  what was typed stays.
+- `start()` asks nothing of the server. The conversation is read at the **first opening** of
+  the panel, so a person who never opens it makes no request to the assistant.
+- **The screens are told to load again by the stream they already have.** Every screen's
+  logic object that loads again when the tab is shown takes one stream in its constructor.
+  The shell hands them `merge(visible$, assistant.changed$)` in its place: `changed$` says
+  that a reply carried a proposal with a change made. No screen's view or logic knows the
+  panel. Only the screen on show is started, so only it loads again; another one reads afresh
+  when it is shown. The settings screen has no such stream (it reads once, when shown): its
+  row of `SCREENS` ends its `start()` and starts it again on `changed$`, so the form is filled
+  with what the server holds, and values typed and not saved are lost, as on leaving.
+
+**The logic object** (`assistant.screen.ts`, with the pure `assistant.model.ts`) holds every
+rule, on one stream of one state, `assistant$`: `open`, `messages`, `progress`, `proposal`,
+`failure`, `remaining`, `canSend`, `canEnd`, `accepted` (a count that grows when the server
+took a message, at which the view empties the field) and `news` (what a screen reader is
+told). It listens to the one stream of the service, `outcome$`, and switches on the call, then
+on the reason.
+
+- **Open and collapsed** is state of the logic, not of the view: it is kept from screen to
+  screen, and nowhere in the browser, so a page loaded again starts collapsed.
+- **The conversation.** The reply of `load` replaces what is held; every other reply adds its
+  messages, and a message already held (its `seq`) is not added again. A reply of another
+  conversation than the one held replaces it.
+- **The loop.** While a reply says `working` the logic calls `continue`, at most
+  `ASSISTANT_LIMITS.modelRequestsPerMessage` times for one message; past that it stops and
+  says "The assistant could not finish. Please ask again, in other words." A conversation
+  found `working` at the first opening is continued in the same way. No failure is followed
+  by a `continue`, except through the one read below.
+- **While a call is away** "Send", "New conversation" and the proposal's buttons are out of
+  use, the progress line shows the reply's `activity` or "…", and nothing is kept to send
+  later. The field is never disabled.
+- **Failures**, one line: the three codes of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1
+  with the sentence of `shared/` in the conversation's language (English while there is none),
+  `conversation_full` with `shared/`'s too, every other reason with a sentence of `texts.ts`
+  in English. The service's `message` never reaches the state. After `assistant_busy`,
+  `proposal_not_found` and `nothing_to_continue` the conversation is read again, once in an
+  exchange, and continued if it then waits for a step.
+- **"Send" out of use for longer**: after the day's limit, or a reply whose `remainingToday`
+  is 0 (the limit's sentence is then shown without a refusal), until the page is loaded again;
+  after `conversation_full`, until "New conversation". Reading, confirming and declining
+  still work.
+
+**The view** (`assistant.view.ts`, 165 lines; it listens to one stream) finds its elements
+once, sets every text with `textContent` (the style sheet keeps the line breaks), copies
+`#tpl-message` and `#tpl-proposed`, and forwards seven actions. Its own state is what a view
+may keep: where the keyboard was before it came into the panel, the text last sent, and the
+list it drew, which it rebuilds only when the stream brings another one. The teardown removes
+the conversation, what was typed and everything the view set.
+
+- **The keyboard.** The field taking the keyboard opens the panel. After sending, confirming,
+  declining and "New conversation" the keyboard is in the field. Collapsing by "Close" or by
+  the Escape key gives it back to where it was before the panel; this is the page's one piece
+  of focus handling of its own (decision 134 is about dialogs), needed because the panel is
+  not a dialog and the browser does nothing for it. The view reads where the keyboard is
+  before hiding anything: a browser takes it away from a button hidden under it.
+- **Dialogs come first.** Every dialog of the page is modal, so while one is open the browser
+  makes the panel inert: it cannot be pressed, typed in or reached by Tab, and the Escape key
+  is the dialog's. Nothing was written for this.
+- **Without a mouse.** The panel is a `<section>` named "Assistant". Its heading is a button
+  with `aria-expanded`. Collapsed, the conversation's part and the two buttons of the heading
+  are `hidden`, so neither Tab nor a screen reader reaches them. `.news` is a live region
+  (`role="status"`), shown to a screen reader only, that says each new answer, notice and
+  line of progress once; the failure line is a `role="alert"`. The proposal's buttons come
+  after the list, "Confirm" first.
+- **The three kinds of message** differ by place, frame and a word above the text ("You",
+  "Assistant", "Notice"), never by colour alone.
+- **Room for the panel.** The style sheet gives `.screen` room at its bottom for the bar, and
+  for the open panel on a wide window (`:has`), so the last rows of a screen can be scrolled
+  into sight. This is the only thing of the screens that changed.
+
+**The tests.** The logic's (`assistant.model.test.ts`, `assistant.screen.test.ts`) have no DOM
+and a fake service with a `ReplaySubject(1)`. The view's (`assistant.view.test.ts`) drives the
+real page with a fake logic object. The shell's has a block for the panel: on every screen of
+both roles and not on the login, mounted once, gone with the session, the next person's
+empty, and each kind of screen loading again after a change. `page.test.ts` checks the
+panel's markup and counts one field and one failure line more.
 
 ## 7. The fallback: `lit-html` for a single view
 
@@ -2226,12 +2328,14 @@ frontend/
 │   │                          # appointments.model.ts, appointments.screen.ts,
 │   │                          # settings.model.ts, settings.screen.ts, users.model.ts,
 │   │                          # users.screen.ts, availability.model.ts, conflicts.ts,
-│   │                          # availability.screen.ts, date.model.ts, date.screen.ts
+│   │                          # availability.screen.ts, date.model.ts, date.screen.ts,
+│   │                          # assistant.model.ts, assistant.screen.ts (the panel, section 6.1)
 │   └── views/                 # shell.ts and one <name>.view.ts per view: login.view.ts, week.view.ts,
 │                              # appointments.view.ts, settings.view.ts, users.view.ts,
 │                              # availability.view.ts and date.view.ts, the two views of one screen,
 │                              # with availability.parts.ts, what the two share; detail.view.ts,
-│                              # the dialog two views mount
+│                              # the dialog two views mount; assistant.view.ts, the panel at the
+│                              # bottom of every screen (section 6.1)
 ├── tests/
 │   └── unit/
 │       ├── services/          # vitest project `unit`, in node
@@ -2422,6 +2526,20 @@ than what the trial showed: these deserve the first look in a review.
 | 135 | The verdict on the fallback was written as a proposal (section 7.2) and taken at the review (decision 137): no condition of section 7 called for `lit-html`; `availability.parts.ts` meets the third condition by its letter and not by its reason; rule 12 should be reworded to allow what was built. Nothing was added or rewritten for it | Settled before step 69 that the verdict is proposed here and taken at the review, and that whatever it is, a view that should move is a step of its own | |
 | 136 | The trial's code, `prototypes/`, is deleted. Of its page on the loading sequence, three things that were still true of `frontend/` and said nowhere are in this document: why nothing shows before the script decides (section 3, rule 2), the handlers of a view that was left (section 4), and the sequence from "Sign in" to the first week, as a numbered list (section 6). Its diagram was not kept | `docs/FRONTEND_VIEW_PLAN.md` step 69. The rest of that page described the trial's own files, or said what sections 4, 6 and 12 already say (the selectors as the contract, `hidden` as the switch, a module script being deferred, the dev server and what it answers). The one diagram, from the request of the page to the login form, says nothing that the last paragraphs of section 6 do not | |
 | 137 | Section 3, rule 12 and the third condition of section 7 are reworded: the views of one screen may share a file of helpers that find elements once, set their values, texts and attributes, and fill copies of a `<template>` with `textContent`; such a helper never decides what is shown, never makes an element other than by copying a template, and keeps no state beyond rule 10's. The fallback is for the day a helper would compare the page with what it should be, or make markup from data without a template | Decided at the review of `docs/FRONTEND_VIEW_PLAN.md` step 69, as section 7.2 proposed. `availability.parts.ts` met the old words by their letter and not by their reason; changing the code to fit them meant some 60 lines written twice, or a move to `lit-html` that would replace about 25 lines. The bound is the review's to hold: no lint rule can | Yes |
+| 138 | The assistant is a panel at the bottom of every screen once a person is signed in, not a screen: no address, no navigation entry, none at the login. Collapsed it is one bar (the heading "Assistant", the field, "Send") fixed to the bottom of the window; open it grows upward to about half the window, most of it on a phone, and the screen behind stays in use. It opens when the field takes the keyboard, when the heading is pressed and when a message is sent; "Close" and Escape collapse it. Open or collapsed is kept across screens and nowhere in the browser. The conversation is asked of the server at the first opening (section 6.1) | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12: the person asks while looking at the calendar and sees it change | Beyond |
+| 139 | The line "This conversation is processed by Anthropic's Claude." is under the heading of the open panel, in fixed English | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 10.2) |  |
+| 140 | A proposal is shown once, in place, under the last message: the server's question, each action's sentence, two buttons with the server's labels, out of use while a call is away. Once settled the same block has no buttons and each action its outcome: "Done"; "Not done." with the page's sentence for the action's error code; or that it is not known whether it was done. A declined proposal is gone, and the block goes when a reply carries none | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12. The contract carries an error code for a refused action, not a sentence, so the words are those `failureText` has for that code on every other screen |  |
+| 141 | While the assistant works the field stays writable and keeps what was typed; "Send" is out of use and Enter sends nothing until the exchange ends; nothing is queued. The progress line shows the server's `activity`, "…" when there is none. While a proposal waits the field is in use, and a message drops the proposal | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 |  |
+| 142 | The loop is the logic's: `continue` while a reply says `working`, at most `ASSISTANT_LIMITS.modelRequestsPerMessage` times per message, then a sentence that the assistant could not finish. No `continue` after a failure | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 |  |
+| 143 | A failure is one line under the conversation, a `role="alert"`, and the text stays in the field when its message was not taken. The three codes of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 use `shared/`'s sentence in the conversation's language; the day's limit or `remainingToday` 0 puts "Send" out of use until the page is loaded again; `conversation_full` until "New conversation"; the other reasons have English sentences in `texts.ts`; after `assistant_busy`, `proposal_not_found` and `nothing_to_continue` the conversation is read again, once | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12. The line is marked by a bar at its side and not written in red: the calendar is not in fault |  |
+| 144 | "N messages left today" is a small line by the field, from `remainingToday` | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 |  |
+| 145 | "New conversation" does not ask first. It is out of use while there is no conversation and while a call is away. After it the panel is empty, still open, the keyboard in the field | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 |  |
+| 146 | After a change (a reply whose proposal has an action `done`) the logic tells the screens to load again through `changed$`, which the shell merges into the stream the screens already load again on; the settings screen, which has none, is started afresh | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12; the mechanism is section 6.1's. No screen was changed |  |
+| 147 | The page's dialogs come first: while one is open the panel cannot be used and loses nothing | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12. It is what a modal `<dialog>` does to the rest of the page; nothing was written |  |
+| 148 | Beyond the Product Owner's choices, found while building: after a confirmation that got `503 assistant_unavailable` or `assistant_budget_reached` the conversation is read once, without a `continue`, to show each outcome; after a confirmation answered `assistant_busy` the screens load again, since the changes were made; the read after `assistant_busy`, `proposal_not_found` or `nothing_to_continue` continues a conversation found `working`, once in an exchange | `docs/CONVERSATIONAL_ARCHITECTURE.md` sections 6 and 6.1 say what the server did in each case; without these the page would show a calendar or a proposal that is no longer true | Beyond |
+| 149 | A message refused as busy whose text the server already holds as the person's last counts as taken, and the field is emptied; "Send" is out of use until the conversation was first read; a first read that failed is tried again at the next opening; a text of spaces only sends nothing | A message that got one of the two `503` answers is saved by the server; sent again it is refused as busy, read back and answered. The others keep the panel from sending before it knows the conversation | Beyond |
+| 150 | The view gives the keyboard back to where it was before the panel when the panel collapses, and puts it in the field after an action | The panel is not a dialog, so the browser does nothing for it (decision 134 stands for the dialogs). Found in the browser: the keyboard must be read before the buttons are hidden | Beyond |
+| 151 | Known and left: after a message that got one of the two `503` answers the line "N messages left today" is one too high until the next reply, since the server counted the message and the failure carries no count; and after such an answer to the first message of a conversation "New conversation" stays out of use until the conversation is read (sending again does it) | Found in the browser check of step c12. Both mend themselves at the next reply; a read after every such failure would be one more request for a line of small print |  |
 
 ## 12. The tooling (open points O4, O6 and O8, decided)
 

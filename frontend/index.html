@@ -600,6 +600,49 @@
           <button type="button" class="danger cancel" hidden>Cancel appointment</button>
         </div>
       </dialog>
+
+      <!-- The assistant (src/views/assistant.view.ts): a panel at the bottom of the window,
+           after the screens and in none of them, mounted once for a person's whole session.
+           Collapsed, it is one bar: the heading and the field. Open, the part .talk shows the
+           conversation between the two. Every text of a conversation is set as plain text. -->
+      <section id="assistant" class="assistant" aria-label="Assistant" hidden>
+        <div class="assistant-head">
+          <h2><button type="button" class="toggle" aria-expanded="false" aria-controls="assistant-talk">Assistant</button></h2>
+          <button type="button" class="end" hidden>New conversation</button>
+          <button type="button" class="collapse" hidden>Close</button>
+        </div>
+        <div id="assistant-talk" class="talk" hidden>
+          <p class="processed">This conversation is processed by Anthropic's Claude.</p>
+          <ol class="messages"></ol>
+          <!-- One message: who wrote it, in words, and its text -->
+          <template id="tpl-message">
+            <li class="message"><span class="author"></span><p class="text"></p></li>
+          </template>
+          <p class="progress"></p>
+          <!-- What a screen reader says when the reader is free: a new answer, a notice, a line
+               of progress. Not on show: the same words are in the conversation. -->
+          <p class="news" role="status"></p>
+          <!-- A proposal: the server's question, its changes, its two buttons with the server's
+               labels. Once settled the buttons go and each change says what became of it. -->
+          <div class="proposal" hidden>
+            <p class="asks"></p>
+            <ul class="changes"></ul>
+            <template id="tpl-proposed">
+              <li class="proposed"><span class="summary"></span> <strong class="outcome"></strong></li>
+            </template>
+            <div class="actions">
+              <button type="button" class="primary confirm"><span class="words"></span></button>
+              <button type="button" class="decline"><span class="words"></span></button>
+            </div>
+          </div>
+          <p class="error" role="alert"></p>
+          <p class="remaining"></p>
+        </div>
+        <form class="compose">
+          <label>Message <input name="message" autocomplete="off" enterkeyhint="send" /></label>
+          <button class="primary send">Send</button>
+        </form>
+      </section>
     </div>
   </body>
 </html>

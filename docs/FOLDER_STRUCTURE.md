@@ -114,13 +114,14 @@ stays at the root.
 │   │   │                        # appointments.screen.ts, settings.model.ts, settings.screen.ts,
 │   │   │                        # users.model.ts, users.screen.ts, availability.model.ts,
 │   │   │                        # conflicts.ts, availability.screen.ts, date.model.ts,
-│   │   │                        # date.screen.ts
+│   │   │                        # date.screen.ts, assistant.model.ts, assistant.screen.ts
 │   │   └── views/               # shell.ts (with the table of screens) and one <name>.view.ts per
 │   │                            # view: login.view.ts, week.view.ts, appointments.view.ts,
 │   │                            # settings.view.ts, users.view.ts, availability.view.ts and
 │   │                            # date.view.ts (two views of one screen, with what they share
 │   │                            # in availability.parts.ts); detail.view.ts, the appointment's
-│   │                            # dialog that two views mount
+│   │                            # dialog that two views mount; assistant.view.ts, the
+│   │                            # assistant's panel, at the bottom of every screen
 │   ├── tests/
 │   │   ├── unit/                # mirrors src/ (plus services/fixtures.ts, logic/zone.ts and
 │   │   │                        # logic/fixtures.ts, views/page.ts); integration/claude.test.ts,

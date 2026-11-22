@@ -1,8 +1,9 @@
 # frontend/
 
 Package `frontend`: the browser's services layer and its view layer, both complete for the
-calendar; the assistant has its service and no screen. It runs locally and is deployed nowhere. This file adds to the root `CLAUDE.md`, whose rules all apply
-here. Paths in this file are relative to `frontend/`.
+calendar; the assistant is a panel at the bottom of every screen, not a screen
+(`docs/FRONTEND_ARCHITECTURE.md` section 6.1). It runs locally and is deployed nowhere. This
+file adds to the root `CLAUDE.md`, whose rules all apply here. Paths in this file are relative to `frontend/`.
 
 What each file holds is in the documents, not here: the services in
 `docs/FRONTEND_SERVICES.md`; the page, the views and the shell in
@@ -32,7 +33,7 @@ when those files are touched (`.claude/rules/frontend-views.md`).
 - `index.html`: all the markup, everything `hidden`: the login `#login`; the frame `#app` with
   the header, the navigation and `main.screen`, which holds one element per screen (`#week`,
   `#appointments`, `#settings`, `#users`, `#availability`), each with its dialogs and its
-  `<template>`s; and `dialog#detail`, in no screen. One module script `app.js`, one style
+  `<template>`s; and, in no screen, `dialog#detail` and the assistant's panel `#assistant`. One module script `app.js`, one style
   sheet, nothing inline. No range, pattern, length or choice of a list is written in the page:
   the script sets them.
 - `style.css`: the one style sheet.
@@ -40,15 +41,17 @@ when those files are touched (`.claude/rules/frontend-views.md`).
   `COGNITO_URL` and `CLIENT_ID`.
 - `src/views/`: `shell.ts` (`runShell`, `mountShell`, the table `SCREENS`, `sessionObjects`:
   new services and logic objects per person, a second `CalendarService` for a single date,
-  never the week's); one `<name>.view.ts` per view, `mount<Name>(root, deps): Subscription`:
-  `login`, `week`, `appointments`, `settings`, `users`, `availability` and `date` (two views of
-  one screen); `detail.view.ts`, the dialog two views mount; `availability.parts.ts`, the
+  never the week's; the assistant's panel, mounted once per session and in no row of
+  `SCREENS`); one `<name>.view.ts` per view, `mount<Name>(root, deps): Subscription`: `login`,
+  `week`, `appointments`, `settings`, `users`, `availability` and `date` (two views of one
+  screen), `assistant`; `detail.view.ts`, the dialog two views mount; `availability.parts.ts`, the
   helpers the availability's two views share, with `mountConfirm`.
 - `src/logic/`: pure models (`texts.ts`, `week.model.ts`, `booking.ts`,
   `appointment.detail.ts`, `appointments.model.ts`, `settings.model.ts`, `users.model.ts`,
-  `availability.model.ts`, `conflicts.ts`, `date.model.ts`) and one class per screen with one
-  stream and `start()` (`week.screen.ts`, `appointments.screen.ts`, `settings.screen.ts`,
-  `users.screen.ts`, `availability.screen.ts`, `date.screen.ts`).
+  `availability.model.ts`, `conflicts.ts`, `date.model.ts`, `assistant.model.ts`) and one class
+  per screen, and one for the panel, with one stream and `start()` (`week.screen.ts`,
+  `appointments.screen.ts`, `settings.screen.ts`, `users.screen.ts`, `availability.screen.ts`,
+  `date.screen.ts`, `assistant.screen.ts`).
 - `scripts/` (Node, outside the browser's lint rules): `bundle.mjs`, `build.mjs`, `dev.mjs`,
   `seed-local.mjs`.
 - `tests/unit/services/`, `tests/unit/logic/` (project `unit`, in node; `zone.ts`,
@@ -77,7 +80,9 @@ when those files are touched (`.claude/rules/frontend-views.md`).
   passes through the logic layer.
 - `src/logic/` has no DOM, gets "now" passed in, and reads dates and times through `shared/`'s
   helpers in the calendar's zone, never the machine's.
-- A new route's failure codes get their sentences in `src/logic/texts.ts` (`failureText`).
+- A new route's failure codes get their sentences in `src/logic/texts.ts` (`failureText`); the
+  assistant's four that the server words in two languages are `shared/`'s (`assistantTexts`).
+- Nothing of a conversation is stored in the browser or logged.
 
 ## Tests
 

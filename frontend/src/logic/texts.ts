@@ -1,4 +1,4 @@
-import { CALENDAR_LIMITS, localDateOf, localTimeOf, toInstant } from '@shared-calendar/shared';
+import { ASSISTANT_LIMITS, CALENDAR_LIMITS, localDateOf, localTimeOf, toInstant } from '@shared-calendar/shared';
 
 // The texts that depend on data (docs/FRONTEND_ARCHITECTURE.md section 5 and section 12.4): a
 // date, a time, a range, a date with a time, a week's label, a UTC offset, and a failure in plain
@@ -142,6 +142,13 @@ const PLAIN_WORDS = new Map<string, string>([
   ['date_in_past', 'This date is now in the past, so it can no longer be changed.'],
   ['override_not_found', 'This day no longer has windows of its own: the weekly patterns apply.'],
   ['window_not_found', 'This extra window no longer exists.'],
+  // The assistant (docs/FRONTEND_SERVICES.md section 20.1): the three answers after which the
+  // panel reads the conversation again, so that it shows what the server holds; each sentence
+  // says so. The three reasons for which the assistant cannot answer and a full conversation
+  // have their sentences in shared/, in the conversation's language.
+  ['assistant_busy', 'The assistant was still at work on this conversation. The conversation has been read again: please look at it before going on.'],
+  ['proposal_not_found', 'This proposal was no longer waiting for an answer. The conversation has been read again.'],
+  ['nothing_to_continue', 'The assistant had nothing left to do. The conversation has been read again.'],
   // The login (docs/FRONTEND_SERVICES.md section 4.3). A wrong password and an unknown user are
   // one reason, so that the sentence does not say which usernames exist.
   ['invalid_credentials', 'The username or the password is not correct.'],
@@ -152,7 +159,7 @@ const PLAIN_WORDS = new Map<string, string>([
 ]);
 
 // What was being attempted when a call failed, where the same reason needs other words for it.
-export type Attempt = 'change' | 'type' | 'pattern' | 'window' | 'patterns-back';
+export type Attempt = 'change' | 'type' | 'pattern' | 'window' | 'patterns-back' | 'message';
 const AFTER: Record<Attempt, Map<string, string>> = {
   // A change is refused with the cancellation's reason when its appointment is too close to be
   // moved by a User (docs/SHARED_CALENDAR_SPEC.md section 8.4): nothing was being cancelled. And
@@ -174,6 +181,10 @@ const AFTER: Record<Attempt, Map<string, string>> = {
   // hours, which would apply again, and an extra window of the day
   // (docs/SHARED_CALENDAR_SPEC.md section 6.5, the last row of its table).
   'patterns-back': new Map([['availability_overlap', 'The hours the weekly patterns give this day overlap one of its extra windows. Delete that extra window first.']]),
+  // A message to the assistant that the check before the request refused: the one thing that
+  // can be wrong with it is its length (docs/CONVERSATIONAL_ARCHITECTURE.md section 4.4), with
+  // the number of shared/.
+  message: new Map([['invalid_request', `A message can be ${ASSISTANT_LIMITS.messageLength} characters long at most, and cannot be empty.`]]),
 };
 
 // A failure's `reason` as a sentence; a reason without a sentence of its own gets the general

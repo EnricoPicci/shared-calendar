@@ -21,7 +21,7 @@ sections 8 and 12.3). Paths are relative to `frontend/`.
   (its block "without a mouse"): every field inside a `<label>` with words of its own; every
   button with words or a name; every `.error` a `role="alert"` and nothing else an alert; every
   "Loading…" a `role="status"`; the two dialogs that ask described by their question. It counts
-  the fields (36) and the places of a failure (48): a new field or a new failure line changes a
+  the fields (37) and the places of a failure (49): a new field or a new failure line changes a
   number there, on purpose.
 - What a screen reader says aloud, and where the keyboard is after a dialog closes (the table
   of `docs/FRONTEND_ARCHITECTURE.md` section 8), are for the walk (`docs/FRONTEND_WALK.md`).

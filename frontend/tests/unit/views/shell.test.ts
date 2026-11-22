@@ -2525,4 +2525,256 @@ describe('the navigation', () => {
       });
     });
   });
+
+  describe('the assistant\'s panel, which is no screen', () => {
+    const PROPOSAL_ID = '01M6DMQ0000000000000000009';
+    const BEARER = { alice: 'Bearer access-token-alice', admin: 'Bearer access-token-admin' };
+    const panel = () => find('#assistant');
+    const one = <T extends HTMLElement = HTMLElement>(selector: string) => find<T>(`#assistant ${selector}`);
+    const field = () => one<HTMLInputElement>('[name="message"]');
+    const texts = () => [...document.querySelectorAll('#assistant .message .text')].map((text) => text.textContent);
+    const at = (hash: string) => window.history.replaceState(null, '', `${window.location.pathname}${hash}`);
+    const current = () => links().find((a) => a.getAttribute('aria-current') === 'page')!.textContent;
+    const settings = (over: object = {}) => ({ timeZone: 'Europe/Rome', cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: null, updatedAt: null, updatedBy: null, ...over });
+    const reply = (over: object = {}) => ({ conversationId: '01M6DMQ0000000000000000008', language: 'en', status: 'idle', messages: [], activity: null, proposal: null, remainingToday: 9, ...over });
+    const said = (seq: number, from: string, text: string) => ({ seq, from, text, at: '2026-11-19T10:00:00.000Z' });
+    const proposal = (outcome: string | null) => ({ proposalId: PROPOSAL_ID, question: 'Shall I make this change?', confirmLabel: 'Confirm', declineLabel: "Don't", actions: [{ summary: 'Book an appointment.', outcome, error: null }] });
+    const NO_CONVERSATION = reply({ conversationId: null, language: null, remainingToday: 10 });
+    // The requests to the API, as "METHOD path", and those of them that are the assistant's.
+    const requests = () => (fetchMock.mock.calls as [string, RequestInit][]).filter(([url]) => url.startsWith(CONFIG.apiUrl)).map(([url, init]) => `${init.method} ${url.slice(CONFIG.apiUrl.length)}`);
+    const toTheAssistant = () => requests().filter((request) => request.includes(' /assistant'));
+    const count = (start: string) => requests().filter((request) => request.startsWith(start)).length;
+    // The API answers by what is asked: every screen's reads, and the assistant's routes as the
+    // test says. What a test does not name stays unanswered.
+    const api = (assistant: Record<string, () => object> = {}, calendarSettings: () => object = settings) => {
+      const answers: Record<string, () => Response> = {
+        'GET /calendar/settings': () => json(200, calendarSettings()),
+        'GET /calendar/appointments': () => json(200, { appointments: [] }),
+        'GET /calendar/types': () => json(200, { types: [] }),
+        'GET /calendar/patterns': () => json(200, { patterns: [] }),
+        'GET /calendar?': () => json(200, winterWeek()),
+        'GET /users': () => json(200, { users: [] }),
+        ...Object.fromEntries(Object.entries(assistant).map(([request, body]) => [request, () => json(200, body())])),
+      };
+      fetchMock.mockImplementation((url: string, init: RequestInit) => {
+        const request = `${init.method} ${url.slice(CONFIG.apiUrl.length)}`;
+        const answer = Object.entries(answers).find(([start]) => request.startsWith(start));
+        return answer ? Promise.resolve(answer[1]()) : unanswered();
+      });
+    };
+    const openPanel = async (first: object = NO_CONVERSATION) => {
+      field().focus();
+      await vi.waitFor(() => expect(one<HTMLButtonElement>('.send').disabled).toBe(false));
+      return first;
+    };
+
+    it.each([
+      ['a User', ALICE, ['Week', 'My appointments']],
+      ['the Administrator', ADMIN, ['Week', 'Settings', 'Users', 'Availability']],
+    ])('the login has none; for %s it is at the bottom of every screen, collapsed, with no link of its own and no request made', async (_name, who, screens) => {
+      api();
+      const { store } = mounted();
+      expect(panel().hidden).toBe(true);
+      store.set(who);
+      expect(links().map((a) => a.textContent)).toEqual(screens);
+      for (const [i, screen] of screens.entries()) {
+        links()[i]!.click();
+        await vi.waitFor(() => expect(current()).toBe(screen));
+        expect([panel().hidden, panel().classList.contains('open'), one('.talk').hidden], screen).toEqual([false, false, true]);
+        expect(panel().closest('[hidden]'), screen).toBeNull();
+      }
+      expect(toTheAssistant()).toEqual([]);
+      expect(window.location.hash).not.toContain('assistant');
+    });
+
+    it('the first opening reads the conversation with the person\'s token, once; the field typed in and the open panel are kept from screen to screen, with no other request to the assistant', async () => {
+      api({ 'GET /assistant/conversation': () => reply({ messages: [said(1, 'person', 'hello'), said(2, 'assistant', 'Hello, alice.')] }) });
+      mounted(ALICE);
+      await weekDrawn();
+      field().focus();
+      expect(panel().classList.contains('open')).toBe(true);
+      await vi.waitFor(() => expect(texts()).toEqual(['hello', 'Hello, alice.']));
+      expect(apiCalls().filter(([url]) => url!.includes('/assistant'))).toEqual([['http://api.test/assistant/conversation', BEARER.alice]]);
+      expect(one('.remaining').textContent).toBe('9 messages left today');
+
+      field().value = 'a question half typed';
+      const rows = [...document.querySelectorAll('#assistant .message')];
+      links()[1]!.click();
+      await vi.waitFor(() => expect(current()).toBe('My appointments'));
+      links()[0]!.click();
+      await vi.waitFor(() => expect(current()).toBe('Week'));
+      expect([panel().hidden, panel().classList.contains('open'), field().value]).toEqual([false, true, 'a question half typed']);
+      // The very rows: the view was not mounted again.
+      expect([...document.querySelectorAll('#assistant .message')]).toEqual(rows);
+      expect(toTheAssistant()).toEqual(['GET /assistant/conversation']);
+    });
+
+    it('signing out takes the panel with the session: hidden, collapsed, the conversation and what was typed gone, the page as before anyone signed in', async () => {
+      api({ 'GET /assistant/conversation': () => reply({ messages: [said(1, 'person', 'a private question'), said(2, 'assistant', 'A private answer.')] }) });
+      const { store, signOut } = mounted();
+      const before = html();
+      store.set(ALICE);
+      await weekDrawn();
+      field().focus();
+      await vi.waitFor(() => expect(texts()).toHaveLength(2));
+      field().value = 'typed and never sent';
+
+      signOut.click();
+      expect([panel().hidden, panel().classList.contains('open'), field().value, texts()]).toEqual([true, false, '', []]);
+      expect(html()).toBe(before);
+      expect(html()).not.toContain('a private question');
+    });
+
+    it('the next person finds it collapsed and empty, and its first opening reads that person\'s conversation; the first person, back, reads their own again', async () => {
+      const conversations: Record<string, object> = {
+        [BEARER.alice]: reply({ messages: [said(1, 'person', 'a question of alice'), said(2, 'assistant', 'An answer for alice.')] }),
+        [BEARER.admin]: NO_CONVERSATION,
+      };
+      fetchMock.mockImplementation((url: string, init: RequestInit) => {
+        if (url.endsWith('/assistant/conversation')) return Promise.resolve(json(200, conversations[(init.headers as Record<string, string>).Authorization!]));
+        return url.includes('/calendar?') ? Promise.resolve(json(200, winterWeek())) : unanswered();
+      });
+      const { store, signOut } = mounted(ALICE);
+      field().focus();
+      await vi.waitFor(() => expect(texts()).toHaveLength(2));
+      field().value = 'typed by alice';
+      signOut.click();
+
+      store.set(ADMIN);
+      expect([panel().hidden, panel().classList.contains('open'), field().value, texts()]).toEqual([false, false, '', []]);
+      for (const hers of ['a question of', 'An answer for', 'typed by']) expect(html()).not.toContain(hers);
+      // By the heading: the emulated page leaves the keyboard in the field although the panel
+      // was hidden meanwhile, so the field would not take it again.
+      one('.toggle').click();
+      await vi.waitFor(() => expect(one('.remaining').textContent).toBe('10 messages left today'));
+      expect([texts(), one<HTMLButtonElement>('.end').disabled]).toEqual([[], true]);
+      for (const hers of ['a question of', 'An answer for', 'typed by']) expect(html()).not.toContain(hers);
+      signOut.click();
+
+      store.set(ALICE);
+      expect(texts()).toEqual([]);
+      one('.toggle').click();
+      await vi.waitFor(() => expect(texts()).toEqual(['a question of alice', 'An answer for alice.']));
+      expect(apiCalls().filter(([url]) => url!.includes('/assistant')).map(([, bearer]) => bearer)).toEqual([BEARER.alice, BEARER.admin, BEARER.alice]);
+    });
+
+    it('a message is sent, the step that follows is asked for by itself, and the answer is shown', async () => {
+      api({
+        'GET /assistant/conversation': () => NO_CONVERSATION,
+        'POST /assistant/messages': () => reply({ status: 'working', activity: 'Looking at the calendar…', messages: [said(1, 'person', 'what is open?')] }),
+        'POST /assistant/continue': () => reply({ messages: [said(2, 'assistant', 'Tuesday is open.')] }),
+      });
+      mounted(ALICE);
+      await weekDrawn();
+      await openPanel();
+      field().value = 'what is open?';
+      submit(one<HTMLFormElement>('.compose'));
+      await vi.waitFor(() => expect(texts()).toEqual(['what is open?', 'Tuesday is open.']));
+      expect(toTheAssistant()).toEqual(['GET /assistant/conversation', 'POST /assistant/messages', 'POST /assistant/continue']);
+      expect([field().value, one('.progress').textContent, one('.news').textContent]).toEqual(['', '', 'Tuesday is open.']);
+      const sent = (fetchMock.mock.calls as [string, RequestInit][]).find(([url]) => url.endsWith('/assistant/messages'))!;
+      expect(JSON.parse(sent[1].body as string)).toEqual({ text: 'what is open?' });
+    });
+
+    it('a change confirmed with the week on show: the week is loaded again by itself, once, under the open panel', async () => {
+      api({
+        'GET /assistant/conversation': () => reply({ status: 'awaiting_confirmation', proposal: proposal(null), messages: [said(1, 'person', 'book it')] }),
+        [`POST /assistant/proposals/${PROPOSAL_ID}/confirm`]: () => reply({ status: 'working', proposal: proposal('done') }),
+        'POST /assistant/continue': () => reply({ proposal: proposal('done'), messages: [said(2, 'assistant', 'Booked.')] }),
+      });
+      mounted(ALICE);
+      await weekDrawn();
+      await openPanel();
+      expect([count('GET /calendar?'), one('.confirm').textContent, one('.decline').textContent]).toEqual([1, 'Confirm', "Don't"]);
+
+      one('.confirm').click();
+      await vi.waitFor(() => expect(texts()).toEqual(['book it', 'Booked.']));
+      expect(count('GET /calendar?')).toBe(2);
+      expect(requests().at(-2)).toBe('GET /calendar?from=2026-11-16&to=2026-11-22');
+      expect([one('.proposal .actions').hidden, one('.proposed .outcome').textContent, panel().classList.contains('open')]).toEqual([true, 'Done', true]);
+      expect(document.activeElement).toBe(field());
+    });
+
+    it('a proposal declined loads nothing again', async () => {
+      api({
+        'GET /assistant/conversation': () => reply({ status: 'awaiting_confirmation', proposal: proposal(null), messages: [said(1, 'person', 'book it')] }),
+        [`POST /assistant/proposals/${PROPOSAL_ID}/decline`]: () => reply({ messages: [said(2, 'notice', 'Nothing was changed.')] }),
+      });
+      mounted(ALICE);
+      await weekDrawn();
+      await openPanel();
+      one('.decline').click();
+      await vi.waitFor(() => expect(texts()).toEqual(['book it', 'Nothing was changed.']));
+      expect([count('GET /calendar?'), one('.proposal').hidden]).toEqual([1, true]);
+    });
+
+    it('a change confirmed with "My appointments" on show: the list is loaded again, and the week when it is shown next', async () => {
+      at('#/appointments');
+      api({
+        'GET /assistant/conversation': () => reply({ status: 'awaiting_confirmation', proposal: proposal(null) }),
+        [`POST /assistant/proposals/${PROPOSAL_ID}/confirm`]: () => reply({ proposal: proposal('done'), messages: [said(2, 'assistant', 'Booked.')] }),
+      });
+      mounted(ALICE);
+      await vi.waitFor(() => expect(find('#appointments .empty').hidden).toBe(false));
+      await openPanel();
+      expect([count('GET /calendar/appointments'), count('GET /calendar?')]).toEqual([1, 0]);
+      one('.confirm').click();
+      await vi.waitFor(() => expect(count('GET /calendar/appointments')).toBe(2));
+      links()[0]!.click();
+      await weekDrawn();
+      expect(count('GET /calendar?')).toBe(1);
+    });
+
+    it('a change confirmed with the settings on show: they are read again and the form is filled with what the server holds', async () => {
+      at('#/settings');
+      let horizon = 56;
+      api(
+        {
+          'GET /assistant/conversation': () => reply({ status: 'awaiting_confirmation', proposal: proposal(null) }),
+          [`POST /assistant/proposals/${PROPOSAL_ID}/confirm`]: () => {
+            horizon = 90; // what the confirmed change did
+            return reply({ proposal: proposal('done'), messages: [said(2, 'assistant', 'Changed.')] });
+          },
+        },
+        () => settings({ bookingHorizonDays: horizon }),
+      );
+      mounted(ADMIN);
+      const horizonField = () => find<HTMLInputElement>('#settings [name="bookingHorizonDays"]');
+      await vi.waitFor(() => expect(horizonField().value).toBe('56'));
+      await openPanel();
+      find<HTMLInputElement>('#settings [name="cancellationNoticeHours"]').value = '99'; // typed, not saved
+      one('.confirm').click();
+      await vi.waitFor(() => expect(horizonField().value).toBe('90'));
+      expect(count('GET /calendar/settings')).toBe(2);
+      expect(find<HTMLInputElement>('#settings [name="cancellationNoticeHours"]').value).toBe('24');
+      expect(find('#settings form.settings').hidden).toBe(false);
+
+      // Leaving the settings ends what was started for them: nothing is read behind the week.
+      links()[0]!.click();
+      await weekDrawn();
+      expect(count('GET /calendar/settings')).toBe(2);
+    });
+
+    it('a change confirmed with the availability on show: its lists are read again', async () => {
+      at('#/availability');
+      api({
+        'GET /assistant/conversation': () => reply({ status: 'awaiting_confirmation', proposal: proposal(null) }),
+        [`POST /assistant/proposals/${PROPOSAL_ID}/confirm`]: () => reply({ proposal: proposal('done'), messages: [said(2, 'assistant', 'Created.')] }),
+      });
+      mounted(ADMIN);
+      await vi.waitFor(() => expect([count('GET /calendar/types'), count('GET /calendar/patterns')]).toEqual([1, 1]));
+      await openPanel();
+      one('.confirm').click();
+      await vi.waitFor(() => expect([count('GET /calendar/types'), count('GET /calendar/patterns')]).toEqual([2, 2]));
+    });
+
+    it('ending the shell takes the panel with it', async () => {
+      api({ 'GET /assistant/conversation': () => reply({ messages: [said(1, 'person', 'hello')] }) });
+      mounted(ALICE);
+      field().focus();
+      await vi.waitFor(() => expect(texts()).toEqual(['hello']));
+      shell?.unsubscribe();
+      expect([panel().hidden, texts(), panel().classList.contains('open')]).toEqual([true, [], false]);
+    });
+  });
 });

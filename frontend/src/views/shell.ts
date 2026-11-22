@@ -1,7 +1,8 @@
 import type { Role } from '@shared-calendar/shared';
-import { fromEvent, Subscription } from 'rxjs';
+import { fromEvent, merge, Subscription } from 'rxjs';
 import { distinctUntilChanged, filter, map, startWith } from 'rxjs/operators';
 import { AppointmentsScreen } from '../logic/appointments.screen';
+import { AssistantScreen } from '../logic/assistant.screen';
 import { AvailabilityScreen } from '../logic/availability.screen';
 import { DateScreen } from '../logic/date.screen';
 import { SettingsScreen } from '../logic/settings.screen';
@@ -9,6 +10,7 @@ import { UsersScreen } from '../logic/users.screen';
 import { WeekScreen } from '../logic/week.screen';
 import type { ApiConfig } from '../services/api';
 import { AppointmentsService } from '../services/appointments.service';
+import { AssistantService } from '../services/assistant.service';
 import { AvailabilityRulesService } from '../services/availability-rules.service';
 import { AvailabilityTypesService } from '../services/availability-types.service';
 import { CalendarSettingsService } from '../services/calendar-settings.service';
@@ -19,6 +21,7 @@ import { RefreshService } from '../services/refresh.service';
 import { SessionStore } from '../services/session.store';
 import { UsersService } from '../services/users.service';
 import { mountAppointments } from './appointments.view';
+import { mountAssistant } from './assistant.view';
 import { mountConfirm } from './availability.parts';
 import { mountAvailability } from './availability.view';
 import { mountDate } from './date.view';
@@ -58,7 +61,9 @@ const ROLE_IN_WORDS: Record<Role, string> = { admin: 'Administrator', user: 'Use
 // week, "My appointments", the settings, the users and the availability; `date` is the
 // availability's second logic object, for its part about a single date. `users` is the
 // service the week's book dialog and the users screen share; `types` and `rules` are the two
-// services of the availability, whose view calls their deletes.
+// services of the availability, whose view calls their deletes. `assistant` is the logic object
+// of the assistant's panel, which is no screen: it is mounted once for the session, beside
+// whichever screen is on show.
 export type SessionObjects = {
   role: Role;
   week: WeekScreen;
@@ -71,6 +76,7 @@ export type SessionObjects = {
   users: UsersService;
   types: AvailabilityTypesService;
   rules: AvailabilityRulesService;
+  assistant: AssistantScreen;
 };
 
 function sessionObjects(config: ApiConfig, store: SessionStore, person: Person): SessionObjects {
@@ -85,21 +91,26 @@ function sessionObjects(config: ApiConfig, store: SessionStore, person: Person):
   // what other people booked or cancelled in the meantime. The API cannot push, and nothing is
   // asked on a timer (docs/FRONTEND_VIEW_PLAN.md section 8, decision 11).
   const visible$ = fromEvent(document, 'visibilitychange').pipe(filter(() => document.visibilityState === 'visible'));
+  // The assistant's panel. A change it made is one more moment at which the screen on show
+  // must load again: the screens are handed one stream for both, and none of them knows the
+  // panel (docs/FRONTEND_ARCHITECTURE.md section 6.1).
+  const assistant = new AssistantScreen(new AssistantService(config, store));
+  const again$ = merge(visible$, assistant.changed$);
   const now = () => new Date();
-  const week = new WeekScreen(calendar, appointments, person.role, now, visible$);
+  const week = new WeekScreen(calendar, appointments, person.role, now, again$);
   // The list screen hands an appointment to move over to the week screen.
-  const list = new AppointmentsScreen(calendarSettings, appointments, week, person.role, now, visible$);
+  const list = new AppointmentsScreen(calendarSettings, appointments, week, person.role, now, again$);
   const settings = new SettingsScreen(calendarSettings);
-  const accounts = new UsersScreen(users, visible$);
+  const accounts = new UsersScreen(users, again$);
   const types = new AvailabilityTypesService(config, store);
   const rules = new AvailabilityRulesService(config, store);
-  const availability = new AvailabilityScreen(calendarSettings, types, rules, now, visible$);
+  const availability = new AvailabilityScreen(calendarSettings, types, rules, now, again$);
   // The part about a single date reads the calendar view of that one date through a
   // CalendarService of its own: the service has one pair of streams and one pending call, and
   // the week's must keep the week (docs/FRONTEND_SERVICES.md section 18). What the
   // availability screen knows (the time zone, the types, the patterns) is handed over.
-  const date = new DateScreen(availability.known$, new CalendarService(config, store), types, rules, now, visible$);
-  return { role: person.role, week, list, settings, accounts, availability, date, appointments, users, types, rules };
+  const date = new DateScreen(availability.known$, new CalendarService(config, store), types, rules, now, again$);
+  return { role: person.role, week, list, settings, accounts, availability, date, appointments, users, types, rules, assistant };
 }
 
 // A screen of the application: its address (the URL's hash), its name in the navigation, the
@@ -151,9 +162,19 @@ export const SCREENS: readonly Screen[] = [
     label: 'Settings',
     roles: ['admin'],
     element: '#settings',
-    show: (root, { settings }) => {
+    // The settings screen reads once, when it is shown, and has nothing to load again on. When
+    // the assistant made a change while it is on show, it is started afresh: the form is filled
+    // with what the server holds, and values typed and not saved are gone, as on leaving.
+    show: (root, { settings, assistant }) => {
       const subscription = mountSettings(root, settings);
-      subscription.add(settings.start());
+      let started = settings.start();
+      subscription.add(
+        assistant.changed$.subscribe(() => {
+          started.unsubscribe();
+          started = settings.start();
+        }),
+      );
+      subscription.add(() => started.unsubscribe());
       return subscription;
     },
   },
@@ -212,6 +233,7 @@ export function mountShell(root: HTMLElement, { config, store, login, screens: t
   const role = find('#app .role');
   const nav = find('#app .nav');
   const linkTemplate = find<HTMLTemplateElement>('#tpl-nav-link');
+  const panel = find('#assistant');
 
   // "Sign out" only clears the store (docs/FRONTEND_ARCHITECTURE.md section 10, open point O7);
   // the screen changes because the session stream then notifies null.
@@ -234,6 +256,14 @@ export function mountShell(root: HTMLElement, { config, store, login, screens: t
       return link;
     });
     nav.replaceChildren(...links);
+
+    // The assistant's panel is no screen: it has no address and no link, and is mounted here,
+    // once, for as long as the person is signed in, whichever screens are shown meanwhile. View
+    // first, then its logic object, as for a screen (docs/FRONTEND_ARCHITECTURE.md section 3,
+    // rule 8).
+    panel.hidden = false;
+    const assistant = mountAssistant(panel, objects.assistant);
+    assistant.add(objects.assistant.start());
 
     // The screen on show, with its logic object.
     let shown: Subscription | undefined;
@@ -268,6 +298,8 @@ export function mountShell(root: HTMLElement, { config, store, login, screens: t
 
     session.add(() => {
       shown?.unsubscribe();
+      assistant.unsubscribe();
+      panel.hidden = true;
       nav.replaceChildren();
       username.textContent = '';
       role.textContent = '';

@@ -56,6 +56,8 @@ describe('index.html', () => {
       'tpl-date-window',
       'tpl-draft-row',
       'tpl-extra-row',
+      'tpl-message',
+      'tpl-proposed',
     ]);
     for (const template of templates) expect(template.content.children, template.id).toHaveLength(1);
   });
@@ -73,7 +75,7 @@ describe('index.html', () => {
 
     it('every field has its label: a <label> around it, with words of its own', () => {
       const fields = everywhere('input, select, textarea');
-      expect(fields).toHaveLength(36);
+      expect(fields).toHaveLength(37);
       for (const field of fields) {
         const label = field.closest('label');
         expect(label, field.getAttribute('name')!).not.toBeNull();
@@ -110,14 +112,14 @@ describe('index.html', () => {
       const place = (element: Element) => [...element.classList].join('.');
       const alerts = everywhere('[role="alert"]');
       const failures = everywhere('.error');
-      expect(failures).toHaveLength(48);
+      expect(failures).toHaveLength(49);
       expect(alerts).toEqual(failures);
       for (const alert of alerts) expect(['P', alert.textContent], place(alert)).toEqual(['P', '']);
       const loading = everywhere('.loading');
       expect(loading.map((element) => [element.getAttribute('role'), element.textContent, element.hidden])).toEqual(Array.from({ length: 6 }, () => ['status', 'Loading…', true]));
       // What else is news: the appointment being moved, the list of Users being read for the
-      // book dialog, and "Settings saved.".
-      expect(everywhere('[role="status"]:not(.loading)').map((element) => place(element) || place(element.parentElement!))).toEqual(['moving', 'users-message', 'saved']);
+      // book dialog, "Settings saved.", and what the assistant answers.
+      expect(everywhere('[role="status"]:not(.loading)').map((element) => place(element) || place(element.parentElement!))).toEqual(['moving', 'users-message', 'saved', 'news']);
     });
   });
 
@@ -513,6 +515,62 @@ describe('index.html', () => {
           for (const button of row.querySelectorAll('button')) expect([button.getAttribute('type'), button.hasAttribute('aria-label')], id).toEqual(['button', false]);
         }
       });
+    });
+  });
+
+  describe('the assistant\'s panel', () => {
+    beforeEach(loadPage);
+    const panel = () => document.querySelector<HTMLElement>('#assistant')!;
+    const one = <T extends HTMLElement = HTMLElement>(selector: string) => panel().querySelector<T>(selector)!;
+
+    it('is in the frame, after the screens and in none of them, hidden, a region with a name of its own', () => {
+      expect(panel().parentElement!.id).toBe('app');
+      expect(panel().closest('main')).toBeNull();
+      expect(document.querySelector('main.screen')!.compareDocumentPosition(panel()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect([panel().tagName, panel().getAttribute('aria-label'), panel().hidden, panel().className]).toEqual(['SECTION', 'Assistant', true, 'assistant']);
+      // It is no screen: the navigation is filled by the script from the table of screens, and
+      // no link of the page leads to it.
+      expect(document.querySelectorAll('a[href*="assistant"]')).toHaveLength(0);
+    });
+
+    it('starts collapsed: the heading is a button that says so, and the conversation\'s part with "New conversation" and "Close" is hidden', () => {
+      const toggle = one('.toggle');
+      expect([toggle.textContent, toggle.getAttribute('aria-expanded'), toggle.parentElement!.tagName]).toEqual(['Assistant', 'false', 'H2']);
+      expect(document.getElementById(toggle.getAttribute('aria-controls')!)).toBe(one('.talk'));
+      expect([one('.talk').hidden, one('.end').hidden, one('.collapse').hidden]).toEqual([true, true, true]);
+      expect([one('.end').textContent, one('.collapse').textContent]).toEqual(['New conversation', 'Close']);
+      // What is hidden holds everything of a conversation: collapsed, none of it is reached.
+      for (const part of ['.processed', '.messages', '.progress', '.news', '.proposal', '.error', '.remaining']) expect(one('.talk').contains(one(part)), part).toBe(true);
+    });
+
+    it('says who processes the conversation, in fixed words, at the top of the open part', () => {
+      expect(one('.talk').firstElementChild).toBe(one('.processed'));
+      expect(one('.processed').textContent).toBe("This conversation is processed by Anthropic's Claude.");
+    });
+
+    it('the conversation starts empty; the proposal is hidden and empty, its two buttons after the list, "Confirm" first, with no words of the page', () => {
+      expect([one('.messages').children.length, one('.progress').textContent, one('.news').textContent, one('.remaining').textContent]).toEqual([0, '', '', '']);
+      expect([one('.proposal').hidden, one('.asks').textContent, one('.changes').children.length]).toEqual([true, '', 0]);
+      const buttons = [...one('.proposal').querySelectorAll('button')];
+      expect(buttons.map((button) => [button.className, button.textContent, button.getAttribute('type')])).toEqual([['primary confirm', '', 'button'], ['decline', '', 'button']]);
+      expect(one('.messages').compareDocumentPosition(one('.proposal')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect([one('.error').getAttribute('role'), one('.news').getAttribute('role'), one('.progress').hasAttribute('role')]).toEqual(['alert', 'status', false]);
+    });
+
+    it('the field is one line with its label and "Send", in a form outside the part that is hidden; its length is the script\'s to set', () => {
+      const field = one<HTMLInputElement>('[name="message"]');
+      expect([field.tagName, field.type, field.hasAttribute('maxlength'), field.getAttribute('autocomplete')]).toEqual(['INPUT', 'text', false, 'off']);
+      expect(field.closest('form')).toBe(one('.compose'));
+      expect(one('.talk').contains(field)).toBe(false);
+      expect(one('.compose').querySelectorAll('button')).toHaveLength(1);
+      expect(one('.send').textContent).toBe('Send');
+    });
+
+    it('a message and a change of a proposal are rows that nothing can be typed or pressed in', () => {
+      const template = (id: string) => one<HTMLTemplateElement>(`#${id}`).content.firstElementChild!;
+      expect([...template('tpl-message').children].map((part) => [part.tagName, part.className])).toEqual([['SPAN', 'author'], ['P', 'text']]);
+      expect([...template('tpl-proposed').children].map((part) => part.className)).toEqual(['summary', 'outcome']);
+      for (const id of ['tpl-message', 'tpl-proposed']) expect(template(id).querySelectorAll('button, a, input, select, textarea'), id).toHaveLength(0);
     });
   });
 });

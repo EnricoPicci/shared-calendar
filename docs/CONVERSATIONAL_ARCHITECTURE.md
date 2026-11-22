@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v14, under way: steps c00 to c11 of `docs/CONVERSATIONAL_PLAN.md` done |
+| Status | v15, under way: steps c00 to c12 of `docs/CONVERSATIONAL_PLAN.md` done |
 | Date | 2026-11-22 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
@@ -25,6 +25,7 @@
 | v13 | 2026-11-22 | Step c10 of `docs/CONVERSATIONAL_PLAN.md` is done: the assistant was judged with the real model. **Open point P4 is decided: `claude-sonnet-5-5` at effort `low`**, chosen by the Product Owner on three runs of the evaluation (sections 7.1, 7.2 and 18.2). **Open point P5 is closed with no tool**: every blocking request proposed the right hours (sections 3 and 18.2). The effort is a setting of the functions, `ASSISTANT_EFFORT`, empty in the template and so `low` (section 7.2). The evaluation exists as built (section 12.3). The cost figures are measured (section 14). Two sentences were added to the instructions (section 7.3), and the Administrator's `get_calendar` gives the id of each window's type (section 8.3), which takes one step out of a block. |
 | v12 | 2026-11-22 | Step c09 of `docs/CONVERSATIONAL_PLAN.md` is done: the back end is closed. **Two limits are added** (section 4.4), found when the size of a stored item was worked out: only the first five reads of one answer of the model are run, and the stored size of a conversation is looked at again after every step that would lead to another, so that an exchange stops at most one step past the bound. **Open point P3 has its numbers and its decision** (sections 9 and 18.2). Two journeys are added: a conversation filled to its bound, and a conversation whose mark of the instructions differs (section 12.1); the journeys make a second direct write to the `assistant` table. A sliding window over the conversation is among the alternatives not taken (section 17). No tool, route, function, role or permission is added |
 | v14 | 2026-11-22 | Step c11 of `docs/CONVERSATIONAL_PLAN.md` is done: the front end's `AssistantService`, which `docs/FRONTEND_SERVICES.md` section 20 governs from now on. **One sentence of section 13 was wrong and is corrected**: the service has one stream for its six calls, each outcome saying the call it answers, not a result and a state stream per call (decided by the Product Owner; `docs/FRONTEND_SERVICES.md` section 3.4 and section 8, decision 46). Section 13 also says that a call of the service makes one request, the loop on `continue` being the logic layer's, as its own row already had it. No route, code or behaviour of the API changes |
+| v15 | 2026-11-22 | Step c12 of `docs/CONVERSATIONAL_PLAN.md` is done, and with it a decision of the Product Owner that changes this document: **the assistant is not a screen but a panel at the bottom of every screen**, for both roles, with no address and no navigation entry. Section 13 is rewritten for the panel; `docs/FRONTEND_ARCHITECTURE.md` (sections 6 and 6.1, decisions 138 to 151) governs it. Wherever this document said "the screen" for the page's part of the assistant it now says "the panel" (sections 1 to 8, 12, 17 to 19, the diagrams). Section 10.2: the line about Anthropic is under the heading of the open panel. Section 13 also states what the panel does that this document did not say: the first read at the first opening, the read after a confirmation that got one of the two `503` answers, the outcome of a refused change in the page's own words (the contract carries a code, not a sentence), and that a message which drops a proposal brings no notice. Section 17: a separate screen among the alternatives. Section 18.1: decision 13 |
 
 ---
 
@@ -42,7 +43,7 @@ terms.
 **Where it stands.** `docs/ARCHITECTURE.md` stays the truth for everything that exists. This
 document governs the assistant until its parts are built; each plan step then merges what it
 built into `docs/ARCHITECTURE.md` (routes, table, roles, security rows, cost), into
-`docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` (the screen), as the calendar
+`docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` (the panel), as the calendar
 did with `docs/SHARED_CALENDAR_SPEC.md`. From step c00 of `docs/CONVERSATIONAL_PLAN.md` on, each
 part of the assistant is governed by `docs/ARCHITECTURE.md` and the two front-end documents from
 the step that merges it into them (the change log of `docs/ARCHITECTURE.md`, v13, says which
@@ -64,7 +65,7 @@ reach the same routes, with the same checks.
 
 | Topic | Decision |
 |---|---|
-| Channel | **A chat screen in the existing web front end.** A messenger (WhatsApp or similar) may follow; the design keeps that step cheap and builds none of it (section 16) |
+| Channel | **A chat in the existing web front end**: a panel at the bottom of every screen (section 13). A messenger (WhatsApp or similar) may follow; the design keeps that step cheap and builds none of it (section 16) |
 | Memory | **Short-lived, on the server.** One conversation per person, kept in DynamoDB, gone a day after the last message (section 4.3) |
 | Changes | **Always confirmed.** The assistant never changes anything by itself: it proposes, the person confirms, and the server, not the model, enforces it (section 5) |
 | Model | **Claude Sonnet 5.5** (`claude-sonnet-5-5`) by default, a deployment parameter (section 7.1) |
@@ -78,7 +79,7 @@ reach the same routes, with the same checks.
 flowchart LR
     subgraph ALL["The conversational interface"]
         subgraph Browser
-            V[Assistant screen<br/>frontend]
+            V[Assistant panel<br/>frontend]
         end
         subgraph AWS["AWS (eu-north-1)"]
             GW[API Gateway<br/>HTTP API]
@@ -108,7 +109,7 @@ flowchart LR
     end
 ```
 
-**How to read it.** The screen sends the person's message to a new group of routes under
+**How to read it.** The panel sends the person's message to a new group of routes under
 `/assistant`, with the same Cognito token as every other call. A function stores the message,
 sends the conversation to Claude together with the list of things Claude may ask for (the
 *tools*: "read the calendar", "book an appointment"), and Claude answers either with text for
@@ -248,8 +249,8 @@ offered, so a change to any of them changes it, and so does a person's change of
 | Limit | Value (a default in `shared/`, like the calendar's) | When reached |
 |---|---|---|
 | Length of one message | 2 000 characters | `400 invalid_request` |
-| Messages of a person per day (the calendar's time zone) | 30, the deployment parameter `AssistantDailyMessageLimit` | `429 assistant_limit_reached`; the screen says so until tomorrow |
-| Messages of a person in one conversation | 40, or 100 KB stored | `409 conversation_full`; the screen offers "New conversation". The stored size is also looked at after every step whose reads were run: when it has reached the bound the exchange stops there, with the fixed sentence "This conversation is full. To continue, start a new one.", and the conversation is `idle`. One message therefore ends at most one step past the bound |
+| Messages of a person per day (the calendar's time zone) | 30, the deployment parameter `AssistantDailyMessageLimit` | `429 assistant_limit_reached`; the panel says so until tomorrow |
+| Messages of a person in one conversation | 40, or 100 KB stored | `409 conversation_full`; the panel offers "New conversation". The stored size is also looked at after every step whose reads were run: when it has reached the bound the exchange stops there, with the fixed sentence "This conversation is full. To continue, start a new one.", and the conversation is `idle`. One message therefore ends at most one step past the bound |
 | Reads run for one answer of Claude | 5 | The requests of one answer that are not changes are counted, mistaken ones too; from the sixth on each gets the error result `too_many_reads`, which tells the model to ask again in its next answer, a few reads at a time, and to tell the person to ask for a shorter period when that is not enough. The results of one answer are stored as one item, and DynamoDB refuses an item over 400 KB |
 | Requests to Claude for one message of the person | 8 | The assistant stops with a fixed sentence asking to put the request differently. Counted from the stored conversation (Claude's answers since the person's last message), so it holds across the HTTP requests of an exchange. When the eighth answer still asks to read, its reads are run and saved with the sentence, so that the conversation stays one Claude accepts |
 | Changes in one proposal | 5 | The model is told to propose fewer at a time |
@@ -269,8 +270,8 @@ API Gateway's HTTP API gives a request 30 seconds at most, and cannot send an an
 piece. An exchange may need several requests to Claude in a row (read the calendar, then read
 the appointments, then answer), each taking a few seconds. So **every HTTP request does at most
 one request to Claude**, saves what came of it, and answers. When the model asked for a read,
-the function runs it, saves the result, and answers `status: "working"`; the screen at once
-calls `POST /assistant/continue`, which does the next step. The screen shows a line of progress
+the function runs it, saves the result, and answers `status: "working"`; the panel at once
+calls `POST /assistant/continue`, which does the next step. The panel shows a line of progress
 meanwhile ("Looking at the calendar…"), which is better than a spinner of unknown length.
 
 Whatever happens in a step (a time-out at Anthropic, a function stopped half-way), the stored
@@ -309,7 +310,7 @@ flowchart LR
 | # | From | To | What happens |
 |---|---|---|---|
 | 1 | `idle` | `working` | The person sends a message |
-| 2 | `working` | `working` | Claude asked to read: done, the result saved; the screen calls `continue` |
+| 2 | `working` | `working` | Claude asked to read: done, the result saved; the panel calls `continue` |
 | 3 | `working` | `idle` | Claude answered with text |
 | 4 | `working` | `awaiting_confirmation` | Claude asked for a change: a proposal is saved, nothing is done |
 | 5 | `awaiting_confirmation` | `working` | Confirm: the changes are made, their outcomes saved |
@@ -330,7 +331,7 @@ sequenceDiagram
     autonumber
     box rgb(250, 250, 247)
         actor P as Person
-        participant V as Assistant screen
+        participant V as Assistant panel
         participant F as sendAssistantMessage / continueAssistant
         participant D as assistant table
         participant C as Claude
@@ -361,7 +362,7 @@ sequenceDiagram
     autonumber
     box rgb(250, 250, 247)
         actor P as Person
-        participant V as Assistant screen
+        participant V as Assistant panel
         participant F as sendAssistantMessage
         participant K as confirmProposal
         participant D as assistant table
@@ -503,9 +504,9 @@ As built (`backend/src/assistant/`: `exchange.ts` makes the proposal, `confirm.t
 
 1. **The model cannot make a change.** A change tool asked for by the model is never run in
    that request. The only way to run it is `POST /assistant/proposals/{proposalId}/confirm`,
-   which the screen sends when the person presses the button. No sentence typed by anybody, and
+   which the panel sends when the person presses the button. No sentence typed by anybody, and
    no text the model reads in the calendar's data, is a confirmation.
-2. **The confirmation is written by the server, not by the model.** The proposal the screen
+2. **The confirmation is written by the server, not by the model.** The proposal the panel
    shows is built from the tool's checked input and from facts the server reads itself (the
    appointment an id stands for, the type of the window, the day's present hours), with the
    fixed texts of the conversation's language. What the person confirms is therefore exactly
@@ -534,7 +535,7 @@ As built (`backend/src/assistant/`: `exchange.ts` makes the proposal, `confirm.t
    to the time the appointment has, the note it has, a removal where there is no note.
 5. **Writing instead of pressing drops the proposal.** A new message while a proposal waits
    ("no, at eleven") declines it; the model is told nothing was changed and reads the new
-   message. That includes a typed "yes": the model then proposes again and the screen shows
+   message. That includes a typed "yes": the model then proposes again and the panel shows
    the buttons again. It is the price of rule 1, and it keeps a channel-independent meaning to
    "confirm" (section 16). The message that drops a proposal is saved in one write with the
    results "not confirmed" and is read by Claude in the same request: one request to Claude,
@@ -571,7 +572,7 @@ it.
 sequenceDiagram
     autonumber
     box rgb(250, 250, 247)
-        participant V as Assistant screen
+        participant V as Assistant panel
         participant E as Entry function
         participant K as Core (one step)
         participant D as assistant table
@@ -634,7 +635,7 @@ sequenceDiagram
     K-->>E: the reply
     E-->>V: 200 AssistantReply (new messages, status, proposal, activity)
 
-    Note over V,E: working - the screen calls continue at once and the diagram starts again<br/>awaiting_confirmation - it shows the proposal and its two buttons and waits for the person<br/>idle - it shows the answer and waits for the person
+    Note over V,E: working - the panel calls continue at once and the diagram starts again<br/>awaiting_confirmation - it shows the proposal and its two buttons and waits for the person<br/>idle - it shows the answer and waits for the person
 ```
 
 How to read it:
@@ -644,8 +645,8 @@ How to read it:
 - **Middle**: one request to Claude and its four possible answers. Only two of them touch the
   calendar, and both only read: running read tools, and reading the facts for a proposal.
   Claude asking for a change never changes anything here.
-- **Bottom**: one write saves the step, and the status in the reply tells the screen what to do
-  next. The loop of an exchange is the screen's: it calls `continue` while the status is
+- **Bottom**: one write saves the step, and the status in the reply tells the panel what to do
+  next. The loop of an exchange is the panel's: it calls `continue` while the status is
   `working`, up to the limit of section 4.4.
 - A declined proposal and "New conversation" are not in the diagram: they only write to the
   table and never reach Claude.
@@ -703,7 +704,7 @@ proposal: {
 `messages` holds only what a person reads: their own texts, the assistant's texts, and the
 server's fixed notices. Claude's tool requests, the tools' results and the thinking blocks
 never leave the server. `POST` routes answer the messages added by that request; `GET` answers
-them all. Text is plain text: the screen shows it as written, line breaks kept, nothing
+them all. Text is plain text: the panel shows it as written, line breaks kept, nothing
 interpreted.
 
 **How long a proposal is shown.** `proposal` is the proposal that waits, with every `outcome`
@@ -725,7 +726,7 @@ The new codes start in `shared/src/api.ts`, as the project's rule asks.
 ### 6.1 When the assistant cannot answer
 
 Three situations stop the assistant without anything being wrong with the person's request.
-Each has its own code, so that the screen can say what is true, kindly, instead of one vague
+Each has its own code, so that the panel can say what is true, kindly, instead of one vague
 "something went wrong". The rest of the application is untouched by all three.
 
 | Code | When | What the person reads (English; the Italian text sits beside it in `shared/`) |
@@ -758,7 +759,7 @@ Each has its own code, so that the screen can say what is true, kindly, instead 
   when the limit is set (step c15 of `docs/CONVERSATIONAL_PLAN.md`).
 - **Where the sentence comes from.** The three sentences are fixed texts in `shared/`, in every
   supported language, not written by the model (which, in two of the three cases, cannot be
-  asked). The screen picks the one for the code in the conversation's language, and in English
+  asked). The panel picks the one for the code in the conversation's language, and in English
   when there is no conversation yet. It shows it in the conversation, where the answer would
   have been, not as a red error.
 - **The sentence makes no promise it cannot keep**: it does not say "back next month", because
@@ -824,7 +825,7 @@ byte for byte the same for the whole conversation, both for the cache and for th
 blocks (section 4.3).
 
 The SDK's time-out is 22 seconds with no automatic retry: the function has 29 seconds in all
-(section 11.3), and the retry is the screen's `continue`, which the person sees and controls.
+(section 11.3), and the retry is the panel's `continue`, which the person sees and controls.
 No streaming: one request, one answer.
 
 **What was tried.** This section and section 6.1 rest on six things taken from Anthropic's
@@ -907,7 +908,7 @@ when that feature exists.
 | Cut at `max_tokens` | Saves what there is, adds the fixed sentence "the answer was cut short"; `idle` |
 | A refusal (`stop_reason: "refusal"`, Anthropic's safety filters) | A fixed sentence; the conversation is ended. The step is saved first, so that the message and its tokens count for the day, then the conversation is ended with a second write. Not expected for calendar talk. Anthropic's automatic fallback to another model is not switched on: it only covers categories that do not occur here, and the model it falls back to does not accept this design's requests |
 | An error or a time-out | `503 assistant_unavailable`; nothing saved but the person's message; `continue` tries again |
-| Anthropic's refusal for the spending limit (section 6.1) | `503 assistant_budget_reached`; nothing saved but the person's message; the screen shows the sentence of section 6.1 and does not call `continue` by itself |
+| Anthropic's refusal for the spending limit (section 6.1) | `503 assistant_budget_reached`; nothing saved but the person's message; the panel shows the sentence of section 6.1 and does not call `continue` by itself |
 
 `backend/src/lib/anthropic.ts` gives the core these as one closed list: `text`,
 `tool_requests`, `cut_short`, `refusal`, `unavailable`, `budget_reached`. The first three carry
@@ -1171,7 +1172,7 @@ result (section 3.1).
 
 This is accepted by building the feature, and stated rather than hidden:
 
-- the screen says, under its title, that the conversation is processed by Anthropic's Claude;
+- the open panel says, under its heading, that the conversation is processed by Anthropic's Claude;
 - the operator checks, for the Anthropic account in use, how long Anthropic keeps requests and
   that they are not used to train models (the terms of the account), before real users are
   invited (section 18.2, P1);
@@ -1362,7 +1363,7 @@ wordings of blocking time; ambiguity that must produce a question; what the web 
 tool of the Administrator asked for by a User; a note that tries to give orders; a message in
 the other language later in a conversation. Each request starts a conversation of its own.
 
-**How it sees an exchange.** It drives the routes of section 6 as a person's screen does and
+**How it sees an exchange.** It drives the routes of section 6 as a person's page does and
 never calls Anthropic itself. The reply gives the status, the language, the proposal and the
 texts. The tools Claude asked for and their inputs are read from the stored conversation, in
 the local table. The model, the effort, the milliseconds and the tokens of each step are read
@@ -1406,27 +1407,62 @@ test gains one real exchange (a read), which proves the key, the permissions and
 
 ## 13. The front end
 
-One new screen, "Assistant", for both roles, built by the rules of
-`docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md`; those two documents get the
-detail when the plan reaches the screen.
+**A panel at the bottom of every screen**, for both roles, built by the rules of
+`docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md`, which hold the detail (its
+sections 6 and 6.1, and decisions 138 to 151). The assistant is not a screen: it has no address
+and no entry in the navigation, the page still opens on the week, and the login has no panel.
+The person asks while looking at the calendar, and sees the calendar change.
+
+- **Collapsed**, as after every load of the page, it is one bar fixed to the bottom of the
+  window: the heading "Assistant" and the field with "Send". The screen above keeps room for
+  it.
+- **Open**, it grows upward to about half of the window, most of it on a phone: the heading
+  with "New conversation" and "Close", the line about Anthropic (section 10.2), the
+  conversation, the proposal, the failure line, the messages left today, the field. It opens
+  when the field takes the keyboard, when the heading is pressed and when a message is sent;
+  "Close" and the Escape key collapse it. Open or collapsed is kept from screen to screen and
+  nowhere in the browser.
+- **The conversation is asked of the server at the first opening**, not when the person signs
+  in: a person who never opens the panel makes no request to the assistant.
 
 | Layer | Addition |
 |---|---|
 | Services | `AssistantService` (`assistant.service.ts`, `assistant.types.ts`): the six calls of section 6 through the shared `api.ts`. **One stream for the six calls**, on which each outcome says the call it answers and carries the reply as the server gave it, or the reason of the failure: the six calls speak of one conversation (`docs/FRONTEND_SERVICES.md` sections 3.4 and 20). A call makes one request, and the service keeps no conversation |
-| Logic | `assistant.screen.ts`: the conversation on show; sending; **the loop that calls `continue` while the status is `working`**, at most the limit of section 4.4; the proposal waiting; the failures in plain words. No DOM |
-| View | `assistant.view.ts` and its section of `index.html`: the list of messages, the progress line, the proposal with its two buttons and, once settled, each action's outcome, the sentence of section 6.1 when the assistant cannot answer, the input, "New conversation", the line about Anthropic. Messages are set as plain text |
-| Shell | The navigation entry, and the session's objects created and dropped with the session as for every screen, so nothing of one person's conversation is left for the next |
+| Logic | `assistant.screen.ts` with the pure `assistant.model.ts`: whether the panel is open; the conversation on show, put together from the replies with no message twice; sending; **the loop that calls `continue` while the status is `working`**, at most the limit of section 4.4, after which it says that the assistant could not finish; the proposal waiting, being confirmed and settled; the failures in plain words; what is in use; the other screens told to load again. No DOM |
+| View | `assistant.view.ts` and the element `#assistant` of `index.html`, after the screens and in none: the list of messages, the progress line, the proposal with its two buttons and, once settled, each action's outcome, the failure line, the messages left today, the field, "New conversation", "Close", the line about Anthropic. Every text of a conversation is set as plain text |
+| Shell | No row in the table of screens and no navigation entry: the shell mounts the panel once when a person signs in and unmounts it when the session ends, with the session's objects created and dropped as for every screen, so nothing of one person's conversation is left for the next |
 
 - **The language.** The front end stays English only, with no translation mechanism
   (`docs/FRONTEND_ARCHITECTURE.md` section 12.4): its own fixed words ("Assistant", "New
-  conversation", "Send") are English. Everything inside the conversation arrives from the
-  server already in the conversation's language, the proposal's question and its two button
-  labels included. That is also what lets another channel show the same proposal.
-- **After a confirmed change** the other screens must not show stale data: the logic object
-  tells the week and the list to reload when a proposal comes back with an action `done`, by
-  the mechanism those screens already reload on.
-- **Without a mouse**: a new message is announced to a screen reader (a live region), the
-  proposal's buttons are reachable in order, and Enter sends.
+  conversation", "Close", "Send", "Done", the line about Anthropic) are English. Everything
+  inside the conversation arrives from the server already in the conversation's language, the
+  proposal's question and its two button labels included. That is also what lets another
+  channel show the same proposal.
+- **The proposal** is shown once, under the last message. Once settled the same block stays
+  without its buttons and each action says what became of it: "Done"; or "Not done." with the
+  page's own English sentence for the error code the action carries (the contract of section 6
+  gives a code there, not a sentence); or that it is not known whether it was done. A declined
+  proposal is gone, and the server's notice says so. A message written instead drops the
+  proposal: the block goes with the reply, and no notice is added.
+- **While the assistant works** the field stays writable, "Send" is out of use and nothing is
+  kept to send later; the progress line shows the reply's `activity`.
+- **When the assistant cannot answer** (section 6.1) the sentence is one line under the
+  conversation, announced, and the text stays in the field. After the day's limit, or a reply
+  that counts no message left, "Send" is out of use until the page is loaded again; after
+  `conversation_full`, until "New conversation". After `assistant_busy`, `proposal_not_found`
+  and `nothing_to_continue` the conversation is read again, once. After a confirmation that got
+  `503 assistant_unavailable` or `assistant_budget_reached` it is read again too, to show each
+  action's outcome, and Claude is not asked again.
+- **After a confirmed change** the other screens must not show stale data: when a reply
+  carries a proposal with an action `done`, the logic object tells the screen on show to load
+  again, by the stream those screens already reload on when the tab is shown again. The week
+  on show changes under the open panel with no press.
+- **The page's dialogs come first**: while one is open the panel cannot be used, and nothing
+  of it is lost.
+- **Without a mouse**: a new answer, a notice and the progress line are announced to a screen
+  reader when it is free (a live region), a failure at once; the proposal's buttons come after
+  the list, in order; Enter sends; after sending, confirming and declining the keyboard is in
+  the field; collapsed, the hidden part is not reached.
 
 ---
 
@@ -1514,7 +1550,7 @@ Not built now. What the design already gives it, and what it would add:
 | Tools that call the API over HTTP with the person's token | A second network hop, the authorizer and a cold start per tool; the token travels inside a function; and a future channel has no token to pass |
 | Tools that invoke the other Lambda functions | Keeps each function's role, but `sam local start-api` cannot do it, and N5 wins, as it did for the authorizer |
 | Tools written directly on `lib/calendarDb.ts` | A second implementation of the checks, which would drift from the first |
-| The whole exchange in one request, looping until Claude is done | Simpler for the screen, but the length of an exchange is not bounded and API Gateway cuts at 30 seconds, leaving the person with nothing and the state unknown |
+| The whole exchange in one request, looping until Claude is done | Simpler for the panel, but the length of an exchange is not bounded and API Gateway cuts at 30 seconds, leaving the person with nothing and the state unknown |
 | Streaming the answer word by word (a Lambda function URL) | The HTTP API cannot stream; a function URL has no authorizer and no throttling, and does not run under `sam local`. The step-by-step progress line gives most of the benefit |
 | A background worker and polling | A queue or an asynchronous invocation that the local stack does not run, for a problem the `continue` call solves |
 | A hosted agent (Anthropic's Managed Agents) or an agent framework | They bring their own loop, sandbox and stored sessions; this needs twenty lines of loop that must stop at a confirmation, with the data staying in our table |
@@ -1523,6 +1559,7 @@ Not built now. What the design already gives it, and what it would add:
 | The key as a template parameter or in Secrets Manager | Readable in the function's settings; or 0.40 USD a month for what Parameter Store does free |
 | One function for all six routes | Loses the property that the function reading free text cannot write the calendar |
 | Sending Claude only the last 100 KB of a conversation that grew past it, instead of ending it | The assistant would forget the start of the conversation without the person knowing; the window may only be cut where Claude accepts it (a request for a tool with its result, a signed thought whole); every request would start differently, so Anthropic's cache discount is lost; and the table would still be read whole. A new conversation costs the person one press |
+| A screen "Assistant" of its own, with an address and a navigation entry | The first design of section 13. The person would leave the calendar to ask about it and come back to see what changed; the Product Owner chose a panel at the bottom of every screen, where a change shows in the week behind it |
 | Detecting the language in code | A word list fails on short messages ("ok", "ciao"); one small constrained question to the model does not |
 
 ---
@@ -1538,7 +1575,7 @@ Not built now. What the design already gives it, and what it would add:
    first; it is never edited.
 4. Every change is a proposal confirmed with a button and worded by the server; at most five
    changes per proposal; a typed message drops it.
-5. One request to Claude per HTTP request; the screen drives the steps.
+5. One request to Claude per HTTP request; the panel drives the steps.
 6. A tool is a handler called in-process with the caller's identity.
 7. Only `confirmProposal` can write the calendar.
 8. Two languages, set by the first message through one constrained question to the model; the
@@ -1549,6 +1586,8 @@ Not built now. What the design already gives it, and what it would add:
 11. Answers are plain text.
 12. Assumed: a person tolerates a few seconds per step with a progress line; the load stays at
     about ten people (N6).
+13. In the web pages the assistant is a panel at the bottom of every screen, not a screen
+    (section 13): a decision of the Product Owner, taken when the plan reached it.
 
 ### 18.2 Open points
 
@@ -1560,7 +1599,7 @@ Not built now. What the design already gives it, and what it would add:
 | P4 | **Effort level and model** | Measured in step c10 on three runs of the evaluation (section 7.1). **Closed: the Product Owner chose `claude-sonnet-5-5` at effort `low`** (2026-11-22) | Nothing |
 | P5 | **Blocking time by an override the model works out** | Judged in step c10: the nine blocking requests of the evaluation were read one by one on the chosen model (a whole day, a morning, an hour inside a window, an interval over two windows, one that holds an extra window, one over an appointment, a day with hours of its own, a day with none), and each proposed the right hours or rightly none. **Closed: no `block_time` tool** (2026-11-22) | Nothing |
 | P6 | **A typed "yes" drops the proposal** (section 5.5, rule 5) | If the walk shows people type more than they press, accept a typed confirmation only through a fixed list of words matched in code, never through the model. Built as stated; in the trial with the real model a typed "yes" made it ask for the same change again, so the buttons came back | Nothing |
-| P7 | **The front end is deployed nowhere** (`docs/FRONTEND_ARCHITECTURE.md` section 10) | Unchanged by this feature: the screen needs the same origin or CORS answer as every other screen | The first deployment of the front end, as today |
+| P7 | **The front end is deployed nowhere** (`docs/FRONTEND_ARCHITECTURE.md` section 10) | Unchanged by this feature: the panel needs the same origin or CORS answer as every other screen | The first deployment of the front end, as today |
 
 ---
 
@@ -1582,7 +1621,7 @@ An outline, in an order where each step can be checked by itself:
 6. **The Administrator's tools**: availability, types, settings, users' list; blocking time.
 7. **The evaluation**: the list of requests, the command, the first run; effort and model
    settled (P4, P5).
-8. **The screen**: service, logic, view, shell; the walk.
+8. **The panel**: service, logic, view, shell; the walk.
 9. **Deployment**: the template's additions deployed, the key set, the spend limit set in the
    Anthropic Console, the smoke test's exchange; P1 and P2 closed; `docs/ARCHITECTURE.md`,
    `docs/FRONTEND_SERVICES.md`, `docs/FRONTEND_ARCHITECTURE.md`, `docs/FOLDER_STRUCTURE.md`,
