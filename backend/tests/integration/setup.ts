@@ -14,9 +14,10 @@ import {
   PutCommand,
   QueryCommand,
   ScanCommand,
+  UpdateCommand,
   type BatchWriteCommandInput,
 } from '@aws-sdk/lib-dynamodb';
-import { existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { connect } from 'node:net';
 
 // Helpers for the integration journeys (docs/IMPLEMENTATION_PLAN.md step 9). They talk to the local
@@ -299,12 +300,145 @@ export async function queryAssistantPartition(PK: string): Promise<AssistantItem
 
 // Forgets what a person used of the assistant so far, by deleting the items that count it. For the
 // seeded accounts only: they keep their `sub` from one run to the next, so without this a day of
-// runs would use up their messages. It is the one write a journey makes to this table directly.
+// runs would use up their messages. One of the two writes a journey makes to this table directly;
+// the other is setStoredPromptVersion.
 export async function forgetDailyUse(sub: string): Promise<void> {
   const client = await localCalendar();
   for (const item of await queryAssistantPartition(`USAGE#${sub}`)) {
     await client.send(new DeleteCommand({ TableName: ASSISTANT_TABLE, Key: { PK: item.PK, SK: item.SK } }));
   }
+}
+
+// Writes another mark of the instructions and tools on the person's conversation in progress: the
+// state a deployment that changes them leaves behind, which no route can produce
+// (docs/CONVERSATIONAL_ARCHITECTURE.md section 4.3). Refused when the person has no stored
+// conversation. The other write a journey makes to this table directly.
+export async function setStoredPromptVersion(sub: string, promptVersion: string): Promise<void> {
+  const client = await localCalendar();
+  await client.send(
+    new UpdateCommand({
+      TableName: ASSISTANT_TABLE,
+      Key: { PK: `CONV#${sub}`, SK: 'META' },
+      UpdateExpression: 'SET promptVersion = :mark',
+      ConditionExpression: 'attribute_exists(PK) AND attribute_type(conversationId, :string)',
+      ExpressionAttributeValues: { ':mark': promptVersion, ':string': 'S' },
+    }),
+  );
+}
+
+// ── What a step of the assistant costs the table ──────────────────────────────────────────────
+// For the measurements of docs/CONVERSATIONAL_ARCHITECTURE.md section 9. Nothing here is asserted
+// by a journey: DynamoDB Local is an emulator, and its count is not a contract.
+
+// The size of an item as DynamoDB counts it for capacity: the UTF-8 bytes of each attribute name
+// and of each string, about one byte per two digits of a number plus one, one byte for a null or
+// a boolean, and three bytes for a list or a map plus one for each of its elements.
+export function itemBytes(item: Record<string, unknown>): number {
+  const valueBytes = (value: unknown): number => {
+    if (typeof value === 'string') return Buffer.byteLength(value, 'utf8');
+    if (typeof value === 'number') return Math.ceil(String(Math.abs(value)).replace(/[^0-9]/g, '').replace(/^0+|0+$/g, '').length / 2) + 1;
+    if (value === null || typeof value === 'boolean') return 1;
+    if (Array.isArray(value)) return 3 + value.reduce<number>((bytes, element) => bytes + 1 + valueBytes(element), 0);
+    return 3 + Object.entries(value as Record<string, unknown>).reduce((bytes, [name, element]) => bytes + 1 + Buffer.byteLength(name, 'utf8') + valueBytes(element), 0);
+  };
+  return Object.entries(item).reduce((bytes, [name, value]) => bytes + Buffer.byteLength(name, 'utf8') + valueBytes(value), 0);
+}
+
+// What the person's conversation in progress weighs in the table, and what DynamoDB Local says the
+// three reads of a step consume on it: the same reads on the same keys as the functions make,
+// strongly consistent, asked again here with the consumed capacity.
+export type AssistantWeight = {
+  storedBytes: number;
+  version: number;
+  metaBytes: number;
+  // The size of each message item of the conversation, by its sort key.
+  messageBytes: Record<string, number>;
+  // The person's use of the day as stored (the latest date), and its size.
+  usage: Record<string, unknown> | null;
+  usageBytes: number;
+  readUnits: { meta: number; messages: number; usage: number };
+};
+
+export async function weighAssistant(sub: string): Promise<AssistantWeight> {
+  const client = await localCalendar();
+  const consumed = { ReturnConsumedCapacity: 'TOTAL' } as const;
+  const meta = await client.send(new GetCommand({ TableName: ASSISTANT_TABLE, Key: { PK: `CONV#${sub}`, SK: 'META' }, ConsistentRead: true, ...consumed }));
+  const messageBytes: Record<string, number> = {};
+  let messageUnits = 0;
+  const conversationId = meta.Item?.conversationId as string | null | undefined;
+  if (conversationId) {
+    let startKey: Record<string, unknown> | undefined;
+    do {
+      const page = await client.send(
+        new QueryCommand({
+          TableName: ASSISTANT_TABLE,
+          KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
+          ExpressionAttributeValues: { ':pk': `CONV#${sub}`, ':prefix': `MSG#${conversationId}#` },
+          ConsistentRead: true,
+          ExclusiveStartKey: startKey,
+          ...consumed,
+        }),
+      );
+      for (const item of page.Items ?? []) messageBytes[item.SK as string] = itemBytes(item);
+      messageUnits += page.ConsumedCapacity?.CapacityUnits ?? 0;
+      startKey = page.LastEvaluatedKey;
+    } while (startKey);
+  }
+  const days = await queryAssistantPartition(`USAGE#${sub}`);
+  const day = days.at(-1);
+  const usage = day ? await client.send(new GetCommand({ TableName: ASSISTANT_TABLE, Key: { PK: day.PK, SK: day.SK }, ConsistentRead: true, ...consumed })) : null;
+  return {
+    storedBytes: conversationId ? (meta.Item?.storedBytes as number) : 0,
+    version: (meta.Item?.version as number | undefined) ?? 0,
+    metaBytes: meta.Item ? itemBytes(meta.Item) : 0,
+    messageBytes,
+    usage: usage?.Item ?? null,
+    usageBytes: usage?.Item ? itemBytes(usage.Item) : 0,
+    readUnits: { meta: meta.ConsumedCapacity?.CapacityUnits ?? 0, messages: messageUnits, usage: usage?.ConsumedCapacity?.CapacityUnits ?? 1 },
+  };
+}
+
+// One request to the assistant as the table saw it: what it read (the conversation as it was
+// before) and what it wrote, worked out from the items that are new or changed afterwards.
+export type AssistantStepCost = {
+  step: string;
+  storedBytes: number;
+  readBytes: number;
+  readUnits: number;
+  itemsWritten: number;
+  writtenBytes: number;
+  largestItemBytes: number;
+  writeUnits: number;
+};
+
+const KB = 1024;
+
+// The write units by AWS's rule: each item written counts its size rounded up to the next
+// kilobyte, the larger of before and after for an item that existed, and twice that inside a
+// transaction. The step that ends a conversation is the one write that is no transaction.
+export function assistantStepCost(step: string, before: AssistantWeight, after: AssistantWeight, transaction = true): AssistantStepCost {
+  const written: number[] = [];
+  if (after.version !== before.version) written.push(Math.max(before.metaBytes, after.metaBytes));
+  for (const [sk, bytes] of Object.entries(after.messageBytes)) if (!(sk in before.messageBytes)) written.push(bytes);
+  if (JSON.stringify(after.usage) !== JSON.stringify(before.usage)) written.push(Math.max(before.usageBytes, after.usageBytes));
+  const readBytes = before.metaBytes + Object.values(before.messageBytes).reduce((sum, bytes) => sum + bytes, 0) + before.usageBytes;
+  return {
+    step,
+    storedBytes: after.storedBytes,
+    readBytes,
+    readUnits: before.readUnits.meta + before.readUnits.messages + before.readUnits.usage,
+    itemsWritten: written.length,
+    writtenBytes: written.reduce((sum, bytes) => sum + bytes, 0),
+    largestItemBytes: Math.max(0, ...written),
+    writeUnits: (transaction ? 2 : 1) * written.reduce((sum, bytes) => sum + Math.ceil(bytes / KB), 0),
+  };
+}
+
+// Appends the measured steps, one JSON line each, to the file named by ASSISTANT_CAPACITY_FILE.
+// Without the variable nothing is written: the gate leaves no file behind.
+export function reportAssistantCosts(costs: AssistantStepCost[]): void {
+  const file = process.env.ASSISTANT_CAPACITY_FILE;
+  if (file) appendFileSync(file, costs.map((cost) => `${JSON.stringify(cost)}\n`).join(''));
 }
 
 // Creates an account that is in neither group, straight in cognito-local: a state the API cannot

@@ -726,6 +726,102 @@ describe('the step: at most eight requests to Claude for one message (5.6)', () 
 });
 
 // Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('the step: the first five reads of one answer of Claude (4.4)', () => {
+  beforeEach(() => calendarHandler.mockImplementation(() => routeAnswer({ days: [] })));
+
+  it('the first five are run, the others are answered as not run, each request keeps its result, and the step goes on', async () => {
+    waitingAfter(0);
+    claude.askStep.mockResolvedValue(asksFor(...[1, 2, 3, 4, 5, 6, 7].map((n) => use(`toolu_${n}`, 'calendar'))));
+
+    const result = await exchange.continueExchange(ALICE, NOW, REQUEST, READS);
+
+    expect(calendarHandler).toHaveBeenCalledTimes(5);
+    const results = (writtenStep().messages[1]?.content as { content: { tool_use_id: string; content: string; is_error?: boolean }[] }).content;
+    expect(results.map((block) => block.tool_use_id)).toEqual(['toolu_1', 'toolu_2', 'toolu_3', 'toolu_4', 'toolu_5', 'toolu_6', 'toolu_7']);
+    expect(results.slice(0, 5).every((block) => block.content === '{"days":[]}' && block.is_error === undefined)).toBe(true);
+    for (const block of results.slice(5)) {
+      expect(block.is_error).toBe(true);
+      expect(JSON.parse(block.content)).toEqual({ error: 'too_many_reads', message: expect.stringContaining('Only the first 5 reads of one answer are run') });
+    }
+    expect(result).toMatchObject({ ok: true, reply: { status: 'working' }, log: { outcome: 'tool_requests' } });
+    const tools = result.log.tools as unknown[];
+    expect(tools.slice(0, 5)).toEqual(Array.from({ length: 5 }, () => ({ name: 'calendar', status: 200, ms: expect.any(Number) })));
+    expect(tools.slice(5)).toEqual([{ name: 'calendar', notRun: 'too_many_reads' }, { name: 'calendar', notRun: 'too_many_reads' }]);
+    expectNoText(result.log);
+  });
+
+  it('a mistaken request takes a place among the five, and a name that is no tool of the person is not logged', async () => {
+    waitingAfter(0, { promptVersion: markFor(WITH_ADMIN_ONLY) });
+    claude.askStep.mockResolvedValue(
+      asksFor(use('toolu_x', 'made_up'), ...[1, 2, 3, 4, 5].map((n) => use(`toolu_${n}`, 'calendar')), use('toolu_y', 'made_up'), use('toolu_z', 'everyone')),
+    );
+
+    const result = await exchange.continueExchange(ALICE, NOW, REQUEST, WITH_ADMIN_ONLY);
+
+    expect(calendarHandler).toHaveBeenCalledTimes(4);
+    expect(everyoneHandler).not.toHaveBeenCalled();
+    const tools = result.log.tools as unknown[];
+    expect(tools[0]).toEqual({ name: null, notRun: 'unknown_tool' });
+    expect(tools.slice(5)).toEqual([{ name: 'calendar', notRun: 'too_many_reads' }, { name: null, notRun: 'too_many_reads' }, { name: null, notRun: 'too_many_reads' }]);
+  });
+});
+
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('the step: a conversation that fills up during an exchange (4.4)', () => {
+  const RESULT = '{"days":[]}';
+  // What the step below stores: Claude's answer and the entry of its one result.
+  const added = (answer: unknown) =>
+    Buffer.byteLength(JSON.stringify({ role: 'assistant', content: answer })) + Buffer.byteLength(JSON.stringify({ role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_n', content: RESULT }] }));
+
+  beforeEach(() => calendarHandler.mockImplementation(() => routeAnswer({ days: [] })));
+
+  it('one byte under the bound after the reads: the conversation waits for its next step', async () => {
+    const asks = asksFor(use('toolu_n', 'calendar'));
+    waitingAfter(1, { storedBytes: 100_000 - added(asks.content) - 1 });
+    claude.askStep.mockResolvedValue(asks);
+    const result = await exchange.continueExchange(ALICE, NOW, REQUEST, READS);
+    expect(writtenStep().status).toBe('working');
+    expect(result).toMatchObject({ ok: true, reply: { status: 'working' }, log: { outcome: 'tool_requests' } });
+  });
+
+  it('at the bound after the reads: the results are saved, the fixed sentence is added, and the conversation waits for the person', async () => {
+    const asks = asksFor(use('toolu_n', 'calendar'));
+    waitingAfter(1, { storedBytes: 100_000 - added(asks.content) });
+    claude.askStep.mockResolvedValue(asks);
+
+    const result = await exchange.continueExchange(ALICE, NOW, REQUEST, READS);
+
+    expect(calendarHandler).toHaveBeenCalledTimes(1);
+    const step = writtenStep();
+    expect(step.status).toBe('idle');
+    expect(step.messages).toEqual([
+      { kind: 'model', content: { role: 'assistant', content: expect.any(Array) } },
+      { kind: 'model', content: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_n', content: RESULT }] } },
+      { kind: 'notice', content: assistantTexts('it').conversationFull },
+    ]);
+    expect(result).toMatchObject({
+      ok: true,
+      reply: { status: 'idle', activity: null, messages: [{ from: 'assistant' }, { from: 'notice', text: assistantTexts('it').conversationFull }] },
+      log: { outcome: 'conversation_full', steps: 2 },
+    });
+    expectNoText(result.log);
+  });
+
+  it('the first step of a new conversation counts from nothing', async () => {
+    noConversation();
+    claude.askStep.mockResolvedValue(asksFor(use('toolu_n', 'calendar')));
+    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, READS);
+    expect(result).toMatchObject({ ok: true, reply: { status: 'working' } });
+  });
+
+  it('an answer in words past the bound is an answer like any other: the next message is the one refused', async () => {
+    waitingAfter(1, { storedBytes: 150_000 });
+    const result = await exchange.continueExchange(ALICE, NOW, REQUEST, READS);
+    expect(result).toMatchObject({ ok: true, reply: { status: 'idle', messages: [{ from: 'assistant', text: ANSWER }] }, log: { outcome: 'text' } });
+  });
+});
+
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
 describe('sendMessage: a language question that took too long (5.6)', () => {
   // Claude's time-out and what a step needs after Claude answered.
   const ROOM = 22_000 + 2_000;

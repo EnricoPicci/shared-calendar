@@ -53,6 +53,9 @@ the scripts themselves win, and this document is fixed.
   when `ANTHROPIC_API_KEY` is set in the shell (section 3.4).
 - `npm run local:api -w backend`: builds and serves the API on http://127.0.0.1:3000
   (foreground). Ready in about 11 s, build included.
+  When its output is to be searched afterwards (that no log line holds a person's text), keep
+  it in a file as well: `npm run local:api -w backend 2>&1 | tee /tmp/shared-calendar-local-api.log`.
+  The file starts again at every start, and holds the handlers' log lines among SAM's own.
 - `npm run local:down -w backend`: stops the stack. The table is in memory and is lost; Cognito
   data survives in `backend/.cognito/`.
 - `npm run build -w backend`: `sam build`. Always go through npm: SAM needs the repository's
@@ -203,12 +206,15 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
   `docs/IMPLEMENTATION_PLAN.md` step 9 (`journeys.test.ts`), the calendar's
   (`calendar.test.ts`) and the assistant's (`assistant.test.ts`: against the fake Claude, with
   the throw-away accounts `chat-text`, `chat-lingua`, `chat-read`, `chat-book`, `chat-decline`,
-  `chat-trouble`, `chat-rival`, `chat-note`, `chat-move`, `chat-cancel`, `chat-limit`, `chat-down`, `chat-nobody`, `chat-notadmin`, `chat-booked` and `chat-in-the-way`, removed first and
-  last; it never empties the `calendar` table: each of its eleven blocks that need the calendar
+  `chat-trouble`, `chat-rival`, `chat-note`, `chat-move`, `chat-cancel`, `chat-limit`, `chat-down`, `chat-nobody`, `chat-notadmin`, `chat-booked`, `chat-in-the-way`, `chat-full` and `chat-mark`, removed first and
+  last; it never empties the `calendar` table: each of its twelve blocks that need the calendar
   creates a type of its own name (`JOURNEY_TYPES` in the file) and hours in the early morning
   on a day of its own, between the 12th and the 28th from today, through the API, and removes
   them first and last, with the weekly patterns of its type and the hours of its own it gave a
-  day; the two blocks that change the hours of a whole day run on a Saturday, where the
+  day; the block that fills a conversation instead opens 00:00–04:00 on every day from tomorrow
+  to the 31st, with fourteen weekly patterns of its type, and with
+  `ASSISTANT_CAPACITY_FILE=<a file>` in its environment writes there what each of its steps
+  read and wrote in the `assistant` table; the two blocks that change the hours of a whole day run on a Saturday, where the
   calendar's journeys leave nothing; the appointments it books it cancels, and those stay in
   the `calendar` table, cancelled; what it leaves in the `assistant` table stays there, under accounts that no longer exist) against the running `local:up` +
   `local:api` stack. Pass the same

@@ -2479,10 +2479,11 @@ Resources:
   # with ListUsersInGroup, the variables that only the local stack fills) and, on top, what the
   # routes it runs need:
   # - writing to the calendar's table (CalendarWritePolicy): a booking, a cancellation, a move, a
-  #   note, the settings, a type created or renamed;
+  #   note, the settings, a type created or renamed, a weekly pattern, a date's own hours or an
+  #   extra window created or changed;
   # - the check that the User of a booking was not deleted meanwhile (CalendarBookPolicy);
-  # - deleting an item of the calendar's table (CalendarDeletePolicy): a type deleted, the one
-  #   change that removes an item;
+  # - deleting an item of the calendar's table (CalendarDeletePolicy): a type, a weekly pattern,
+  #   a date's own hours or an extra window deleted;
   # - reading one account of the user pool and its groups (AdminGetUser, AdminListGroupsForUser):
   #   the booking route checks with them that the User the Administrator books for exists and is
   #   not an administrator. Both only read. The function cannot create, change or delete an account.

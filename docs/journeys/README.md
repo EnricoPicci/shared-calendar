@@ -122,3 +122,5 @@ The pages written so far. Which pages are still to come, and in which order, is 
 | [`backend/assistant-blocking.md`](backend/assistant-blocking.md) | `backend/tests/integration/assistant.test.ts`, `time blocked through the assistant (3, 5.4, 5.5)` |
 | [`backend/assistant-blocking-refused.md`](backend/assistant-blocking-refused.md) | `backend/tests/integration/assistant.test.ts`, `a block over an appointment is refused by the calendar (3, 5.4, 8.3)` |
 | [`backend/assistant-pattern.md`](backend/assistant-pattern.md) | `backend/tests/integration/assistant.test.ts`, `a weekly pattern created and deleted through the assistant (3, 5.4, 5.5)` |
+| [`backend/assistant-full-conversation.md`](backend/assistant-full-conversation.md) | `backend/tests/integration/assistant.test.ts`, `a conversation filled to its bound (4.4, 9)` |
+| [`backend/assistant-other-instructions.md`](backend/assistant-other-instructions.md) | `backend/tests/integration/assistant.test.ts`, `a conversation started under other instructions is over (4.3)` |

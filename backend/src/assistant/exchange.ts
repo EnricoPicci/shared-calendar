@@ -33,6 +33,11 @@ const counts = (usage: TokenCounts) => ({ input: usage.inputTokens, output: usag
 const inputOf = (usage: TokenCounts | null) => (usage ? usage.inputTokens + usage.cacheReadTokens + usage.cacheWriteTokens : 0);
 
 const notice = (text: string): NewMessage => ({ kind: 'notice', content: text });
+// What the messages of a step add to the stored size of their conversation: the bytes of each
+// content as the table stores it, its JSON text.
+const storedBytesOf = (messages: NewMessage[]) => messages.reduce((bytes, message) => bytes + Buffer.byteLength(JSON.stringify(message.content), 'utf8'), 0);
+// What Claude is told of a read that was not run because its answer asked for too many.
+const TOO_MANY_READS = `Only the first ${ASSISTANT_LIMITS.readsPerAnswer} reads of one answer are run, and this one was not: its result is missing, not empty. Ask for it again in your next answer, a few reads at a time. If the person's request needs more than you can read this way, tell them to ask for a shorter period.`;
 const entriesOf = (messages: { kind: string; content: unknown }[]) =>
   messages.filter((message) => message.kind === 'model').map((message) => message.content as ConversationEntry);
 
@@ -254,9 +259,18 @@ export async function runStep(input: StepInput): Promise<CoreResult> {
       // a request that was refused, or a change that can be proposed.
       const answered: ({ result: ToolResultBlock } | { change: ProposedChange; log: number })[] = [];
       let refusedChange = false;
+      // The requests of this answer that are not changes, counted as they come.
+      let reads = 0;
+      // A name Claude gave, when it is a tool of the person's role: the log line names no other.
+      const offeredName = (name: string) => (tools.some((tool) => tool.definition.name === name && tool.definition.roles.includes(caller.role)) ? name : null);
       for (const asked of answer.requests) {
         if (!asksForChange(asked, tools, caller)) {
-          const done = await runRead(asked, tools, caller, context, now);
+          // The results of one answer are stored together, so only its first few requests that
+          // are not changes are looked at, a mistaken one among them: Claude is told to ask for
+          // the others in its next answer.
+          reads += 1;
+          const done =
+            reads <= ASSISTANT_LIMITS.readsPerAnswer ? await runRead(asked, tools, caller, context, now) : notRun(asked.id, offeredName(asked.name), 'too_many_reads', TOO_MANY_READS);
           answered.push({ result: done.result });
           ran.push(done.log);
           continue;
@@ -310,6 +324,12 @@ export async function runStep(input: StepInput): Promise<CoreResult> {
         // results saved so that the conversation stays one Claude can be given again.
         messages.push(notice(texts.tooManySteps));
         outcome = 'step_limit';
+      } else if ((current.conversation?.storedBytes ?? 0) + storedBytesOf(messages) >= ASSISTANT_LIMITS.conversationBytes) {
+        // With these results the conversation is full: the exchange stops here, results saved,
+        // and the person is told to start a new conversation, which the next message would be
+        // told anyway. Without this a single message could go on filling it, step after step.
+        messages.push(notice(texts.conversationFull));
+        outcome = 'conversation_full';
       } else {
         status = 'working';
       }

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v11, under way: steps c00 to c08 of `docs/CONVERSATIONAL_PLAN.md` done |
+| Status | v12, under way: steps c00 to c09 of `docs/CONVERSATIONAL_PLAN.md` done |
 | Date | 2026-11-22 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
@@ -22,6 +22,7 @@
 | v9 | 2026-11-22 | Step c06 of `docs/CONVERSATIONAL_PLAN.md` is done: the other appointment changes, `cancel_appointment`, `change_appointment` and `set_appointment_note`, for both roles, and several changes in one proposal. **Decided with the Product Owner:** the three tools are offered to the Administrator too, and the sentence then names whose appointment it is; more than five changes in one answer propose none; when one change of an answer cannot be proposed, none is (section 5.5, rule 4); `book_appointment` no longer asks for one booking at a time. What the implementation fixed is said here. The appointment an id stands for is read through the list of the appointments that have not ended, as the calendar has no route that reads one (section 5.4). Two changes of one answer on the same appointment or into the same slot are not proposed, nor is a change that changes nothing (section 5.5, rule 4). The changes of one answer share one reading of the calendar (section 5.4). A note is a text or `null`, never left out (section 8.2). The confirming function needed no new permission: section 11.3 named `CalendarDeletePolicy` by mistake. The fake's third mark, for an appointment's id (section 12.1) |
 | v10 | 2026-11-22 | Step c07 of `docs/CONVERSATIONAL_PLAN.md` is done: the Administrator's simpler tools, `list_users`, `list_patterns`, `update_settings`, `create_type`, `rename_type` and `delete_type`, and `book_appointment` for a named User. **Finding F6 of the plan is answered** (section 5.4): the confirmation of a booking for a User checks the username against the users' list, read through the handler of `GET /users`. **Decided with the Product Owner:** the sentences of the new proposals; a tool of the other role is answered with the very result of a tool that does not exist, code included (section 7.4); a confirmed change of settings writes the four values read at the proposal (section 5.4). What the implementation fixed is said here: what each new tool checks at the proposal and what only its route can check (sections 5.4 and 8.2), the two new results (8.3), the instructions (7.3), the permissions and the environment of the three functions that run tools (11.3), the journeys (12.1) |
 | v11 | 2026-11-22 | Step c08 of `docs/CONVERSATIONAL_PLAN.md` is done: the Administrator's tools of the opening hours, `create_pattern`, `update_pattern`, `delete_pattern`, `set_date_override`, `delete_date_override`, `create_one_off_window` and `delete_one_off_window`, and blocking time. **Every tool of section 3 exists**, and the stopgap paragraph of the instructions is gone (section 7.3). **Decided with the Product Owner:** the sentences of the seven proposals; `delete_one_off_window` takes the window's date beside its id, since no route reads one window (section 5.4). Three questions the step answered: for the Administrator `get_calendar` says where each window comes from, the id of an extra window and whether the day has hours of its own (section 8.3); a block over an extra window is three changes in one proposal (section 3); a refusal that lists the appointments in the way gives Claude the list, made small (section 8.3). What the implementation fixed is said here: what each tool checks at the proposal and what only its route can (section 5.4), two changes about the same thing (5.5), the instructions (7.3), the inputs (8.2), two more marks of the fake (12.1). No route, function, role or permission is added (11.3) |
+| v12 | 2026-11-22 | Step c09 of `docs/CONVERSATIONAL_PLAN.md` is done: the back end is closed. **Two limits are added** (section 4.4), found when the size of a stored item was worked out: only the first five reads of one answer of the model are run, and the stored size of a conversation is looked at again after every step that would lead to another, so that an exchange stops at most one step past the bound. **Open point P3 has its numbers and its decision** (sections 9 and 18.2). Two journeys are added: a conversation filled to its bound, and a conversation whose mark of the instructions differs (section 12.1); the journeys make a second direct write to the `assistant` table. A sliding window over the conversation is among the alternatives not taken (section 17). No tool, route, function, role or permission is added |
 
 ---
 
@@ -246,12 +247,15 @@ offered, so a change to any of them changes it, and so does a person's change of
 |---|---|---|
 | Length of one message | 2 000 characters | `400 invalid_request` |
 | Messages of a person per day (the calendar's time zone) | 30, the deployment parameter `AssistantDailyMessageLimit` | `429 assistant_limit_reached`; the screen says so until tomorrow |
-| Messages of a person in one conversation | 40, or 100 KB stored | `409 conversation_full`; the screen offers "New conversation" |
+| Messages of a person in one conversation | 40, or 100 KB stored | `409 conversation_full`; the screen offers "New conversation". The stored size is also looked at after every step whose reads were run: when it has reached the bound the exchange stops there, with the fixed sentence "This conversation is full. To continue, start a new one.", and the conversation is `idle`. One message therefore ends at most one step past the bound |
+| Reads run for one answer of Claude | 5 | The requests of one answer that are not changes are counted, mistaken ones too; from the sixth on each gets the error result `too_many_reads`, which tells the model to ask again in its next answer, a few reads at a time, and to tell the person to ask for a shorter period when that is not enough. The results of one answer are stored as one item, and DynamoDB refuses an item over 400 KB |
 | Requests to Claude for one message of the person | 8 | The assistant stops with a fixed sentence asking to put the request differently. Counted from the stored conversation (Claude's answers since the person's last message), so it holds across the HTTP requests of an exchange. When the eighth answer still asks to read, its reads are run and saved with the sentence, so that the conversation stays one Claude accepts |
 | Changes in one proposal | 5 | The model is told to propose fewer at a time |
 
 The limits bound the cost per person (section 14) and keep one conversation small enough to
-read from the table at every step.
+read from the table at every step. What they come to in the table: a step stores at most about
+37 KB (five results of 6 KB, each about 7.2 KB once written as text inside its entry), a
+conversation at most about 138 KB, and no item comes near DynamoDB's 400 KB (section 9).
 
 ---
 
@@ -650,6 +654,10 @@ How to read it:
 - **The limit of eight** (section 4.4) is checked after Claude answered: the eighth answer in
   words is an answer like any other; the eighth that asks to read has its reads run and saved,
   then the fixed sentence, and the status is `idle`.
+- **The first five reads of one answer are run** (section 4.4); the others get an error result
+  and no handler is called for them. **After a step whose reads were run the stored size is
+  compared with the bound**: at 100 KB the exchange stops with its fixed sentence, as at the
+  limit of eight. An answer in words and a proposal are saved whatever the size.
 - **Everything in the diagram is built.** A proposal holds up to five changes (section 5.5,
   rule 4), and the loop of the confirmation runs once for each.
 
@@ -1073,9 +1081,37 @@ so that the calendar's shared permission sets stay as they are.
 - The module `backend/src/lib/assistantDb.ts` is the only one that knows this layout, which
   `docs/ARCHITECTURE.md` section 5.4 describes as built.
 
-A step writes a few kilobytes and reads the whole conversation (at most 100 KB), which now and
-then exceeds 8 units in one second; DynamoDB's burst allowance (five minutes of unused
-capacity) absorbs it at this load. The plan measures it (section 18.2, P3).
+**What a step costs the table** (open point P3 of section 18.2, measured in step c09 of
+`docs/CONVERSATIONAL_PLAN.md`, whose "As done" note says how). A step makes three consistent
+reads (`META`, the messages of the conversation, the day's use) and one transaction. DynamoDB
+counts a consistent read at one unit per 4 KB, the messages of a query added up before
+rounding, and a write at one unit per KB of each item, **twice in a transaction**.
+
+| Step | Read units | Write units |
+|---|---|---|
+| An ordinary one: a short message, a short answer | 2 | 14 |
+| The largest a step can be: five results cut at 6 KB, about 37 KB stored in one item | 2 to 21, by what the conversation holds | 78 to 84 |
+| Reading a full conversation (111 KB stored: a message refused, `GET`, `DELETE`) | 30 | 0, or 1 for `DELETE` |
+| The largest read, worked out: a conversation of 138 KB | 36 | |
+| A proposal that keeps five full results back, and its confirmation, worked out | as above | about 82 for the proposal; about 40 to take it and 160 to 230 for the outcomes |
+
+Against 8 read and 6 write units a second, an ordinary step fits in the three seconds Claude
+takes to answer, and a large one does not: it takes the write capacity of fourteen seconds.
+DynamoDB keeps the capacity a table did not use in the last five minutes, here up to 2 400
+read and 1 800 write units, and spends it on such moments: about twenty of the largest steps in
+a row from a table at rest. AWS states this allowance as it is today, not as a promise. **When
+the table does refuse a request for capacity**, the AWS SDK tries again by itself (four
+attempts, waiting between them); when that is not enough the person gets `500 internal_error`,
+the step is not saved, and sending again or `continue` is the way on. DynamoDB Local counts the
+units as AWS does and never refuses for capacity, so the refusal is reasoned from AWS's
+documentation and was not seen.
+
+**The bounds are both kept**, 100 KB for a conversation and 6 KB for a
+result. The two limits of section 4.4 that the step added already hold the largest step and the
+largest conversation; a lower cut would shorten real answers about the calendar (a month, for
+the Administrator); and the large steps need five full results in one answer, which the model
+did not ask for in any trial. Decided by the Product Owner at the review of step c09
+(section 18.2, P3).
 
 ---
 
@@ -1245,8 +1281,27 @@ left on a day from tomorrow to 28 days ahead.
 **The journeys and the settings.** One journey changes a setting through the assistant, as
 the seeded Administrator: the booking horizon, to 57 days, which no journey's booking comes
 near. It puts the settings back at its end, whatever happened; a run killed before that
-leaves the horizon at 57, and the next run starts by setting it to 56. The three blocks that
-talk as the Administrator each start that account's count of the day again.
+leaves the horizon at 57, and the next run starts by setting it to 56. The blocks that
+talk as the Administrator each start that account's count of the day again
+(`forgetDailyUse()`), so the gate does not depend on how many messages that account sent
+today.
+
+**A conversation filled to its bound.** One journey, as a throw-away User of its own, opens
+four hours on every day of a month under its own type and sends one sentence the fake answers,
+at every step, with six readings of that month: a step no model would ask for, which stores the
+most a step can. It checks the five reads and the sixth refused, the stop at the bound, the
+refusal of the next message, and that the conversation can be read, ended and followed by a new
+small one. It asserts no number of units: it weighs every step by AWS's rule and, when the
+variable `ASSISTANT_CAPACITY_FILE` names a file, writes the numbers there.
+
+**A conversation under other instructions.** One journey writes another mark on the stored
+conversation of its User, the second of the two direct writes the journeys make to the
+`assistant` table (`setStoredPromptVersion()`), and shows through the routes that the
+conversation then reads as empty, that `continue` has nothing to continue, that the next message
+starts a new conversation to which the old messages are not sent, and that the old messages stay
+stored and no route gives them. Starting the local function with other instructions would prove
+the same and need a second build; that the mark moves when the instructions, the block about the
+person or the tools change is shown by the unit tests of `backend/src/assistant/prompt.ts`.
 
 ### 12.2 The tests
 
@@ -1385,6 +1440,7 @@ Not built now. What the design already gives it, and what it would add:
 | The conversation kept in the browser and sent back each time | The server would act on a history it cannot trust, and a messenger has no browser |
 | The key as a template parameter or in Secrets Manager | Readable in the function's settings; or 0.40 USD a month for what Parameter Store does free |
 | One function for all six routes | Loses the property that the function reading free text cannot write the calendar |
+| Sending Claude only the last 100 KB of a conversation that grew past it, instead of ending it | The assistant would forget the start of the conversation without the person knowing; the window may only be cut where Claude accepts it (a request for a tool with its result, a signed thought whole); every request would start differently, so Anthropic's cache discount is lost; and the table would still be read whole. A new conversation costs the person one press |
 | Detecting the language in code | A word list fails on short messages ("ok", "ciao"); one small constrained question to the model does not |
 
 ---
@@ -1418,7 +1474,7 @@ Not built now. What the design already gives it, and what it would add:
 |---|---|---|---|
 | P1 | **Anthropic's data terms** for the account in use: how long requests are kept, and that they are not used for training | The operator reads the account's settings and terms; the result is written in section 10.2 | Inviting real users |
 | P2 | **Whether reading the key needs a `kms:Decrypt` statement** besides `ssm:GetParameter`. AWS's documentation says the default key of Parameter Store already lets every principal of the account decrypt, and also shows roles carrying the statement | Try it in the first deployment step; if needed, one statement naming that key, usable only through Parameter Store | Nothing: a known fix either way |
-| P3 | **The capacity of the `assistant` table** under a long conversation | Measure the units a step uses in the journeys; lower the 100 KB bound or the result cap if the burst allowance is not enough | Nothing |
+| P3 | **The capacity of the `assistant` table** under a long conversation | Measured in step c09 (section 9, "What a step costs the table"): an ordinary step 2 read and 14 write units, the largest 84 write units, a full conversation 30 read units, against 8 / 6 a second and a burst allowance of 2 400 / 1 800. **Closed: the Product Owner decided to keep the 100 KB bound and the 6 KB cut** (2026-11-22) | Nothing |
 | P4 | **Effort level and model** | The first evaluation run decides, on quality, seconds per step and cents per exchange | Nothing |
 | P5 | **Blocking time by an override the model works out** | If the evaluation shows wrong hours, add one composed tool, `block_time`, where the server takes the interval out of the day's windows with a pure function in `shared/` | Nothing |
 | P6 | **A typed "yes" drops the proposal** (section 5.5, rule 5) | If the walk shows people type more than they press, accept a typed confirmation only through a fixed list of words matched in code, never through the model. Built as stated; in the trial with the real model a typed "yes" made it ask for the same change again, so the buttons came back | Nothing |

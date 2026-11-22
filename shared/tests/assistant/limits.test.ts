@@ -10,6 +10,7 @@ describe('ASSISTANT_LIMITS', () => {
       messagesPerConversation: 40,
       conversationBytes: 100000,
       modelRequestsPerMessage: 8,
+      readsPerAnswer: 5,
       changesPerProposal: 5,
     });
   });

@@ -15,7 +15,7 @@ Each section explains one idea in simple words and names the document that defin
 | `dave`, `erin` | throw-away Users of the back end's calendar journeys | `backend/tests/integration/calendar.test.ts` |
 | `fe-calendar`, `fe-calendar-b` | throw-away Users of the front end's calendar journeys | `frontend/tests/integration/calendar.test.ts` |
 | `fe-journey` | a throw-away User of the front end's Hello World journeys | `frontend/tests/integration/journeys.test.ts` |
-| `chat-text`, `chat-lingua`, `chat-read`, `chat-book`, `chat-decline`, `chat-trouble`, `chat-note`, `chat-move`, `chat-cancel`, `chat-limit`, `chat-down`, `chat-notadmin` | throw-away Users of the assistant's journeys, one per block | `backend/tests/integration/assistant.test.ts` |
+| `chat-text`, `chat-lingua`, `chat-read`, `chat-book`, `chat-decline`, `chat-trouble`, `chat-note`, `chat-move`, `chat-cancel`, `chat-limit`, `chat-down`, `chat-notadmin`, `chat-full`, `chat-mark` | throw-away Users of the assistant's journeys, one per block | `backend/tests/integration/assistant.test.ts` |
 | `chat-rival` | a second throw-away User of one assistant journey, who books through the calendar's own route | `backend/tests/integration/assistant.test.ts` |
 | `chat-booked` | the throw-away User the Administrator books for through the assistant; it only reads its own list | `backend/tests/integration/assistant.test.ts` |
 | `chat-in-the-way` | the throw-away User whose appointment lies in the hour the Administrator asks the assistant to block; it books through the calendar's own route | `backend/tests/integration/assistant.test.ts` |
@@ -47,6 +47,9 @@ All journeys and the smoke test use the same local `calendar` table. They treat 
   block checks only what it made, whatever else its day holds.
   Three more blocks change the opening hours themselves, and prepare the calendar in another
   way: see "The opening hours through the assistant" below.
+  One block more fills a conversation: it opens 00:00–04:00 on every day from tomorrow to 31
+  days ahead, with fourteen weekly patterns of its own type valid on those days alone, and
+  deletes them and the type at its end.
 
 Appointments cannot be deleted through the API, only cancelled. So cancelled appointments, their
 events and the deleted-user markers of removed Users stay in the table as history.
@@ -476,6 +479,9 @@ the tools" below). The texts the journeys send:
 | `fake: what is free on the day of the blocking journey?` | first a request for `get_calendar`, for the Saturday of the blocking journey; then, as its text, the result of that tool word for word |
 | `fake: open the weekly pattern of the pattern journey` | first a request for `list_types`, with the words "I need the type id."; then a request for `create_pattern`: Sunday, 04:00–06:00, the id of the journey's type found by its name in that list, valid from the day 12 days after today to the day 18 days after; then the last result of a tool as its text |
 | `fake: delete the weekly pattern of the pattern journey` | first a request for `list_patterns`; then a request for `delete_pattern`, with the id of the pattern whose type has the journey's name in that list; then the last result of a tool as its text |
+| `fake: read the month of the filling journey six times over` | at every step, six requests for `get_calendar` in one answer, each from the day after today to the day 31 days after: an answer written by hand, which no model would send |
+| `fake: read the settings of the mark journey` | first a request for the tool `get_settings`; then, as its text, the result of that tool word for word |
+| `fake: what was the last result you were given?` | as its text, the last result of a tool that the request holds, or "(no result of a tool in the request)" when it holds none |
 | a text the file does not hold | "Fake Claude: no answer is scripted for this message." |
 
 The language question (below) is scripted the same way: of the texts the journeys send,
@@ -685,9 +691,12 @@ Six blocks of `backend/tests/integration/assistant.test.ts` talk to the assistan
 seeded Administrator, `admin`. Unlike a throw-away User, that account keeps its `sub` from one
 run to the next, so it does not start clean by itself. Each of those blocks first deletes the
 Administrator's items of daily use (`forgetDailyUse()` of `backend/tests/integration/setup.ts`,
-the one write a journey makes to the `assistant` table directly) and ends their conversation
+one of the two writes a journey makes to the `assistant` table directly) and ends their conversation
 (`DELETE /assistant/conversation`); it sends one or two messages, and ends the conversation
-again when it is done.
+again when it is done. The other direct write is `setStoredPromptVersion()`, in the one block
+that shows what a deployment with other instructions does to a conversation in progress: it
+writes another mark of the instructions on that person's `META` item, a state no route can
+produce.
 
 ### The `assistant` table
 
@@ -696,7 +705,7 @@ The journeys read it with `queryAssistantPartition()` of `backend/tests/integrat
 
 | Item | `PK` | `SK` | What it holds |
 |---|---|---|---|
-| Conversation | `CONV#<sub>` | `META` | one per person: `conversationId` (`null` when ended), `language`, `status`, `messageCount` (the person's messages), `nextSeq`, `proposal` (the proposal waiting or settled, or `null`) |
+| Conversation | `CONV#<sub>` | `META` | one per person: `conversationId` (`null` when ended), `language`, `status`, `messageCount` (the person's messages), `storedBytes` (the bytes of every stored `content`), `nextSeq`, `promptVersion` (the mark of the instructions and tools the conversation started under), `proposal` (the proposal waiting or settled, or `null`) |
 | Message | `CONV#<sub>` | `MSG#<conversationId>#<seq>`, `seq` on six digits | `kind` `model`, with `content` the JSON text of one entry as exchanged with Claude (`role` `user`, `system` for the line of the application, `assistant`); or `kind` `notice`, a fixed text of the server that the person reads and Claude never gets. The file's helper `storedEntries()` gives the `model` entries of the conversation in progress |
 | Daily use | `USAGE#<sub>` | the local date | `messages`, `inputTokens`, `outputTokens` of that day |
 
@@ -713,3 +722,22 @@ A person may send a fixed number of messages a day, counted on the calendar's lo
 call it `LIMIT`. `remainingToday` in a reply is what is left of it. A message counts when it is
 saved, whether Claude answered it or not; a refused request counts nothing. Ending a conversation
 does not give the messages back.
+
+### A full conversation
+
+A conversation has two bounds of its own, beside the day's (`ASSISTANT_LIMITS` in
+`shared/src/assistant/limits.ts`; `docs/CONVERSATIONAL_ARCHITECTURE.md` section 4.4): 40
+messages of the person, and 100 KB stored. The stored size is `storedBytes` on the `META` item:
+the bytes of every `content` of the conversation, as the JSON text it is kept as. A message sent
+to a conversation that has reached either bound is refused with `409 conversation_full`: nothing
+is saved, nothing is counted for the day, and Claude is not asked. The person can still read the
+conversation, and ends it with `DELETE /assistant/conversation`; the next message starts a new
+one.
+
+The size is looked at again after each step that reads. When the results just saved bring the
+conversation to the bound, the exchange stops there: the conversation is left `idle`, with the
+notice "This conversation is full. To continue, start a new one." Two more limits keep a step
+small: a result of a tool is cut at 6 KB, at a whole item of its list, with a line `cut` that
+says so (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 8.3); and only the first five reads of
+one answer of Claude are run, the others getting the error `too_many_reads`, which tells Claude
+to ask again.

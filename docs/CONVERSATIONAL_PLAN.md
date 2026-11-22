@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`) |
+| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`). **Step c09 done** 2026-11-22 (brief `prompts/a11-step-c09-implementation.md`) |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown on its screen, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which is deployed nowhere today (open point P7, section 2.2). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
@@ -63,7 +63,7 @@ this plan.
 |---|---|---|---|
 | P1 | Anthropic's data terms for the account in use | c15 | The operator reads the account's settings and terms. The result is written in `docs/CONVERSATIONAL_ARCHITECTURE.md` section 10.2. Until then nobody but the operator is invited |
 | P2 | Whether reading the key needs `kms:Decrypt` | c15 | The deployment is made without the statement. The smoke test's exchange tells. If the key cannot be read: one statement naming the key, a second deployment, each with its own go |
-| P3 | The capacity of the `assistant` table under a long conversation | c09 | A journey fills a conversation to its bound and records the read and write units of each step. The report compares them with 8 / 6 and the burst allowance and proposes to keep or lower the 100 KB bound and the 6 KB cap |
+| P3 | The capacity of the `assistant` table under a long conversation | c09 | Measured (the "As done" note of step c09): an ordinary step 2 read and 14 write units, the largest 84 write units, a full conversation 30 read units, against 8 / 6 a second and a burst allowance of 2 400 / 1 800. **Closed: the Product Owner decided to keep the 100 KB bound and the 6 KB cap** (2026-11-22) |
 | P4 | Effort level and model | c10 | The first evaluation run, at two effort levels and on two models: quality, seconds per step, cents per exchange. The Product Owner chooses |
 | P5 | Blocking time by an override the model works out | c10 | The evaluation's blocking requests. If the hours come out wrong, the tool `block_time` is proposed, and built only after the Product Owner's go, as an addition to step c10 |
 | P6 | A typed "yes" drops the proposal | c13 | The walk with the real model, by the Product Owner too. If people type more than they press, the fixed list of words matched in code is proposed, and built only after the go |
@@ -73,8 +73,8 @@ this plan.
 
 Reading the architecture against the repository brought up six points it does not settle. They
 are not open points of the architecture yet. Each is raised in the step named, with a proposal,
-before the code that depends on it. F1, F2, F3, F4 and F5 are closed: the "As done" notes of steps
-c02, c03, c04 and c05 say how.
+before the code that depends on it. All six are closed: the "As done" notes of steps
+c02, c03, c04, c05 and c07 say how.
 
 | # | Finding | Step |
 |---|---|---|
@@ -932,6 +932,135 @@ instructions; a refusal names the appointments in the way.
 
 **Acceptance:** the gate green twice; P3's numbers and the decision taken at the review written
 in `docs/CONVERSATIONAL_ARCHITECTURE.md` section 9 and 18.2; the log search empty.
+
+**As done** (2026-11-22, brief `prompts/a11-step-c09-implementation.md`). No tool, route,
+function, role or permission was added. The step differed from its text in these points:
+
+- **Two limits were added to the product, decided by the Product Owner in the session.** The
+  brief asked whether anything bounds the size of one stored item. Nothing did: the results of
+  one answer are one item (or part of `META` when a proposal keeps them back), an answer may
+  ask for any number of reads, and at about 66 results of 6 KB the item passes DynamoDB's
+  400 KB, which DynamoDB Local refuses as AWS does (tried: 390 KB accepted, 410 KB refused).
+  And the 100 KB bound was looked at only when a message arrived, so one message could add
+  eight steps to a conversation just under it. Decided: (1) only the first five requests of one
+  answer that are not changes are looked at, the others get the error result `too_many_reads`
+  and Claude is told to ask again, a few at a time (`readsPerAnswer` in
+  `shared/src/assistant/limits.ts`); the Product Owner asked whether the person should be told
+  instead, and chose this way, in which Claude tells the person when a shorter period is
+  needed; (2) after a step whose reads were run, a conversation at its bound stops the exchange
+  with the fixed sentence `conversationFull`, which both languages already had. The Product
+  Owner asked whether to send Claude only the last 100 KB instead, and decided against
+  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 17). The instructions did not change, so no
+  conversation in progress is ended by this step.
+- **The mark journey writes the mark in the table**, it does not start the local function with
+  another one: `setStoredPromptVersion()` changes `promptVersion` on the stored `META` item.
+  Through the routes it proves that such a conversation reads as empty, that the next message
+  starts a new one and that the old messages are not sent to Claude. That the mark moves with
+  the instructions, the person's block and the tools stays with the unit tests of
+  `backend/src/assistant/prompt.ts`.
+- **The log search found two lines' worth of a username**, not nothing: see below.
+
+**Tests.** No existing test was changed or replaced. Added: two `describe` blocks of
+`backend/tests/unit/assistant/exchange.test.ts` (the five reads; a conversation that fills up
+during an exchange), one expected value in `shared/tests/assistant/limits.test.ts`, and two
+journeys with their pages, `docs/journeys/backend/assistant-full-conversation.md` and
+`docs/journeys/backend/assistant-other-instructions.md`, each written by one subagent and
+checked by another; the checker found no wrong check and seven small points (an order of
+events, which tests depend on which, three references, one order of checks), all applied but
+one: `POST /users` stays out of a page's table of routes, as on the other pages.
+
+**P3, the numbers.** How obtained: DynamoDB Local 3.3.1 answers `ReturnConsumedCapacity` by
+AWS's rule in every case tried (consistent and eventual reads of 0.1 to 30 KB, a query of five
+items, a missing item, a transaction of two puts and an update, which it counts twice). The
+filling journey repeats the three reads of a step with the units asked for, and works the
+write units out from the size of the items by AWS's rule, since the write is made by the
+function. With `ASSISTANT_CAPACITY_FILE` set, it wrote these (the same in three runs but for a
+few bytes):
+
+| Request | Stored after | Read (bytes, units) | Written (items, bytes, largest item) | Write units |
+|---|---|---|---|---|
+| The message, first step | 37 288 | 0, 2 | 6, 38 266, 36 224 | 84 |
+| `continue` | 74 258 | 38 266, 12 | 3, 37 551, 36 224 | 78 |
+| `continue`, which fills the conversation and stops | 111 286 | 75 524, 21 | 4, 37 754, 36 224 | 80 |
+| A message refused, and `GET` | 111 286 | 112 982, 30 | 0 | 0 |
+| `DELETE` | 0 | 112 982, 30 | 1, 290 | 1 |
+| A message in the new conversation | 2 199 | 374, 2 | 5, 3 029, 2 060 | 14 |
+
+- A result cut at 6 000 bytes weighs about 7.2 KB stored: it is JSON text inside the JSON text
+  of its entry, and every quotation mark takes two bytes. Five of them are one item of 36 KB.
+- Worked out, not measured: a message arriving just under the bound and one full step leave
+  about 138 KB, 36 units to read. A proposal that keeps five full results back holds them in
+  `META`, about 41 KB: about 82 units to write it, about 40 to take it at the confirmation and
+  160 to 230 for the outcomes. `storedBytes` does not count what `META` keeps back.
+- **A busy minute.** In the trials with the real model a step took 1.3 to 5.8 seconds and
+  stored about a kilobyte: 14 write units every three seconds, under the 6 a second. Two
+  people at once pass it, and the largest step takes fourteen seconds of capacity by itself.
+  The allowance covers both: DynamoDB keeps up to 300 seconds of unused capacity, 2 400 read
+  and 1 800 write units here, about twenty of the largest steps in a row.
+- **When the table throttles**: the installed SDK (`@aws-sdk/client-dynamodb` 3.1158.0) makes
+  four attempts for DynamoDB, waiting between them; then the handler answers
+  `500 internal_error` and nothing of the step is saved. A cancelled transaction is not tried
+  again and still uses its units. How sure: the bytes and units are measured; the throttling
+  is read from AWS's pages and from the SDK's code, since DynamoDB Local ignores the capacity.
+- **Proposed, and decided by the Product Owner at the review: keep 100 KB and 6 KB.**
+- AWS's pages used, in the Amazon DynamoDB Developer Guide: "DynamoDB read and write
+  operations" (`read-write-operations.html`), "Provisioned capacity mode"
+  (`provisioned-capacity-mode.html`), "Understanding DynamoDB item sizes and formats"
+  (`CapacityUnitCalculations.html`), "Burst and adaptive capacity"
+  (`burst-adaptive-capacity.html`), "Amazon DynamoDB Transactions: how it works"
+  (`transaction-apis.html`), "DynamoDB local usage notes" (`DynamoDBLocal.UsageNotes.html`),
+  "Programming Amazon DynamoDB with JavaScript" (`programming-with-javascript.html`).
+
+**The log search.** One whole run of the gate with the output of `local:api` kept in a file:
+12 027 lines, 890 of them the handlers' log lines. Looked for: 327 texts (every sentence and
+answer of `answers.json`, the tool input and the signature of a thought it holds, every text
+the three journey files send or write as a note, a type name or a password, the placeholder of
+the key) and six shapes (a token, a bearer header, a key of Anthropic, a body, a tool's input,
+a tool's result), and each throw-away username on a line of another caller. **No text of a
+person, of Claude or of a note, no password, token or key.** Two usernames were found, three
+lines: `target` in the lines of `POST /users` and of the Administrator's
+`POST /calendar/appointments`, which name the account the Administrator acts on, as
+`docs/ARCHITECTURE.md` section 11 describes. Nothing was repaired. SAM's own lines hold no
+body and no environment variable. The same search on the fresh stack's run gave the same.
+
+**Repeatability.** `DYNAMODB_PORT=8002 npm run verify` green three times on the final code:
+twice in a row on one stack, then on a stack started again (1 706 unit tests of the back end and its 189 journeys,
+437 tests of `shared` and 2 067 of the front end, 100 % of the lines, audit clean). What the second run found of the first: in `calendar` nothing more, the same 96 items
+after each run (the calendar's journeys empty the table, and the assistant's remove their
+windows, patterns and types; the cancelled appointments of the assistant's journeys go with
+the next emptying); in `assistant` the conversations and daily use of accounts that no longer
+exist (218 message and `META` items and 15 of daily use a run), which nobody reads since every
+run's throw-away User has a new `sub`; in `hello-messages` three rows a run, which no test
+counts. The gate does not depend on:
+
+- **the Administrator's count of the day**: every block that talks as `admin` first deletes
+  that account's items of daily use (`forgetDailyUse()`) and ends its conversation;
+- **a run killed half-way**: each block removes its users first, the file removes what any
+  block left in the calendar before the first starts (by `JOURNEY_TYPES`), and the settings
+  block sets its starting value itself;
+- **the order of the blocks**: each has its own account, type and day or hours; the filling
+  block opens 00:00–04:00, which no other opens, and deletes its fourteen patterns at its end.
+
+**`docs/ARCHITECTURE.md` against the template and the code.** Untrue and corrected: the six
+route rows stood outside the route table; a decline never answers `assistant_busy`; three
+functions, not two, read the key and declare the local variables; the assistant's permission
+sets were said to be attached to no role; `CalendarDeletePolicy` serves four deletions, not
+one; the fake has six marks, not three; `AssistantBusyError` is answered differently by each
+route; the template's and the logger's sizes. Missing and added: the confirmation's `409`; the
+proposal routes among those of both roles; the assistant in section 2; the control "a change
+needs the person", four threats and three residual risks from
+`docs/CONVERSATIONAL_ARCHITECTURE.md` section 10; the log lines of every assistant route with
+all their outcomes and fields; the read of the day's use; the environment of the six
+functions; Parameter Store and Anthropic in the cost table; the two 503 as alarms. A stale
+comment of `backend/template.yaml` on the confirming role was corrected too.
+
+**`CLAUDE.md` and `backend/CLAUDE.md`**: no line became untrue; unchanged, 199 and 197 lines.
+
+What steps c10 and c11 find ready: the back end complete and described in
+`docs/ARCHITECTURE.md`; a gate that can be repeated; the limits that bound what the real model
+can make a step cost, with `too_many_reads` as a result the evaluation may meet; the reply's
+status `idle` with the notice of a full conversation as one more end of an exchange for the
+screen.
 
 ---
 

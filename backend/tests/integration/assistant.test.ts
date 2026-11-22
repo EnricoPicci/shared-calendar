@@ -1,5 +1,19 @@
-import { addDays, assistantTexts, localDateOf, localTimeOf, weekdayOf } from '@shared-calendar/shared';
-import { api, createUserInNoGroup, forgetDailyUse, localDailyMessageLimit, queryAssistantPartition, removeUserIfPresent, signIn, subOf } from './setup';
+import { addDays, ASSISTANT_LIMITS, assistantTexts, localDateOf, localTimeOf, weekdayOf } from '@shared-calendar/shared';
+import {
+  api,
+  assistantStepCost,
+  createUserInNoGroup,
+  forgetDailyUse,
+  localDailyMessageLimit,
+  queryAssistantPartition,
+  removeUserIfPresent,
+  reportAssistantCosts,
+  setStoredPromptVersion,
+  signIn,
+  subOf,
+  weighAssistant,
+  type AssistantStepCost,
+} from './setup';
 
 // The assistant's journeys (docs/CONVERSATIONAL_ARCHITECTURE.md section 12.2), end to end through
 // sam local, with the fake Claude of the Docker stack answering for Anthropic
@@ -8,14 +22,17 @@ import { api, createUserInNoGroup, forgetDailyUse, localDailyMessageLimit, query
 //
 // Each block plays its own throw-away User, created through POST /users. A new account has a new
 // `sub`, so it starts with no conversation and with all of today's messages. The file writes the
-// assistant table through the API only, but for the Administrator's count of the day
+// assistant table through the API only, with two exceptions. The Administrator's count of the day
 // (forgetDailyUse): the six blocks that talk as the seeded Administrator, the same account at
-// every run, each start its count again and send one or two messages.
+// every run, each start its count again and send one or two messages. And the mark of the
+// instructions on one stored conversation (setStoredPromptVersion), in the block that shows what
+// a deployment with other instructions does to a conversation in progress.
 //
 // The calendar table is never emptied here, and nothing another file left in it is relied on.
 // Each block that needs the calendar creates what it uses through the API, as the Administrator:
 // an extra window or a weekly pattern on a day of its own (12 to 28 days after today), under a
-// type name of its own and in hours no other journey opens. It removes them and the type at the
+// type name of its own and in hours no other journey opens; the block that fills a conversation
+// opens the first four hours of every day of a month, which no other block uses. It removes them and the type at the
 // end and, should an interrupted run have left them, before it starts; the appointments it booked
 // are cancelled first, so what stays in the table is those cancelled appointments and their
 // events, which keep no slot busy. Before any block starts, the file removes what an interrupted
@@ -97,6 +114,7 @@ const JOURNEY_TYPES = [
   'assistant blocking journey',
   'assistant blocked journey',
   'assistant pattern journey',
+  'assistant filling journey',
 ];
 
 // Removes what the journeys made in the calendar under one of their type names, when it is there:
@@ -1606,5 +1624,209 @@ describe('a weekly pattern created and deleted through the assistant (3, 5.4, 5.
       { name: 'list_patterns', input: {} },
       { name: 'delete_pattern', input: { patternId } },
     ]);
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/assistant-full-conversation.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('a conversation filled to its bound (4.4, 9)', () => {
+  const TYPE = 'assistant filling journey';
+  const USER = 'chat-full';
+  // The fake answers this sentence, at every step, with six requests for the same 31 days.
+  const ASK = 'fake: read the month of the filling journey six times over';
+  const FULL = assistantTexts('en').conversationFull;
+  // The most one result of a tool weighs: the cut of docs/CONVERSATIONAL_ARCHITECTURE.md section 8.3.
+  const RESULT_CAP = 6000;
+  let token: string;
+  let sub: string;
+  let typeId: string;
+  let full: Record<string, unknown> | undefined;
+  // What each request cost the table, for the file of measurements; nothing of it is asserted.
+  const costs: AssistantStepCost[] = [];
+  const sizes: number[] = [];
+
+  // Does one request to the assistant and notes what the table read and wrote for it.
+  async function measured<T>(step: string, request: () => Promise<T>, transaction = true): Promise<T> {
+    const before = await weighAssistant(sub);
+    const res = await request();
+    const after = await weighAssistant(sub);
+    costs.push(assistantStepCost(step, before, after, transaction));
+    sizes.push(after.storedBytes);
+    return res;
+  }
+
+  beforeAll(async () => {
+    token = await newUser(USER);
+    sub = subOf(token);
+    await removeFromCalendar(TYPE);
+    // The month the fake asks for, 1 to 31 days after today: two windows a day, 00:00 to 02:00
+    // and 02:00 to 04:00, from fourteen weekly patterns valid on those days alone. A month of such
+    // days weighs more than one result may, so each read comes back cut.
+    const from = await dayOfJourney(1);
+    const to = await dayOfJourney(31);
+    const type = await api('POST', '/calendar/types', adminToken, { name: TYPE });
+    expect(type.status).toBe(201);
+    typeId = type.body?.typeId as string;
+    for (let weekday = 1; weekday <= 7; weekday++) {
+      for (const [start, end] of [['00:00', '02:00'], ['02:00', '04:00']]) {
+        expect((await api('POST', '/calendar/patterns', adminToken, { weekday, start, end, typeId, validFrom: from, validUntil: to })).status).toBe(201);
+      }
+    }
+  });
+
+  afterAll(async () => {
+    reportAssistantCosts(costs);
+    await removeFromCalendar(TYPE);
+    const patterns = (await api('GET', '/calendar/patterns', adminToken)).body?.patterns as { typeId: string }[];
+    expect(patterns.filter((p) => p.typeId === typeId)).toEqual([]);
+    await removeUserIfPresent(USER);
+  });
+
+  it('one message, step after step: the conversation grows with every step until it is full, and the exchange is stopped there with the fixed sentence', async () => {
+    let res = await measured('message', () => say(token, ASK));
+    let steps = 1;
+    while (res.status === 200 && res.body?.status === 'working') {
+      expect(res.body.activity).toBe('Looking at the calendar…');
+      res = await measured('continue', () => goOn(token));
+      steps += 1;
+    }
+    expect(res.status).toBe(200);
+    full = res.body;
+    expect(full).toMatchObject({ status: 'idle', activity: null, proposal: null, remainingToday: LIMIT - 1 });
+    expect((full?.messages as { from: string; text: string }[]).at(-1)).toMatchObject({ from: 'notice', text: FULL });
+    // Stopped for its size, before the message had used all its requests to Claude.
+    expect(steps).toBeLessThan(ASSISTANT_LIMITS.modelRequestsPerMessage);
+
+    // Under the bound before the last step, at or over it after, and over by less than one step.
+    // A step of five full results stores more than five times the cut: a result is a text kept
+    // inside the text of its entry, where each of its quotation marks takes two bytes.
+    expect(sizes.at(-2)).toBeLessThan(ASSISTANT_LIMITS.conversationBytes);
+    expect(sizes.at(-1)).toBeGreaterThanOrEqual(ASSISTANT_LIMITS.conversationBytes);
+    expect(sizes.at(-1)).toBeLessThan(ASSISTANT_LIMITS.conversationBytes + 2 * ASSISTANT_LIMITS.readsPerAnswer * RESULT_CAP);
+  });
+
+  it('each answer asked for six reads: five were run, each cut at 6 KB, and the sixth was told to ask again', async () => {
+    const entries = (await storedEntries(token)).filter((entry) => entry.role === 'user' && Array.isArray(entry.content));
+    expect(entries.length).toBe(sizes.length);
+    for (const entry of entries) {
+      const results = entry.content as { content: string; is_error?: boolean }[];
+      expect(results).toHaveLength(ASSISTANT_LIMITS.readsPerAnswer + 1);
+      for (const result of results.slice(0, ASSISTANT_LIMITS.readsPerAnswer)) {
+        // As large as a result may be: the month is cut at a whole day, with the line that says so.
+        expect(Buffer.byteLength(result.content, 'utf8')).toBeLessThanOrEqual(RESULT_CAP);
+        expect(Buffer.byteLength(result.content, 'utf8')).toBeGreaterThan(RESULT_CAP - 500);
+        expect(JSON.parse(result.content)).toMatchObject({ cut: expect.stringContaining('This result was too long') });
+        expect(result.content).toContain(TYPE);
+      }
+      expect(results.at(-1)?.is_error).toBe(true);
+      expect(JSON.parse(results.at(-1)?.content ?? '')).toMatchObject({ error: 'too_many_reads' });
+    }
+  });
+
+  it('the next message is refused: conversation_full, and nothing is stored or counted for it', async () => {
+    const res = await measured('message refused', () => say(token, HELLO));
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ error: 'conversation_full', message: expect.any(String) });
+    expect(sizes.at(-1)).toBe(sizes.at(-2));
+    // No step waits either.
+    expect(await goOn(token)).toMatchObject({ status: 409, body: { error: 'nothing_to_continue' } });
+  });
+
+  it('the full conversation can still be read, whole', async () => {
+    const res = await measured('read', () => conversation(token));
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ conversationId: full?.conversationId, status: 'idle', remainingToday: LIMIT - 1 });
+    const messages = res.body?.messages as { seq: number; from: string; text: string }[];
+    // Of everything stored the person reads two lines: their message and the fixed sentence.
+    expect(messages.map((message) => message.from)).toEqual(['person', 'notice']);
+    expect(messages[0]).toMatchObject({ seq: 1, text: ASK });
+    expect(messages[1]?.text).toBe(FULL);
+  });
+
+  it('"New conversation" ends it, and the next message starts an empty one', async () => {
+    expect((await measured('end', () => startAgain(token), false)).status).toBe(204);
+    expect((await conversation(token)).body).toEqual(none(LIMIT - 1));
+
+    const res = await measured('message, new conversation', () => say(token, HELLO));
+    expect(res.status).toBe(200);
+    expect(res.body?.conversationId).not.toBe(full?.conversationId);
+    expect(res.body).toMatchObject({ status: 'idle', messages: [{ seq: 1, from: 'person', text: HELLO }, { seq: 3, from: 'assistant', text: HELLO_ANSWER }], remainingToday: LIMIT - 2 });
+    expect(sizes.at(-1)).toBeLessThan(5000);
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/assistant-other-instructions.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('a conversation started under other instructions is over (4.3)', () => {
+  const USER = 'chat-mark';
+  const ASK = 'fake: read the settings of the mark journey';
+  // The fake answers with the last result of a tool that the request holds, or says there is none.
+  const ASK_LAST = 'fake: what was the last result you were given?';
+  const NO_RESULT = '(no result of a tool in the request)';
+  // A mark no deployment works out: sixteen characters, as a real one, but not hexadecimal.
+  const OTHER_MARK = 'another-mark-000';
+  let token: string;
+  let sub: string;
+  let oldId: string;
+  let mark: string;
+
+  const meta = async () => (await queryAssistantPartition(`CONV#${sub}`)).find((item) => item.SK === 'META');
+
+  beforeAll(async () => {
+    token = await newUser(USER);
+    sub = subOf(token);
+    expect((await startAgain(token)).status).toBe(204);
+  });
+
+  afterAll(async () => {
+    await removeUserIfPresent(USER);
+  });
+
+  it('a conversation holds a read of the settings, and Claude is sent it again with the next message', async () => {
+    const read = await sayAndRead(token, ASK);
+    expect(read.reads).toBe(1);
+    oldId = read.body?.conversationId as string;
+
+    const res = await say(token, ASK_LAST);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ conversationId: oldId, remainingToday: LIMIT - 2 });
+    const answer = (res.body?.messages as { from: string; text: string }[]).at(-1);
+    expect(JSON.parse(answer?.text ?? '')).toMatchObject({ timeZone: 'Europe/Rome' });
+
+    mark = (await meta())?.promptVersion as string;
+    expect(mark).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  it('once its stored mark is another, the conversation is over: nothing to read, nothing to continue, the count of the day kept', async () => {
+    await setStoredPromptVersion(sub, OTHER_MARK);
+    expect((await conversation(token)).body).toEqual(none(LIMIT - 2));
+    expect(await goOn(token)).toMatchObject({ status: 409, body: { error: 'nothing_to_continue' } });
+    // Reading changed nothing: the conversation is still stored, under the other mark.
+    expect(await meta()).toMatchObject({ conversationId: oldId, promptVersion: OTHER_MARK });
+  });
+
+  it('the next message starts a new conversation, and Claude is sent nothing of the old one', async () => {
+    const res = await say(token, ASK_LAST);
+    expect(res.status).toBe(200);
+    expect(res.body?.conversationId).not.toBe(oldId);
+    expect(res.body).toMatchObject({
+      language: 'en',
+      status: 'idle',
+      messages: [
+        { seq: 1, from: 'person', text: ASK_LAST },
+        { seq: 3, from: 'assistant', text: NO_RESULT },
+      ],
+      remainingToday: LIMIT - 3,
+    });
+    // The new conversation carries the mark of the instructions in use, and holds its own three entries.
+    expect(await meta()).toMatchObject({ conversationId: res.body?.conversationId, promptVersion: mark, messageCount: 1, nextSeq: 4 });
+    expect((await storedEntries(token)).map((entry) => entry.role)).toEqual(['user', 'system', 'assistant']);
+  });
+
+  it('the old messages stay in the table until they expire, and no route gives them', async () => {
+    const items = await queryAssistantPartition(`CONV#${sub}`);
+    expect(items.filter((item) => item.SK.startsWith(`MSG#${oldId}#`)).length).toBeGreaterThan(0);
+    const read = (await conversation(token)).body;
+    expect((read?.messages as unknown[]).length).toBe(2);
   });
 });

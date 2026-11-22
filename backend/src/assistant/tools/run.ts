@@ -26,7 +26,7 @@ import {
 export type { ToolResultBlock } from './tool';
 
 // Why a request was answered without calling the handler of its route.
-export type NotRun = 'unknown_tool' | 'not_offered' | 'not_a_read' | 'invalid_input' | 'too_many_changes' | 'not_possible' | 'same_thing_twice' | 'not_proposed';
+export type NotRun = 'unknown_tool' | 'not_offered' | 'not_a_read' | 'invalid_input' | 'too_many_reads' | 'too_many_changes' | 'not_possible' | 'same_thing_twice' | 'not_proposed';
 
 // What the log line says of one tool request: the tool's name with the status its route answered
 // and how long it took, or why it was not run. For a change that was proposed, the status and the
