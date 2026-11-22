@@ -16,7 +16,7 @@
 // that passes: the application asks again with nothing changed. It is the one thing the fake
 // remembers between two requests, and it forgets it as soon as "then" is given.
 //
-// Four marks an answer can hold, each replaced from the request it answers:
+// Six marks an answer can hold, each replaced from the request it answers:
 //   {{application-line}}  in a text: the last line of the application in the request (the entry
 //                         of role "system" that follows a message of the person), so that a
 //                         journey can read what Claude was told about the time and the language.
@@ -32,6 +32,16 @@
 //                         when that result is a list of appointments. An appointment's id is made
 //                         by the server and cannot be scripted: like the real Claude, the fake
 //                         takes it from the list it was just given.
+//   {{saturday+N}}        anywhere: the first Saturday on or after the date N days after that
+//                         date. A journey that changes the hours of a whole day needs a day that
+//                         holds nothing but its own hours, and the other journeys of the local
+//                         stack leave weekly patterns on the working days.
+//   {{id:LIST:NAME}}      anywhere, so in the input of a tool request too: the id of the item
+//                         whose name, or whose type's name, is NAME in the list LIST ("types",
+//                         "patterns") of the latest result of a tool in the request that holds
+//                         one. The ids of a type and of a weekly pattern are made by the server
+//                         too: the fake reads the list first, as the real Claude does, and finds
+//                         the journey's own type or pattern in it by the name the journey gave.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -88,7 +98,9 @@ function onceThen(step, request) {
 const LINE_MARK = '{{application-line}}';
 const RESULT_MARK = '{{last-tool-result}}';
 const DATE_MARK = /\{\{date\+(\d+)\}\}/g;
+const SATURDAY_MARK = /\{\{saturday\+(\d+)\}\}/g;
 const APPOINTMENT_MARK = /\{\{appointment-id-(\d+)\}\}/g;
+const ID_MARK = /\{\{id:([a-z]+):([^}]+)\}\}/g;
 
 // The last line of the application in the request, or null.
 function applicationLine(request) {
@@ -96,14 +108,39 @@ function applicationLine(request) {
   return lines.length > 0 ? lines[lines.length - 1].content : null;
 }
 
+// The first Saturday on or after the date `days` after a date.
+function saturdayAfter(date, days) {
+  let day = daysAfter(date, days);
+  while (new Date(`${day}T00:00:00Z`).getUTCDay() !== 6) day = daysAfter(day, 1);
+  return day;
+}
+
+// The content of every result of a tool in the request, as text, in the order given.
+function toolResults(request) {
+  return (Array.isArray(request.messages) ? request.messages : [])
+    .flatMap((entry) => (entry?.role === 'user' && Array.isArray(entry.content) ? entry.content : []))
+    .filter((block) => block?.type === 'tool_result')
+    .map(({ content }) => (typeof content === 'string' ? content : JSON.stringify(content)));
+}
+
 // The content of the last result of a tool in the request, as text, or null.
 function lastToolResult(request) {
-  const results = (Array.isArray(request.messages) ? request.messages : [])
-    .flatMap((entry) => (entry?.role === 'user' && Array.isArray(entry.content) ? entry.content : []))
-    .filter((block) => block?.type === 'tool_result');
-  if (results.length === 0) return null;
-  const { content } = results[results.length - 1];
-  return typeof content === 'string' ? content : JSON.stringify(content);
+  return toolResults(request).at(-1) ?? null;
+}
+
+// The id of the item whose name, or whose type's name, is `name` in the list `list` of a result of
+// a tool in the request, the latest result that holds such an item; null when none does.
+function idInList(request, list, name) {
+  for (const result of toolResults(request).reverse()) {
+    try {
+      const items = JSON.parse(result)?.[list];
+      const found = Array.isArray(items) ? items.find((item) => item?.name === name || item?.type === name) : null;
+      if (typeof found?.id === 'string') return found.id;
+    } catch {
+      // A result that is not JSON holds no list.
+    }
+  }
+  return null;
 }
 
 // The id of the appointment at `position` (from 1) in the last result of a tool in the request, or
@@ -137,7 +174,11 @@ function withMarks(body, request) {
   const line = applicationLine(request);
   const today = line?.match(/\((\d{4}-\d{2}-\d{2})\)/)?.[1];
   const dated = mapStrings(body.content, (text) =>
-    text.replace(DATE_MARK, (mark, days) => (today ? daysAfter(today, Number(days)) : mark)).replace(APPOINTMENT_MARK, (mark, position) => appointmentId(request, Number(position)) ?? mark),
+    text
+      .replace(DATE_MARK, (mark, days) => (today ? daysAfter(today, Number(days)) : mark))
+      .replace(SATURDAY_MARK, (mark, days) => (today ? saturdayAfter(today, Number(days)) : mark))
+      .replace(APPOINTMENT_MARK, (mark, position) => appointmentId(request, Number(position)) ?? mark)
+      .replace(ID_MARK, (mark, list, name) => idInList(request, list, name) ?? mark),
   );
   const inText = (text) =>
     text

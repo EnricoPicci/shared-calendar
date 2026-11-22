@@ -18,6 +18,7 @@ Each section explains one idea in simple words and names the document that defin
 | `chat-text`, `chat-lingua`, `chat-read`, `chat-book`, `chat-decline`, `chat-trouble`, `chat-note`, `chat-move`, `chat-cancel`, `chat-limit`, `chat-down`, `chat-notadmin` | throw-away Users of the assistant's journeys, one per block | `backend/tests/integration/assistant.test.ts` |
 | `chat-rival` | a second throw-away User of one assistant journey, who books through the calendar's own route | `backend/tests/integration/assistant.test.ts` |
 | `chat-booked` | the throw-away User the Administrator books for through the assistant; it only reads its own list | `backend/tests/integration/assistant.test.ts` |
+| `chat-in-the-way` | the throw-away User whose appointment lies in the hour the Administrator asks the assistant to block; it books through the calendar's own route | `backend/tests/integration/assistant.test.ts` |
 | `chat-nobody` | a throw-away account in neither group, made straight in cognito-local | `backend/tests/integration/assistant.test.ts` |
 | `smoke-<epoch>` | the smoke test's throw-away User | `backend/scripts/smoke.sh` |
 
@@ -39,11 +40,13 @@ All journeys and the smoke test use the same local `calendar` table. They treat 
   morning, hours no other journey opens, on a day of its own: the 21st to the 28th from
   today. Each removes its window and its type at its end (the file's helpers `openWindow()` and
   `removeFromCalendar()`). Before any block starts, the file removes what an interrupted run of
-  any of them left on a day from tomorrow to 28 days ahead, so that a window left by one
+  any of them left on a day from today to 28 days ahead, so that a window left by one
   block never stands in the way of another a day later.
   The blocks that book cancel their appointments first, as the Administrator; a cancelled
   appointment keeps no slot busy, so a second run the same day finds the same free slots. Each
   block checks only what it made, whatever else its day holds.
+  Three more blocks change the opening hours themselves, and prepare the calendar in another
+  way: see "The opening hours through the assistant" below.
 
 Appointments cannot be deleted through the API, only cancelled. So cancelled appointments, their
 events and the deleted-user markers of removed Users stay in the table as history.
@@ -430,8 +433,7 @@ the API to decide can expect exactly one.
 
 The assistant is the calendar used by conversation: a person writes a message, the server asks
 Claude (Anthropic's model) and answers with what Claude said. Its routes and their answers are
-defined in `docs/ARCHITECTURE.md` section 4 ("The assistant's routes"); what is not built yet
-(the Administrator's changes to the opening hours) is in
+defined in `docs/ARCHITECTURE.md` section 4 ("The assistant's routes"); the design behind them is
 `docs/CONVERSATIONAL_ARCHITECTURE.md`.
 
 - **One conversation per person**, found by the `sub` of the token. No route takes a conversation
@@ -470,6 +472,10 @@ the tools" below). The texts the journeys send:
 | `fake: add a note to my appointment of the note journey`, `fake: move my appointment of the moving journey`, `fake: cancel both my appointments of the cancelling journey` | first a request for `list_appointments`, for the day 22, 23 or 24 days after today; then a request for the change (`set_appointment_note`, `change_appointment`, or two `cancel_appointment` in one answer), with the id of the first appointment of that list, and of the second for the second cancellation; then the last result of a tool as its text |
 | `fake: set the booking horizon of the settings journey`, `fake: change a setting, which a User cannot` | first a request for the tool `update_settings`, for a booking horizon of 57 days; then, as its text, the last result of a tool word for word |
 | `fake: book the slot of the journey for its User` | first a request for the tool `book_appointment` with the username `chat-booked`, for the day 21 days after today at 05:00; then, as its text, the last result of a tool word for word |
+| `fake: block an hour of the day of the blocking journey`, `fake: block an hour that somebody booked` | first a request for `get_calendar`, for one Saturday (the first on or after the day 12, or 19, days after today); then a request for `list_types`, with the words "I need the type id."; then a request for `set_date_override` on that Saturday, with the hours 04:00–05:00 and 06:00–07:00 under the id of the journey's type, found by its name in that list; then the last result of a tool as its text |
+| `fake: what is free on the day of the blocking journey?` | first a request for `get_calendar`, for the Saturday of the blocking journey; then, as its text, the result of that tool word for word |
+| `fake: open the weekly pattern of the pattern journey` | first a request for `list_types`, with the words "I need the type id."; then a request for `create_pattern`: Sunday, 04:00–06:00, the id of the journey's type found by its name in that list, valid from the day 12 days after today to the day 18 days after; then the last result of a tool as its text |
+| `fake: delete the weekly pattern of the pattern journey` | first a request for `list_patterns`; then a request for `delete_pattern`, with the id of the pattern whose type has the journey's name in that list; then the last result of a tool as its text |
 | a text the file does not hold | "Fake Claude: no answer is scripted for this message." |
 
 The language question (below) is scripted the same way: of the texts the journeys send,
@@ -522,13 +528,19 @@ the internal fields are left out: a window carries no id. An appointment keeps i
 does a type in the list of types, since a later request must be able to name them
 (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 8.3).
 
-The fake has four **marks**, texts it replaces in a scripted answer, and one memory. `{{application-line}}`
+The fake has six **marks**, texts it replaces in a scripted answer, and one memory. `{{application-line}}`
 becomes the line of the application. `{{date+25}}` becomes the date 25 days after the date that
 line states, so the fake can ask for a day the journey prepared without knowing the date itself.
 `{{last-tool-result}}` becomes the result of the last tool, which is how a journey reads what
 Claude was given. `{{appointment-id-1}}` becomes the id of the first appointment in the result of
 the last tool, when that result is a list of appointments (`-2` the second): the server makes
-an appointment's id, so the fake, like Claude, must read the list to learn it. And a step may be written to fail once: an error the first time a request
+an appointment's id, so the fake, like Claude, must read the list to learn it.
+`{{saturday+12}}` becomes the first Saturday on or after the date 12 days after the date of the
+line of the application: a date 12 to 18 days ahead. `{{id:types:NAME}}` becomes the id of the
+type named NAME in the latest result of a tool that holds a list `types` with such a type, and
+`{{id:patterns:NAME}}` the id of the weekly pattern whose type is named NAME in a list
+`patterns`: the server makes these ids too, so the fake reads the list first and finds the
+journey's own type or pattern by the name the journey gave. And a step may be written to fail once: an error the first time a request
 comes, the answer when the very same request comes again.
 
 ### A proposal, and its two buttons
@@ -536,7 +548,8 @@ comes, the answer when the very same request comes again.
 Claude cannot change the calendar (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 5.5). When it
 asks for a tool that changes something (`book_appointment`, `cancel_appointment`,
 `change_appointment` and `set_appointment_note`, offered to everybody, and `update_settings`,
-`create_type`, `rename_type` and `delete_type`, offered to the Administrator only),
+`create_type`, `rename_type` and `delete_type`, offered to the Administrator only, like the
+seven tools of the opening hours, which have a section of their own below),
 the server changes nothing. It reads the facts itself, with the person's identity. For a
 booking, through the code of `GET /calendar`: the free slot at the time asked for, its end, the
 name of its type. For the other three, through the code of `GET /calendar/appointments`: the
@@ -588,8 +601,9 @@ answered, and the words that the person pressed the button), `declined` after a 
 
 A tool belongs to one role or to both (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3). Eight
 are offered to everybody: the four reads and the four changes of an appointment. The
-Administrator is offered more: the reads `list_users` and `list_patterns`, and the changes
-`update_settings`, `create_type`, `rename_type` and `delete_type`. The server names to Claude
+Administrator is offered more: the reads `list_users` and `list_patterns`, the changes
+`update_settings`, `create_type`, `rename_type` and `delete_type`, and the seven changes of the
+opening hours (see "The opening hours through the assistant" below). The server names to Claude
 only the tools of the person's role.
 
 Should Claude ask for a tool the person's role is not offered, the server answers exactly as for
@@ -610,15 +624,70 @@ is and as it would become, and at the confirmation sends all four to `PUT /calen
 the others as it read them (`docs/SHARED_CALENDAR_SPEC.md` R-SET-02). Asked for the values the
 settings already have, it proposes nothing.
 
+### The opening hours through the assistant
+
+The Administrator can change the opening hours by conversation, with one tool for each route
+that writes them (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3). Each is a change: it becomes
+a proposal, and only the confirmation runs its route.
+
+| Tool | Route | What it does, in the words of the application |
+|---|---|---|
+| `create_pattern`, `update_pattern`, `delete_pattern` | `POST /calendar/patterns`, `PUT` and `DELETE /calendar/patterns/{patternId}` | a **weekly pattern** created, changed, deleted |
+| `set_date_override`, `delete_date_override` | `PUT` and `DELETE /calendar/overrides/{date}` | **this day's own hours** set, or the day sent back to the weekly patterns |
+| `create_one_off_window`, `delete_one_off_window` | `POST /calendar/windows`, `DELETE /calendar/windows/{windowId}` | an **extra window** added to a date, or deleted |
+
+The three sources are those of [where a window comes from](#where-a-window-comes-from): a date
+override is what the proposals call "this day's own hours", a one-off window an "extra window".
+
+- **What Claude reads first.** The Administrator's `get_calendar` says more than a User's: each
+  window carries its `source` (`pattern`, `override`, `one_off`), an extra window its `id`, and
+  each day `hasOverride`; a day closed by hours of its own is kept in the answer
+  (`docs/SHARED_CALENDAR_SPEC.md` section 11.6 for the route's fields). A type and a pattern are
+  named by their id, which Claude learns from `list_types` and `list_patterns`. Claude writes a
+  weekday as a word (`Monday`); the server sends the route its number, 1 for Monday.
+- **Blocking time** has no route of its own. A day's hours are what the weekly patterns give,
+  unless the date has hours of its own, which then take the place of all of them
+  (`docs/SHARED_CALENDAR_SPEC.md` R-OVR-01). To block an hour, Claude reads the day, takes the
+  hour out of its hours and asks `set_date_override` for what is left. The extra windows of the
+  date are not touched (`docs/SHARED_CALENDAR_SPEC.md` R-OVR-03).
+- **What the proposal shows.** For a day's hours the server calls the code of `GET /calendar`
+  for that date and of `GET /calendar/types`, as the Administrator, and words the day as it is
+  and as it would become: "Set the hours of Saturday 5 December 2026, for this day only. As it
+  is now (from the weekly patterns): 09:00–12:00 (Visit). As it would become: 09:00–10:00
+  (Visit), 11:00–12:00 (Visit)." For a pattern it reads the types (and, to change or delete
+  one, the patterns) and names the pattern in full: "Create a weekly pattern: every Monday,
+  from 09:00 to 12:00 (Visit), valid from … until …".
+- **What is left to the confirmation.** The proposal does not look for appointments the change
+  would leave outside the opening hours, nor for an overlap with other hours: the route checks
+  both under the calendar lock when the person confirms
+  ([booked appointments keep their window](#booked-appointments-keep-their-window),
+  [windows never overlap](#windows-never-overlap)). A change refused with
+  `availability_conflict` is shown as `refused` with that code, and Claude is given the
+  appointments in the way: each with its id, its username, its local date and its times.
+
+In the journeys, three blocks of `backend/tests/integration/assistant.test.ts` change the
+opening hours. Two of them block an hour of a day, so they need a day whose hours are theirs
+alone: a Saturday, since the calendar's journeys leave weekly patterns, and appointments in
+them, on the working days. (A calendar seeded by hand, with `seed:local`, may hold hours on a
+Saturday too: the journeys are run on a stack started afresh, or after the calendar's own.)
+The file's helper `saturdayOfJourney(N)` gives the first Saturday on
+or after the day N days after today, the date the fake names `{{saturday+N}}`. They open their
+hours with a weekly pattern valid on that one day (`openPattern()`), not with a one-off window:
+hours of its own on a day replace a pattern's window and would leave an extra window open. The
+third block creates a pattern through the assistant, on the one Sunday of the days 12 to 18
+after today: a weekday on which the calendar's journeys leave no day with hours of its own,
+while they leave one on a Monday. `removeFromCalendar()` removes, under a journey's type name, the day's own hours
+that hold the type, the weekly patterns of the type and its extra windows, before the type.
+
 ### The Administrator's conversation in the journeys
 
-Three blocks of `backend/tests/integration/assistant.test.ts` talk to the assistant as the
+Six blocks of `backend/tests/integration/assistant.test.ts` talk to the assistant as the
 seeded Administrator, `admin`. Unlike a throw-away User, that account keeps its `sub` from one
 run to the next, so it does not start clean by itself. Each of those blocks first deletes the
 Administrator's items of daily use (`forgetDailyUse()` of `backend/tests/integration/setup.ts`,
 the one write a journey makes to the `assistant` table directly) and ends their conversation
-(`DELETE /assistant/conversation`); it sends one message, and ends the conversation again when
-it is done.
+(`DELETE /assistant/conversation`); it sends one or two messages, and ends the conversation
+again when it is done.
 
 ### The `assistant` table
 

@@ -1,4 +1,4 @@
-import { addDays, assistantTexts, localDateOf } from '@shared-calendar/shared';
+import { addDays, assistantTexts, localDateOf, localTimeOf, weekdayOf } from '@shared-calendar/shared';
 import { api, createUserInNoGroup, forgetDailyUse, localDailyMessageLimit, queryAssistantPartition, removeUserIfPresent, signIn, subOf } from './setup';
 
 // The assistant's journeys (docs/CONVERSATIONAL_ARCHITECTURE.md section 12.2), end to end through
@@ -9,17 +9,17 @@ import { api, createUserInNoGroup, forgetDailyUse, localDailyMessageLimit, query
 // Each block plays its own throw-away User, created through POST /users. A new account has a new
 // `sub`, so it starts with no conversation and with all of today's messages. The file writes the
 // assistant table through the API only, but for the Administrator's count of the day
-// (forgetDailyUse): the three blocks that talk as the seeded Administrator, the same account at
-// every run, each start its count again and send one message.
+// (forgetDailyUse): the six blocks that talk as the seeded Administrator, the same account at
+// every run, each start its count again and send one or two messages.
 //
 // The calendar table is never emptied here, and nothing another file left in it is relied on.
 // Each block that needs the calendar creates what it uses through the API, as the Administrator:
-// one window on a day of its own (21 to 28 days after today), under a type name of its own and in
-// hours no other journey opens. It removes the window and the type at the end and, should an
-// interrupted run have left them, before it starts; the appointments it booked are cancelled
-// first, so what stays in the table is those cancelled appointments and their events, which keep
-// no slot busy. Before any block starts, the file removes what an interrupted run of any of them
-// left on a day still to come.
+// an extra window or a weekly pattern on a day of its own (12 to 28 days after today), under a
+// type name of its own and in hours no other journey opens. It removes them and the type at the
+// end and, should an interrupted run have left them, before it starts; the appointments it booked
+// are cancelled first, so what stays in the table is those cancelled appointments and their
+// events, which keep no slot busy. Before any block starts, the file removes what an interrupted
+// run of any of them left, today or on a day still to come.
 //
 // Secrets: tokens and passwords stay in variables; no assertion prints one.
 
@@ -69,7 +69,19 @@ async function dayOfJourney(days: number): Promise<string> {
   return addDays(localDateOf(new Date().toISOString(), settings.body?.timeZone as string), days);
 }
 
-type JourneyWindow = { typeName: string; source?: string; sourceId?: string };
+// The first Saturday on or after the date `days` after today's: the date the fake's answer file
+// names as {{saturday+N}}. The journeys that change the hours of a whole day run on a Saturday,
+// where the calendar's journeys leave nothing: on the working days they leave weekly patterns, and
+// appointments in them. A calendar seeded by hand for a look at the pages may hold hours on a
+// Saturday too: the journeys are run on a stack started afresh, or after the calendar's own.
+async function saturdayOfJourney(days: number): Promise<string> {
+  let day = await dayOfJourney(days);
+  while (weekdayOf(day) !== 6) day = addDays(day, 1);
+  return day;
+}
+
+type JourneyWindow = { start: string; end: string; typeName: string; source?: string; sourceId?: string };
+type JourneyDay = { date: string; hasOverride?: boolean; windows: JourneyWindow[]; slots: { start: string; typeId: string }[] };
 type Booked = { appointmentId: string; typeName: string; start: string; username: string; status: string; note: string | null; createdBy: { username: string; role: string } };
 
 // The type names of the journeys that use the calendar, one per block.
@@ -82,14 +94,18 @@ const JOURNEY_TYPES = [
   'assistant moving journey',
   'assistant cancelling journey',
   'assistant booking for a user journey',
+  'assistant blocking journey',
+  'assistant blocked journey',
+  'assistant pattern journey',
 ];
 
 // Removes what the journeys made in the calendar under one of their type names, when it is there:
-// the appointments booked under that type are cancelled, then its windows and the type are
-// deleted. It looks at every day a journey can have used and that is still to come, tomorrow to
-// 28 days ahead, so that what a run interrupted on an earlier date left is removed too.
+// the appointments booked under that type are cancelled, then the hours of its own of a day that
+// hold the type, the weekly patterns of the type, its extra windows and the type are deleted. It
+// looks at every day a journey can have used and that has not passed, today to 28 days ahead, so
+// that what a run interrupted on an earlier date left is removed too.
 async function removeFromCalendar(typeName: string): Promise<void> {
-  const from = await dayOfJourney(1);
+  const from = await dayOfJourney(0);
   const to = await dayOfJourney(28);
   const booked = await api('GET', `/calendar/appointments?from=${from}&to=${to}`, adminToken);
   expect(booked.status).toBe(200);
@@ -98,11 +114,18 @@ async function removeFromCalendar(typeName: string): Promise<void> {
   }
   const view = await api('GET', `/calendar?from=${from}&to=${to}`, adminToken);
   expect(view.status).toBe(200);
-  const windows = (view.body?.days as { windows: JourneyWindow[] }[]).flatMap((d) => d.windows);
-  for (const window of windows.filter((w) => w.typeName === typeName && w.source === 'one_off')) {
-    expect((await api('DELETE', `/calendar/windows/${window.sourceId}`, adminToken)).status).toBe(204);
+  const days = view.body?.days as JourneyDay[];
+  for (const day of days.filter((d) => d.windows.some((w) => w.typeName === typeName && w.source === 'override'))) {
+    expect((await api('DELETE', `/calendar/overrides/${day.date}`, adminToken)).status).toBe(204);
   }
   const types = (await api('GET', '/calendar/types', adminToken)).body?.types as { typeId: string; name: string }[];
+  const patterns = (await api('GET', '/calendar/patterns', adminToken)).body?.patterns as { patternId: string; typeId: string }[];
+  for (const pattern of patterns.filter((p) => types.some((t) => t.name === typeName && t.typeId === p.typeId))) {
+    expect((await api('DELETE', `/calendar/patterns/${pattern.patternId}`, adminToken)).status).toBe(204);
+  }
+  for (const window of days.flatMap((d) => d.windows).filter((w) => w.typeName === typeName && w.source === 'one_off')) {
+    expect((await api('DELETE', `/calendar/windows/${window.sourceId}`, adminToken)).status).toBe(204);
+  }
   for (const type of types.filter((t) => t.name === typeName)) {
     expect((await api('DELETE', `/calendar/types/${type.typeId}`, adminToken)).status).toBe(204);
   }
@@ -116,6 +139,66 @@ async function openWindow(day: string, typeName: string, start: string, end: str
   const window = await api('POST', '/calendar/windows', adminToken, { date: day, start, end, typeId });
   expect(window.status).toBe(201);
   return { typeId, windowId: window.body?.windowId as string };
+}
+
+// Opens the journey's hours on its day alone with a weekly pattern, under a new type of the
+// journey's name: a pattern of that day's weekday whose first and last valid day are that day.
+async function openPattern(day: string, typeName: string, start: string, end: string): Promise<{ typeId: string; patternId: string }> {
+  const type = await api('POST', '/calendar/types', adminToken, { name: typeName });
+  expect(type.status).toBe(201);
+  const typeId = type.body?.typeId as string;
+  const pattern = await api('POST', '/calendar/patterns', adminToken, { weekday: weekdayOf(day), start, end, typeId, validFrom: day, validUntil: day });
+  expect(pattern.status).toBe(201);
+  return { typeId, patternId: pattern.body?.patternId as string };
+}
+
+// One day as the calendar's own route gives it to the Administrator, and its time zone.
+async function dayOfCalendar(day: string): Promise<{ zone: string; view: JourneyDay }> {
+  const res = await api('GET', `/calendar?from=${day}&to=${day}`, adminToken);
+  expect(res.status).toBe(200);
+  return { zone: res.body?.timeZone as string, view: (res.body?.days as JourneyDay[])[0]! };
+}
+
+// The windows of a day in wall-clock times with the name of their type, as a proposal words them:
+// those that are not extra windows, and the extra ones. A window that ends at midnight ends at 24:00.
+async function hoursOfDay(day: string): Promise<{ hasOverride: boolean; hours: { start: string; end: string; type: string; source?: string }[]; extras: { start: string; end: string; type: string }[] }> {
+  const { zone, view } = await dayOfCalendar(day);
+  const local = (w: JourneyWindow) => ({ start: localTimeOf(w.start, zone), end: localDateOf(w.end, zone) === day ? localTimeOf(w.end, zone) : '24:00', type: w.typeName });
+  return {
+    hasOverride: view.hasOverride === true,
+    hours: view.windows.filter((w) => w.source !== 'one_off').map((w) => ({ ...local(w), source: w.source })),
+    extras: view.windows.filter((w) => w.source === 'one_off').map(local),
+  };
+}
+
+// After a journey of the opening hours cleared up: no weekly pattern of its type is left, and its
+// day has no hours of its own.
+async function expectHoursAsBefore(day: string, typeId: string): Promise<void> {
+  const patterns = (await api('GET', '/calendar/patterns', adminToken)).body?.patterns as { typeId: string }[];
+  expect(patterns.filter((p) => p.typeId === typeId)).toEqual([]);
+  expect((await dayOfCalendar(day)).view.hasOverride).toBe(false);
+}
+
+// The requests for a tool Claude made in the person's conversation, as stored, in order.
+const storedToolRequests = async (token: string) =>
+  (await storedEntries(token))
+    .filter((entry) => entry.role === 'assistant' && Array.isArray(entry.content))
+    .flatMap((entry) => entry.content as { type: string; name: string; input: unknown }[])
+    .filter((block) => block.type === 'tool_use')
+    .map((block) => ({ name: block.name, input: block.input }));
+
+// Sends a message and does the steps that only read, until the conversation waits for the person:
+// the answer of the last step, and how many steps read.
+async function sayAndRead(token: string, text: string): Promise<{ body: Record<string, unknown> | undefined; reads: number }> {
+  let res = await say(token, text);
+  let reads = 0;
+  while (res.status === 200 && res.body?.status === 'working') {
+    expect(res.body.proposal).toBeNull();
+    reads += 1;
+    res = await goOn(token);
+  }
+  expect(res.status).toBe(200);
+  return { body: res.body, reads };
 }
 
 const confirm = (token: string, proposalId: string) => api('POST', `/assistant/proposals/${proposalId}/confirm`, token);
@@ -1277,5 +1360,251 @@ describe('the Administrator books for a User through the assistant (3, 5.4, 5.5)
   it('Claude asked for the booking with the username, a day and a time, and nothing else', async () => {
     const stored = await storedEntries(adminToken);
     expect(stored[2]?.content).toEqual([expect.objectContaining({ type: 'tool_use', name: 'book_appointment', input: { username: USER, date: day, time: '05:00' } })]);
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/assistant-blocking.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('time blocked through the assistant (3, 5.4, 5.5)', () => {
+  const TYPE = 'assistant blocking journey';
+  const ASK = 'fake: block an hour of the day of the blocking journey';
+  const ASK_FREE = 'fake: what is free on the day of the blocking journey?';
+  // What the fake asks to leave of the day: its answer file's hours around 05:00 to 06:00.
+  const LEFT = [
+    { start: '04:00', end: '05:00', type: TYPE },
+    { start: '06:00', end: '07:00', type: TYPE },
+  ];
+  // The day the fake asks to block on: {{saturday+12}} of its answer file.
+  let day: string;
+  let typeId: string;
+  let summary: string;
+  let proposalId: string;
+
+  beforeAll(async () => {
+    day = await saturdayOfJourney(12);
+    await removeFromCalendar(TYPE);
+    ({ typeId } = await openPattern(day, TYPE, '04:00', '07:00'));
+    // The day as it is: the journey's three hours, with whatever else the local calendar holds on it.
+    const { hasOverride, hours, extras } = await hoursOfDay(day);
+    expect(hours).toContainEqual({ start: '04:00', end: '07:00', type: TYPE, source: 'pattern' });
+    const now = { from: hasOverride ? ('own' as const) : ('patterns' as const), windows: hours.map(({ start, end, type }) => ({ start, end, type })) };
+    summary = assistantTexts('en').changes.setDateOverride({ date: day, now, then: { from: 'own', windows: LEFT }, extras });
+    await forgetDailyUse(subOf(adminToken));
+    expect((await startAgain(adminToken)).status).toBe(204);
+  });
+
+  afterAll(async () => {
+    await startAgain(adminToken);
+    await removeFromCalendar(TYPE);
+    await expectHoursAsBefore(day, typeId);
+  });
+
+  it('a request to block an hour: Claude reads the day and the types, then asks for the hours that are left, and the proposal shows the day as it is and as it would become', async () => {
+    const { body, reads } = await sayAndRead(adminToken, ASK);
+    expect(reads).toBe(2);
+    expect(body).toMatchObject({ status: 'awaiting_confirmation', activity: null, proposal: proposalOf([summary]), remainingToday: LIMIT - 1 });
+    expect(summary).toContain('for this day only. As it is now (');
+    expect(summary).toContain(`As it would become: 04:00–05:00 (${TYPE}), 06:00–07:00 (${TYPE}).`);
+    proposalId = (body?.proposal as { proposalId: string }).proposalId;
+    // Nothing is changed yet: the day has its three hours from the pattern.
+    expect((await hoursOfDay(day)).hours).toContainEqual({ start: '04:00', end: '07:00', type: TYPE, source: 'pattern' });
+  });
+
+  it("confirm blocks it: the proposal is shown as done, and Claude is told the day's own hours as saved", async () => {
+    const res = await confirm(adminToken, proposalId);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'idle', proposal: { ...proposalOf([summary], [['done', null]]), proposalId } });
+    const messages = res.body?.messages as { from: string; text: string }[];
+    expect(JSON.parse(messages[0]?.text ?? '')).toMatchObject({
+      outcome: 'done',
+      date: day,
+      hoursOfItsOwn: [
+        { start: '04:00', end: '05:00' },
+        { start: '06:00', end: '07:00' },
+      ],
+    });
+  });
+
+  it("the calendar's own route shows the day with hours of its own, and the hour from 05:00 is no longer a free slot", async () => {
+    const { hasOverride, hours } = await hoursOfDay(day);
+    expect(hasOverride).toBe(true);
+    expect(hours).toEqual(LEFT.map((window) => ({ ...window, source: 'override' })));
+    const { zone, view } = await dayOfCalendar(day);
+    expect(view.slots.filter((slot) => slot.typeId === typeId).map((slot) => localTimeOf(slot.start, zone))).toEqual(['04:00', '06:00']);
+  });
+
+  it('asked what is free that day, Claude reads it again and is given the two hours left, each from the hours of the day itself', async () => {
+    const { body, reads } = await sayAndRead(adminToken, ASK_FREE);
+    expect(reads).toBe(1);
+    expect(body).toMatchObject({ status: 'idle', proposal: null, remainingToday: LIMIT - 2 });
+    // The fake answers with the result it was given, word for word.
+    const messages = body?.messages as { from: string; text: string }[];
+    const given = JSON.parse(messages.at(-1)?.text ?? '') as { days: Record<string, unknown>[] };
+    expect(given.days).toEqual([{ date: day, weekday: expect.any(String), hasOverride: true, windows: LEFT.map((window) => ({ ...window, source: 'override' })), freeSlots: ['04:00', '06:00'], appointments: [] }]);
+  });
+
+  it('Claude asked for the day, the types and the hours of the day with the id of the type it read in the list, then for the day again, and nothing else', async () => {
+    const windows = LEFT.map(({ start, end }) => ({ start, end, typeId }));
+    expect(await storedToolRequests(adminToken)).toEqual([
+      { name: 'get_calendar', input: { from: day, to: day } },
+      { name: 'list_types', input: {} },
+      { name: 'set_date_override', input: { date: day, windows } },
+      { name: 'get_calendar', input: { from: day, to: day } },
+    ]);
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/assistant-blocking-refused.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('a block over an appointment is refused by the calendar (3, 5.4, 8.3)', () => {
+  const TYPE = 'assistant blocked journey';
+  const ASK = 'fake: block an hour that somebody booked';
+  const USER = 'chat-in-the-way';
+  // The day the fake asks to block on: {{saturday+19}} of its answer file, from 05:00 to 06:00.
+  let day: string;
+  let typeId: string;
+  let userToken: string;
+  let appointmentId: string;
+  let summary: string;
+  let proposalId: string;
+
+  beforeAll(async () => {
+    day = await saturdayOfJourney(19);
+    userToken = await newUser(USER);
+    await removeFromCalendar(TYPE);
+    ({ typeId } = await openPattern(day, TYPE, '04:00', '07:00'));
+    // The User books the hour from 05:00, the second free slot of the journey's type.
+    appointmentId = (await bookSlots(userToken, day, typeId, [1]))[0]!.appointmentId;
+    const { hasOverride, hours, extras } = await hoursOfDay(day);
+    const now = { from: hasOverride ? ('own' as const) : ('patterns' as const), windows: hours.map(({ start, end, type }) => ({ start, end, type })) };
+    const then = [
+      { start: '04:00', end: '05:00', type: TYPE },
+      { start: '06:00', end: '07:00', type: TYPE },
+    ];
+    summary = assistantTexts('en').changes.setDateOverride({ date: day, now, then: { from: 'own', windows: then }, extras });
+    await forgetDailyUse(subOf(adminToken));
+    expect((await startAgain(adminToken)).status).toBe(204);
+  });
+
+  afterAll(async () => {
+    await startAgain(adminToken);
+    await removeFromCalendar(TYPE);
+    await expectHoursAsBefore(day, typeId);
+    await removeUserIfPresent(USER);
+  });
+
+  it('the block is proposed all the same: the server looks for no appointment before the confirmation', async () => {
+    const { body, reads } = await sayAndRead(adminToken, ASK);
+    expect(reads).toBe(2);
+    expect(body).toMatchObject({ status: 'awaiting_confirmation', proposal: proposalOf([summary]), remainingToday: LIMIT - 1 });
+    proposalId = (body?.proposal as { proposalId: string }).proposalId;
+  });
+
+  it('confirm: the calendar refuses, the proposal is shown as refused with the code, and Claude is told which appointment is in the way, whose it is and when', async () => {
+    const res = await confirm(adminToken, proposalId);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'idle', proposal: { ...proposalOf([summary], [['refused', 'availability_conflict']]), proposalId } });
+    // The fake answers with the result it was given, word for word.
+    const messages = res.body?.messages as { from: string; text: string }[];
+    expect(JSON.parse(messages[0]?.text ?? '')).toEqual({
+      error: 'availability_conflict',
+      message: '1 appointment would fall outside the availability',
+      conflicts: [{ id: appointmentId, username: USER, date: day, start: '05:00', end: '06:00' }],
+    });
+  });
+
+  it("the calendar's own route shows the day as it was, from its pattern, and the appointment still booked", async () => {
+    const { hasOverride, hours } = await hoursOfDay(day);
+    expect(hasOverride).toBe(false);
+    expect(hours).toContainEqual({ start: '04:00', end: '07:00', type: TYPE, source: 'pattern' });
+    expect(await appointmentsOf(userToken)).toMatchObject([{ appointmentId, status: 'booked' }]);
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/assistant-pattern.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('a weekly pattern created and deleted through the assistant (3, 5.4, 5.5)', () => {
+  const TYPE = 'assistant pattern journey';
+  const ASK = 'fake: open the weekly pattern of the pattern journey';
+  const ASK_DELETE = 'fake: delete the weekly pattern of the pattern journey';
+  // What the fake asks for: every Sunday from 04:00 to 06:00, valid from {{date+12}} to
+  // {{date+18}} of its answer file, seven days that hold one Sunday, a weekday on which the calendar's journeys leave no hours of a day's own.
+  let from: string;
+  let until: string;
+  let sunday: string;
+  let typeId: string;
+  let facts: { weekday: number; start: string; end: string; type: string; validFrom: string; validUntil: string };
+  let proposalId: string;
+  let patternId: string;
+  const patternsOfJourney = async () => ((await api('GET', '/calendar/patterns', adminToken)).body?.patterns as { patternId: string; typeId: string }[]).filter((p) => p.typeId === typeId);
+
+  beforeAll(async () => {
+    from = await dayOfJourney(12);
+    until = await dayOfJourney(18);
+    sunday = [0, 1, 2, 3, 4, 5, 6].map((n) => addDays(from, n)).find((date) => weekdayOf(date) === 7)!;
+    await removeFromCalendar(TYPE);
+    const type = await api('POST', '/calendar/types', adminToken, { name: TYPE });
+    expect(type.status).toBe(201);
+    typeId = type.body?.typeId as string;
+    facts = { weekday: 7, start: '04:00', end: '06:00', type: TYPE, validFrom: from, validUntil: until };
+    await forgetDailyUse(subOf(adminToken));
+    expect((await startAgain(adminToken)).status).toBe(204);
+  });
+
+  afterAll(async () => {
+    await startAgain(adminToken);
+    await removeFromCalendar(TYPE);
+    expect((await api('GET', '/calendar/types', adminToken)).body?.types).not.toContainEqual(expect.objectContaining({ name: TYPE }));
+  });
+
+  it('a request for a weekly pattern: Claude reads the types, then asks for the pattern, and the proposal names its weekday, hours, type and dates; nothing is created', async () => {
+    const { body, reads } = await sayAndRead(adminToken, ASK);
+    expect(reads).toBe(1);
+    const summary = assistantTexts('en').changes.createPattern(facts);
+    expect(summary).toContain(`Create a weekly pattern: every Sunday, from 04:00 to 06:00 (${TYPE}), valid from `);
+    expect(body).toMatchObject({ status: 'awaiting_confirmation', proposal: proposalOf([summary]), remainingToday: LIMIT - 1 });
+    proposalId = (body?.proposal as { proposalId: string }).proposalId;
+    expect(await patternsOfJourney()).toEqual([]);
+  });
+
+  it('confirm creates it: Claude is told the pattern with its id, and the calendar opens those hours on the one Sunday between its dates', async () => {
+    const res = await confirm(adminToken, proposalId);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'idle', proposal: { proposalId, actions: [{ outcome: 'done', error: null }] } });
+    const messages = res.body?.messages as { from: string; text: string }[];
+    const given = JSON.parse(messages[0]?.text ?? '') as { outcome: string; pattern: Record<string, unknown> };
+    expect(given).toMatchObject({ outcome: 'done', pattern: { weekday: 'Sunday', start: '04:00', end: '06:00', validFrom: from, validUntil: until } });
+    patternId = given.pattern.id as string;
+    expect(await patternsOfJourney()).toMatchObject([{ patternId, weekday: 7, start: '04:00', end: '06:00', validFrom: from, validUntil: until }]);
+    expect((await hoursOfDay(sunday)).hours).toContainEqual({ start: '04:00', end: '06:00', type: TYPE, source: 'pattern' });
+  });
+
+  it('a request to delete it: Claude reads the patterns, then asks for the deletion by the id it read, and the proposal names the pattern in full', async () => {
+    const { body, reads } = await sayAndRead(adminToken, ASK_DELETE);
+    expect(reads).toBe(1);
+    const summary = assistantTexts('en').changes.deletePattern(facts);
+    expect(summary).toContain('Delete the weekly pattern: every Sunday, from 04:00 to 06:00');
+    expect(body).toMatchObject({ status: 'awaiting_confirmation', proposal: proposalOf([summary]), remainingToday: LIMIT - 2 });
+    proposalId = (body?.proposal as { proposalId: string }).proposalId;
+    expect(await patternsOfJourney()).toHaveLength(1);
+  });
+
+  it('confirm deletes it: Claude is told so, the pattern is gone and the Sunday has those hours no more', async () => {
+    const res = await confirm(adminToken, proposalId);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'idle', proposal: { proposalId, actions: [{ outcome: 'done', error: null }] } });
+    const messages = res.body?.messages as { from: string; text: string }[];
+    expect(JSON.parse(messages.at(-1)?.text ?? '')).toMatchObject({ outcome: 'done', deleted: true });
+    expect(await patternsOfJourney()).toEqual([]);
+    expect((await hoursOfDay(sunday)).hours.filter((window) => window.type === TYPE)).toEqual([]);
+  });
+
+  it('Claude asked for the pattern with a weekday in words and the id of the type, and for the deletion with the id of the pattern, and nothing else', async () => {
+    expect(await storedToolRequests(adminToken)).toEqual([
+      { name: 'list_types', input: {} },
+      { name: 'create_pattern', input: { weekday: 'Sunday', start: '04:00', end: '06:00', typeId, validFrom: from, validUntil: until } },
+      { name: 'list_patterns', input: {} },
+      { name: 'delete_pattern', input: { patternId } },
+    ]);
   });
 });

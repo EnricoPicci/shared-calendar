@@ -119,3 +119,6 @@ The pages written so far. Which pages are still to come, and in which order, is 
 | [`backend/assistant-admin-tools-refused.md`](backend/assistant-admin-tools-refused.md) | `backend/tests/integration/assistant.test.ts`, `a User is not offered the Administrator's tools (3, 7.4)` |
 | [`backend/assistant-settings.md`](backend/assistant-settings.md) | `backend/tests/integration/assistant.test.ts`, `a setting changed through the assistant (3, 5.4, 5.5)` |
 | [`backend/assistant-booking-for-user.md`](backend/assistant-booking-for-user.md) | `backend/tests/integration/assistant.test.ts`, `the Administrator books for a User through the assistant (3, 5.4, 5.5)` |
+| [`backend/assistant-blocking.md`](backend/assistant-blocking.md) | `backend/tests/integration/assistant.test.ts`, `time blocked through the assistant (3, 5.4, 5.5)` |
+| [`backend/assistant-blocking-refused.md`](backend/assistant-blocking-refused.md) | `backend/tests/integration/assistant.test.ts`, `a block over an appointment is refused by the calendar (3, 5.4, 8.3)` |
+| [`backend/assistant-pattern.md`](backend/assistant-pattern.md) | `backend/tests/integration/assistant.test.ts`, `a weekly pattern created and deleted through the assistant (3, 5.4, 5.5)` |

@@ -350,6 +350,13 @@ Step c07 of `docs/CONVERSATIONAL_PLAN.md` (2026-11-22) added the Administrator's
 kinds of read (users, patterns). `tools/facts.ts` gained the reads of the present settings, the
 present types and the users' list.
 
+Step c08 of `docs/CONVERSATIONAL_PLAN.md` (2026-11-22) added the tools of the opening hours,
+`tools/createPattern.ts`, `tools/updatePattern.ts`, `tools/deletePattern.ts`,
+`tools/setDateOverride.ts`, `tools/deleteDateOverride.ts`, `tools/createOneOffWindow.ts` and
+`tools/deleteOneOffWindow.ts`, with their seven sentences in `changes`. `tools/facts.ts` gained
+the reads of the present patterns and of one day's hours, and `tools/result.ts` a refusal with
+its list of appointments made small.
+
 What stays out of `shared/`: the DynamoDB item shape (`MessageItem`), the authorizer context,
 the logger, the password generator (server-side secret handling), and everything that imports
 `aws-lambda` types or the AWS SDK.

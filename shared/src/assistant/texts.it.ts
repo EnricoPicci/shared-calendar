@@ -1,5 +1,5 @@
 import { weekdayOf } from '../calendar/time';
-import type { AppointmentSummary, AssistantSettingName, AssistantTexts, SettingChange } from './texts';
+import type { AppointmentSummary, AssistantSettingName, AssistantTexts, DayHours, HoursSummary, PatternSummary, SettingChange } from './texts';
 
 const WEEKDAYS = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
 const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
@@ -26,6 +26,31 @@ const settingChange = ({ setting, from, to }: SettingChange) => {
   const value = (count: number | null) => (count === null ? 'nessun limite' : `${count} ${count === 1 ? one : many}`);
   return `${name}: da ${value(from)} a ${value(to)}.`;
 };
+
+// A weekly pattern as a sentence names it: "ogni martedì, dalle 09:00 alle 12:00 (Visit), valido da
+// martedì 1 dicembre 2026, senza scadenza".
+const thePattern = ({ weekday, start, end, type, validFrom, validUntil }: PatternSummary) =>
+  `ogni ${WEEKDAYS[weekday - 1]}, dalle ${start} alle ${end} (${type}), valido da ${fullDate(validFrom)}` + (validUntil === null ? ', senza scadenza' : ` fino a ${fullDate(validUntil)}`);
+
+// Some hours in a list: "09:00–12:00 (Visit)".
+const hours = ({ start, end, type }: HoursSummary) => `${start}–${end} (${type})`;
+
+// Where the hours of a day come from.
+const FROM_PATTERNS = 'dagli orari settimanali';
+const OWN_HOURS = 'orari propri di questo giorno';
+
+// The hours of a day, one after the other. A day the weekly patterns give nothing to has no hours.
+// A day whose own hours are none is not available.
+const dayHours = ({ from, windows }: DayHours) => (windows.length > 0 ? windows.map(hours).join(', ') : from === 'own' ? 'non disponibile' : 'nessun orario');
+
+// The day as it is, with where its hours come from, and as it would become. What it would become
+// says where the hours come from only when the day goes back to the weekly patterns.
+const dayNow = (day: DayHours) => `Com'è ora (${day.from === 'own' ? OWN_HOURS : FROM_PATTERNS}): ${dayHours(day)}.`;
+const dayThen = (day: DayHours) => `Come diventerebbe${day.from === 'own' ? '' : ` (${FROM_PATTERNS})`}: ${dayHours(day)}.`;
+
+// The extra windows of the day, which a change to the day's own hours leaves as they are.
+const extraWindows = (extras: HoursSummary[]) =>
+  extras.length === 0 ? '' : extras.length === 1 ? ` La finestra aggiuntiva ${hours(extras[0]!)} di questo giorno non cambia.` : ` Le finestre aggiuntive ${extras.map(hours).join(', ')} di questo giorno non cambiano.`;
 
 // The fixed texts in Italian, key by key the ones of the English object. The person is addressed
 // with the formal "lei" throughout. The second button is not "Annulla": in a calendar that word
@@ -66,6 +91,13 @@ export const ASSISTANT_TEXTS_IT: AssistantTexts = {
     createType: ({ name }) => `Creare il tipo di appuntamento «${name}».`,
     renameType: ({ from, to }) => `Rinominare il tipo di appuntamento «${from}» in «${to}».`,
     deleteType: ({ name }) => `Eliminare il tipo di appuntamento «${name}».`,
+    createPattern: (pattern) => `Creare un orario settimanale: ${thePattern(pattern)}.`,
+    updatePattern: ({ from, to }) => `Modificare un orario settimanale. Com'è ora: ${thePattern(from)}. Come diventerebbe: ${thePattern(to)}.`,
+    deletePattern: (pattern) => `Eliminare l'orario settimanale: ${thePattern(pattern)}.`,
+    setDateOverride: ({ date, now, then, extras }) => `Impostare gli orari di ${fullDate(date)}, solo per questo giorno. ${dayNow(now)} ${dayThen(then)}${extraWindows(extras)}`,
+    deleteDateOverride: ({ date, now, then, extras }) => `Tornare agli orari settimanali per ${fullDate(date)}. ${dayNow(now)} ${dayThen(then)}${extraWindows(extras)}`,
+    createOneOffWindow: ({ date, start, end, type }) => `Creare una finestra aggiuntiva per ${fullDate(date)}, dalle ${start} alle ${end} (${type}).`,
+    deleteOneOffWindow: ({ date, start, end, type }) => `Eliminare la finestra aggiuntiva di ${fullDate(date)}, dalle ${start} alle ${end} (${type}).`,
   },
   working: 'Ci sto lavorando…',
   reading: {

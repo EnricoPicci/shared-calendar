@@ -4,7 +4,7 @@ import { getSettings } from '../../../../src/assistant/tools/getSettings';
 import { DEFINITIONS, TOOLS } from '../../../../src/assistant/tools/list';
 import { listAppointments } from '../../../../src/assistant/tools/listAppointments';
 import { listTypes } from '../../../../src/assistant/tools/listTypes';
-import { appointmentForModel, cappedJson, localDateTime, localEndTime, RESULT_CAP_BYTES } from '../../../../src/assistant/tools/result';
+import { appointmentForModel, cappedJson, localDateTime, localEndTime, refusalForModel, RESULT_CAP_BYTES } from '../../../../src/assistant/tools/result';
 import { forClaude, offeredTo, toolsForClaude } from '../../../../src/assistant/tools/tool';
 import recorded from './recorded/routes.json';
 
@@ -19,9 +19,23 @@ const ADMIN = { timeZone: ROME, role: 'admin' as const };
 
 // Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
 describe('the list of tools (3, 8.2)', () => {
-  it('holds the four reads and the four appointment changes for both roles, then the two reads and the four changes of the Administrator, the definitions in the same order as the tools', () => {
+  it('holds the four reads and the four appointment changes for both roles, then the two reads and the eleven changes of the Administrator, the definitions in the same order as the tools', () => {
     const FOR_BOTH = ['get_settings', 'list_types', 'get_calendar', 'list_appointments', 'book_appointment', 'cancel_appointment', 'change_appointment', 'set_appointment_note'];
-    const FOR_ADMIN = ['list_users', 'list_patterns', 'update_settings', 'create_type', 'rename_type', 'delete_type'];
+    const FOR_ADMIN = [
+      'list_users',
+      'list_patterns',
+      'update_settings',
+      'create_type',
+      'rename_type',
+      'delete_type',
+      'create_pattern',
+      'update_pattern',
+      'delete_pattern',
+      'set_date_override',
+      'delete_date_override',
+      'create_one_off_window',
+      'delete_one_off_window',
+    ];
     expect(DEFINITIONS.map((definition) => definition.name)).toEqual([...FOR_BOTH, ...FOR_ADMIN]);
     expect(TOOLS.map((tool) => tool.definition)).toEqual([...DEFINITIONS]);
     for (const definition of DEFINITIONS.slice(0, 4)) {
@@ -147,9 +161,72 @@ describe('get_calendar (3, 8.3)', () => {
     expect((list?.items[2] as { appointments: object[] }).appointments[0]).not.toHaveProperty('cancellableUntil');
   });
 
-  it('leaves out every internal field: no instant, no type id, no source of a window, no busy time, no author', () => {
-    const text = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, ADMIN));
-    for (const internal of ['typeId', 'sourceId', 'one_off', 'busy', 'hasOverride', 'createdBy', 'updatedAt', 'generatedAt', '.000Z']) expect(text).not.toContain(internal);
+  it("leaves out every internal field: no instant, no type id, no busy time, no author; and for a User, no source of a window and no word on the day's own hours", () => {
+    const forAdmin = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, ADMIN));
+    for (const internal of ['typeId', 'sourceId', 'busy', 'createdBy', 'updatedAt', 'generatedAt', '.000Z']) expect(forAdmin).not.toContain(internal);
+    // The very answer the route gave the Administrator, turned into a User's result: none of it.
+    const forUser = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, USER));
+    for (const internal of ['typeId', 'sourceId', 'source', 'one_off', 'hasOverride', recorded.admin.calendar.days[0]!.windows[0]!.sourceId]) expect(forUser).not.toContain(internal);
+  });
+
+  it("the Administrator's result and a User's, side by side: the Administrator alone gets where each window comes from, the id of an extra window, and whether the day has hours of its own", () => {
+    const window = (start: string, end: string, source: 'pattern' | 'override' | 'one_off', sourceId: string) => ({ start, end, typeId: '01A', typeName: 'Visit', source, sourceId });
+    const view: CalendarView = {
+      timeZone: ROME,
+      from: '2026-11-23',
+      to: '2026-11-26',
+      generatedAt: '2026-11-21T10:00:00.000Z',
+      days: [
+        { date: '2026-11-23', weekday: 1, hasOverride: false, slots: [], busy: [], windows: [window('2026-11-23T08:00:00.000Z', '2026-11-23T11:00:00.000Z', 'pattern', '01PATTERN'), window('2026-11-23T14:00:00.000Z', '2026-11-23T15:00:00.000Z', 'one_off', '01WINDOW')] },
+        { date: '2026-11-24', weekday: 2, hasOverride: true, slots: [], busy: [], windows: [window('2026-11-24T08:00:00.000Z', '2026-11-24T10:00:00.000Z', 'override', '2026-11-24')] },
+        // A day closed by hours of its own, and a day with nothing on it at all.
+        { date: '2026-11-25', weekday: 3, hasOverride: true, slots: [], busy: [], windows: [] },
+        { date: '2026-11-26', weekday: 4, hasOverride: false, slots: [], busy: [], windows: [] },
+      ],
+      appointments: [],
+    };
+    expect(getCalendar.toModel(view, ADMIN).list?.items).toEqual([
+      {
+        date: '2026-11-23',
+        weekday: 'Monday',
+        hasOverride: false,
+        windows: [
+          { start: '09:00', end: '12:00', type: 'Visit', source: 'pattern' },
+          { start: '15:00', end: '16:00', type: 'Visit', source: 'one_off', id: '01WINDOW' },
+        ],
+        freeSlots: [],
+        appointments: [],
+      },
+      { date: '2026-11-24', weekday: 'Tuesday', hasOverride: true, windows: [{ start: '09:00', end: '11:00', type: 'Visit', source: 'override' }], freeSlots: [], appointments: [] },
+      // Kept for the Administrator: the day is closed by hours of its own, which can be taken away.
+      { date: '2026-11-25', weekday: 'Wednesday', hasOverride: true, windows: [], freeSlots: [], appointments: [] },
+    ]);
+    expect(getCalendar.toModel(view, USER).list?.items).toEqual([
+      {
+        date: '2026-11-23',
+        weekday: 'Monday',
+        windows: [
+          { start: '09:00', end: '12:00', type: 'Visit' },
+          { start: '15:00', end: '16:00', type: 'Visit' },
+        ],
+        freeSlots: [],
+        appointments: [],
+      },
+      { date: '2026-11-24', weekday: 'Tuesday', windows: [{ start: '09:00', end: '11:00', type: 'Visit' }], freeSlots: [], appointments: [] },
+    ]);
+  });
+
+  it("what the Administrator's result adds: 20 bytes a day and 19 to 22 a window, 34 more for an extra window; the description says it to the Administrator only", () => {
+    const admin = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, ADMIN).list?.items);
+    const user = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, USER).list?.items);
+    // Five days, each with one extra window: 20 + 19 + 34 bytes each.
+    expect(admin.length - user.length).toBe(5 * (20 + 19 + 34));
+    const forAdmin = forClaude(getCalendar.definition, 'admin').description ?? '';
+    const forUser = forClaude(getCalendar.definition, 'user').description ?? '';
+    expect(forAdmin).toContain('"hasOverride"');
+    expect(forAdmin).toContain('"one_off"');
+    expect(forAdmin.startsWith(forUser)).toBe(true);
+    for (const word of ['source', 'override', 'one_off', 'hasOverride']) expect(forUser).not.toContain(word);
   });
 
   // A day open from midnight to midnight, with slots around the change of the clocks.
@@ -279,5 +356,34 @@ describe('the cap of a result (8.3)', () => {
     const result = JSON.parse(cappedJson({ fields: { from: 'a' }, list: { name: 'days', items: ['x'.repeat(RESULT_CAP_BYTES)] } })) as { days: unknown[]; cut: string };
     expect(result.days).toEqual([]);
     expect(result.cut).toContain('only the first 0 of 1 days');
+  });
+});
+
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('a refusal as Claude sees it (8.3)', () => {
+  const REFUSAL = { error: 'availability_conflict', message: '2 appointments would fall outside the availability' };
+  const conflict = (n: number) => ({ appointmentId: `01JD0000000000000000APPT${String(n).padStart(2, '0')}`, username: 'alice', start: '2026-11-24T09:00:00.000Z', end: '2026-11-24T10:00:00.000Z' });
+
+  it('is the code and the message alone when the route listed no appointment', () => {
+    expect(refusalForModel(REFUSAL, { ...REFUSAL }, ROME)).toEqual({ fields: REFUSAL });
+    expect(refusalForModel(REFUSAL, null, ROME)).toEqual({ fields: REFUSAL });
+    expect(refusalForModel(REFUSAL, { ...REFUSAL, conflicts: 'two' }, ROME)).toEqual({ fields: REFUSAL });
+    expect(cappedJson(refusalForModel(REFUSAL, null, ROME))).toBe(JSON.stringify(REFUSAL));
+  });
+
+  it('gives each appointment in the way as its id, whose it is, its local date and its wall-clock times', () => {
+    const result = refusalForModel(REFUSAL, { ...REFUSAL, conflicts: [conflict(1)] }, ROME);
+    expect(result.fields).toEqual(REFUSAL);
+    expect(result.list).toMatchObject({ name: 'conflicts', items: [{ id: '01JD0000000000000000APPT01', username: 'alice', date: '2026-11-24', start: '10:00', end: '11:00' }] });
+    expect(cappedJson(result)).not.toContain('.000Z');
+  });
+
+  it('a list too long is cut at a whole appointment like every list, and Claude is told how to see the others', () => {
+    const text = cappedJson(refusalForModel(REFUSAL, { ...REFUSAL, conflicts: Array.from({ length: 200 }, (_, n) => conflict(n)) }, ROME));
+    expect(Buffer.byteLength(text, 'utf8')).toBeLessThanOrEqual(RESULT_CAP_BYTES);
+    const cut = JSON.parse(text) as { error: string; conflicts: unknown[]; cut: string };
+    expect(cut.error).toBe('availability_conflict');
+    expect(cut.conflicts.length).toBeGreaterThan(40);
+    expect(cut.cut).toBe(`This result was too long: only the first ${cut.conflicts.length} of 200 conflicts are here. Use list_appointments to see the others.`);
   });
 });

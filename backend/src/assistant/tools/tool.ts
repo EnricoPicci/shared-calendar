@@ -54,9 +54,10 @@ export type ToolCall = {
 // A route's handler, as every file of src/handlers exports it.
 export type RouteHandler = (event: APIGatewayProxyEventV2) => Promise<HttpResponse>;
 
-// What a tool gives Claude of a route's 2xx answer: a few fixed fields and, when the answer is a
-// list, its items under one name, so that a result too long can be cut at a whole item.
-export type ToolResult = { fields: Record<string, unknown>; list?: { name: string; items: unknown[] } };
+// What a tool gives Claude of a route's answer: a few fixed fields and, when the answer is a
+// list, its items under one name, so that a result too long can be cut at a whole item. `rest`
+// tells Claude how to get the items a cut left out, where asking for a shorter period is not it.
+export type ToolResult = { fields: Record<string, unknown>; list?: { name: string; items: unknown[]; rest?: string } };
 
 // The result of one tool request, as the Messages API takes it back.
 export type ToolResultBlock = { type: 'tool_result'; tool_use_id: string; content: string; is_error?: true };

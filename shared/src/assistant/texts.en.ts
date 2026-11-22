@@ -1,5 +1,5 @@
 import { weekdayOf } from '../calendar/time';
-import type { AppointmentSummary, AssistantSettingName, AssistantTexts, SettingChange } from './texts';
+import type { AppointmentSummary, AssistantSettingName, AssistantTexts, DayHours, HoursSummary, PatternSummary, SettingChange } from './texts';
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -26,6 +26,31 @@ const settingChange = ({ setting, from, to }: SettingChange) => {
   const value = (count: number | null) => (count === null ? 'no limit' : `${count} ${count === 1 ? one : many}`);
   return `${name}: from ${value(from)} to ${value(to)}.`;
 };
+
+// A weekly pattern as a sentence names it: "every Tuesday, from 09:00 to 12:00 (Visit), valid from
+// Tuesday 1 December 2026, with no end".
+const thePattern = ({ weekday, start, end, type, validFrom, validUntil }: PatternSummary) =>
+  `every ${WEEKDAYS[weekday - 1]}, from ${start} to ${end} (${type}), valid from ${fullDate(validFrom)}` + (validUntil === null ? ', with no end' : ` until ${fullDate(validUntil)}`);
+
+// Some hours in a list: "09:00–12:00 (Visit)".
+const hours = ({ start, end, type }: HoursSummary) => `${start}–${end} (${type})`;
+
+// Where the hours of a day come from, in the words of the page of a single date.
+const FROM_PATTERNS = 'from the weekly patterns';
+const OWN_HOURS = "this day's own hours";
+
+// The hours of a day, one after the other. A day the weekly patterns give nothing to has no hours.
+// A day whose own hours are none is not available.
+const dayHours = ({ from, windows }: DayHours) => (windows.length > 0 ? windows.map(hours).join(', ') : from === 'own' ? 'not available' : 'no hours');
+
+// The day as it is, with where its hours come from, and as it would become. What it would become
+// says where the hours come from only when the day goes back to the weekly patterns.
+const dayNow = (day: DayHours) => `As it is now (${day.from === 'own' ? OWN_HOURS : FROM_PATTERNS}): ${dayHours(day)}.`;
+const dayThen = (day: DayHours) => `As it would become${day.from === 'own' ? '' : ` (${FROM_PATTERNS})`}: ${dayHours(day)}.`;
+
+// The extra windows of the day, which a change to the day's own hours leaves as they are.
+const extraWindows = (extras: HoursSummary[]) =>
+  extras.length === 0 ? '' : extras.length === 1 ? ` The extra window ${hours(extras[0]!)} of this day is not changed.` : ` The extra windows ${extras.map(hours).join(', ')} of this day are not changed.`;
 
 // The fixed texts in English. The three sentences of `cannotAnswer` are those of
 // docs/CONVERSATIONAL_ARCHITECTURE.md section 6.1, word for word.
@@ -64,6 +89,13 @@ export const ASSISTANT_TEXTS_EN: AssistantTexts = {
     createType: ({ name }) => `Create the appointment type "${name}".`,
     renameType: ({ from, to }) => `Rename the appointment type "${from}" to "${to}".`,
     deleteType: ({ name }) => `Delete the appointment type "${name}".`,
+    createPattern: (pattern) => `Create a weekly pattern: ${thePattern(pattern)}.`,
+    updatePattern: ({ from, to }) => `Change a weekly pattern. As it is now: ${thePattern(from)}. As it would become: ${thePattern(to)}.`,
+    deletePattern: (pattern) => `Delete the weekly pattern: ${thePattern(pattern)}.`,
+    setDateOverride: ({ date, now, then, extras }) => `Set the hours of ${fullDate(date)}, for this day only. ${dayNow(now)} ${dayThen(then)}${extraWindows(extras)}`,
+    deleteDateOverride: ({ date, now, then, extras }) => `Go back to the weekly patterns on ${fullDate(date)}. ${dayNow(now)} ${dayThen(then)}${extraWindows(extras)}`,
+    createOneOffWindow: ({ date, start, end, type }) => `Create an extra window on ${fullDate(date)}, from ${start} to ${end} (${type}).`,
+    deleteOneOffWindow: ({ date, start, end, type }) => `Delete the extra window of ${fullDate(date)}, from ${start} to ${end} (${type}).`,
   },
   working: 'Working…',
   reading: {

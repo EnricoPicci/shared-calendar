@@ -2,6 +2,7 @@ import type { ListPatternsResponse, ListTypesResponse } from '@shared-calendar/s
 import { z } from 'zod';
 import { handler as listTypes } from '../../handlers/listAvailabilityTypes';
 import { handler } from '../../handlers/listPatterns';
+import { WEEKDAY_NAMES } from './result';
 import type { ReadTool, ToolDefinition } from './tool';
 
 // The tool for GET /calendar/patterns (docs/CONVERSATIONAL_ARCHITECTURE.md section 3): the weekly
@@ -23,8 +24,6 @@ export const listPatternsDefinition: ToolDefinition = {
   reads: 'patterns',
 };
 
-const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
 const parts: ReadTool<z.infer<typeof Input>> = {
   definition: listPatternsDefinition,
   toHandler: {
@@ -41,7 +40,7 @@ const parts: ReadTool<z.infer<typeof Input>> = {
         name: 'patterns',
         items: (body as ListPatternsResponse).patterns.map((pattern) => ({
           id: pattern.patternId,
-          weekday: WEEKDAYS[pattern.weekday - 1],
+          weekday: WEEKDAY_NAMES[pattern.weekday - 1],
           start: pattern.start,
           end: pattern.end,
           type: names.get(pattern.typeId) ?? null,

@@ -6,7 +6,8 @@
     "The text {{application-line}} in an answer is replaced by the fake with the last line of the application in the request (the entry of role \"system\" after a message of the person). {{date+N}}, anywhere in an answer, is replaced by the date N days after the date that line states. {{last-tool-result}}, in a text, is replaced by the content of the last result of a tool in the request. {{appointment-id-N}}, anywhere in an answer, is replaced by the id of the Nth appointment in the last result of a tool in the request, when that result is a list of appointments: the server makes an appointment's id, so no answer can hold one.",
     "The requests for a booking (tool-book-day…) are the one content block the real model sent for \"book me Tuesday at 10\" in the trial of the step that built the proposal (its id, name and caller; an input of a date and a time, nothing else), with the date replaced by a mark and the time by the hour each journey opens. A step after a proposal is counted like any other: the confirmation's request for the closing words is the second request since the person's message. The message \"yes\" is scripted to ask for the same booking again, as the real model did when a person typed it instead of pressing the button.",
     "The requests to cancel, move and annotate an appointment (tool-cancel-…, tool-change-…, tool-set-note-…) and the requests for the list that come before them (tool-list-appointments-day…) are the content blocks the real model sent in the trial of the step that built those three tools: \"cancel both my appointments of next week\" was answered with a request for the list of that week, then with two requests to cancel in one answer. The ids of the appointments and the dates are replaced by marks, and the hour of the move by the hour its journey opens.",
-    "The request to change a setting (tool-update-settings-horizon-57) and the request to book for a User (tool-book-for-user-…) are the content blocks the real model sent, as the Administrator, in the trial of the step that built the Administrator's tools: \"set the booking horizon to 40 days\" and \"book alice on Thursday at 14:00\" (the block with its id, name and caller; an input of the one setting, and of a username, a date and a time). The number of days is replaced by the one the settings journey uses, the username by the journey's own User, the date by a mark and the time by the hour the journey opens. The same request for the setting is scripted for a User, who is not offered that tool: the real model never sent it for a User, and the journey shows what the server answers if it did."
+    "The request to change a setting (tool-update-settings-horizon-57) and the request to book for a User (tool-book-for-user-…) are the content blocks the real model sent, as the Administrator, in the trial of the step that built the Administrator's tools: \"set the booking horizon to 40 days\" and \"book alice on Thursday at 14:00\" (the block with its id, name and caller; an input of the one setting, and of a username, a date and a time). The number of days is replaced by the one the settings journey uses, the username by the journey's own User, the date by a mark and the time by the hour the journey opens. The same request for the setting is scripted for a User, who is not offered that tool: the real model never sent it for a User, and the journey shows what the server answers if it did.",
+    "The requests about the opening hours are the content blocks the real model sent, as the Administrator, in the trial of the step that built those tools. For \"block Saturday from 10:00 to 11:00\" it read the day (tool-get-calendar-saturday12, -day19), said \"I need the type id.\" and read the types (tool-list-types), then asked for the day's own hours with what was left of it (tool-override-saturday…-block-0500): here the date is the mark {{saturday+N}}, the first Saturday on or after the date N days ahead, a day on which the local calendar holds nothing but the journey's own hours; the hours are those the journey's pattern leaves around 05:00 to 06:00, and the id of the type is the mark {{id:types:NAME}}, which the fake replaces with the id of the type of that name in the list of types the request holds. For \"every Sunday from 10 to 12\" it asked for the pattern (tool-create-pattern-sunday: here a Sunday between two dates a week apart, so that the pattern opens one day) and for \"delete it\" for its deletion (tool-delete-pattern-of-journey), by the id it had from the creation; the journey's fake reads the list of patterns first (tool-list-patterns, written for the journey: the real model did not need it) and takes the id from it with {{id:patterns:NAME}}."
   ],
   "answers": {
     "not-scripted": {
@@ -783,6 +784,285 @@
           "output_tokens": 0
         }
       }
+    },
+    "tool-get-calendar-saturday12": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_get_calendar_saturday12",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01KYiwv2nx7Zub3pdHzv3ntf",
+            "name": "get_calendar",
+            "input": {
+              "from": "{{saturday+12}}",
+              "to": "{{saturday+12}}"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-get-calendar-saturday19": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_get_calendar_saturday19",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01Q5bQv1ujgGs2dE9ho2iDYj",
+            "name": "get_calendar",
+            "input": {
+              "from": "{{saturday+19}}",
+              "to": "{{saturday+19}}"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-list-types": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_list_types",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "text",
+            "text": "I need the type id."
+          },
+          {
+            "type": "tool_use",
+            "id": "toolu_0154QGMQwqXG2knEyXbV3TZj",
+            "name": "list_types",
+            "input": {},
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-override-saturday12-block-0500": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_override_saturday12_block_0500",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_017Lqxsj7DURv1D3Mdm3i1xN",
+            "name": "set_date_override",
+            "input": {
+              "date": "{{saturday+12}}",
+              "windows": [
+                {
+                  "start": "04:00",
+                  "end": "05:00",
+                  "typeId": "{{id:types:assistant blocking journey}}"
+                },
+                {
+                  "start": "06:00",
+                  "end": "07:00",
+                  "typeId": "{{id:types:assistant blocking journey}}"
+                }
+              ]
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-override-saturday19-block-0500": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_override_saturday19_block_0500",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01PgyRSyzVm1JB5mPp8T5S2h",
+            "name": "set_date_override",
+            "input": {
+              "date": "{{saturday+19}}",
+              "windows": [
+                {
+                  "start": "04:00",
+                  "end": "05:00",
+                  "typeId": "{{id:types:assistant blocked journey}}"
+                },
+                {
+                  "start": "06:00",
+                  "end": "07:00",
+                  "typeId": "{{id:types:assistant blocked journey}}"
+                }
+              ]
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-create-pattern-sunday": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_create_pattern_sunday",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_019gDiL4759ghSnwoHoCFVwf",
+            "name": "create_pattern",
+            "input": {
+              "weekday": "Sunday",
+              "start": "04:00",
+              "end": "06:00",
+              "typeId": "{{id:types:assistant pattern journey}}",
+              "validFrom": "{{date+12}}",
+              "validUntil": "{{date+18}}"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-list-patterns": {
+      "source": "fake",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_list_patterns",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_fake_list_patterns",
+            "name": "list_patterns",
+            "input": {},
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-delete-pattern-of-journey": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_delete_pattern_of_journey",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01FCPtBju8pma5KZdqUqyctU",
+            "name": "delete_pattern",
+            "input": {
+              "patternId": "{{id:patterns:assistant pattern journey}}"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
     }
   },
   "otherwise": "not-scripted",
@@ -888,6 +1168,32 @@
     ],
     "fake: book the slot of the journey for its User": [
       "tool-book-for-user-day21-0500",
+      "text-last-tool-result"
+    ],
+    "fake: block an hour of the day of the blocking journey": [
+      "tool-get-calendar-saturday12",
+      "tool-list-types",
+      "tool-override-saturday12-block-0500",
+      "text-last-tool-result"
+    ],
+    "fake: what is free on the day of the blocking journey?": [
+      "tool-get-calendar-saturday12",
+      "text-last-tool-result"
+    ],
+    "fake: block an hour that somebody booked": [
+      "tool-get-calendar-saturday19",
+      "tool-list-types",
+      "tool-override-saturday19-block-0500",
+      "text-last-tool-result"
+    ],
+    "fake: open the weekly pattern of the pattern journey": [
+      "tool-list-types",
+      "tool-create-pattern-sunday",
+      "text-last-tool-result"
+    ],
+    "fake: delete the weekly pattern of the pattern journey": [
+      "tool-list-patterns",
+      "tool-delete-pattern-of-journey",
       "text-last-tool-result"
     ]
   }

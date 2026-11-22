@@ -107,8 +107,6 @@ the line.
   `promptVersion`, the mark of the instructions, the block about the person and the role's
   tools. **Changing `INSTRUCTIONS`, or a tool's name, description or schema, ends every
   conversation in progress.**
-- **The paragraph "What you can do for the time being" of `INSTRUCTIONS` is a stopgap**: a step
-  that adds a tool takes its ability out of it, and the step that adds the last one removes it.
 - `conversation.ts`: no Claude and no handler here, so two functions bundle neither.
   `exchange.ts`: a message, `continue`, and the one step: Claude once, its reads or a proposal,
   one write. `proposal.ts`, `confirm.ts`, `decline.ts`: a proposal stored and settled.

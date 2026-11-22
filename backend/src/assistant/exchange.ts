@@ -269,7 +269,7 @@ export async function runStep(input: StepInput): Promise<CoreResult> {
         const twice = proposed.ok && proposed.subjects.some((subject) => subjects.has(subject));
         if (!proposed.ok || twice) {
           const refused = proposed.ok
-            ? notRun(asked.id, proposed.tool, 'same_thing_twice', 'Another change asked for in the same answer is about the same appointment or the same slot: nothing was proposed. Ask for one change of it.')
+            ? notRun(asked.id, proposed.tool, 'same_thing_twice', 'Another change asked for in the same answer is about the same thing (the same appointment, slot, type, pattern, date or window): nothing was proposed. Ask for one change of it.')
             : proposed.outcome;
           answered.push({ result: refused.result });
           ran.push(refused.log);

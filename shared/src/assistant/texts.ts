@@ -48,6 +48,13 @@ export type AssistantTexts = {
     createType: (type: { name: string }) => string;
     renameType: (rename: { from: string; to: string }) => string;
     deleteType: (type: { name: string }) => string;
+    createPattern: (pattern: PatternSummary) => string;
+    updatePattern: (change: { from: PatternSummary; to: PatternSummary }) => string;
+    deletePattern: (pattern: PatternSummary) => string;
+    setDateOverride: (change: DayChangeSummary) => string;
+    deleteDateOverride: (change: DayChangeSummary) => string;
+    createOneOffWindow: (window: WindowSummary) => string;
+    deleteOneOffWindow: (window: WindowSummary) => string;
   };
   // The line of progress of a step that has none of its own.
   working: string;
@@ -89,6 +96,28 @@ export type AssistantSettingName = (typeof ASSISTANT_SETTING_NAMES)[number];
 // future appointments can be.
 export type SettingChange = { setting: AssistantSettingName; from: number | null; to: number | null };
 export type SettingsSummary = { changes: SettingChange[] };
+
+// Some open hours as a proposal names them: two wall-clock times and the name of their type. An
+// end at the midnight that closes the day is "24:00".
+export type HoursSummary = { start: string; end: string; type: string };
+
+// A weekly pattern as a proposal names it (docs/SHARED_CALENDAR_SPEC.md section 6.2): its weekday,
+// 1 for Monday to 7 for Sunday, its hours, the name of its type, the first date it holds on and
+// the last, null when it has no end.
+export type PatternSummary = HoursSummary & { weekday: number; validFrom: string; validUntil: string | null };
+
+// The hours of one date, without its extra windows, and where they come from: the weekly patterns,
+// or the hours the date has of its own, which take the patterns' place
+// (docs/SHARED_CALENDAR_SPEC.md R-OVR-01). No window of its own means the day is not available.
+export type DayHours = { from: 'patterns' | 'own'; windows: HoursSummary[] };
+
+// What the proposal of a change to one date's own hours shows: the day as it is and as it would
+// become. `extras` are the extra windows of the date, which such a change never touches
+// (docs/SHARED_CALENDAR_SPEC.md R-OVR-03): they belong to both pictures and are said once.
+export type DayChangeSummary = { date: string; now: DayHours; then: DayHours; extras: HoursSummary[] };
+
+// An extra window of one date as a proposal names it.
+export type WindowSummary = HoursSummary & { date: string };
 
 // What a read tool of the assistant looks at: each kind has its own line of progress
 // (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.1).

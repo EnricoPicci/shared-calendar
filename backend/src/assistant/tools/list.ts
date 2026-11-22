@@ -1,7 +1,12 @@
 import { bookAppointment, bookAppointmentDefinition } from './bookAppointment';
 import { cancelAppointment, cancelAppointmentDefinition } from './cancelAppointment';
 import { changeAppointment, changeAppointmentDefinition } from './changeAppointment';
+import { createOneOffWindow, createOneOffWindowDefinition } from './createOneOffWindow';
+import { createPattern, createPatternDefinition } from './createPattern';
 import { createType, createTypeDefinition } from './createType';
+import { deleteDateOverride, deleteDateOverrideDefinition } from './deleteDateOverride';
+import { deleteOneOffWindow, deleteOneOffWindowDefinition } from './deleteOneOffWindow';
+import { deletePattern, deletePatternDefinition } from './deletePattern';
 import { deleteType, deleteTypeDefinition } from './deleteType';
 import { getCalendar, getCalendarDefinition } from './getCalendar';
 import { getSettings, getSettingsDefinition } from './getSettings';
@@ -11,7 +16,9 @@ import { listTypes, listTypesDefinition } from './listTypes';
 import { listUsers, listUsersDefinition } from './listUsers';
 import { renameType, renameTypeDefinition } from './renameType';
 import { setAppointmentNote, setAppointmentNoteDefinition } from './setAppointmentNote';
+import { setDateOverride, setDateOverrideDefinition } from './setDateOverride';
 import type { Tool, ToolDefinition } from './tool';
+import { updatePattern, updatePatternDefinition } from './updatePattern';
 import { updateSettings, updateSettingsDefinition } from './updateSettings';
 
 // The tools of the assistant (docs/CONVERSATIONAL_ARCHITECTURE.md section 3), in the order Claude
@@ -35,6 +42,13 @@ export const DEFINITIONS: readonly ToolDefinition[] = [
   createTypeDefinition,
   renameTypeDefinition,
   deleteTypeDefinition,
+  createPatternDefinition,
+  updatePatternDefinition,
+  deletePatternDefinition,
+  setDateOverrideDefinition,
+  deleteDateOverrideDefinition,
+  createOneOffWindowDefinition,
+  deleteOneOffWindowDefinition,
 ];
 
 // The tools whole, for the functions that run the reads and build the proposals. A tool that
@@ -54,4 +68,11 @@ export const TOOLS: readonly Tool[] = [
   createType,
   renameType,
   deleteType,
+  createPattern,
+  updatePattern,
+  deletePattern,
+  setDateOverride,
+  deleteDateOverride,
+  createOneOffWindow,
+  deleteOneOffWindow,
 ];

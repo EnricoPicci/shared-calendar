@@ -7,8 +7,8 @@ import { AFTER_CLAUDE_MS, runStep, type RequestInfo } from './exchange';
 import { DONE, notRunResult, proposalOf, settlement, type Proposal, type ProposedChange } from './proposal';
 import { CHANGE_HANDLERS } from './tools/changeHandlers';
 import { TOOLS } from './tools/list';
-import { cappedJson } from './tools/result';
-import { callRoute, errorResult, refusalOf, succeeded } from './tools/run';
+import { cappedJson, refusalForModel } from './tools/result';
+import { callRoute, refusalOf, succeeded } from './tools/run';
 import type { RouteHandler, Tool, ToolResult, ToolResultBlock } from './tools/tool';
 
 // The result of a change that was made, as Claude gets it: that the person confirmed and the
@@ -82,7 +82,8 @@ export async function confirmProposal(
       changes.push({ ...change, outcome: 'unknown', error: null });
     } else {
       const refusal = refusalOf(answer, 'The change was refused.');
-      results.push(errorResult(change.toolUseId, refusal.error, refusal.message));
+      // The refusal with, when the route gave it, the list of the appointments in the way.
+      results.push({ type: 'tool_result', tool_use_id: change.toolUseId, content: cappedJson(refusalForModel(refusal, answer.body, config.timeZone)), is_error: true });
       changes.push({ ...change, outcome: 'refused', error: refusal.error as ApiErrorCode });
     }
   }

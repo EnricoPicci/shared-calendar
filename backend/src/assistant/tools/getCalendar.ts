@@ -1,13 +1,15 @@
 import { LocalDate, localTimeOf, type CalendarView } from '@shared-calendar/shared';
 import { z } from 'zod';
 import { handler } from '../../handlers/getCalendar';
-import { appointmentForModel, localEndTime, slotTime } from './result';
+import { appointmentForModel, localEndTime, slotTime, WEEKDAY_NAMES } from './result';
 import type { ReadTool, ToolDefinition } from './tool';
 
 // The tool for GET /calendar (docs/CONVERSATIONAL_ARCHITECTURE.md section 3): what a period of the
 // calendar looks like to the person, day by day. Both roles: the route builds the view for the
 // caller's role, so a User gets the slots a User may book and their own appointments, the
-// Administrator every appointment.
+// Administrator every appointment. The Administrator is also given what the tools that change the
+// opening hours need: where each window comes from, the id of an extra window, and whether the
+// date has hours of its own (docs/SHARED_CALENDAR_SPEC.md section 11.6).
 
 // The dates are local dates, as the route takes them: nothing is converted on the way in. The
 // route refuses a period that ends before it starts or is longer than 31 days.
@@ -26,35 +28,43 @@ export const getCalendarDefinition: ToolDefinition = {
     "(the person's own for a User, everybody's for the Administrator). A day that is not in the answer has no open hours and no appointments. " +
     'On the one night a year when the clocks go back, a time comes twice: the second of the two free slots is then written with " (second)" after it. ' +
     'Use it for every question about free times or about what a day or a week looks like. All dates and times are in the calendar\'s time zone.',
+  descriptionForAdmin:
+    'For the Administrator each window also says where it comes from ("source"): "pattern" for a weekly pattern, "override" for the hours that date has of its own in the place of the patterns, ' +
+    '"one_off" for an extra window added on that date, which then has its "id" too. Each day says whether it has such hours of its own ("hasOverride"): ' +
+    'a day with "hasOverride" true and no window from an override is closed as far as the weekly patterns go.',
   kind: 'read',
   roles: ['admin', 'user'],
   input: () => Input,
   reads: 'calendar',
 };
 
-const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
 const parts: ReadTool<z.infer<typeof Input>> = {
   definition: getCalendarDefinition,
   toHandler: { handler, request: ({ from, to }) => ({ routeKey: 'GET /calendar', path: '/calendar', query: { from, to } }) },
   // A day as its windows, its free slot starts and its appointments, in wall-clock times. The days
-  // with nothing on them are left out, which keeps a month of mostly closed days small; where a
-  // window comes from, the busy time of other people and the ids of the types stay out.
-  toModel: (body, { timeZone }) => {
+  // with nothing on them are left out, which keeps a month of mostly closed days small; the busy
+  // time of other people and the ids of the types stay out. Where a window comes from, the id of
+  // an extra window and whether the date has hours of its own are given to the Administrator
+  // only, who alone can change them; a day closed by hours of its own is then kept.
+  toModel: (body, { timeZone, role }) => {
     const view = body as CalendarView;
+    const admin = role === 'admin';
     const days = view.days
       .map((day) => ({
         date: day.date,
-        weekday: WEEKDAYS[day.weekday - 1],
+        weekday: WEEKDAY_NAMES[day.weekday - 1],
+        ...(admin && { hasOverride: day.hasOverride === true }),
         windows: day.windows.map((window) => ({
           start: localTimeOf(window.start, timeZone),
           end: localEndTime(window.end, day.date, timeZone),
           type: window.typeName,
+          ...(admin && { source: window.source }),
+          ...(admin && window.source === 'one_off' && { id: window.sourceId }),
         })),
         freeSlots: day.slots.map((slot) => slotTime(slot.start, timeZone)),
         appointments: view.appointments.filter((appointment) => appointment.date === day.date).map((appointment) => appointmentForModel(appointment, timeZone)),
       }))
-      .filter((day) => day.windows.length > 0 || day.appointments.length > 0);
+      .filter((day) => day.windows.length > 0 || day.appointments.length > 0 || day.hasOverride === true);
     return { fields: { from: view.from, to: view.to }, list: { name: 'days', items: days } };
   },
 };

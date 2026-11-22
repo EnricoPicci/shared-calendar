@@ -1,20 +1,30 @@
 import {
+  LocalEndTime,
+  LocalTime,
   localDateOf,
   localTimeOf,
   toInstant,
+  Ulid,
   type Appointment,
   type AppointmentSummary,
   type AvailabilityType,
+  type CalendarDay,
   type CalendarSettings,
   type CalendarView,
+  type HoursSummary,
   type ListAppointmentsResponse,
+  type ListPatternsResponse,
   type ListTypesResponse,
   type ListUsersResponse,
+  type PatternSummary,
+  type WeeklyPattern,
+  type WindowSource,
 } from '@shared-calendar/shared';
 import { handler as getCalendar } from '../../handlers/getCalendar';
 import { handler as getSettings } from '../../handlers/getCalendarSettings';
 import { handler as listAppointments } from '../../handlers/listAppointments';
 import { handler as listTypes } from '../../handlers/listAvailabilityTypes';
+import { handler as listPatterns } from '../../handlers/listPatterns';
 import { handler as listUsers } from '../../handlers/listUsers';
 import { hoursAfter, localEndTime } from './result';
 import { refusalOf, succeeded } from './run';
@@ -23,8 +33,9 @@ import type { CallRoute, ToolContext } from './tool';
 // The facts the confirmations of the changes read (docs/CONVERSATIONAL_ARCHITECTURE.md section
 // 5.5, rule 2), shared by the tools: the instant a local date and time stand for, the free slot
 // that starts at an instant, the appointment an id stands for, the User a username names, the
-// settings as they are and the appointment types. Each is read through the handler of a route
-// that only reads, with the identity of the person, so it is what that person may see.
+// settings as they are, the appointment types, the weekly patterns and one day's hours with where
+// they come from. Each is read through the handler of a route that only reads, with the identity
+// of the person, so it is what that person may see.
 
 // What could not be read, or what the facts say cannot be done: a code and a sentence for Claude.
 export type NotPossible = { ok: false; error: string; message: string };
@@ -174,10 +185,100 @@ export const nameTaken = (name: string): NotPossible => ({
   message: `An appointment type with the name "${name}" already exists; names that differ only in their capitals count as the same. Tell the person, and ask for another name.`,
 });
 
+// The hours of a window as the tools that change the opening hours take them from Claude: two
+// wall-clock times on the quarter hour and the id of an appointment type
+// (docs/SHARED_CALENDAR_SPEC.md section 11.4).
+export const hoursInput = {
+  start: LocalTime.describe('When the hours start: a wall-clock time as HH:mm, on the quarter hour (minutes 00, 15, 30 or 45).'),
+  end: LocalEndTime.describe('When the hours end, after "start": HH:mm on the quarter hour, or "24:00" for the midnight that closes the day.'),
+  typeId: Ulid.describe('The id of the appointment type of these hours, as list_types gave it. Never its name, and never a guess.'),
+};
+
+// The hours must end after they start. Times written HH:mm compare as text, and "24:00" comes last.
+export const endsAfterStart = (hours: { start: string; end: string }): boolean => hours.start < hours.end;
+export const END_AFTER_START = { message: 'end must be after start', path: ['end'] };
+
+/** The weekly patterns, as GET /calendar/patterns answers the Administrator. */
+export async function presentPatterns(route: CallRoute): Promise<{ ok: true; patterns: WeeklyPattern[] } | NotPossible> {
+  const answer = await route(listPatterns, { routeKey: 'GET /calendar/patterns', path: '/calendar/patterns' });
+  if (!succeeded(answer)) return { ok: false, ...refusalOf(answer, 'The weekly patterns could not be read.') };
+  return { ok: true, patterns: (answer.body as ListPatternsResponse).patterns };
+}
+
+/** The pattern an id stands for among the patterns read, or the refusal the patterns' routes answer. */
+export function patternById(patterns: WeeklyPattern[], patternId: string): { ok: true; pattern: WeeklyPattern } | NotPossible {
+  const pattern = patterns.find((candidate) => candidate.patternId === patternId);
+  if (!pattern) {
+    return { ok: false, error: 'pattern_not_found', message: 'There is no weekly pattern with this id. Never guess an id: use list_patterns to find the pattern the person means.' };
+  }
+  return { ok: true, pattern };
+}
+
+/**
+ * Some hours as a proposal names them: the two times as given and the name of the type the id
+ * stands for among the types read. A type that is not there is the refusal its routes answer.
+ */
+export function hoursOf<Hours extends { start: string; end: string; typeId: string }>(hours: Hours, types: AvailabilityType[]): { ok: true; hours: HoursSummary } | NotPossible {
+  const found = typeById(types, hours.typeId);
+  if (!found.ok) return found;
+  return { ok: true, hours: { start: hours.start, end: hours.end, type: found.type.name } };
+}
+
+/** A weekly pattern as a proposal names it, with the name of its type among the types read. */
+export function patternSummaryOf(
+  pattern: { weekday: number; start: string; end: string; typeId: string; validFrom: string; validUntil: string | null },
+  types: AvailabilityType[],
+): { ok: true; summary: PatternSummary } | NotPossible {
+  const named = hoursOf(pattern, types);
+  if (!named.ok) return named;
+  return { ok: true, summary: { ...named.hours, weekday: pattern.weekday, validFrom: pattern.validFrom, validUntil: pattern.validUntil } };
+}
+
+// A window of a day as the confirmations compare and name it: wall-clock times, the id and the
+// name of its type, where it comes from, and the id of its source (of an extra window, its own).
+export type DayWindow = HoursSummary & { typeId: string; source: WindowSource | undefined; sourceId: string | undefined };
+
+/**
+ * One date as GET /calendar answers the Administrator for it: whether it has hours of its own, and
+ * its windows in wall-clock times, each with where it comes from. A date before today is the
+ * refusal the routes that change a date's hours answer (docs/SHARED_CALENDAR_SPEC.md R-AV-02):
+ * "today" is the local date of the moment the route built its answer at.
+ */
+export async function presentDay(route: CallRoute, date: string, timeZone: string): Promise<{ ok: true; hasOverride: boolean; windows: DayWindow[] } | NotPossible> {
+  const answer = await route(getCalendar, { routeKey: 'GET /calendar', path: '/calendar', query: { from: date, to: date } });
+  if (!succeeded(answer)) return { ok: false, ...refusalOf(answer, 'The calendar could not be read.') };
+  const view = answer.body as CalendarView;
+  if (date < localDateOf(view.generatedAt, timeZone)) {
+    return { ok: false, error: 'date_in_past', message: `${date} is in the past: the opening hours of a day that has passed cannot be changed.` };
+  }
+  const day: CalendarDay | undefined = view.days.find((candidate) => candidate.date === date);
+  const windows = (day?.windows ?? []).map((window) => ({
+    start: localTimeOf(window.start, timeZone),
+    end: localEndTime(window.end, date, timeZone),
+    type: window.typeName,
+    typeId: window.typeId,
+    source: window.source,
+    sourceId: window.sourceId,
+  }));
+  return { ok: true, hasOverride: day?.hasOverride === true, windows };
+}
+
+/** A window of a day as a proposal names it: its hours and the name of its type. */
+export const namedHours = ({ start, end, type }: HoursSummary): HoursSummary => ({ start, end, type });
+
 // What two changes of one answer of Claude must not share: the appointment a change acts on, the
-// slot a change would fill, the settings, a type, and the name a type would get.
+// slot a change would fill, the settings, a type, the name a type would get, a weekly pattern, the
+// hours a date has of its own, and an extra window. A pattern or an extra window still to be
+// created is the weekday or the date with the hours it would open, and for a pattern its two
+// dates: two that share all of it are one asked for twice.
 export const appointmentSubject = (appointmentId: string) => `appointment ${appointmentId}`;
 export const slotSubject = (start: string) => `slot ${start}`;
 export const SETTINGS_SUBJECT = 'settings';
 export const typeSubject = (typeId: string) => `type ${typeId}`;
 export const typeNameSubject = (name: string) => `type name ${typeNameKey(name)}`;
+export const patternSubject = (patternId: string) => `pattern ${patternId}`;
+export const newPatternSubject = (pattern: { weekday: number; start: string; end: string; validFrom: string; validUntil: string | null }) =>
+  `new pattern ${pattern.weekday} ${pattern.start}-${pattern.end} ${pattern.validFrom} ${pattern.validUntil ?? ''}`;
+export const overrideSubject = (date: string) => `override ${date}`;
+export const windowSubject = (windowId: string) => `window ${windowId}`;
+export const newWindowSubject = (window: { date: string; start: string; end: string }) => `new window ${window.date} ${window.start}-${window.end}`;

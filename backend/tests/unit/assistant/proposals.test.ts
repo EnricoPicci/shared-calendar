@@ -589,7 +589,21 @@ describe('the step: Claude asks for a change (5.4, 7.4)', () => {
 
 // Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
 describe('the tools and the roles (3, 7.4)', () => {
-  const ADMIN_ONLY = ['list_users', 'list_patterns', 'update_settings', 'create_type', 'rename_type', 'delete_type'];
+  const ADMIN_ONLY = [
+    'list_users',
+    'list_patterns',
+    'update_settings',
+    'create_type',
+    'rename_type',
+    'delete_type',
+    'create_pattern',
+    'update_pattern',
+    'delete_pattern',
+    'set_date_override',
+    'delete_date_override',
+    'create_one_off_window',
+    'delete_one_off_window',
+  ];
 
   it("a User's request to Claude names none of the Administrator's tools, the Administrator's names them all, and each has its own book_appointment", async () => {
     const { DEFINITIONS } = await import('../../../src/assistant/tools/list');
@@ -898,6 +912,13 @@ describe('confirmProposal (POST /assistant/proposals/{proposalId}/confirm, 5.4, 
       create_type: (await import('../../../src/handlers/createAvailabilityType')).handler,
       rename_type: (await import('../../../src/handlers/renameAvailabilityType')).handler,
       delete_type: (await import('../../../src/handlers/deleteAvailabilityType')).handler,
+      create_pattern: (await import('../../../src/handlers/createPattern')).handler,
+      update_pattern: (await import('../../../src/handlers/updatePattern')).handler,
+      delete_pattern: (await import('../../../src/handlers/deletePattern')).handler,
+      set_date_override: (await import('../../../src/handlers/setOverride')).handler,
+      delete_date_override: (await import('../../../src/handlers/deleteOverride')).handler,
+      create_one_off_window: (await import('../../../src/handlers/createOneOffWindow')).handler,
+      delete_one_off_window: (await import('../../../src/handlers/deleteOneOffWindow')).handler,
     });
     expect(Object.keys(CHANGE_HANDLERS)).toEqual(deployed.filter((tool) => tool.definition.kind === 'change').map((tool) => tool.definition.name));
   });
@@ -1320,5 +1341,156 @@ describe('the log lines of a proposal (10.1)', () => {
       tools: [{ name: 'update_settings', notRun: 'not_proposed' }, { name: 'update_settings', notRun: 'same_thing_twice' }],
     });
     expect(steps()[0]).toMatchObject({ status: 'working', proposal: null });
+  });
+
+  // The tools of the deployment, their read routes replaced. Tuesday 24 November 2026 has a
+  // morning and an afternoon from the weekly patterns and an extra window from 15:00 to 17:00
+  // inside nothing else. The Administrator asks to block 14:00 to 16:00, and Claude asks, in one
+  // answer, for the day's own hours, the deletion of the extra window and a new one for the hour
+  // of it that stays open.
+  describe('blocking time: the hours of a day and its extra window in one proposal', () => {
+    const VISIT = '01JD00000000000000000TYPE1';
+    const EXTRA = '01JD000000000000000000W1ND';
+    const MADE = '01JD000000000000000000W2ND';
+    const DAY = '2026-11-24';
+    const window = (start: string, end: string, source: string, sourceId: string) => ({ start: `${DAY}T${start}:00.000Z`, end: `${DAY}T${end}:00.000Z`, typeId: VISIT, typeName: 'Visit', source, sourceId });
+    // Wall-clock 09:00-12:00 and 16:00-19:00 from the patterns, and the extra window 14:00-15:00: an hour ahead of UTC.
+    const view = { timeZone: 'Europe/Rome', from: DAY, to: DAY, generatedAt: NOW, days: [{ date: DAY, weekday: 2, hasOverride: false, slots: [], busy: [], windows: [window('08:00', '11:00', 'pattern', 'p1'), window('13:00', '14:00', 'one_off', EXTRA), window('15:00', '18:00', 'pattern', 'p2')] }], appointments: [] };
+    const LEFT = [
+      { start: '09:00', end: '12:00', typeId: VISIT },
+      { start: '17:00', end: '19:00', typeId: VISIT },
+    ];
+    const OVERRIDE = use('toolu_override', 'set_date_override', { date: DAY, windows: LEFT });
+    const DELETE = use('toolu_delete', 'delete_one_off_window', { date: DAY, windowId: EXTRA });
+    const CREATE = use('toolu_create', 'create_one_off_window', { date: DAY, start: '14:00', end: '14:30', typeId: VISIT });
+    const forbidden = ['roberta', 'Visit', VISIT, EXTRA, MADE, '2026-11-2', '09:00', '14:00', '17:00', 'novembre', 'orari', 'finestra', '01JD0000000000000000APPT', CLAUDE_SAID, TEXT];
+    const clean = (log: unknown) => {
+      for (const text of forbidden) expect(JSON.stringify(log)).not.toContain(text);
+    };
+    let mark: string;
+
+    beforeEach(async () => {
+      const { DEFINITIONS } = await import('../../../src/assistant/tools/list');
+      readRoutes.listTypes.mockImplementation(() => routeAnswer({ types: [{ typeId: VISIT, name: 'Visit', createdAt: AT, updatedAt: AT }] }));
+      readRoutes.getCalendar.mockImplementation(() => routeAnswer(view));
+      readRoutes.listPatterns.mockImplementation(() => routeAnswer({ patterns: [] }));
+      mark = prompt.promptVersion(prompt.INSTRUCTIONS, prompt.contextBlock(ADMIN, 'Europe/Rome'), toolsForClaude(DEFINITIONS, 'admin'));
+      db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: mark }), messages: EARLIER });
+    });
+
+    it('the three changes of one date make one proposal, on one reading of the day and of the types; a refusal with the appointments in the way gives Claude the list, small, and the lines hold none of it', async () => {
+      claude.askStep.mockResolvedValue(asksFor(OVERRIDE, DELETE, CREATE));
+
+      const proposed = await exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST);
+
+      expect(readRoutes.getCalendar).toHaveBeenCalledTimes(1);
+      expect(readRoutes.listTypes).toHaveBeenCalledTimes(1);
+      const stored = steps()[0]?.proposal as Proposal;
+      expect(stored.changes.map((change) => change.summary)).toEqual([
+        "Impostare gli orari di martedì 24 novembre 2026, solo per questo giorno. Com'è ora (dagli orari settimanali): 09:00–12:00 (Visit), 16:00–19:00 (Visit). " +
+          'Come diventerebbe: 09:00–12:00 (Visit), 17:00–19:00 (Visit). La finestra aggiuntiva 14:00–15:00 (Visit) di questo giorno non cambia.',
+        'Eliminare la finestra aggiuntiva di martedì 24 novembre 2026, dalle 14:00 alle 15:00 (Visit).',
+        'Creare una finestra aggiuntiva per martedì 24 novembre 2026, dalle 14:00 alle 14:30 (Visit).',
+      ]);
+      const NAMES = ['set_date_override', 'delete_one_off_window', 'create_one_off_window'];
+      expect(proposed).toMatchObject({ ok: true, reply: { status: 'awaiting_confirmation', proposal: { question: 'Conferma queste 3 modifiche?' } } });
+      expect(proposed.log).toMatchObject({ outcome: 'proposal', proposed: NAMES, tools: NAMES.map((name) => ({ name, status: 200, ms: 0, proposed: true })) });
+      clean(proposed.log);
+
+      const read = conversation({ promptVersion: mark, status: 'awaiting_confirmation', proposal: stored, nextSeq: 7 });
+      db.readConversation.mockResolvedValue({ version: 3, conversation: read, messages: WAITING_MESSAGES });
+      db.takeProposal.mockResolvedValue({ ...read, executing: { proposalId: stored.proposalId, at: NOW } });
+      // Two appointments lie in the hours that would close: the route lists them, as instants.
+      const conflicts = [
+        { appointmentId: '01JD0000000000000000APPT01', username: 'roberta', start: `${DAY}T15:00:00.000Z`, end: `${DAY}T16:00:00.000Z` },
+        { appointmentId: '01JD0000000000000000APPT02', username: 'roberta', start: `${DAY}T22:00:00.000Z`, end: `${DAY}T23:00:00.000Z` },
+      ];
+      const set = vi.fn(() => routeAnswer({ error: 'availability_conflict', message: '2 appointments would fall outside the availability', conflicts }, 409));
+      const remove = vi.fn(() => Promise.resolve({ statusCode: 204 }));
+      const create = vi.fn(() => routeAnswer({ windowId: MADE, date: DAY, start: '14:00', end: '14:30', typeId: VISIT, createdAt: NOW }, 201));
+      const confirmed = await confirm.confirmProposal(ADMIN, stored.proposalId, NOW, REQUEST, undefined, { set_date_override: set, delete_one_off_window: remove, create_one_off_window: create });
+
+      // Each route was sent exactly what the proposal stored, in the order asked.
+      expect(set.mock.calls[0]).toMatchObject([{ routeKey: 'PUT /calendar/overrides/{date}', pathParameters: { date: DAY }, body: JSON.stringify({ windows: LEFT }) }]);
+      expect(remove.mock.calls[0]).toMatchObject([{ routeKey: 'DELETE /calendar/windows/{windowId}', pathParameters: { windowId: EXTRA } }]);
+      expect(create.mock.calls[0]).toMatchObject([{ routeKey: 'POST /calendar/windows', body: JSON.stringify({ date: DAY, start: '14:00', end: '14:30', typeId: VISIT }) }]);
+
+      const settled = steps().at(1)!;
+      expect((settled.proposal as Proposal).changes.map((change) => [change.tool, change.outcome, change.error])).toEqual([
+        ['set_date_override', 'refused', 'availability_conflict'],
+        ['delete_one_off_window', 'done', null],
+        ['create_one_off_window', 'done', null],
+      ]);
+      // What Claude is given: the refusal with each appointment as its id, whose it is, its local
+      // date and wall-clock times (the second ends at the midnight that closes the day); then the
+      // two changes that were made.
+      const results = (settled.messages[0]?.content as { content: { content: string; is_error?: true }[] }).content;
+      expect(results[0]?.is_error).toBe(true);
+      expect(JSON.parse(results[0]!.content)).toEqual({
+        error: 'availability_conflict',
+        message: '2 appointments would fall outside the availability',
+        conflicts: [
+          { id: '01JD0000000000000000APPT01', username: 'roberta', date: DAY, start: '16:00', end: '17:00' },
+          { id: '01JD0000000000000000APPT02', username: 'roberta', date: DAY, start: '23:00', end: '24:00' },
+        ],
+      });
+      expect(JSON.parse(results[1]!.content)).toMatchObject({ outcome: 'done', deleted: true });
+      expect(JSON.parse(results[2]!.content)).toMatchObject({ outcome: 'done', window: { id: MADE, date: DAY, start: '14:00', end: '14:30' } });
+      expect(confirmed.log).toMatchObject({
+        proposalId: stored.proposalId,
+        changes: [
+          { name: 'set_date_override', status: 409, ms: 0 },
+          { name: 'delete_one_off_window', status: 204, ms: 0 },
+          { name: 'create_one_off_window', status: 201, ms: 0 },
+        ],
+      });
+      clean(confirmed.log);
+    });
+
+    it('with the pattern tools: a pattern created and another deleted in one proposal, and the lines hold no weekday, hour, date or id', async () => {
+      const PATTERN = '01JD000000000000000000PAT1';
+      readRoutes.listPatterns.mockImplementation(() => routeAnswer({ patterns: [{ patternId: PATTERN, weekday: 2, start: '09:00', end: '12:00', typeId: VISIT, validFrom: '2026-11-02', validUntil: null, createdAt: AT, updatedAt: AT }] }));
+      claude.askStep.mockResolvedValue(
+        asksFor(use('toolu_new', 'create_pattern', { weekday: 'Thursday', start: '14:00', end: '17:00', typeId: VISIT, validFrom: '2026-11-26' }), use('toolu_old', 'delete_pattern', { patternId: PATTERN })),
+      );
+      const proposed = await exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST);
+      expect((steps()[0]?.proposal as Proposal).changes.map((change) => change.summary)).toEqual([
+        'Creare un orario settimanale: ogni giovedì, dalle 14:00 alle 17:00 (Visit), valido da giovedì 26 novembre 2026, senza scadenza.',
+        "Eliminare l'orario settimanale: ogni martedì, dalle 09:00 alle 12:00 (Visit), valido da lunedì 2 novembre 2026, senza scadenza.",
+      ]);
+      expect(proposed.log).toMatchObject({ outcome: 'proposal', proposed: ['create_pattern', 'delete_pattern'] });
+      for (const text of [...forbidden, PATTERN, 'Thursday', 'giovedì', 'martedì']) expect(JSON.stringify(proposed.log)).not.toContain(text);
+    });
+
+    it('two changes of one answer on the same pattern, the hours of the same date, the same extra window, or the same new pattern or window, are not proposed', async () => {
+      const PATTERN = '01JD000000000000000000PAT1';
+      const pattern = { weekday: 'Tuesday', start: '09:00', end: '12:00', typeId: VISIT, validFrom: '2026-11-02', validUntil: null };
+      readRoutes.listPatterns.mockImplementation(() => routeAnswer({ patterns: [{ patternId: PATTERN, ...pattern, weekday: 2, createdAt: AT, updatedAt: AT }] }));
+      readRoutes.getCalendar.mockImplementation(() => routeAnswer({ ...view, days: [{ ...view.days[0], hasOverride: true }] }));
+      const ask = async (...blocks: ReturnType<typeof use>[]) => {
+        db.saveStep.mockClear();
+        claude.askStep.mockResolvedValue(asksFor(...blocks));
+        return ((await exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST)).log as unknown as { tools: { name: string; notRun?: string }[] }).tools.map((tool) => [tool.name, tool.notRun]);
+      };
+      const refused = (first: string, second: string) => [
+        [first, 'not_proposed'],
+        [second, 'same_thing_twice'],
+      ];
+
+      expect(await ask(use('a', 'update_pattern', { patternId: PATTERN, ...pattern, end: '13:00' }), use('b', 'delete_pattern', { patternId: PATTERN }))).toEqual(refused('update_pattern', 'delete_pattern'));
+      expect(await ask(OVERRIDE, use('b', 'delete_date_override', { date: DAY }))).toEqual(refused('set_date_override', 'delete_date_override'));
+      expect(await ask(DELETE, use('b', 'delete_one_off_window', { date: DAY, windowId: EXTRA }))).toEqual(refused('delete_one_off_window', 'delete_one_off_window'));
+      expect(await ask(CREATE, use('b', 'create_one_off_window', { date: DAY, start: '14:00', end: '14:30', typeId: VISIT }))).toEqual(refused('create_one_off_window', 'create_one_off_window'));
+      const fresh = { ...pattern, weekday: 'Friday' };
+      expect(await ask(use('a', 'create_pattern', fresh), use('b', 'create_pattern', fresh))).toEqual(refused('create_pattern', 'create_pattern'));
+      expect(steps()[0]).toMatchObject({ status: 'working', proposal: null });
+      // The same hours on another weekday, and another extra window of the same date, are two things.
+      expect(await ask(use('a', 'create_pattern', fresh), use('b', 'create_pattern', { ...fresh, weekday: 'Saturday' }), CREATE, use('d', 'create_one_off_window', { date: DAY, start: '20:00', end: '21:00', typeId: VISIT }))).toEqual([
+        ['create_pattern', undefined],
+        ['create_pattern', undefined],
+        ['create_one_off_window', undefined],
+        ['create_one_off_window', undefined],
+      ]);
+    });
   });
 });

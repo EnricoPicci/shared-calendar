@@ -41,6 +41,28 @@ const ALL_SETTINGS = {
 };
 const LIMIT_LIFTED = { changes: [{ setting: 'maxFutureAppointmentsPerUser' as const, from: 1, to: null }] };
 
+// A weekly pattern as its proposal words it: one with no end, and one that ends, at midnight.
+const PATTERN = { weekday: 2, start: '09:00', end: '12:00', type: 'Visit', validFrom: '2026-12-01', validUntil: null };
+const PATTERN_ENDING = { ...PATTERN, start: '14:00', end: '24:00', validUntil: '2026-12-31' };
+
+// The hours of one date as the proposal of a change to them words them. A day of patterns with
+// an hour blocked. A day that has hours of its own, closed, with an extra window. A closed day
+// opened, with two extra windows. A day the patterns give nothing to. A day that goes back to the
+// patterns, and one the patterns give nothing to.
+const MORNING = { start: '09:00', end: '12:00', type: 'Visit' };
+const AFTERNOON = { start: '14:00', end: '18:00', type: 'Visit' };
+const LATE = { start: '16:00', end: '18:00', type: 'Visit' };
+const EXTRA = { start: '19:00', end: '20:00', type: 'Phone call' };
+const SECOND_EXTRA = { start: '21:00', end: '22:00', type: 'Phone call' };
+const DAY = '2026-11-24';
+const BLOCKED = { date: DAY, now: { from: 'patterns' as const, windows: [MORNING, AFTERNOON] }, then: { from: 'own' as const, windows: [MORNING, LATE] }, extras: [] };
+const CLOSED = { date: DAY, now: { from: 'own' as const, windows: [MORNING, LATE] }, then: { from: 'own' as const, windows: [] }, extras: [EXTRA] };
+const OPENED = { date: DAY, now: { from: 'own' as const, windows: [] }, then: { from: 'own' as const, windows: [MORNING] }, extras: [EXTRA, SECOND_EXTRA] };
+const NO_PATTERN_HOURS = { date: DAY, now: { from: 'patterns' as const, windows: [] }, then: { from: 'own' as const, windows: [MORNING] }, extras: [] };
+const BACK_TO_PATTERNS = { date: DAY, now: { from: 'own' as const, windows: [] }, then: { from: 'patterns' as const, windows: [MORNING, AFTERNOON] }, extras: [] };
+const BACK_TO_NOTHING = { date: DAY, now: { from: 'own' as const, windows: [LATE] }, then: { from: 'patterns' as const, windows: [] }, extras: [EXTRA] };
+const WINDOW = { date: DAY, ...EXTRA };
+
 // The arguments each text that is a function is tried with: every number of changes a proposal
 // may hold, and each shape of a booking. A new function among the texts needs its entry here, or
 // the test below fails.
@@ -54,6 +76,13 @@ const SAMPLES: Record<string, unknown[][]> = {
   'changes.createType': [[{ name: 'Phone call' }]],
   'changes.renameType': [[{ from: 'Visit', to: 'Check-up' }]],
   'changes.deleteType': [[{ name: 'Visit' }]],
+  'changes.createPattern': [[PATTERN], [PATTERN_ENDING]],
+  'changes.updatePattern': [[{ from: PATTERN, to: PATTERN_ENDING }]],
+  'changes.deletePattern': [[PATTERN], [PATTERN_ENDING]],
+  'changes.setDateOverride': [[BLOCKED], [CLOSED], [OPENED], [NO_PATTERN_HOURS]],
+  'changes.deleteDateOverride': [[BACK_TO_PATTERNS], [BACK_TO_NOTHING]],
+  'changes.createOneOffWindow': [[WINDOW]],
+  'changes.deleteOneOffWindow': [[WINDOW]],
 };
 
 // Every text of one language as `path -> the strings it gives`: a string as itself, a function
@@ -234,5 +263,89 @@ describe('assistantTexts', () => {
     expect(ASSISTANT_TEXTS_IT.changes.createType({ name: 'Phone call' })).toBe('Creare il tipo di appuntamento «Phone call».');
     expect(ASSISTANT_TEXTS_IT.changes.renameType({ from: 'Visit', to: 'Check-up' })).toBe('Rinominare il tipo di appuntamento «Visit» in «Check-up».');
     expect(ASSISTANT_TEXTS_IT.changes.deleteType({ name: 'Visit' })).toBe('Eliminare il tipo di appuntamento «Visit».');
+  });
+
+  it('a weekly pattern is named by its weekday, its hours, its type and its dates, in both languages', () => {
+    const en = ASSISTANT_TEXTS_EN.changes;
+    const it_ = ASSISTANT_TEXTS_IT.changes;
+    expect(en.createPattern(PATTERN)).toBe('Create a weekly pattern: every Tuesday, from 09:00 to 12:00 (Visit), valid from Tuesday 1 December 2026, with no end.');
+    expect(it_.createPattern(PATTERN)).toBe('Creare un orario settimanale: ogni martedì, dalle 09:00 alle 12:00 (Visit), valido da martedì 1 dicembre 2026, senza scadenza.');
+    expect(en.deletePattern(PATTERN_ENDING)).toBe('Delete the weekly pattern: every Tuesday, from 14:00 to 24:00 (Visit), valid from Tuesday 1 December 2026 until Thursday 31 December 2026.');
+    expect(it_.deletePattern(PATTERN_ENDING)).toBe("Eliminare l'orario settimanale: ogni martedì, dalle 14:00 alle 24:00 (Visit), valido da martedì 1 dicembre 2026 fino a giovedì 31 dicembre 2026.");
+  });
+
+  it('a change to a weekly pattern shows it as it is and as it would become, in both languages', () => {
+    expect(ASSISTANT_TEXTS_EN.changes.updatePattern({ from: PATTERN, to: PATTERN_ENDING })).toBe(
+      'Change a weekly pattern. As it is now: every Tuesday, from 09:00 to 12:00 (Visit), valid from Tuesday 1 December 2026, with no end. ' +
+        'As it would become: every Tuesday, from 14:00 to 24:00 (Visit), valid from Tuesday 1 December 2026 until Thursday 31 December 2026.',
+    );
+    expect(ASSISTANT_TEXTS_IT.changes.updatePattern({ from: PATTERN, to: PATTERN_ENDING })).toBe(
+      "Modificare un orario settimanale. Com'è ora: ogni martedì, dalle 09:00 alle 12:00 (Visit), valido da martedì 1 dicembre 2026, senza scadenza. " +
+        'Come diventerebbe: ogni martedì, dalle 14:00 alle 24:00 (Visit), valido da martedì 1 dicembre 2026 fino a giovedì 31 dicembre 2026.',
+    );
+  });
+
+  it('new hours for a day of patterns show the day as it is, from the patterns, and as it would become', () => {
+    expect(ASSISTANT_TEXTS_EN.changes.setDateOverride(BLOCKED)).toBe(
+      'Set the hours of Tuesday 24 November 2026, for this day only. As it is now (from the weekly patterns): 09:00–12:00 (Visit), 14:00–18:00 (Visit). ' +
+        'As it would become: 09:00–12:00 (Visit), 16:00–18:00 (Visit).',
+    );
+    expect(ASSISTANT_TEXTS_IT.changes.setDateOverride(BLOCKED)).toBe(
+      "Impostare gli orari di martedì 24 novembre 2026, solo per questo giorno. Com'è ora (dagli orari settimanali): 09:00–12:00 (Visit), 14:00–18:00 (Visit). " +
+        'Come diventerebbe: 09:00–12:00 (Visit), 16:00–18:00 (Visit).',
+    );
+    expect(ASSISTANT_TEXTS_EN.changes.setDateOverride(NO_PATTERN_HOURS)).toContain('As it is now (from the weekly patterns): no hours. As it would become: 09:00–12:00 (Visit).');
+    expect(ASSISTANT_TEXTS_IT.changes.setDateOverride(NO_PATTERN_HOURS)).toContain("Com'è ora (dagli orari settimanali): nessun orario. Come diventerebbe: 09:00–12:00 (Visit).");
+  });
+
+  it('a day that has hours of its own is closed with no hours, and its extra window is said to stay', () => {
+    expect(ASSISTANT_TEXTS_EN.changes.setDateOverride(CLOSED)).toBe(
+      "Set the hours of Tuesday 24 November 2026, for this day only. As it is now (this day's own hours): 09:00–12:00 (Visit), 16:00–18:00 (Visit). " +
+        'As it would become: not available. The extra window 19:00–20:00 (Phone call) of this day is not changed.',
+    );
+    expect(ASSISTANT_TEXTS_IT.changes.setDateOverride(CLOSED)).toBe(
+      "Impostare gli orari di martedì 24 novembre 2026, solo per questo giorno. Com'è ora (orari propri di questo giorno): 09:00–12:00 (Visit), 16:00–18:00 (Visit). " +
+        'Come diventerebbe: non disponibile. La finestra aggiuntiva 19:00–20:00 (Phone call) di questo giorno non cambia.',
+    );
+  });
+
+  it('a closed day is opened, and several extra windows are said to stay', () => {
+    expect(ASSISTANT_TEXTS_EN.changes.setDateOverride(OPENED)).toBe(
+      "Set the hours of Tuesday 24 November 2026, for this day only. As it is now (this day's own hours): not available. As it would become: 09:00–12:00 (Visit). " +
+        'The extra windows 19:00–20:00 (Phone call), 21:00–22:00 (Phone call) of this day are not changed.',
+    );
+    expect(ASSISTANT_TEXTS_IT.changes.setDateOverride(OPENED)).toBe(
+      "Impostare gli orari di martedì 24 novembre 2026, solo per questo giorno. Com'è ora (orari propri di questo giorno): non disponibile. Come diventerebbe: 09:00–12:00 (Visit). " +
+        'Le finestre aggiuntive 19:00–20:00 (Phone call), 21:00–22:00 (Phone call) di questo giorno non cambiano.',
+    );
+  });
+
+  it('a day that goes back to the weekly patterns shows its own hours and those the patterns would give it', () => {
+    expect(ASSISTANT_TEXTS_EN.changes.deleteDateOverride(BACK_TO_PATTERNS)).toBe(
+      "Go back to the weekly patterns on Tuesday 24 November 2026. As it is now (this day's own hours): not available. " +
+        'As it would become (from the weekly patterns): 09:00–12:00 (Visit), 14:00–18:00 (Visit).',
+    );
+    expect(ASSISTANT_TEXTS_IT.changes.deleteDateOverride(BACK_TO_PATTERNS)).toBe(
+      "Tornare agli orari settimanali per martedì 24 novembre 2026. Com'è ora (orari propri di questo giorno): non disponibile. " +
+        'Come diventerebbe (dagli orari settimanali): 09:00–12:00 (Visit), 14:00–18:00 (Visit).',
+    );
+    expect(ASSISTANT_TEXTS_EN.changes.deleteDateOverride(BACK_TO_NOTHING)).toBe(
+      "Go back to the weekly patterns on Tuesday 24 November 2026. As it is now (this day's own hours): 16:00–18:00 (Visit). " +
+        'As it would become (from the weekly patterns): no hours. The extra window 19:00–20:00 (Phone call) of this day is not changed.',
+    );
+  });
+
+  it('an extra window is named by its date, its hours and its type, in both languages', () => {
+    expect(ASSISTANT_TEXTS_EN.changes.createOneOffWindow(WINDOW)).toBe('Create an extra window on Tuesday 24 November 2026, from 19:00 to 20:00 (Phone call).');
+    expect(ASSISTANT_TEXTS_IT.changes.createOneOffWindow(WINDOW)).toBe('Creare una finestra aggiuntiva per martedì 24 novembre 2026, dalle 19:00 alle 20:00 (Phone call).');
+    expect(ASSISTANT_TEXTS_EN.changes.deleteOneOffWindow(WINDOW)).toBe('Delete the extra window of Tuesday 24 November 2026, from 19:00 to 20:00 (Phone call).');
+    expect(ASSISTANT_TEXTS_IT.changes.deleteOneOffWindow(WINDOW)).toBe('Eliminare la finestra aggiuntiva di martedì 24 novembre 2026, dalle 19:00 alle 20:00 (Phone call).');
+  });
+
+  it('the longest sentence of a day (ten stretches of hours as it is, ten as it would become, ten extra windows, the longest names) stays under 2 000 characters', () => {
+    const ten = Array.from({ length: 10 }, (_, i) => ({ start: `${String(i * 2).padStart(2, '0')}:15`, end: `${String(i * 2 + 1).padStart(2, '0')}:45`, type: 'W'.repeat(40) }));
+    const longest = { date: '2026-09-30', now: { from: 'own' as const, windows: ten }, then: { from: 'own' as const, windows: ten }, extras: ten };
+    expect(ASSISTANT_TEXTS_EN.changes.setDateOverride(longest)).toHaveLength(1847);
+    expect(ASSISTANT_TEXTS_IT.changes.setDateOverride(longest)).toHaveLength(1870);
   });
 });

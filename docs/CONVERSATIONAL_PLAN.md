@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`) |
+| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`) |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown on its screen, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which is deployed nowhere today (open point P7, section 2.2). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
@@ -796,6 +796,118 @@ and deleted.
 **Acceptance:** the gate green; the journeys with their pages; with the real key, three
 blocking requests by hand, the proposed hours reported as they came. Checkpoint: every tool of
 `docs/CONVERSATIONAL_ARCHITECTURE.md` section 3 exists.
+
+**As done** (2026-11-22, brief `prompts/a10-step-c08-implementation.md`). The step as planned;
+every tool of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 3 exists and the stopgap paragraph
+of `INSTRUCTIONS` is gone. No route, function, role or permission was added, and no calendar
+handler or module of `backend/src/lib` was touched.
+
+- **the three questions of the brief**, answered before the tools were written:
+  - *what the Administrator's reads give.* `get_calendar` gives the Administrator each
+    window's `source`, the `id` of an extra window and `hasOverride` per day, and keeps a day
+    closed by hours of its own. A type's id comes from `list_types`. A User's result is the
+    same, byte for byte. It adds 20 bytes a day, about 20 a window and 34 for an extra
+    window's id, inside the cut of 6 KB. **The version marks of both roles change**: the
+    Administrator's by the tools and the description, a User's by the instructions alone;
+  - *a block over an extra window.* It holds without a new route: the day's own hours, the
+    deletion of the window and a new window for the part that stays open, in one proposal.
+    Section 3 of the architecture gained the sentence. P5 was not judged;
+  - *appointments in the way.* Nothing is looked for before the confirmation. There the
+    change is `refused`, and Claude gets the code, the message and each appointment as its id,
+    username, local date and times, cut like every list (`refusalForModel` in
+    `tools/result.ts`, used by `confirm.ts` for any refusal that carries the list);
+- **decided with the Product Owner:** the sentences of the seven proposals in both languages,
+  with the words of the web pages ("weekly pattern", "this day's own hours", "extra window");
+  **`delete_one_off_window` takes the window's date beside its id**, a difference from the
+  brief: no route reads or lists one window, so the confirmation looks for it in its day;
+- **decided in the step:**
+  - a weekday is an English word in a pattern's input, a number never; `update_pattern` takes
+    the whole pattern and must name its last day, a date or `null`;
+  - checked at the proposal: an unknown pattern, window or type; a date already past, judged
+    against `generatedAt` of the calendar's own answer; two stretches of one override that
+    overlap each other; a change that changes nothing (`pattern_unchanged`,
+    `override_unchanged`); hours to take away that the date does not have. **Left to the
+    route**: an overlap with other open hours, the appointments in the way, the limits. They
+    are only true under the route's lock, and a deletion of the same proposal may remove what
+    stands in the way;
+  - hours equal to those the patterns give are proposed: the date then has hours of its own;
+  - the longest sentence of a day (ten stretches as it is, ten as it would become, ten extra
+    windows, type names of 40 characters) is 1 847 characters in English and 1 870 in Italian;
+  - two changes of one answer on the same pattern, the hours of the same date, the same extra
+    window, or twice the same new pattern or window, are not proposed; the hours of a date and
+    an extra window of that date are two things;
+  - the instructions: the stopgap paragraph is replaced by one sentence in the paragraph on
+    changes ("offer only what you have a tool for"); a paragraph on where the hours of a day
+    come from and the words to use for them; the paragraph on blocking, rewritten;
+- **tests changed, and why.** `prompt.test.ts`: the rows of the stopgap paragraph and its two
+  tests are replaced by rows for the opening hours and blocking and one test that no stopgap
+  is left. `proposals.test.ts`: the list of the Administrator's tools holds thirteen and the
+  list of change handlers fifteen. `tools/tools.test.ts`: the list of twenty-one tools; the
+  test "leaves out every internal field", which read the Administrator's view, is replaced by
+  one that sets the Administrator's result beside a User's. No other existing test changed.
+  New: `tools/availabilityTools.test.ts` (59 tests), a block as one proposal with its refusal
+  and its log lines, the refusal's list and its cut, the sentences word for word;
+- **the template and the bundles.** The seven routes need the calendar's read set with the
+  write or the delete set, which `ConfirmProposalRole` held: no role changed. Read from the
+  source maps: the confirming function's bundle holds the fifteen change handlers, the other
+  five none. Weights before and after, in bytes: `sendAssistantMessage` 1 867 010 →
+  1 886 302, `continueAssistant` 1 864 898 → 1 884 190, `confirmProposal` 1 893 485 →
+  1 930 712, `declineProposal` 1 166 032 → 1 178 455, `getConversation` 1 161 133 →
+  1 173 556, `endConversation` 1 136 026 → 1 138 787;
+- **the journeys**, three blocks, each with a type of its own. A block proposed, confirmed and
+  the free slots read back; a block over the appointment of a User of its own
+  (`chat-in-the-way`), refused with the appointment named; a pattern created and deleted. The
+  fake learnt two marks: `{{id:LIST:NAME}}`, the id of a type or a pattern by its name in the
+  list the request holds, and `{{saturday+N}}`. **The two blocking journeys run on a
+  Saturday**: an override takes the place of every pattern of its day, and the calendar's
+  journeys leave patterns, and appointments in them, on the working days, so on another day
+  the fake's fixed hours were refused. Their hours come from a weekly pattern valid on that
+  one day. **The pattern journey opens a Sunday**, 12 to 18 days ahead: the calendar's journeys
+  leave an empty override on a Monday of those weeks, found by the subagent that wrote the
+  pages. A calendar seeded by hand (`seed:local`) may hold hours on a Saturday: the journeys
+  are run on a stack started afresh or after the calendar's own, as the gate does. The journeys send eight messages a run as `admin` (three before), each block
+  starting the count of the day again. `removeFromCalendar` also deletes the hours of its own
+  of a day that hold the journey's type and the patterns of the type, looks from today and no
+  longer from tomorrow, and each block checks at its end that none is left. What they leave in the local tables: the cancelled appointment of
+  the refused block with its events, and the ended conversations. Run twice the same day,
+  green both times. Their three pages were written by one subagent and checked by another in a
+  fresh context: nine points, none wrong, each answered in the pages (one was a rule of the
+  spec cited by the wrong number in the architecture);
+- **the trial with the real model** (`claude-sonnet-5-5`, 47 requests). A type of the trial
+  with two weekly patterns on Saturdays, 09:00–12:00 and 14:00–18:00, and one appointment of
+  `alice`. **The three blocking requests, the hours as they came:**
+  - "Block Saturday 28 November from 10:00 to 11:00": the day read, the types read, then
+    09:00–10:00, 11:00–12:00, 14:00–18:00. Right. 5.8 s to the proposal, 1.6 s to confirm;
+  - "I am away from 9 until 15: block that time": the day read, then 15:00–18:00. Right
+    (3.2 s);
+  - "Close Saturday 19 December": the day read, then an empty list. Right (3.7 s).
+
+  Then: a block over `alice`'s appointment was **not proposed**: Claude saw the appointment in
+  the day it had read, said so, and offered to move or cancel it. Asked to propose it all the
+  same, it did; the confirmation was refused with `availability_conflict`, and Claude named
+  the appointment and what to do. A second block on the day already blocked kept the first
+  (four stretches, right). "Open Saturday 19 December again as usual": `delete_date_override`.
+  An extra window created; a block over half of it: the window deleted and a new one for the
+  half that stays, in one proposal of two, with no override, as that day had no other hours;
+  the window deleted. A pattern created, its end moved and deleted, in Italian, the id taken
+  from the result of the creation. As `alice`, "block Tuesday afternoon": answered in words,
+  no tool asked for. **One fault, fixed and tried again:** in Italian Claude said "pattern"
+  where the pages say "orario settimanale"; the instructions now give the words of the pages
+  in both languages, and the second try used them. **Seen, not changed:** after taking a
+  day's own hours away Claude said the day "should now be open as usual", as the result only
+  says the hours were deleted; the real model asked for the list of patterns before no
+  deletion, which the journey's fake does. **A mistake of the session, with no lasting
+  effect:** the script that deleted the trial's data also deleted the override of 2026-12-07,
+  a leftover of the calendar's journeys in the local table, which their next run makes again.
+
+What step c09 finds ready: every tool exists, so the log lines and the capacity can be judged
+on the whole set; the journeys run twice a day as they are, with eight messages of `admin` a
+run under a local limit of 10, each block starting the count again; `removeFromCalendar` clears
+appointments, a day's own hours, patterns, extra windows and the type. What step c10 finds
+ready: blocking by `set_date_override` gave the right hours in each of the six requests
+tried, the two with a window cut in two and the one over an extra window included, which is
+what open point P5 asks; the words the model uses for the opening hours are fixed in the
+instructions; a refusal names the appointments in the way.
 
 ---
 
