@@ -161,15 +161,15 @@ describe('get_calendar (3, 8.3)', () => {
     expect((list?.items[2] as { appointments: object[] }).appointments[0]).not.toHaveProperty('cancellableUntil');
   });
 
-  it("leaves out every internal field: no instant, no type id, no busy time, no author; and for a User, no source of a window and no word on the day's own hours", () => {
+  it("leaves out every internal field: no instant, no busy time, no author; and for a User, no type id, no source of a window and no word on the day's own hours", () => {
     const forAdmin = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, ADMIN));
-    for (const internal of ['typeId', 'sourceId', 'busy', 'createdBy', 'updatedAt', 'generatedAt', '.000Z']) expect(forAdmin).not.toContain(internal);
+    for (const internal of ['sourceId', 'busy', 'createdBy', 'updatedAt', 'generatedAt', '.000Z']) expect(forAdmin).not.toContain(internal);
     // The very answer the route gave the Administrator, turned into a User's result: none of it.
     const forUser = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, USER));
     for (const internal of ['typeId', 'sourceId', 'source', 'one_off', 'hasOverride', recorded.admin.calendar.days[0]!.windows[0]!.sourceId]) expect(forUser).not.toContain(internal);
   });
 
-  it("the Administrator's result and a User's, side by side: the Administrator alone gets where each window comes from, the id of an extra window, and whether the day has hours of its own", () => {
+  it("the Administrator's result and a User's, side by side: the Administrator alone gets the id of each window's type, where each window comes from, the id of an extra window, and whether the day has hours of its own", () => {
     const window = (start: string, end: string, source: 'pattern' | 'override' | 'one_off', sourceId: string) => ({ start, end, typeId: '01A', typeName: 'Visit', source, sourceId });
     const view: CalendarView = {
       timeZone: ROME,
@@ -191,13 +191,13 @@ describe('get_calendar (3, 8.3)', () => {
         weekday: 'Monday',
         hasOverride: false,
         windows: [
-          { start: '09:00', end: '12:00', type: 'Visit', source: 'pattern' },
-          { start: '15:00', end: '16:00', type: 'Visit', source: 'one_off', id: '01WINDOW' },
+          { start: '09:00', end: '12:00', type: 'Visit', typeId: '01A', source: 'pattern' },
+          { start: '15:00', end: '16:00', type: 'Visit', typeId: '01A', source: 'one_off', id: '01WINDOW' },
         ],
         freeSlots: [],
         appointments: [],
       },
-      { date: '2026-11-24', weekday: 'Tuesday', hasOverride: true, windows: [{ start: '09:00', end: '11:00', type: 'Visit', source: 'override' }], freeSlots: [], appointments: [] },
+      { date: '2026-11-24', weekday: 'Tuesday', hasOverride: true, windows: [{ start: '09:00', end: '11:00', type: 'Visit', typeId: '01A', source: 'override' }], freeSlots: [], appointments: [] },
       // Kept for the Administrator: the day is closed by hours of its own, which can be taken away.
       { date: '2026-11-25', weekday: 'Wednesday', hasOverride: true, windows: [], freeSlots: [], appointments: [] },
     ]);
@@ -216,17 +216,18 @@ describe('get_calendar (3, 8.3)', () => {
     ]);
   });
 
-  it("what the Administrator's result adds: 20 bytes a day and 19 to 22 a window, 34 more for an extra window; the description says it to the Administrator only", () => {
+  it("what the Administrator's result adds: 20 bytes a day and 57 to 60 a window, 34 more for an extra window; the description says it to the Administrator only", () => {
     const admin = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, ADMIN).list?.items);
     const user = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, USER).list?.items);
-    // Five days, each with one extra window: 20 + 19 + 34 bytes each.
-    expect(admin.length - user.length).toBe(5 * (20 + 19 + 34));
+    // Five days, each with one extra window: 20 + 57 + 34 bytes each, 38 of the 57 the type's id.
+    expect(admin.length - user.length).toBe(5 * (20 + 57 + 34));
+    expect(forClaude(getCalendar.definition, 'admin').description).toContain('"typeId"');
     const forAdmin = forClaude(getCalendar.definition, 'admin').description ?? '';
     const forUser = forClaude(getCalendar.definition, 'user').description ?? '';
     expect(forAdmin).toContain('"hasOverride"');
     expect(forAdmin).toContain('"one_off"');
     expect(forAdmin.startsWith(forUser)).toBe(true);
-    for (const word of ['source', 'override', 'one_off', 'hasOverride']) expect(forUser).not.toContain(word);
+    for (const word of ['typeId', 'source', 'override', 'one_off', 'hasOverride']) expect(forUser).not.toContain(word);
   });
 
   // A day open from midnight to midnight, with slots around the change of the clocks.

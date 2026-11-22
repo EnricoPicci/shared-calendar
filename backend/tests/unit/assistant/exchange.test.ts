@@ -16,7 +16,7 @@ const db = vi.hoisted(() => {
     endConversation: vi.fn(),
   };
 });
-const claude = vi.hoisted(() => ({ askStep: vi.fn(), askLanguage: vi.fn(), assistantModel: vi.fn(), STEP_TIMEOUT_MS: 22_000 }));
+const claude = vi.hoisted(() => ({ askStep: vi.fn(), askLanguage: vi.fn(), assistantModel: vi.fn(), assistantEffort: vi.fn(), STEP_TIMEOUT_MS: 22_000 }));
 vi.mock('../../../src/lib/assistantDb', () => db);
 vi.mock('../../../src/lib/anthropic', () => claude);
 
@@ -95,6 +95,7 @@ beforeEach(async () => {
   vi.setSystemTime(new Date(NOW));
   await load();
   claude.assistantModel.mockReturnValue('claude-sonnet-5-5');
+  claude.assistantEffort.mockReturnValue('low');
   claude.askLanguage.mockResolvedValue({ kind: 'language', language: 'en', usage: LANGUAGE_USAGE });
   claude.askStep.mockResolvedValue({ kind: 'text', content: CONTENT, text: ANSWER, usage: USAGE });
   db.startConversation.mockImplementation((_sub, _version, _start, step) => Promise.resolve(started(step)));
@@ -176,7 +177,7 @@ describe('sendMessage: the first message of a conversation (4.2, 5.6)', () => {
       log: {
         conversationId: ID,
         outcome: 'text',
-        model: 'claude-sonnet-5-5',
+        model: 'claude-sonnet-5-5', effort: 'low',
         modelMs: 0,
         usage: { input: 100, output: 40, cacheRead: 6000, cacheWrite: 300 },
         languageUsage: { input: 300, output: 10, cacheRead: 0, cacheWrite: 0 },
@@ -215,7 +216,7 @@ describe('sendMessage: the first message of a conversation (4.2, 5.6)', () => {
 
     const result = await exchange.sendMessage(ALICE, TEXT, NOW);
 
-    expect(result).toEqual({ ok: false, refusal, log: { conversationId: null, ...log, model: 'claude-sonnet-5-5', languageMs: 0 } });
+    expect(result).toEqual({ ok: false, refusal, log: { conversationId: null, ...log, model: 'claude-sonnet-5-5', effort: 'low', languageMs: 0 } });
     expect(claude.askStep).not.toHaveBeenCalled();
     expect(db.startConversation).not.toHaveBeenCalled();
     expect(db.saveStep).not.toHaveBeenCalled();
@@ -432,7 +433,7 @@ describe('the step: each answer of Claude (7.4)', () => {
       { kind: 'model', content: { role: 'user', content: TEXT }, fromPerson: true },
       { kind: 'model', content: { role: 'system', content: expect.any(String) } },
     ]);
-    expect(result).toMatchObject({ ok: false, refusal, log: { conversationId: ID, ...log, model: 'claude-sonnet-5-5', newConversation: false } });
+    expect(result).toMatchObject({ ok: false, refusal, log: { conversationId: ID, ...log, model: 'claude-sonnet-5-5', effort: 'low', newConversation: false } });
     expect(db.endConversation).not.toHaveBeenCalled();
     expectNoText(result.log);
   });
@@ -458,7 +459,7 @@ describe('the step: the one write (9)', () => {
     expect(await exchange.sendMessage(ALICE, TEXT, NOW)).toEqual({
       ok: false,
       refusal: 'assistant_busy',
-      log: { conversationId: ID, outcome: 'lost_the_race', model: 'claude-sonnet-5-5', modelMs: 0 },
+      log: { conversationId: ID, outcome: 'lost_the_race', model: 'claude-sonnet-5-5', effort: 'low', modelMs: 0 },
     });
   });
 
@@ -958,7 +959,7 @@ describe('continueExchange (POST /assistant/continue, 5.1, 6)', () => {
     expect(await exchange.continueExchange(ALICE, NOW, REQUEST, READS)).toEqual({
       ok: false,
       refusal: 'assistant_busy',
-      log: { conversationId: ID, outcome: 'lost_the_race', model: 'claude-sonnet-5-5', modelMs: 0 },
+      log: { conversationId: ID, outcome: 'lost_the_race', model: 'claude-sonnet-5-5', effort: 'low', modelMs: 0 },
     });
   });
 

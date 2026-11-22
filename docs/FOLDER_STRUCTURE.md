@@ -84,7 +84,9 @@ stays at the root.
 │   │                            # anthropic.ts: the one door to Claude, the only file that imports
 │   │                            # the Anthropic SDK; parameters.ts: one read of Parameter Store)
 │   ├── tests/
-│   │   ├── unit/                # mirrors src/
+│   │   ├── unit/                # mirrors src/; unit/eval/ tests the pure parts of tests/eval/
+│   │   ├── eval/                # the evaluation with the real model (npm run assistant:eval):
+│   │   │                        # the list, its checks, the known week, the prices; no part of the gate
 │   │   └── integration/         # journeys against the local Docker stack; fake-claude/answers.json:
 │   │                            # the scripted answers of the fake Claude, owned by the journeys
 │   ├── scripts/                 # operator scripts (local stack, verify, deploy, smoke, budget…)

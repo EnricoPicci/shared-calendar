@@ -1,5 +1,5 @@
 import type { ApiErrorCode } from '@shared-calendar/shared';
-import { assistantModel, STEP_TIMEOUT_MS } from '../lib/anthropic';
+import { assistantEffort, assistantModel, STEP_TIMEOUT_MS } from '../lib/anthropic';
 import { AssistantBusyError, saveStep, takeProposal, type Conversation, type NewMessage } from '../lib/assistantDb';
 import { coreConfig } from './config';
 import { activityLine, currentConversation, remaining, replyOf, type CoreResult, type Identity } from './conversation';
@@ -50,6 +50,7 @@ export async function confirmProposal(
 ): Promise<CoreResult> {
   const config = coreConfig();
   const model = assistantModel();
+  const effort = assistantEffort();
   const definitions = tools.map((tool) => tool.definition);
   const current = await currentConversation(identity, now, config, definitions);
   const { conversation } = current;
@@ -114,6 +115,6 @@ export async function confirmProposal(
       log: { ...log, outcome: 'closing_words_left_to_continue' },
     };
   }
-  const closing = await runStep({ identity, current: after, language: saved.language, added: [], asking: null, ask: true, model, now, config, request, tools, proposal: settled, dropped: false });
+  const closing = await runStep({ identity, current: after, language: saved.language, added: [], asking: null, ask: true, model, effort, now, config, request, tools, proposal: settled, dropped: false });
   return { ...closing, log: { ...closing.log, ...log } };
 }

@@ -23,8 +23,16 @@ export class AnthropicConfigError extends Error {
 // `apiKey` is the key given directly (the local stack); `keyParameter` the name of the Parameter
 // Store parameter that holds it (the cloud); `baseUrl` another address than Anthropic's (the local
 // fake). Each is null when its variable is unset or empty. `budgetMemoryMs` is how long the
-// spending limit, once seen, is answered without asking Anthropic again.
-type Config = { model: string; apiKey: string | null; keyParameter: string | null; baseUrl: string | null; budgetMemoryMs: number };
+// spending limit, once seen, is answered without asking Anthropic again. `effort` is how much work
+// Claude is asked to put into a step.
+type Config = { model: string; effort: Effort; apiKey: string | null; keyParameter: string | null; baseUrl: string | null; budgetMemoryMs: number };
+
+// The effort levels Anthropic's Messages API takes (`output_config.effort`).
+const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+export type Effort = (typeof EFFORTS)[number];
+// The effort of a step when the deployment names none: the level for a chat that must answer fast
+// (docs/CONVERSATIONAL_ARCHITECTURE.md section 7.2).
+export const DEFAULT_EFFORT: Effort = 'low';
 
 let config: Config | AnthropicConfigError | undefined;
 
@@ -41,8 +49,13 @@ function readConfig(): Config | AnthropicConfigError {
   // (docs/ARCHITECTURE.md section 8). The cloud leaves it empty and gets the ten minutes.
   const seconds = process.env.ASSISTANT_BUDGET_MEMORY_SECONDS ? Number(process.env.ASSISTANT_BUDGET_MEMORY_SECONDS) : BUDGET_MINUTES * 60;
   if (!Number.isInteger(seconds) || seconds < 0) return new AnthropicConfigError('ASSISTANT_BUDGET_MEMORY_SECONDS is not a whole number of seconds');
+  // ASSISTANT_EFFORT is for the local stack only, where the evaluation with the real model tries
+  // more than one level (docs/ARCHITECTURE.md section 8). The cloud leaves it empty and gets the default.
+  const effort = process.env.ASSISTANT_EFFORT || DEFAULT_EFFORT;
+  if (!(EFFORTS as readonly string[]).includes(effort)) return new AnthropicConfigError(`ASSISTANT_EFFORT is not one of ${EFFORTS.join(', ')}`);
   return {
     model: process.env.ASSISTANT_MODEL,
+    effort: effort as Effort,
     apiKey: process.env.ANTHROPIC_API_KEY || null,
     keyParameter: process.env.ANTHROPIC_KEY_PARAMETER || null,
     baseUrl: process.env.ANTHROPIC_BASE_URL || null,
@@ -60,6 +73,11 @@ function anthropicConfig(): Config {
 /** The model every request names. Throws `AnthropicConfigError` when the deployment gives none. */
 export function assistantModel(): string {
   return anthropicConfig().model;
+}
+
+/** The effort every step is asked with. Throws `AnthropicConfigError` on a level that does not exist. */
+export function assistantEffort(): Effort {
+  return anthropicConfig().effort;
 }
 
 // ── What goes in and what comes back ───────────────────────────────────────────────────────────
@@ -124,7 +142,8 @@ const STEP_MAX_TOKENS = 8_000;
 // The language answer is ten tokens; the rest is room for thinking the model may do first.
 const LANGUAGE_MAX_TOKENS = 2_000;
 const THINKING = { type: 'adaptive' } as const;
-const EFFORT = 'low' as const;
+// The language question is one word: it is always asked at the lowest effort.
+const LANGUAGE_EFFORT: Effort = 'low';
 const CACHE_MARK = { type: 'ephemeral' } as const;
 
 // The key read from Parameter Store, the client made for the key in use, and the moment the
@@ -179,8 +198,9 @@ function classify(err: unknown): 'budget_reached' | UnavailableReason {
 
 type Body = Omit<Anthropic.MessageCreateParamsNonStreaming, 'model'>;
 
-// Sends one request and gives Anthropic's message, or why there is none.
-async function send(body: Body, now: string): Promise<{ kind: 'message'; message: Anthropic.Message } | Unavailable | BudgetReached> {
+// Sends one request and gives Anthropic's message, or why there is none. The body is made from
+// the configuration, so that a broken one fails before anything else is done.
+async function send(makeBody: (cfg: Config) => Body, now: string): Promise<{ kind: 'message'; message: Anthropic.Message } | Unavailable | BudgetReached> {
   const cfg = anthropicConfig();
   const nowMs = Date.parse(now);
   if (budgetReachedAt !== undefined && nowMs - budgetReachedAt < cfg.budgetMemoryMs) return { kind: 'budget_reached' };
@@ -192,7 +212,7 @@ async function send(body: Body, now: string): Promise<{ kind: 'message'; message
   }
 
   try {
-    return { kind: 'message', message: await client.anthropic.messages.create({ ...body, model: cfg.model }) };
+    return { kind: 'message', message: await client.anthropic.messages.create({ ...makeBody(cfg), model: cfg.model }) };
   } catch (err) {
     const meaning = classify(err);
     if (meaning === 'budget_reached') {
@@ -225,17 +245,17 @@ const textOf = (content: AnswerContent): string =>
 
 /**
  * Asks Claude for the next step of a conversation. The conversation is sent exactly as given. The
- * module adds what is its own: adaptive thinking at low effort, the room for the answer, and the
+ * module adds what is its own: adaptive thinking at the deployment's effort, the room for the answer, and the
  * two cache marks of docs/CONVERSATIONAL_ARCHITECTURE.md section 7.2, one after the fixed
  * instructions (which caches the tools with them) and one at the end of the conversation, placed
  * by Anthropic on the last entry. `now` is an ISO instant.
  */
 export async function askStep(request: StepRequest, now: string): Promise<StepAnswer> {
   const sent = await send(
-    {
+    (cfg) => ({
       max_tokens: STEP_MAX_TOKENS,
       thinking: THINKING,
-      output_config: { effort: EFFORT },
+      output_config: { effort: cfg.effort },
       cache_control: CACHE_MARK,
       // An empty list is left out: the request then names no tools at all.
       ...(request.tools.length > 0 ? { tools: request.tools } : {}),
@@ -244,7 +264,7 @@ export async function askStep(request: StepRequest, now: string): Promise<StepAn
         { type: 'text', text: request.context },
       ],
       messages: request.conversation,
-    },
+    }),
     now,
   );
   if (sent.kind !== 'message') return sent;
@@ -308,13 +328,13 @@ function readLanguage(answer: string): AssistantLanguage {
  */
 export async function askLanguage(text: string, now: string): Promise<LanguageAnswer> {
   const sent = await send(
-    {
+    () => ({
       max_tokens: LANGUAGE_MAX_TOKENS,
       thinking: THINKING,
-      output_config: { effort: EFFORT, format: LANGUAGE_FORMAT },
+      output_config: { effort: LANGUAGE_EFFORT, format: LANGUAGE_FORMAT },
       system: LANGUAGE_QUESTION,
       messages: [{ role: 'user', content: text }],
-    },
+    }),
     now,
   );
   if (sent.kind !== 'message') return sent;

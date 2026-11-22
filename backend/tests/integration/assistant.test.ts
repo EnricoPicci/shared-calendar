@@ -10,6 +10,7 @@ import {
   reportAssistantCosts,
   setStoredPromptVersion,
   signIn,
+  storedEntries,
   subOf,
   weighAssistant,
   type AssistantStepCost,
@@ -57,16 +58,6 @@ const say = (token: string, text: string) => api('POST', '/assistant/messages', 
 const conversation = (token: string) => api('GET', '/assistant/conversation', token);
 const startAgain = (token: string) => api('DELETE', '/assistant/conversation', token);
 const goOn = (token: string) => api('POST', '/assistant/continue', token);
-
-// The entries of the person's conversation in progress that Claude is given, as stored: each
-// message item of that conversation, in order, its content read as the JSON text it is kept as.
-// A notice, which only the person reads, is left out, and so are the messages of the person's
-// earlier conversations, which the partition also holds.
-async function storedEntries(token: string): Promise<{ role: string; content: unknown }[]> {
-  const items = await queryAssistantPartition(`CONV#${subOf(token)}`);
-  const id = items.find((item) => item.SK === 'META')?.conversationId as string;
-  return items.filter((item) => item.SK.startsWith(`MSG#${id}#`) && item.kind === 'model').map((item) => JSON.parse(item.content as string) as { role: string; content: unknown });
-}
 
 // What the routes answer while the person has no conversation.
 const none = (remainingToday: number) => ({
@@ -1458,7 +1449,7 @@ describe('time blocked through the assistant (3, 5.4, 5.5)', () => {
     // The fake answers with the result it was given, word for word.
     const messages = body?.messages as { from: string; text: string }[];
     const given = JSON.parse(messages.at(-1)?.text ?? '') as { days: Record<string, unknown>[] };
-    expect(given.days).toEqual([{ date: day, weekday: expect.any(String), hasOverride: true, windows: LEFT.map((window) => ({ ...window, source: 'override' })), freeSlots: ['04:00', '06:00'], appointments: [] }]);
+    expect(given.days).toEqual([{ date: day, weekday: expect.any(String), hasOverride: true, windows: LEFT.map((window) => ({ ...window, typeId, source: 'override' })), freeSlots: ['04:00', '06:00'], appointments: [] }]);
   });
 
   it('Claude asked for the day, the types and the hours of the day with the id of the type it read in the list, then for the day again, and nothing else', async () => {

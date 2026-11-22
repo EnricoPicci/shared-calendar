@@ -50,7 +50,8 @@ the scripts themselves win, and this document is fixed.
   pool, client, groups, users `admin` / `Admin-Local-Pass-1!` and `alice` /
   `Alice-Local-Pass-1!`) and writes `env.local.json`. Idempotent; rerun it after a change to
   `local-seed.sh`. Its last line but one says which Claude it wired: the fake, or the real one
-  when `ANTHROPIC_API_KEY` is set in the shell (section 3.4).
+  when `ANTHROPIC_API_KEY` is set in the shell (section 3.4). The line before it says the daily
+  limit, the model and the effort.
 - `npm run local:api -w backend`: builds and serves the API on http://127.0.0.1:3000
   (foreground). Ready in about 11 s, build included.
   When its output is to be searched afterwards (that no log line holds a person's text), keep
@@ -106,7 +107,7 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
 - `ASSISTANT_DAILY_MESSAGE_LIMIT`: **10 messages a person a day**, not the template's 30, so
   that a journey can reach the limit. For a long session by hand:
   `ASSISTANT_DAILY_MESSAGE_LIMIT=30 DYNAMODB_PORT=8002 npm run local:up -w backend`, then restart
-  `local:api`. `local:up` says the value on its last line but two. The count is per person and
+  `local:api`. `local:up` says the value on its last line but two, with the model and the effort. The count is per person and
   per day and is never reset: when `alice` has used hers, wait for tomorrow or raise the limit.
 - `ASSISTANT_BUDGET_MEMORY_SECONDS`: 0, so that a spending limit answered by the fake Claude is
   not remembered for ten minutes by the function.
@@ -152,6 +153,34 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
   a letter, a digit, `-` or `_`. Do not `export` the variable: **a `local:up` without it takes
   the key out of the file again**, and that is the way back to the fake.
 - Either way, restart `local:api` afterwards: it reads `env.local.json` only when it starts.
+- **The model and the effort** can be named for that one command too, to try them:
+  `ASSISTANT_MODEL=claude-haiku-5-5 ASSISTANT_EFFORT=medium ANTHROPIC_API_KEY=… DYNAMODB_PORT=8002 npm run local:up -w backend`.
+  The model is one of the three the template allows, the effort one of `low`, `medium`, `high`,
+  `xhigh`, `max`; `local:up` refuses another value. Without them the template's model and the
+  effort `low` are used, and a `local:up` without them is the way back.
+- **`npm run assistant:eval -w backend`: the evaluation with the real model**
+  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3). It plays 51 requests in English and
+  Italian against the local API and checks what Claude did. **It costs money at Anthropic**:
+  about 40 US cents and four minutes for the whole list on `claude-sonnet-5-5`, 3 cents on
+  `claude-haiku-5-5`. It is no part of `verify`. Run it before a deployment that changes the
+  instructions (`backend/src/assistant/prompt.ts`), a tool or the model.
+  - It needs: the real Claude wired; **a stack started afresh** (`local:down`, `local:up`), as
+    it refuses a calendar that holds a type whose name does not start with "eval", so never
+    after a gate on the same tables; `local:api` started through `tee` into
+    `/tmp/shared-calendar-local-api.log`, from which it reads the tokens of each step; the
+    same `DYNAMODB_PORT` as `local:up`.
+  - `DYNAMODB_PORT=8002 npm run assistant:eval -w backend -- --ceiling 4 --out run.json --hand answers.txt`:
+    `--ceiling` stops the run when it has cost that many US dollars (4 when not given),
+    `--out` writes the run as JSON, `--hand` writes the answers a person must read; `--only`
+    with ids, or `--kind` with a kind, plays part of the list; `--log` names another log file.
+    `-- --list` prints the list and its checks, plays nothing, costs nothing and needs no stack.
+  - It makes the accounts `eval-anna` and `eval-bruno` and the types "eval Visit" and
+    "eval Lesson", and removes them at the end, also when stopped with Ctrl-C. The
+    appointments it made stay in the table, cancelled. Never run it together with a gate or
+    with the integration tests.
+  - When a request fails, play it again alone before believing it: the model does not answer
+    the same way twice. Afterwards go back to the fake (a `local:up` without the key, restart
+    `local:api`) before any `verify`.
 - `SendAssistantMessageFunction` declares the two variables, empty, in `template.yaml`: that is
   what lets the file fill them. In the cloud they stay empty and the key comes from Parameter
   Store.

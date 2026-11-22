@@ -20,7 +20,7 @@ const db = vi.hoisted(() => {
     endConversation: vi.fn(),
   };
 });
-const claude = vi.hoisted(() => ({ askStep: vi.fn(), askLanguage: vi.fn(), assistantModel: vi.fn(), STEP_TIMEOUT_MS: 22_000 }));
+const claude = vi.hoisted(() => ({ askStep: vi.fn(), askLanguage: vi.fn(), assistantModel: vi.fn(), assistantEffort: vi.fn(), STEP_TIMEOUT_MS: 22_000 }));
 // The routes the real tools read through, for the tests that give the core the tools of the
 // deployment.
 const readRoutes = vi.hoisted(() => ({ listAppointments: vi.fn(), getCalendar: vi.fn(), getSettings: vi.fn(), listTypes: vi.fn(), listUsers: vi.fn(), listPatterns: vi.fn() }));
@@ -174,6 +174,7 @@ beforeEach(async () => {
   conversations = await import('../../../src/assistant/conversation');
   prompt = await import('../../../src/assistant/prompt');
   claude.assistantModel.mockReturnValue('claude-sonnet-5-5');
+  claude.assistantEffort.mockReturnValue('low');
   claude.askStep.mockResolvedValue(says(DONE));
   db.readDailyUse.mockResolvedValue({ messages: 4, inputTokens: 0, outputTokens: 0 });
   db.saveStep.mockImplementation((_sub, read: Conversation, step: { messages: unknown[]; status: Conversation['status']; proposal: Proposal | null }) =>

@@ -189,7 +189,7 @@ The test checks:
   to `LIMIT` − 2;
 - the text of the last message of the reply is JSON whose `days` is exactly one day: `date`
   the day, a `weekday` (any text), `hasOverride` `true`, `windows` the two of `LEFT` each with
-  `source` `override`, `freeSlots` `["04:00", "06:00"]` and `appointments` empty.
+  the type's id as `typeId` and `source` `override`, `freeSlots` `["04:00", "06:00"]` and `appointments` empty.
 
 So what Claude reads agrees with the calendar's own route: 05:00 is not offered any more.
 This check names the whole day, not only the block's part of it: it holds as long as the

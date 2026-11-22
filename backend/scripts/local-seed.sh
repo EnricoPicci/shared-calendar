@@ -226,6 +226,23 @@ if [[ ! "$DAILY_MESSAGE_LIMIT" =~ ^[1-9][0-9]*$ ]]; then
   echo "ERROR: ASSISTANT_DAILY_MESSAGE_LIMIT must be a whole number, 1 or more." >&2
   exit 1
 fi
+# The model and the effort, for a run of the evaluation with the real model (npm run
+# assistant:eval): ASSISTANT_MODEL and ASSISTANT_EFFORT in this shell are written into the file,
+# where they win over the template's default model and fill the effort, which the template
+# declares empty. Without them neither is written: the model is the template's default and the
+# effort the functions' own. The values are those the template and Anthropic allow.
+LOCAL_MODEL="${ASSISTANT_MODEL:-}"
+if [[ -n "$LOCAL_MODEL" && ! "$LOCAL_MODEL" =~ ^claude-(sonnet|opus|haiku)-5-5$ ]]; then
+  echo "ERROR: ASSISTANT_MODEL must be claude-sonnet-5-5, claude-opus-5-5 or claude-haiku-5-5." >&2
+  echo "       Nothing was written." >&2
+  exit 1
+fi
+LOCAL_EFFORT="${ASSISTANT_EFFORT:-}"
+if [[ -n "$LOCAL_EFFORT" && ! "$LOCAL_EFFORT" =~ ^(low|medium|high|xhigh|max)$ ]]; then
+  echo "ERROR: ASSISTANT_EFFORT must be low, medium, high, xhigh or max." >&2
+  echo "       Nothing was written." >&2
+  exit 1
+fi
 REAL_CLAUDE_KEY="${ANTHROPIC_API_KEY:-}"
 if [[ -n "$REAL_CLAUDE_KEY" && ! "$REAL_CLAUDE_KEY" =~ ^[A-Za-z0-9_-]+$ ]]; then
   echo "ERROR: ANTHROPIC_API_KEY holds a character that is not a letter, a digit, '-' or '_'." >&2
@@ -249,6 +266,8 @@ EOF
     printf '    "ANTHROPIC_BASE_URL": "%s",\n' "$FAKE_CLAUDE_BASE_URL"
     printf '    "ANTHROPIC_API_KEY": "%s",\n' "$FAKE_CLAUDE_KEY"
   fi
+  if [[ -n "$LOCAL_MODEL" ]]; then printf '    "ASSISTANT_MODEL": "%s",\n' "$LOCAL_MODEL"; fi
+  if [[ -n "$LOCAL_EFFORT" ]]; then printf '    "ASSISTANT_EFFORT": "%s",\n' "$LOCAL_EFFORT"; fi
   cat <<EOF
     "DYNAMODB_ENDPOINT": "http://dynamodb:8000"
   },
@@ -319,6 +338,10 @@ if [[ -n "$REAL_CLAUDE_KEY" ]]; then
 else
   echo "Claude: the fake of the Docker stack ($FAKE_CLAUDE_BASE_URL for the functions, $FAKE_CLAUDE_URL from here)."
 fi
-echo "Assistant: $DAILY_MESSAGE_LIMIT messages a person a day."
+# The two defaults are named outside the line: bash 3.2 reads an apostrophe in the default of a
+# parameter expansion as the start of a quoted text, and swallows what follows.
+SHOWN_MODEL="${LOCAL_MODEL:-the default of the template}"
+SHOWN_EFFORT="${LOCAL_EFFORT:-the default of the functions}"
+echo "Assistant: $DAILY_MESSAGE_LIMIT messages a person a day; model $SHOWN_MODEL, effort $SHOWN_EFFORT."
 echo
 echo "Local stack ready. DB browser: http://localhost:8001"

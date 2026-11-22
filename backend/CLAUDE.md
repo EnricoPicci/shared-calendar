@@ -67,7 +67,7 @@ Paths in this file are relative to `backend/`.
   `@anthropic-ai/sdk`** (`npm run lint` refuses it elsewhere, its unit test excepted).
   `askStep` and `askLanguage` answer one of a closed list (`text`, `tool_requests`,
   `cut_short`, `refusal`, `unavailable` with a reason, `budget_reached`) and never throw for
-  what Anthropic did: only `AnthropicConfigError` (`ASSISTANT_MODEL` missing). It logs nothing
+  what Anthropic did: only `AnthropicConfigError` (`ASSISTANT_MODEL` missing, a bad `ASSISTANT_EFFORT`). It logs nothing
   and gives back nothing of Anthropic's own words. The key: `ANTHROPIC_API_KEY`, else the
   parameter named in `ANTHROPIC_KEY_PARAMETER`, kept ten minutes. "now" is passed in.
 - `parameters.ts`: `readParameter(name)`, one decrypted read of Parameter Store, `null` when

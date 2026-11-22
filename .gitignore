@@ -10,3 +10,4 @@ coverage/
 *.local.json
 # Written by npm run verify, checked by npm run deploy.
 .verify-ok
+future-improvements.md

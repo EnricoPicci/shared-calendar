@@ -1,5 +1,5 @@
 import { ASSISTANT_LIMITS, assistantTexts, type AssistantLanguage, type AssistantStatus } from '@shared-calendar/shared';
-import { askLanguage, askStep, assistantModel, STEP_TIMEOUT_MS, type ConversationEntry, type StepAnswer, type TokenCounts } from '../lib/anthropic';
+import { askLanguage, askStep, assistantEffort, assistantModel, STEP_TIMEOUT_MS, type ConversationEntry, type StepAnswer, type TokenCounts } from '../lib/anthropic';
 import { ulid } from 'ulid';
 import { AssistantBusyError, endConversation as endStored, saveStep, startConversation, type Conversation, type NewMessage } from '../lib/assistantDb';
 import { coreConfig, type CoreConfig } from './config';
@@ -76,6 +76,7 @@ function answersSinceThePerson(entries: ConversationEntry[]): number {
 export async function sendMessage(identity: Identity, text: string, now: string, request: RequestInfo = UNKNOWN_REQUEST, tools: readonly Tool[] = TOOLS): Promise<CoreResult> {
   const config = coreConfig();
   const model = assistantModel();
+  const effort = assistantEffort();
   const current = await currentConversation(identity, now, config, tools.map((tool) => tool.definition));
   const { conversation } = current;
   const conversationId = conversation?.conversationId ?? null;
@@ -103,7 +104,7 @@ export async function sendMessage(identity: Identity, text: string, now: string,
       return {
         ok: false,
         refusal: asked.kind === 'budget_reached' ? 'assistant_budget_reached' : 'assistant_unavailable',
-        log: { conversationId, outcome: `language_${asked.kind}`, ...(asked.kind === 'unavailable' && { reason: asked.reason }), model, languageMs: Date.now() - started },
+        log: { conversationId, outcome: `language_${asked.kind}`, ...(asked.kind === 'unavailable' && { reason: asked.reason }), model, effort, languageMs: Date.now() - started },
       };
     }
     language = asked.language;
@@ -120,7 +121,7 @@ export async function sendMessage(identity: Identity, text: string, now: string,
   // Only a request that asked the language question has spent time on Claude already.
   const room = asking !== null && request.remainingMs !== null ? request.remainingMs() : Infinity;
   const ask = room >= STEP_TIMEOUT_MS + AFTER_CLAUDE_MS;
-  return runStep({ identity, current, language, added, asking, ask, model, now, config, request, tools, proposal: null, dropped: waiting !== null });
+  return runStep({ identity, current, language, added, asking, ask, model, effort, now, config, request, tools, proposal: null, dropped: waiting !== null });
 }
 
 /**
@@ -139,10 +140,11 @@ export async function sendMessage(identity: Identity, text: string, now: string,
 export async function continueExchange(identity: Identity, now: string, request: RequestInfo = UNKNOWN_REQUEST, tools: readonly Tool[] = TOOLS): Promise<CoreResult> {
   const config = coreConfig();
   const model = assistantModel();
+  const effort = assistantEffort();
   const current = await currentConversation(identity, now, config, tools.map((tool) => tool.definition));
   const { conversation } = current;
   const conversationId = conversation?.conversationId ?? null;
-  const step = { identity, current, asking: null, ask: true, model, now, config, request, tools, dropped: false };
+  const step = { identity, current, asking: null, ask: true, model, effort, now, config, request, tools, dropped: false };
   const taken = conversation ? takenState(conversation, now) : 'free';
   const waiting = conversation?.status === 'awaiting_confirmation' ? proposalOf(conversation) : null;
   if (conversation && waiting && taken !== 'free') {
@@ -167,6 +169,7 @@ export type StepInput = {
   // False when the step is left to `continue`: the additions are saved and Claude is not asked.
   ask: boolean;
   model: string;
+  effort: string;
   now: string;
   config: CoreConfig;
   request: RequestInfo;
@@ -190,7 +193,7 @@ export type StepInput = {
  * the person wrote is lost.
  */
 export async function runStep(input: StepInput): Promise<CoreResult> {
-  const { identity, current, language, added, asking, ask, model, now, config, request, tools } = input;
+  const { identity, current, language, added, asking, ask, model, effort, now, config, request, tools } = input;
   const texts = assistantTexts(language);
   const languageUsage = asking?.usage ?? null;
   const conversation = [...entriesOf(current.messages), ...entriesOf(added)];
@@ -355,7 +358,7 @@ export async function runStep(input: StepInput): Promise<CoreResult> {
   } catch (err) {
     // Another request of the same person wrote first: nothing of this step was saved.
     if (!(err instanceof AssistantBusyError)) throw err;
-    return { ok: false, refusal: 'assistant_busy', log: { conversationId: current.conversation?.conversationId ?? null, outcome: 'lost_the_race', model, modelMs } };
+    return { ok: false, refusal: 'assistant_busy', log: { conversationId: current.conversation?.conversationId ?? null, outcome: 'lost_the_race', model, effort, modelMs } };
   }
 
   const log: StepLog = {
@@ -363,6 +366,7 @@ export async function runStep(input: StepInput): Promise<CoreResult> {
     outcome,
     ...(reason && { reason }),
     model,
+    effort,
     modelMs,
     ...(usage && { usage: counts(usage) }),
     ...(asking && { languageUsage: counts(asking.usage), languageMs: asking.ms }),

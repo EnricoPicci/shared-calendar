@@ -24,7 +24,7 @@ import { connect } from 'node:net';
 // stack of docs/ARCHITECTURE.md section 8: `npm run local:up` (emulators) and `npm run local:api`
 // (sam local). Unlike the handlers, tests may use the AWS SDK directly.
 
-const API_URL = 'http://127.0.0.1:3000';
+export const API_URL = 'http://127.0.0.1:3000';
 const COGNITO_URL = 'http://localhost:9229';
 const DYNAMODB_PORT = process.env.DYNAMODB_PORT ?? '8000';
 const DYNAMODB_URL = `http://localhost:${DYNAMODB_PORT}`;
@@ -92,6 +92,14 @@ export function claudeWiringProblem(): string | null {
     'Run npm run local:up in a shell where ANTHROPIC_API_KEY is not set, then restart npm run local:api ' +
     '(it reads the file only when it starts)'
   );
+}
+
+// Whether env.local.json wires the real Claude: no other address than Anthropic's own, and a key
+// that is not the fake's placeholder. The evaluation with the real model asks this
+// (docs/CONVERSATIONAL_ARCHITECTURE.md section 12.3); the key itself is never given back.
+export function realClaudeWired(): boolean {
+  const parameters = (JSON.parse(readFileSync(ENV_FILE, 'utf8')) as { Parameters?: Record<string, string> }).Parameters ?? {};
+  return !parameters.ANTHROPIC_BASE_URL && Boolean(parameters.ANTHROPIC_API_KEY) && parameters.ANTHROPIC_API_KEY !== FAKE_CLAUDE_KEY;
 }
 
 // vitest globalSetup: fail fast, with the command to run, when the local stack is not up.
@@ -296,6 +304,16 @@ export async function queryAssistantPartition(PK: string): Promise<AssistantItem
     startKey = page.LastEvaluatedKey;
   } while (startKey);
   return items;
+}
+
+// The entries of the person's conversation in progress that Claude is given, as stored: each
+// message item of that conversation, in order, its content read as the JSON text it is kept as.
+// A notice, which only the person reads, is left out, and so are the messages of the person's
+// earlier conversations, which the partition also holds.
+export async function storedEntries(token: string): Promise<{ role: string; content: unknown }[]> {
+  const items = await queryAssistantPartition(`CONV#${subOf(token)}`);
+  const id = items.find((item) => item.SK === 'META')?.conversationId as string;
+  return items.filter((item) => item.SK.startsWith(`MSG#${id}#`) && item.kind === 'model').map((item) => JSON.parse(item.content as string) as { role: string; content: unknown });
 }
 
 // Forgets what a person used of the assistant so far, by deleting the items that count it. For the

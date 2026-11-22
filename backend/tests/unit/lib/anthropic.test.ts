@@ -21,10 +21,11 @@ const MINUTE = 60_000;
 
 const plus = (instant: string, ms: number) => new Date(Date.parse(instant) + ms).toISOString();
 
-type Env = { model?: string; key?: string; keyParameter?: string; baseUrl?: string; budgetMemorySeconds?: string };
+type Env = { model?: string; effort?: string; key?: string; keyParameter?: string; baseUrl?: string; budgetMemorySeconds?: string };
 
 async function load(env: Env = {}): Promise<Lib> {
   vi.stubEnv('ASSISTANT_MODEL', env.model ?? MODEL);
+  vi.stubEnv('ASSISTANT_EFFORT', env.effort ?? '');
   vi.stubEnv('ANTHROPIC_API_KEY', env.key ?? KEY);
   vi.stubEnv('ANTHROPIC_KEY_PARAMETER', env.keyParameter ?? '');
   vi.stubEnv('ANTHROPIC_BASE_URL', env.baseUrl ?? '');
@@ -542,6 +543,36 @@ describe('the configuration', () => {
     const lib = await load({ model: 'claude-haiku-5-5' });
 
     expect(lib.assistantModel()).toBe('claude-haiku-5-5');
+  });
+
+  it('assistantEffort gives the low effort when the deployment names none, and a step is asked with it', async () => {
+    const lib = await load();
+    answers();
+
+    expect(lib.assistantEffort()).toBe('low');
+    await lib.askStep(request(), NOW);
+    expect(create.mock.calls[0]?.[0]).toMatchObject({ output_config: { effort: 'low' } });
+  });
+
+  it('a step is asked with the effort ASSISTANT_EFFORT names, the language question always with the low one', async () => {
+    const lib = await load({ effort: 'medium' });
+    answers();
+
+    expect(lib.assistantEffort()).toBe('medium');
+    await lib.askStep(request(), NOW);
+    expect(create.mock.calls[0]?.[0]).toMatchObject({ output_config: { effort: 'medium' } });
+
+    languageAnswer('{"language":"it"}');
+    await lib.askLanguage('ciao', NOW);
+    expect(create.mock.calls[1]?.[0]).toMatchObject({ output_config: { effort: 'low' } });
+  });
+
+  it('throws its own error for an effort that is no level, and asks nothing', async () => {
+    const lib = await load({ effort: 'extreme' });
+
+    expect(() => lib.assistantEffort()).toThrow(lib.AnthropicConfigError);
+    await expect(lib.askStep(request(), NOW)).rejects.toThrow('ASSISTANT_EFFORT is not one of low, medium, high, xhigh, max');
+    expect(create).not.toHaveBeenCalled();
   });
 
   it('throws its own error when ASSISTANT_MODEL is not set, and keeps it for the next call', async () => {

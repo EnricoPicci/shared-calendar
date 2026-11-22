@@ -2269,10 +2269,11 @@ Resources:
   # value named /<stack>/anthropic-api-key; ANTHROPIC_KEY_PARAMETER only carries that name, and the
   # role may read that one parameter and no other. Until the key is there the assistant answers
   # 503 assistant_unavailable and everything else works.
-  # ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL and ASSISTANT_BUDGET_MEMORY_SECONDS are declared empty on
-  # purpose: only the local stack fills them (env.local.json: the fake Claude's address, a
-  # placeholder key, no memory of a spending limit between two journeys). In the cloud they stay
-  # empty, so the key can only come from Parameter Store.
+  # ANTHROPIC_API_KEY, ANTHROPIC_BASE_URL, ASSISTANT_BUDGET_MEMORY_SECONDS and ASSISTANT_EFFORT are
+  # declared empty on purpose: only the local stack fills them (env.local.json: the fake Claude's
+  # address, a placeholder key, no memory of a spending limit between two journeys, and another
+  # effort level for a run of the evaluation with the real model). In the cloud they stay empty, so
+  # the key can only come from Parameter Store and Claude is asked at the low effort.
   # When Claude asks to read the calendar (the settings, the types, a period, the appointments),
   # the function runs the code of that calendar route itself, inside this same function, with the
   # identity of the person who wrote. So it needs what those four routes need: the name of the
@@ -2303,6 +2304,7 @@ Resources:
           ANTHROPIC_API_KEY: ''
           ANTHROPIC_BASE_URL: ''
           ASSISTANT_BUDGET_MEMORY_SECONDS: ''
+          ASSISTANT_EFFORT: ''
           USER_POOL_ID: !Ref UserPool
           COGNITO_ENDPOINT: ''
       Events:
@@ -2400,6 +2402,7 @@ Resources:
           ANTHROPIC_API_KEY: ''
           ANTHROPIC_BASE_URL: ''
           ASSISTANT_BUDGET_MEMORY_SECONDS: ''
+          ASSISTANT_EFFORT: ''
           USER_POOL_ID: !Ref UserPool
           COGNITO_ENDPOINT: ''
       Events:
@@ -2507,6 +2510,7 @@ Resources:
           ANTHROPIC_API_KEY: ''
           ANTHROPIC_BASE_URL: ''
           ASSISTANT_BUDGET_MEMORY_SECONDS: ''
+          ASSISTANT_EFFORT: ''
           USER_POOL_ID: !Ref UserPool
           COGNITO_ENDPOINT: ''
       Events:

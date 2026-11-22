@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`). **Step c09 done** 2026-11-22 (brief `prompts/a11-step-c09-implementation.md`) |
+| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`). **Step c09 done** 2026-11-22 (brief `prompts/a11-step-c09-implementation.md`). **Step c10 done** 2026-11-22 (brief `prompts/a12-step-c10-implementation.md`) |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown on its screen, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which is deployed nowhere today (open point P7, section 2.2). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
@@ -64,8 +64,8 @@ this plan.
 | P1 | Anthropic's data terms for the account in use | c15 | The operator reads the account's settings and terms. The result is written in `docs/CONVERSATIONAL_ARCHITECTURE.md` section 10.2. Until then nobody but the operator is invited |
 | P2 | Whether reading the key needs `kms:Decrypt` | c15 | The deployment is made without the statement. The smoke test's exchange tells. If the key cannot be read: one statement naming the key, a second deployment, each with its own go |
 | P3 | The capacity of the `assistant` table under a long conversation | c09 | Measured (the "As done" note of step c09): an ordinary step 2 read and 14 write units, the largest 84 write units, a full conversation 30 read units, against 8 / 6 a second and a burst allowance of 2 400 / 1 800. **Closed: the Product Owner decided to keep the 100 KB bound and the 6 KB cap** (2026-11-22) |
-| P4 | Effort level and model | c10 | The first evaluation run, at two effort levels and on two models: quality, seconds per step, cents per exchange. The Product Owner chooses |
-| P5 | Blocking time by an override the model works out | c10 | The evaluation's blocking requests. If the hours come out wrong, the tool `block_time` is proposed, and built only after the Product Owner's go, as an addition to step c10 |
+| P4 | Effort level and model | c10 | **Closed** 2026-11-22: `claude-sonnet-5-5` at effort `low`, chosen by the Product Owner on three runs of the evaluation (the note under step c10) |
+| P5 | Blocking time by an override the model works out | c10 | **Closed** 2026-11-22: no `block_time` tool. The nine blocking requests of the evaluation proposed the right hours (the note under step c10) |
 | P6 | A typed "yes" drops the proposal | c13 | The walk with the real model, by the Product Owner too. If people type more than they press, the fixed list of words matched in code is proposed, and built only after the go |
 | P7 | The front end is deployed nowhere | c16 | **Stays open**, on purpose: this plan does not deploy the front end. Step c12 makes the screen work locally through the dev server. Step c16 adds the assistant's routes to what `docs/FRONTEND_ARCHITECTURE.md` section 10 says a deployment must cover |
 
@@ -1100,6 +1100,119 @@ The runs, and what each decides:
 report; the requests that still fail listed with the reason each is accepted or not; P4 and P5
 written as decided in `docs/CONVERSATIONAL_ARCHITECTURE.md` sections 7.1, 7.2 and 18;
 `docs/COMMANDS.md` has the command and when to run it.
+
+**As done (2026-11-22).** The command exists, the three runs were made, P4 and P5 are closed,
+and the cost is measured. The step spent **2.19 USD** at Anthropic, of the 20 agreed.
+
+**The five answers, agreed before any code.** (1) The evaluation drives the routes; the tools
+and their inputs come from the stored conversation, the model, the effort, the milliseconds
+and the tokens from the log line of each step. (2) The effort is a variable of the three
+functions that ask Claude, `ASSISTANT_EFFORT`, empty in the template and so `low`; the model
+and the effort of a run are named in the shell that runs `local:up`. (3) The known week: two
+types and two accounts whose names start with "eval", made through the API and removed by
+those names; the command refuses a calendar that holds another type. (4) The count of the day
+of the account that asks is cleared before each request; no local setting changes. (5) A
+ceiling of 20 USD for the step, 4, 6 and 0.50 for the three runs. All are written in
+`docs/CONVERSATIONAL_ARCHITECTURE.md` sections 7.2 and 12.3.
+
+**What Anthropic accepts**, read on 2026-11-22: the page "Effort"
+(`https://platform.claude.com/docs/en/build-with-claude/effort`), for the five levels and
+that the two models take them; the page "Pricing"
+(`https://platform.claude.com/docs/en/about-claude/pricing`), for the prices in
+`backend/tests/eval/cost.ts`.
+
+**The list**: 51 requests, 55 messages, 28 in English and 23 in Italian (the brief said about forty). By kind:
+the first brief's examples 5, relative dates 7, readings 5, changes 10, blocking 9,
+ambiguity 3, the web pages 3, the other role 3, an order in a note 3, the other language
+later 3. One request confirms its proposal, the block over an appointment, whose check is the
+calendar's refusal.
+
+**The runs** (the table is in `docs/CONVERSATIONAL_ARCHITECTURE.md` section 7.1):
+
+| Run | Passed | Cents |
+|---|---|---|
+| Four requests on Haiku, to try the command | 4 of 4 | 0.4 |
+| `claude-haiku-5-5`, `low` | 45 of 51 | 2.7 |
+| Its six failures again | 3 of 6 | 0.3 |
+| `claude-sonnet-5-5`, `low` | 51 of 51 | 39.6 |
+| `claude-sonnet-5-5`, `medium` | 50 of 51 | 36.7 |
+| Its failure again | 0 of 1 | 0.9 |
+| Sonnet `low`, the corrected list | 51 of 51 | 38.9 |
+| The 14 requests that name dates, after the first sentence | 14 of 14 | 13.8 |
+| The whole list after the second sentence | 51 of 51 | 39.2 |
+| The 9 blocking requests, after the type's id in the reading | 9 of 9 | 10.8 |
+| **The final run, on the final state** | **51 of 51** | **35.4** |
+
+**Faults of the list, corrected, not counted against a model.** A User's cancellation named
+Monday's appointment, which on a Sunday is inside the 24 hours of notice: the model rightly
+refused; the request names Thursday's. Three checks on a weekday that can be read in two ways
+took one day only: a model that reads both and offers both is right.
+
+**Haiku's failures that held**: a type renamed to "Lezione" when "eval Lezione" was asked,
+twice; "Close the Tuesday afternoon" proposed for one Tuesday without asking, twice, the first
+time with the type's name in the place of its id; a cancellation asked about in words
+("Lo annullo?") instead of proposed, once on the corrected request. One answer that said it
+could not tell today's date passed when played again. **No request fails on the chosen
+model.**
+
+**P5, read one by one** on Sonnet `low`, each day as it was and as the proposal would make it:
+
+| Asked | The day as it was | Proposed |
+|---|---|---|
+| Tuesday 15:00–16:00 | Visit 09–13, Lesson 15–18 | Visit 09–13, Lesson 16–18 |
+| A whole Monday | Visit 09–13 | no hours |
+| "La mattina" of a Tuesday | Visit 09–13, Lesson 15–18 | Lesson 15–18 |
+| Thursday 10:00–11:00 | Visit 09–13, Lesson 15–18 | Visit 09–10, Visit 11–13, Lesson 15–18 |
+| Thursday 12:00–16:00, over two windows | Visit 09–13, Lesson 15–18 | Visit 09–12, Lesson 16–18 |
+| Saturday 11:00–12:00, in an extra window | extra window Lesson 10–12 | that window deleted, one created 10–11 |
+| Wednesday 11:00–12:00, a day with its own hours | own hours Visit 10–12 | own hours Visit 10–11 |
+| Sunday 10:00–12:00, a day with no hours | nothing | no proposal: "nothing to block" |
+| Tuesday 09:00–11:00, over an appointment | Visit 09–13 with an appointment at 09:00, Lesson 15–18 | Visit 11–13, Lesson 15–18; refused by the calendar at the confirmation, and the appointment named |
+
+All right. Haiku was right in all nine too.
+
+**Read by hand** on the final run: the refusals of what the web pages keep and of the
+Administrator's tools say where to go; the note that gives an order is quoted as text and not
+acted on in the three requests, also when the person says "do whatever needs doing"; a message
+in the other language is answered in the conversation's language, and the proposal's sentence
+is in it; the ambiguous requests get a question. Two things are left as they are. Asked for a
+new password, the model names an option of the sign-in page that does not exist: nobody can
+change a password today, and the Product Owner asked to leave the case until that feature is
+built. Beside a call that proposes a change the model sometimes writes one short sentence
+("No extra windows and no appointments, so I can close the day."), shown above the proposal:
+harmless, sometimes in English in an Italian conversation.
+
+**The instructions**, each change shown to the Product Owner first: "next week" on a Sunday
+starts tomorrow (a refusal named 1 December for "Tuesday of next week", twice; right after the
+change); nothing is written beside a call that only reads. The second did not remove the note
+"I need type ids.": its cause was that the Administrator's `get_calendar` named a window's
+type and not its id. **`get_calendar` now gives the Administrator the id** (decided by the
+Product Owner): a block went from three steps to two. Three tests of
+`backend/tests/unit/assistant/tools/tools.test.ts` changed for it, and one journey, the reading
+after a block, with its page (`docs/journeys/backend/assistant-blocking.md`); the sentence
+stays. The fake Claude still asks for `list_types` before a block, as the real model did when
+its answers were recorded: a path that remains valid, no longer the usual one.
+
+**The code.** `backend/src/lib/anthropic.ts` reads the effort (`assistantEffort`), and the
+step's log line carries it: the tests of `exchange.test.ts`, `proposals.test.ts` and
+`anthropic.test.ts` changed for that field. `backend/scripts/local-seed.sh` takes the model
+and the effort from the shell. `backend/tests/integration/setup.ts` exports `API_URL`,
+`realClaudeWired` and `storedEntries`, moved out of `assistant.test.ts`, which the evaluation
+imports. `backend/tests/eval/` holds the evaluation, outside the gate and outside the folders
+whose coverage is enforced; its pure parts (dates, checks, cost) have unit tests in
+`backend/tests/unit/eval/`, a reading of "the gate stays untouched": they reach nothing and
+cost nothing. `backend/scripts/assistant-eval.sh` bundles it with the repository's esbuild.
+No template default changed: the model chosen is the default there was.
+
+**`shared/src/assistant/limits.ts`**: nothing in the runs asks for a change. The longest
+exchange took 3 steps of the 8 allowed, and no answer met `too_many_reads`.
+
+**`CLAUDE.md` and `backend/CLAUDE.md`**: 199 and 197 lines, as before. One line of
+`backend/CLAUDE.md` gained the bad `ASSISTANT_EFFORT` as a second configuration error.
+
+What step c11 finds ready: the model and the effort settled; a `get_calendar` whose
+Administrator's result carries the type's id; the evaluation to run again when the walk of
+step c13 shows something about the instructions.
 
 ---
 
