@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`). **Step c09 done** 2026-11-22 (brief `prompts/a11-step-c09-implementation.md`). **Step c10 done** 2026-11-22 (brief `prompts/a12-step-c10-implementation.md`) |
+| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`). **Step c09 done** 2026-11-22 (brief `prompts/a11-step-c09-implementation.md`). **Step c10 done** 2026-11-22 (brief `prompts/a12-step-c10-implementation.md`). **Step c11 done** 2026-11-22 (brief `prompts/a13-step-c11-implementation.md`) |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown on its screen, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which is deployed nowhere today (open point P7, section 2.2). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
@@ -1232,6 +1232,131 @@ Documents: `docs/FRONTEND_SERVICES.md`, a section for the service.
 
 **Acceptance:** `npm run verify -w frontend` green; `RUN_INTEGRATION=1 npm run test:integration
 -w frontend` green against the fake; the root gate green.
+
+**As done** (2026-11-22, brief `prompts/a13-step-c11-implementation.md`). The service, its unit
+tests, three journeys with their pages, and the documents. Nothing changed in `backend/`, in
+`shared/` or in the fake Claude; no existing test changed; `frontend/src/logic`,
+`frontend/src/views`, `index.html` and `style.css` are untouched.
+
+**Four decisions of the Product Owner, taken before the step**, written in
+`docs/FRONTEND_SERVICES.md` section 8 as decisions 46 to 49:
+
+1. **One stream for the conversation**: `AssistantService` has the one stream `outcome$`, and each
+   of its six calls notifies its outcome on it with the call it answers. The pattern of
+   `docs/FRONTEND_SERVICES.md` section 3 gained a note for it (section 3.4: the pattern is a
+   guideline), and rule 4 of its section 2, which said "one subject per remote call", names the
+   exception.
+2. **The caller repeats `continue`**: a call of the service makes one request. The loop is step
+   c12's, and in the journeys the test's.
+3. **The journeys reuse the fake's sentences, under accounts of their own.**
+4. **The service tells the cases apart and writes no sentence**: `frontend/src/logic/texts.ts` is
+   not touched.
+
+**The service** (`frontend/src/services/assistant.service.ts`, `assistant.types.ts`;
+`docs/FRONTEND_SERVICES.md` section 20). Six methods, `load`, `end`, `send`, `continue`,
+`confirm`, `decline`, each one request through `apiCall`. The types of the contract are imported
+from `shared/` and none is declared again. What the step fixed that the text left open:
+
+- **An outcome is `{ call, status, … }`**: `reply` on a success (the body as received; `end` has
+  none, its route answers 204), `reason` and `message` on a failure. The reasons of each call are
+  a type of their own (`AssistantSendFailureReason` and five more), so `call` narrows a value of
+  the stream to the reasons of its route. The unit test holds one `switch` without a default per
+  list: a code added to a route and not handled stops the typecheck.
+- **No state stream** and no `pending` value: the stream carries outcomes only. Decision 1 says a
+  single public stream; what a form shows while a request is away is the logic layer's to know.
+- **A call made again abandons its own pending request**, never another call's, as in the other
+  services.
+- **A reply is checked lightly**: a 200 whose `status` is a string, `messages` a list and
+  `remainingToday` a number; the rest is passed on as given, a field the service does not know
+  included.
+- **The id of a proposal** is checked with `shared/`'s `Ulid`, and the refusal is worded
+  `proposalId: expected a ULID`: the schema's message under the field's name, since `shared/` has
+  no schema for the path (the back end's handler builds its own from `Ulid`) and `frontend/src`
+  may not import `zod` to build one. Nothing was asked of `shared/`.
+- **A 503 or a 429 without a code** is API Gateway's own and stays `server`: it is none of the
+  three reasons of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1.
+
+**Decision 3, checked before the journeys were written.** It holds, with nothing missing. The fake
+chooses its answer by the exact text of the person's last message and never looks at the account.
+The three sentences and what each needs: `fake: what is open on the day of the journey?` reads
+the 25th day from today and answers with the result word for word, so any window of the
+journey's own on that day will do; `fake: book me the slot of the booking journey` and `fake:
+book me the slot of the declining journey` book 05:00 on the 26th and on the 27th day, so that
+hour must be a free slot there. None is in the fake's list for the language question: the
+conversations are English. A User books up to 27 days ahead, inside the default horizon of 56
+days; the journeys change no setting, as the back end's of the same sentences do not. **One
+thing the reuse costs**: the front end's blocks open 05:00–07:00 on the same three days as the
+back end's blocks of those sentences, which remove their hours at their end; hours left there by
+an interrupted back-end run make a block fail in its `beforeAll` with `availability_overlap`,
+and the repair is a run of the back end's journeys or a fresh stack
+(`docs/FRONTEND_SERVICES.md` section 14.7, `docs/COMMANDS.md` section 4).
+
+**The journeys** (`frontend/tests/integration/assistant.test.ts`, 19 tests in three blocks):
+a reading driven by `continue` (7), a booking confirmed and read back through
+`AppointmentsService` and `CalendarService` (7), a proposal declined with the day equal to the
+day read before (5). Accounts `fe-assistant-read`, `fe-assistant-book` and
+`fe-assistant-decline`, types `fe-assistant …`, created and removed first and last; the
+`calendar` table never emptied, the `assistant` table never touched. Their pages:
+`docs/journeys/frontend/assistant-reading.md`, `assistant-booking.md` and
+`assistant-declined.md`, written with the project skill `explain-journey` and checked by a
+subagent that had only the pages, the tests and the repository. It found no wrong check (every
+"the test checks" traces to an `expect`, every "exactly" to a `toEqual`) and ten points, all
+applied: two links missing from a page's list of ideas, the events of the cancelled appointment
+not named, a sentence wider than its check ("a User is given no internal id": only the type's
+id is looked for), the emptied messages handed to the loop not told, "they expire by themselves"
+said of DynamoDB Local, and the three accounts of what a failed test does to the later ones, one
+of which said that nothing is ever booked in the declining block (a decline that fails lets the
+later `confirm` book).
+
+**The real Claude is refused** by `refuseRealClaude()` of `frontend/tests/integration/claude.ts`,
+called before any request. The front end's integration project has no start-up check as the back
+end's has, so the check is the file's own. Its pure part has a unit test,
+`frontend/tests/unit/integration/claude.test.ts`: seven cases, among them a key that looks real
+with no address, and the same key with the fake's address. It runs in `npm run verify -w
+frontend` and needs no stack: the refusal was never shown by wiring the real Claude.
+
+**As run**, on the final state:
+
+- `npm run verify -w frontend`: green. Typecheck, lint, 2 234 tests (2 067 before; 160 new for
+  the service, 7 for the check of which Claude is wired), 100 % of the lines of `frontend/src`
+  (2 133 of 2 133).
+- `RUN_INTEGRATION=1 npm run test:integration -w frontend`, against the fake: green twice in a
+  row, 65 tests in 4 files, of which the 19 new ones; and a third time after the root gate, on
+  the calendar the back end's journeys had left. The journeys passed at their first run. After
+  the runs the API showed no type and no account of theirs.
+- The root gate `DYNAMODB_PORT=8002 npm run verify`: PASSED. Back end 1 735 unit tests and 189
+  journeys, audit clean; `shared` 437 tests; front end 2 234. No change in `backend/` or
+  `shared/`.
+- `npm run typecheck` and `npm run lint` at the root: green, also after the last corrections of
+  the documents, which were made after the gate's run (sentences of the journey pages and of
+  two documents, from the pages' check; no code).
+- The two diagrams of the new pages were rendered on a dark page and looked at
+  (`.claude/rules/diagrams.md`). The scratch files are deleted; the stack is left on the fake.
+
+**The documents.** `docs/FRONTEND_SERVICES.md` v8: the note of section 3.4, rule 4 of section 2,
+decisions 46 to 49, sections 14.1, 14.7 and 14.8, the new section 20, and the corrected sentence
+on the layer being complete (true of the routes the API had at v7).
+`docs/CONVERSATIONAL_ARCHITECTURE.md` v14: one sentence of section 13 proved wrong, "the result
+and state streams of the pattern", and was corrected. `docs/COMMANDS.md` section 4,
+`docs/FOLDER_STRUCTURE.md`, `docs/journeys/README.md` and `docs/journeys/concepts.md` (the new
+accounts, the journeys' use of the calendar, and "The assistant's service: one stream for six
+calls"). `frontend/CLAUDE.md`: three lines had become untrue (the layers "both complete", "one
+result/state pair per method", the list of integration files), 122 lines from 121. `CLAUDE.md`:
+no line became untrue, 199 lines.
+
+**Left as it is, for step c12 to decide**: `frontend/CLAUDE.md` says that a new route's failure
+codes get their sentences in `src/logic/texts.ts`. For the assistant, decision 4 keeps that file
+untouched here, and the three sentences of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 are
+already in `shared/`; where the sentences of the other reasons (`assistant_busy`,
+`conversation_full`, `proposal_not_found`, `nothing_to_continue`) live is the screen's choice.
+
+What step c12 finds ready: `AssistantService` with the stream `outcome$` and the six calls; the
+reasons of each call as closed lists to `switch` over; the loop on `working` still to write,
+with `ASSISTANT_LIMITS.modelRequestsPerMessage` as its bound and no `continue` after
+`assistant_budget_reached`; replies to put together into the conversation (`load` gives every
+message, the other calls the messages added); the fake's three sentences and the helpers of
+`frontend/tests/integration/assistant.test.ts` (`open`, `close`, `ask`, `reply`,
+`untilTheExchangeEnds`) for a browser check against the fake.
 
 ---
 

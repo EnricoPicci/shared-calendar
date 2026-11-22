@@ -98,6 +98,9 @@ The pages written so far. Which pages are still to come, and in which order, is 
 |---|---|
 | [`frontend/calendar-view.md`](frontend/calendar-view.md) | `frontend/tests/integration/calendar.test.ts`, `calendar view` |
 | [`frontend/calendar-appointments.md`](frontend/calendar-appointments.md) | `frontend/tests/integration/calendar.test.ts`, `appointments` |
+| [`frontend/assistant-reading.md`](frontend/assistant-reading.md) | `frontend/tests/integration/assistant.test.ts`, `a reading driven by continue` |
+| [`frontend/assistant-booking.md`](frontend/assistant-booking.md) | `frontend/tests/integration/assistant.test.ts`, `a booking confirmed` |
+| [`frontend/assistant-declined.md`](frontend/assistant-declined.md) | `frontend/tests/integration/assistant.test.ts`, `a proposal declined` |
 
 ### Back end
 

@@ -106,7 +106,8 @@ stays at the root.
 │   ├── src/
 │   │   ├── main.ts              # the entry file of the bundle: the configuration, then the shell
 │   │   ├── services/            # the services layer (docs/FRONTEND_SERVICES.md): session store,
-│   │   │                        # login, refresh, hello, users, the calendar's; cognito.ts and api.ts
+│   │   │                        # login, refresh, hello, users, the calendar's, the assistant's
+│   │   │                        # (assistant.service.ts, assistant.types.ts); cognito.ts and api.ts
 │   │   ├── logic/               # between the services and the views, no DOM: texts.ts (dates, times,
 │   │   │                        # failures in plain words), week.model.ts, week.screen.ts,
 │   │   │                        # booking.ts, appointment.detail.ts, appointments.model.ts,
@@ -122,8 +123,11 @@ stays at the root.
 │   │                            # dialog that two views mount
 │   ├── tests/
 │   │   ├── unit/                # mirrors src/ (plus services/fixtures.ts, logic/zone.ts and
-│   │   │                        # logic/fixtures.ts, views/page.ts)
-│   │   └── integration/         # login and the services' journeys against the local stack
+│   │   │                        # logic/fixtures.ts, views/page.ts); integration/claude.test.ts,
+│   │   │                        # the test of the journeys' check of which Claude is wired
+│   │   └── integration/         # login and the services' journeys against the local stack;
+│   │                            # assistant.test.ts against the fake Claude, with claude.ts,
+│   │                            # the check that refuses the real one
 │   ├── (reserved, not yet) template.yaml
 │   └── (generated, git-ignored) coverage/  dist/
 │

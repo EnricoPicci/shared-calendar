@@ -257,8 +257,9 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
   which refuses any endpoint but `localhost`/`127.0.0.1`): calendar data made by hand is lost
   when they run.
 - `RUN_INTEGRATION=1 npm run test:integration -w frontend`: runs `frontend/tests/integration`
-  (`login.service.test.ts`, `journeys.test.ts` and `calendar.test.ts`: the services against
-  cognito-local on 9229 and the API on 3000, `docs/FRONTEND_SERVICES.md` section 14). Needs
+  (`login.service.test.ts`, `journeys.test.ts`, `calendar.test.ts` and `assistant.test.ts`: the
+  services against cognito-local on 9229 and the API on 3000, `docs/FRONTEND_SERVICES.md`
+  section 14). Needs
   `local:up` + `local:api` running and, in a Codespace, the iptables rule of section 3.3.
   Without `RUN_INTEGRATION=1` it runs nothing and exits 0, like the back end's. Creates and
   removes the throw-away users `fe-journey`, `fe-calendar` and `fe-calendar-b` (removed first
@@ -278,6 +279,27 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
     (`docs/FRONTEND_SERVICES.md` section 14.4);
   - appointments cannot be deleted through the API: the cancelled ones, their events and the
     two users' deleted-user markers stay in the local table as history, like the smoke test's.
+
+  `assistant.test.ts` runs `AssistantService` **against the fake Claude** and refuses to start
+  when `env.local.json` wires the real one, with the same repair as the back end's journeys
+  (`local:up` without `ANTHROPIC_API_KEY`, then a restart of `local:api`); its check has a unit
+  test, so the refusal is seen in `npm run verify -w frontend` without wiring anything
+  (`docs/FRONTEND_SERVICES.md` section 14.7):
+  - it sends three sentences that `answers.json` already answers for the back end's journeys
+    (the reading, the booking, the declining), so it needs what they fix: 05:00 free on the
+    25th, the 26th and the 27th day from today, and settings that let a User book 27 days ahead
+    (the default horizon is 56 days). It changes no setting and nothing of the fake;
+  - its throw-away users are `fe-assistant-read`, `fe-assistant-book` and
+    `fe-assistant-decline`, one per block, created through the API and removed first and last.
+    A new account has all of the day's messages, so the daily limit is never met;
+  - **it never resets the `calendar` table**: each block creates a type named `fe-assistant …`
+    and one extra window 05:00–07:00 of it on its day, and removes the user, the window and the
+    type before it starts and after it ends. When hours of somebody else lie there (a back-end
+    run interrupted before its clean-up), the block fails with `availability_overlap`: run the
+    back end's journeys, or start the stack afresh;
+  - what stays: in `calendar`, the appointment of the booking block, cancelled when its user
+    was deleted, with its events, and the three deleted-user markers; in `assistant`, the
+    conversations and the day's count of accounts that no longer exist, which nobody reads.
 - Integration files run one at a time, in both packages (`fileParallelism: false` on the
   `integration` projects): they share one `sam local`, one DynamoDB Local and one cognito-local.
   Their order is not fixed, so every file prepares its own state. Never run the back end's and

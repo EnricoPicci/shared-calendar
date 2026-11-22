@@ -15,6 +15,7 @@ Each section explains one idea in simple words and names the document that defin
 | `dave`, `erin` | throw-away Users of the back end's calendar journeys | `backend/tests/integration/calendar.test.ts` |
 | `fe-calendar`, `fe-calendar-b` | throw-away Users of the front end's calendar journeys | `frontend/tests/integration/calendar.test.ts` |
 | `fe-journey` | a throw-away User of the front end's Hello World journeys | `frontend/tests/integration/journeys.test.ts` |
+| `fe-assistant-read`, `fe-assistant-book`, `fe-assistant-decline` | throw-away Users of the front end's assistant journeys, one per block | `frontend/tests/integration/assistant.test.ts` |
 | `chat-text`, `chat-lingua`, `chat-read`, `chat-book`, `chat-decline`, `chat-trouble`, `chat-note`, `chat-move`, `chat-cancel`, `chat-limit`, `chat-down`, `chat-notadmin`, `chat-full`, `chat-mark` | throw-away Users of the assistant's journeys, one per block | `backend/tests/integration/assistant.test.ts` |
 | `chat-rival` | a second throw-away User of one assistant journey, who books through the calendar's own route | `backend/tests/integration/assistant.test.ts` |
 | `chat-booked` | the throw-away User the Administrator books for through the assistant; it only reads its own list | `backend/tests/integration/assistant.test.ts` |
@@ -50,6 +51,14 @@ All journeys and the smoke test use the same local `calendar` table. They treat 
   One block more fills a conversation: it opens 00:00–04:00 on every day from tomorrow to 31
   days ahead, with fourteen weekly patterns of its own type valid on those days alone, and
   deletes them and the type at its end.
+
+- **The front end's assistant journeys never reset it.** Each of the three blocks creates a type
+  of its own name (`fe-assistant …`) and one extra window 05:00–07:00 on a day of its own: the
+  25th, the 26th or the 27th from today, the days the fake Claude's answers name. Those are the
+  hours the back end's assistant journeys open on the same days, and remove at their end; the two
+  packages' journeys never run at the same time. Each block removes its User, its window and its
+  type before it starts and after it ends (the file's helpers `open()` and `close()`), and looks
+  only at what it made, whatever else its day holds.
 
 Appointments cannot be deleted through the API, only cancelled. So cancelled appointments, their
 events and the deleted-user markers of removed Users stay in the table as history.
@@ -403,8 +412,8 @@ A range covers at most 31 days.
 The front end's journeys (`frontend/tests/integration/`) reach the API only through the services
 of `frontend/src/services/`, as a screen will (`docs/FRONTEND_SERVICES.md` section 14).
 
-- **A method returns nothing; its result arrives on a stream.** Each method has its own pair of
-  streams, a result and a state: `book()` answers on `bookResult$`, `cancel()` on `cancelResult$`
+- **A method returns nothing; its result arrives on a stream.** Each method of the calendar's
+  services has its own pair of streams, a result and a state: `book()` answers on `bookResult$`, `cancel()` on `cancelResult$`
   (`docs/FRONTEND_SERVICES.md` section 3). The names are those of `docs/FRONTEND_SERVICES.md`;
   where they differ from `docs/SHARED_CALENDAR_SPEC.md` section 16.2, the services document wins
   (`docs/FRONTEND_SERVICES.md` section 8, decision 40).
@@ -414,6 +423,38 @@ of `frontend/src/services/`, as a screen will (`docs/FRONTEND_SERVICES.md` secti
   `{ status: 'failure', reason, message }`. The `reason` is the API's `error` code
   (`slot_taken`), or one of the service's own (`network`, `not_signed_in`, …). The test helper
   `ok()` fails the test with the whole result when it is not a success, and returns the success.
+
+### The assistant's service: one stream for six calls
+
+`AssistantService` (`frontend/src/services/assistant.service.ts`) is the one service that does
+not have a stream per method. Its six calls speak of one thing, the person's conversation, so
+they all notify on **one stream, `outcome$`** (`docs/FRONTEND_SERVICES.md` sections 3.4 and 20).
+
+| Method | Route |
+|---|---|
+| `load()` | `GET /assistant/conversation` |
+| `end()` | `DELETE /assistant/conversation` |
+| `send(text)` | `POST /assistant/messages` |
+| `continue()` | `POST /assistant/continue` |
+| `confirm(proposalId)` | `POST /assistant/proposals/{proposalId}/confirm` |
+| `decline(proposalId)` | `POST /assistant/proposals/{proposalId}/decline` |
+
+- **An outcome says which call it answers**: `{ call: 'send', status: 'success', reply }`, with
+  the server's `AssistantReply` as given, or `{ call: 'send', status: 'failure', reason, message }`.
+  `end` has no reply: its success is `{ call: 'end', status: 'success' }`. The reasons of a call
+  are the error codes of its route and the service's own, as for the other services.
+- **A call makes one request.** When a reply says `working`, the service does not go on by
+  itself: the caller calls `continue()` again (`docs/FRONTEND_SERVICES.md` section 8, decision
+  47). In the journeys the helper `untilTheExchangeEnds()` of
+  `frontend/tests/integration/assistant.test.ts` does it, as the screen's logic will.
+- **The service keeps no conversation.** `load()` gives every message; the other calls give the
+  messages their request added.
+- **The test helpers** `ask(service, call, trigger)` and `reply(service, call, trigger)` of that
+  file use `outcome()` on `outcome$`. `ask()` also expects the outcome to say the call that was
+  made; `reply()` fails the test when the outcome is not a success, and returns the reply.
+- **The front end's assistant journeys refuse the real Claude**: `refuseRealClaude()` of
+  `frontend/tests/integration/claude.ts` reads `backend/env.local.json` before any request and
+  throws unless it wires the fake (see "The fake Claude" below).
 
 ### Refused before sending, or by the API
 
@@ -429,7 +470,9 @@ unknown id, someone else's appointment (`docs/FRONTEND_SERVICES.md` section 8, d
 same `invalid_request` can therefore come from either side.
 
 A journey shows which side decided by counting the requests with a spy on `fetch`. The helper
-`noRequest()` of `frontend/tests/integration/calendar.test.ts` expects none; a test that expects
+`noRequest()` of `frontend/tests/integration/calendar.test.ts` (and its twin in
+`assistant.test.ts`, where the input checked is the text of a message and the id of a proposal,
+by the schemas of `shared/src/assistant/schemas.ts` and the calendar's `Ulid`) expects none; a test that expects
 the API to decide can expect exactly one.
 
 ## The assistant in the journeys

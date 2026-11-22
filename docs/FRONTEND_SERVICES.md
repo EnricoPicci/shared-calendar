@@ -1,11 +1,11 @@
-# Front end — The services layer: login, session, refresh, Hello World, users and the shared calendar
+# Front end — The services layer: login, session, refresh, Hello World, users, the shared calendar and the assistant
 
 | | |
 |---|---|
-| Status | v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); **the services layer is complete** for every route of the API. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). Logout is not designed yet |
-| Date | 2026-11-05; v6 and v7 2026-11-15 |
-| Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows); since v7 the calendar view and the appointments |
-| Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), since v6 v12 (sections 3 and 4: the calendar routes as implemented); `docs/SHARED_CALENDAR_SPEC.md` v15 section 16 (v13 when v6 was written), and for v7 sections 8, 11.1 (routes 15–20), 11.2, 11.5, 11.6; `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/` |
+| Status | v8 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 20), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). Logout is not designed yet |
+| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-22 |
+| Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows); since v7 the calendar view and the appointments; since v8 the conversation with the assistant |
+| Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), since v6 v12 (sections 3 and 4: the calendar routes as implemented); `docs/SHARED_CALENDAR_SPEC.md` v15 section 16 (v13 when v6 was written), and for v7 sections 8, 11.1 (routes 15–20), 11.2, 11.5, 11.6; `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/`; for v8 `docs/CONVERSATIONAL_ARCHITECTURE.md` v14 (sections 4.4, 5.1 to 5.5, 6, 6.1 and 13) and `docs/ARCHITECTURE.md` section 4, "The assistant's routes" |
 
 ### Change log
 
@@ -18,6 +18,7 @@
 | v6 | 2026-11-15 | Implemented (brief 54, plan step 53, from `docs/SHARED_CALENDAR_SPEC.md` v13 section 16). `api.ts` (section 10.2): `ApiRequest` is a union, `GET`/`DELETE` without a body and `POST`/`PUT`/`PATCH` with one; `query` encoded with `URLSearchParams`; `ApiFailure.conflicts` with `availability_conflict` only, well-formed entries kept; three helpers for the services, `invalidRequest` (the first schema issue with its field), `unexpectedAnswer` and `hasString`. New services, appended after section 14 so that cited numbers stay valid: 15 `CalendarSettingsService`, 16 `AvailabilityTypesService`, 17 `AvailabilityRulesService`. `UsersService` gains `listUsers()` (`GET /users`), and `deleteUser` the reason `concurrent_update`, which the API answers since plan step 51 (section 13). The journeys file `frontend/tests/integration/calendar.test.ts` with the throw-away User `fe-calendar` (section 14.2). Error codes per route are architecture section 4's; spec 11.1 differed on routes 9 and 10, and its v14 corrects route 9 (decision 32). The journeys keep the settings they read in a git-ignored file until they are written back, so even a killed run is repaired by the next one (decision 35). Decisions 29–37. The unit tests share one per-method suite, `tests/unit/services/suite.ts` (section 14.1). No change to the existing services' behaviour but `deleteUser`'s new reason; no existing test changed. |
 | v5 | 2026-11-05 | Implemented (brief 32, part B); acceptance in section 14.3. What the code fixed that the sketches left open: `api.ts` has two failure builders, `apiFailure(code, …)` for a route's code (and `UsersService`'s check before any request) and `transportFailure(reason, …)` for the five transport reasons, typed `ApiFailure<never>` so that it fits every route (the sketches' `failure<C>`); `toApiAnswer` reads an empty non-2xx body as `{}`, so a 403 without body is also `session_rejected`; `RefreshService` maps Cognito's reasons with a complete `Record<AuthFailureReason, RefreshFailureReason>` (section 11.5 as a table in code). Tests: the store rows "login writes" and "login failure" of section 9.8 live in `login.service.test.ts`, with the service they exercise; the unit tests share `tests/unit/services/fixtures.ts` (unsigned JWTs, `Response` builders, a session factory); RxJS's `timer` schedules with `setInterval`, so tests that fake timers must fake it (the schedule tests fake `setTimeout`, `setInterval` and `Date` only, and flush fetch promises with the real `setImmediate`); a test session must expire within 24.8 days of the clock, or the store's `setTimeout` overflows and fires at once. Section 5 points at section 14.1 for the tree. No design change. |
 | v7 | 2026-11-15 | Implemented (brief 56, plan step 54, from `docs/SHARED_CALENDAR_SPEC.md` v15 section 16). New sections, appended: 18 `CalendarService` (`load(from, to)`, `reload()`, route 15) and 19 `AppointmentsService` (`list`, `book`, `cancel`, `change`, `updateNote`, routes 16–20). **The services layer is complete.** `pending` carries every argument under the contract's names (decision 38); `reload()` re-runs the last `load`'s range, answers `invalid_request` before any load, and shares one pending call with `load` (decision 39). Two stream names differ from spec 16.2, which is not edited: `appointmentsResult$` (spec: `listResult$`) and `updateNoteResult$` (spec: `noteResult$`), by decision 31 (decision 40). Success values and their checks (decision 41); validation with the shared schemas only, nothing that depends on the role or on the server's data (decision 42). Error codes of architecture section 4, which agrees with spec 11.1 on routes 15–20 (decision 44). Journeys (section 14.4): the calendar view, booking, note, change, cancel, `upcoming` and `availability_conflict` end to end; a second throw-away User `fe-calendar-b` for the anonymous `busy` (decided with the user); the appointment blocks set the settings for their run and write them back; the Users are removed before the clean-up; the cancelled appointments, their events and the two deleted-user markers stay as history (decision 43). `suite.ts`: `other` is optional, for a service whose methods share one pending call (decision 45); no existing test changed. Acceptance in section 14.6. |
+| v8 | 2026-11-22 | Implemented (brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11). New section 20, `AssistantService`: the six routes of the assistant (`load`, `end`, `send`, `continue`, `confirm`, `decline`). **One stream for the six calls**, `outcome$`, each outcome saying the call it answers: the pattern read in a wider sense, which the new section 3.4 allows and rule 4 of section 2 now names (decision 46). A call makes one request: repeating `continue` is the caller's (decision 47). Every code of a route is a reason of that route alone, as a closed list; the daily limit, the spending limit and the outage are three reasons; the service writes no sentence and keeps no conversation (decision 48). The journeys `frontend/tests/integration/assistant.test.ts` (section 14.7) reuse three sentences of the fake Claude's answers under throw-away accounts of their own, and refuse the real Claude (decision 49). **The v7 sentence "the services layer is complete" is corrected**: it was true of the routes the API had then. No existing service, test or helper changed; `suite.ts` is not used by the new tests, which test one stream. Acceptance in section 14.8. |
 
 ---
 
@@ -36,7 +37,9 @@ designs the first service, **login** (sections 1 to 8). The later building block
 sections of their own, following the same pattern: the session store (9), the shared request
 helpers (10), token refresh (11), Hello World (12), and user administration (13); since v6 the
 calendar settings (15), the availability types (16) and the availability rules (17); since v7 the
-calendar view (18) and the appointments (19), which complete the services layer.
+calendar view (18) and the appointments (19), which completed the services layer for the routes the
+API had then; since v8 the conversation with the assistant (20), whose six routes were added to the
+API afterwards.
 
 The services layer is implemented in `frontend/src/services/` (v2). It was created ahead of the
 front-end architecture document, as the one exception of `docs/FOLDER_STRUCTURE.md` section 7:
@@ -76,7 +79,9 @@ a remote service and exposes the result", and it follows the same pattern as eve
 4. **One subject per remote call, and the subject never dies.** Each remote call has a private
    `ReplaySubject(1)` and a public observable derived from it. The pipeline maps every outcome,
    success or failure, into a *value*; the subject receives neither `error` nor `complete`. See
-   section 3.2 for why.
+   section 3.2 for why. "One per remote call" is the usual shape, not a rule without exception:
+   several calls that speak of the same thing may share one subject (section 3.4). That the
+   subject never dies, and that a failure is a value, hold everywhere.
 5. **Subscribe first, then call.** The consumer subscribes to the result observable and then
    calls the method that triggers the remote call. The method returns `void`: the result travels
    only through the observable. With `ReplaySubject(1)` a consumer that subscribes late still
@@ -158,6 +163,24 @@ Both are fed by the same pipeline; the outcome value is the same object in both 
 view picks the one it needs. The `BehaviorSubject` is exposed only as an observable: its
 synchronous `.value` is not part of the API, so consumers cannot slip into reading state
 imperatively.
+
+### 3.4 The pattern is a guideline: one stream for several calls (v8)
+
+Sections 3.1 to 3.3 show the usual shape, one subject (or one pair) per remote call. It is a
+guideline, and may be read in a wider sense where that makes sense: for instance **one stream
+shared by several calls that speak of the same thing**. What may not be given up is section 3.2:
+a failure is a value, only `next` is forwarded, and the subject lives as long as the service.
+
+The example is `AssistantService` (section 20), whose six calls notify on the one stream
+`outcome$`. It made sense there because the six calls speak of one thing, the person's
+conversation: five of them answer the same `AssistantReply`, each reply is the next piece of that
+one conversation, and the screen shows one conversation, not six results. With a stream per call
+the consumer would have to merge six streams back into the order the answers came in, which is
+the order the single stream already has. So that the reasons of a route stay those of that route,
+each value of a shared stream says which call it answers (section 20.3).
+
+Where the calls do not speak of one thing (the five methods of `AppointmentsService`, each with a
+result of its own that a different part of the screen shows), the usual shape stays the right one.
 
 ---
 
@@ -562,6 +585,10 @@ unexpected`).
 | 43 | The appointment journeys: each appointment block sets the settings for its own run in its `beforeAll` (`bookingHorizonDays` 365, `minBookingNoticeHours` 0, `maxFutureAppointmentsPerUser` `null`, `cancellationNoticeHours` as read) and writes the values read back in its `afterAll`, with the settings file of decision 35. A second throw-away User, `fe-calendar-b`, created and removed with `fe-calendar`, is booked only by the Administrator, so that `fe-calendar`'s view has another User's appointment to show as `busy`. Both Users are removed **before** the clean-up of types and availability, in `beforeAll` and in `afterAll`. Appointments cannot be deleted through the API: the cancelled appointments, their events and the two Users' deleted-user markers stay in the local table as history | Brief 56, design point 6 (a User must book about a year ahead, the band of decision 35). `fe-calendar-b`: decided with the user during step 54; `busy` holds only *other* Users' appointments, so one User cannot prove "busy without names". The order: a booked appointment blocks deleting its pattern (`availability_conflict`) and its type (R-TYPE-03), and deleting a User cancels its future appointments first (architecture section 4), so after a failed run only that order clears everything. |
 | 44 | The error codes of routes 15–20 are architecture section 4's; they agree with spec 11.1 (checked in step 54, no difference). `concurrent_update` is a normal reason of book, cancel, change and note (spec 16.3). `user_not_found` is one reason for both of its 404s, an unknown target of the Administrator's booking and a deleted User (R-BOOK-10, also on a change). `cancel` has no `invalid_json` (the route reads no body, none is sent); `list` and the view have none either (a `GET`) | Brief 56, "The step". One reason per meaning for the view, as decision 32 did for `type_not_found`. |
 | 45 | `describeMethod`'s `other` is optional; without it the cancel test proves only that a second call aborts the first. The suite runs for `reload` on a service whose last range is primed without a request (`Reflect.set` of the private `last`), so its counts start clean | Step 54: `load` and `reload` share one pending call (decision 39), so the suite's "another method stays pending" does not apply to `CalendarService`; the shared-call behaviour has its own tests (section 18.8). The change keeps every existing call of the suite as it was. |
+| 46 | **One stream for the conversation.** `AssistantService` has a single public stream, `outcome$` (`ReplaySubject(1)`), and each of its six calls notifies its outcome on it: the reply the server gave, or the reason of the failure, with the call it came from (`call`). No stream per call and no state stream: section 3.4. The rest of the pattern holds: a failure is a value, only `next` is forwarded, the stream lives as long as the service. The stream carries each outcome as the server gave it; putting the added messages together into the whole conversation is the logic layer's work | Decided by the Product Owner, 2026-11-22 (brief `prompts/a13-step-c11-implementation.md`). The six calls speak of one thing, five answer the same `AssistantReply`, and the screen shows one conversation. `docs/CONVERSATIONAL_ARCHITECTURE.md` section 13 said "the result and state streams of the pattern" and was corrected (its v14). |
+| 47 | **The caller repeats `continue`, not the service.** A call of the service makes one HTTP request. The loop "while the status is `working`, continue" belongs to the logic layer (`docs/CONVERSATIONAL_PLAN.md` step c12); in the journeys the test repeats the call itself | Decided by the Product Owner, 2026-11-22. One call, one request, as in every other service; the loop has a limit and a line of progress to show, which are the screen's matters (`docs/CONVERSATIONAL_ARCHITECTURE.md` sections 4.4 and 5.1). |
+| 48 | **The service tells the cases apart and writes no sentence.** Each code a route answers is a reason of that route, typed as a closed list; a code the contract does not give that route is `unexpected`. `assistant_limit_reached`, `assistant_budget_reached` and `assistant_unavailable` are three reasons, never one. Choosing and showing their sentences, which are in `shared/`, is the screen's work: `frontend/src/logic/texts.ts` is not touched by the service. A message's text is passed on as written, no language is chosen, and nothing is kept beyond the last outcome the stream replays: the conversation is the server's, and after a reload the screen asks for it again | Decided by the Product Owner, 2026-11-22. `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1: the screen says what is true for each of the three, in the conversation's language. |
+| 49 | **The assistant's journeys reuse the fake's sentences, under accounts of their own.** They send three sentences `backend/tests/integration/fake-claude/answers.json` already answers; each run creates its throw-away accounts through `UsersService` and deletes them, first and last. A new account has its whole day's count, so the daily limit is never met and no test touches the `assistant` table. Nothing changes in `backend/` or in the fake. The journeys refuse to start unless `backend/env.local.json` wires the fake Claude | Decided by the Product Owner, 2026-11-22, and checked before the journeys were written (section 14.7): the fake chooses by the exact text and never looks at the account; what each sentence fixes is a day and an hour, which the journeys prepare. |
 
 ---
 
@@ -1679,25 +1706,30 @@ frontend/src/services/
 ├── calendar.service.ts            # CalendarService (18, v7)
 ├── calendar.types.ts              # CalendarFailureReason, CalendarResult, CalendarState
 ├── appointments.service.ts        # AppointmentsService (19, v7)
-└── appointments.types.ts          # Appointments / Book / Cancel / Change / UpdateNote …
+├── appointments.types.ts          # Appointments / Book / Cancel / Change / UpdateNote …
+├── assistant.service.ts           # AssistantService (20, v8)
+└── assistant.types.ts             # AssistantCall, AssistantOutcome, the reasons of each call
 
 frontend/tests/
 ├── unit/services/        # one file per source file: session.store, cognito, api, jwt,
 │                         # login.service, refresh.service, hello.service, users.service,
 │                         # calendar-settings.service, availability-types.service,
 │                         # availability-rules.service (v6); calendar.service,
-│                         # appointments.service (v7);
+│                         # appointments.service (v7); assistant.service (v8);
 │                         # plus fixtures.ts (v5): JWT, Response and session builders,
 │                         # and suite.ts (v6): the per-method suite of the API services
+├── unit/integration/     # claude.test.ts (v8): the check of integration/claude.ts, no stack needed
 └── integration/
     ├── local.ts           # the local stack's URLs and client id (reads backend/env.local.json);
     │                      # since v6 also `outcome()`, used by calendar.test.ts
     ├── login.service.test.ts  # the same journeys; tokens read from the store (section 9.9)
     ├── journeys.test.ts   # sections 11.9, 12.9, 13.9, in order
-    └── calendar.test.ts   # v6: sections 13.9 (listUsers), 15.9, 16.9, 17.9; v7: 18.9, 19.9 (section 14.4)
+    ├── calendar.test.ts   # v6: sections 13.9 (listUsers), 15.9, 16.9, 17.9; v7: 18.9, 19.9 (section 14.4)
+    ├── claude.ts          # v8: which Claude the stack is wired to; the journeys refuse the real one
+    └── assistant.test.ts  # v8: section 20.9 (section 14.7)
 ```
 
-`local.ts` and `suite.ts` are helpers, not tests (both projects select `*.test.ts` only). Nothing
+`local.ts`, `claude.ts` and `suite.ts` are helpers, not tests (both projects select `*.test.ts` only). Nothing
 new in `package.json`, `tsconfig.json`, `vitest.config.ts` or the ESLint guard (v6 included).
 
 **`suite.ts`** (v6). Every API method of sections 13 (`listUsers`), 15, 16 and 17 is tested by one
@@ -1918,6 +1950,94 @@ appointment that `AppointmentsService` makes; the unit tests prove the mapping a
    left nothing either.
 4. Root `DYNAMODB_PORT=8002 npm run verify`: PASSED (back end 1087 unit + 90 integration, `shared`
    377, front end 639); `git status` shows no change in `backend/` or `shared/`.
+
+### 14.7 The assistant's journeys (v8)
+
+`frontend/tests/integration/assistant.test.ts` (`docs/CONVERSATIONAL_PLAN.md` step c11): three
+blocks, each with its page under `docs/journeys/frontend/`. They run `AssistantService` against the
+local API with **the fake Claude** of the Docker stack answering for Anthropic
+(`docs/ARCHITECTURE.md` section 8), and read the calendar back through `CalendarService` and
+`AppointmentsService`.
+
+- **They refuse the real Claude** (decision 49). The file's `beforeAll` calls `refuseRealClaude()`
+  of `frontend/tests/integration/claude.ts` before any request: it reads `Parameters` of
+  `backend/env.local.json` and throws unless `ANTHROPIC_BASE_URL` is the fake's address and
+  `ANTHROPIC_API_KEY` the fake's placeholder, with a message that says what to run and holds
+  neither value. The pure part, `claudeWiringProblem(parameters)`, has a unit test,
+  `frontend/tests/unit/integration/claude.test.ts`, which runs in `npm run verify -w frontend`
+  with no stack: the refusal is shown there, never by wiring the real Claude. The file read is
+  what `local:api` was started with only if it was restarted after the last `local:up`, as for
+  the back end's check (`docs/COMMANDS.md` section 4).
+- **The sentences are the back end's** (decision 49). The fake answers a message by its exact
+  text, from `backend/tests/integration/fake-claude/answers.json`, and never looks at who asks.
+  The three sentences sent, and what each fixes:
+
+  | Sentence | What the fake asks for | What the block prepares |
+  |---|---|---|
+  | `fake: what is open on the day of the journey?` | `get_calendar` for the 25th day from today, then a text that is the tool's result word for word | a window on that day |
+  | `fake: book me the slot of the booking journey` | `book_appointment` on the 26th day at 05:00, then the same kind of text | a free slot at 05:00 on that day |
+  | `fake: book me the slot of the declining journey` | `book_appointment` on the 27th day at 05:00 | a free slot at 05:00 on that day |
+
+  "Today" is the date in the calendar's zone, which the fake reads from the line the server
+  writes; the journeys work it out from the settings' `timeZone` with `localDateOf`. None of the
+  sentences is in the fake's list for the language question, so each conversation is English.
+  A User books 26 and 27 days ahead: the settings must allow it (the default horizon is 56 days,
+  and the back end's journeys of the same sentences rely on the same). The journeys change no
+  setting.
+- **Their accounts** are `fe-assistant-read`, `fe-assistant-book` and `fe-assistant-decline`,
+  one per block, created through `UsersService` as admin and removed before (accepting
+  `user_not_found`) and after. A new account has a new `sub`: no conversation, and all of the
+  day's messages (10 on the local stack), of which a block sends one or two. The daily limit is
+  never met, and nothing reads or writes the `assistant` table but the routes.
+- **Their types** are `fe-assistant reading`, `fe-assistant booking` and `fe-assistant
+  declining`. Each block opens, as the Administrator, one extra window 05:00–07:00 of its type on
+  its day, through `AvailabilityRulesService`. Those are the hours the back end's assistant
+  journeys open on the same three days and remove at their end. When hours of somebody else lie
+  there (a back-end run interrupted before its clean-up, hours opened by hand), opening the window
+  fails with `availability_overlap` and the block stops in its `beforeAll`, with that reason: the
+  sentence fixes the day and the hour, so the block cannot move. The repair is a run of the back
+  end's journeys, or a fresh stack.
+- **The `calendar` table is never emptied**, and nothing the file did not create is changed or
+  deleted. Clean-up, in each block's `beforeAll` and `afterAll`: first the User (deleting a User
+  cancels its future appointments, which would keep the window from being deleted), then the
+  extra windows of the block's type from today to 28 days ahead (so that what a run of an earlier
+  day left is found), then the type. A run that failed half-way is repeated without a manual step.
+- **What stays behind**: the appointment of the booking block, cancelled `user_deleted`, with its
+  events, and the three deleted-user markers of each run, in `calendar`; the conversations and the
+  day's count of accounts that no longer exist, in `assistant`, which nobody reads (DynamoDB
+  Local may never act on their time to live). No type, no window, nothing booked.
+- **The journey repeats `continue`** (decision 47): the helper `untilTheExchangeEnds` calls it
+  while the reply says `working`, at most `ASSISTANT_LIMITS.modelRequestsPerMessage` times.
+
+| Block | Journey | Expect |
+|---|---|---|
+| a reading driven by continue | `load` with no conversation; `send` the sentence with spaces around it; `send` again; `load`, then `continue` while `working`; `load`; `continue`; `end`, `load` | the empty reply with the day's count; one request, `working`, the line "Looking at the calendar…", the trimmed text as the one message, the count one less; `assistant_busy`; one `continue` gives `idle` and the assistant's text, which holds the block's window 05:00–07:00 by the type's name, the free slots 05:00 and 06:00 and no id of the type; both messages in order; `nothing_to_continue`; `{ call: 'end', status: 'success' }`, the empty reply, the count kept |
+| a booking confirmed | `send`; `confirm` and `decline` with `not-an-id`; `confirm` with an unknown ULID; `confirm` with the proposal's id (and `continue` while `working`); `AppointmentsService.list` and `CalendarService.load` as the User; `confirm` and `decline` again; `load` | `awaiting_confirmation` with the proposal in the server's words (the summary built with `assistantTexts('en')`), nothing booked; `invalid_request` `proposalId: expected a ULID`, no request sent; `proposal_not_found`, the proposal still waiting; `idle`, the proposal with outcome `done`, one text of the assistant; one appointment 05:00–06:00 of the block's type, booked by the User, and the day's free slots of that type only 06:00; `proposal_not_found` twice, still one appointment; the settled proposal still shown |
+| a proposal declined | `send`, then the day read through `CalendarService`; `decline`; the day and the list read again; `confirm` and `decline` again; `load` | a proposal waits; `idle`, the notice "Nothing was changed.", `proposal` `null`, the day's count unchanged; the day equal to the one read before but for `generatedAt`, no appointment; `proposal_not_found` twice; the request and the notice, nothing to confirm |
+
+### 14.8 Acceptance check (v8, `docs/CONVERSATIONAL_PLAN.md` step c11)
+
+1. `npm run verify -w frontend` green with 100 % line coverage on `frontend/src`.
+2. `RUN_INTEGRATION=1 npm run test:integration -w frontend` green against the fake Claude, twice
+   in a row; the journeys refuse the real Claude, shown by the unit test of the check.
+3. The root `DYNAMODB_PORT=8002 npm run verify` green; no diff in `backend/` or `shared/`.
+
+**As run (2026-11-22, v8):**
+
+1. `npm run verify -w frontend`: typecheck, lint, 2 234 tests in 42 files of the `unit` and
+   `views` projects (2 067 before, none of them changed; 160 new in `assistant.service.test.ts`
+   and 7 in `claude.test.ts`), 100 % lines (2 133 of 2 133).
+2. Integration, against the fake Claude: 65 tests in 4 files (`assistant.test.ts`: 19; the three
+   earlier files 46), green twice in a row, and a third time after the root gate, on the
+   calendar the back end's journeys had left. A read-only look through the API after the runs
+   found no type named `fe-assistant …` and no account named `fe-assistant-…`. The refusal of
+   the real Claude: the seven cases of `claude.test.ts`, in item 1; the real Claude was never
+   wired.
+3. Root `DYNAMODB_PORT=8002 npm run verify`: PASSED (back end 1 735 unit tests and 189 journeys,
+   audit clean; `shared` 437; front end 2 234); `git status` shows no change in `backend/` or
+   `shared/`. Sentences of the documents and of the journey pages were corrected after that run
+   (the points of the pages' check); the root `npm run typecheck` and `npm run lint` were green
+   after them.
 
 ---
 
@@ -2415,3 +2535,202 @@ past), and a cancel with no body.
 ### 19.9 Integration checks
 
 Section 14.4, blocks "calendar view", "appointments" and "availability conflict".
+
+---
+
+## 20. `AssistantService` (v8)
+
+The person's conversation with the assistant (`docs/CONVERSATIONAL_ARCHITECTURE.md` sections 4 to
+6). One service for the six routes, and **one stream for its six calls** (section 3.4, decision
+46).
+
+### 20.1 The remote calls
+
+Both roles; a person only ever reaches their own conversation, found by the token. Codes from
+`docs/CONVERSATIONAL_ARCHITECTURE.md` section 6, which agrees with `docs/ARCHITECTURE.md` section 4
+on these routes.
+
+| Call | Request | Success | Errors besides 403 `forbidden`, 500 `internal_error` |
+|---|---|---|---|
+| `load()` | `GET /assistant/conversation`, no body | `200` `AssistantReply` with every message, or an empty one when there is no conversation | none |
+| `end()` | `DELETE /assistant/conversation`, no body | `204`; also with no conversation to end | none |
+| `send(text)` | `POST /assistant/messages`, `AssistantMessageBody` | `200` `AssistantReply` with the messages the request added | 400 `invalid_json` / `invalid_request` · 409 `assistant_busy`, `conversation_full` · 429 `assistant_limit_reached` · 503 `assistant_unavailable`, `assistant_budget_reached` |
+| `continue()` | `POST /assistant/continue`, no body | the same | 409 `nothing_to_continue`, `assistant_busy` · 503 `assistant_unavailable`, `assistant_budget_reached` |
+| `confirm(proposalId)` | `POST /assistant/proposals/{proposalId}/confirm`, no body | the same, with the proposal and the outcome of each change | 400 `invalid_request` · 404 `proposal_not_found` · 409 `assistant_busy` · 503 `assistant_unavailable`, `assistant_budget_reached` |
+| `decline(proposalId)` | `POST /assistant/proposals/{proposalId}/decline`, no body | the same, with the fixed notice and `proposal` `null` | 400 `invalid_request` · 404 `proposal_not_found` |
+
+What the codes mean for the caller is `docs/CONVERSATIONAL_ARCHITECTURE.md` sections 6 and 6.1.
+Three points bear on the service's shape:
+
+- **A call makes one request** (decision 47). A reply whose `status` is `working` asks for
+  `continue()`; the caller makes that call, and repeats it while the status stays `working`.
+- **The three codes of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1** are three reasons:
+  `assistant_limit_reached` (only `send`: the person's messages of the day), and
+  `assistant_budget_reached` and `assistant_unavailable` (`send`, `continue`, `confirm`). After
+  either 503 of a `confirm` the changes were made and saved: a `load()` shows the proposal with
+  its outcomes, and `continue()` gets the closing words.
+- **A refusal of the calendar at a confirmation is not a failure of the call**: the reply is a
+  success whose proposal has an action with `outcome: 'refused'` and the route's code in `error`.
+
+### 20.2 Configuration
+
+As section 15.2.
+
+### 20.3 Types (`assistant.types.ts`)
+
+The contract is `shared/`'s and is declared nowhere else: `AssistantReply` with its parts, the
+schema `AssistantMessageBody`, `Ulid`, `ASSISTANT_LIMITS`, the codes of `ApiErrorCode`.
+
+```ts
+export type AssistantCall = 'load' | 'end' | 'send' | 'continue' | 'confirm' | 'decline';
+
+// Per call: its reasons as a closed list, and its outcomes.
+export type AssistantSendFailureReason = SendCode | TransportFailureReason; // and five more
+export type AssistantSendOutcome =
+  | { call: 'send'; status: 'success'; reply: AssistantReply }
+  | { call: 'send'; status: 'failure'; reason: AssistantSendFailureReason; message: string };
+export type AssistantEndOutcome =
+  | { call: 'end'; status: 'success' } // a 204: nothing to carry
+  | { call: 'end'; status: 'failure'; reason: AssistantEndFailureReason; message: string };
+
+// One value of the stream.
+export type AssistantOutcome =
+  | AssistantLoadOutcome | AssistantEndOutcome | AssistantSendOutcome
+  | AssistantContinueOutcome | AssistantConfirmOutcome | AssistantDeclineOutcome;
+```
+
+`call` is what keeps the reasons of a route those of that route on a shared stream: after
+`outcome.call === 'decline'` the compiler knows that `reason` cannot be `assistant_unavailable`,
+and a `switch` over the reasons of one call needs no default (the unit test holds one per call,
+so a code added to a route and not handled stops the build). A failure has `status`, `reason` and
+`message` as an `ApiFailure` (section 10.2), without `conflicts`, which no route of the assistant
+answers. There is no `idle` and no `pending` value: the stream carries outcomes only (section
+20.4).
+
+### 20.4 The class
+
+```ts
+export class AssistantService {
+  private readonly outcomeSubject = new ReplaySubject<AssistantOutcome>(1);
+  readonly outcome$: Observable<AssistantOutcome> = this.outcomeSubject.asObservable();
+
+  constructor(config: ApiConfig, store: SessionStore) {}
+
+  load(): void;
+  end(): void;
+  send(text: string): void;
+  continue(): void;
+  confirm(proposalId: string): void;
+  decline(proposalId: string): void;
+}
+```
+
+- **One subject, fed by the six calls** with `next` only (section 3.2). Each call goes through
+  `apiCall` (section 10.2): the token, the handling of a rejected session and of an answer
+  outside the contract are its own.
+- **No state stream** (section 3.3 is optional). What a form needs while a request is in flight
+  is known to the logic layer that made the call, which is also the one that knows an exchange is
+  still going on between two `continue` calls; a `pending` of one request would say less.
+- **No memory** beyond the last outcome, which the `ReplaySubject(1)` gives a late subscriber. The
+  service keeps no conversation, no proposal and no text: the conversation is the server's, and
+  after a reload of the page the screen calls `load()`.
+- **A call made again abandons its own pending request**, never another call's, as in every
+  service. The server may still have done what the abandoned request asked.
+- **Checked before sending**, with the schemas of `shared/` (decision 33):
+
+  | Method | Schema | Sent |
+  |---|---|---|
+  | `send` | `AssistantMessageBody` on `{ text }` | the parsed body: the text trimmed |
+  | `confirm`, `decline` | `Ulid` on the id | no body; the id in the path through `encodeURIComponent` |
+  | `load`, `end`, `continue` | none | no body |
+
+  A text that is empty after trimming or longer than `ASSISTANT_LIMITS.messageLength` answers
+  `invalid_request` `text: 1 to 2000 characters`; an id that is not a ULID answers
+  `invalid_request` `proposalId: expected a ULID` (the schema's message, under the field's name,
+  since `shared/` has the id's schema and not one for the path). No request is sent.
+- **Nothing of the model is interpreted.** A message's text, the proposal's question, labels and
+  summaries and the line of progress are passed on as given. The service builds no sentence and
+  chooses no language (decision 48).
+
+### 20.5 Mapping the answer
+
+| Answer | Outcome |
+|---|---|
+| the input fails its schema | `invalid_request` with the field, no request |
+| `load`, `send`, `continue`, `confirm`, `decline`: `200` with an object whose `status` is a string, `messages` an array and `remainingToday` a number | `success`, `reply`: the body as received |
+| `end`: `204` | `success` |
+| any other 2xx | `unexpected` |
+| an `error` code of the route | that code |
+| an `error` code of another route (`assistant_unavailable` on `decline`, `assistant_limit_reached` on `continue`, a calendar code on `confirm`) | `unexpected` |
+| everything else | section 10.2. A 503 or a 429 **without** an `error` code is API Gateway's own and stays `server`: it is none of the assistant's three reasons |
+
+Every outcome carries the `call` it answers.
+
+### 20.6 Use from the view layer
+
+The view never sees the service: the logic object of the screen does
+(`docs/CONVERSATIONAL_ARCHITECTURE.md` section 13, `docs/CONVERSATIONAL_PLAN.md` step c12). In
+short:
+
+```ts
+const assistant = new AssistantService({ apiUrl }, store);
+assistant.outcome$.subscribe((o) => {
+  if (o.call === 'end') return o.status === 'success' ? conversation.clear() : conversation.explain(o);
+  if (o.status === 'failure') return conversation.explain(o); // the sentence for o.call and o.reason
+  if (o.call === 'load') conversation.replace(o.reply); // every message
+  else conversation.add(o.reply);                       // the messages this request added
+  if (o.reply.status === 'working') assistant.continue(); // the caller's loop, with its limit
+});
+assistant.load();
+form.onSend = (text) => assistant.send(text);
+```
+
+- The replies are put together by the caller: `load` gives every message, the other calls the
+  messages their request added; `status`, `activity`, `proposal` and `remainingToday` of the
+  latest reply are the current ones.
+- The loop on `working` stops after `ASSISTANT_LIMITS.modelRequestsPerMessage` calls, and is not
+  started again after `assistant_budget_reached`
+  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 13).
+- The sentences of the three reasons of section 20.1 are `shared/`'s fixed texts, chosen by the
+  screen in the conversation's language (`reply.language` of the last reply, English when there
+  is none).
+- After a `confirm` whose proposal has an action `done`, the screens that show the calendar
+  reload: no service refreshes another.
+
+### 20.7 Security notes
+
+A conversation is personal data: the person's texts, the assistant's, the notes and usernames an
+answer may quote. Nothing of it is logged, put in a URL or kept by the service beyond the last
+outcome, which goes with the service when the session's objects are dropped. The only thing in a
+path is the proposal's id, a ULID checked first. A message's text is plain text: the service does
+not read it, and the view sets it as text, never as markup. The token rules are those of section
+10.2.
+
+### 20.8 Unit tests (`assistant.service.test.ts`)
+
+One suite of its own, run per call (the per-method suite of section 14.1 tests a pair of streams
+per method): the outcome with its `call`; what is sent (the method, the path, the body or its
+absence, the bearer token); **every code of the route**, each with its own reason and the session
+kept; codes of neighbouring routes as `unexpected` (the three reasons of section 20.1 on `load`
+and `end`; `assistant_limit_reached` and `conversation_full` on `continue` and `confirm`; the
+codes of a route that asks Claude on `decline`; `slot_taken` on `send` and `confirm`); answers
+that are not a reply (a 201, `status`, `messages` or `remainingToday` missing or wrong, an empty
+200; a 200 for `end`); a rejected token (the store cleared); a 503 without a code (`server`);
+nobody signed in (no request); the inputs refused before a request (an empty text, one of spaces
+and line breaks, 2 001 characters, none; an id with an `I`, too short, with a path in it, empty);
+the network failing, then a success; a second call abandoning the first and not another call's;
+the replay to a late subscriber; no token in any outcome.
+
+Then, for the one stream: the outcomes of five different calls in the order the answers came,
+each with its call; a reply that says `working` passed on with no request following by itself; a
+reply passed on as given (a text with markup and line breaks, a refused change with its code, a
+field the service does not know); the three reasons of section 20.1 each on its own, on every
+route that answers them; the same code on two routes as two outcomes, and as `unexpected` on a
+third; only the last outcome replayed; no `conflicts` in a failure. The file also holds one
+`switch` without a default per list of reasons, which the typecheck compiles.
+
+`frontend/tests/unit/integration/claude.test.ts` tests the check of section 14.7.
+
+### 20.9 Integration checks
+
+Section 14.7, its three blocks.
