@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { firstValueFrom, type Observable } from 'rxjs';
 import { filter, skip } from 'rxjs/operators';
 import type { ApiConfig } from '../../src/services/api';
+import type { ChangePasswordConfig } from '../../src/services/change-password.types';
 import type { CognitoConfig } from '../../src/services/cognito';
 import { LoginService } from '../../src/services/login.service';
 import type { LoginResult, Session } from '../../src/services/login.types';
@@ -18,6 +19,12 @@ export const API: ApiConfig = { apiUrl: 'http://127.0.0.1:3000' };
 export function cognito(): CognitoConfig {
   const env = JSON.parse(readFileSync(ENV_FILE, 'utf8')) as { AuthorizerFunction: { CLIENT_ID: string } };
   return { cognitoUrl: 'http://localhost:9229/', clientId: env.AuthorizerFunction.CLIENT_ID };
+}
+
+// The change of one's own password against the local stack: the sign-out everywhere is skipped,
+// since the Cognito emulator does not implement GlobalSignOut (docs/ARCHITECTURE.md section 8).
+export function changePasswordConfig(): ChangePasswordConfig {
+  return { cognitoUrl: cognito().cognitoUrl, skipGlobalSignOut: true };
 }
 
 export const PASSWORDS = { alice: 'Alice-Local-Pass-1!', admin: 'Admin-Local-Pass-1!' };

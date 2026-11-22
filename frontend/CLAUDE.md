@@ -1,7 +1,7 @@
 # frontend/
 
 Package `frontend`: the browser's services layer and its view layer, both complete for the
-calendar; the assistant has its service and no screen. It runs locally and is deployed nowhere. This file adds to the root `CLAUDE.md`, whose rules all apply
+calendar; the assistant and the change of one's own password have their services and no screen. It runs locally and is deployed nowhere. This file adds to the root `CLAUDE.md`, whose rules all apply
 here. Paths in this file are relative to `frontend/`.
 
 What each file holds is in the documents, not here: the services in
@@ -26,9 +26,9 @@ when those files are touched (`.claude/rules/frontend-views.md`).
 - `src/services/`: `session.store.ts`; `cognito.ts`, `api.ts` and `jwt.ts`, the building
   blocks; then one `<name>.service.ts` + `<name>.types.ts` per service: `login`, `refresh`,
   `hello`, `users`, `calendar-settings`, `availability-types`, `availability-rules`,
-  `calendar`, `appointments`, `assistant`. One result/state pair per method, except `assistant`:
-  one stream, `outcome$`, for its six calls. Input checked with the shared schemas before
-  sending. Tokens live only in the `SessionStore`: no result, state or service field holds one.
+  `calendar`, `appointments`, `assistant`, `change-password` (straight at Cognito, no route).
+  One result/state pair per method, except `assistant`: one stream, `outcome$`, for its six
+  calls. Input checked with the shared schemas before sending. Tokens live only in the `SessionStore`: no result, state or service field holds one.
 - `index.html`: all the markup, everything `hidden`: the login `#login`; the frame `#app` with
   the header, the navigation and `main.screen`, which holds one element per screen (`#week`,
   `#appointments`, `#settings`, `#users`, `#availability`), each with its dialogs and its
@@ -54,9 +54,9 @@ when those files are touched (`.claude/rules/frontend-views.md`).
 - `tests/unit/services/`, `tests/unit/logic/` (project `unit`, in node; `zone.ts`,
   `fixtures.ts`) and `tests/unit/views/` (project `views`, `happy-dom`; `page.ts`,
   `page.test.ts`, `shell.test.ts`) mirror `src/`; `tests/integration/` (`local.ts`,
-  `login.service.test.ts`, `journeys.test.ts`, `calendar.test.ts`; `assistant.test.ts`, against
-  the fake Claude only: `claude.ts`, tested in `tests/unit/integration/`) runs the services
-  against the local stack.
+  `login.service.test.ts`, `journeys.test.ts`, `calendar.test.ts`, `change-password.test.ts`;
+  `assistant.test.ts`, against the fake Claude only: `claude.ts`, tested in
+  `tests/unit/integration/`) runs the services against the local stack.
 - Generated, git-ignored: `coverage/`, `dist/`.
 
 ## Rules that are easy to break

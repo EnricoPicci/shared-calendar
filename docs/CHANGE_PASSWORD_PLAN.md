@@ -1,7 +1,8 @@
 # Shared Calendar: a person changes their own password (implementation plan)
 
-**Version:** v3 (2026-11-22): step p1 done, the design is in `docs/ARCHITECTURE.md` (v14, section
-6.9); findings F1 and F2 checked against AWS's reference and made exact; nothing of code is built.
+**Version:** v4 (2026-11-22): steps p1 and p2 done. The design is in `docs/ARCHITECTURE.md` (v14,
+section 6.9); the shared rule and `ChangePasswordService` are built (`docs/FRONTEND_SERVICES.md`
+v9, section 21); no screen yet.
 **Governed by:** `docs/ARCHITECTURE.md` (section 7.4, option B), `docs/FRONTEND_SERVICES.md`,
 `docs/FRONTEND_ARCHITECTURE.md`. On any conflict those documents win, and this plan is fixed.
 
@@ -169,7 +170,8 @@ changed, nothing deployed, no `aws` command run.
   Reasons: `not_signed_in`, `new_password_refused` (the shared rule, before any request),
   `wrong_current_password`, `too_many_attempts`, `network`, `server`, `unexpected`. The
   success carries nothing. After it (D2): `GlobalSignOut` (skipped by configuration locally), then
-  `store.clear()`; a failed sign-out after a successful change is a success that says so.
+  `store.clear()`; a sign-out that fails or is skipped gives the same success, which carries
+  nothing, and the store is cleared in every case.
 - Rule 6 of `docs/FRONTEND_SERVICES.md` section 2 holds as written: both passwords live in
   the arguments and the request body only. The unit tests assert that no stream, no message
   and no log holds either.
@@ -182,6 +184,68 @@ changed, nothing deployed, no `aws` command run.
 
 **Check:** the gate; `RUN_INTEGRATION=1 npm run test:integration -w frontend` with the new
 journey green twice in a row.
+
+**As done (2026-11-22).** Nothing changed under `backend/src` or in `backend/template.yaml`;
+nothing deployed, no `aws` command run.
+
+- *The rule*, `shared/src/password.ts`, exported from `shared/src/index.ts`: `PASSWORD_POLICY`
+  (12 to 256 characters, the four classes required), `PASSWORD_SYMBOLS` (the 32 of
+  `docs/ARCHITECTURE.md` section 6.9, copied), `PASSWORD_PROBLEMS` and `passwordProblems(text)`,
+  the closed list `too_short`, `too_long`, `no_uppercase`, `no_lowercase`, `no_digit`,
+  `no_symbol`, `blank`, and the schema `Password`, one issue per problem with the problem's name
+  as its message. A letter is `A`–`Z` or `a`–`z` only; "blank" is JavaScript's `\s`, which also
+  holds the Unicode spaces (a no-break space): a little more than `ChangePassword`'s `[\S]+`
+  refuses, never less. Its unit tests in `shared/tests/password.test.ts`.
+- *Held to the pool and to the generator*: `backend/tests/unit/lib/password.test.ts` reads the
+  user pool's `PasswordPolicy` block of `backend/template.yaml` as text (no YAML library; the
+  template's tags would need one) and compares its keys and values with `PASSWORD_POLICY`, so a
+  key added there, a password history for instance, fails it too; and 2 000 generated passwords
+  all pass `passwordProblems` and `Password`.
+- *`cognito.ts`*: `cognitoRequest(config, target, body)` for `InitiateAuth`, `ChangePassword` and
+  `GlobalSignOut`, with `readCognitoBody` and `readCognitoError`; `initiateAuth` and
+  `toAuthOutcome` built on them. No test of `LoginService`, `RefreshService` or `cognito.ts`
+  changed; new tests only. One detail is stricter: a Cognito `message` that is not a string is
+  replaced by `Cognito answered <status>`.
+- *`ChangePasswordService`* (`frontend/src/services/change-password.service.ts`, `.types.ts`), as
+  `docs/FRONTEND_SERVICES.md` section 21 describes it; decisions 50 to 55 of its section 8. The
+  rule is checked before the session, as `UsersService` checks a username. The store is cleared
+  unguarded, since a refresh during the change replaces the session object. A second call
+  abandons the first, as in every service; when the first change was already made, its sign-out
+  and clear go with it, so the screen must keep its button disabled while `pending` (decision 55).
+- *The emulator*, checked by hand with a probe outside the repository that printed statuses and
+  error classes only: a wrong current password is `400 InvalidPasswordException`; a new password
+  of three letters is accepted (no policy); a change answers `200 {}`; `GlobalSignOut` answers
+  `500 CognitoLocal#Unsupported`; a garbage access token is `400 InvalidParameterException`
+  (real Cognito: `NotAuthorizedException`, finding F5), which the service reads as `unexpected`.
+  `docs/ARCHITECTURE.md` section 8 holds; the last detail matters only locally.
+- *The journey*, `frontend/tests/integration/change-password.test.ts`, block `change password`,
+  account `fe-password`, page `docs/journeys/frontend/change-password.md` (written with the skill
+  `explain-journey`, listed in `docs/journeys/README.md`; the account added to
+  `docs/journeys/concepts.md`). `changePasswordConfig()` in `frontend/tests/integration/local.ts`
+  is the local configuration, the sign-out skipped.
+- *Documents*: `docs/FRONTEND_SERVICES.md` v9 (sections 4.8, 10, 10.1, 10.4, 14.1, 14.9, 14.10,
+  21, decisions 50 to 55); `docs/ARCHITECTURE.md` v14 (the sentence of step p2, row 3 of section
+  6.9 corrected); `docs/FOLDER_STRUCTURE.md`, `docs/COMMANDS.md` section 4, `frontend/CLAUDE.md`,
+  `shared/CLAUDE.md`; the sentence of this step on a failed sign-out corrected.
+- *Check*: root `DYNAMODB_PORT=8002 npm run verify` PASSED (back end 1 737 unit tests and 189
+  journeys, audit clean; `shared` 489 tests; front end 2 282 tests in 43 files; 100 % lines on
+  `backend/src/lib` and `src/assistant`, `shared/src` and `frontend/src`).
+  `RUN_INTEGRATION=1 npm run test:integration -w frontend`: 70 tests in 5 files, the 5 of the new
+  journey with them, green twice in a row; afterwards the local pool held `admin` and `alice`
+  only. `git status`: nothing under `backend/src` or in `backend/template.yaml`. The stack was
+  started afresh from this worktree before the runs.
+- **Step p3 finds ready:** `ChangePasswordService` with its two streams, the reasons as a closed
+  list and `problems` on `new_password_refused`; `passwordProblems` of `shared/` for the hints
+  while typing, without the service; the problem names for which the screen writes its
+  sentences (`frontend/src/logic/texts.ts`), `same_as_current` among them. **Cognito's
+  configuration**: the shell already receives `cognitoUrl` (the `ShellDeps` configuration that
+  `frontend/src/main.ts` hands over), which is all the service needs besides the store; no client
+  id. **The skip value** is new: the proposal is a fourth constant of the bundle beside `API_URL`,
+  `COGNITO_URL` and `CLIENT_ID`, say `SKIP_GLOBAL_SIGN_OUT`, set to `true` by
+  `frontend/scripts/dev.mjs` (the local stack) and to `false` by `frontend/scripts/build.mjs`,
+  so that a cloud build always signs out; p3 decides it. **The order on success**: the store is cleared before the success is emitted, so the
+  shell's `session$` shows the login first; "Password changed" must be shown there, by the login
+  view or the shell, not by the password screen, which is gone by then (decision 55).
 
 ### Step p3 — Front end: the screen (≈ 6 h)
 

@@ -107,7 +107,9 @@ stays at the root.
 │   │   ├── main.ts              # the entry file of the bundle: the configuration, then the shell
 │   │   ├── services/            # the services layer (docs/FRONTEND_SERVICES.md): session store,
 │   │   │                        # login, refresh, hello, users, the calendar's, the assistant's
-│   │   │                        # (assistant.service.ts, assistant.types.ts); cognito.ts and api.ts
+│   │   │                        # (assistant.service.ts, assistant.types.ts), the change of one's
+│   │   │                        # own password (change-password.service.ts, .types.ts); cognito.ts
+│   │   │                        # (one request for any target of Cognito) and api.ts
 │   │   ├── logic/               # between the services and the views, no DOM: texts.ts (dates, times,
 │   │   │                        # failures in plain words), week.model.ts, week.screen.ts,
 │   │   │                        # booking.ts, appointment.detail.ts, appointments.model.ts,
@@ -127,7 +129,8 @@ stays at the root.
 │   │   │                        # the test of the journeys' check of which Claude is wired
 │   │   └── integration/         # login and the services' journeys against the local stack;
 │   │                            # assistant.test.ts against the fake Claude, with claude.ts,
-│   │                            # the check that refuses the real one
+│   │                            # the check that refuses the real one; change-password.test.ts,
+│   │                            # the change of one's own password at cognito-local
 │   ├── (reserved, not yet) template.yaml
 │   └── (generated, git-ignored) coverage/  dist/
 │
@@ -140,6 +143,8 @@ stays at the root.
     │   ├── api.ts               # response bodies, error body, error codes (architecture section 4)
     │   ├── roles.ts             # Role, resolveRole (architecture section 3, "admin wins")
     │   ├── username.ts          # the username rule and the zod schemas built on it
+    │   ├── password.ts          # the pool's password rule: PASSWORD_POLICY, the 32 symbols,
+    │   │                        # passwordProblems and the Password schema (architecture 6.9)
     │   ├── calendar/            # the shared calendar's contract (docs/SHARED_CALENDAR_SPEC.md 12):
     │   │                        # time.ts (time-zone helpers, Intl only), schemas.ts (primitives,
     │   │                        # bodies, parameters), types.ts (responses, events), rules.ts (pure

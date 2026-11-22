@@ -1,5 +1,13 @@
 import { firstValueFrom } from 'rxjs';
-import { describe as describeError, initiateAuth, toAuthOutcome, type CognitoConfig } from '../../../src/services/cognito';
+import {
+  cognitoRequest,
+  describe as describeError,
+  initiateAuth,
+  readCognitoBody,
+  readCognitoError,
+  toAuthOutcome,
+  type CognitoConfig,
+} from '../../../src/services/cognito';
 import { call, cognitoError, cognitoTokens, jwt } from './fixtures';
 
 // docs/FRONTEND_SERVICES.md section 10.4. Most of the mapping is exercised through
@@ -69,5 +77,42 @@ describe('describe', () => {
   it('an Error gives "Name: message"; anything else its string', () => {
     expect(describeError(new TypeError('fetch failed'))).toBe('TypeError: fetch failed');
     expect(describeError('down')).toBe('down');
+  });
+});
+
+describe('cognitoRequest', () => {
+  it.each(['InitiateAuth', 'ChangePassword', 'GlobalSignOut'] as const)('%s: one POST with the target in X-Amz-Target and the body as JSON', async (target) => {
+    fetchMock.mockResolvedValueOnce(new Response('{}', { status: 200 }));
+    const answer = await firstValueFrom(cognitoRequest(CONFIG, target, { AccessToken: 'token' }));
+    expect(answer).toEqual({ status: 200, text: '{}' });
+    const [url, init] = call(fetchMock);
+    expect(url).toBe('http://cognito.test/');
+    expect(init.method).toBe('POST');
+    expect(init.headers).toEqual({
+      'Content-Type': 'application/x-amz-json-1.1',
+      'X-Amz-Target': `AWSCognitoIdentityProviderService.${target}`,
+    });
+    expect(JSON.parse(init.body as string)).toEqual({ AccessToken: 'token' });
+  });
+
+  it('needs no client id', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 200 }));
+    expect(await firstValueFrom(cognitoRequest({ cognitoUrl: 'http://cognito.test/' }, 'GlobalSignOut', {}))).toEqual({ status: 200, text: '' });
+  });
+});
+
+describe('readCognitoBody and readCognitoError', () => {
+  it('an object is read as it is, other JSON as an empty object, a text that is not JSON as undefined', () => {
+    expect(readCognitoBody('{"a":1}')).toEqual({ a: 1 });
+    expect(readCognitoBody('null')).toEqual({});
+    expect(readCognitoBody('3')).toEqual({});
+    expect(readCognitoBody('')).toBeUndefined();
+    expect(readCognitoBody('<html>')).toBeUndefined();
+  });
+
+  it('the error class without its namespace, and the message when it is a string', () => {
+    expect(readCognitoError({ __type: 'NotAuthorizedException', message: 'no' })).toEqual({ type: 'NotAuthorizedException', message: 'no' });
+    expect(readCognitoError({ __type: 'com.amazonaws#LimitExceededException' })).toEqual({ type: 'LimitExceededException', message: undefined });
+    expect(readCognitoError({ message: 7 })).toEqual({ type: '', message: undefined });
   });
 });

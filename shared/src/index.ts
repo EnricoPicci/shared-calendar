@@ -1,7 +1,8 @@
-// The public surface of the shared package: the API contract, the username rule, the
-// calendar's contract, time model and rules, and the assistant's contract and fixed texts
-// (docs/FOLDER_STRUCTURE.md section 6). Consumers import from '@shared-calendar/shared' only.
+// The public surface of the shared package: the API contract, the username rule, the password
+// rule, the calendar's contract, time model and rules, and the assistant's contract and fixed
+// texts (docs/FOLDER_STRUCTURE.md section 6). Consumers import from '@shared-calendar/shared' only.
 export * from './api';
+export * from './password';
 export * from './roles';
 export * from './username';
 export * from './assistant/languages';
