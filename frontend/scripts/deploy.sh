@@ -14,6 +14,17 @@
 #   8. four checks against the page's address with curl and no credentials, PASS or FAIL each
 #   9. print the page's address
 #
+# A name of our own for the page (the template's parameters PageDomain and PageCertificateArn)
+# is given once, in the environment, both values together:
+#
+#   PAGE_DOMAIN=calendar.example.com PAGE_CERTIFICATE_ARN=arn:aws:acm:us-east-1:... \
+#     npm run deploy -w frontend
+#
+# A run without the two leaves the stack's values as they are: sam deploy sends "use the
+# previous value" for a parameter it is not given. The certificate is made beforehand, in
+# us-east-1; the name's DNS record (a CNAME to the stack's output DistributionDomain) is added
+# by hand, and until it exists the four checks, which ask the name, fail.
+#
 # --dry-run does points 1, 2 and 5 and says what the others would do. It creates and changes
 # nothing in the cloud and does not need the hosting's stack to exist; it passes the gate like
 # a real run.
@@ -119,6 +130,22 @@ COGNITO_URL="https://cognito-idp.$REGION.amazonaws.com/"
 # compares with what arrives.
 POLICY="default-src 'self'; connect-src 'self' https://cognito-idp.$REGION.amazonaws.com; frame-ancestors 'none'; base-uri 'none'"
 
+# ---- A name of our own, when one is given ---------------------------------------------------
+# Both values or neither. The same shapes the template's parameters accept, refused here
+# before anything is built or deployed. Neither is a secret.
+PAGE_DOMAIN=${PAGE_DOMAIN:-}
+PAGE_CERTIFICATE_ARN=${PAGE_CERTIFICATE_ARN:-}
+PARAMETERS="ApiDomain=$API_DOMAIN"
+if [[ -n "$PAGE_DOMAIN" || -n "$PAGE_CERTIFICATE_ARN" ]]; then
+  [[ -n "$PAGE_DOMAIN" && -n "$PAGE_CERTIFICATE_ARN" ]] ||
+    die "PAGE_DOMAIN and PAGE_CERTIFICATE_ARN go together: one of the two is empty."
+  [[ "$PAGE_DOMAIN" =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] ||
+    die "PAGE_DOMAIN is not a host name in lower case (no https://, no port, no path): $PAGE_DOMAIN"
+  [[ "$PAGE_CERTIFICATE_ARN" =~ ^arn:aws:acm:us-east-1:[0-9]{12}:certificate/[a-f0-9-]+$ ]] ||
+    die "PAGE_CERTIFICATE_ARN is not the ARN of a certificate in us-east-1 (arn:aws:acm:us-east-1:<account>:certificate/<id>)."
+  PARAMETERS="$PARAMETERS PageDomain=$PAGE_DOMAIN PageCertificateArn=$PAGE_CERTIFICATE_ARN"
+fi
+
 echo "    API        $API_URL"
 echo "    client id  $CLIENT_ID"
 echo "    Cognito    $COGNITO_URL"
@@ -177,7 +204,9 @@ if [[ "$dry_run" == true ]]; then
   echo
   echo "  3. sam deploy frontend/template.yaml"
   echo "       stack      $WEB_STACK in $REGION ($exists)"
-  echo "       parameter  ApiDomain=$API_DOMAIN"
+  echo "       parameters $PARAMETERS"
+  [[ -n "$PAGE_DOMAIN" ]] ||
+    echo "                  (PageDomain and PageCertificateArn: not given, the stack's values stay)"
   echo "       the change set is shown and must be confirmed"
   echo "  4. read the outputs BucketName, DistributionId and PageUrl of $WEB_STACK"
   echo "  6. upload, in this order, each with Cache-Control: no-cache:"
@@ -199,19 +228,21 @@ fi
 # disagree; the rest is in samconfig.toml. A release that changes no resource says so and goes
 # on.
 echo
-echo "==> sam deploy: stack $WEB_STACK in $REGION, ApiDomain=$API_DOMAIN"
+echo "==> sam deploy: stack $WEB_STACK in $REGION, $PARAMETERS"
+# One argument holding every "Name=value", separated by spaces: no value holds a space.
 sam deploy --template-file template.yaml --stack-name "$WEB_STACK" --region "$REGION" \
-  --parameter-overrides "ApiDomain=$API_DOMAIN" || die "sam deploy failed: nothing was uploaded."
+  --parameter-overrides "$PARAMETERS" || die "sam deploy failed: nothing was uploaded."
 
 # ---- 4. Its outputs -------------------------------------------------------------------------
 # shellcheck disable=SC2016 # JMESPath literals
 values=$(aws cloudformation describe-stacks --region "$REGION" --stack-name "$WEB_STACK" --output text --query 'Stacks[0].[
     Outputs[?OutputKey==`BucketName`].OutputValue | [0],
     Outputs[?OutputKey==`DistributionId`].OutputValue | [0],
-    Outputs[?OutputKey==`PageUrl`].OutputValue | [0]]') ||
+    Outputs[?OutputKey==`PageUrl`].OutputValue | [0],
+    Outputs[?OutputKey==`DistributionDomain`].OutputValue | [0]]') ||
   die "cannot read stack $WEB_STACK in $REGION (was the change set confirmed?)."
-read -r BUCKET DISTRIBUTION PAGE_URL <<< "$values"
-for name in BUCKET DISTRIBUTION PAGE_URL; do
+read -r BUCKET DISTRIBUTION PAGE_URL DISTRIBUTION_DOMAIN <<< "$values"
+for name in BUCKET DISTRIBUTION PAGE_URL DISTRIBUTION_DOMAIN; do
   [[ -n "${!name:-}" && "${!name}" != None ]] || die "stack $WEB_STACK lacks an output ($name): nothing was uploaded."
 done
 
@@ -285,6 +316,10 @@ api_message() {
 
 echo
 echo "==> checking $PAGE_URL"
+# A name of our own answers only once its DNS record exists; that record is not made here.
+if [[ "$PAGE_URL" != "https://$DISTRIBUTION_DOMAIN" ]]; then
+  echo "    its DNS record must be a CNAME to $DISTRIBUTION_DOMAIN; without it the checks fail."
+fi
 
 ask /
 if [[ "$STATUS" == 200 && "$(header content-security-policy)" == "$POLICY" ]]; then

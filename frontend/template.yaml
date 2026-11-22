@@ -13,8 +13,9 @@ Description: >
 # No "Transform: AWS::Serverless" line: nothing here is one of SAM's short forms, so this is
 # plain CloudFormation, which sam validate and sam deploy read as they are.
 
-# The one value given at deploy time. The deploy command reads it from the back end's stack
-# (the host of its output ApiUrl); it is in no committed file.
+# The values given at deploy time; none is in a committed file. The deploy command reads
+# ApiDomain from the back end's stack (the host of its output ApiUrl) at every run. The two
+# others are given once, by the person who deploys, and the stack keeps them afterwards.
 Parameters:
   ApiDomain:
     Type: String
@@ -25,6 +26,36 @@ Parameters:
     Description: >
       Host name of the back end's API (<id>.execute-api.<region>.amazonaws.com), where the
       distribution sends the requests for /api/...
+  # A name of our own for the page, for instance calendar.example.com. Empty: the page answers
+  # only at the address AWS gives the distribution, https://<id>.cloudfront.net. The name's
+  # DNS is not in this stack: a CNAME record from the name to the output DistributionDomain is
+  # added by hand where the domain's DNS is managed.
+  PageDomain:
+    Type: String
+    Default: ''
+    # Empty, or a host name in lower case: no scheme, no port, no path.
+    AllowedPattern: '^$|^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$'
+    ConstraintDescription: must be empty or a host name in lower case, without "https://", a port or a path.
+    Description: >
+      Optional. The page's own host name (calendar.example.com). Needs PageCertificateArn.
+  # The certificate that proves the name above, made beforehand in AWS Certificate Manager.
+  # CloudFront accepts a certificate from the region us-east-1 only, whatever the region of
+  # this stack, so the pattern refuses any other. Used only when PageDomain is given.
+  PageCertificateArn:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|^arn:aws:acm:us-east-1:[0-9]{12}:certificate/[a-f0-9-]+$'
+    ConstraintDescription: must be empty or the ARN of a certificate of AWS Certificate Manager in us-east-1.
+    Description: >
+      Optional. ARN of the issued certificate for PageDomain, in us-east-1.
+
+# True when the page has a name of its own and the certificate for it: both values given. The
+# distribution's alias, its certificate and the output PageUrl depend on it. A name without a
+# certificate changes nothing.
+Conditions:
+  HasPageDomain: !And
+    - !Not [!Equals [!Ref PageDomain, '']]
+    - !Not [!Equals [!Ref PageCertificateArn, '']]
 
 Resources:
   # ---------------------------------------------------------------------------
@@ -168,10 +199,11 @@ Resources:
   # The address: the distribution and its two rules
   # ---------------------------------------------------------------------------
 
-  # The HTTPS address of the page, https://<id>.cloudfront.net, with AWS's own certificate
-  # (docs/FRONTEND_ARCHITECTURE.md section 13.1). It fetches what it answers from two places
-  # ("origins"), chosen by the path: /api/... from the API, everything else from the bucket.
-  # No domain of our own, no logging and no firewall
+  # The HTTPS address of the page. AWS gives every distribution an address,
+  # https://<id>.cloudfront.net, with AWS's own certificate; when the parameter PageDomain is
+  # given, the distribution answers under that name too, with the certificate of
+  # PageCertificateArn. It fetches what it answers from two places ("origins"), chosen by the
+  # path: /api/... from the API, everything else from the bucket. No logging and no firewall
   # (docs/FRONTEND_ARCHITECTURE.md section 13.8).
   #
   # No CustomErrorResponses, on purpose (docs/FRONTEND_ARCHITECTURE.md section 13.3, rules 2
@@ -191,9 +223,22 @@ Resources:
         IPV6Enabled: true
         # The cheapest set of CloudFront's locations: Europe and North America.
         PriceClass: PriceClass_100
-        # The certificate AWS provides for *.cloudfront.net: nothing to buy or renew.
-        ViewerCertificate:
-          CloudFrontDefaultCertificate: true
+        # The name of our own, when there is one: the distribution refuses a request that
+        # arrives under a name it was not told.
+        Aliases: !If
+          - HasPageDomain
+          - - !Ref PageDomain
+          - !Ref AWS::NoValue
+        # With a name of our own: its certificate, shown by the browser's asking for the name
+        # (SNI, which costs nothing; every current browser does it), and no version of TLS
+        # older than 1.2. Without: the certificate AWS provides for *.cloudfront.net, nothing
+        # to buy or renew.
+        ViewerCertificate: !If
+          - HasPageDomain
+          - AcmCertificateArn: !Ref PageCertificateArn
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
+          - CloudFrontDefaultCertificate: true
         Origins:
           # The bucket, reached at its address in this region and signed for by BucketAccess.
           # The empty OriginAccessIdentity is required by CloudFormation and says that the
@@ -251,9 +296,18 @@ Resources:
 
 # What the deploy command reads after the deployment. None is a secret.
 Outputs:
+  # The address people use, and the one the deploy command checks: the name of our own when
+  # there is one, AWS's otherwise.
   PageUrl:
     Description: The address of the page
-    Value: !Sub https://${Distribution.DomainName}
+    Value: !If
+      - HasPageDomain
+      - !Sub https://${PageDomain}
+      - !Sub https://${Distribution.DomainName}
+  # What the DNS record of a name of our own points at (a CNAME). The page answers here too.
+  DistributionDomain:
+    Description: The host name AWS gives the distribution (<id>.cloudfront.net)
+    Value: !GetAtt Distribution.DomainName
   BucketName:
     Description: The bucket the four built files are uploaded to
     Value: !Ref PageBucket

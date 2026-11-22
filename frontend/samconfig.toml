@@ -20,7 +20,10 @@ lint = true
 # that changes no resource of the stack is not a failure: sam says so and the deploy script goes
 # on to the upload (fail_on_empty_changeset).
 # ApiDomain is deliberately not here: the deploy script reads it from the back end's stack at
-# every run and passes it on the command line.
+# every run and passes it on the command line. PageDomain and PageCertificateArn (a name of
+# our own for the page and its certificate) are not here either: the deploy script takes them
+# from the environment (PAGE_DOMAIN, PAGE_CERTIFICATE_ARN) the one time they are given, and
+# the stack keeps them.
 [default.deploy.parameters]
 confirm_changeset = true
 fail_on_empty_changeset = false
