@@ -110,6 +110,9 @@ The pages written so far. Which pages are still to come, and in which order, is 
 | [`backend/assistant-booking.md`](backend/assistant-booking.md) | `backend/tests/integration/assistant.test.ts`, `booking through the assistant (5.4, 5.5, 6)` |
 | [`backend/assistant-not-confirmed.md`](backend/assistant-not-confirmed.md) | `backend/tests/integration/assistant.test.ts`, `a proposal that is not confirmed (5.5, 6)` |
 | [`backend/assistant-confirm-trouble.md`](backend/assistant-confirm-trouble.md) | `backend/tests/integration/assistant.test.ts`, `a confirmation that meets trouble (5.4, 7.4)` |
+| [`backend/assistant-note.md`](backend/assistant-note.md) | `backend/tests/integration/assistant.test.ts`, `a note set through the assistant (5.4, 5.5)` |
+| [`backend/assistant-move.md`](backend/assistant-move.md) | `backend/tests/integration/assistant.test.ts`, `an appointment moved through the assistant (5.4, 5.5)` |
+| [`backend/assistant-cancel-both.md`](backend/assistant-cancel-both.md) | `backend/tests/integration/assistant.test.ts`, `two cancellations in one proposal (5.4, 5.5 rule 4)` |
 | [`backend/assistant-daily-limit.md`](backend/assistant-daily-limit.md) | `backend/tests/integration/assistant.test.ts`, `the daily limit (4.4, 6.1)` |
 | [`backend/assistant-cannot-answer.md`](backend/assistant-cannot-answer.md) | `backend/tests/integration/assistant.test.ts`, `when Claude cannot answer (6.1, 7.4)` |
 | [`backend/assistant-who-may.md`](backend/assistant-who-may.md) | `backend/tests/integration/assistant.test.ts`, `who may talk to the assistant (6)` |

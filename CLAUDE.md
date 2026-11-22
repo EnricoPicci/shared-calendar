@@ -52,10 +52,10 @@ one that is fixed:
 ## Working rhythm
 
 - Implement one plan step at a time. Run the step's acceptance check, report the result
-  honestly (including failures), then stop for review before the next step.
-- Commit only when asked.
-- When the implementation proves the architecture wrong, say so and propose the document change
-  rather than silently diverging.
+  honestly (including failures), then stop for review before the next step. Commit only when asked.
+- End every task with one or two simple sentences on what was done, then say plainly what the
+  user must decide or do. No tables or long reports in that message unless the user asks.
+- When the implementation proves the architecture wrong, say so and propose the document change.
 
 ## Hard rules from the design
 

@@ -13,7 +13,7 @@ import { api, createUserInNoGroup, forgetDailyUse, localDailyMessageLimit, query
 //
 // The calendar table is never emptied here, and nothing another file left in it is relied on.
 // Each block that needs the calendar creates what it uses through the API, as the Administrator:
-// one window on a day of its own (25 to 28 days after today), under a type name of its own and in
+// one window on a day of its own (22 to 28 days after today), under a type name of its own and in
 // hours no other journey opens. It removes the window and the type at the end and, should an
 // interrupted run have left them, before it starts; the appointments it booked are cancelled
 // first, so what stays in the table is those cancelled appointments and their events, which keep
@@ -72,7 +72,15 @@ type JourneyWindow = { typeName: string; source?: string; sourceId?: string };
 type Booked = { appointmentId: string; typeName: string; start: string; username: string; status: string; note: string | null; createdBy: { username: string; role: string } };
 
 // The type names of the journeys that use the calendar, one per block.
-const JOURNEY_TYPES = ['assistant journey', 'assistant booking journey', 'assistant declining journey', 'assistant trouble journey'];
+const JOURNEY_TYPES = [
+  'assistant journey',
+  'assistant booking journey',
+  'assistant declining journey',
+  'assistant trouble journey',
+  'assistant note journey',
+  'assistant moving journey',
+  'assistant cancelling journey',
+];
 
 // Removes what the journeys made in the calendar under one of their type names, when it is there:
 // the appointments booked under that type are cancelled, then its windows and the type are
@@ -122,6 +130,49 @@ const bookingProposal = (day: string, start: string, end: string, type: string, 
   declineLabel: "Don't",
   actions: [{ summary: assistantTexts('en').changes.bookAppointment({ date: day, start, end, type, note: null, secondTime: false }), outcome, error }],
 });
+
+// Books, through the calendar's own route and as the person, the slot of the journey's type that
+// starts at each of the given places among that day's free slots in order of time (0 is the
+// first). The appointment is the person's own, made without the assistant.
+async function bookSlots(token: string, day: string, typeId: string, places: number[], note?: string): Promise<Booked[]> {
+  const days = (await api('GET', `/calendar?from=${day}&to=${day}`, token)).body?.days as { slots: { start: string; typeId: string }[] }[];
+  const slots = days[0]!.slots.filter((slot) => slot.typeId === typeId);
+  const booked: Booked[] = [];
+  for (const place of places) {
+    const res = await api('POST', '/calendar/appointments', token, { start: slots[place]!.start, ...(note !== undefined && { note }) });
+    expect(res.status).toBe(201);
+    booked.push(res.body as unknown as Booked);
+  }
+  return booked;
+}
+
+// A proposal as the screen gets it, waiting: the question and the two labels are the fixed texts
+// of the conversation's language, each summary is the server's own sentence.
+const proposalOf = (summaries: string[], outcomes: [string | null, string | null][] = summaries.map(() => [null, null])) => ({
+  proposalId: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/),
+  question: summaries.length === 1 ? 'Make this change?' : `Make these ${summaries.length} changes?`,
+  confirmLabel: 'Confirm',
+  declineLabel: "Don't",
+  actions: summaries.map((summary, index) => ({ summary, outcome: outcomes[index]![0], error: outcomes[index]![1] })),
+});
+
+// The results of tools Claude was given in the person's conversation, as stored, in order.
+const storedToolResults = async (token: string) =>
+  (await storedEntries(token))
+    .filter((entry) => entry.role === 'user' && Array.isArray(entry.content))
+    .flatMap((entry) => entry.content as { type: string; content: string }[])
+    .map((block) => JSON.parse(block.content) as Record<string, unknown>);
+
+// A request about an appointment takes two steps before the proposal: Claude asks for the list of
+// the day, to learn the appointment's id, then asks for the change.
+async function askForChange(token: string, text: string): Promise<Record<string, unknown> | undefined> {
+  const first = await say(token, text);
+  expect(first.status).toBe(200);
+  expect(first.body).toMatchObject({ status: 'working', activity: 'Looking at the appointments…', proposal: null });
+  const second = await goOn(token);
+  expect(second.status).toBe(200);
+  return second.body;
+}
 
 // A well-formed id that names no proposal.
 const NO_PROPOSAL = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
@@ -640,6 +691,238 @@ describe('a confirmation that meets trouble (5.4, 7.4)', () => {
     const messages = next.body?.messages as { from: string; text: string }[];
     expect(JSON.parse(messages[0]?.text ?? '')).toMatchObject({ outcome: 'done', appointment: { date: day, start: '06:00' } });
     expect(await appointmentsOf(token)).toHaveLength(2);
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/assistant-note.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('a note set through the assistant (5.4, 5.5)', () => {
+  const TYPE = 'assistant note journey';
+  const ASK = 'fake: add a note to my appointment of the note journey';
+  // The day the fake asks the list of: {{date+22}} of its answer file. The appointment is at 05:00.
+  let day: string;
+  let token: string;
+  let appointmentId: string;
+  let proposalId: string;
+  const summary = () =>
+    assistantTexts('en').changes.setAppointmentNote({
+      appointment: { date: day, start: '05:00', end: '06:00', type: TYPE, username: null },
+      note: 'bring the documents',
+      previous: 'first note',
+    });
+
+  beforeAll(async () => {
+    day = await dayOfJourney(22);
+    token = await newUser('chat-note');
+    await removeFromCalendar(TYPE);
+    const { typeId } = await openWindow(day, TYPE, '05:00', '07:00');
+    appointmentId = (await bookSlots(token, day, typeId, [0], 'first note'))[0]!.appointmentId;
+  });
+
+  afterAll(async () => {
+    await removeFromCalendar(TYPE);
+    await removeUserIfPresent('chat-note');
+  });
+
+  it('a request for a note: Claude reads the appointments, then asks for the change by the id it read, and the proposal shows the new note and the one it replaces', async () => {
+    const body = await askForChange(token, ASK);
+    expect(body).toMatchObject({ status: 'awaiting_confirmation', activity: null, proposal: proposalOf([summary()]), remainingToday: LIMIT - 1 });
+    expect(summary()).toContain('"bring the documents"');
+    expect(summary()).toContain('"first note"');
+    proposalId = (body?.proposal as { proposalId: string }).proposalId;
+    // Nothing is changed yet.
+    expect((await appointmentsOf(token)).map((appointment) => appointment.note)).toEqual(['first note']);
+  });
+
+  it('confirm sets it: the proposal is shown as done, and Claude is told the appointment with its new note', async () => {
+    const res = await confirm(token, proposalId);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'idle', proposal: { ...proposalOf([summary()], [['done', null]]), proposalId } });
+    const messages = res.body?.messages as { from: string; text: string }[];
+    expect(messages.map((message) => message.from)).toEqual(['assistant']);
+    // The fake answers with the result of the change, word for word: what Claude was given.
+    const given = JSON.parse(messages[0]?.text ?? '') as { outcome: string; message: string; appointment: Record<string, unknown> };
+    expect(given.outcome).toBe('done');
+    expect(given.message).toContain('pressed the confirm button');
+    expect(given.appointment).toMatchObject({ id: appointmentId, date: day, start: '05:00', note: 'bring the documents', status: 'booked' });
+  });
+
+  it("the calendar's own route gives the note back, on the same appointment", async () => {
+    const booked = await appointmentsOf(token);
+    expect(booked).toHaveLength(1);
+    expect(booked[0]).toMatchObject({ appointmentId, note: 'bring the documents', status: 'booked' });
+  });
+
+  it('Claude asked for the change with the id of the list and the note, and nothing else', async () => {
+    const stored = await storedEntries(token);
+    expect(stored.map((entry) => entry.role)).toEqual(['user', 'system', 'assistant', 'user', 'assistant', 'user', 'assistant']);
+    expect(stored[2]?.content).toEqual([expect.objectContaining({ type: 'tool_use', name: 'list_appointments', input: { from: day, to: day } })]);
+    expect(stored[4]?.content).toEqual([expect.objectContaining({ type: 'tool_use', name: 'set_appointment_note', input: { appointmentId, note: 'bring the documents' } })]);
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/assistant-move.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('an appointment moved through the assistant (5.4, 5.5)', () => {
+  const TYPE = 'assistant moving journey';
+  const ASK = 'fake: move my appointment of the moving journey';
+  // The day the fake asks the list of and moves within: {{date+23}} of its answer file. The
+  // appointment is at 04:00 and the fake asks to move it to 06:00.
+  let day: string;
+  let token: string;
+  let oldId: string;
+  let newId: string;
+  let proposalId: string;
+  const summary = () =>
+    assistantTexts('en').changes.changeAppointment({
+      appointment: { date: day, start: '04:00', end: '05:00', type: TYPE, username: null },
+      to: { date: day, start: '06:00', end: '07:00', type: TYPE, secondTime: false },
+    });
+
+  beforeAll(async () => {
+    day = await dayOfJourney(23);
+    token = await newUser('chat-move');
+    await removeFromCalendar(TYPE);
+    const { typeId } = await openWindow(day, TYPE, '04:00', '07:00');
+    oldId = (await bookSlots(token, day, typeId, [0], 'keep this note'))[0]!.appointmentId;
+  });
+
+  afterAll(async () => {
+    await removeFromCalendar(TYPE);
+    await removeUserIfPresent('chat-move');
+  });
+
+  it('a request to move: the proposal names the old time and the new one, and nothing is moved', async () => {
+    const body = await askForChange(token, ASK);
+    expect(body).toMatchObject({ status: 'awaiting_confirmation', proposal: proposalOf([summary()]), remainingToday: LIMIT - 1 });
+    proposalId = (body?.proposal as { proposalId: string }).proposalId;
+    expect((await appointmentsOf(token)).map((appointment) => appointment.appointmentId)).toEqual([oldId]);
+  });
+
+  it('confirm moves it: Claude is told the new appointment, with a new id and the note kept, and which one it replaces', async () => {
+    const res = await confirm(token, proposalId);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'idle', proposal: { ...proposalOf([summary()], [['done', null]]), proposalId } });
+    const messages = res.body?.messages as { from: string; text: string }[];
+    const given = JSON.parse(messages[0]?.text ?? '') as { outcome: string; appointment: Record<string, unknown>; replaced: Record<string, unknown> };
+    expect(given.outcome).toBe('done');
+    expect(given.appointment).toMatchObject({ date: day, start: '06:00', end: '07:00', type: TYPE, note: 'keep this note', status: 'booked' });
+    expect(given.replaced).toEqual({ id: oldId, date: day, start: '04:00', end: '05:00', status: 'cancelled' });
+    newId = given.appointment.id as string;
+    expect(newId).not.toBe(oldId);
+  });
+
+  it("the calendar's own route finds the appointment at its new time, and the old one cancelled as changed", async () => {
+    const booked = await appointmentsOf(token);
+    expect(booked).toHaveLength(1);
+    expect(booked[0]).toMatchObject({ appointmentId: newId, typeName: TYPE, status: 'booked', note: 'keep this note' });
+
+    const all = (await api('GET', `/calendar/appointments?from=${day}&to=${day}&status=all`, token)).body?.appointments as (Booked & { cancelReason?: string })[];
+    expect(all.map((appointment) => [appointment.appointmentId, appointment.status, appointment.cancelReason ?? null])).toEqual([
+      [oldId, 'cancelled', 'changed'],
+      [newId, 'booked', null],
+    ]);
+  });
+
+  it('Claude asked for the move with the id of the list, a day and a time, and nothing else', async () => {
+    const stored = await storedEntries(token);
+    expect(stored[4]?.content).toEqual([expect.objectContaining({ type: 'tool_use', name: 'change_appointment', input: { appointmentId: oldId, date: day, time: '06:00' } })]);
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/assistant-cancel-both.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('two cancellations in one proposal (5.4, 5.5 rule 4)', () => {
+  const TYPE = 'assistant cancelling journey';
+  const ASK = 'fake: cancel both my appointments of the cancelling journey';
+  // The day the fake asks the list of: {{date+24}} of its answer file. The two appointments are at
+  // 04:00 and 06:00.
+  let day: string;
+  let token: string;
+  let early: Booked;
+  let late: Booked;
+  let proposalId: string;
+  const summaries = () =>
+    [
+      ['04:00', '05:00'],
+      ['06:00', '07:00'],
+    ].map(([start, end]) => assistantTexts('en').changes.cancelAppointment({ date: day, start: start!, end: end!, type: TYPE, username: null }));
+
+  beforeAll(async () => {
+    day = await dayOfJourney(24);
+    token = await newUser('chat-cancel');
+    await removeFromCalendar(TYPE);
+    const { typeId } = await openWindow(day, TYPE, '04:00', '07:00');
+    [early, late] = (await bookSlots(token, day, typeId, [0, 2])) as [Booked, Booked];
+  });
+
+  afterAll(async () => {
+    await removeFromCalendar(TYPE);
+    await removeUserIfPresent('chat-cancel');
+  });
+
+  it('"cancel both": Claude asks for two changes in one answer, and one proposal holds both, each in its own sentence', async () => {
+    const body = await askForChange(token, ASK);
+    expect(body).toMatchObject({ status: 'awaiting_confirmation', proposal: proposalOf(summaries()), remainingToday: LIMIT - 1 });
+    expect((body?.proposal as { question: string }).question).toBe('Make these 2 changes?');
+    proposalId = (body?.proposal as { proposalId: string }).proposalId;
+    expect(await appointmentsOf(token)).toHaveLength(2);
+
+    // One answer of Claude with the two requests, the ids those of the list it was given.
+    const stored = await storedEntries(token);
+    expect(stored[4]?.content).toEqual([
+      expect.objectContaining({ type: 'tool_use', name: 'cancel_appointment', input: { appointmentId: early.appointmentId } }),
+      expect.objectContaining({ type: 'tool_use', name: 'cancel_appointment', input: { appointmentId: late.appointmentId } }),
+    ]);
+  });
+
+  it('confirmed while the first is inside the notice for cancelling: the calendar refuses that one and cancels the other, and each line of the proposal has its own outcome', async () => {
+    // The Administrator sets the notice to a number of whole hours that ends between the two
+    // appointments: the first, two hours earlier, is inside it, the second is not. The setting
+    // is put back whatever happens.
+    const before = (await api('GET', '/calendar/settings', adminToken)).body as Record<string, unknown>;
+    const settings = {
+      cancellationNoticeHours: before.cancellationNoticeHours,
+      minBookingNoticeHours: before.minBookingNoticeHours,
+      bookingHorizonDays: before.bookingHorizonDays,
+      maxFutureAppointmentsPerUser: before.maxFutureAppointmentsPerUser,
+    };
+    const hoursToTheFirst = (Date.parse(early.start) - Date.now()) / 3_600_000;
+    let res: Awaited<ReturnType<typeof confirm>>;
+    try {
+      expect((await api('PUT', '/calendar/settings', adminToken, { ...settings, cancellationNoticeHours: Math.floor(hoursToTheFirst) + 1 })).status).toBe(200);
+      res = await confirm(token, proposalId);
+    } finally {
+      expect((await api('PUT', '/calendar/settings', adminToken, settings)).status).toBe(200);
+    }
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      status: 'idle',
+      proposal: {
+        ...proposalOf(summaries(), [
+          ['refused', 'cancellation_notice_too_short'],
+          ['done', null],
+        ]),
+        proposalId,
+      },
+    });
+    expect((res.body?.messages as { from: string }[]).map((message) => message.from)).toEqual(['assistant']);
+  });
+
+  it('Claude is given one result for each change, in the order it asked: the refusal with its code, and the cancelled appointment', async () => {
+    const results = await storedToolResults(token);
+    expect(results).toHaveLength(3);
+    expect(results[1]).toEqual({ error: 'cancellation_notice_too_short', message: expect.any(String) });
+    expect(results[2]).toMatchObject({ outcome: 'done', appointment: { id: late.appointmentId, start: '06:00', status: 'cancelled' } });
+  });
+
+  it("the calendar's own route shows the first appointment still booked and the second cancelled", async () => {
+    const all = (await api('GET', `/calendar/appointments?from=${day}&to=${day}&status=all`, token)).body?.appointments as Booked[];
+    expect(all.map((appointment) => [appointment.appointmentId, appointment.status])).toEqual([
+      [early.appointmentId, 'booked'],
+      [late.appointmentId, 'cancelled'],
+    ]);
   });
 });
 

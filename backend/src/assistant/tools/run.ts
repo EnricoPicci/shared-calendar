@@ -26,7 +26,7 @@ import {
 export type { ToolResultBlock } from './tool';
 
 // Why a request was answered without calling the handler of its route.
-export type NotRun = 'unknown_tool' | 'not_offered' | 'not_a_read' | 'invalid_input' | 'one_change_at_a_time' | 'not_possible';
+export type NotRun = 'unknown_tool' | 'not_offered' | 'not_a_read' | 'invalid_input' | 'too_many_changes' | 'not_possible' | 'same_thing_twice' | 'not_proposed';
 
 // What the log line says of one tool request: the tool's name with the status its route answered
 // and how long it took, or why it was not run. For a change that was proposed, the status and the
@@ -150,16 +150,31 @@ export function asksForChange(request: ToolRequest, tools: readonly Tool[], call
 
 // A change that can be proposed: the tool, what its route will be sent at the confirmation, and
 // the server's own words for it in the conversation's language.
-export type Proposable = { ok: true; tool: string; call: ToolCall; summary: string; log: ToolLog } | { ok: false; outcome: ToolOutcome };
+// `subjects` is what the change acts on, as its tool names it.
+export type Proposable = { ok: true; tool: string; call: ToolCall; summary: string; subjects: string[]; log: ToolLog } | { ok: false; outcome: ToolOutcome };
+
+// The answers of the read routes the confirmations of one answer of Claude have asked for, by
+// what was asked: the changes of one answer are worked out on one reading of the calendar, and a
+// route several of them need is called once.
+export type FactsRead = Map<string, Promise<RouteAnswer>>;
 
 /**
  * Answers a request for a change without running it: the input is checked, then the facts the
  * proposal shows are read through a route that only reads, with the person's identity, and the
  * change is worded with the fixed text of the conversation's language. When the input is wrong,
  * or the facts cannot be read or say the change cannot be made, Claude gets an error result with
- * the reason and nothing is proposed.
+ * the reason and nothing is proposed. `facts` holds what the confirmations of the same answer have
+ * read already.
  */
-export async function proposeChange(request: ToolRequest, tools: readonly Tool[], caller: ToolCaller, context: ToolContext, texts: AssistantTexts, now: string): Promise<Proposable> {
+export async function proposeChange(
+  request: ToolRequest,
+  tools: readonly Tool[],
+  caller: ToolCaller,
+  context: ToolContext,
+  texts: AssistantTexts,
+  now: string,
+  facts: FactsRead = new Map(),
+): Promise<Proposable> {
   const checked = checkRequest(request, tools, caller);
   if (!checked.ok) return { ok: false, outcome: checked.outcome };
   const tool = checked.tool as ChangeTool;
@@ -168,7 +183,10 @@ export async function proposeChange(request: ToolRequest, tools: readonly Tool[]
   // The status of the last route the confirmation called, for the log line.
   let status = 0;
   const route: CallRoute = async (handler, call) => {
-    const answer = await callRoute(handler, call, caller, now);
+    const key = JSON.stringify(call);
+    const asked = facts.get(key) ?? callRoute(handler, call, caller, now);
+    facts.set(key, asked);
+    const answer = await asked;
     status = answer.status;
     return answer;
   };
@@ -177,5 +195,5 @@ export async function proposeChange(request: ToolRequest, tools: readonly Tool[]
   if (!read.ok) {
     return { ok: false, outcome: { result: errorResult(request.id, read.error, read.message), log: { name, notRun: 'not_possible', status, ms }, reads } };
   }
-  return { ok: true, tool: name, call: read.call, summary: tool.confirmation.summary(texts, read.facts), log: { name, status, ms, proposed: true } };
+  return { ok: true, tool: name, call: read.call, summary: tool.confirmation.summary(texts, read.facts), subjects: read.subjects ?? [], log: { name, status, ms, proposed: true } };
 }

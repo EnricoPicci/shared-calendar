@@ -1,4 +1,7 @@
 import { handler as bookAppointment } from '../../handlers/bookAppointment';
+import { handler as cancelAppointment } from '../../handlers/cancelAppointment';
+import { handler as changeAppointment } from '../../handlers/changeAppointment';
+import { handler as setAppointmentNote } from '../../handlers/updateAppointmentNote';
 import type { RouteHandler } from './tool';
 
 // The handlers of the routes that change the calendar, by the name of the tool that stands for
@@ -8,4 +11,7 @@ import type { RouteHandler } from './tool';
 // and ask Claude do not carry the code that changes the calendar.
 export const CHANGE_HANDLERS: Readonly<Record<string, RouteHandler>> = {
   book_appointment: bookAppointment,
+  cancel_appointment: cancelAppointment,
+  change_appointment: changeAppointment,
+  set_appointment_note: setAppointmentNote,
 };

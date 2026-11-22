@@ -69,8 +69,10 @@ export type CallRoute = (handler: RouteHandler, call: ToolCall) => Promise<Route
 // What reading the facts of a change gives. When the change can be proposed: the request its route
 // will be sent at the confirmation, exactly, and the facts the proposal shows. When it cannot (the
 // facts could not be read, or they say the change cannot be made): a code and a sentence for
-// Claude, and nothing is proposed.
-export type ConfirmationRead<Facts> = { ok: true; call: ToolCall; facts: Facts } | { ok: false; error: string; message: string };
+// Claude, and nothing is proposed. `subjects` names what the change acts on (an appointment, a
+// slot): two changes of one answer of Claude that share a subject are not proposed together, since
+// the second would be refused once the first was made.
+export type ConfirmationRead<Facts> = { ok: true; call: ToolCall; facts: Facts; subjects?: string[] } | { ok: false; error: string; message: string };
 
 // The fourth part, of a change tool only (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5, rule
 // 2): it reads the facts a proposal shows, through the handler of a route that only reads, and

@@ -74,8 +74,9 @@ stays at the root.
 │   │   │   └── tools/           # tool.ts (what a tool is), one file per tool, list.ts (the tools
 │   │   │                        # in the order Claude gets them), event.ts (the event a handler is
 │   │   │                        # called with), result.ts (a result made small), run.ts (one read,
-│   │   │                        # one proposed change), changeHandlers.ts (the handler of each
-│   │   │                        # change tool, imported by confirm.ts alone)
+│   │   │                        # one proposed change), facts.ts (the reads the confirmations
+│   │   │                        # share), changeHandlers.ts (the handler of each change tool,
+│   │   │                        # imported by confirm.ts alone)
 │   │   └── lib/                 # the only place that touches the AWS SDK (calendarDb.ts:
 │   │                            # the calendar table's item layout and lock; calendarRules.ts:
 │   │                            # the calendar's checks, pure, no AWS; assistantDb.ts: the
@@ -337,6 +338,11 @@ the booking's in both language files. In the back end it added `src/assistant/pr
 `tools/changeHandlers.ts`, and the handlers `confirmProposal.ts` and `declineProposal.ts`. A new
 change tool is one new file, one line in `list.ts`, one line in `changeHandlers.ts` and one
 function of `changes` in each language.
+
+Step c06 of `docs/CONVERSATIONAL_PLAN.md` (2026-11-22) added `tools/cancelAppointment.ts`,
+`tools/changeAppointment.ts` and `tools/setAppointmentNote.ts` with their three sentences in
+`changes`, and `tools/facts.ts`: what the confirmations read in common (the instant of a local
+date and time, the free slot at an instant, the appointment an id stands for).
 
 What stays out of `shared/`: the DynamoDB item shape (`MessageItem`), the authorizer context,
 the logger, the password generator (server-side secret handling), and everything that imports

@@ -15,8 +15,8 @@ Each section explains one idea in simple words and names the document that defin
 | `dave`, `erin` | throw-away Users of the back end's calendar journeys | `backend/tests/integration/calendar.test.ts` |
 | `fe-calendar`, `fe-calendar-b` | throw-away Users of the front end's calendar journeys | `frontend/tests/integration/calendar.test.ts` |
 | `fe-journey` | a throw-away User of the front end's Hello World journeys | `frontend/tests/integration/journeys.test.ts` |
-| `chat-text`, `chat-lingua`, `chat-read`, `chat-book`, `chat-decline`, `chat-trouble`, `chat-limit`, `chat-down` | throw-away Users of the assistant's journeys, one per block |
-| `chat-rival` | a second throw-away User of one assistant journey, who books through the calendar's own route | `backend/tests/integration/assistant.test.ts` | `backend/tests/integration/assistant.test.ts` |
+| `chat-text`, `chat-lingua`, `chat-read`, `chat-book`, `chat-decline`, `chat-trouble`, `chat-note`, `chat-move`, `chat-cancel`, `chat-limit`, `chat-down` | throw-away Users of the assistant's journeys, one per block | `backend/tests/integration/assistant.test.ts` |
+| `chat-rival` | a second throw-away User of one assistant journey, who books through the calendar's own route | `backend/tests/integration/assistant.test.ts` |
 | `chat-nobody` | a throw-away account in neither group, made straight in cognito-local | `backend/tests/integration/assistant.test.ts` |
 | `smoke-<epoch>` | the smoke test's throw-away User | `backend/scripts/smoke.sh` |
 
@@ -33,13 +33,12 @@ All journeys and the smoke test use the same local `calendar` table. They treat 
   they create only types named `fe-calendar …`, use only dates with nothing on them, from today +
   330 days, and remove what they made.
 - **The smoke test** uses a type `smoke-<epoch>` and a free 03:00–04:00 from 50 days ahead.
-- **The assistant's journeys never reset it either.** Four blocks need the calendar. Each creates
-  a type of its own name (`assistant journey`, `assistant booking journey`,
-  `assistant declining journey`, `assistant trouble journey`) and a one-off window in the early
-  morning, hours no other journey opens, on a day of its own: the 25th, 26th, 27th and 28th from
+- **The assistant's journeys never reset it either.** Seven blocks need the calendar. Each creates
+  a type of its own name (the file's `JOURNEY_TYPES`) and a one-off window in the early
+  morning, hours no other journey opens, on a day of its own: the 22nd to the 28th from
   today. Each removes its window and its type at its end (the file's helpers `openWindow()` and
   `removeFromCalendar()`). Before any block starts, the file removes what an interrupted run of
-  any of the four left on a day from tomorrow to 28 days ahead, so that a window left by one
+  any of them left on a day from tomorrow to 28 days ahead, so that a window left by one
   block never stands in the way of another a day later.
   The blocks that book cancel their appointments first, as the Administrator; a cancelled
   appointment keeps no slot busy, so a second run the same day finds the same free slots. Each
@@ -431,7 +430,8 @@ the API to decide can expect exactly one.
 The assistant is the calendar used by conversation: a person writes a message, the server asks
 Claude (Anthropic's model) and answers with what Claude said. Its routes and their answers are
 defined in `docs/ARCHITECTURE.md` section 4 ("The assistant's routes"); what is not built yet
-(the changes other than a User's booking) is in `docs/CONVERSATIONAL_ARCHITECTURE.md`.
+(the Administrator's changes: the settings, the types, the opening hours, a booking for a
+User) is in `docs/CONVERSATIONAL_ARCHITECTURE.md`.
 
 - **One conversation per person**, found by the `sub` of the token. No route takes a conversation
   id, so nobody can reach another person's conversation. `GET /assistant/conversation` reads it,
@@ -466,6 +466,7 @@ the tools" below). The texts the journeys send:
 | `fake: book me the slot of the booking journey`, `fake: book me the slot of the declining journey`, `fake: book me the slot somebody else takes`, `fake: book me the slot confirmed twice` | first a request for the tool `book_appointment`, for a day 26, 27 or 28 days after today at a fixed hour; then, as its text, the last result of a tool it was given |
 | `yes` | the same two answers as the sentence of the declining journey |
 | `fake: book me a slot when the money runs out` | first a request for `book_appointment`; then an error (a spending limit) the first time, and the second time the last result of a tool as its text |
+| `fake: add a note to my appointment of the note journey`, `fake: move my appointment of the moving journey`, `fake: cancel both my appointments of the cancelling journey` | first a request for `list_appointments`, for the day 22, 23 or 24 days after today; then a request for the change (`set_appointment_note`, `change_appointment`, or two `cancel_appointment` in one answer), with the id of the first appointment of that list, and of the second for the second cancellation; then the last result of a tool as its text |
 | a text the file does not hold | "Fake Claude: no answer is scripted for this message." |
 
 The language question (below) is scripted the same way: of the texts the journeys send,
@@ -517,19 +518,26 @@ the internal fields are left out: a window carries no id. An appointment keeps i
 does a type in the list of types, since a later request must be able to name them
 (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 8.3).
 
-The fake has three **marks**, texts it replaces in a scripted answer. `{{application-line}}`
+The fake has four **marks**, texts it replaces in a scripted answer, and one memory. `{{application-line}}`
 becomes the line of the application. `{{date+25}}` becomes the date 25 days after the date that
 line states, so the fake can ask for a day the journey prepared without knowing the date itself.
 `{{last-tool-result}}` becomes the result of the last tool, which is how a journey reads what
-Claude was given. And a step may be written to fail once: an error the first time a request
+Claude was given. `{{appointment-id-1}}` becomes the id of the first appointment in the result of
+the last tool, when that result is a list of appointments (`-2` the second): the server makes
+an appointment's id, so the fake, like Claude, must read the list to learn it. And a step may be written to fail once: an error the first time a request
 comes, the answer when the very same request comes again.
 
 ### A proposal, and its two buttons
 
 Claude cannot change the calendar (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 5.5). When it
-asks for a tool that changes something (for now one, `book_appointment`, offered to Users only),
-the server changes nothing. It reads the facts itself, through the code of `GET /calendar` with
-the person's identity: the free slot at the time asked for, its end, the name of its type. Then
+asks for a tool that changes something (`book_appointment`, offered to Users only, and
+`cancel_appointment`, `change_appointment` and `set_appointment_note`, offered to everybody),
+the server changes nothing. It reads the facts itself, with the person's identity. For a
+booking, through the code of `GET /calendar`: the free slot at the time asked for, its end, the
+name of its type. For the other three, through the code of `GET /calendar/appointments`: the
+appointment the id stands for, among the person's appointments that have not ended. Several
+changes asked for in one answer of Claude make one proposal, with one line in `actions` for
+each, five at most; if one of them cannot be proposed, none is. Then
 it saves a **proposal** and answers `status` `awaiting_confirmation`, with:
 
 ```
@@ -544,8 +552,10 @@ proposal waits, `outcome` and `error` are `null`. What happens next is the perso
 
 - **`POST /assistant/proposals/{proposalId}/confirm`** is the only way the change is made. The
   server takes the proposal, so that a second confirmation finds none, and calls the code of the
-  change's own route (`POST /calendar/appointments`) with the identity of the request: every
-  rule of the calendar is checked again at that moment. It saves the outcome (`done`; `refused`
+  change's own route (`POST /calendar/appointments` for a booking, and the cancel, change and
+  note routes of an appointment for the other three) with the identity of the request: every
+  rule of the calendar is checked again at that moment. The changes of a proposal are run in
+  order, each with its own outcome: one refused does not stop the others. It saves the outcome (`done`; `refused`
   with the route's error code in `error`; `unknown`), then asks Claude once for its closing
   words. The settled proposal stays in the replies, with its outcome, until the person's next
   message.

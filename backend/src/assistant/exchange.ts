@@ -7,7 +7,7 @@ import { activityLine, currentConversation, remaining, replyOf, type CoreResult,
 import { INSTRUCTIONS, timeLine } from './prompt';
 import { TOOLS } from './tools/list';
 import { asUnknown, isWaiting, proposalOf, settledWithout, takenState, type Proposal, type ProposedChange } from './proposal';
-import { asksForChange, notRun, proposeChange, runRead, type ToolLog } from './tools/run';
+import { asksForChange, notRun, proposeChange, runRead, type FactsRead, type Proposable, type ToolLog } from './tools/run';
 import type { Tool, ToolResultBlock } from './tools/tool';
 
 // The part of the assistant's core that asks Claude (docs/CONVERSATIONAL_ARCHITECTURE.md section
@@ -245,32 +245,56 @@ export async function runStep(input: StepInput): Promise<CoreResult> {
       // the conversation one Anthropic no longer accepts.
       const caller = { ...identity, requestId: request.requestId };
       const context = { timeZone: config.timeZone, role: identity.role };
-      const changesAsked = answer.requests.filter((asked) => asksForChange(asked, tools, caller)).length;
-      const results: ToolResultBlock[] = [];
-      const changes: ProposedChange[] = [];
+      // More changes than a proposal may hold: none is proposed, and no fact is read.
+      const tooMany = answer.requests.filter((asked) => asksForChange(asked, tools, caller)).length > ASSISTANT_LIMITS.changesPerProposal;
+      // One reading of the calendar for all the changes of this answer.
+      const facts: FactsRead = new Map();
+      const subjects = new Set<string>();
+      // What each request of the answer came to, in the order asked: the result of a read or of
+      // a request that was refused, or a change that can be proposed.
+      const answered: ({ result: ToolResultBlock } | { change: ProposedChange; log: number })[] = [];
+      let refusedChange = false;
       for (const asked of answer.requests) {
         if (!asksForChange(asked, tools, caller)) {
           const done = await runRead(asked, tools, caller, context, now);
-          results.push(done.result);
+          answered.push({ result: done.result });
           ran.push(done.log);
           continue;
         }
-        // A proposal holds one change: asked for several in one answer, Claude is told to ask
-        // for one, and none is proposed.
-        if (changesAsked > 1) {
-          const refused = notRun(asked.id, asked.name, 'one_change_at_a_time', 'Ask for one change at a time: nothing was proposed. Call the tool for the first change alone.');
-          results.push(refused.result);
+        const proposed: Proposable = tooMany
+          ? { ok: false, outcome: notRun(asked.id, asked.name, 'too_many_changes', `Ask for at most ${ASSISTANT_LIMITS.changesPerProposal} changes in one answer: nothing was proposed. Call the tools again for the first ${ASSISTANT_LIMITS.changesPerProposal}, and for the others after the person has confirmed those.`) }
+          : await proposeChange(asked, tools, caller, context, texts, now, facts);
+        // Two changes of one answer on the same appointment or into the same slot: the second
+        // would be refused once the first was made, so it is not proposed.
+        const twice = proposed.ok && proposed.subjects.some((subject) => subjects.has(subject));
+        if (!proposed.ok || twice) {
+          const refused = proposed.ok
+            ? notRun(asked.id, proposed.tool, 'same_thing_twice', 'Another change asked for in the same answer is about the same appointment or the same slot: nothing was proposed. Ask for one change of it.')
+            : proposed.outcome;
+          answered.push({ result: refused.result });
           ran.push(refused.log);
+          refusedChange = true;
           continue;
         }
-        const proposed = await proposeChange(asked, tools, caller, context, texts, now);
-        if (!proposed.ok) {
-          results.push(proposed.outcome.result);
-          ran.push(proposed.outcome.log);
-          continue;
-        }
+        for (const subject of proposed.subjects) subjects.add(subject);
         ran.push(proposed.log);
-        changes.push({ toolUseId: asked.id, tool: proposed.tool, call: proposed.call, summary: proposed.summary, outcome: null, error: null });
+        answered.push({ change: { toolUseId: asked.id, tool: proposed.tool, call: proposed.call, summary: proposed.summary, outcome: null, error: null }, log: ran.length - 1 });
+      }
+      // The changes of one answer are confirmed together or not at all: when one of them cannot
+      // be proposed, none is, so that the person is never shown half of what they asked for. Each
+      // of the others is answered with the reason, and Claude tells the person.
+      const results: ToolResultBlock[] = [];
+      const changes: ProposedChange[] = [];
+      for (const one of answered) {
+        if ('result' in one) {
+          results.push(one.result);
+        } else if (refusedChange) {
+          const left = notRun(one.change.toolUseId, one.change.tool, 'not_proposed', 'Nothing was proposed: another change asked for in the same answer could not be proposed, and the changes of one answer are confirmed together. This change itself is possible. Tell the person what could not be done, and call the tools again for what can be.');
+          results.push(left.result);
+          ran[one.log] = left.log;
+        } else {
+          changes.push(one.change);
+        }
       }
       if (changes.length > 0) {
         // The conversation now ends with an answer of Claude whose results are not all there:

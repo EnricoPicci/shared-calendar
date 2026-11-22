@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v8, under way: steps c00 to c05 of `docs/CONVERSATIONAL_PLAN.md` done |
-| Date | 2026-11-21 |
+| Status | v9, under way: steps c00 to c06 of `docs/CONVERSATIONAL_PLAN.md` done |
+| Date | 2026-11-22 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
 
@@ -19,6 +19,7 @@
 | v6 | 2026-11-21 | Step c03 of `docs/CONVERSATIONAL_PLAN.md` is done: the conversation in text. `docs/ARCHITECTURE.md` section 4 ("The assistant's routes") governs the three routes built. What the implementation fixed is said here: the language question that cannot be asked saves nothing (section 4.2). The version mark is worked out, from the instructions, the block about the person and the tools (section 4.3). A refusal is saved, then the conversation is ended (section 7.4). The instructions ask for the formal "lei" in Italian (section 7.3). The local stack does not remember a spending limit (section 6.1). **One point is left to step c04**, where `continue` is built: a first message asks Claude twice, the language and the step, each allowed 22 seconds, in a function of 29 |
 | v7 | 2026-11-21 | Step c04 of `docs/CONVERSATIONAL_PLAN.md` is done: reading. `docs/ARCHITECTURE.md` section 4 ("The assistant's routes") governs `POST /assistant/continue` and the four read tools. What the implementation fixed is said here. **Decided by the Product Owner:** `continue` is not a message of the day and the daily limit does not refuse it (section 6); a language question that took too long leaves the step to `continue` (sections 4.2 and 5.1); the instructions name what cannot be done yet, a stopgap each later step shrinks (section 7.3). The limit of eight is counted from the stored conversation, and the eighth answer's reads are still run and saved (sections 4.4 and 5.6). `continue` answers `409 assistant_busy` to the loser of two at once (section 6). A tool of another role is answered like one that does not exist (section 7.4). A tool's JSON Schema is made from its `zod` schema by `zod` itself; an input differs by role where the route takes more from the Administrator (section 8.2). What a result holds, and how it is cut (section 8.3). The fake Claude's tool requests, its two new marks and its one memory (section 12.1) |
 | v8 | 2026-11-21 | Step c05 of `docs/CONVERSATIONAL_PLAN.md` is done: a change, with its proposal, and one change tool, `book_appointment`, for Users. `docs/ARCHITECTURE.md` section 4 ("The assistant's routes") governs the two routes built, `confirm` and `decline`. **Decided with the Product Owner:** `book_appointment` is offered to Users only until the Administrator's booking is built, and the function that confirms gets only the permissions a User's booking needs (section 11.3). The stored proposal is a list of changes from the start, of which one is accepted for now (section 5.5, rule 4). What the implementation fixed is said here. A message while a proposal waits drops it and is read in the same request (section 5.5, rule 5). What each request does when it finds a proposal a confirmation took, and how old such a proposal must be to count as left (section 5.5, rule 6). The result of a change that was made says that the person confirmed, because the real model otherwise spoke of a proposal still waiting (section 5.4). A change the route failed on has the outcome `unknown` (section 5.4). How long a settled proposal is shown (section 6). The night the clocks go back: which of two equal times (section 8.2). The change handlers are reachable from the confirming function alone, which a lint rule keeps so (section 8.2). The stored shape of a proposal (section 9) |
+| v9 | 2026-11-22 | Step c06 of `docs/CONVERSATIONAL_PLAN.md` is done: the other appointment changes, `cancel_appointment`, `change_appointment` and `set_appointment_note`, for both roles, and several changes in one proposal. **Decided with the Product Owner:** the three tools are offered to the Administrator too, and the sentence then names whose appointment it is; more than five changes in one answer propose none; when one change of an answer cannot be proposed, none is (section 5.5, rule 4); `book_appointment` no longer asks for one booking at a time. What the implementation fixed is said here. The appointment an id stands for is read through the list of the appointments that have not ended, as the calendar has no route that reads one (section 5.4). Two changes of one answer on the same appointment or into the same slot are not proposed, nor is a change that changes nothing (section 5.5, rule 4). The changes of one answer share one reading of the calendar (section 5.4). A note is a text or `null`, never left out (section 8.2). The confirming function needed no new permission: section 11.3 named `CalendarDeletePolicy` by mistake. The fake's third mark, for an appointment's id (section 12.1) |
 
 ---
 
@@ -377,6 +378,23 @@ As built (`backend/src/assistant/`: `exchange.ts` makes the proposal, `confirm.t
   at the time asked for, and takes its end and the name of its type from the answer. No slot,
   or a time that the day does not have, is an error result and the step goes on as after a
   read: there is no proposal.
+- **The appointment an id stands for is read through the list.** The calendar has no route
+  that reads one appointment. To cancel, move or annotate, the server calls the code of
+  `GET /calendar/appointments` with the caller's identity for the appointments that have not
+  ended, cancelled ones included, and looks for the id in the answer. That list is what the
+  three routes can act on. A User's list holds their own appointments only, so another
+  person's id is not found, with the code `appointment_not_found` that the routes answer for
+  it. An appointment that has ended is not in the list, and is not found either. A cancelled
+  one is found and refused with the routes' `appointment_not_active`. For the Administrator
+  the list is everybody's appointments still to end: its cost grows with the calendar, as
+  `list_appointments` without a period does.
+- **A move** reads the appointment and then the day it would go to, as a booking does, with
+  the same code for both. The proposal names the old time and the new slot, each with its
+  type, since a move into other hours changes the type.
+- **The changes of one answer share one reading.** A route asked the same thing by two
+  changes of one answer is called once: "cancel all five" reads the list once.
+- **What is not checked at the proposal**: the notice for cancelling. The route checks it at
+  the confirmation, and a change inside the notice is shown as refused there.
 - **Confirming** takes the proposal, runs each change through its route's handler with the
   identity of the request that confirms (not one stored with the proposal), and saves the
   outcomes before Claude is asked anything. Then it asks Claude once, for the closing words,
@@ -418,11 +436,15 @@ As built (`backend/src/assistant/`: `exchange.ts` makes the proposal, `confirm.t
    together, run in order, each with its own outcome (one refused does not stop the others;
    the calendar's routes are independent). Reads asked for in the same answer are run at once
    and their results kept back until the proposal is settled.
-   **For the time being a proposal holds one change**: when the model asks for more than one
-   in an answer, none is proposed and each gets the error result "one change at a time", so
-   the model asks for the first alone. The stored proposal is a list all the same, and the
-   screen's `actions` too, so that the step that brings the other change tools only lifts
-   this limit.
+   As built: **more than five changes** in one answer propose none, and each gets the error
+   result `too_many_changes`, without a fact being read. **When one change of an answer
+   cannot be proposed, none is**: that one gets its own error (an appointment not found, no
+   free slot), the others the error `not_proposed`, and the model tells the person and asks
+   again for what can be done. A proposal is therefore always the whole of what the model
+   asked for. **Two changes of one answer about the same thing** (the same appointment, or
+   two bookings or moves into the same slot) are one that cannot be proposed: the second gets
+   `same_thing_twice`. **A change that would change nothing** is not proposed either: a move
+   to the time the appointment has, the note it has, a removal where there is no note.
 5. **Writing instead of pressing drops the proposal.** A new message while a proposal waits
    ("no, at eleven") declines it; the model is told nothing was changed and reads the new
    message. That includes a typed "yes": the model then proposes again and the screen shows
@@ -547,8 +569,8 @@ How to read it:
 - **The limit of eight** (section 4.4) is checked after Claude answered: the eighth answer in
   words is an answer like any other; the eighth that asks to read has its reads run and saved,
   then the fixed sentence, and the status is `idle`.
-- **Everything in the diagram is built.** For the time being a proposal holds one change
-  (section 5.5, rule 4), so the loop of the confirmation runs once.
+- **Everything in the diagram is built.** A proposal holds up to five changes (section 5.5,
+  rule 4), and the loop of the confirmation runs once for each.
 
 ---
 
@@ -743,9 +765,11 @@ conversation's language) say, in prose:
 **The instructions say what works.** While some abilities of section 3 have no tool yet, one
 paragraph ("What you can do for the time being") tells Claude that it can look things up
 (the settings, the types, the free slots, the appointments), that a User can book an
-appointment for themself, and that moving, cancelling, notes and the opening hours, types and
-settings are done from the web pages for the time being, as is the Administrator's booking for
-a User. It is one paragraph for both roles: the tools a request names already differ by
+appointment for themself, that an appointment can be cancelled, moved or have its note set or
+removed (a User's own, and anybody's for the Administrator), and that the opening hours,
+types and settings are done from the web pages for the time being, as is the Administrator's
+booking for a User. The paragraph on changes also says to name an appointment by the id a
+read gave, never a guessed one, and to ask for several changes in one answer, five at most. It is one paragraph for both roles: the tools a request names already differ by
 role. **That paragraph is a stopgap.** Each step that brings a tool takes its ability out
 of it, and the step that brings the last one removes the paragraph; only the list of section
 3.1 stays in the web pages for good. Every change to it changes the version mark (section 4.3),
@@ -831,7 +855,17 @@ out one proposed change, `changeHandlers.ts` names the handler of each change to
   optional `occurrence`, `first` or `second`. A time that comes twice asked without it is an
   error result that tells Claude to ask the person, and the proposal of the second one says
   so in words. A time the day does not have (the night the clocks go forward) is an error
-  result too.
+  result too. Several bookings are asked for in one answer, one request each.
+- **`cancel_appointment`**, **`change_appointment`** and **`set_appointment_note`**, for both
+  roles. Each takes the appointment's id and nothing that names it another way: no date, no
+  username. `change_appointment` adds a day, a local start time and the optional
+  `occurrence`: it only moves, so it has no note (the route keeps the one the appointment
+  has), no end and no type. `set_appointment_note` adds `note`, which must be given: a text
+  is the whole new note, `null` removes it, and an empty text is refused, so that a note is
+  never removed by accident. The schemas are the same for both roles: the route decides whose
+  appointments the caller may touch.
+- **What Claude gets of a move** is the new appointment, which has a new id, and which one it
+  replaces (its id, day, times and the status `cancelled`).
 
 - **The JSON Schema Claude is given is made from the `zod` schema**, by `zod`'s own
   `z.toJSONSchema`, without its `$schema` line. One schema therefore does both jobs: it tells
@@ -1012,12 +1046,14 @@ key and a monthly spend limit (section 14).
 | `declineProposal` | `POST …/decline` | 10 s | assistant table (no key: it never asks Claude) |
 | `sendAssistantMessage` | `POST /assistant/messages` | 29 s | assistant table; `CalendarReadPolicy`; Cognito `ListUsersInGroup` (the tool `list_users`); `ssm:GetParameter` on the key |
 | `continueAssistant` | `POST /assistant/continue` | 29 s | as `sendAssistantMessage` |
-| `confirmProposal` | `POST …/confirm` | 29 s | as `sendAssistantMessage`, plus `CalendarWritePolicy`, `CalendarDeletePolicy`, `CalendarBookPolicy` and Cognito `AdminGetUser`, `AdminListGroupsForUser` (booking for a User) |
+| `confirmProposal` | `POST …/confirm` | 29 s | as `sendAssistantMessage`, plus `CalendarWritePolicy`, `CalendarBookPolicy`, the further calendar sets the availability tools need, and Cognito `AdminGetUser`, `AdminListGroupsForUser` (booking for a User) |
 
 **As built, `confirmProposal` has less than the row above**: the assistant table, the key,
 and of the calendar `CalendarReadPolicy`, `CalendarWritePolicy` and `CalendarBookPolicy`, which
-is what a User's booking needs. `CalendarDeletePolicy` and the two Cognito actions come with
-the tools that need them (the changes that delete, and the Administrator's booking for a User).
+is what a User's booking needs, and also all that cancelling, moving and a note need: those
+three routes' own roles hold the read and write sets, and the move the book set too. The two
+Cognito actions come with the Administrator's booking for a User, and any further calendar set
+with the availability tool whose route needs it.
 `sendAssistantMessage` and `continueAssistant` gained nothing: a proposal's facts are read with
 the calendar's read set they already had. They have no Cognito permission yet either, as
 `list_users` is not built.
@@ -1052,10 +1088,13 @@ Anthropic's documentation. A text nobody scripted gets one fixed, recognisable a
 
 With the tools, the fake learnt three things. **A request for a tool** is an answer like any
 other, scripted per step; those in the file were recorded from the real model in step c04 of
-`docs/CONVERSATIONAL_PLAN.md`. **Two marks**: `{{date+N}}`, replaced anywhere in an answer, so
+`docs/CONVERSATIONAL_PLAN.md`. **Three marks**: `{{date+N}}`, replaced anywhere in an answer, so
 in a tool's input too, by the date N days after the date the last line of the application
-states; and `{{last-tool-result}}`, replaced in a text by the content of the last result of a
-tool in the request, which lets a journey read what Claude was given of the calendar. The fake
+states; `{{last-tool-result}}`, replaced in a text by the content of the last result of a
+tool in the request, which lets a journey read what Claude was given of the calendar; and
+`{{appointment-id-N}}`, replaced anywhere by the id of the Nth appointment in that last
+result when it is a list of appointments, because the server makes an appointment's id and no
+script can hold one: the fake, like Claude, asks for the list first and takes the id from it. The fake
 reads no clock: it takes "today" from the line the application wrote, as Claude does, so it
 never disagrees with the journey about the date. **One memory**: a step written
 `{ "once": …, "then": … }` gives the first answer the first time a request comes and the second

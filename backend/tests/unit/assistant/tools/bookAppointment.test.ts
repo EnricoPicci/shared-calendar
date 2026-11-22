@@ -55,6 +55,10 @@ describe('book_appointment: what Claude is given (3, 8.2)', () => {
     expect(bookAppointmentDefinition.description).toContain('confirm');
   });
 
+  it('the description says that several bookings are asked for in one answer', () => {
+    expect(bookAppointmentDefinition.description).toContain('call this tool once for each in the same answer');
+  });
+
   it('refuses an end, a type, a username, a time off the grid and a date that is not one', () => {
     const input = bookAppointmentDefinition.input('user');
     expect(input.safeParse({ date: '2026-11-24', time: '10:00' }).success).toBe(true);
@@ -79,6 +83,8 @@ describe('book_appointment: the facts of the confirmation (5.5 rule 2)', () => {
     expect(result).toEqual({
       ok: true,
       call: { routeKey: 'POST /calendar/appointments', path: '/calendar/appointments', body: { start: '2026-11-24T09:00:00.000Z' } },
+      // What another change of the same answer must not also fill.
+      subjects: ['slot 2026-11-24T09:00:00.000Z'],
       facts: { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', note: null, secondTime: false },
     });
   });

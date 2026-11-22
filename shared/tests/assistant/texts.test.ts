@@ -15,12 +15,26 @@ const BOOKING = { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit
 const BOOKING_WITH_NOTE = { ...BOOKING, note: 'Bring the documents' };
 const BOOKING_SECOND_TIME = { date: '2026-10-25', start: '02:00', end: '03:00', type: 'Visit', note: null, secondTime: true };
 
+// An appointment as the proposal of a change names it: a User's own, which names nobody, and
+// alice's as the Administrator is shown it. A move to a slot of another type, and to the second
+// 02:00 of the night the clocks go back. A note set, set over another, and removed.
+const OWN = { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', username: null };
+const OF_ALICE = { ...OWN, username: 'alice' };
+const TO = { date: '2026-11-26', start: '09:00', end: '10:00', type: 'Checkup', secondTime: false };
+const TO_SECOND_TIME = { date: '2026-10-25', start: '02:00', end: '03:00', type: 'Visit', secondTime: true };
+const NOTE_SET = { appointment: OWN, note: 'Bring the documents', previous: null };
+const NOTE_REPLACED = { appointment: OF_ALICE, note: 'Bring the documents', previous: 'First visit' };
+const NOTE_REMOVED = { appointment: OWN, note: null, previous: 'First visit' };
+
 // The arguments each text that is a function is tried with: every number of changes a proposal
 // may hold, and each shape of a booking. A new function among the texts needs its entry here, or
 // the test below fails.
 const SAMPLES: Record<string, unknown[][]> = {
   proposalQuestion: Array.from({ length: ASSISTANT_LIMITS.changesPerProposal }, (_, i) => [i + 1]),
   'changes.bookAppointment': [[BOOKING], [BOOKING_WITH_NOTE], [BOOKING_SECOND_TIME]],
+  'changes.cancelAppointment': [[OWN], [OF_ALICE]],
+  'changes.changeAppointment': [[{ appointment: OWN, to: TO }], [{ appointment: OF_ALICE, to: TO }], [{ appointment: OWN, to: TO_SECOND_TIME }]],
+  'changes.setAppointmentNote': [[NOTE_SET], [NOTE_REPLACED], [NOTE_REMOVED]],
 };
 
 // Every text of one language as `path -> the strings it gives`: a string as itself, a function
@@ -118,5 +132,50 @@ describe('assistantTexts', () => {
     expect(bookAppointment(BOOKING_SECOND_TIME)).toBe(
       "Prenotare un appuntamento per domenica 25 ottobre 2026, dalle 02:00 alle 03:00 (Visit). È la seconda volta che quella notte l'orologio segna le 02:00: torna l'ora solare.",
     );
+  });
+
+  it('a cancellation names the appointment, and whose it is for the Administrator only: both languages', () => {
+    expect(ASSISTANT_TEXTS_EN.changes.cancelAppointment(OWN)).toBe('Cancel the appointment on Tuesday 24 November 2026, from 10:00 to 11:00 (Visit).');
+    expect(ASSISTANT_TEXTS_EN.changes.cancelAppointment(OF_ALICE)).toBe('Cancel the appointment of alice on Tuesday 24 November 2026, from 10:00 to 11:00 (Visit).');
+    expect(ASSISTANT_TEXTS_IT.changes.cancelAppointment(OWN)).toBe("Annullare l'appuntamento di martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Visit).");
+    expect(ASSISTANT_TEXTS_IT.changes.cancelAppointment(OF_ALICE)).toBe("Annullare l'appuntamento di alice di martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Visit).");
+  });
+
+  it('a move names the appointment as it is and the slot it goes to, each with its type: both languages', () => {
+    const en = ASSISTANT_TEXTS_EN.changes.changeAppointment;
+    const it_ = ASSISTANT_TEXTS_IT.changes.changeAppointment;
+    expect(en({ appointment: OWN, to: TO })).toBe(
+      'Move the appointment on Tuesday 24 November 2026, from 10:00 to 11:00 (Visit), to Thursday 26 November 2026, from 09:00 to 10:00 (Checkup).',
+    );
+    expect(en({ appointment: OF_ALICE, to: TO })).toBe(
+      'Move the appointment of alice on Tuesday 24 November 2026, from 10:00 to 11:00 (Visit), to Thursday 26 November 2026, from 09:00 to 10:00 (Checkup).',
+    );
+    expect(en({ appointment: OWN, to: TO_SECOND_TIME })).toBe(
+      'Move the appointment on Tuesday 24 November 2026, from 10:00 to 11:00 (Visit), to Sunday 25 October 2026, from 02:00 to 03:00 (Visit). This is the second 02:00 of that night: the clocks go back.',
+    );
+    expect(it_({ appointment: OWN, to: TO })).toBe(
+      "Spostare l'appuntamento di martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Visit), a giovedì 26 novembre 2026, dalle 09:00 alle 10:00 (Checkup).",
+    );
+    expect(it_({ appointment: OF_ALICE, to: TO })).toBe(
+      "Spostare l'appuntamento di alice di martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Visit), a giovedì 26 novembre 2026, dalle 09:00 alle 10:00 (Checkup).",
+    );
+    expect(it_({ appointment: OWN, to: TO_SECOND_TIME })).toBe(
+      "Spostare l'appuntamento di martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Visit), a domenica 25 ottobre 2026, dalle 02:00 alle 03:00 (Visit). È la seconda volta che quella notte l'orologio segna le 02:00: torna l'ora solare.",
+    );
+  });
+
+  it('a note is shown as it would become, with the note it replaces or removes: both languages', () => {
+    const en = ASSISTANT_TEXTS_EN.changes.setAppointmentNote;
+    const it_ = ASSISTANT_TEXTS_IT.changes.setAppointmentNote;
+    expect(en(NOTE_SET)).toBe('Set the note of the appointment on Tuesday 24 November 2026, from 10:00 to 11:00 (Visit), to: "Bring the documents"');
+    expect(en(NOTE_REPLACED)).toBe(
+      'Set the note of the appointment of alice on Tuesday 24 November 2026, from 10:00 to 11:00 (Visit), to: "Bring the documents" It replaces the note: "First visit"',
+    );
+    expect(en(NOTE_REMOVED)).toBe('Remove the note of the appointment on Tuesday 24 November 2026, from 10:00 to 11:00 (Visit). The note is: "First visit"');
+    expect(it_(NOTE_SET)).toBe("Impostare la nota dell'appuntamento di martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Visit): «Bring the documents»");
+    expect(it_(NOTE_REPLACED)).toBe(
+      "Impostare la nota dell'appuntamento di alice di martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Visit): «Bring the documents» Sostituisce la nota: «First visit»",
+    );
+    expect(it_(NOTE_REMOVED)).toBe("Togliere la nota dell'appuntamento di martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Visit). La nota è: «First visit»");
   });
 });

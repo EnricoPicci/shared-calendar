@@ -19,8 +19,17 @@ const ADMIN = { timeZone: ROME, role: 'admin' as const };
 
 // Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
 describe('the list of tools (3, 8.2)', () => {
-  it('holds the four reads, each for both roles, then the booking for Users, the definitions in the same order as the tools', () => {
-    expect(DEFINITIONS.map((definition) => definition.name)).toEqual(['get_settings', 'list_types', 'get_calendar', 'list_appointments', 'book_appointment']);
+  it('holds the four reads, each for both roles, then the booking for Users and the three other appointment changes for both roles, the definitions in the same order as the tools', () => {
+    expect(DEFINITIONS.map((definition) => definition.name)).toEqual([
+      'get_settings',
+      'list_types',
+      'get_calendar',
+      'list_appointments',
+      'book_appointment',
+      'cancel_appointment',
+      'change_appointment',
+      'set_appointment_note',
+    ]);
     expect(TOOLS.map((tool) => tool.definition)).toEqual([...DEFINITIONS]);
     for (const definition of DEFINITIONS.slice(0, 4)) {
       expect(definition.kind).toBe('read');
@@ -28,13 +37,22 @@ describe('the list of tools (3, 8.2)', () => {
       expect(definition.description.length).toBeGreaterThan(80);
     }
     expect(DEFINITIONS[4]).toMatchObject({ kind: 'change', roles: ['user'] });
-    expect(offeredTo(DEFINITIONS, 'user')).toHaveLength(5);
-    expect(offeredTo(DEFINITIONS, 'admin')).toHaveLength(4);
+    for (const definition of DEFINITIONS.slice(5)) expect(definition).toMatchObject({ kind: 'change', roles: ['admin', 'user'] });
+    expect(offeredTo(DEFINITIONS, 'user')).toHaveLength(8);
+    expect(offeredTo(DEFINITIONS, 'admin').map((definition) => definition.name)).toEqual([
+      'get_settings',
+      'list_types',
+      'get_calendar',
+      'list_appointments',
+      'cancel_appointment',
+      'change_appointment',
+      'set_appointment_note',
+    ]);
   });
 
   it('gives Claude each tool as a name, a description and the JSON Schema of its input', () => {
     const tools = toolsForClaude(DEFINITIONS, 'user');
-    expect(tools.map((tool) => Object.keys(tool))).toEqual(Array(5).fill(['name', 'description', 'input_schema']));
+    expect(tools.map((tool) => Object.keys(tool))).toEqual(Array(8).fill(['name', 'description', 'input_schema']));
     expect(tools[0]?.input_schema).toEqual({ type: 'object', properties: {}, additionalProperties: false });
     expect(tools[1]?.input_schema).toEqual({ type: 'object', properties: {}, additionalProperties: false });
     expect(tools[2]?.input_schema).toEqual({

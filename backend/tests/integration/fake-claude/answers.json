@@ -3,8 +3,9 @@
     "The scripted answers of the fake Claude (backend/docker/fake-claude.mjs), owned by the journeys beside this folder and read again at every request.",
     "answers: named answers, each a status and a body as Anthropic sends them. messages: the exact text of a message of the person -> the steps of the exchange it starts, one per request to Claude; a step is the name of an answer, or { once, then }: the first name the first time a request comes, the second when the very same request comes again (an outage that passes). language: the same for the language question. otherwise: the answer for a message nobody scripted.",
     "source says where a body comes from: \"recorded\" from the real API (cut down to the fields a client reads), \"documentation\" when Anthropic's pages give the shape and it cannot be provoked, \"fake\" when the text was written for a journey, in the shape of a recorded answer. The two requests for a tool are the content blocks the real model sent in the trial of the step that built the tools (the block with its id, name and caller), one block each, with the dates of the calendar request replaced by a mark; the envelope around them (id, usage) is written in the shape of the recorded answers.",
-    "The text {{application-line}} in an answer is replaced by the fake with the last line of the application in the request (the entry of role \"system\" after a message of the person). {{date+N}}, anywhere in an answer, is replaced by the date N days after the date that line states. {{last-tool-result}}, in a text, is replaced by the content of the last result of a tool in the request.",
-    "The requests for a booking (tool-book-day…) are the one content block the real model sent for \"book me Tuesday at 10\" in the trial of the step that built the proposal (its id, name and caller; an input of a date and a time, nothing else), with the date replaced by a mark and the time by the hour each journey opens. A step after a proposal is counted like any other: the confirmation's request for the closing words is the second request since the person's message. The message \"yes\" is scripted to ask for the same booking again, as the real model did when a person typed it instead of pressing the button."
+    "The text {{application-line}} in an answer is replaced by the fake with the last line of the application in the request (the entry of role \"system\" after a message of the person). {{date+N}}, anywhere in an answer, is replaced by the date N days after the date that line states. {{last-tool-result}}, in a text, is replaced by the content of the last result of a tool in the request. {{appointment-id-N}}, anywhere in an answer, is replaced by the id of the Nth appointment in the last result of a tool in the request, when that result is a list of appointments: the server makes an appointment's id, so no answer can hold one.",
+    "The requests for a booking (tool-book-day…) are the one content block the real model sent for \"book me Tuesday at 10\" in the trial of the step that built the proposal (its id, name and caller; an input of a date and a time, nothing else), with the date replaced by a mark and the time by the hour each journey opens. A step after a proposal is counted like any other: the confirmation's request for the closing words is the second request since the person's message. The message \"yes\" is scripted to ask for the same booking again, as the real model did when a person typed it instead of pressing the button.",
+    "The requests to cancel, move and annotate an appointment (tool-cancel-…, tool-change-…, tool-set-note-…) and the requests for the list that come before them (tool-list-appointments-day…) are the content blocks the real model sent in the trial of the step that built those three tools: \"cancel both my appointments of next week\" was answered with a request for the list of that week, then with two requests to cancel in one answer. The ids of the appointments and the dates are replaced by marks, and the hour of the move by the hour its journey opens."
   ],
   "answers": {
     "not-scripted": {
@@ -514,6 +515,209 @@
           "output_tokens": 0
         }
       }
+    },
+    "tool-list-appointments-day22": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_list_appointments_day22",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01H3pcMJH5TTgdNg9BThCg9g",
+            "name": "list_appointments",
+            "input": {
+              "from": "{{date+22}}",
+              "to": "{{date+22}}"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-list-appointments-day23": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_list_appointments_day23",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01DBwgmknNUB9LvZSTuqqEuM",
+            "name": "list_appointments",
+            "input": {
+              "from": "{{date+23}}",
+              "to": "{{date+23}}"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-list-appointments-day24": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_list_appointments_day24",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_014v384V58h5fQBAUJdwiSKA",
+            "name": "list_appointments",
+            "input": {
+              "from": "{{date+24}}",
+              "to": "{{date+24}}"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-set-note-first": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_set_note_first",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01KPY4F4izVmmx2KQCbtjVGZ",
+            "name": "set_appointment_note",
+            "input": {
+              "appointmentId": "{{appointment-id-1}}",
+              "note": "bring the documents"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-change-first-day23-0600": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_change_first_day23_0600",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_01RGLxim5QdAZJAjMFdu6v27",
+            "name": "change_appointment",
+            "input": {
+              "appointmentId": "{{appointment-id-1}}",
+              "date": "{{date+23}}",
+              "time": "06:00"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-cancel-first-and-second": {
+      "source": "recorded",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_cancel_first_and_second",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_018uXTRKShRdGzFQJ1uKuBTD",
+            "name": "cancel_appointment",
+            "input": {
+              "appointmentId": "{{appointment-id-1}}"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          },
+          {
+            "type": "tool_use",
+            "id": "toolu_01T4qkfsFzPZETMtyywqwqHC",
+            "name": "cancel_appointment",
+            "input": {
+              "appointmentId": "{{appointment-id-2}}"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
     }
   },
   "otherwise": "not-scripted",
@@ -593,6 +797,21 @@
         "once": "error-own-spend-limit",
         "then": "text-last-tool-result"
       }
+    ],
+    "fake: add a note to my appointment of the note journey": [
+      "tool-list-appointments-day22",
+      "tool-set-note-first",
+      "text-last-tool-result"
+    ],
+    "fake: move my appointment of the moving journey": [
+      "tool-list-appointments-day23",
+      "tool-change-first-day23-0600",
+      "text-last-tool-result"
+    ],
+    "fake: cancel both my appointments of the cancelling journey": [
+      "tool-list-appointments-day24",
+      "tool-cancel-first-and-second",
+      "text-last-tool-result"
     ]
   }
 }

@@ -21,6 +21,11 @@ const db = vi.hoisted(() => {
   };
 });
 const claude = vi.hoisted(() => ({ askStep: vi.fn(), askLanguage: vi.fn(), assistantModel: vi.fn(), STEP_TIMEOUT_MS: 22_000 }));
+// The two routes the real appointment tools read their facts through, for the tests that give the
+// core the tools of the deployment.
+const readRoutes = vi.hoisted(() => ({ listAppointments: vi.fn(), getCalendar: vi.fn() }));
+vi.mock('../../../src/handlers/listAppointments', () => ({ handler: readRoutes.listAppointments }));
+vi.mock('../../../src/handlers/getCalendar', () => ({ handler: readRoutes.getCalendar }));
 vi.mock('../../../src/lib/assistantDb', () => db);
 vi.mock('../../../src/lib/anthropic', () => claude);
 
@@ -64,7 +69,7 @@ const change = (name: string, roles: Tool['definition']['roles']): Tool => ({
       const { date, note } = input as { date: string; note?: string };
       const answer = await route(factsHandler, { routeKey: 'GET /facts', path: '/facts', query: { date } });
       if (answer.status !== 200) return { ok: false, error: 'no_free_slot', message: 'There is no free slot then.' };
-      return { ok: true, call: { routeKey: `POST /${name}`, path: `/${name}`, body: { start: date, ...(note && { note }) } }, facts: { type: (answer.body as { type: string }).type, date, note: note ?? null } };
+      return { ok: true, call: { routeKey: `POST /${name}`, path: `/${name}`, body: { start: date, ...(note && { note }) } }, subjects: [`slot ${date}`], facts: { type: (answer.body as { type: string }).type, date, note: note ?? null } };
     },
     summary: (texts, facts) => {
       const { type, date, note } = facts as { type: string; date: string; note: string | null };
@@ -323,9 +328,56 @@ describe('the rules of a proposal (5.5)', () => {
     });
   });
 
-  it('rule 4: asked for several changes in one answer, each is answered "one change at a time", none is proposed, and the step goes on', async () => {
+  // The request for a booking on a day of November 2026, each with its own id.
+  const bookOn = (day: number) => use(`toolu_book${day}`, 'book', { date: `2026-11-${day}` });
+  const resultsOf = (step: ReturnType<typeof steps>[number] | undefined) => (step?.messages[3]?.content as { content: { tool_use_id: string; content: string; is_error?: boolean }[] }).content;
+
+  it('rule 4: several changes asked for in one answer make one proposal, listed in the order asked, each with its own summary, on one reading of the facts each', async () => {
     idle();
-    claude.askStep.mockResolvedValue(asksFor(BOOK, LOOK, use('toolu_book2', 'book', { date: '2026-11-25' })));
+    claude.askStep.mockResolvedValue(asksFor(bookOn(24), LOOK, bookOn(25)));
+
+    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+
+    noChangeRun();
+    expect(factsHandler).toHaveBeenCalledTimes(2);
+    const [step] = steps();
+    expect(step?.status).toBe('awaiting_confirmation');
+    expect(step?.messages).toHaveLength(3);
+    expect(step?.proposal?.changes.map((change) => [change.toolUseId, change.call.body, change.outcome])).toEqual([
+      ['toolu_book24', { start: '2026-11-24' }, null],
+      ['toolu_book25', { start: '2026-11-25' }, null],
+    ]);
+    expect(step?.proposal?.keptBack).toEqual([KEPT]);
+    expect(result).toMatchObject({
+      ok: true,
+      reply: {
+        status: 'awaiting_confirmation',
+        proposal: {
+          question: IT.proposalQuestion(2),
+          actions: [
+            { summary: `${IT.confirmLabel}: 2026-11-24 (Visit)`, outcome: null, error: null },
+            { summary: `${IT.confirmLabel}: 2026-11-25 (Visit)`, outcome: null, error: null },
+          ],
+        },
+      },
+      log: { outcome: 'proposal', proposed: ['book', 'book'], tools: [{ name: 'book', proposed: true }, { name: 'calendar', status: 200 }, { name: 'book', proposed: true }] },
+    });
+  });
+
+  it('rule 4: five changes are one proposal of five', async () => {
+    idle();
+    claude.askStep.mockResolvedValue(asksFor(...[20, 21, 22, 23, 24].map(bookOn)));
+
+    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+
+    expect(steps()[0]?.proposal?.changes.map((change) => change.toolUseId)).toEqual(['toolu_book20', 'toolu_book21', 'toolu_book22', 'toolu_book23', 'toolu_book24']);
+    expect(result).toMatchObject({ ok: true, reply: { status: 'awaiting_confirmation', proposal: { question: IT.proposalQuestion(5) } } });
+    expect(result.ok && result.reply.proposal?.actions).toHaveLength(5);
+  });
+
+  it('rule 4: a sixth change is one too many, none is proposed, no fact is read, each is told to ask for five at most, and the step goes on', async () => {
+    idle();
+    claude.askStep.mockResolvedValue(asksFor(...[20, 21, 22].map(bookOn), LOOK, ...[23, 24, 25].map(bookOn)));
 
     const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
 
@@ -334,14 +386,68 @@ describe('the rules of a proposal (5.5)', () => {
     const [step] = steps();
     expect(step?.status).toBe('working');
     expect(step?.proposal).toBeNull();
-    const results = (step?.messages[3]?.content as { content: { tool_use_id: string; content: string; is_error?: boolean }[] }).content;
-    expect(results.map((result) => result.tool_use_id)).toEqual(['toolu_book', 'toolu_look', 'toolu_book2']);
-    for (const refused of [results[0], results[2]]) {
-      expect(JSON.parse(refused!.content)).toMatchObject({ error: 'one_change_at_a_time' });
-      expect(refused!.is_error).toBe(true);
+    const results = resultsOf(step);
+    expect(results.map((one) => one.tool_use_id)).toEqual(['toolu_book20', 'toolu_book21', 'toolu_book22', 'toolu_look', 'toolu_book23', 'toolu_book24', 'toolu_book25']);
+    for (const refused of results.filter((one) => one.tool_use_id !== 'toolu_look')) {
+      expect(JSON.parse(refused.content)).toEqual({ error: 'too_many_changes', message: expect.stringContaining('at most 5 changes') });
+      expect(refused.is_error).toBe(true);
     }
-    expect(results[1]).toEqual(KEPT);
-    expect(result).toMatchObject({ ok: true, reply: { status: 'working', proposal: null }, log: { tools: [{ name: 'book', notRun: 'one_change_at_a_time' }, { name: 'calendar', status: 200 }, { name: 'book', notRun: 'one_change_at_a_time' }] } });
+    expect(results[3]).toEqual(KEPT);
+    expect(result).toMatchObject({ ok: true, reply: { status: 'working', proposal: null } });
+    expect((result.log.tools as { notRun?: string }[]).map((tool) => tool.notRun)).toEqual(['too_many_changes', 'too_many_changes', 'too_many_changes', undefined, 'too_many_changes', 'too_many_changes', 'too_many_changes']);
+  });
+
+  it('rule 4: when one change of an answer cannot be proposed, none is: it gets its reason, the others are told why, and the step goes on', async () => {
+    idle();
+    // The facts of the second day cannot be read.
+    factsHandler.mockImplementation((event: { queryStringParameters: { date: string } }) => (event.queryStringParameters.date === '2026-11-25' ? routeAnswer({ error: 'x', message: 'y' }, 409) : routeAnswer({ type: 'Visit' })));
+    claude.askStep.mockResolvedValue(asksFor(bookOn(24), bookOn(25), LOOK, bookOn(26)));
+
+    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+
+    noChangeRun();
+    const [step] = steps();
+    expect(step?.status).toBe('working');
+    expect(step?.proposal).toBeNull();
+    const results = resultsOf(step);
+    expect(results.map((one) => [one.tool_use_id, one.is_error === true ? (JSON.parse(one.content) as { error: string }).error : 'ok'])).toEqual([
+      ['toolu_book24', 'not_proposed'],
+      ['toolu_book25', 'no_free_slot'],
+      ['toolu_look', 'ok'],
+      ['toolu_book26', 'not_proposed'],
+    ]);
+    expect(JSON.parse(results[0]!.content)).toMatchObject({ message: expect.stringContaining('another change asked for in the same answer could not be proposed') });
+    expect(result).toMatchObject({
+      ok: true,
+      reply: { status: 'working', proposal: null },
+      log: { outcome: 'tool_requests', tools: [{ name: 'book', notRun: 'not_proposed' }, { name: 'book', notRun: 'not_possible', status: 409 }, { name: 'calendar', status: 200 }, { name: 'book', notRun: 'not_proposed' }] },
+    });
+    expect(result.log).not.toHaveProperty('proposed');
+  });
+
+  it('rule 4: a change whose input is refused stops the proposal of the others of its answer too', async () => {
+    idle();
+    claude.askStep.mockResolvedValue(asksFor(bookOn(24), use('toolu_bad', 'book', { date: '2026-11-25', end: '11:00' })));
+
+    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+
+    expect(steps()[0]).toMatchObject({ status: 'working', proposal: null });
+    expect(result.log).toMatchObject({ tools: [{ name: 'book', notRun: 'not_proposed' }, { name: 'book', notRun: 'invalid_input' }] });
+  });
+
+  it('rule 4: two changes of one answer about the same thing are not proposed: the second would be refused once the first was made', async () => {
+    idle();
+    claude.askStep.mockResolvedValue(asksFor(bookOn(24), use('toolu_again', 'book', { date: '2026-11-24' })));
+
+    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+
+    noChangeRun();
+    // The same route asked the same thing by two changes of one answer is called once.
+    expect(factsHandler).toHaveBeenCalledTimes(1);
+    const [step] = steps();
+    expect(step).toMatchObject({ status: 'working', proposal: null });
+    expect(resultsOf(step).map((one) => (JSON.parse(one.content) as { error: string }).error)).toEqual(['not_proposed', 'same_thing_twice']);
+    expect(result.log).toMatchObject({ tools: [{ name: 'book', notRun: 'not_proposed' }, { name: 'book', notRun: 'same_thing_twice' }] });
   });
 
   it('rule 5, writing instead of pressing drops the proposal: Claude is told nothing was changed and reads the new message, in one write and one request', async () => {
@@ -490,7 +596,7 @@ describe('book_appointment and the roles (3)', () => {
 
     db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: real(ADMIN) }), messages: EARLIER });
     await exchange.sendMessage(ADMIN, 'Book alice on Tuesday at 10', NOW);
-    expect(namesGiven()).toEqual(['get_settings', 'list_types', 'get_calendar', 'list_appointments']);
+    expect(namesGiven()).toEqual(['get_settings', 'list_types', 'get_calendar', 'list_appointments', 'cancel_appointment', 'change_appointment', 'set_appointment_note']);
   });
 
   it('asked for by Claude for the Administrator all the same, book_appointment is answered as a tool that does not exist: no proposal', async () => {
@@ -740,10 +846,109 @@ describe('confirmProposal (POST /assistant/proposals/{proposalId}/confirm, 5.4, 
     await expect(confirm.confirmProposal(ALICE, PROPOSAL, NOW, REQUEST, TOOLS, HANDLERS)).rejects.toThrow('DynamoDB is down');
   });
 
-  it('the deployment has a change route for book_appointment, and only for it', async () => {
+  it('the deployment has a change route for each change tool, and for nothing else', async () => {
     const { CHANGE_HANDLERS } = await import('../../../src/assistant/tools/changeHandlers');
-    const { handler } = await import('../../../src/handlers/bookAppointment');
-    expect(CHANGE_HANDLERS).toEqual({ book_appointment: handler });
+    const { TOOLS: deployed } = await import('../../../src/assistant/tools/list');
+    expect(CHANGE_HANDLERS).toEqual({
+      book_appointment: (await import('../../../src/handlers/bookAppointment')).handler,
+      cancel_appointment: (await import('../../../src/handlers/cancelAppointment')).handler,
+      change_appointment: (await import('../../../src/handlers/changeAppointment')).handler,
+      set_appointment_note: (await import('../../../src/handlers/updateAppointmentNote')).handler,
+    });
+    expect(Object.keys(CHANGE_HANDLERS)).toEqual(deployed.filter((tool) => tool.definition.kind === 'change').map((tool) => tool.definition.name));
+  });
+});
+
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('confirming a proposal of several changes (5.5 rule 4, 5.4)', () => {
+  const call = (day: number) => ({ routeKey: 'POST /book', path: '/book', body: { start: `2026-11-${day}` } });
+  const SEVERAL: Proposal = {
+    proposalId: PROPOSAL,
+    changes: [22, 23, 24].map((day) => ({ toolUseId: `toolu_book${day}`, tool: 'book', call: call(day), summary: `Summary of ${day}`, outcome: null, error: null })),
+    keptBack: [KEPT],
+  };
+  const started = (event: { body: string }) => (JSON.parse(event.body) as { start: string }).start;
+
+  it('runs every change in order, each with what was stored; one refused and one that failed do not stop the others; each has its own outcome and its own result', async () => {
+    waiting({ proposal: SEVERAL });
+    bookHandler.mockImplementation((event: { body: string }) => {
+      vi.advanceTimersByTime(10);
+      if (started(event) === '2026-11-22') return routeAnswer({ error: 'cancellation_notice_too_short', message: 'Too late' }, 403);
+      if (started(event) === '2026-11-23') return Promise.reject(new Error('the table is gone'));
+      return routeAnswer({ appointmentId: 'appt-3' }, 201);
+    });
+
+    const result = await confirm.confirmProposal(ALICE, PROPOSAL, NOW, REQUEST, TOOLS, HANDLERS);
+
+    expect(bookHandler.mock.calls.map(([event]) => started(event as { body: string }))).toEqual(['2026-11-22', '2026-11-23', '2026-11-24']);
+    // One write holds the three outcomes, then the closing words.
+    expect(db.saveStep).toHaveBeenCalledTimes(2);
+    const [outcome] = steps();
+    expect(outcome?.proposal?.changes.map((change) => [change.toolUseId, change.outcome, change.error])).toEqual([
+      ['toolu_book22', 'refused', 'cancellation_notice_too_short'],
+      ['toolu_book23', 'unknown', null],
+      ['toolu_book24', 'done', null],
+    ]);
+    const told = (outcome?.messages[0]?.content as { content: { tool_use_id: string; content: string; is_error?: boolean }[] }).content;
+    expect(told.map((one) => one.tool_use_id)).toEqual(['toolu_book22', 'toolu_book23', 'toolu_book24', 'toolu_look']);
+    expect(told[0]).toMatchObject({ is_error: true, content: '{"error":"cancellation_notice_too_short","message":"Too late"}' });
+    expect(JSON.parse(told[1]!.content)).toMatchObject({ outcome: 'unknown' });
+    expect(JSON.parse(told[2]!.content)).toMatchObject({ outcome: 'done', message: expect.stringContaining('pressed the confirm button'), booked: { appointmentId: 'appt-3' } });
+    expect(result).toMatchObject({
+      ok: true,
+      reply: {
+        status: 'idle',
+        proposal: {
+          question: IT.proposalQuestion(3),
+          actions: [
+            { summary: 'Summary of 22', outcome: 'refused', error: 'cancellation_notice_too_short' },
+            { summary: 'Summary of 23', outcome: 'unknown', error: null },
+            { summary: 'Summary of 24', outcome: 'done', error: null },
+          ],
+        },
+      },
+      log: { proposalId: PROPOSAL, changes: [{ name: 'book', status: 403, ms: 10 }, { name: 'book', status: 500, ms: 10 }, { name: 'book', status: 201, ms: 10 }] },
+    });
+  });
+
+  it('when the changes took so long that a step no longer fits, Claude is not asked: the outcomes are saved and the answer says `working`', async () => {
+    waiting({ proposal: SEVERAL });
+    let left = 29_000;
+    bookHandler.mockImplementation(() => {
+      left -= 2_000;
+      return routeAnswer({ appointmentId: 'appt' }, 201);
+    });
+
+    const result = await confirm.confirmProposal(ALICE, PROPOSAL, NOW, { requestId: 'req-9', remainingMs: () => left }, TOOLS, HANDLERS);
+
+    expect(bookHandler).toHaveBeenCalledTimes(3);
+    expect(claude.askStep).not.toHaveBeenCalled();
+    expect(steps()[0]?.proposal?.changes.map((change) => change.outcome)).toEqual(['done', 'done', 'done']);
+    expect(result).toMatchObject({ ok: true, reply: { status: 'working', messages: [] }, log: { outcome: 'closing_words_left_to_continue' } });
+  });
+
+  it('taken and left by a function that stopped half-way: every change is recorded as unknown, the ones that may have been made included', async () => {
+    waiting({ proposal: SEVERAL }, 31_000);
+
+    const result = await exchange.continueExchange(ALICE, NOW, REQUEST, TOOLS);
+
+    noChangeRun();
+    const [step] = steps();
+    const told = (step?.messages[0]?.content as { content: { tool_use_id: string; content: string }[] }).content;
+    expect(told.map((one) => one.tool_use_id)).toEqual(['toolu_book22', 'toolu_book23', 'toolu_book24', 'toolu_look']);
+    for (const one of told.slice(0, 3)) expect(JSON.parse(one.content)).toMatchObject({ outcome: 'unknown', message: expect.stringContaining('Read the calendar') });
+    expect(result).toMatchObject({ ok: true, reply: { proposal: { actions: [{ outcome: 'unknown' }, { outcome: 'unknown' }, { outcome: 'unknown' }] } }, log: { settledUnknown: true } });
+  });
+
+  it('declined or dropped, each change is answered and nothing is run', async () => {
+    waiting({ proposal: SEVERAL });
+    await decline.declineProposal(ALICE, PROPOSAL, NOW, TOOLS.map((tool) => tool.definition));
+    waiting({ proposal: SEVERAL });
+    await exchange.sendMessage(ALICE, 'no', NOW, REQUEST, TOOLS);
+
+    noChangeRun();
+    const outcomes = steps().map((step) => (step.messages[0]?.content as { content: { content: string }[] }).content.slice(0, 3).map((one) => (JSON.parse(one.content) as { outcome: string }).outcome));
+    expect(outcomes).toEqual([['declined', 'declined', 'declined'], ['not_confirmed', 'not_confirmed', 'not_confirmed']]);
   });
 });
 
@@ -866,5 +1071,90 @@ describe('the log lines of a proposal (10.1)', () => {
     expectNoText((await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS)).log);
     waiting({}, 40_000);
     expectNoText((await exchange.continueExchange(ALICE, NOW, REQUEST, TOOLS)).log);
+  });
+
+  // The tools of the deployment, their two read routes replaced: alice asks to cancel one
+  // appointment, move another and set a note, in one answer.
+  it('with the three appointment tools: the lines name the tools and hold no id of an appointment, no username, no note, no date and no summary', async () => {
+    const { DEFINITIONS } = await import('../../../src/assistant/tools/list');
+    const FIRST = '01JD0000000000000000APPT01';
+    const SECOND = '01JD0000000000000000APPT02';
+    const THIRD = '01JD0000000000000000APPT03';
+    const SECRET = 'Tell nobody about the forms';
+    const TYPE = '01JD00000000000000000TYPE1';
+    const appointment = (appointmentId: string, day: number) => ({
+      appointmentId,
+      username: 'alice',
+      date: `2026-11-${day}`,
+      start: `2026-11-${day}T09:00:00.000Z`,
+      end: `2026-11-${day}T10:00:00.000Z`,
+      typeId: TYPE,
+      typeName: 'Visit',
+      note: 'An older note',
+      status: 'booked',
+      cancellableUntil: `2026-11-${day - 1}T09:00:00.000Z`,
+    });
+    readRoutes.listAppointments.mockImplementation(() => routeAnswer({ appointments: [appointment(FIRST, 24), appointment(SECOND, 25), appointment(THIRD, 26)] }));
+    readRoutes.getCalendar.mockImplementation(() =>
+      routeAnswer({
+        days: [{ date: '2026-11-27', weekday: 5, windows: [{ start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T11:00:00.000Z', typeId: TYPE, typeName: 'Visit' }], slots: [{ start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T09:00:00.000Z', typeId: TYPE }], busy: [] }],
+      }),
+    );
+    const mark = prompt.promptVersion(prompt.INSTRUCTIONS, prompt.contextBlock(ALICE, 'Europe/Rome'), toolsForClaude(DEFINITIONS, 'user'));
+    db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: mark }), messages: EARLIER });
+    claude.askStep.mockResolvedValue(
+      asksFor(
+        use('toolu_cancel', 'cancel_appointment', { appointmentId: FIRST }),
+        use('toolu_move', 'change_appointment', { appointmentId: SECOND, date: '2026-11-27', time: '09:00' }),
+        use('toolu_note', 'set_appointment_note', { appointmentId: THIRD, note: SECRET }),
+      ),
+    );
+    const forbidden = [FIRST, SECOND, THIRD, SECRET, 'An older note', 'alice', 'Visit', '2026-11-2', 'novembre', CLAUDE_SAID, TEXT];
+    const clean = (log: unknown) => {
+      for (const text of forbidden) expect(JSON.stringify(log)).not.toContain(text);
+    };
+
+    const proposed = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST);
+
+    // The three changes read the appointments once between them, and the move the day it goes to.
+    expect(readRoutes.listAppointments).toHaveBeenCalledTimes(1);
+    expect(readRoutes.getCalendar).toHaveBeenCalledTimes(1);
+    const stored = steps()[0]?.proposal as Proposal;
+    expect(stored.changes.map((change) => change.summary)).toEqual([
+      "Annullare l'appuntamento di martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Visit).",
+      "Spostare l'appuntamento di mercoledì 25 novembre 2026, dalle 10:00 alle 11:00 (Visit), a venerdì 27 novembre 2026, dalle 09:00 alle 10:00 (Visit).",
+      `Impostare la nota dell'appuntamento di giovedì 26 novembre 2026, dalle 10:00 alle 11:00 (Visit): «${SECRET}» Sostituisce la nota: «An older note»`,
+    ]);
+    expect(proposed.log).toMatchObject({
+      outcome: 'proposal',
+      proposed: ['cancel_appointment', 'change_appointment', 'set_appointment_note'],
+      tools: [
+        { name: 'cancel_appointment', status: 200, ms: 0, proposed: true },
+        { name: 'change_appointment', status: 200, ms: 0, proposed: true },
+        { name: 'set_appointment_note', status: 200, ms: 0, proposed: true },
+      ],
+    });
+    clean(proposed.log);
+
+    const read = conversation({ promptVersion: mark, status: 'awaiting_confirmation', proposal: stored, nextSeq: 7 });
+    db.readConversation.mockResolvedValue({ version: 3, conversation: read, messages: WAITING_MESSAGES });
+    const cancel = vi.fn(() => routeAnswer({ ...appointment(FIRST, 24), status: 'cancelled', cancellableUntil: null }));
+    const move = vi.fn(() => routeAnswer({ error: 'slot_taken', message: `No: ${SECRET}` }, 409));
+    const note = vi.fn(() => routeAnswer({ ...appointment(THIRD, 26), note: SECRET }));
+    const confirmed = await confirm.confirmProposal(ALICE, stored.proposalId, NOW, REQUEST, undefined, { cancel_appointment: cancel, change_appointment: move, set_appointment_note: note });
+
+    // Each route was sent exactly what the proposal stored.
+    expect(cancel.mock.calls[0]).toMatchObject([{ routeKey: 'POST /calendar/appointments/{appointmentId}/cancel', pathParameters: { appointmentId: FIRST } }]);
+    expect(move.mock.calls[0]).toMatchObject([{ pathParameters: { appointmentId: SECOND }, body: JSON.stringify({ start: '2026-11-27T08:00:00.000Z' }) }]);
+    expect(note.mock.calls[0]).toMatchObject([{ routeKey: 'PATCH /calendar/appointments/{appointmentId}', pathParameters: { appointmentId: THIRD }, body: JSON.stringify({ note: SECRET }) }]);
+    expect(confirmed.log).toMatchObject({
+      proposalId: stored.proposalId,
+      changes: [
+        { name: 'cancel_appointment', status: 200, ms: 0 },
+        { name: 'change_appointment', status: 409, ms: 0 },
+        { name: 'set_appointment_note', status: 200, ms: 0 },
+      ],
+    });
+    clean(confirmed.log);
   });
 });

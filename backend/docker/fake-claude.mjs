@@ -16,7 +16,7 @@
 // that passes: the application asks again with nothing changed. It is the one thing the fake
 // remembers between two requests, and it forgets it as soon as "then" is given.
 //
-// Three marks an answer can hold, each replaced from the request it answers:
+// Four marks an answer can hold, each replaced from the request it answers:
 //   {{application-line}}  in a text: the last line of the application in the request (the entry
 //                         of role "system" that follows a message of the person), so that a
 //                         journey can read what Claude was told about the time and the language.
@@ -27,6 +27,11 @@
 //                         what "today" is.
 //   {{last-tool-result}}  in a text: the content of the last result of a tool in the request, so
 //                         that a journey can read what Claude was given of the calendar.
+//   {{appointment-id-N}}  anywhere, so in the input of a tool request too: the id of the Nth
+//                         appointment (1 is the first) in the last result of a tool in the request,
+//                         when that result is a list of appointments. An appointment's id is made
+//                         by the server and cannot be scripted: like the real Claude, the fake
+//                         takes it from the list it was just given.
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -83,6 +88,7 @@ function onceThen(step, request) {
 const LINE_MARK = '{{application-line}}';
 const RESULT_MARK = '{{last-tool-result}}';
 const DATE_MARK = /\{\{date\+(\d+)\}\}/g;
+const APPOINTMENT_MARK = /\{\{appointment-id-(\d+)\}\}/g;
 
 // The last line of the application in the request, or null.
 function applicationLine(request) {
@@ -98,6 +104,17 @@ function lastToolResult(request) {
   if (results.length === 0) return null;
   const { content } = results[results.length - 1];
   return typeof content === 'string' ? content : JSON.stringify(content);
+}
+
+// The id of the appointment at `position` (from 1) in the last result of a tool in the request, or
+// null when that result is not a list of appointments or is shorter.
+function appointmentId(request, position) {
+  try {
+    const id = JSON.parse(lastToolResult(request) ?? 'null')?.appointments?.[position - 1]?.id;
+    return typeof id === 'string' ? id : null;
+  } catch {
+    return null;
+  }
 }
 
 // The date `days` after a date written YYYY-MM-DD. Plain calendar arithmetic: no time zone is involved.
@@ -119,7 +136,9 @@ function withMarks(body, request) {
   if (!Array.isArray(body?.content)) return body;
   const line = applicationLine(request);
   const today = line?.match(/\((\d{4}-\d{2}-\d{2})\)/)?.[1];
-  const dated = mapStrings(body.content, (text) => text.replace(DATE_MARK, (mark, days) => (today ? daysAfter(today, Number(days)) : mark)));
+  const dated = mapStrings(body.content, (text) =>
+    text.replace(DATE_MARK, (mark, days) => (today ? daysAfter(today, Number(days)) : mark)).replace(APPOINTMENT_MARK, (mark, position) => appointmentId(request, Number(position)) ?? mark),
+  );
   const inText = (text) =>
     text
       .split(LINE_MARK)

@@ -179,10 +179,12 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
   `backend/tests/integration/fake-claude/answers.json`, read again at every request: a change
   to that file needs no restart. A text the file does not script gets "Fake Claude: no answer
   is scripted for this message." A sentence's entry lists one answer per step of its exchange,
-  and an answer may ask for a tool. Two marks besides `{{application-line}}`: `{{date+N}}`,
+  and an answer may ask for a tool. Three marks besides `{{application-line}}`: `{{date+N}}`,
   anywhere in an answer, becomes the date N days after the date the application's last line
   states (so a tool's input can name a day the journey prepared); `{{last-tool-result}}`, in a
-  text, becomes the last result of a tool in the request. A step written
+  text, becomes the last result of a tool in the request; `{{appointment-id-N}}`, anywhere,
+  becomes the id of the Nth appointment in that last result when it is a list of appointments
+  (so a tool's input can name an appointment the journey booked). A step written
   `{ "once": "error-overloaded", "then": "…" }` fails the first time and answers the second
   time the same request comes: the only thing the fake remembers, lost when its container
   restarts. Its log, one line per request: `docker compose logs fake-claude`
@@ -195,11 +197,10 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
   `docs/IMPLEMENTATION_PLAN.md` step 9 (`journeys.test.ts`), the calendar's
   (`calendar.test.ts`) and the assistant's (`assistant.test.ts`: against the fake Claude, with
   the throw-away accounts `chat-text`, `chat-lingua`, `chat-read`, `chat-book`, `chat-decline`,
-  `chat-trouble`, `chat-rival`, `chat-limit`, `chat-down` and `chat-nobody`, removed first and
-  last; it never empties the `calendar` table: each of its four blocks that need the calendar
-  creates a type of its own name (`assistant journey`, `assistant booking journey`,
-  `assistant declining journey`, `assistant trouble journey`) and a window in the early morning
-  on a day of its own, the 25th to the 28th from today, through the API, and removes both first
+  `chat-trouble`, `chat-rival`, `chat-note`, `chat-move`, `chat-cancel`, `chat-limit`, `chat-down` and `chat-nobody`, removed first and
+  last; it never empties the `calendar` table: each of its seven blocks that need the calendar
+  creates a type of its own name (`JOURNEY_TYPES` in the file) and a window in the early morning
+  on a day of its own, the 22nd to the 28th from today, through the API, and removes both first
   and last; the appointments it books it cancels, and those stay in the `calendar` table,
   cancelled; what it leaves in the `assistant` table stays there, under accounts that no longer exist) against the running `local:up` +
   `local:api` stack. Pass the same

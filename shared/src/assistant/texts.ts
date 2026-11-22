@@ -41,6 +41,9 @@ export type AssistantTexts = {
   // (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5, rule 2).
   changes: {
     bookAppointment: (booking: BookingSummary) => string;
+    cancelAppointment: (appointment: AppointmentSummary) => string;
+    changeAppointment: (move: MoveSummary) => string;
+    setAppointmentNote: (change: NoteSummary) => string;
   };
   // The line of progress of a step that has none of its own.
   working: string;
@@ -54,6 +57,21 @@ export type AssistantTexts = {
 // `secondTime` marks the second of the two times a clock shows the same hour on the night the
 // clocks go back.
 export type BookingSummary = { date: string; start: string; end: string; type: string; note: string | null; secondTime: boolean };
+
+// An existing appointment as a proposal names it: its day as a local date, its two wall-clock
+// times and the name of its type. `username` is whose it is, given only when the person asked is
+// not its owner: the Administrator. For a User, whose proposals are about their own appointments,
+// it is null and the sentence names nobody.
+export type AppointmentSummary = { date: string; start: string; end: string; type: string; username: string | null };
+
+// What the proposal of a move shows: the appointment as it is, and the slot it would go to, with
+// the type of the hours that slot lies in, which may differ from the appointment's. `secondTime`
+// is as in a booking.
+export type MoveSummary = { appointment: AppointmentSummary; to: { date: string; start: string; end: string; type: string; secondTime: boolean } };
+
+// What the proposal of a note shows: the appointment, the note as it would become (null: no note)
+// and the note it has, which the new one replaces.
+export type NoteSummary = { appointment: AppointmentSummary; note: string | null; previous: string | null };
 
 // What a read tool of the assistant looks at: each kind has its own line of progress
 // (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.1).

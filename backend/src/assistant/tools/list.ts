@@ -1,8 +1,11 @@
 import { bookAppointment, bookAppointmentDefinition } from './bookAppointment';
+import { cancelAppointment, cancelAppointmentDefinition } from './cancelAppointment';
+import { changeAppointment, changeAppointmentDefinition } from './changeAppointment';
 import { getCalendar, getCalendarDefinition } from './getCalendar';
 import { getSettings, getSettingsDefinition } from './getSettings';
 import { listAppointments, listAppointmentsDefinition } from './listAppointments';
 import { listTypes, listTypesDefinition } from './listTypes';
+import { setAppointmentNote, setAppointmentNoteDefinition } from './setAppointmentNote';
 import type { Tool, ToolDefinition } from './tool';
 
 // The tools of the assistant (docs/CONVERSATIONAL_ARCHITECTURE.md section 3), in the order Claude
@@ -17,8 +20,11 @@ export const DEFINITIONS: readonly ToolDefinition[] = [
   getCalendarDefinition,
   listAppointmentsDefinition,
   bookAppointmentDefinition,
+  cancelAppointmentDefinition,
+  changeAppointmentDefinition,
+  setAppointmentNoteDefinition,
 ];
 
 // The tools whole, for the functions that run the reads and build the proposals. A tool that
 // changes the calendar is here without the handler of its route, which is in `changeHandlers.ts`.
-export const TOOLS: readonly Tool[] = [getSettings, listTypes, getCalendar, listAppointments, bookAppointment];
+export const TOOLS: readonly Tool[] = [getSettings, listTypes, getCalendar, listAppointments, bookAppointment, cancelAppointment, changeAppointment, setAppointmentNote];

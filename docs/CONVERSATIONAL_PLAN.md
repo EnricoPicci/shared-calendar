@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`) |
+| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`) |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown on its screen, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which is deployed nowhere today (open point P7, section 2.2). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
@@ -92,7 +92,7 @@ c02, c03, c04 and c05 say how.
 | The contract: codes, `AssistantReply`, languages, limits, fixed texts | `shared/src/assistant/`, `shared/src/api.ts` | c00 |
 | The table `assistant` and its module | `backend/template.yaml`, `backend/scripts/local-seed.sh`, `backend/src/lib/assistantDb.ts` | c01 |
 | The model's module, the key, the fake Claude | `backend/src/lib/anthropic.ts`, `backend/docker/`, `backend/docker-compose.yml` | c02 |
-| The core and the six functions | `backend/src/assistant/`, `backend/src/handlers/` | c03 to c05 |
+| The core and the six functions | `backend/src/assistant/`, `backend/src/handlers/` | c03 to c06 |
 | The tools | `backend/src/assistant/tools/` | c04 to c08 |
 | The journeys and their pages | `backend/tests/integration/assistant.test.ts`, `docs/journeys/backend/` | c03 to c09 |
 | The evaluation | `backend/scripts/`, `backend/tests/eval/` | c10 |
@@ -522,8 +522,9 @@ booking by hand from the sentence to the appointment.
   Administrator's booking for a User is step c07, with finding F6;
 - **decided with the Product Owner: `confirmProposal`'s role holds what a User's booking
   needs**, not what this step's text lists: the assistant table's two sets, the read of the
-  key, and the calendar's read, write and book sets. No `CalendarDeletePolicy` and no Cognito
-  statement: step c06 brings the first with the changes that need it, step c07 the second.
+  key, and the calendar's read, write and book sets. No Cognito statement: step c07 brings it.
+  No `CalendarDeletePolicy` either: no appointment route needs it (cancelling, moving and a
+  note update items), so step c06 adds nothing to the role.
   `sendAssistantMessage` and `continueAssistant` gained nothing;
 - **decided with the Product Owner: the stored proposal is a list from the start**, of which
   one change is accepted: more than one in an answer makes no proposal, and each gets the error
@@ -600,6 +601,46 @@ move confirmed and found; a note set.
 **Acceptance:** the gate green; the journeys with their pages. Checkpoint: everything a User
 can do by conversation works locally.
 
+**As done** (2026-11-22). As written, with these differences and findings:
+
+- **the template did not change.** `confirmProposal`'s role already held what the three routes
+  need (the calendar's read, write and book sets); none needs `CalendarDeletePolicy`. The three
+  handlers are in the confirming function's bundle and in none of the other five (searched
+  after the build). The lint rule's list already held their names;
+- **the appointment an id stands for is read through the list**: the code of
+  `GET /calendar/appointments` with `upcoming=true&status=all` and the caller's identity. No
+  route reads one appointment, and none was added. An id of another person's appointment is
+  therefore not found at the proposal (`appointment_not_found`, the routes' code): the test "a
+  User proposing a change to another person's appointment gets the route's refusal" is met by
+  that error, not by the route answering. An appointment that has ended is not found either;
+- **decided with the Product Owner:** the three tools are offered to both roles, and the
+  sentence names whose appointment it is for the Administrator; more than five changes in one
+  answer propose none; one change that cannot be proposed means no proposal at all;
+  `book_appointment`'s description no longer says "one booking at a time";
+- **decided in the step:** two changes of one answer on the same appointment, or into the same
+  slot, are not proposed; a change that changes nothing is not proposed; `note` is required, a
+  text or `null`; the changes of one answer share one reading of the calendar; three sentences
+  added to the instructions' paragraph on changes (name an appointment by its id; several
+  changes in one answer, five at most; say which were made and which refused);
+- **the tests of the one-change limit are replaced** by six of rule 4 (two changes, five, a
+  sixth, one that cannot be proposed, a refused input, the same thing twice) and four of a
+  confirmation of several;
+- **the fake's new mark** `{{appointment-id-N}}`, and three journeys on days 22 to 24, each
+  with its User and its type. The "cancel both" journey changes the notice for cancelling as
+  the Administrator for the time of the confirmation and puts it back in a `finally`: a run
+  killed in between leaves the local setting changed;
+- **the trial with the real model** (`claude-sonnet-5-5`, 22 requests): as `alice`, a
+  cancellation (list 3.4 s, request 1.4 s, closing words 1.3 s), a move (three steps of 1.3 to
+  2.1 s), a note (1.7 s) and "cancel both my appointments of next week" (one answer with two
+  requests, one proposal of two, both done) each worked at the first try. A move to a taken
+  slot was not asked for: Claude read the day and offered the free times. An id of another
+  person's appointment was not asked for either: Claude read alice's list, did not find it,
+  and said so. As `admin`, "cancel alice's appointment" made the proposal "Cancel the
+  appointment of alice on …". No fault was found. **Seen, not changed:** in the move Claude
+  first asked `list_appointments` for a period of a year, which the route refuses, and asked
+  again for the day; the tool's own errors `no_free_slot` and `appointment_not_found` were
+  not provoked, as the model read first.
+
 ---
 
 ### Step c07 — The Administrator: users' list, settings, types, booking for a User (≈ 6 h)
@@ -607,6 +648,12 @@ can do by conversation works locally.
 **Goal:** the Administrator's simpler tools.
 
 **First: finding F6**, on what the confirmation of a booking for a User can show.
+
+What step c06 left ready: the three other appointment tools are offered to the Administrator
+already, with whose appointment it is in the sentence; a proposal holds up to five changes of
+any tools; `tools/facts.ts` has the shared reads of a confirmation (a local time to an
+instant, the free slot at an instant, the appointment of an id) and `run.ts` the one reading
+per answer; the fake can take an appointment's id from a list.
 
 What step c05 left ready: `book_appointment` exists for Users, with its roles list holding
 `user` alone and its input without a username; a unit test shows that an Administrator's

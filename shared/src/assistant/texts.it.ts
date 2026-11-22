@@ -1,11 +1,16 @@
 import { weekdayOf } from '../calendar/time';
-import type { AssistantTexts } from './texts';
+import type { AppointmentSummary, AssistantTexts } from './texts';
 
 const WEEKDAYS = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
 const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
 
 // A local date written out in full: "martedì 24 novembre 2026".
 const fullDate = (date: string) => `${WEEKDAYS[weekdayOf(date) - 1]} ${Number(date.slice(8, 10))} ${MONTHS[Number(date.slice(5, 7)) - 1]} ${date.slice(0, 4)}`;
+
+// An existing appointment as a sentence names it: "l'appuntamento di alice di martedì 24 novembre
+// 2026, dalle 10:00 alle 11:00 (Visit)", without "di alice" when it is the person's own.
+const theAppointment = ({ date, start, end, type, username }: AppointmentSummary) =>
+  `l'appuntamento${username === null ? '' : ` di ${username}`} di ${fullDate(date)}, dalle ${start} alle ${end} (${type})`;
 
 // The fixed texts in Italian, key by key the ones of the English object. The person is addressed
 // with the formal "lei" throughout. The second button is not "Annulla": in a calendar that word
@@ -34,6 +39,14 @@ export const ASSISTANT_TEXTS_IT: AssistantTexts = {
       `Prenotare un appuntamento per ${fullDate(date)}, dalle ${start} alle ${end} (${type}).` +
       (secondTime ? ` È la seconda volta che quella notte l'orologio segna le ${start}: torna l'ora solare.` : '') +
       (note === null ? '' : ` Nota: «${note}»`),
+    cancelAppointment: (appointment) => `Annullare ${theAppointment(appointment)}.`,
+    changeAppointment: ({ appointment, to }) =>
+      `Spostare ${theAppointment(appointment)}, a ${fullDate(to.date)}, dalle ${to.start} alle ${to.end} (${to.type}).` +
+      (to.secondTime ? ` È la seconda volta che quella notte l'orologio segna le ${to.start}: torna l'ora solare.` : ''),
+    setAppointmentNote: ({ appointment, note, previous }) =>
+      note === null
+        ? `Togliere la nota del${theAppointment(appointment)}. La nota è: «${previous ?? ''}»`
+        : `Impostare la nota del${theAppointment(appointment)}: «${note}»` + (previous === null ? '' : ` Sostituisce la nota: «${previous}»`),
   },
   working: 'Ci sto lavorando…',
   reading: {
