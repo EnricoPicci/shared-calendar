@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v17, under way: steps c00 to c13 of `docs/CONVERSATIONAL_PLAN.md` done |
+| Status | v18, under way: steps c00 to c14 of `docs/CONVERSATIONAL_PLAN.md` done, and the first point of step c15, P1 |
 | Date | 2026-11-23 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
@@ -28,6 +28,7 @@
 | v15 | 2026-11-22 | Step c12 of `docs/CONVERSATIONAL_PLAN.md` is done, and with it a decision of the Product Owner that changes this document: **the assistant is not a screen but a panel at the bottom of every screen**, for both roles, with no address and no navigation entry. Section 13 is rewritten for the panel; `docs/FRONTEND_ARCHITECTURE.md` (sections 6 and 6.1, decisions 159 to 172) governs it. Wherever this document said "the screen" for the page's part of the assistant it now says "the panel" (sections 1 to 8, 12, 17 to 19, the diagrams). Section 10.2: the line about Anthropic is under the heading of the open panel. Section 13 also states what the panel does that this document did not say: the first read at the first opening, the read after a confirmation that got one of the two `503` answers, the outcome of a refused change in the page's own words (the contract carries a code, not a sentence), and that a message which drops a proposal brings no notice. Section 17: a separate screen among the alternatives. Section 18.1: decision 13 |
 | v16 | 2026-11-23 | Step c13 of `docs/CONVERSATIONAL_PLAN.md` is done: the panel walked by a script against the fake Claude (`docs/FRONTEND_WALK.md` v3, 122 checks) and used by the Product Owner with the real model. **Open point P6 is closed as built**: a typed answer to a proposal changed nothing, and no list of words matched in code is added (sections 5.5 and 18.2). Section 13: after a message that got one of the two `503` answers the panel reads the conversation once and does not continue it, so that the count of messages left and the conversation are the server's. |
 | v17 | 2026-11-23 | The branch `deploy-frontend` merged: the page is deployed as the stack `shared-calendar-web`, whose distribution passes every path under `/api/` on to the API. **Open point P7 is met by it** (section 18.2), to be seen at the deployed page once the assistant is deployed (`docs/CONVERSATIONAL_PLAN.md` step c15). Nothing else changed |
+| v18 | 2026-11-23 | **Open point P1 closed** by the operator, before any deployment (`docs/CONVERSATIONAL_PLAN.md` step c15, point 1): the account's requests are not used for training and not retained by default (section 10.2). Nothing else changed |
 
 ---
 
@@ -1178,9 +1179,15 @@ result (section 3.1).
 This is accepted by building the feature, and stated rather than hidden:
 
 - the open panel says, under its heading, that the conversation is processed by Anthropic's Claude;
-- the operator checks, for the Anthropic account in use, how long Anthropic keeps requests and
-  that they are not used to train models (the terms of the account), before real users are
-  invited (section 18.2, P1);
+- the operator checked, for the Anthropic account in use, how long Anthropic keeps requests and
+  that they are not used to train models, before anything was deployed (section 18.2, P1). Found
+  on 2026-11-23, in the account's data retention setting in the Anthropic Console and in
+  Anthropic's documentation ("API and data retention", with the commercial data retention
+  policy it points to): **the requests are not used to train models**, and **the prompts and
+  answers are not retained by default**. Two exceptions stated there: a few models require 30
+  days of retention, not `claude-sonnet-5-5`, the model in use; and content flagged by
+  Anthropic's automated safety systems may be kept up to two years. A change of model, or of
+  Anthropic's terms, means reading them again;
 - a person who prefers not to use it loses nothing: every function stays in the web pages.
 
 ### 10.3 Changes to `docs/ARCHITECTURE.md` section 7
@@ -1602,7 +1609,7 @@ Not built now. What the design already gives it, and what it would add:
 
 | # | Point | Direction | Blocks |
 |---|---|---|---|
-| P1 | **Anthropic's data terms** for the account in use: how long requests are kept, and that they are not used for training | The operator reads the account's settings and terms; the result is written in section 10.2 | Inviting real users |
+| P1 | **Anthropic's data terms** for the account in use: how long requests are kept, and that they are not used for training | The operator reads the account's settings and terms; the result is written in section 10.2. **Closed** (2026-11-23, by the operator, before any deployment): not used for training, not retained by default; the exceptions in section 10.2 | Nothing |
 | P2 | **Whether reading the key needs a `kms:Decrypt` statement** besides `ssm:GetParameter`. AWS's documentation says the default key of Parameter Store already lets every principal of the account decrypt, and also shows roles carrying the statement | Try it in the first deployment step; if needed, one statement naming that key, usable only through Parameter Store | Nothing: a known fix either way |
 | P3 | **The capacity of the `assistant` table** under a long conversation | Measured in step c09 (section 9, "What a step costs the table"): an ordinary step 2 read and 14 write units, the largest 84 write units, a full conversation 30 read units, against 8 / 6 a second and a burst allowance of 2 400 / 1 800. **Closed: the Product Owner decided to keep the 100 KB bound and the 6 KB cut** (2026-11-22) | Nothing |
 | P4 | **Effort level and model** | Measured in step c10 on three runs of the evaluation (section 7.1). **Closed: the Product Owner chose `claude-sonnet-5-5` at effort `low`** (2026-11-22) | Nothing |
