@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
+| Status | v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
 | What it is | One list of checks that walks every screen of the front end and the assistant's panel in a browser, as a User and as the Administrator, against the local stack. **The check to repeat after a later change to the view layer** |
 | What it is not | A source of truth, and not an automated test. On any conflict `docs/FRONTEND_ARCHITECTURE.md` and the tests win, and this page is fixed. No end-to-end test tool is in the repository (`docs/FRONTEND_VIEW_PLAN.md` section 8, decision 6): a person follows the list by hand, or drives a browser with a script kept outside the repository |
 | Made from | The browser checks of `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 68 and of `docs/CONVERSATIONAL_PLAN.md` step c12, in the order a person would follow, and `docs/SHARED_CALENDAR_SPEC.md` section 16.8 |
@@ -12,7 +12,10 @@
 | Version | Date | Change |
 |---|---|---|
 | v1 | 2026-11-20 | First version: 102 checks. |
-| v2 | 2026-11-22 | **The assistant's panel**: section 6, checks 103 to 122, against the fake Claude, with what they need and leave in section 1; the short list for the real model and what a screen reader says of the panel, not yet listened to, in section 7; the row of step c12 in section 8. No earlier check changed its number. Two lines corrected by the run: check 5 (on a Sunday the week of today has no window and its legend is empty) and check 90 (saving a day is one write, followed by a read of the date). 122 checks. |
+| v2 | 2026-11-21 | `docs/FRONTEND_DEPLOY_PLAN.md` step 71: "Sign out" also tells Cognito. Check 4 now looks at that request too (mark `[N]`); 102 checks still. Check 4 was done in that step's browser check, by a script; the walk was not run again in full. |
+| v2, note | 2026-11-21 | `docs/FRONTEND_DEPLOY_PLAN.md` step 73: section 1 says where the walk stands at the deployed page. No check changed. |
+| v3 | 2026-11-22 | **The assistant's panel**: section 6, checks 103 to 122, against the fake Claude, with what they need and leave in section 1; the short list for the real model and what a screen reader says of the panel, not yet listened to, in section 7; the row of step c12 in section 8. No earlier check changed its number. Two lines corrected by the run: check 5 (on a Sunday the week of today has no window and its legend is empty) and check 90 (saving a day is one write, followed by a read of the date). 122 checks. |
+| v3, note | 2026-11-23 | The branch `deploy-frontend` merged into `main`: the panel's version, first numbered v2, is v3, after the sign-out's v2. Walked on the merged page that day by a script in headless Chromium, at a desktop and a phone width, against the local stack with the fake Claude, as `alice`: checks 3, 4 (one `RevokeToken`, answered 200) and 103 to 105, then "Sign out" while the panel waited for an answer (the login at once, the panel gone, no `continue` sent after it, the conversation read again at the next sign-in); all yes. The console held `zod`'s `eval` probe only. The rest of the walk was not run again. |
 
 ---
 
@@ -58,6 +61,12 @@
   the checks after it undone: start again with another User (`walk-<tag>-a2`). A run at the
   other width is a run of its own, with its own tag and so its own User. `admin` sends one
   message, at check 121.
+
+**At the deployed page.** The walk is written for the local stack, and has been run in full
+there only. The page deployed on 2026-11-21 is the same page; a part of the checks was done at
+it that day, at a desktop width, with data made by hand through the page (the seed refuses any
+address but the laptop's, on purpose). What was done, and the rest of the walk with the phone
+width, still to do there, are in `docs/RUNBOOK.md` section 5.5.
 
 **What it changes, and what it leaves.**
 
@@ -112,7 +121,11 @@ The widths: 1280 × 800 for the desktop, 390 × 844 for the phone.
    disabled while the call is under way (the first call after the stack starts takes seconds).
 3. `[K]` → The frame: the header says `alice` and "User"; the navigation holds "Week" and "My
    appointments" and nothing else; the address ends in `#/week`.
-4. `[K]` Press "Sign out". → The login again, both fields empty, no failure shown.
+4. `[K]` `[N]` Press "Sign out". → The login again, at once, both fields empty, no failure shown.
+   In the Network panel: one request to `/cognito/` sent at the press, its header
+   `X-Amz-Target` ending in `RevokeToken`, answered 200. (With the local Cognito stopped the
+   login shows just the same and nothing on the page says the request failed: not a check
+   of the walk, which needs the stack whole.)
 
 ## 3. A User (`alice`)
 

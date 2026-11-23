@@ -23,14 +23,14 @@ Ideas used here, explained once for all journeys:
 
 - `AssistantService` makes the calls `load`, `send`, `continue` and `end`, and notifies the
   outcome of each on its one stream, `outcome$`, with the call it answers
-  (`docs/FRONTEND_SERVICES.md` sections 3.4 and 20.4).
+  (`docs/FRONTEND_SERVICES.md` sections 3.4 and 21.4).
 - A call makes one request. When a reply says `working`, the service does nothing more: the
-  caller calls `continue` (`docs/FRONTEND_SERVICES.md` section 8, decision 47;
+  caller calls `continue` (`docs/FRONTEND_SERVICES.md` section 8, decision 60;
   `docs/CONVERSATIONAL_ARCHITECTURE.md` section 5.1).
 - Two refusals of the routes arrive as reasons of their own: `assistant_busy` on `send` and
   `nothing_to_continue` on `continue` (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 6).
 - The reply is passed on as the server gave it: the text of the answer is still the text the
-  server wrote (`docs/FRONTEND_SERVICES.md` section 20.5).
+  server wrote (`docs/FRONTEND_SERVICES.md` section 21.5).
 
 ## Who takes part
 

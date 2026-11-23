@@ -1,7 +1,7 @@
 import type { ApiErrorCode, AssistantReply } from '@shared-calendar/shared';
 import type { ApiFailure, TransportFailureReason } from './api';
 
-// What AssistantService notifies on its one stream (docs/FRONTEND_SERVICES.md section 20.3): the
+// What AssistantService notifies on its one stream (docs/FRONTEND_SERVICES.md section 21.3): the
 // outcome of each of its six calls, with the call it answers. The reply itself is the shared
 // AssistantReply, passed on as the server gave it; the error codes are those each route answers
 // in docs/CONVERSATIONAL_ARCHITECTURE.md section 6.

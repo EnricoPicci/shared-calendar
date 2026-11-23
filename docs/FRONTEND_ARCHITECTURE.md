@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Status | v14 — **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12, walked at step c13 on 2026-11-23). Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
-| Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders |
-| Not in scope | Hosting, the CORS gap, keeping the session across a reload, the Content-Security-Policy of the hosting, logout, the size of the bundle. They are the open points of section 10: the only things between the front end and a deployment |
-| Depends on | `docs/FRONTEND_SERVICES.md` v8 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work) |
+| Status | v20 — the view layer **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12, walked at step c13 on 2026-11-23); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`), **written** (`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21, brief `prompts/94-step-70-implementation.md`: the template, the deploy command and its gate) **and deployed** (step 72, 2026-11-21, brief `prompts/96-step-72-implementation.md`): the stack `shared-calendar-web` exists and the page is in use at the address of its output `PageUrl`; section 13 says what is built and deployed, with how each thing was seen. `docs/FRONTEND_DEPLOY_PLAN.md` is done (its step 73, 2026-11-21, brief `prompts/97-step-73-implementation.md`), **with checks at the deployed page still owed**: a refresh with the revoked token refused by the real Cognito, a session renewed after its fifteen minutes, "Sign out" with the network off, a reload and the console, and the rest of the walk with the phone width (the open items of `docs/RUNBOOK.md` section 5.5); **logout is built** (step 71, 2026-11-21, brief `prompts/95-step-71-implementation.md`: `docs/FRONTEND_SERVICES.md` v8, section 20; here sections 6 and 13.7), proven against the local stack, and at the deployed page as far as the revocation answered 200. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
+| Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders; and, since v13, how the page is hosted and deployed (section 13) |
+| Not in scope | Keeping the session across a reload, the size of the bundle, a domain of our own: open points of section 10, none of which blocked the deployment. The design of the logout service: it is `docs/FRONTEND_SERVICES.md` section 20; section 13.7 here keeps the direction and what follows from it for the page |
+| Depends on | `docs/FRONTEND_SERVICES.md` v9 (the services the views use, the sign-out and the assistant among them), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work of the views), `docs/FRONTEND_DEPLOY_PLAN.md` (the order of work of the hosting) |
 | Why this choice | `docs/FRONTEND_VIEW_OPTIONS.md` v3: the options compared (plain HTML/CSS, `lit-html`, Lit, React, Angular, Svelte) and the reasons. Not repeated here |
 
 ### Change log
@@ -27,8 +27,15 @@
 
 | v11 | 2026-11-20 | Plan step 69, the closing. Status: implemented. The text is brought to the present tense: it says what is, not what a step added. Section 3, rule 2: why nothing shows before the script decides. Section 4: the handlers of a view that was left; a slot and an appointment named with their day for a screen reader; the dialogs that ask described by their question; the sentence of an overlap among the windows of "this day only" said once, under "Start", with "End" marked (a field in fault with no words of its own). Section 6: the sequence from "Sign in" to the first week. Section 7: the new sections 7.1, what the code became, and 7.2, the verdict on the fallback, as a proposal. Section 8: the walk, a document of its own (`docs/FRONTEND_WALK.md`); the table of the dialogs and the focus; the two tests of `page.test.ts` on reading the page without a mouse. Section 10: every open point as it stands today. Section 12.1: the size at step 69 and the share of `zod`, measured again. Section 11: decision 106 closed, decision 123 as settled, decisions 129 to 136. The trial's code (`prototypes/`) is deleted; what was still true of its page on the loading sequence is in sections 3, 4 and 6. |
 | v12 | 2026-11-20 | The verdict of section 7.2 taken at the review of plan step 69: section 3, rule 12 and the third condition of section 7 are reworded to allow what `availability.parts.ts` is, a file of helpers shared by the views of one screen, with its bound. Section 7.2 says what was decided, no longer what was proposed. Section 11: decision 135 as taken, decision 137. No code changed. |
-| v13 | 2026-11-22 | Step c12 of `docs/CONVERSATIONAL_PLAN.md`: the assistant's panel, a view that is no screen and lives across the screens, as the Product Owner decided. New section 6.1: what the panel is, what the shell does for it, its logic object and its view, how the screens are told to load again, what its tests hold. Section 5.1: two files more, `assistant.model.ts` and `assistant.screen.ts`. Section 6, point 4: the session's objects include the `AssistantService` and the `AssistantScreen`, and the screens are handed one stream to load again on. Section 9: the new files. Section 11: decisions 138 to 151. The numbers of section 7.1 are those of plan step 69 and are not measured again; the panel's are in section 6.1 |
-| v14 | 2026-11-23 | Step c13 of `docs/CONVERSATIONAL_PLAN.md`: the walk with the assistant's panel (`docs/FRONTEND_WALK.md` v2). Section 6.1: after a message that got one of the two `503` answers the conversation is read once and not continued (decision 151, rewritten as what was done); the conversation stays scrolled to its end when a proposal or a line appears under it; the heading's arrow has no words for a screen reader. Section 8: the panel's rows after the table of the dialogs, and the order a date is typed in. Decisions 152 and 153. |
+| v13 | 2026-11-21 | The hosting and the deployment, decided (brief `prompts/93-deploy-frontend.md`); nothing built, no code changed. New section 13: what the browser talks to, the stack `shared-calendar-web` (a private bucket behind a CloudFront distribution), the API through the page's address (one origin, no CORS, the back end unchanged), the headers sent with the page, the files and their caching, the deploy command with its gate and its checks, the direction for logout, what is left out on purpose. Section 10: O1, O2 and O5 decided, O7 with its direction, new open point O10 (a domain of our own); what blocks a deployment now is work, not a decision. Section 12.1: where a deployment's values come from. Section 11: decisions 138 to 153. The order of work is a new document, `docs/FRONTEND_DEPLOY_PLAN.md` (steps 70 to 73). |
+| v14 | 2026-11-21 | `docs/FRONTEND_DEPLOY_PLAN.md` step 70: the hosting's template, the deploy command and the gate's shared check are written; nothing is deployed. **Corrected after AWS's documentation:** section 13.3, rule 3 and decision 141: the cache policy `CachingDisabled` keeps no failure, so the distribution sets nothing for failures (no `CustomErrorResponses`); which failures CloudFront keeps elsewhere, and when. Section 13.2: what the template holds as written (no `Transform`, the names of its resources, the bucket's ownership setting). Section 13.4: the header for HTTPS names no sub-domain. Section 13.5: CloudFront's own copy lives a second. Section 13.6: the command as written (its one argument `--dry-run`, the build checked before an upload, the wait for the invalidation, the statuses of the four checks, what `sam deploy` needs and does not). Section 12.2: the dev server's policy. Section 10: O1, O2 and O5 as they stand. Section 11: decisions 141 and 147 corrected, decisions 154 to 158. |
+| v15 | 2026-11-21 | **The sign-out as designed** (`docs/FRONTEND_DEPLOY_PLAN.md` step 71, part A, brief `prompts/95-step-71-implementation.md`; `docs/FRONTEND_SERVICES.md` v8, section 20). No code changed: "Sign out" still only clears the `SessionStore`, and every changed place says so. **Corrected: the order of section 13.7 and of decision 152.** Version 13 wrote "revokes, then clears"; the decision taken with the design is the reverse: the page forgets the person at once and Cognito is told after, with a time limit, so that a slow or dead network never keeps a person signed in. Section 13.7 rewritten with it, and with what the step found: `RevokeToken` confirmed on AWS's pages (no credentials, no secret), cognito-local implements it, whether a browser may call it from another origin is not in the documentation and is proven at step 72. Section 6: the start-up will create a fourth page-wide object, the `LogoutService`, and hand the shell its one method (point 1); "Sign out" will call it and nothing else (point 2); the sequence of a sign-out with the reset before and the request after. Section 10, row O7: designed, not closed. |
+| v16 | 2026-11-21 | **The sign-out built** (`docs/FRONTEND_DEPLOY_PLAN.md` step 71, part B, brief `prompts/95-step-71-implementation.md`), as version 15 described it; no difference found while building. `shell.ts`: `runShell` creates the `LogoutService` with the store, the `LoginService` and the `RefreshService`; `mountShell` is handed its one method; the handler of "Sign out" calls it and nothing else. Sections 6 and 13.7 in the present tense; section 10, row O7 closed; section 8, what the shell's test gained. Checked in a browser against the local stack, also with the local Cognito stopped and with it silent (section 13.7). Section 13.1's table does not change: the local page and the deployed one sign out the same way. Section 7.1 is not measured again: it is the record of `docs/FRONTEND_VIEW_PLAN.md` step 69. |
+| v17 | 2026-11-21 | **The first deployment** (`docs/FRONTEND_DEPLOY_PLAN.md` step 72, brief `prompts/96-step-72-implementation.md`; the record is `docs/RUNBOOK.md` section 5.5). Only what the deployment proved or disproved is changed; the rest of section 13 still speaks as before it, until step 73. Section 13: the stack exists. Section 13.2: the account may create a distribution. Section 13.3: rule 1 (the `Authorization` header arrives) and rule 3 (no failure of the API is kept) are proven, each with how it was seen; **corrected: the API's access log shows the caller's own address for a call made by the page, not CloudFront's** (also decision 153), and a path that is no route leaves no line in it. Section 13.5: the sizes as downloaded, compressed with Brotli (open point O9). Section 13.7: the browser may call `RevokeToken` from the page's address (answered 200); that a refresh with the revoked token is then refused by the real Cognito was not tried. Section 10: one sentence on where the rows stand. No code changed. |
+| v18 | 2026-11-21 | **The text brought into line with the page being deployed** (`docs/FRONTEND_DEPLOY_PLAN.md` step 73, brief `prompts/97-step-73-implementation.md`). No design and no code changed, and nothing new was proven: the text says what is, where it still spoke of a deployment to come. Status. Section 1. Section 9: the tree names the hosting's three files. Section 10: every row as it stands with the page deployed (O1, O2 and O5 built and deployed, O7 with what the deployed page showed, O3, O9 and O10 open), and the paragraph under the table. Section 11: one clause on the decisions the first deployment confirmed (138 to 140, 142, 144, 145, 149, 150, 152, 154, 155). Section 13: the opening, section 13.2 (the account and the distribution), section 13.3, rule 1, section 13.6 (the procedure is in `docs/RUNBOOK.md`; the command as run). **Corrected:** section 13.4 said that `zod`'s report is seen under the distribution's policy; it was seen under the dev server's, and the console at the deployed page is not yet looked at. Checked again that day, read-only: the stack, the bucket's policy and settings, the distribution's rules, the headers, and a "not changed" (304) to a second question for each file (section 13.5). The checks at the deployed page that `docs/RUNBOOK.md` section 5.5 lists as open are still open, and no sentence here says otherwise. |
+| v19 | 2026-11-22 | Step c12 of `docs/CONVERSATIONAL_PLAN.md`: the assistant's panel, a view that is no screen and lives across the screens, as the Product Owner decided. New section 6.1: what the panel is, what the shell does for it, its logic object and its view, how the screens are told to load again, what its tests hold. Section 5.1: two files more, `assistant.model.ts` and `assistant.screen.ts`. Section 6, point 4: the session's objects include the `AssistantService` and the `AssistantScreen`, and the screens are handed one stream to load again on. Section 9: the new files. Section 11: decisions 159 to 172. The numbers of section 7.1 are those of plan step 69 and are not measured again; the panel's are in section 6.1 |
+| v20 | 2026-11-23 | Step c13 of `docs/CONVERSATIONAL_PLAN.md`: the walk with the assistant's panel (`docs/FRONTEND_WALK.md` v3). Section 6.1: after a message that got one of the two `503` answers the conversation is read once and not continued (decision 172, rewritten as what was done); the conversation stays scrolled to its end when a proposal or a line appears under it; the heading's arrow has no words for a screen reader. Section 8: the panel's rows after the table of the dialogs, and the order a date is typed in. Decisions 173 and 174. |
+| v20, note | 2026-11-23 | The branch `deploy-frontend` merged into `main`, where the assistant's panel had been written at the same time. The panel's two versions, first numbered v13 and v14, are v19 and v20, after the hosting's v13 to v18; its decisions, first numbered 138 to 153, are 159 to 174, after the hosting's 138 to 158; every reference to them was changed with them. The status row says both. No other text changed. |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
 TypeScript module script**. The markup of every screen is in one `index.html`; the script
@@ -49,6 +56,10 @@ code of that view proves painful (section 7); no view needed it (section 7.2).
 - `docs/FRONTEND_VIEW_OPTIONS.md` is the record of why this option was chosen. It is not a source
   of truth: where it differs from this document, this document is right.
 - The order of work was that of `docs/FRONTEND_VIEW_PLAN.md` (steps 60 to 69, done).
+- It is also the source of truth for **the hosting and the deployment** of the page (section 13),
+  decided, written and deployed; their order of work was `docs/FRONTEND_DEPLOY_PLAN.md`
+  (steps 70 to 73, done, with checks at the deployed page still owed: `docs/RUNBOOK.md`
+  section 5.5).
 - `docs/FRONTEND_WALK.md` is the walk through every screen in a browser: the check to repeat
   after a later change. It is not a source of truth either: this document and the tests win.
 
@@ -1628,23 +1639,32 @@ their sentences here.
 
 The shell is the start-up code, one function called by the entry file of the bundle:
 `runShell(config)`, in `frontend/src/views/shell.ts`. It creates what lives as long as the page
-(point 1) and calls `mountShell(root, { config, store, login })`, which does the rest and is
-what the shell's DOM test drives, with a store and a login of its own. `mountShell` gets the
+(point 1) and calls `mountShell(root, { config, store, login, logout })`, which does the rest and is
+what the shell's DOM test drives, with a store, a login and a sign-out service of its own. `mountShell` gets the
 API's configuration and the whole store because it creates the API services of each session
 (point 4), which read the token from the store at each call.
 
-1. **It creates the `SessionStore`, the `LoginService` and the `RefreshService` once**, with the
+1. **It creates the `SessionStore`, the `LoginService`, the `RefreshService` and the
+   `LogoutService` once**, with the
    configuration (the API's URL, Cognito's URL, the client id), which it receives as one plain
    object and never looks up itself (section 12.1). It starts the automatic refresh
-   (`docs/FRONTEND_SERVICES.md` section 11.6).
+   (`docs/FRONTEND_SERVICES.md` section 11.6). The `LogoutService` is created with the store
+   and with the two services before it, which it puts back to their first state at a sign-out
+   (`docs/FRONTEND_SERVICES.md` section 20.6); `mountShell` is handed its one method,
+   `logout`, beside `login`. It is not one of the objects of point 4: the teardown of the
+   person who leaves must not cancel the request that tells Cognito. Ending the shell does
+   not end it either: a request under way ends by itself, in 10 seconds at most.
 2. **It subscribes to `store.session$`** (`docs/FRONTEND_SERVICES.md` section 9.5). `null` shows
    and mounts the login view. A session hides it and shows the application, with the navigation
    its `role` allows. The application's frame is one element of `index.html` (`#app`): a header
    with the username, the role in words ("Administrator" or "User") and "Sign out", the
    navigation, and the main area where the screens are. The shell fills the header when a person
-   enters and empties it when that person leaves. "Sign out" clears the `SessionStore` and does
-   nothing else (section 10, open point O7): the screen changes because `session$` then notifies
-   `null`.
+   enters and empties it when that person leaves. "Sign out" calls `logout()` of the
+   `LogoutService` and nothing else (section 13.7): the shell clears nothing itself, waits for
+   nothing and shows nothing about Cognito's answer. The screen changes because the service
+   clears the `SessionStore` during that call, and `session$` then notifies `null`. A session
+   that ends by itself (its expiry, a token rejected) reaches the shell the same way, as a
+   `null`, with no call to the service.
 3. **A refreshed session is the same person.** The shell reacts only when the username or the
    role changes (`distinctUntilChanged`), so a token refresh leaves the screen as it is. The session is
    reduced to the username and the role before anything else sees it (section 3, rule 11).
@@ -1745,10 +1765,16 @@ order:
 7. The answer arrives; the `WeekScreen` makes the week ready to draw (`weekModel`) and
    `week$` carries it; the view draws the days from the templates, once for that week object.
 
-Signing out is the same sequence backwards: the store is cleared, `session$` says `null`, the
-shell unsubscribes the person's one subscription, which ends the logic object's and the
-view's and runs the view's teardown, hides `#app`, shows `#login` and mounts the login view on
-the same, emptied, form.
+Signing out is the same sequence backwards, with a step before it and one after
+(section 13.7). The handler of "Sign out" calls `logout()`. The `LogoutService` first puts the
+`LoginService` and the `RefreshService` back to their first state, so the login view mounted
+a moment later finds no outcome of the person who left. Then the store is cleared,
+`session$` says `null`, the shell unsubscribes the person's one subscription, which ends the
+logic object's and the view's and runs the view's teardown, hides `#app`, shows `#login` and
+mounts the login view on the same, emptied, form. Last, the request that tells Cognito
+leaves. All of it is one run of the script, inside the handler: the person sees the login at
+once, and Cognito's answer, whenever it comes and whatever it says, changes nothing on the
+page.
 
 ### 6.1 The assistant's panel: a view that lives across the screens
 
@@ -1810,7 +1836,7 @@ on the reason.
   `assistant_unavailable` or `assistant_budget_reached` it is read once too and **not**
   continued, whatever it waits for: the server may have saved and counted the message, so the
   messages left, the conversation and "New conversation" are the server's, the text stays in
-  the field, and Claude is asked again only when the person sends (decision 151).
+  the field, and Claude is asked again only when the person sends (decision 172).
 - **"Send" out of use for longer**: after the day's limit, or a reply whose `remainingToday`
   is 0 (the limit's sentence is then shown without a refusal), until the page is loaded again;
   after `conversation_full`, until "New conversation". Reading, confirming and declining
@@ -1823,7 +1849,7 @@ may keep: where the keyboard was before it came into the panel, the text last se
 list it drew, which it rebuilds only when the stream brings another one. The conversation is
 scrolled to its end when it is rebuilt, when the panel opens, and when it was at its end
 before a proposal or a line appeared under it; a person who scrolled back is left there
-(decision 153). The teardown removes the conversation, what was typed and everything the view
+(decision 174). The teardown removes the conversation, what was typed and everything the view
 set.
 
 - **The keyboard.** The field taking the keyboard opens the panel. After sending, confirming,
@@ -2150,7 +2176,7 @@ the native modal `<dialog>`, and one `autofocus` in the page (section 11, decisi
 
 **The assistant's panel**, which is no dialog, as Chromium 156 does it at a desktop width
 (`docs/FRONTEND_WALK.md` checks 104, 105, 109, 113, 114, 117 and 118). Here the view moves the
-focus itself (section 6.1, decision 150).
+focus itself (section 6.1, decision 171).
 
 | The panel | The keyboard is on |
 |---|---|
@@ -2163,7 +2189,7 @@ focus itself (section 6.1, decision 150).
 What the browser tells a screen reader of the open panel (its accessibility tree, check 117):
 a region named "Assistant"; a heading whose button is named "Assistant" and said to be
 expanded or collapsed (the arrow beside it is drawn by the style sheet with no words,
-decision 152); a status with the last answer or notice; an alert with the failure's sentence.
+decision 173); a status with the last answer or notice; an alert with the failure's sentence.
 **Nobody has listened to it with a screen reader yet** (`docs/FRONTEND_WALK.md` section 7).
 
 - **Where the keyboard ends on nothing, one more Tab reaches the next sensible thing** in every
@@ -2277,6 +2303,16 @@ What the tests of the users rely on (plan step 66), and what was learnt in the b
   page (its source and what every field holds) as the Administrator finds it after a User was
   there with the page the Administrator finds when nobody was there before, with the clock
   standing still: anything left of the first person, of whatever kind, makes the two differ.
+- **The sign-out in the shell's test** (`docs/FRONTEND_DEPLOY_PLAN.md` step 71). `mounted()`
+  hands `mountShell` the real `LogoutService` on the test's store, so every test that presses
+  "Sign out" also sends the request that tells Cognito, which the file's `fetch` stub leaves
+  unanswered: the page is judged before any answer, as a person sees it. What is the
+  shell's own is tested with a service that does nothing (the person then stays: the shell
+  clears nothing itself). Under `runShell`: the login is back with Cognito silent, with no
+  token in the page, a field or the address; a second person signs in while the first
+  one's request is unanswered, and the page does not change when that request ends, whether
+  with a 200, a refusal or no network. A session that ends by itself sends nothing. The
+  10 seconds, and the request given up, are the service's tests and the browser check.
 
 What the tests of the availability rely on (plan step 67), and what was learnt in the browser:
 
@@ -2341,13 +2377,17 @@ Inside `frontend/`, next to the services:
 
 ```
 frontend/
+├── template.yaml              # the hosting: the stack shared-calendar-web (section 13.2)
+├── samconfig.toml             # that stack's name and region; nothing of a deployment
 ├── index.html                 # all the markup: one element per view, its dialogs, the <template>s
 ├── style.css                  # the one style sheet
-├── scripts/                   # Node, not the browser: the bundle command and the dev server (section 12)
+├── scripts/                   # Node, not the browser: the bundle command and the dev server (section 12);
+│   │                          # and one bash script, the release of the page (section 13.6)
 │   ├── bundle.mjs             # what the two share: how src/main.ts becomes app.js
 │   ├── build.mjs              # npm run build -w frontend → dist/
 │   ├── dev.mjs                # npm run dev -w frontend → http://localhost:5173
-│   └── seed-local.mjs         # npm run seed:local -w frontend → a week to look at, in the local calendar
+│   ├── seed-local.mjs         # npm run seed:local -w frontend → a week to look at, in the local calendar
+│   └── deploy.sh              # npm run deploy -w frontend → the page released
 ├── src/
 │   ├── main.ts                # the entry file of the bundle: the configuration, then the shell
 │   ├── services/              # docs/FRONTEND_SERVICES.md
@@ -2389,26 +2429,36 @@ frontend/
 
 ## 10. Open points
 
-Not decided. "Blocks" says what cannot be done before the point is settled. O4, O6 and O8 were
-decided with `docs/FRONTEND_VIEW_PLAN.md` (its section 2) and are no longer open: their rows
-say where the decision is written. Each open row ends with **what is true of it today**
-(2026-11-20, every view built and running against the local stack).
+Three points are still open: O3, O9 and O10, and none of them blocks anything. "Blocks" says
+what cannot be done before a point is settled. The others are decided, and their rows say where
+the decision is written: O4, O6 and O8 with `docs/FRONTEND_VIEW_PLAN.md` (its section 2); O1, O2
+and O5 on 2026-11-21 (section 13), built and deployed with `docs/FRONTEND_DEPLOY_PLAN.md`; O7
+designed and built the same day (`docs/FRONTEND_SERVICES.md` section 20). A row says **what is
+true of it today** (2026-11-21, the page deployed as the stack `shared-calendar-web`). "Not yet
+looked at" in a row is a check at the deployed page that is an open item of `docs/RUNBOOK.md`
+section 5.5.
 
 | # | Point | Direction, where there is one | Blocks |
 |---|---|---|---|
-| O1 | **Hosting.** Static files on an S3 bucket behind CloudFront, or equivalent, in its own SAM template (`docs/FOLDER_STRUCTURE.md` section 7) | Fixed in principle there; the template, the domain and the deploy script are not designed. **Today:** `npm run build -w frontend` writes the three files a host would serve (`frontend/dist/`), with the three values of the configuration taken from the environment; nothing serves them outside this machine, and `frontend/` has no template and no `deploy` script | The first deployment |
-| O2 | **The CORS gap.** The API answers no cross-origin request (`docs/FRONTEND_SERVICES.md` section 10.3) | One origin for the page and the API (the hosting routes a path to the API), or a `CorsConfiguration` on the API naming the page's origin. Decided with O1. Locally the dev server passes the API's and Cognito's paths on, which gives one origin (section 12.2): the gap does not bite there, and is not solved. **Today:** every screen makes its calls through that one origin; the bundle's two addresses are whatever the build is given, so either direction needs no change to `frontend/src` | The first deployment |
-| O3 | **The session across a reload.** In memory only: a reload means signing in again (`docs/FRONTEND_SERVICES.md` section 9.6) | `sessionStorage` is the candidate named there. Decided with O5. **Today:** a reload shows the login (`docs/FRONTEND_WALK.md` check 101). The screens add to what a reload loses: the address is kept (the hash), but the week on show, the mode and the period of "My appointments", an appointment being moved and everything typed and not saved are in memory only | Nothing: the application works without it |
+| O1 | **Hosting.** Static files on an S3 bucket behind CloudFront, in its own SAM template (`docs/FOLDER_STRUCTURE.md` section 7) | **Decided: a private bucket behind a CloudFront distribution**, stack `shared-calendar-web`, on the address AWS gives the distribution; deployed by `npm run deploy -w frontend`. Sections 13.1, 13.2 and 13.6. **Today:** built and deployed: the stack `shared-calendar-web` exists (created on 2026-11-21, six resources) and the page is in use at the address of its output `PageUrl`. The account may create a distribution: it did. Nothing of it is unproven: what the stack holds was read back after the deployment (`docs/RUNBOOK.md` section 5.5) | Nothing any more |
+| O2 | **The CORS gap.** The API answers no cross-origin request (`docs/FRONTEND_SERVICES.md` section 10.3) | **Decided: one origin.** The distribution passes `/api/…` on to the API with the prefix removed, as the dev server does; the API gets no CORS configuration and the back end's template does not change. Section 13.3. **Today:** built and deployed: the deployed page calls the API at `/api/…` of its own address; the bundle's two addresses are whatever the build is given, so `frontend/src` did not change. The `Authorization` header arrives, and `GET`, `POST`, `PUT` and `DELETE` were seen to pass (2026-11-21, section 13.3). Not yet looked at: a `PATCH` and the routes of a move and of a cancel sent through the distribution, which the same rule passes on | Nothing any more |
+| O3 | **The session across a reload.** In memory only: a reload means signing in again (`docs/FRONTEND_SERVICES.md` section 9.6) | `sessionStorage` is the candidate named there. It was not decided with O5: it is a decision of its own (section 13.8). **Today:** open. A reload shows the login (`docs/FRONTEND_WALK.md` check 101, against the local stack; the deployed page runs the same code, and a reload there is not yet looked at). The screens add to what a reload loses: the address is kept (the hash), but the week on show, the mode and the period of "My appointments", an appointment being moved and everything typed and not saved are in memory only | Nothing: the application works without it |
 | O4 | **The bundle command and the dev server**, and with them where the configuration comes from and where the built files go | **Decided: esbuild**, two Node scripts. Sections 12.1 and 12.2 | Nothing any more |
-| O5 | **The Content-Security-Policy of the hosting** | `default-src 'self'` works: the dev server sends it (section 12.2). To settle: `zod` probes for `eval` when it starts, which such a policy reports in the console (it is caught, and harmless). **Today:** the whole walk ran under that policy, at two widths, with that one report and no other: the views need no inline script, no inline style and no other origin (section 3, rule 6; `page.test.ts` holds the page to it) | The first deployment |
+| O5 | **The Content-Security-Policy of the hosting** | **Decided:** `default-src 'self'`, Cognito's address for the login, no frame, no `<base>`; sent by the distribution with three more headers; the dev server sends the same without Cognito's address. `zod`'s probe for `eval` stays reported and harmless. Section 13.4. **Today:** built and deployed: the distribution sends the policy and the three other headers with every answer, a file's and the API's alike (read with curl on 2026-11-21), and the login, the screens used that day and `RevokeToken` worked under it at the deployed page. The dev server sends `default-src 'self'; frame-ancestors 'none'; base-uri 'none'`; the login and the week were seen under it, with `zod`'s one report and no other (the whole walk ran under `default-src 'self'` alone, before). Not yet looked at: the console at the deployed page (`zod`'s one report and no other, under the distribution's policy) | Nothing any more |
 | O6 | **The DOM emulation for the views' tests and the coverage of the views** | **Decided: `happy-dom`, and the views inside the 100 % line coverage** of `frontend/src`. Section 12.3 | Nothing any more |
-| O7 | **Logout.** Not designed in the services layer (`docs/FRONTEND_SERVICES.md`, status line) | The shell needs it. Until then "Sign out" can only clear the `SessionStore`, which leaves the refresh token valid at Cognito. **Today:** that is what "Sign out" does (section 6, point 2). Everything of the person leaves the page and the memory with it (the session's objects are dropped, every view empties what it showed: the shell's test compares whole pages); what is left is at Cognito, not in the browser | The first deployment |
+| O7 | ~~**Logout.** Not designed in the services layer~~ **Closed** on 2026-11-21 (`docs/FRONTEND_DEPLOY_PLAN.md` step 71): designed and built, `docs/FRONTEND_SERVICES.md` section 20 | "Sign out" makes the page forget the person at once (the page-wide services back to their first state, the `SessionStore` cleared), then tells Cognito to revoke the refresh token (`RevokeToken`), giving up after 10 seconds; the person is signed out of the page whatever Cognito answers, and sees nothing about it. Section 13.7. **At the deployed page** (2026-11-21): a browser may make the call from the page's address, and the real Cognito answered it 200. **Not yet looked at:** a refresh with the revoked token refused by the real Cognito, and "Sign out" with the network off. Which error the real Cognito gives a refusal was not asked | Nothing |
 | O8 | **The language of the interface** and where its texts are kept | **Decided: English only**, no translation mechanism. Section 12.4 | Nothing any more |
-| O9 | **The size of the bundle.** Of the 490 kB of `app.js` at plan step 60, 454 are `zod`, and 264 of those are its messages in other languages, which the interface never shows (section 12.1). **Today:** 575 kB, 128 kB compressed, with every view; `zod` is still 454 kB of it, 79 %, and everything written for this front end (the services, the logic, the views) is 87 kB | Slimming it means changing how `shared/` brings `zod` in (which entry of `zod` its schemas import, or what `shared/` exports to the browser): a change to `shared/`, which the back end uses too, so a decision of its own | The first deployment. Nothing locally |
+| O9 | **The size of the bundle.** Of the 490 kB of `app.js` at plan step 60, 454 are `zod`, and 264 of those are its messages in other languages, which the interface never shows (section 12.1). **Today:** open. As deployed, `app.js` is 578,155 bytes as built and 121,188 as downloaded, compressed with Brotli (130,771 with gzip only; section 13.5); a first load of the page is about 131 kB. The shares were last measured at `docs/FRONTEND_VIEW_PLAN.md` step 69, on 575 kB (section 7.1): `zod` 454 kB of it, 79 %, and everything written for this front end (the services, the logic, the views) 87 kB | Slimming it means changing how `shared/` brings `zod` in (which entry of `zod` its schemas import, or what `shared/` exports to the browser): a change to `shared/`, which the back end uses too, so a decision of its own | Nothing: it did not block the deployment (section 11, decision 150) |
+| O10 | **A domain of our own** for the page, in the place of `<id>.cloudfront.net` | None yet. A certificate for a CloudFront distribution must be made in `us-east-1`, where the organization's policy lets this account do nothing (`docs/AWS_ACCOUNTS.md`); so it starts with that policy, or with another account (`docs/NEW_ACCOUNT.md`). **Today:** open. The page's address is the one AWS gave the distribution, the stack's output `PageUrl`. No code, template, script or token holds it; it is written in `README.md` and in the record of `docs/RUNBOOK.md` section 5.5, for a person to read. So a later change costs a deployment, those two lines and telling the people | Nothing: the page works on the address AWS gives |
 
-**These are now the only things between the front end and a deployment.** O1, O2, O5 and O7
-block it; O9 should be looked at before it, since it decides what every person downloads; O3
-blocks nothing. No view waits for any of them, and none of them needs a view to change.
+**Nothing stands between the front end and its use any more: the page is deployed.** O1, O2 and
+O5 are decided (section 13), built and deployed (`docs/FRONTEND_DEPLOY_PLAN.md` steps 70 and 72);
+O7 is closed (its step 71). That plan is done, with checks at the deployed page still owed:
+a refresh with the revoked token refused by the real Cognito, a session renewed after its fifteen minutes,
+"Sign out" with the network off, a reload and the console, and
+the rest of the walk with the phone width (the open items of `docs/RUNBOOK.md` section 5.5). O3, O9
+and O10 are open and block nothing: no view waits for any of them, and none of them needs a
+view to change.
 
 ## 11. Decisions and assumptions
 
@@ -2554,22 +2604,43 @@ than what the trial showed: these deserve the first look in a review.
 | 135 | The verdict on the fallback was written as a proposal (section 7.2) and taken at the review (decision 137): no condition of section 7 called for `lit-html`; `availability.parts.ts` meets the third condition by its letter and not by its reason; rule 12 should be reworded to allow what was built. Nothing was added or rewritten for it | Settled before step 69 that the verdict is proposed here and taken at the review, and that whatever it is, a view that should move is a step of its own | |
 | 136 | The trial's code, `prototypes/`, is deleted. Of its page on the loading sequence, three things that were still true of `frontend/` and said nowhere are in this document: why nothing shows before the script decides (section 3, rule 2), the handlers of a view that was left (section 4), and the sequence from "Sign in" to the first week, as a numbered list (section 6). Its diagram was not kept | `docs/FRONTEND_VIEW_PLAN.md` step 69. The rest of that page described the trial's own files, or said what sections 4, 6 and 12 already say (the selectors as the contract, `hidden` as the switch, a module script being deferred, the dev server and what it answers). The one diagram, from the request of the page to the login form, says nothing that the last paragraphs of section 6 do not | |
 | 137 | Section 3, rule 12 and the third condition of section 7 are reworded: the views of one screen may share a file of helpers that find elements once, set their values, texts and attributes, and fill copies of a `<template>` with `textContent`; such a helper never decides what is shown, never makes an element other than by copying a template, and keeps no state beyond rule 10's. The fallback is for the day a helper would compare the page with what it should be, or make markup from data without a template | Decided at the review of `docs/FRONTEND_VIEW_PLAN.md` step 69, as section 7.2 proposed. `availability.parts.ts` met the old words by their letter and not by their reason; changing the code to fit them meant some 60 lines written twice, or a move to `lit-html` that would replace about 25 lines. The bound is the review's to hold: no lint rule can | Yes |
-| 138 | The assistant is a panel at the bottom of every screen once a person is signed in, not a screen: no address, no navigation entry, none at the login. Collapsed it is one bar (the heading "Assistant", the field, "Send") fixed to the bottom of the window; open it grows upward to about half the window, most of it on a phone, and the screen behind stays in use. It opens when the field takes the keyboard, when the heading is pressed and when a message is sent; "Close" and Escape collapse it. Open or collapsed is kept across screens and nowhere in the browser. The conversation is asked of the server at the first opening (section 6.1) | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12: the person asks while looking at the calendar and sees it change | Beyond |
-| 139 | The line "This conversation is processed by Anthropic's Claude." is under the heading of the open panel, in fixed English | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 10.2) |  |
-| 140 | A proposal is shown once, in place, under the last message: the server's question, each action's sentence, two buttons with the server's labels, out of use while a call is away. Once settled the same block has no buttons and each action its outcome: "Done"; "Not done." with the page's sentence for the action's error code; or that it is not known whether it was done. A declined proposal is gone, and the block goes when a reply carries none | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12. The contract carries an error code for a refused action, not a sentence, so the words are those `failureText` has for that code on every other screen |  |
-| 141 | While the assistant works the field stays writable and keeps what was typed; "Send" is out of use and Enter sends nothing until the exchange ends; nothing is queued. The progress line shows the server's `activity`, "…" when there is none. While a proposal waits the field is in use, and a message drops the proposal | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 |  |
-| 142 | The loop is the logic's: `continue` while a reply says `working`, at most `ASSISTANT_LIMITS.modelRequestsPerMessage` times per message, then a sentence that the assistant could not finish. No `continue` after a failure | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 |  |
-| 143 | A failure is one line under the conversation, a `role="alert"`, and the text stays in the field when its message was not taken. The three codes of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 use `shared/`'s sentence in the conversation's language; the day's limit or `remainingToday` 0 puts "Send" out of use until the page is loaded again; `conversation_full` until "New conversation"; the other reasons have English sentences in `texts.ts`; after `assistant_busy`, `proposal_not_found` and `nothing_to_continue` the conversation is read again, once | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12. The line is marked by a bar at its side and not written in red: the calendar is not in fault |  |
-| 144 | "N messages left today" is a small line by the field, from `remainingToday` | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 |  |
-| 145 | "New conversation" does not ask first. It is out of use while there is no conversation and while a call is away. After it the panel is empty, still open, the keyboard in the field | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 |  |
-| 146 | After a change (a reply whose proposal has an action `done`) the logic tells the screens to load again through `changed$`, which the shell merges into the stream the screens already load again on; the settings screen, which has none, is started afresh | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12; the mechanism is section 6.1's. No screen was changed |  |
-| 147 | The page's dialogs come first: while one is open the panel cannot be used and loses nothing | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12. It is what a modal `<dialog>` does to the rest of the page; nothing was written |  |
-| 148 | Beyond the Product Owner's choices, found while building: after a confirmation that got `503 assistant_unavailable` or `assistant_budget_reached` the conversation is read once, without a `continue`, to show each outcome; after a confirmation answered `assistant_busy` the screens load again, since the changes were made; the read after `assistant_busy`, `proposal_not_found` or `nothing_to_continue` continues a conversation found `working`, once in an exchange | `docs/CONVERSATIONAL_ARCHITECTURE.md` sections 6 and 6.1 say what the server did in each case; without these the page would show a calendar or a proposal that is no longer true | Beyond |
-| 149 | A message refused as busy whose text the server already holds as the person's last counts as taken, and the field is emptied; "Send" is out of use until the conversation was first read; a first read that failed is tried again at the next opening; a text of spaces only sends nothing | A message that got one of the two `503` answers is saved by the server; sent again it is refused as busy, read back and answered. The others keep the panel from sending before it knows the conversation | Beyond |
-| 150 | The view gives the keyboard back to where it was before the panel when the panel collapses, and puts it in the field after an action | The panel is not a dialog, so the browser does nothing for it (decision 134 stands for the dialogs). Found in the browser: the keyboard must be read before the buttons are hidden | Beyond |
-| 151 | After a message that got one of the two `503` answers the conversation is read once and not continued; the text stays in the field, and sending it again is how the person asks for its answer (the server answers `assistant_busy` when it holds the message, and the read after that continues it) | The server counted and perhaps saved the message, and the failure carries no count: without the read "N messages left today" was one too high and, after the first message of a conversation, "New conversation" stayed out of use. One more request after a failure; Claude is not asked again by the panel itself, as `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 asks. Decided by the Product Owner for `docs/CONVERSATIONAL_PLAN.md` step c13; step c12 had left both as known |  |
-| 152 | The arrow beside the panel's heading is drawn by the style sheet with an empty alternative text (`content: ' ▾' / ''`, after a plain declaration for a browser that does not know the slash) | Found in the walk: the browser named the button "Assistant ▾", and a screen reader would read the arrow; whether the panel is open is said by `aria-expanded`. `page.test.ts` reads the two rules of the style sheet | |
-| 153 | The view keeps the conversation at its end when something appears under it: it reads whether the list is at its end before it changes anything, and scrolls after | Found in the walk: the proposal's block takes its room from the list, and the last message, the one the proposal answers, went out of sight. A person who scrolled back is not moved | |
+| 138 | The page is hosted as static files in a private S3 bucket behind a CloudFront distribution, in a stack of its own, `shared-calendar-web` (section 13.2). Deployed on 2026-11-21 | `docs/FOLDER_STRUCTURE.md` section 7 fixed it in principle. HTTPS with nothing to run, patch or pay for at this size; a release of the page never changes the back end's stack | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 139 | One origin: the distribution passes `/api/…` on to the API, the prefix removed by a CloudFront Function; no CORS configuration on the API (section 13.3). Confirmed at the first deployment: the page's signed-in calls were answered through the distribution | The deployed page then calls the API exactly as the local one does, the back end's template does not change, and the Content-Security-Policy needs no API address. The other way (a `CorsConfiguration` naming the page's origin) would make each stack need a value of the other | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 140 | The login and the refresh go to Cognito directly, not through the distribution. Seen at the first deployment for the login and for `RevokeToken`; a renewal at the deployed page is not yet looked at (`docs/RUNBOOK.md` section 5.5) | Cognito answers a browser from any origin already. Passing it through would be a second rule to keep right, for a password to cross one service more. It costs one address in the Content-Security-Policy | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 141 | The distribution replaces no failure with `index.html` and keeps no failure of the API (section 13.3, rules 2 and 3). Corrected at `docs/FRONTEND_DEPLOY_PLAN.md` step 70: nothing is set for it, the cache policy `CachingDisabled` is enough (decision 154) | The navigation is the hash, so no path but `/` needs the page; and a failure kept for ten seconds could be one person's refusal given to another, since the cache's key names no header | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 142 | The bucket's policy names the four objects, not `…/*` (section 13.2). Read back from the bucket after the first deployment: one statement, the four objects | The hard rule of `CLAUDE.md` (no wildcard resource) holds for the bucket too, and it can: the build writes four files with fixed names. A fifth file is a change to the template, on purpose | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 143 | The address is the one AWS gives the distribution; no domain of our own (open point O10) | It works today and needs no certificate. A certificate for CloudFront must be made in `us-east-1`, which the organization's policy blocks for this account | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 144 | The Content-Security-Policy of section 13.4; `frame-ancestors 'none'` and `base-uri 'none'` beside what the dev server sent until now; the dev server sends the same words without Cognito's address. The four headers were read word for word at the deployed page; its console is not yet looked at (`docs/RUNBOOK.md` section 5.5) | The walk then runs locally under what the deployed page gets. The two additions cost nothing: the page is shown in no frame and has no `<base>` | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 145 | Every file is uploaded with `Cache-Control: no-cache`; the names stay fixed; the deploy command invalidates `/*` (section 13.5). Seen at the deployed page: `no-cache` on the four files, and "not changed" (304) to a second question | A name with a hash in it would mean rewriting `index.html` at build time, which is copied as it is and tested as it is. Three small files asked again at each load is a price nobody notices | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 146 | The source map is uploaded with the three files | The repository is public, so the map tells nothing new, and a failure in a person's console can then be read | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 147 | `npm run deploy -w frontend` stands behind the back end's gate (`backend/.verify-ok`), runs the front end's own `verify` itself, and the gate's check becomes one file both deploy scripts use (section 13.6, point 1). Since `docs/FRONTEND_DEPLOY_PLAN.md` step 70 that `verify` ends with `sam validate --lint` of the hosting's template (decision 157) | The gate's promise is "what is deployed is a committed, checked state of the repository" (`docs/FOLDER_STRUCTURE.md` section 4.5), and there is one history. The stamp is written before the front end's checks run, so it does not prove them; they need no Docker and take a minute | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 148 | The deploy command reads `ApiUrl` and `UserPoolClientId` from the back end's stack and builds with them; nothing of a deployment is in a committed file (section 13.6, points 2 and 5) | `docs/FOLDER_STRUCTURE.md` section 7; the repository is public. It also fixes the order: the back end first | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 149 | The deploy command ends with four checks made with curl and no credentials; the signed-in call is proven by the walk's first login (section 13.6, point 8). At the first deployment the four checks passed, twice, and the Administrator's sign-in at the page was that proof | A script that signs in would need a password. The four checks prove the bucket, the headers, the rule for `/api/*`, the function and that a failure of the API arrives as the API sent it | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 150 | The size of the bundle (O9) does not block the first deployment. It did not: `app.js` is downloaded as 121 kB, with Brotli (section 13.5) | It is sent compressed: 128 kB, once per load of the page, answered "not changed" afterwards. Slimming it is a change to `shared/`, which the back end uses too: a decision of its own, and not one to take in a hurry before a release | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 151 | No root `deploy` script that runs both deployments; the order is a procedure of `docs/RUNBOOK.md` | The back end's deploy takes arguments of its own and asks to confirm a change set; the page is released alone more often than with the API | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 152 | "Sign out" signs the person out of the page at once and then tells Cognito to revoke the refresh token; what Cognito answers, or that it does not answer, changes nothing of the sign-out (section 13.7). ~~Version 13: "revokes the refresh token and signs the person out of the page whatever Cognito answered", in that order~~. At the deployed page the revocation was answered 200; that the real Cognito then refuses a refresh with the revoked token is not yet looked at (`docs/RUNBOOK.md` section 5.5) | A failed revocation must not keep someone signed in on a shared computer, and neither must a slow one: with the old order a dead network kept the person's frame on screen for as long as the request lasted. The access token's last minutes are the limit already accepted for a deleted user (`docs/ARCHITECTURE.md` section 7.3) | Yes: decided with brief `prompts/93-deploy-frontend.md`; the order decided with the user before the design of step 71 (`docs/FRONTEND_SERVICES.md` section 8, decision 47) |
+| 153 | No logs of the distribution, no firewall, no second environment, no pipeline (section 13.8). ~~The API's access log shows CloudFront's address for the page's calls~~ **Corrected at the first deployment (2026-11-21):** the log shows the caller's own address for a call made through the page (section 13.3) | Each is a cost or a thing to keep for a question nobody has asked yet. The table of section 13.8 says when each would come | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 154 | The distribution has no `CustomErrorResponses` at all. Version 13 of this document asked for one entry per status CloudFront keeps, with the time at zero | AWS's page on the failures CloudFront keeps says: "If you're using the CachingDisabled managed cache policy, CloudFront won't cache these status codes or custom error pages." The entries would have done nothing on `/api/*`, and they belong to the whole distribution, so their one effect would have been on the files' rule. The page also says which failures are kept where caching is on: 404, 414 and 500 to 504 always, 400, 403 and 405 only when the origin says for how long, 401 never. Proven at the first deployment (2026-11-21) by a 404 asked twice, which the API answered twice (section 13.3, rule 3) | Yes: found at `docs/FRONTEND_DEPLOY_PLAN.md` step 70, taken before the template was written |
+| 155 | `frontend/template.yaml` has no `Transform` line: it is plain CloudFormation, which `sam validate` and `sam deploy` read as it is. `frontend/samconfig.toml` names no bucket for artifacts (`resolve_s3`) and no `capabilities`, and sets `fail_on_empty_changeset = false` | Nothing in it is one of SAM's short forms. SAM CLI sends a template with nothing to package and under 51,200 bytes as it is (read in the source of SAM CLI 1.171.0, `samcli/commands/deploy/deploy_context.py`; confirmed at the first deployment: `Deployment s3 bucket : None`, the template accepted), so no managed bucket is created for it; it creates no role. A release of the page that changes no resource must go on to the upload, as the second deployment did | |
+| 156 | The deploy command takes one argument, `--dry-run`, and refuses any other; it passes the stack's name, the region and the template to `sam deploy` itself. After a build it refuses to upload a bundle that holds `localhost` or lacks Cognito's address. The third and fourth checks ask for the API's exact answers: 401 `{"message":"Unauthorized"}` and 404 `{"message":"Not Found"}`, as JSON | The back end's deploy hands its arguments to `sam deploy` because its first deployment needs a parameter; this one reads its only parameter itself, so an argument could only point it somewhere else. The two answers were read from the API's own address on 2026-11-21, without credentials | |
+| 157 | `npm run verify -w frontend` runs `sam validate --lint` on the template, last, and so needs the SAM CLI; without it the last step fails and says that `sam` is not found. It does not go through `backend/scripts/check-sam.sh` | The root `verify` already needs the SAM CLI for the back end, and a template that lint refuses must not reach a deployment. The minimum version of `check-sam.sh` is about `sam build` in a monorepo (`docs/FOLDER_STRUCTURE.md` section 4.3), which this template never needs. The price: a machine with node alone can no longer run the front end's whole `verify`; `typecheck`, `lint` and `test:unit` still run there one by one | |
+| 158 | The header `Strict-Transport-Security` names no sub-domain and asks for no preload; the bucket has `ObjectOwnership: BucketOwnerEnforced`; the resources that need a name carry the stack's (`shared-calendar-web-bucket`, `-strip-api-prefix`, `-headers`) | The address is `<id>.cloudfront.net`, which has no sub-domain of ours. The ownership setting turns the per-object permission lists off, so the bucket's policy is the only grant; it is S3's default for a new bucket, written down. The names must be free in the account | |
+| 159 | The assistant is a panel at the bottom of every screen once a person is signed in, not a screen: no address, no navigation entry, none at the login. Collapsed it is one bar (the heading "Assistant", the field, "Send") fixed to the bottom of the window; open it grows upward to about half the window, most of it on a phone, and the screen behind stays in use. It opens when the field takes the keyboard, when the heading is pressed and when a message is sent; "Close" and Escape collapse it. Open or collapsed is kept across screens and nowhere in the browser. The conversation is asked of the server at the first opening (section 6.1) | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12: the person asks while looking at the calendar and sees it change | Beyond |
+| 160 | The line "This conversation is processed by Anthropic's Claude." is under the heading of the open panel, in fixed English | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 10.2) |  |
+| 161 | A proposal is shown once, in place, under the last message: the server's question, each action's sentence, two buttons with the server's labels, out of use while a call is away. Once settled the same block has no buttons and each action its outcome: "Done"; "Not done." with the page's sentence for the action's error code; or that it is not known whether it was done. A declined proposal is gone, and the block goes when a reply carries none | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12. The contract carries an error code for a refused action, not a sentence, so the words are those `failureText` has for that code on every other screen |  |
+| 162 | While the assistant works the field stays writable and keeps what was typed; "Send" is out of use and Enter sends nothing until the exchange ends; nothing is queued. The progress line shows the server's `activity`, "…" when there is none. While a proposal waits the field is in use, and a message drops the proposal | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 |  |
+| 163 | The loop is the logic's: `continue` while a reply says `working`, at most `ASSISTANT_LIMITS.modelRequestsPerMessage` times per message, then a sentence that the assistant could not finish. No `continue` after a failure | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 |  |
+| 164 | A failure is one line under the conversation, a `role="alert"`, and the text stays in the field when its message was not taken. The three codes of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 use `shared/`'s sentence in the conversation's language; the day's limit or `remainingToday` 0 puts "Send" out of use until the page is loaded again; `conversation_full` until "New conversation"; the other reasons have English sentences in `texts.ts`; after `assistant_busy`, `proposal_not_found` and `nothing_to_continue` the conversation is read again, once | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12. The line is marked by a bar at its side and not written in red: the calendar is not in fault |  |
+| 165 | "N messages left today" is a small line by the field, from `remainingToday` | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 |  |
+| 166 | "New conversation" does not ask first. It is out of use while there is no conversation and while a call is away. After it the panel is empty, still open, the keyboard in the field | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 |  |
+| 167 | After a change (a reply whose proposal has an action `done`) the logic tells the screens to load again through `changed$`, which the shell merges into the stream the screens already load again on; the settings screen, which has none, is started afresh | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12; the mechanism is section 6.1's. No screen was changed |  |
+| 168 | The page's dialogs come first: while one is open the panel cannot be used and loses nothing | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12. It is what a modal `<dialog>` does to the rest of the page; nothing was written |  |
+| 169 | Beyond the Product Owner's choices, found while building: after a confirmation that got `503 assistant_unavailable` or `assistant_budget_reached` the conversation is read once, without a `continue`, to show each outcome; after a confirmation answered `assistant_busy` the screens load again, since the changes were made; the read after `assistant_busy`, `proposal_not_found` or `nothing_to_continue` continues a conversation found `working`, once in an exchange | `docs/CONVERSATIONAL_ARCHITECTURE.md` sections 6 and 6.1 say what the server did in each case; without these the page would show a calendar or a proposal that is no longer true | Beyond |
+| 170 | A message refused as busy whose text the server already holds as the person's last counts as taken, and the field is emptied; "Send" is out of use until the conversation was first read; a first read that failed is tried again at the next opening; a text of spaces only sends nothing | A message that got one of the two `503` answers is saved by the server; sent again it is refused as busy, read back and answered. The others keep the panel from sending before it knows the conversation | Beyond |
+| 171 | The view gives the keyboard back to where it was before the panel when the panel collapses, and puts it in the field after an action | The panel is not a dialog, so the browser does nothing for it (decision 134 stands for the dialogs). Found in the browser: the keyboard must be read before the buttons are hidden | Beyond |
+| 172 | After a message that got one of the two `503` answers the conversation is read once and not continued; the text stays in the field, and sending it again is how the person asks for its answer (the server answers `assistant_busy` when it holds the message, and the read after that continues it) | The server counted and perhaps saved the message, and the failure carries no count: without the read "N messages left today" was one too high and, after the first message of a conversation, "New conversation" stayed out of use. One more request after a failure; Claude is not asked again by the panel itself, as `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 asks. Decided by the Product Owner for `docs/CONVERSATIONAL_PLAN.md` step c13; step c12 had left both as known |  |
+| 173 | The arrow beside the panel's heading is drawn by the style sheet with an empty alternative text (`content: ' ▾' / ''`, after a plain declaration for a browser that does not know the slash) | Found in the walk: the browser named the button "Assistant ▾", and a screen reader would read the arrow; whether the panel is open is said by `aria-expanded`. `page.test.ts` reads the two rules of the style sheet | |
+| 174 | The view keeps the conversation at its end when something appears under it: it reads whether the list is at its end before it changes anything, and scrolls after | Found in the walk: the proposal's block takes its room from the list, and the last message, the one the proposal answers, went out of sight. A person who scrolled back is not moved | |
 
 ## 12. The tooling (open points O4, O6 and O8, decided)
 
@@ -2597,7 +2668,7 @@ They are declared and read in `frontend/src/main.ts` and nowhere else; it hands 
 as one plain object (`docs/FRONTEND_SERVICES.md` section 2, rule 3). A build with one of the
 three variables missing stops and names it. No value is written in a committed file
 (`docs/FOLDER_STRUCTURE.md` section 7). Which values a deployment uses, and the script that reads
-them from the stack's outputs, belong to the hosting (section 10, open point O1).
+them from the stack's outputs, are in section 13.6.
 
 The build prints the size of each file, as it is and compressed. At plan step 60, with the login
 only: `app.js` 490 kB, 105 kB compressed. Of the 490 kB, 454 are `zod` (264 of them its messages
@@ -2624,8 +2695,14 @@ id, and says so when the file is missing) and, to sign in, `npm run local:api -w
 - It passes `/api/…` on to `http://127.0.0.1:3000` and `/cognito/…` to `http://localhost:9229`,
   so the browser sees **one origin** (section 10, open point O2). The two addresses in the
   bundle have no host; the browser completes them with the page's origin.
-- It sends `Content-Security-Policy: default-src 'self'` with the page and
-  `cache-control: no-store` with every answer.
+- It sends `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'none'`
+  with the page (the deployed page's policy without Cognito's address, section 13.4) and
+  `cache-control: no-store` with every answer. Since no site may show the page in a frame, a
+  preview pane that is itself a frame inside an editor stays empty: the page is opened in a
+  browser tab, the forwarded port of a Codespace included. Seen on 2026-11-21 through a
+  Codespace's forwarded address, in a browser tab ("Open in Browser" in the editor's list of
+  ports, then "Continue" on GitHub's notice about a development port): the login, then the
+  week, under this policy.
 - It never prints a request's body or headers: the login's body holds a password, and the API
   calls carry a token.
 
@@ -2677,3 +2754,361 @@ day", "Extra windows", "Add window", "Remove", "Delete") are in the page. The wo
 (`movingOf`); the fixed words around them ("Moving: … Choose a free time.", "From:", "To:") are
 in the page. No view shows the `message` of a
 service. The shell holds the two names of the roles.
+
+---
+
+## 13. The hosting and the deployment (open points O1, O2 and O5, decided)
+
+Decided on 2026-11-21 (brief `prompts/93-deploy-frontend.md`), built and **deployed** the same
+day; the order of work was `docs/FRONTEND_DEPLOY_PLAN.md` (steps 70 to 73, done). What is built:
+`frontend/template.yaml` and `frontend/samconfig.toml` (sections 13.2 to 13.5),
+`frontend/scripts/deploy.sh` and `scripts/deploy-gate.sh` (section 13.6), and logout (section
+13.7). What is deployed: the stack `shared-calendar-web`, with the six resources of section
+13.2; the page is in use at the address of its output `PageUrl`. The record of the first
+deployment is `docs/RUNBOOK.md` section 5.5.
+
+This section says what is. Where a sentence rested on AWS's documentation alone before the
+first deployment, it says how the thing was then seen, with the date. Where a thing has not been
+looked at at the deployed page, it says "not yet looked at", and the check is an open item of
+`docs/RUNBOOK.md` section 5.5. Two sentences of the design were found wrong on the way and are
+corrected where they stand: section 13.3, rule 3 (before the template was written) and section
+13.3, the access log's `ip` (by the first deployment).
+
+### 13.1 What a person's browser talks to
+
+One address for the page and for the API, and Cognito for the login:
+
+```
+browser ──► https://<id>.cloudfront.net/            the distribution (CloudFront)
+              │   /, /index.html, /style.css,
+              │   /app.js, /app.js.map       ──►  the bucket (S3, private): the built files
+              │   /api/…                     ──►  the API (API Gateway), the "/api" removed
+              │
+        ──► https://cognito-idp.<region>.amazonaws.com/    the login and the refresh, directly
+```
+
+- **CloudFront** is the AWS service that answers at an HTTPS address and fetches what it
+  answers from somewhere else: here from a bucket of files and from the API. A *distribution*
+  is one such address with its rules.
+- The page's address is the one AWS gives the distribution, `https://<id>.cloudfront.net`. It
+  comes with a certificate: nothing to buy, nothing to renew. A domain of our own is open
+  point O10.
+- The page calls the API at `/api/…` of its own address, exactly as it does under the dev
+  server (section 12.2). So the browser sees **one origin** and asks no cross-origin question:
+  the API needs no CORS configuration, and `backend/template.yaml` is not changed (O2).
+- The login (`InitiateAuth`) and the refresh go straight to Cognito, which answers a browser
+  from any origin (`docs/FRONTEND_SERVICES.md` section 10.3). They are not passed through the
+  distribution: a password then crosses one service less.
+
+Where the deployed page and the local one differ, and nowhere else:
+
+| | Under the dev server | Deployed |
+|---|---|---|
+| The page's files | Read from `frontend/`, `app.js` bundled at every request | The files of `frontend/dist/`, in the bucket |
+| `API_URL` | `/api`, passed on to `http://127.0.0.1:3000` | `/api`, passed on to the API of the stack `shared-calendar-api` |
+| `COGNITO_URL` | `/cognito/`, passed on to cognito-local | `https://cognito-idp.<region>.amazonaws.com/` |
+| `CLIENT_ID` | From `backend/env.local.json` | The output `UserPoolClientId` of the back end's stack |
+| Content-Security-Policy | Section 13.4, without Cognito's address | Section 13.4 |
+
+### 13.2 The stack `shared-calendar-web`
+
+One SAM template, `frontend/template.yaml`, and one stack, `shared-calendar-web`, in
+`eu-north-1`, beside the back end's and never part of it (`docs/FOLDER_STRUCTURE.md`
+section 7). It holds no function of Lambda, no table and no role. The template is plain
+CloudFormation, with no `Transform` line: nothing in it is one of SAM's short forms
+(section 11, decision 155). Its six resources, in plain words:
+
+| Resource | What it is | What is set |
+|---|---|---|
+| The bucket (`AWS::S3::Bucket`) | Where the four built files lie | Private: every kind of public access blocked, no web-site mode, encrypted at rest with S3's own key, the per-object permission lists off. Its name is left to CloudFormation. It is created empty; the stack cannot be deleted while it holds files |
+| The bucket's policy (`AWS::S3::BucketPolicy`) | Who may read the files | The CloudFront service, for this one distribution only (a condition on the distribution's ARN), action `s3:GetObject`, on **the four objects by name**: `index.html`, `style.css`, `app.js`, `app.js.map`. No wildcard (`CLAUDE.md`, hard rules) |
+| The origin access control (`AWS::CloudFront::OriginAccessControl`) | How the distribution proves to S3 that it is the one asking | Requests to the bucket are signed (SigV4), always |
+| The function (`AWS::CloudFront::Function`) | A few lines of JavaScript that CloudFront runs on a request for `/api/…` before passing it on | It removes the first four characters of the path (`/api`), and does nothing else; a path that is then empty becomes `/`. Its code, five lines, is in the template (runtime `cloudfront-js-2.0`); it holds no value of a deployment and has no test of its own: the deploy command's third and fourth checks prove it |
+| The headers (`AWS::CloudFront::ResponseHeadersPolicy`) | What the distribution adds to every answer | Section 13.4 |
+| The distribution (`AWS::CloudFront::Distribution`) | The address, and the rules of section 13.3 and 13.5 | HTTP is redirected to HTTPS; `index.html` answers `/`; the files are sent compressed; the cheapest price class (Europe and North America); HTTP/2 and HTTP/3, IPv6; the API reached over HTTPS only, TLS 1.2; no alias, no logging |
+
+One parameter, `ApiDomain`: the host name of the back end's API (`<id>.execute-api.<region>.amazonaws.com`),
+which the deploy command reads from the back end's stack (section 13.6); the template refuses a
+value that is not a host name alone (a `/` or a `:` in it). Three outputs: `PageUrl`,
+`BucketName`, `DistributionId`. The three managed policies are named by their ids, as read on
+AWS's pages on 2026-11-21: `CachingDisabled` `4135ea2d-6df8-44a3-9df3-4b5a84be39ad`,
+`CachingOptimized` `658327ea-f89d-4fab-a63d-7e88639e58f6`, `AllViewerExceptHostHeader`
+`b689b0a8-53d0-40ab-baf2-68738e2966ac`.
+
+The stack is in `eu-north-1` like the other. CloudFront itself is a global service: it has no
+region to choose. The organization's policy allows regional services in `eu-north-1` only
+(`docs/AWS_ACCOUNTS.md`) and does not stand in the way of a distribution: the account created
+this one (2026-11-21; the stack was complete three and a half minutes after the change set was
+confirmed). What the stack holds was read back after the deployment, with read-only commands,
+and is what the table says (`docs/RUNBOOK.md` section 5.5).
+
+### 13.3 The API through the page's address
+
+The distribution has two rules (*cache behaviours*), chosen by the path:
+
+| Path | Goes to | Methods | Kept by CloudFront | Passed on |
+|---|---|---|---|---|
+| `/api/*` | The API, over HTTPS | All seven | Never (managed cache policy `CachingDisabled`) | Every header of the browser except `Host`, the query string, the body (managed origin request policy `AllViewerExceptHostHeader`); the path without `/api` |
+| Everything else | The bucket | `GET`, `HEAD` | Section 13.5 | Nothing of the browser's headers |
+
+Rules that are easy to break:
+
+1. **The `Authorization` header must reach the API.** CloudFront removes it unless told
+   otherwise; a policy that passes on all the browser's headers passes it on too, and one
+   cannot name it alone in a policy of one's own. `Host` is the one header not passed on: API
+   Gateway finds the API by it, and it must be the API's own. AWS's pages say of
+   `AllViewerExceptHostHeader` that it is "intended for use with Amazon API Gateway" and passes
+   on every header but `Host`; where they speak of `Authorization` they name its sibling
+   `AllViewer`. **It arrives. Seen on
+   2026-11-21:** the Administrator and a User signed in at the page and the API answered
+   their calls 200 and 201 through the distribution (the week, the users, the availability,
+   bookings), each of which the authorizer lets through only with the token; seen on the
+   page and in the API's access log.
+2. **No answer of the API is replaced.** The distribution has no "custom error response" that
+   swaps a 403 or a 404 for `index.html`, the usual trick of a single-page application. The
+   page needs none (its navigation is the URL's hash, section 6), and the trick would turn the
+   API's refusals into a page of HTML.
+3. **No answer of the API is kept, a failure neither**, so a refusal given to one person is
+   never the answer to the next. Nothing is set for it beyond the rule's cache policy: where
+   caching is on, CloudFront keeps some failures of an origin for ten seconds (404, 414 and 500
+   to 504 always; 400, 403 and 405 only when the origin says for how long; 401 never), but
+   AWS's page says: "If you're using the CachingDisabled managed cache policy, CloudFront won't
+   cache these status codes or custom error pages." So the distribution has no
+   `CustomErrorResponses` at all, which is also what rule 2 asks (section 11, decision 154).
+   **Proven on 2026-11-21:** `/api/no-such-route` asked twice within a second answered 404
+   twice with two different `apigw-requestid` headers: the API answered both, nothing was
+   kept.
+   On the files' rule the bucket answers 403 for any name that is not one of the four files
+   (listing is not granted, so S3 does not say 404; seen at the first deployment, with S3's
+   own XML and the four headers of section 13.4), which CloudFront does not keep either;
+   whatever it did keep there would be the same answer for everybody, and nobody's data.
+4. The function touches the path only. It reads no header and no body.
+
+What this changes for the API, and what it does not:
+
+- **The API keeps its own address** (`ApiUrl`), and answers there as before: the smoke test,
+  the curl examples of `README.md` and the scripts use it. It was never a secret: every one of its
+  routes asks for a token.
+- **The access log's `ip`** (`backend/template.yaml`, `AccessLogSettings`) **is still the
+  caller's own address for a call made by the page**, not CloudFront's. Versions 13 to 16 of
+  this document said the opposite; the first deployment showed it (2026-11-21: the calls
+  made with curl through the page's address were logged with the address of the machine that
+  made them). Nothing had to change for it. Also seen there: a request for a path that is no
+  route of the API (answered 404) leaves no line in the access log.
+- The API's throttling (burst 10, 5 a second) is for the whole API, as before: the page's
+  calls and direct calls share it.
+- CloudFront waits 30 seconds for an origin; the API's functions answer or fail well inside
+  that.
+
+### 13.4 The headers sent with the page (O5)
+
+One response headers policy, on both rules, so every answer carries the same:
+
+| Header | Value | Why |
+|---|---|---|
+| `Content-Security-Policy` | `default-src 'self'; connect-src 'self' https://cognito-idp.<region>.amazonaws.com; frame-ancestors 'none'; base-uri 'none'` | The page loads its script and its style from its own address and nowhere else, and calls its own address and Cognito only (section 3, rule 6: nothing inline). No other site may show it in a frame |
+| `Strict-Transport-Security` | `max-age=31536000` (no sub-domains, no preload) | A browser that has been here once never asks over plain HTTP again |
+| `X-Content-Type-Options` | `nosniff` | A file is what its type says |
+| `Referrer-Policy` | `no-referrer` | The page's address is told to nobody |
+
+- The region in the policy is the stack's own (`AWS::Region`): the user pool is in the same
+  region as the hosting stack, and the deploy command builds `COGNITO_URL` from the same
+  value; it stops when the two `samconfig.toml` files name different regions.
+- Each of the four is set to win over a header of the same name from the bucket or the API
+  (neither sends one).
+- **The dev server sends the same policy without Cognito's address**, which it does not need
+  (`connect-src` is then left out and `default-src` decides): the walk
+  (`docs/FRONTEND_WALK.md`) runs locally under the words the deployed page gets. It sends the
+  policy only, not the other three headers, which are about HTTPS and other sites.
+- `zod`'s probe for `eval` is reported once in the console under the dev server's policy. It
+  is caught and harmless (section 12.2); `'unsafe-eval'` is not added to silence it. The same
+  one report is expected under the distribution's policy: the console at the deployed page is
+  not yet looked at (`docs/RUNBOOK.md` section 5.5).
+- **As sent by the distribution** (read with curl on 2026-11-21): the four headers, word for
+  word, on each of the four files, on a 401 and a 404 of the API and on the bucket's 403. The
+  login, the screens used that day and `RevokeToken` worked under the policy.
+
+### 13.5 The files and their caching
+
+The bucket holds four objects and never a fifth: the three files of the page and the source
+map (the repository is public, so the map tells nobody anything new, and it makes a failure
+in the console readable).
+
+The files' names are fixed (`app.js`, not `app.3f9a….js`): `index.html` is copied as it is
+(section 12.1) and `page.test.ts` holds it to one script and one style sheet by those names.
+So no file may be kept by a browser without asking:
+
+- Every object is uploaded with `Cache-Control: no-cache`: a browser keeps its copy but asks,
+  at every load, whether it is still the newest, and gets a short "not changed" when it is.
+- CloudFront keeps the files (managed cache policy `CachingOptimized`) and, since the files
+  say `no-cache`, asks the bucket again as well, once its copy is a second old (that policy's
+  shortest time, which `no-cache` does not undo). After an upload the deploy command also
+  empties CloudFront's copies (an *invalidation* of `/*`), so that a release is there at once
+  and not a moment later.
+- An upload is four files one after the other, `index.html` last. A person who loads the
+  page in those seconds may get the new script with the old page; a reload ends it. Accepted
+  at this size.
+
+`app.js` is sent compressed. **As downloaded from the deployed page** (2026-11-21, with
+curl, which a browser's network panel shows with a few hundred bytes of headers more):
+
+| File | As built | Downloaded (Brotli, what a browser gets) | With gzip only |
+|---|---|---|---|
+| `index.html` | 30,677 bytes | 5,095 | 5,398 |
+| `style.css` | 16,676 | 4,578 | 4,897 |
+| `app.js` | 578,155 | 121,188 | 130,771 |
+
+CloudFront chooses Brotli for a client that accepts it, which every current browser does. So
+a first load of the page is about 131 kB, and a later one three short "not changed" answers
+(status 304 to each, seen with curl on 2026-11-21). Slimming `app.js` stays open point O9, which did not block the deployment (section 11,
+decision 150). The source map (2.2 MB) is fetched only by a browser whose developer tools
+are open.
+
+### 13.6 The deploy command
+
+`npm run deploy -w frontend` (`frontend/scripts/deploy.sh`), a real cloud action: only when
+explicitly asked (`CLAUDE.md`, cloud safety). The same command for the first deployment and
+for every release. Its one argument is `--dry-run` (below); any other is refused. In order,
+stopping at the first failure and naming it:
+
+1. **The gate**, the same as the back end's (`docs/ARCHITECTURE.md` section 8.1):
+   `backend/.verify-ok` younger than 30 minutes, naming HEAD, written on a clean tree, and the
+   tree still clean. The check is one file both deploy scripts use
+   (`scripts/deploy-gate.sh`), not two copies. The stamp proves the back end and `shared/`;
+   the front end's own checks (`npm run verify -w frontend`: typecheck, lint, unit tests, and
+   `sam validate --lint` of the hosting's template; no Docker, about a minute) are run by the
+   command itself, here, before anything is read from AWS.
+2. **Read the back end's stack** (`shared-calendar-api`, the name in `backend/samconfig.toml`;
+   read-only `describe-stacks`, as `backend/scripts/target.sh` does): `ApiUrl` and
+   `UserPoolClientId`. A missing stack or output stops the command and is named. So the back
+   end is deployed first, always.
+3. **`sam deploy`** of `frontend/template.yaml` with `ApiDomain` = the host of `ApiUrl`
+   (`frontend/samconfig.toml` holds the stack's name and region, nothing of a deployment). The
+   change set is shown and confirmed, as for the back end. On a release that changes no
+   resource it says so and goes on (`fail_on_empty_changeset = false`). There is no `sam build`
+   (the template has no code) and no bucket for artifacts (section 11, decision 155).
+4. **Read its own stack**: `BucketName`, `DistributionId`, `PageUrl`.
+5. **Build**: `npm run build -w frontend` with `API_URL=/api`,
+   `COGNITO_URL=https://cognito-idp.<region>.amazonaws.com/` and `CLIENT_ID` in the
+   environment. No value of a stack is written in a committed file. The command then
+   refuses to go on if one of the four files is missing or empty, if `app.js` holds
+   `localhost`, or if it lacks Cognito's address.
+6. **Upload** the four files of `frontend/dist/` by name (four `aws s3 cp`, never a `sync`,
+   never a delete), each with its content type and `Cache-Control: no-cache`, `index.html`
+   last.
+7. **Invalidate** `/*`, and wait until CloudFront says it is done.
+8. **Check**, with curl and no credentials, PASS or FAIL each: `/` answers 200 with the
+   Content-Security-Policy of section 13.4; `/app.js` answers 200 as JavaScript; `/api/calendar`
+   answers 401 with the API's own JSON, `{"message":"Unauthorized"}` (the rule for `/api/*`,
+   the function and the API are in line); a path that is no route, `/api/no-such-route`,
+   answers 404 with the API's JSON, `{"message":"Not Found"}`, and not with a page. All four
+   run; one FAIL makes the command end with 1.
+9. Print `PageUrl`.
+
+**`--dry-run`** does points 1, 2 and 5 and says what points 3, 4 and 6 to 8 would do, with the
+names it knows (the hosting stack's, if it exists already: one more read). It creates and
+changes nothing in the cloud. It passes the gate like a real run: there is no switch that
+skips the gate.
+
+What the command never does: it takes no password and no token (so it cannot prove a
+signed-in call: a sign-in at the page after a release does); it never touches the stack
+`shared-calendar-api`; it refuses a stack name given for the back end that is the old
+`hello-world-api`.
+
+**The deployment process**, then (the procedure is `docs/RUNBOOK.md` section 2):
+`npm run verify` → `npm run deploy -w backend` → the smoke test → `npm run deploy -w frontend`.
+A release of the page alone is `npm run verify` and the last command. There is no root
+`deploy` script that runs both: the back end's deploy takes arguments of its own and asks to
+confirm a change set, and the two are released apart more often than together.
+
+**As run** (2026-11-21, `docs/RUNBOOK.md` section 5.5): the dry run; the first deployment, which
+created the stack (a change set of six *Add*); and a second with no change, to which SAM said
+"No changes to deploy" and asked nothing. The four checks passed both times.
+
+### 13.7 Logout (O7)
+
+Built at `docs/FRONTEND_DEPLOY_PLAN.md` step 71. `docs/FRONTEND_SERVICES.md` section 20 is the
+truth for the service (`LogoutService`); here is what it means for the page.
+
+"Sign out" does two things, in this order:
+
+1. **The page forgets the person, at once.** The `SessionStore` is cleared, so the login
+   shows, and the two services that live as long as the page (login, refresh) are put back
+   to their first state, so that nothing of the person is left in a service either.
+2. **Then Cognito is told** to revoke the refresh token (`RevokeToken`). The request is given
+   up after 10 seconds.
+
+Version 13 of this document had the two the other way round ("first revokes, then clears").
+With that order a slow or dead network would have kept the person's frame on screen while
+Cognito was waited for. The order above was decided before the design (section 11, decision
+152).
+
+- **The person is signed out of the page whatever Cognito answers, and also when it does not
+  answer.** A failed revocation must not keep someone signed in on a shared computer; what
+  is then left is the refresh token at Cognito, for at most its seven days, held by nothing
+  in the page.
+- **The person sees the login and nothing else**: no "signing out…", no message when the
+  revocation fails. The failure is in the service's result, for a developer and for the
+  tests; no view reads it.
+- **Only "Sign out" tells Cognito.** A session that ends by itself (its expiry, a token the
+  API rejected, a renewal Cognito refused) clears the store and sends nothing: it is like a
+  tab that is closed, which no code sees (`docs/FRONTEND_SERVICES.md` section 20.6).
+- **Only this sign-in is ended.** The same person signed in on another computer stays signed
+  in there.
+- **A tab closed straight after the press** still tells Cognito: the request is sent so that
+  the browser finishes it without the page (`keepalive`; `docs/FRONTEND_SERVICES.md` section
+  8, decision 56). Not something a test here can show.
+- `RevokeToken` needs no AWS credentials and, for an app client without a secret, nothing but
+  the refresh token and the client id: confirmed on AWS's pages on 2026-11-21
+  (`docs/FRONTEND_SERVICES.md` section 20.1, with the addresses). The app client already
+  allows it (`EnableTokenRevocation`, `backend/template.yaml`). The back end did not change.
+- The policy of section 13.4 already allows the call: it goes to Cognito's address, like the
+  login. Under the dev server it goes to `/cognito/`, like the login.
+- The limit that stays: the API's authorizer checks an access token's signature and expiry,
+  not whether it was revoked. A copied access token works for at most its 15 minutes after a
+  sign-out, plus the 5 minutes the authorizer remembers an answer. AWS's guide says so in its
+  own words for any server that only verifies the token. The same is accepted for a deleted
+  user (`docs/ARCHITECTURE.md` section 7.3). What the revocation ends is the making of new
+  access tokens, for the seven days it would otherwise go on.
+- **cognito-local implements `RevokeToken`**, and then refuses a refresh with the revoked
+  token: the sign-out has an integration journey
+  (`frontend/tests/integration/logout.service.test.ts`), and the local page and the deployed
+  one do not differ in it.
+
+**Seen in a browser** (2026-11-21, headless Chromium, the dev server against the local stack):
+
+| Case | What the page did |
+|---|---|
+| The local Cognito running | The login in the same run of the script as the press, both fields empty; nothing of the person or of a token in the page, in a field or in the address; one `RevokeToken` to `/cognito/`, answered 200, its body the client id and the token, no `Authorization` header |
+| The local Cognito stopped (its container stopped, then started again) | The same for the person; the request was answered 502 by the dev server; no message on the page. The browser itself writes one line about the 502 in its console: its own report of a failed request, not the page's |
+| Cognito silent (the request held and never answered) | The same for the person; another person signed in meanwhile and got a frame of their own; the request was aborted after 10 seconds and nothing of the page changed |
+| The console otherwise | `zod`'s one report (section 12.2); no token in any line |
+
+**At the deployed page** (step 72, 2026-11-21): **a browser may make the call from the
+page's address.** AWS's pages do not speak of it; in the browser's network panel the request
+to Cognito sent at "Sign out" (`X-Amz-Target` ending in `RevokeToken`) was answered 200, not
+blocked. It has to be looked at there on purpose, after any change to the policy of section
+13.4 or to the call: a refused call would sign the person out all the same, and nothing on
+the page would show it.
+
+**Not yet looked at, at the deployed page:** that the real Cognito then refuses a refresh
+with the revoked token (the local emulator does; `docs/FRONTEND_SERVICES.md` section 20.9),
+and "Sign out" with the network off. Both are open items of `docs/RUNBOOK.md` section 5.5.
+
+### 13.8 Left out on purpose
+
+| Not there | Why | When it would come |
+|---|---|---|
+| A domain of our own | A certificate for CloudFront must be made in `us-east-1`, which the organization's policy blocks for this account; and nothing asks for it yet | Open point O10 |
+| The session across a reload (O3) | Blocks nothing; `sessionStorage` would put tokens where a script injected into the page could read them, which the policy of section 13.4 is there to prevent but is a decision of its own | When asked |
+| The distribution's own logs | They need a bucket and a setting per distribution; the API's access log and the functions' logs already say what the application did | When a question arises that those logs cannot answer |
+| A firewall (AWS WAF) in front of the distribution | A monthly price, against the 1 USD budget; the API throttles and every route asks for a token | When the page has an audience beyond the people given a user |
+| A second environment (a test copy of the page) | The local stack is the test environment (`docs/ARCHITECTURE.md` N5) | With a second back-end stack, never alone |
+| A pipeline that deploys on a push | The back end has none either (`docs/IMPLEMENTATION_PLAN.md` section 6) | Together with the back end's |
+
+**Cost.** At this size the bucket and the distribution stay inside AWS's free allowances
+(CloudFront's is 1 TB and 10 million requests a month): with the page deployed, the
+month-to-date cost on 2026-11-21 was 0 USD, and the forecast had no data yet (`docs/RUNBOOK.md`
+section 5.3). The budget of 1 USD
+(`npm run budget -w backend`) has no filter by stack: it watches the whole account's bill, the
+hosting's included, and no second budget is made.

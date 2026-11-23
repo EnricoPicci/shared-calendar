@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v4 (2026-10-28). **Steps 1–12 done** (step 12 on 2026-11-04, tag `v1.0.0`); step 20, monorepo move, done 2026-11-04. **Shared calendar: steps 41–59 planned** (2026-11-10, brief 41, from `docs/SHARED_CALENDAR_SPEC.md` v2); step 41 done 2026-11-12 (brief 42); step 42 done 2026-11-12 (brief 43); step 43 done 2026-11-12 (brief 44); step 44 done 2026-11-12 (brief 45; O2 checked, PO confirmed T2); step 45 done 2026-11-12 (brief 46); step 46 done 2026-11-13 (brief 47; spec v7); step 47 done 2026-11-13 (brief 48; spec v8; availability complete); step 48 done 2026-11-14 (brief 49; spec v9; booking and the event log); step 49 done 2026-11-14 (brief 50; spec v10; listing, note and cancel); step 50 done 2026-11-14 (brief 51; spec v11; change; appointments complete); step 51 done 2026-11-14 (brief 52; spec v12; `GET /users`, user deletion with appointments); step 52 done 2026-11-14 (brief 53; spec v13; smoke test's calendar journey, AC-36 locally): **back end complete**; step 53 done 2026-11-15 (brief 54; `FRONTEND_SERVICES.md` v6; spec v14; `api.ts`, settings, types and availability-rules services, `listUsers`); step 54 done 2026-11-15 (brief 56; `FRONTEND_SERVICES.md` v7; `CalendarService`, `AppointmentsService`): **services layer complete**; step 55 done 2026-11-16 (brief 70; commit `340d9b0` deployed to `hello-world-api`, smoke test 19/19 PASS in the cloud, `docs/RUNBOOK.md` section 5.2): **shared calendar deployed**; 2026-11-16: rename to "shared-calendar" planned as steps 56–58 (`docs/RENAME_PLAN.md`), documentation and hand-over renumbered 56 → 59; step 56 done 2026-11-16 (brief 71; repository renamed, local stack on `shared-calendar-local`, no cloud change); step 57 done 2026-11-16 (brief 72; commit `4e22058` deployed as the new stack `shared-calendar-api`, smoke test 19/19 PASS, `docs/RUNBOOK.md` section 5.4): **new stack in use**, `hello-world-api` kept as the way back until step 58 |
+| Status | v1 — derived from `docs/ARCHITECTURE.md` v2 (2026-10-27), aligned with v4 (2026-10-28). **Steps 1–12 done** (step 12 on 2026-11-04, tag `v1.0.0`); step 20, monorepo move, done 2026-11-04. **Shared calendar: steps 41–59 planned** (2026-11-10, brief 41, from `docs/SHARED_CALENDAR_SPEC.md` v2); step 41 done 2026-11-12 (brief 42); step 42 done 2026-11-12 (brief 43); step 43 done 2026-11-12 (brief 44); step 44 done 2026-11-12 (brief 45; O2 checked, PO confirmed T2); step 45 done 2026-11-12 (brief 46); step 46 done 2026-11-13 (brief 47; spec v7); step 47 done 2026-11-13 (brief 48; spec v8; availability complete); step 48 done 2026-11-14 (brief 49; spec v9; booking and the event log); step 49 done 2026-11-14 (brief 50; spec v10; listing, note and cancel); step 50 done 2026-11-14 (brief 51; spec v11; change; appointments complete); step 51 done 2026-11-14 (brief 52; spec v12; `GET /users`, user deletion with appointments); step 52 done 2026-11-14 (brief 53; spec v13; smoke test's calendar journey, AC-36 locally): **back end complete**; step 53 done 2026-11-15 (brief 54; `FRONTEND_SERVICES.md` v6; spec v14; `api.ts`, settings, types and availability-rules services, `listUsers`); step 54 done 2026-11-15 (brief 56; `FRONTEND_SERVICES.md` v7; `CalendarService`, `AppointmentsService`): **services layer complete**; step 55 done 2026-11-16 (brief 70; commit `340d9b0` deployed to `hello-world-api`, smoke test 19/19 PASS in the cloud, `docs/RUNBOOK.md` section 5.2): **shared calendar deployed**; 2026-11-16: rename to "shared-calendar" planned as steps 56–58 (`docs/RENAME_PLAN.md`), documentation and hand-over renumbered 56 → 59; step 56 done 2026-11-16 (brief 71; repository renamed, local stack on `shared-calendar-local`, no cloud change); step 57 done 2026-11-16 (brief 72; commit `4e22058` deployed as the new stack `shared-calendar-api`, smoke test 19/19 PASS, `docs/RUNBOOK.md` section 5.4): **new stack in use**; step 58 done 2026-11-21 (the old stack `hello-world-api` deleted, with its budget; `docs/RUNBOOK.md` section 5.4; the old profile still to remove from `~/.aws/config`) |
 | Date | 2026-10-28; calendar steps added 2026-11-10 |
 | Scope | Everything needed to go from an empty repository to a deployed, smoke-tested v1; then the shared calendar (steps 41–59), from its specification to a deployed, smoke-tested feature |
 
@@ -118,7 +118,8 @@ by unit tests with a fixed clock; the journeys prove the same scenario on dates 
 
 Nothing in the spec is without a step except, by design: R-TIME-05 and the view needs of 16.8
 (the user interface is out of scope, spec 1.3); the future notifier of 15.3; the follow-ups of
-spec 21 (section 6 below); and the CORS gap, which waits for `FRONTEND_ARCHITECTURE.md`.
+spec 21 (section 6 below); and the CORS gap, which waited for `FRONTEND_ARCHITECTURE.md` (closed there on 2026-11-21, its
+section 13.3, with no change to the API).
 
 ---
 
@@ -1046,7 +1047,14 @@ checks of step 55 on the new stack; `README.md` ids and `docs/RUNBOOK.md` record
 
 ---
 
-### Step 58 — Retire the old stack `hello-world-api` (≈ 1 h, needs explicit instruction)
+### Step 58 — Retire the old stack `hello-world-api` (≈ 1 h, needs explicit instruction) — done
+
+**Done 2026-11-21**, on the PO's instruction and with no export; the record is `docs/RUNBOOK.md`
+section 5.4. Of the acceptance below: the stack does not exist, the budget is gone, and the new
+stack's smoke test passed (run and reported by the operator). **Not done:** the old profile is
+still in the operator's `~/.aws/config`. `docs/RENAME_PLAN.md` says so in its status. What
+differed: five days after step 57, not a week (the PO decided); the stack's removal was given
+one go for its four commands, the budget a go of its own. The step as planned:
 
 **When the PO decides**, after the new stack has run without problems for a while (one week as a
 minimum). After this step there is no way back to the old stack (`docs/RENAME_PLAN.md`
@@ -1186,7 +1194,7 @@ Shared calendar follow-ups (spec 21), not in steps 41–59:
 4. Per-User settings.
 5. A "force" option for availability changes that cancels the affected appointments through the normal path.
 6. Per-day locks instead of the global lock, if load ever grows (spec 13.4, T3).
-7. The user interface: `docs/FRONTEND_ARCHITECTURE.md`, the views of spec 16.8, R-TIME-05, and the CORS gap.
+7. The user interface: `docs/FRONTEND_ARCHITECTURE.md`, the views of spec 16.8, R-TIME-05, and the CORS gap. Done since, in plans of its own: the views (`docs/FRONTEND_VIEW_PLAN.md`, 2026-11-20) and the hosting, which closed the CORS gap with no change to the API (`docs/FRONTEND_DEPLOY_PLAN.md`, 2026-11-21).
 
 ---
 

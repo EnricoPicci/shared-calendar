@@ -15,7 +15,7 @@ import { SessionStore } from '../../../src/services/session.store';
 import { call, json, session } from './fixtures';
 import { CONFIG } from './suite';
 
-// docs/FRONTEND_SERVICES.md section 20.8: the six calls of AssistantService, each with the same
+// docs/FRONTEND_SERVICES.md section 21.8: the six calls of AssistantService, each with the same
 // tests, then what belongs to the one stream they share. The per-method suite of suite.ts is not
 // used: it tests a pair of streams per method, and this service has one stream for all its calls.
 // A real SessionStore; fetch stubbed with real Responses; every test subscribes first, then calls.

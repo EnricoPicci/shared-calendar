@@ -296,3 +296,60 @@ describe('LoginService', () => {
     expect(JSON.stringify(Object.entries(service).filter(([k]) => k === 'config'))).not.toContain(PASSWORD);
   });
 });
+
+// docs/FRONTEND_SERVICES.md section 4.4: back to the first state, for a sign-out.
+describe('LoginService.reset', () => {
+  it('after a success: idle, nothing replayed, the name in no current value, the store untouched', async () => {
+    const { service, states, sessions } = await loginOnce(tokens(ALICE));
+    const signedIn = sessions.at(-1);
+    service.reset();
+    expect(states.at(-1)).toEqual({ status: 'idle' });
+    expect(sessions.at(-1)).toBe(signedIn);
+
+    const lateResults: LoginResult[] = [];
+    const lateStates: LoginState[] = [];
+    service.loginResult$.subscribe((r) => lateResults.push(r));
+    service.loginState$.subscribe((s) => lateStates.push(s));
+    expect(lateResults).toEqual([]);
+    expect(lateStates).toEqual([{ status: 'idle' }]);
+    expect(JSON.stringify([lateResults, lateStates])).not.toContain('alice');
+  });
+
+  it('while pending: the request is aborted and its late answer reports nothing and signs nobody in', async () => {
+    let signal: AbortSignal | undefined;
+    let answer: (r: Response) => void = () => {};
+    fetchMock.mockImplementationOnce((_url: string, init: RequestInit) => {
+      signal = init.signal ?? undefined;
+      return new Promise<Response>((resolve) => (answer = resolve));
+    });
+    const { service, results, states, sessions } = subscribed();
+    service.login('alice', PASSWORD);
+    service.reset();
+    expect(signal?.aborted).toBe(true);
+    answer(tokens(ALICE));
+    await new Promise((r) => setTimeout(r, 10));
+    expect(results).toEqual([]);
+    expect(states.map((s) => s.status)).toEqual(['idle', 'pending', 'idle']);
+    expect(sessions).toEqual([null]);
+  });
+
+  it('keeps the subscribers: one of before receives the next login, and nothing in between', async () => {
+    fetchMock.mockResolvedValueOnce(tokens(ALICE)).mockResolvedValueOnce(cognitoError('NotAuthorizedException', 'no'));
+    const { service, results } = subscribed();
+    service.login('alice', PASSWORD);
+    await vi.waitFor(() => expect(results).toHaveLength(1));
+    service.reset();
+    expect(results).toHaveLength(1);
+    service.login('alice', 'wrong');
+    await vi.waitFor(() => expect(results).toHaveLength(2));
+    expect(results.map((r) => r.status)).toEqual(['success', 'failure']);
+  });
+
+  it('before any login: idle, no result, no request', () => {
+    const { service, results, states } = subscribed();
+    service.reset();
+    expect(results).toEqual([]);
+    expect(states).toEqual([{ status: 'idle' }, { status: 'idle' }]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

@@ -1,17 +1,19 @@
 # Operator runbook
 
-What to do, in order, to work on the deployed stack: the daily start, updating the stack,
-deploying from scratch, and the one-time setup done during plan step 11 that is easy to
-forget. The why behind each rule is in `docs/ARCHITECTURE.md` and `CLAUDE.md`. Which AWS
+What to do, in order, to work on the two deployed stacks, the API's and the page's: the daily
+start, updating the API's stack, releasing the page, deploying from scratch, and the one-time
+setup done during plan step 11 that is easy to forget. The tools a machine needs, with their
+versions, are in `README.md`, "Prerequisites". The why behind each rule is in `docs/ARCHITECTURE.md` and `CLAUDE.md`. Which AWS
 identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AWS_ACCOUNTS.md`.
 
 | | |
 |---|---|
-| Stack | `shared-calendar-api` |
+| The API's stack | `shared-calendar-api` |
+| The page's stack | `shared-calendar-web`, same region and profile: the hosting of the browser page (`docs/FRONTEND_ARCHITECTURE.md` section 13), first deployed on 2026-11-21 (section 5.5) and released with section 2, step 6. The page's address is its output `PageUrl` (`README.md`, "The deployed stacks", has it) |
 | Region | `eu-north-1` (the only region the AWS organization allows for regional services) |
 | CLI profile | `shared-calendar-admin` (IAM Identity Center, role `AdministratorAccess`) |
 | Alerts to | the `AlertEmail` stack parameter |
-| Old stack | `hello-world-api` (profile `hello-admin`): replaced by `shared-calendar-api` in `docs/IMPLEMENTATION_PLAN.md` step 57 (2026-11-16); it stays, untouched, as the way back until step 58 (`docs/RENAME_PLAN.md` section 4.2). Never deploy to it: `deploy.sh` refuses |
+| Old stack | `hello-world-api` (profile `hello-admin`): replaced by `shared-calendar-api` in `docs/IMPLEMENTATION_PLAN.md` step 57 (2026-11-16); **deleted on 2026-11-21** (step 58, section 5.4), with its tables, its user pool and its budget. There is no way back to it (`docs/RENAME_PLAN.md` section 4.3). Both `deploy.sh` still refuse its name |
 
 ---
 
@@ -26,9 +28,12 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
    ```
 
 2. `nvm use` (Node 22 from `.nvmrc`). Commands below run from the repository root; the back
-   end's scripts run in its workspace (`-w backend`, or `cd backend` and drop the flag). After a
-   fresh clone or a dependency change: `npm ci` at the root.
-3. In every terminal that talks to AWS:
+   end's scripts run in its workspace (`-w backend`, or `cd backend` and drop the flag), the front
+   end's in its own (`-w frontend`). After a fresh clone or a dependency change: `npm ci` at the
+   root. On a machine that has never run the project, first the tools of `README.md`,
+   "Prerequisites": Node 22, Docker, the SAM CLI, the AWS CLI, git and curl.
+3. In every terminal that talks to AWS (the profile is set up once per machine: section 4; the
+   person needs an Identity Center user with access to the account: `docs/AWS_ACCOUNTS.md`):
 
    ```bash
    export AWS_PROFILE=shared-calendar-admin
@@ -38,11 +43,23 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
 
    The device code is needed in the Codespace: the normal login waits for a browser callback
    on `localhost`, which is the laptop, not the Codespace. Do not set `AWS_REGION`: the scripts
-   and SAM take the region from `backend/samconfig.toml`.
+   and SAM take the region from `backend/samconfig.toml` and, for the page, `frontend/samconfig.toml`.
 
 ---
 
-## 2. Updating the deployed stack (code or template change)
+## 2. Updating the deployed stacks (a change to the code or to a template)
+
+What changed decides the steps:
+
+| What changed | Steps |
+|---|---|
+| `backend/` only | 1 to 5 |
+| `frontend/` only (the page, or its hosting in `frontend/template.yaml`) | 1 to 3, then 6 |
+| `shared/`, or both | 1 to 6: `shared/` is built into the API's functions and into the page |
+
+**The API first, always**: the page is built with values read from the API's stack, and its
+command stops when that stack is missing. One `verify` (step 3) serves both deployments when
+both fit into its 30 minutes; otherwise run it again before the second.
 
 1. Make the change, commit it. The deploy refuses uncommitted changes.
 2. Start the local stack (two terminals, leave them running):
@@ -51,6 +68,9 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
    DYNAMODB_PORT=8002 npm run local:up -w backend
    npm run local:api -w backend         # wait for "Running on http://127.0.0.1:3000"
    ```
+
+   They need Docker running. `DYNAMODB_PORT=8002` is for a machine where another project holds
+   port 8000; drop it when the port is free, and use the same value in step 3.
 
 3. `DYNAMODB_PORT=8002 npm run verify -w backend`: must end with `verify PASSED … (clean tree)`.
    From now on there are **30 minutes** to deploy, and no tracked file may change.
@@ -70,6 +90,38 @@ identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AW
    needed, the root has no `smoke` script): all 19 lines must say PASS (10 Hello World checks,
    9 calendar checks: section 2.1). `script -q -c "…" /tmp/smoke.txt` works here too; the
    password prompt does not echo, so the password does not reach the file.
+6. **Releasing the page**, after the back end's deploy and its smoke test, or alone when only
+   `frontend/` changed (then steps 1 to 3, and this one): `npm run deploy -w frontend`, from the
+   repository root, in a
+   terminal set up as in section 1, item 3, inside the same 30 minutes of the same stamp. It
+   takes no argument but `--dry-run`, which goes as far as the build and then says what it
+   would do, changing nothing; it passes the same gate. In order
+   (`docs/FRONTEND_ARCHITECTURE.md` section 13.6):
+   - the gate, then `npm run verify -w frontend` (about a minute);
+   - it reads `ApiUrl` and `UserPoolClientId` from the stack `shared-calendar-api`: the back
+     end is deployed first, always;
+   - `sam deploy` of `frontend/template.yaml` to the stack `shared-calendar-web`. **The only
+     question it asks**, and only when a resource of the hosting changes: `Deploy this
+     changeset? [y/N]`. Read the table first. A release of the page alone changes no
+     resource: SAM says `No changes to deploy. Stack shared-calendar-web is up to date` and
+     asks nothing. **Remove** or **Replace** on `PageBucket` or `Distribution` means a new
+     bucket or a new address for the page: answer N and investigate. SAM must name no bucket
+     of its own (`Deployment s3 bucket : None`);
+   - the build, four uploads (`app.js.map`, `app.js`, `style.css`, `index.html` last), an
+     invalidation of `/*` that it waits for (a minute or two);
+   - four checks with curl and no credentials, `PASS` or `FAIL` each: `GET /` 200 with the
+     Content-Security-Policy; `GET /app.js` 200 as JavaScript; `GET /api/calendar` 401 and
+     `GET /api/no-such-route` 404, both with the API's own JSON. Then `The page is released:`
+     and the address. One `FAIL` ends the command with an error: the files are uploaded all
+     the same, and what the page then serves is not as designed.
+   Record it like the back end's: `script -q -c "npm run deploy -w frontend" /tmp/deploy-web.txt`.
+   The checks cannot prove a signed-in call: sign in at the page once after a release, as any
+   user (`README.md`, "The deployed stacks": who can sign in, and with which password); the week
+   that loads is the proof. The page's address is the command's last line and the stack's output
+   `PageUrl`.
+   **Which branch:** the hosting's template and this command were deployed from the branch
+   `deploy-frontend` (section 5.5). Until that branch is merged into `main`, a clone of `main`
+   holds neither: release from `deploy-frontend`.
 
 Rules:
 
@@ -154,7 +206,8 @@ Plan step 11 has the full list; in short:
 0. Region check, read-only: `aws cloudformation describe-stacks --stack-name shared-calendar-api
    --region eu-north-1` must answer "does not exist", not `AccessDenied … explicit deny in a
    service control policy`. In another account, check its organization's allowed region first and
-   put it in `backend/samconfig.toml` (both `region` lines) and the profile.
+   put it in `backend/samconfig.toml` (both `region` lines), in `frontend/samconfig.toml` (the
+   page's deploy stops when the two files name different regions) and in the profile.
 1. Steps 1 to 3 of section 2 (commit, local stack, verify).
 2. `npm run deploy -w backend -- --parameter-overrides AdminUsername="admin" FunctionArchitecture="arm64" AlertEmail=<alert address>`.
    `backend/samconfig.toml` holds everything else (stack, region, capabilities); the address is
@@ -188,6 +241,7 @@ Plan step 11 has the full list; in short:
    `shared-calendar-api-hello-messages` → Explore items shows the smoke rows;
    `shared-calendar-api-calendar` shows the smoke test's cancelled
    appointment, its two events and the deleted-user marker (section 2.1).
+8. The page, which needs this stack: section 3.1.
 
 If the first create fails: CloudFormation rolls back, but cannot delete the three protected
 resources (the tables `<stack>-hello-messages` and `<stack>-calendar`, and the user pool), so the stack may end in
@@ -203,6 +257,33 @@ with the `<stack>-calendar` table, so export what must be kept first.
 A failed change set (for example an unknown resource type) creates nothing: the stack stays in
 `REVIEW_IN_PROGRESS` with 0 resources, and the next deploy simply reuses it.
 
+### 3.1 The page's stack `shared-calendar-web`: from scratch, and how it is deleted
+
+**From scratch:** section 2, steps 1 to 3 and 6, once the stack `shared-calendar-api` exists.
+The first run shows a change set of six *Add* (`BucketAccess`, `Distribution`, `PageBucket`,
+`PageBucketPolicy`, `PageHeaders`, `StripApiPrefixFunction`) and nothing else; the distribution
+takes three to four minutes, during which the screen stands still. The page's address is new
+with every new distribution: tell the people who use it.
+
+**Deleting it, should it ever be needed. Written as a procedure; never run.** CloudFormation
+cannot delete a bucket that holds objects, so the stack's deletion fails at `PageBucket` while
+the four files are in it, and leaves the stack in `DELETE_FAILED` with the distribution already
+gone. So the bucket is emptied first, and the page is down from that moment:
+
+```bash
+bucket=$(aws cloudformation describe-stacks --stack-name shared-calendar-web --region eu-north-1 \
+  --query "Stacks[0].Outputs[?OutputKey=='BucketName'].OutputValue" --output text)
+aws s3 ls "s3://$bucket/"                      # look first: the four files and nothing else
+aws s3 rm "s3://$bucket/" --recursive          # empties it; the bucket has no versioning
+aws cloudformation delete-stack --stack-name shared-calendar-web --region eu-north-1
+aws cloudformation wait stack-delete-complete --stack-name shared-calendar-web --region eu-north-1
+```
+
+Disabling and deleting a distribution takes several minutes. Nothing of the stack
+`shared-calendar-api` is touched: the API keeps answering at its own address, and no data is
+in the page's stack. If the deletion was started with the files still there: empty the bucket
+as above and run `delete-stack` again.
+
 ---
 
 ## 4. One-time AWS setup (redo only for a new account or a new machine)
@@ -212,7 +293,7 @@ A failed change set (for example an unknown resource type) creates nothing: the 
 | Account | Use |
 |---|---|
 | Management account (root user = the sign-up e-mail) | billing and emergencies only; IAM Identity Center lives here (home region `us-east-1`) |
-| "Identity Delegated Admin" | where the stack is deployed and where `shared-calendar-admin` signs in |
+| "Identity Delegated Admin" | where the two stacks are deployed and where `shared-calendar-admin` signs in |
 | "Side Quest Accepted" | unused |
 
 The organization policy `AdvancedModeRegionRestrictionSecurityControlPolicy` applies to all
@@ -374,3 +455,139 @@ with `npm run deploy -w backend` and no extra argument.
     `DataUnavailableException: Insufficient amount of historical data` (not yet visible, section
     5.3). The account's provisioned tables are now the two stacks' four: 22 read and 22 write
     units, inside the free 25/25 (`docs/RENAME_PLAN.md` section 7).
+
+- Plan step 58 (2026-11-21): **the old stack `hello-world-api` retired**, on the Product Owner's
+  instruction, five days after step 57 (the plan named a week as the least; the Product Owner
+  decided). No export: its tables held smoke history only. The commands were run in the session
+  with Claude Code, under the profile `shared-calendar-admin`, each resource read back first.
+  - **Before** (read-only): the stack `UPDATE_COMPLETE`, untouched since 2026-11-16 09:56 UTC,
+    118 resources, no termination protection; `hello-messages` 4 rows and `calendar` 6 items,
+    deletion protection on, both confirmed as the old stack's through its resources
+    (`MessagesTable`, `CalendarTable`); the user pool `eu-north-1_1DOUiHwSk`, protection
+    `ACTIVE`, one user, `admin`.
+  - **Protection lifted**: `aws dynamodb update-table … --no-deletion-protection-enabled` on
+    `hello-messages` and on `calendar`; `aws cognito-idp update-user-pool … --deletion-protection
+    INACTIVE` on the old pool, with its password policy, admin-only creation, recovery setting,
+    MFA off, tier and verification template repeated in the same call (the call resets what it
+    is not given). The new stack's two tables and its pool were read after each: protection on.
+  - **Deleted**: `aws cloudformation delete-stack --stack-name hello-world-api` at 15:19:36 UTC;
+    gone by 15:21:08 UTC, with no `DELETE_FAILED`. `describe-stacks` answers "does not exist".
+  - **After** (read-only): the region's tables are `shared-calendar-api-calendar` and
+    `shared-calendar-api-hello-messages` only; one user pool, the new one; no function and no
+    log group with the old name; the alarms are the new stack's two, `OK`; the old API's
+    address no longer answers. `shared-calendar-api` and `shared-calendar-web`
+    `CREATE_COMPLETE` with their `LastUpdatedTime` unchanged; without a token the API answers
+    401 at its own address and through the page's, and the page answers 200.
+  - **The budget** `hello-world-api-monthly` deleted (`aws budgets delete-budget`), on a go of
+    its own; `shared-calendar-api-monthly` is the one left, and watches the whole account.
+  - **Smoke test** of `shared-calendar-api`, run by the operator after the deletion: reported
+    as passed; its output was not seen in the session.
+  - **The old build artifacts** deleted, on a go of their own: in SAM's upload bucket (stack
+    `aws-sam-cli-managed-default`; the bucket keeps versions) the 36 objects under the prefix
+    `hello-world-api/`, 29 MB, every version of each, by key and version id; no version and no
+    delete marker is left under the prefix. The 26 objects under `shared-calendar-api/` were
+    not touched.
+  - **The deploy scripts** (`backend/scripts/deploy.sh`, `frontend/scripts/deploy.sh`) still
+    refuse the name `hello-world-api`; their comments and the words of the refusal say that
+    the stack is deleted, no longer that it is kept. Both refusals tried by hand.
+  - **Not done:** the sections `[profile hello-admin]` and `[sso-session hello]` are still in
+    the operator's `~/.aws/config`.
+  - **Cost:** the provisioned tables are the new stack's two again, 11 read and 11 write
+    units of the free 25/25.
+
+### 5.5 The page's first deployment (`docs/FRONTEND_DEPLOY_PLAN.md` step 72, 2026-11-21)
+
+The stack `shared-calendar-web`, created beside `shared-calendar-api`, which was not deployed:
+`git diff 4e22058 HEAD -- backend/src backend/template.yaml shared/src` was empty (`4e22058` is
+the commit of section 5.4). Commit deployed: `646b706` (the step's brief on top of `f767e2e`),
+**from the branch `deploy-frontend`**, not yet merged into `main`. Who did what: the operator
+ran the two deployments and the checks in a browser; the read-only `aws` commands, the checks
+with curl and the reading of the recorded output were done in the session with Claude Code,
+which ran nothing that writes to AWS and saw no password and no token of the real pool.
+
+- **Before:** root `DYNAMODB_PORT=8000 npm run verify` PASSED on the clean tree at 13:25 UTC;
+  the front end's integration tests, which it does not run, 53 green;
+  `npm run deploy -w frontend -- --dry-run` passed the gate, read the back end's stack and
+  built. Read-only: no stack `shared-calendar-web`; no distribution, function, origin access
+  control or headers policy in the account; the three managed policies under the template's
+  ids. The change set to expect was written down before the command was run.
+- **First deployment**, `npm run deploy -w frontend` at 13:33 UTC, no argument. SAM's values:
+  stack `shared-calendar-web`, `eu-north-1`, `Deployment s3 bucket : None`, `Capabilities :
+  null`, `ApiDomain` the host of `ApiUrl`. **Change set: 6 Add, nothing else**
+  (`BucketAccess`, `Distribution`, `PageBucketPolicy`, `PageBucket`, `PageHeaders`,
+  `StripApiPrefixFunction`), as written down, and read before the `y` this time. Executed at
+  13:36:30 UTC, `CREATE_COMPLETE` at 13:39:58 UTC (the distribution about three and a half
+  minutes). No bucket of SAM's own, no role.
+- **Outputs:** `PageUrl` `https://dfhghsvimmgfm.cloudfront.net`, `BucketName`
+  `shared-calendar-web-pagebucket-pmpsh2fgyi1j`, `DistributionId` `E2V5GRRPLMET12`.
+- **Uploads:** `app.js.map` (2,200,102 bytes), `app.js` (578,155), `style.css` (16,676),
+  `index.html` (30,677), in this order; one invalidation of `/*`, waited for.
+- **The four checks:** PASS each, at 13:40 UTC.
+- **Read-only, after** (session): the stack `CREATE_COMPLETE`, six resources, three outputs.
+  The bucket: the four public-access settings on; its policy one statement (the CloudFront
+  service, `s3:GetObject`, the four objects by name, this distribution's ARN); four objects;
+  its own address answers 403. The distribution: enabled, `Deployed`, `PriceClass_100`,
+  HTTP/2 and HTTP/3, IPv6, no alias, no logging, no firewall, no custom error response; its
+  two rules as `docs/FRONTEND_ARCHITECTURE.md` section 13.3 has them. With curl and no
+  credentials: plain HTTP answers 301 to HTTPS; the four files 200 with their content types
+  and `Cache-Control: no-cache`; the four headers of section 13.4 word for word on the files,
+  on a 401 and a 404 of the API and on the bucket's 403; a name that is no file
+  (`/nothing-here`, and `/api` without a slash) 403 with S3's own XML; `/api/calendar` 401
+  and `/api/no-such-route` 404 with the API's JSON; **the 404 asked twice within a second
+  carried two different `apigw-requestid`**: no failure of the API is kept. Sizes downloaded:
+  `index.html` 5,095 bytes, `style.css` 4,578, `app.js` 121,188, compressed with Brotli
+  (with gzip only: 5,398, 4,897 and 130,771).
+- **The API's access log** (`/aws/apigateway/shared-calendar-api-access`): the page's calls
+  are in it within a minute, **with the caller's own address in `ip`, not CloudFront's**
+  (`docs/FRONTEND_ARCHITECTURE.md` section 13.3 said the opposite and was corrected). A
+  request for a path that is no route (the 404) leaves no line in it.
+- **In a browser, by the operator, at a desktop width.** A shorter list than the one prepared
+  (57 checks and 10 looks at a phone width, from `docs/FRONTEND_WALK.md`); what was done:
+  - seen by the operator: a wrong password refused; `admin` signed in and the week loaded;
+    `Bob` and `ab` refused by the page; the settings shown, 721 refused, nothing saved;
+    **"Sign out": the request `RevokeToken` to Cognito answered 200**, not blocked;
+  - seen in the access log, all through the page's address with a token: `GET /calendar`,
+    `/users`, `/calendar/settings`, `/calendar/types` and `/calendar/patterns` 200;
+    `POST /users` 201 and, for the same name again, 409; two types and two patterns created;
+    an extra window created and "this day only" saved for a date; two bookings by the User.
+    So **the `Authorization` header reaches the API through the distribution**, and `GET`,
+    `POST`, `PUT` and `DELETE` pass.
+- **Removed at the end**, by the operator through the page, each seen in the log as a 204: the
+  User `walk-d1` (which cancelled its two appointments), the date's override and extra window,
+  both patterns, both types. **What stays in `shared-calendar-api-calendar`, as history:** the
+  two appointments, cancelled with the reason of a deleted user, their pointers and events,
+  the deleted-user marker of `walk-d1`, and a higher version of the lock item. No type, no
+  pattern, no window, no settings item (the settings were never saved), no User. Inferred from
+  the log and the API's rules: the table itself was not read.
+- **Second deployment**, the acceptance: `verify` PASSED again on the same clean commit at
+  14:22 UTC; `npm run deploy -w frontend` at 14:32 UTC said `No changes to deploy. Stack
+  shared-calendar-web is up to date` and asked nothing, uploaded the four files again,
+  invalidated, and its four checks PASSED at 14:35 UTC. The stack's `LastUpdatedTime` is still
+  that of its creation.
+- **The other stacks:** `shared-calendar-api` `CREATE_COMPLETE`, last touched 2026-11-16
+  12:26 UTC; `hello-world-api` `UPDATE_COMPLETE`, 2026-11-16 09:56 UTC: both as before.
+- **Cost:** month-to-date 0 USD; `aws ce get-cost-forecast` still answers
+  `DataUnavailableException` (section 5.3).
+
+**Not done on 2026-11-21, and still to do** (each needs a sign-in at the page; the list is
+`docs/FRONTEND_DEPLOY_PLAN.md` step 72, point 5):
+
+- [ ] **A refresh with the revoked token is refused by the real Cognito.** The revocation was
+      answered 200; that the token then makes no new session was not tried.
+- [ ] **The session renewed**: a tab left signed in for 16 minutes, one `InitiateAuth` to
+      Cognito about a minute before the fifteenth, and the page still working.
+- [ ] "Sign out" with the network off; a reload (the login again); the console (`zod`'s one
+      report and no other, under the distribution's policy).
+- [ ] The rest of the walk: the password dialog, a note, a move, a cancel by the User, the
+      refusals of the API in the availability's forms, the addresses typed by hand, and
+      everything at a phone width. `PATCH` and the routes of a move and of a cancel were not
+      sent through the distribution; `PUT /calendar/settings` neither, on purpose (a first
+      save leaves a settings item that cannot be removed).
+
+
+**Read again on 2026-11-21, for `docs/FRONTEND_DEPLOY_PLAN.md` step 73** (documents only;
+read-only commands and curl with no credentials, in the session with Claude Code): the stack
+`CREATE_COMPLETE` with its six resources and three outputs; the bucket's settings, policy and
+four objects, the distribution's rules and the headers as recorded above; a second question
+for `/`, `/style.css` and `/app.js` with the first answer's `ETag` answered 304 each. Nothing
+was deployed, and none of the four items above was looked at: they stay open.

@@ -1,11 +1,11 @@
-# Front end — The services layer: login, session, refresh, Hello World, users, the shared calendar and the assistant
+# Front end — The services layer: login, session, refresh, logout, Hello World, users, the shared calendar and the assistant
 
 | | |
 |---|---|
-| Status | v8 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 20), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). Logout is not designed yet |
-| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-22 |
-| Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows); since v7 the calendar view and the appointments; since v8 the conversation with the assistant |
-| Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), since v6 v12 (sections 3 and 4: the calendar routes as implemented); `docs/SHARED_CALENDAR_SPEC.md` v15 section 16 (v13 when v6 was written), and for v7 sections 8, 11.1 (routes 15–20), 11.2, 11.5, 11.6; `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/`; for v8 `docs/CONVERSATIONAL_ARCHITECTURE.md` v14 (sections 4.4, 5.1 to 5.5, 6, 6.1 and 13) and `docs/ARCHITECTURE.md` section 4, "The assistant's routes" |
+| Status | v9 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 21), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v8 — implemented (2026-11-21, brief `prompts/95-step-71-implementation.md`, `docs/FRONTEND_DEPLOY_PLAN.md` step 71; the design reviewed before the code): `LogoutService` (section 20), `revokeToken` and `toRevokeOutcome` in `cognito.ts` (section 10.1), `reset()` on `LoginService` and `RefreshService`; proven against cognito-local, and at the deployed page as far as the revocation answered 200 (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; section 20.9 says what was seen and what was not). v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). |
+| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-21; v9 2026-11-22 |
+| Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows); since v7 the calendar view and the appointments; since v8 the sign-out; since v9 the conversation with the assistant |
+| Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), since v6 v12 (sections 3 and 4: the calendar routes as implemented); `docs/SHARED_CALENDAR_SPEC.md` v15 section 16 (v13 when v6 was written), and for v7 sections 8, 11.1 (routes 15–20), 11.2, 11.5, 11.6; for v8 `docs/FRONTEND_ARCHITECTURE.md` section 13.7 and section 11, decision 152 (the direction for logout as v14 had it; its v15 follows this design), and `docs/ARCHITECTURE.md` section 7.3; `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/`; for v9 `docs/CONVERSATIONAL_ARCHITECTURE.md` v14 (sections 4.4, 5.1 to 5.5, 6, 6.1 and 13) and `docs/ARCHITECTURE.md` section 4, "The assistant's routes" |
 
 ### Change log
 
@@ -18,7 +18,11 @@
 | v6 | 2026-11-15 | Implemented (brief 54, plan step 53, from `docs/SHARED_CALENDAR_SPEC.md` v13 section 16). `api.ts` (section 10.2): `ApiRequest` is a union, `GET`/`DELETE` without a body and `POST`/`PUT`/`PATCH` with one; `query` encoded with `URLSearchParams`; `ApiFailure.conflicts` with `availability_conflict` only, well-formed entries kept; three helpers for the services, `invalidRequest` (the first schema issue with its field), `unexpectedAnswer` and `hasString`. New services, appended after section 14 so that cited numbers stay valid: 15 `CalendarSettingsService`, 16 `AvailabilityTypesService`, 17 `AvailabilityRulesService`. `UsersService` gains `listUsers()` (`GET /users`), and `deleteUser` the reason `concurrent_update`, which the API answers since plan step 51 (section 13). The journeys file `frontend/tests/integration/calendar.test.ts` with the throw-away User `fe-calendar` (section 14.2). Error codes per route are architecture section 4's; spec 11.1 differed on routes 9 and 10, and its v14 corrects route 9 (decision 32). The journeys keep the settings they read in a git-ignored file until they are written back, so even a killed run is repaired by the next one (decision 35). Decisions 29–37. The unit tests share one per-method suite, `tests/unit/services/suite.ts` (section 14.1). No change to the existing services' behaviour but `deleteUser`'s new reason; no existing test changed. |
 | v5 | 2026-11-05 | Implemented (brief 32, part B); acceptance in section 14.3. What the code fixed that the sketches left open: `api.ts` has two failure builders, `apiFailure(code, …)` for a route's code (and `UsersService`'s check before any request) and `transportFailure(reason, …)` for the five transport reasons, typed `ApiFailure<never>` so that it fits every route (the sketches' `failure<C>`); `toApiAnswer` reads an empty non-2xx body as `{}`, so a 403 without body is also `session_rejected`; `RefreshService` maps Cognito's reasons with a complete `Record<AuthFailureReason, RefreshFailureReason>` (section 11.5 as a table in code). Tests: the store rows "login writes" and "login failure" of section 9.8 live in `login.service.test.ts`, with the service they exercise; the unit tests share `tests/unit/services/fixtures.ts` (unsigned JWTs, `Response` builders, a session factory); RxJS's `timer` schedules with `setInterval`, so tests that fake timers must fake it (the schedule tests fake `setTimeout`, `setInterval` and `Date` only, and flush fetch promises with the real `setImmediate`); a test session must expire within 24.8 days of the clock, or the store's `setTimeout` overflows and fires at once. Section 5 points at section 14.1 for the tree. No design change. |
 | v7 | 2026-11-15 | Implemented (brief 56, plan step 54, from `docs/SHARED_CALENDAR_SPEC.md` v15 section 16). New sections, appended: 18 `CalendarService` (`load(from, to)`, `reload()`, route 15) and 19 `AppointmentsService` (`list`, `book`, `cancel`, `change`, `updateNote`, routes 16–20). **The services layer is complete.** `pending` carries every argument under the contract's names (decision 38); `reload()` re-runs the last `load`'s range, answers `invalid_request` before any load, and shares one pending call with `load` (decision 39). Two stream names differ from spec 16.2, which is not edited: `appointmentsResult$` (spec: `listResult$`) and `updateNoteResult$` (spec: `noteResult$`), by decision 31 (decision 40). Success values and their checks (decision 41); validation with the shared schemas only, nothing that depends on the role or on the server's data (decision 42). Error codes of architecture section 4, which agrees with spec 11.1 on routes 15–20 (decision 44). Journeys (section 14.4): the calendar view, booking, note, change, cancel, `upcoming` and `availability_conflict` end to end; a second throw-away User `fe-calendar-b` for the anonymous `busy` (decided with the user); the appointment blocks set the settings for their run and write them back; the Users are removed before the clean-up; the cancelled appointments, their events and the two deleted-user markers stay as history (decision 43). `suite.ts`: `other` is optional, for a service whose methods share one pending call (decision 45); no existing test changed. Acceptance in section 14.6. |
-| v8 | 2026-11-22 | Implemented (brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11). New section 20, `AssistantService`: the six routes of the assistant (`load`, `end`, `send`, `continue`, `confirm`, `decline`). **One stream for the six calls**, `outcome$`, each outcome saying the call it answers: the pattern read in a wider sense, which the new section 3.4 allows and rule 4 of section 2 now names (decision 46). A call makes one request: repeating `continue` is the caller's (decision 47). Every code of a route is a reason of that route alone, as a closed list; the daily limit, the spending limit and the outage are three reasons; the service writes no sentence and keeps no conversation (decision 48). The journeys `frontend/tests/integration/assistant.test.ts` (section 14.7) reuse three sentences of the fake Claude's answers under throw-away accounts of their own, and refuse the real Claude (decision 49). **The v7 sentence "the services layer is complete" is corrected**: it was true of the routes the API had then. No existing service, test or helper changed; `suite.ts` is not used by the new tests, which test one stream. Acceptance in section 14.8. |
+| v8 | 2026-11-21 | **The sign-out**, designed (brief 95, part A), reviewed, then implemented (part B; `docs/FRONTEND_DEPLOY_PLAN.md` step 71); acceptance in section 20.10. New section 20, `LogoutService`: `logout()` puts the page-wide services back to their first state, clears the `SessionStore` at once and only then tells Cognito to revoke the refresh token (`RevokeToken`), with a time limit of 10 seconds; its result says whether Cognito revoked, and why not, and holds no token and no name. `cognito.ts` gains `revokeToken` and `toRevokeOutcome` (section 10.1). `LoginService` and `RefreshService` gain `reset()` (sections 4.4 and 11.4). Rule 9 gains its one exception: the copy of the refresh token that travels in the revocation, for at most 10 seconds after the store is cleared. The row "logout" of section 4.8 is rewritten; the rows of sections 9.4 and 9.7 follow. Found: `RevokeToken` on the wire, from AWS's API reference (section 20.1); cognito-local implements it and then refuses a refresh with the revoked token (checked 2026-11-21), so an integration journey covers it (section 20.9). What the code fixed that the design left open: the table of error types is a `Map`, so that a name every object has (`constructor`) is not taken for a type of the list; the unit tests' "no leak" runs after every test of `logout.service.test.ts` rather than as one test; the journey's `afterAll` signs out every store of the file. No difference from the reviewed design otherwise. Decisions 46 to 58: 46 to 54 are the nine points decided with the user before the design, 55 to 58 are the design's own; on review (2026-11-21) the user confirmed the `reset()` of the `RefreshService` (decision 53), `keepalive` (56) and the names `success`/`failure` (46). |
+| v8, note | 2026-11-21 | After the first deployment of the page (`docs/FRONTEND_DEPLOY_PLAN.md` step 72, brief `prompts/96-step-72-implementation.md`): sections 20.1 and 20.9 say what the real Cognito answered at the deployed page (`RevokeToken` from a browser on the page's origin: 200) and what was not tried (a refresh with the revoked token; any refusal). No design and no code changed, so no new version. |
+| v8, note 2 | 2026-11-21 | With the page deployed (`docs/FRONTEND_DEPLOY_PLAN.md` step 73, brief `prompts/97-step-73-implementation.md`), the text around it brought into line: section 10.3, **the CORS gap is closed**, and how (one origin; the API has no CORS configuration and needs none; Cognito answers a browser from the page's origin, as seen for the login and for `RevokeToken`); sections 1, 1.1, 4.7, 5 and 9.6 and decisions 11, 27, 54 and 57 no longer speak of a hosting or of a first deployment to come; section 20.1 says where the browser's call to `RevokeToken` is looked at. No design and no code changed, and nothing new was proven, so no new version. |
+| v9 | 2026-11-22 | Implemented (brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11). New section 21, `AssistantService`: the six routes of the assistant (`load`, `end`, `send`, `continue`, `confirm`, `decline`). **One stream for the six calls**, `outcome$`, each outcome saying the call it answers: the pattern read in a wider sense, which the new section 3.4 allows and rule 4 of section 2 now names (decision 59). A call makes one request: repeating `continue` is the caller's (decision 60). Every code of a route is a reason of that route alone, as a closed list; the daily limit, the spending limit and the outage are three reasons; the service writes no sentence and keeps no conversation (decision 61). The journeys `frontend/tests/integration/assistant.test.ts` (section 14.7) reuse three sentences of the fake Claude's answers under throw-away accounts of their own, and refuse the real Claude (decision 62). **The v7 sentence "the services layer is complete" is corrected**: it was true of the routes the API had then. No existing service, test or helper changed; `suite.ts` is not used by the new tests, which test one stream. Acceptance in section 14.8. |
+| v9, note | 2026-11-23 | The branch `deploy-frontend` merged into `main`, where `AssistantService` had been written at the same time. The assistant's version, first numbered v8, is v9, after the sign-out's v8; its section, first 20, is section 21, after the sign-out's 20; its decisions, first 46 to 49, are 59 to 62, after the sign-out's 46 to 58; every reference to them was changed with them. No other text changed. |
 
 ---
 
@@ -28,7 +32,8 @@ The browser front end has two layers (brief `prompts/30-design-first-service-cla
 
 - a **services layer**: plain TypeScript classes that call the remote services and publish the
   results as RxJS observables;
-- a **view layer**: whatever renders the UI (plain HTML, React, Angular: not chosen yet). It
+- a **view layer**: whatever renders the UI (chosen since: plain HTML and CSS with one
+  TypeScript module script, `docs/FRONTEND_ARCHITECTURE.md`). It
   subscribes to the services' observables and calls their methods. It never calls the network
   itself.
 
@@ -38,8 +43,8 @@ sections of their own, following the same pattern: the session store (9), the sh
 helpers (10), token refresh (11), Hello World (12), and user administration (13); since v6 the
 calendar settings (15), the availability types (16) and the availability rules (17); since v7 the
 calendar view (18) and the appointments (19), which completed the services layer for the routes the
-API had then; since v8 the conversation with the assistant (20), whose six routes were added to the
-API afterwards.
+API had then; since v8 the sign-out (20); since v9 the conversation with the assistant (21), whose
+six routes were added to the API afterwards.
 
 The services layer is implemented in `frontend/src/services/` (v2). It was created ahead of the
 front-end architecture document, as the one exception of `docs/FOLDER_STRUCTURE.md` section 7:
@@ -54,7 +59,9 @@ Cognito, flow `USER_PASSWORD_AUTH`, which answers with three JWTs (`docs/ARCHITE
 sections 3.1 and 6.2). The API then wants the **access token** as `Authorization: Bearer …` on
 every call. Locally the same call goes to the Cognito emulator (cognito-local on port 9229),
 which speaks the same protocol and sets the CORS headers a browser needs (checked in the
-bundled server of image `jagregory/cognito-local:5.3.0`).
+bundled server of image `jagregory/cognito-local:5.3.0`). The real Cognito answers a browser
+from the deployed page's address too: seen for the login and for the sign-out's `RevokeToken`
+(section 10.3).
 
 So the login service talks to Cognito, not to API Gateway, but it is still "a service that calls
 a remote service and exposes the result", and it follows the same pattern as every other one.
@@ -104,6 +111,12 @@ a remote service and exposes the result", and it follows the same pattern as eve
    field of a service holds an access, id or refresh token. A service that needs one reads it
    from the store at the moment of the call and passes it straight into the request; a service
    that obtains one (login, refresh) writes it to the store and emits an outcome without it.
+
+   **The one exception** (v8) is the sign-out. `LogoutService` reads the refresh token from the
+   store, clears the store at once and sends the revocation after (section 20.4, decision 47).
+   While that request is in flight, for at most 10 seconds, one copy of the refresh token
+   exists outside the store: in the request's body and in the variables of that one call, in no
+   field, no state and no result. It is dropped when the call ends or is given up.
 
 ---
 
@@ -164,20 +177,20 @@ view picks the one it needs. The `BehaviorSubject` is exposed only as an observa
 synchronous `.value` is not part of the API, so consumers cannot slip into reading state
 imperatively.
 
-### 3.4 The pattern is a guideline: one stream for several calls (v8)
+### 3.4 The pattern is a guideline: one stream for several calls (v9)
 
 Sections 3.1 to 3.3 show the usual shape, one subject (or one pair) per remote call. It is a
 guideline, and may be read in a wider sense where that makes sense: for instance **one stream
 shared by several calls that speak of the same thing**. What may not be given up is section 3.2:
 a failure is a value, only `next` is forwarded, and the subject lives as long as the service.
 
-The example is `AssistantService` (section 20), whose six calls notify on the one stream
+The example is `AssistantService` (section 21), whose six calls notify on the one stream
 `outcome$`. It made sense there because the six calls speak of one thing, the person's
 conversation: five of them answer the same `AssistantReply`, each reply is the next piece of that
 one conversation, and the screen shows one conversation, not six results. With a stream per call
 the consumer would have to merge six streams back into the order the answers came in, which is
 the order the single stream already has. So that the reasons of a route stay those of that route,
-each value of a shared stream says which call it answers (section 20.3).
+each value of a shared stream says which call it answers (section 21.3).
 
 Where the calls do not speak of one thing (the five methods of `AppointmentsService`, each with a
 result of its own that a different part of the screen shows), the usual shape stays the right one.
@@ -348,6 +361,43 @@ Sequence for the cases of interest:
 | `login` again while pending | `pending` (the first attempt is aborted and never reports) | |
 | late subscriber | current state at once | last outcome at once |
 
+**`reset()` (v8).** The service lives as long as the page, and after a login its two
+streams hold the person: `loginState$` and `loginResult$` hold the last outcome, `{ status:
+'success', username, role, expiresAt }` (no token: rule 9), or the `pending` with the username
+typed. `reset()` puts the service back as it was when it was created. `LogoutService` calls it
+at a sign-out (section 20.4, decision 53); nothing else does.
+
+```ts
+  // The result stream's buffer of one cannot be emptied, so it is overwritten: `undefined`
+  // takes the place of the last outcome and is never passed on.
+  private readonly resultSubject = new ReplaySubject<LoginResult | undefined>(1);
+  readonly loginResult$: Observable<LoginResult> = this.resultSubject.pipe(
+    filter((result): result is LoginResult => result !== undefined),
+  );
+
+  // Back to the first state: no attempt in flight, `idle`, and no outcome to replay.
+  reset(): void {
+    this.pending?.unsubscribe(); // an attempt in flight is aborted and never reports
+    this.pending = undefined;
+    this.resultSubject.next(undefined);
+    this.stateSubject.next({ status: 'idle' });
+  }
+```
+
+- The subject stays one and never dies (rule 4): a consumer subscribed before the `reset()`
+  stays subscribed and receives the next login's outcome; one that subscribes after it waits,
+  as before the first login.
+- An attempt in flight is cancelled, as a new `login` cancels it (decision 6): after a
+  sign-out no late answer signs anybody in.
+- `reset()` does not touch the store. With nothing to forget it changes nothing a consumer
+  can see, except that `loginState$` notifies `idle` again.
+
+| Event | `loginState$` | `loginResult$` |
+|---|---|---|
+| `reset()` after a success | `idle` | (nothing; a late subscriber gets nothing) |
+| `reset()` while pending | `idle` (the attempt is aborted and never reports) | |
+| `login` after a `reset()` | `pending`, then the outcome | the outcome |
+
 ### 4.5 Mapping the answer
 
 ```ts
@@ -439,8 +489,9 @@ may use the schema for an early hint if it wishes.
   on the instance, not in `pending`, not in any state or result value.
 - Tokens go from Cognito's answer into the `SessionStore` and nowhere else (rule 9): the login
   outcome on `loginResult$` and `loginState$` carries `username`, `role` and `expiresAt` only.
-- Tokens are in memory only. Persistence, if any, is decided by the front-end architecture
-  document together with the hosting (the CloudFront origin decides the CORS and CSP story).
+- Tokens are in memory only. Persistence, if any, is a decision of the front-end architecture
+  document, where it is open (`docs/FRONTEND_ARCHITECTURE.md` section 10, open point O3): the
+  hosting was decided and deployed without it.
 - Nothing is logged by the service. If the front end later adds a logger, the `Session` and the
   request body are excluded by design, as the back end excludes tokens (CLAUDE.md hard rules).
 - The JWT is decoded without verification only to display claims; authorization always happens
@@ -455,7 +506,7 @@ may use the schema for an early hint if it wishes.
 | `RefreshService` | `InitiateAuth` with `REFRESH_TOKEN_AUTH` | `Session.refreshToken`, from the store | 11 |
 | `HelloService` | `POST /hello` | `Session.accessToken`, from the store; `HelloResponse` | 12 |
 | `UsersService` | `POST /users`, `DELETE /users/{username}` | `Session.accessToken`, from the store; `CreateUserResponse`, `Username` | 13 |
-| logout (not designed yet) | `RevokeToken` (optional), then `SessionStore.clear()` and `reset()` on the services | `session$` emits `null`; returns the services' states to `idle` | — |
+| `LogoutService` (v8) | `reset()` on the page-wide `LoginService` and `RefreshService` and `SessionStore.clear()` first; then `RevokeToken` | `Session.refreshToken`, from the store, read at the press. `session$` emits `null` before the request leaves; the result says whether Cognito revoked. The services of one person's session have no `reset()`: the view layer makes new ones for each person (`docs/FRONTEND_ARCHITECTURE.md` section 6, point 4) | 20 |
 
 ---
 
@@ -484,8 +535,8 @@ v2 had `login.service.ts`, `login.types.ts`, `jwt.ts` and their tests.
   `Buffer`, `global`, `require`, `__dirname`, `__filename` (root `eslint.config.js`). Tests are not
   covered: the integration test uses `node:fs` to read `backend/env.local.json`.
 
-When `docs/FRONTEND_ARCHITECTURE.md` (framework, hosting, sign-in flow) is written, this document
-becomes, or is referenced as, its services chapter.
+`docs/FRONTEND_ARCHITECTURE.md` (the views, the hosting and the deployment) refers to this
+document as the truth for the services.
 
 ---
 
@@ -511,6 +562,10 @@ The global `fetch` is replaced with `vi.stubGlobal('fetch', vi.fn())` and answer
 | cancel | first fetch pending, `login` called again | the first request's `signal.aborted` is `true`; only the second answer is emitted |
 | late subscriber | subscribe after a success | `loginResult$` replays the success; `loginState$` gives the current `success` |
 | no leak | success and failure answers | no state or result value contains the password string, nor any of the three tokens (v4, rule 9) |
+| reset after a success (v8) | 200, then `reset()` | `loginState$` gives `idle`; a late subscriber of `loginResult$` receives nothing; no value either stream now gives holds the username; the store is untouched |
+| reset while pending (v8) | first fetch pending, `reset()`, then the fetch answers 200 | the request's `signal.aborted` is `true`; no outcome on either stream; the store stays empty |
+| reset keeps the subscribers (v8) | subscribe, success, `reset()`, a second login | the subscriber of before receives both outcomes and nothing in between |
+| reset before any login (v8) | `reset()` | `idle`; nothing on `loginResult$`; no request |
 
 `jwt.test.ts`: decodes a known payload, handles base64url characters (`-`, `_`) and missing
 padding, and throws on a string that is not a JWT (which `toSession` maps to `failure
@@ -550,7 +605,7 @@ unexpected`).
 | 8 | ~~No code until `docs/FRONTEND_ARCHITECTURE.md` exists~~ Revised in v2: the services layer is created before it; everything else in `frontend/` still waits | Brief 31, decision 1: the services layer depends on nothing the architecture will choose. Recorded in `docs/FOLDER_STRUCTURE.md` section 7. |
 | 9 | One `SessionStore` holds the signed-in `Session`; nobody else keeps a copy of a token | Section 9.1. One place to refresh, expire or clear; every consumer sees the change. No state library: a `BehaviorSubject` is enough. |
 | 10 | `LoginService` writes to the store itself (store injected), before it emits the outcome | Section 9.4. The view does not have to wire login to the store, and a view reacting to `success` already finds the session there. |
-| 11 | Memory only; no `sessionStorage` or `localStorage` in v3 | Rule 7. A reload means signing in again. `sessionStorage` is the candidate if that becomes annoying, decided by the front-end architecture with the hosting and its CSP; `localStorage` is excluded (tokens outlive the tab). |
+| 11 | Memory only; no `sessionStorage` or `localStorage` in v3 | Rule 7. A reload means signing in again. `sessionStorage` is the candidate if that becomes annoying, decided by the front-end architecture with the hosting and its CSP; `localStorage` is excluded (tokens outlive the tab). The hosting was decided and deployed on 2026-11-21 without it: still open (`docs/FRONTEND_ARCHITECTURE.md` section 10, open point O3). |
 | 12 | The store clears itself at `expiresAt` | Section 9.3. The view learns of the expiry on time instead of from a rejected API call (API Gateway's 403, section 9.4; corrected in v4, v3 said 401). `RefreshService` replaces the session before then, which re-arms the timer. |
 | 13 | `session$` is `Session \| null`, without a reason for `null` | Assumed, the simplest option. If the view needs to say "your session expired" rather than show the bare form, the value becomes a small union (`signed_in` / `signed_out` with `reason: 'logout' \| 'expired' \| 'rejected'`) without changing who writes or reads it. |
 | 14 | The shared building blocks are modules of functions (`cognito.ts`, `api.ts`), not a base class | Brief 32, decision 1: extracted, not copied. Each service still declares its own subjects and pipeline, so the pattern of section 3 stays visible in every class; the modules only build a request and map an answer. |
@@ -567,7 +622,7 @@ unexpected`).
 | 25 | 5xx and 429 without an `error` field are `server`; any other answer outside the contract is `unexpected` | 429 is the stage throttling (5 req/s, architecture section 7.1): try again later, like a 5xx. The rest would be a bug or a wrong `apiUrl` (section 10.2). |
 | 26 | Integration: one ordered journeys file (`journeys.test.ts`) next to the login file; a fixed throw-away user `fe-journey`, removed before and after through `UsersService` itself | Mirrors the back end's journeys. No AWS SDK in `frontend/` tests; a fixed name with removal at both ends survives a crashed run (section 14). |
 | 28 | The `SessionStore` is the only place that holds tokens (rule 9); no result, state or service field carries one | The user's decision on reviewing v4 part A. One holder means one place to clear: after logout or expiry no replayed stream still holds a token. It changes `LoginService`'s success (decision 4). |
-| 27 | The missing CORS configuration of the API is recorded as a known gap, not fixed | Brief 32, correction 2. It belongs to the front-end architecture (hosting); the tests run in Node, which does not apply CORS (section 10.3). |
+| 27 | The missing CORS configuration of the API is recorded as a known gap, not fixed | Brief 32, correction 2. It belongs to the front-end architecture (hosting); the tests run in Node, which does not apply CORS (section 10.3). Closed on 2026-11-21 without a change to the API: the page and the API share one origin (section 10.3). |
 | 29 | `ApiRequest` is a union: `GET` and `DELETE` take no `body` (`body?: never`), `POST`, `PUT` and `PATCH` may; `query?: Record<string, string>` encoded with `URLSearchParams`, keys in the order given, no `?` when absent or empty | Brief 54, point 1 (spec 16.1). The compiler refuses a body where fetch would refuse it (`GET`) or the API reads none (`DELETE`). `query` is added now for step 54's routes 15 and 16; `api.test.ts` proves it. |
 | 30 | `ApiFailure.conflicts` is set only with `availability_conflict` (a route code); the service keeps the entries whose `appointmentId`, `username`, `start`, `end` are strings, copied field by field; a missing or non-array list gives `[]`; the reason stays `availability_conflict` in every case | Brief 54, point 1. The view can always list what it got, and a malformed answer does not turn a known refusal into `unexpected`. Copying the four fields keeps anything else the server might add out of the view (section 17.7). |
 | 31 | `pending` carries **every argument of the call under the API contract's names** from `shared/` (`typeId`, `patternId`, `windowId`, `date`, `name`, `windows`); a whole-object argument is named after its object (`settings`, `pattern`, `window`); a load with no argument carries nothing. A load's streams are named after what it loads (`settingsResult$`, `typesResult$`, `patternsResult$`, `listUsersResult$`), every other method's after the method (`updateResult$`, `createResult$`, `renameResult$`, `removeResult$`, `createPatternResult$`, …), each with its `…State$` | Brief 54, point 2; step 54 copies it. Generalises `deleteUserState$`'s `username` (decision 24) so that a view can show what is pending without keeping its own copy. The names follow spec 16.2. |
@@ -585,10 +640,23 @@ unexpected`).
 | 43 | The appointment journeys: each appointment block sets the settings for its own run in its `beforeAll` (`bookingHorizonDays` 365, `minBookingNoticeHours` 0, `maxFutureAppointmentsPerUser` `null`, `cancellationNoticeHours` as read) and writes the values read back in its `afterAll`, with the settings file of decision 35. A second throw-away User, `fe-calendar-b`, created and removed with `fe-calendar`, is booked only by the Administrator, so that `fe-calendar`'s view has another User's appointment to show as `busy`. Both Users are removed **before** the clean-up of types and availability, in `beforeAll` and in `afterAll`. Appointments cannot be deleted through the API: the cancelled appointments, their events and the two Users' deleted-user markers stay in the local table as history | Brief 56, design point 6 (a User must book about a year ahead, the band of decision 35). `fe-calendar-b`: decided with the user during step 54; `busy` holds only *other* Users' appointments, so one User cannot prove "busy without names". The order: a booked appointment blocks deleting its pattern (`availability_conflict`) and its type (R-TYPE-03), and deleting a User cancels its future appointments first (architecture section 4), so after a failed run only that order clears everything. |
 | 44 | The error codes of routes 15–20 are architecture section 4's; they agree with spec 11.1 (checked in step 54, no difference). `concurrent_update` is a normal reason of book, cancel, change and note (spec 16.3). `user_not_found` is one reason for both of its 404s, an unknown target of the Administrator's booking and a deleted User (R-BOOK-10, also on a change). `cancel` has no `invalid_json` (the route reads no body, none is sent); `list` and the view have none either (a `GET`) | Brief 56, "The step". One reason per meaning for the view, as decision 32 did for `type_not_found`. |
 | 45 | `describeMethod`'s `other` is optional; without it the cancel test proves only that a second call aborts the first. The suite runs for `reload` on a service whose last range is primed without a request (`Reflect.set` of the private `last`), so its counts start clean | Step 54: `load` and `reload` share one pending call (decision 39), so the suite's "another method stays pending" does not apply to `CalendarService`; the shared-call behaviour has its own tests (section 18.8). The change keeps every existing call of the suite as it was. |
-| 46 | **One stream for the conversation.** `AssistantService` has a single public stream, `outcome$` (`ReplaySubject(1)`), and each of its six calls notifies its outcome on it: the reply the server gave, or the reason of the failure, with the call it came from (`call`). No stream per call and no state stream: section 3.4. The rest of the pattern holds: a failure is a value, only `next` is forwarded, the stream lives as long as the service. The stream carries each outcome as the server gave it; putting the added messages together into the whole conversation is the logic layer's work | Decided by the Product Owner, 2026-11-22 (brief `prompts/a13-step-c11-implementation.md`). The six calls speak of one thing, five answer the same `AssistantReply`, and the screen shows one conversation. `docs/CONVERSATIONAL_ARCHITECTURE.md` section 13 said "the result and state streams of the pattern" and was corrected (its v14). |
-| 47 | **The caller repeats `continue`, not the service.** A call of the service makes one HTTP request. The loop "while the status is `working`, continue" belongs to the logic layer (`docs/CONVERSATIONAL_PLAN.md` step c12); in the journeys the test repeats the call itself | Decided by the Product Owner, 2026-11-22. One call, one request, as in every other service; the loop has a limit and a line of progress to show, which are the screen's matters (`docs/CONVERSATIONAL_ARCHITECTURE.md` sections 4.4 and 5.1). |
-| 48 | **The service tells the cases apart and writes no sentence.** Each code a route answers is a reason of that route, typed as a closed list; a code the contract does not give that route is `unexpected`. `assistant_limit_reached`, `assistant_budget_reached` and `assistant_unavailable` are three reasons, never one. Choosing and showing their sentences, which are in `shared/`, is the screen's work: `frontend/src/logic/texts.ts` is not touched by the service. A message's text is passed on as written, no language is chosen, and nothing is kept beyond the last outcome the stream replays: the conversation is the server's, and after a reload the screen asks for it again | Decided by the Product Owner, 2026-11-22. `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1: the screen says what is true for each of the three, in the conversation's language. |
-| 49 | **The assistant's journeys reuse the fake's sentences, under accounts of their own.** They send three sentences `backend/tests/integration/fake-claude/answers.json` already answers; each run creates its throw-away accounts through `UsersService` and deletes them, first and last. A new account has its whole day's count, so the daily limit is never met and no test touches the `assistant` table. Nothing changes in `backend/` or in the fake. The journeys refuse to start unless `backend/env.local.json` wires the fake Claude | Decided by the Product Owner, 2026-11-22, and checked before the journeys were written (section 14.7): the fake chooses by the exact text and never looks at the account; what each sentence fixes is a day and an hour, which the journeys prepare. |
+| 46 | **The sign-out is a full service**, `LogoutService`, in the pattern of section 3: `logout()`, `logoutResult$` and `logoutState$`. Its result speaks of the revocation only: `success` means Cognito answered 200, a `failure` says why Cognito did not revoke (`not_signed_in`, `token_rejected`, `not_enabled`, `too_many_attempts`, `timeout`, `network`, `server`, `unexpected`). The person is signed out of the page in every case, so no value says so. No token and no name in a state or a result; `pending` carries nothing | Decided with the user before the design (brief 95, point 1). `success`/`failure` and `idle`/`pending` are the names every other service uses (section 3.3), so a consumer reads this one like the others; what they mean here is said where the types are (section 20.3). The names were put to the user on review against `revoked`/`not_revoked` and kept (2026-11-21). |
+| 47 | **Forget first, tell Cognito after.** `logout()` reads the session from the store, clears the store in the same run of the script, and sends the revocation with the refresh token it read. That copy lives in the variables of the one call and in the request's body: no field, no state, no result, nothing a caller can reach; it goes when the call ends or is given up, 10 seconds at most (decision 51). This is rule 9's one exception | Decided with the user (point 2): a slow or dead network never keeps a person signed in. It reverses the order written in `docs/FRONTEND_ARCHITECTURE.md` section 13.7 as its version 14 had it; its version 15 is corrected. The token cannot be read after the store is cleared, and must not stay in the store while Cognito is asked: so one copy, for the length of one request. |
+| 48 | **The page owns the `LogoutService`**, like the `LoginService`: one for the page, created at the start-up, not among the objects made and dropped with each person. Nothing cancels a revocation in flight, not the teardown of the person who left, not a later press. Its late answer changes the service's own two streams and nothing of a session | Decided with the user (point 3). The teardown of a person's objects runs because of the sign-out itself; a service torn down there would cancel its own request. |
+| 49 | **A renewal under way does not delay the sign-out, and its answer is never used.** `logout()` revokes the refresh token the store held at the press. The `RefreshService`'s call in flight is aborted by its `reset()` (decision 53), and the store's guarded write (section 9.2) would drop its answer in any case; the `null` disarms the renewal's timer. No new refresh token can come out of that renewal: with this app client (no refresh-token rotation) a refresh answers an access and an id token only, and with rotation switched on Cognito refuses `REFRESH_TOKEN_AUTH` altogether (section 20.6, with the source). What may be left at Cognito is an access and an id token that nobody received: valid at the API for their 15 minutes plus the authorizer's 5, the limit of `docs/ARCHITECTURE.md` section 7.3 | Decided with the user (point 4). Waiting for the renewal would let a slow network delay a sign-out, against decision 47. |
+| 50 | **The person sees the login, and nothing about the revocation**, whether it worked or not. No view subscribes to `logoutResult$` or `logoutState$`; the failure is there for a developer and for the tests | Decided with the user (point 5). There is nothing the person could do about a failed revocation, and on the page the sign-out has happened. |
+| 51 | **The revocation is given up after 10 seconds** (`REVOKE_TIMEOUT_MS = 10_000`), measured from the request to the whole answer read; the request is then aborted and the result is `failure timeout`. **Each `logout()` is a call of its own**: it never cancels an earlier one and never waits for it. The result stream gives every revocation's outcome, in the order they arrive; the state follows the latest call only, so a late outcome of an earlier call does not overwrite it | Decided with the user (point 6: "about 10 seconds"). No other service has a time limit to be in line with: they wait for `fetch`, and a new call or a teardown cancels them, which decision 48 rules out here; so the number is the brief's. A second press straight after the first finds the store empty and answers `not_signed_in` without a request. A second person's sign-out within 10 seconds of the first's sends that person's own token. |
+| 52 | **Only "Sign out" revokes.** The expiry, a token the API rejected and a refresh Cognito refused clear the store as before (section 9.4) and send nothing | Decided with the user (point 7). Section 20.6 says for each why the refresh token left at Cognito is acceptable: in short, a session that ends by itself is like a tab that is closed, which no code sees. |
+| 53 | **A sign-out puts the page-wide services back to their first state**: `LoginService.reset()` and `RefreshService.reset()`, called by `LogoutService`, which receives them as a list (`readonly Resettable[]`), before it clears the store. The `LogoutService` keeps its own last result until the next sign-out; it names nobody. The services of one person's session need no `reset()` | Decided with the user (point 8) for the `LoginService`. **Extended by the design to the `RefreshService`, and confirmed by the user on review (2026-11-21)**: it is page-wide too, and its success holds the username (section 11.3); without its `reset()` the aim of the decision, nothing of the person left in a service, is not met. Called by the service rather than by the view, so that whoever calls `logout()` gets all of it. Before the store is cleared, so that the login view, mounted when `session$` says `null`, finds `idle` and never the last person's outcome. |
+| 54 | **The proof: unit tests, an integration journey, and the cloud at step 72.** cognito-local implements `RevokeToken`, and a refresh with the revoked token is then refused (checked 2026-11-21, section 20.1): so `frontend/tests/integration/logout.service.test.ts`, with its page under `docs/journeys/frontend/` (section 20.9). What only the cloud proves is listed there, with what the first deployment showed (the call from a browser, answered 200) and what it did not try (a refresh with the revoked token) | Decided with the user (point 9), on the branch "cognito-local revokes". |
+| 55 | A failure of the revocation never carries Cognito's own `message`: the service writes `Cognito answered <status> <type>`, and names the type only when it is one of the table of section 20.5 | The design's own, for review. AWS's validation errors can quote the value they refuse, and here the only value is the refresh token. Decision 46 says no token in a result; this makes it true whatever Cognito answers. A login keeps Cognito's message as before (section 4.5): there the request's secret is the password, and nothing changes in v8. |
+| 56 | The revocation is sent with `keepalive: true` | The design's own, confirmed by the user on review (2026-11-21). A person on a shared computer presses "Sign out" and closes the tab: without it the browser drops a request still in flight, and the refresh token stays valid. With it the browser finishes the request after the page is gone. `fetch`'s standard option, no new import. Not proven by the unit tests beyond the option being set; a browser's behaviour. |
+| 57 | Cognito's error types for `RevokeToken` are mapped in a table of their own, `toRevokeOutcome` in `cognito.ts`: the eight of AWS's API reference for the operation, `ThrottlingException` of its common errors, and the two cognito-local answers (`NotAuthorizedException`, `ResourceNotFoundException`). A 200 is a success whatever its body | The design's own. AWS's page lists the types but does not say which one answers a token already revoked, expired or malformed, an unknown client, or revocation switched off (section 20.1): the mapping follows the types' descriptions; no refusal of the real Cognito was provoked at step 72, so none was read. The reasons differ from a login's (decision 15), so one shared table would mislead. |
+| 58 | `cognito.ts` builds both requests with one private function, `cognitoRequest`; `initiateAuth` keeps its signature | The design's own. The address, the method, the two headers and the body's reading are the same for both calls (section 10.1); written twice they would drift. Decision 14: extracted, not copied. |
+| 59 | **One stream for the conversation.** `AssistantService` has a single public stream, `outcome$` (`ReplaySubject(1)`), and each of its six calls notifies its outcome on it: the reply the server gave, or the reason of the failure, with the call it came from (`call`). No stream per call and no state stream: section 3.4. The rest of the pattern holds: a failure is a value, only `next` is forwarded, the stream lives as long as the service. The stream carries each outcome as the server gave it; putting the added messages together into the whole conversation is the logic layer's work | Decided by the Product Owner, 2026-11-22 (brief `prompts/a13-step-c11-implementation.md`). The six calls speak of one thing, five answer the same `AssistantReply`, and the screen shows one conversation. `docs/CONVERSATIONAL_ARCHITECTURE.md` section 13 said "the result and state streams of the pattern" and was corrected (its v14). |
+| 60 | **The caller repeats `continue`, not the service.** A call of the service makes one HTTP request. The loop "while the status is `working`, continue" belongs to the logic layer (`docs/CONVERSATIONAL_PLAN.md` step c12); in the journeys the test repeats the call itself | Decided by the Product Owner, 2026-11-22. One call, one request, as in every other service; the loop has a limit and a line of progress to show, which are the screen's matters (`docs/CONVERSATIONAL_ARCHITECTURE.md` sections 4.4 and 5.1). |
+| 61 | **The service tells the cases apart and writes no sentence.** Each code a route answers is a reason of that route, typed as a closed list; a code the contract does not give that route is `unexpected`. `assistant_limit_reached`, `assistant_budget_reached` and `assistant_unavailable` are three reasons, never one. Choosing and showing their sentences, which are in `shared/`, is the screen's work: `frontend/src/logic/texts.ts` is not touched by the service. A message's text is passed on as written, no language is chosen, and nothing is kept beyond the last outcome the stream replays: the conversation is the server's, and after a reload the screen asks for it again | Decided by the Product Owner, 2026-11-22. `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1: the screen says what is true for each of the three, in the conversation's language. |
+| 62 | **The assistant's journeys reuse the fake's sentences, under accounts of their own.** They send three sentences `backend/tests/integration/fake-claude/answers.json` already answers; each run creates its throw-away accounts through `UsersService` and deletes them, first and last. A new account has its whole day's count, so the daily limit is never met and no test touches the `assistant` table. Nothing changes in `backend/` or in the fake. The journeys refuse to start unless `backend/env.local.json` wires the fake Claude | Decided by the Product Owner, 2026-11-22, and checked before the journeys were written (section 14.7): the fake chooses by the exact text and never looks at the account; what each sentence fixes is a day and an hour, which the journeys prepare. |
 
 ---
 
@@ -696,7 +764,7 @@ the moment the token stops working, instead of discovering it from a failed API 
 | `RefreshService` (section 11) | `replace(old, new)` | A refresh succeeds, before `expiresAt` |
 | `RefreshService` (section 11) | `clear(old)` | Cognito rejects the refresh token (`NotAuthorizedException`: expired or revoked, e.g. the user was deleted), or the new token has no role |
 | the API helper (section 10.2) | `clear(used)` | The API rejects the token: see the table below |
-| logout (later) | `clear()` | The user signs out |
+| `LogoutService` (section 20, v8) | `clear()` | The user signs out: at the press, before Cognito is told |
 
 **When an API answer clears the store** (corrected in v4; v3 wrongly said "on 401"). Architecture
 section 4: API Gateway answers an **expired or invalid token with 403** and its own body
@@ -725,6 +793,10 @@ A view reacting to `success` on `loginResult$` or `loginState$` therefore alread
 session in `session$`, and it is the only place to find it. A failed attempt does not touch the store: a session already present
 stays until expiry or logout.
 
+**Only the sign-out tells Cognito** (v8, decision 52). The other writers of `null` (the expiry,
+a token the API rejected, a refresh Cognito refused) clear the store and send nothing: section
+20.6 says why for each.
+
 ### 9.5 Who reads
 
 - **The view** subscribes to `session$`: `null` → the login form; a session → the application,
@@ -752,7 +824,8 @@ to read later.
 If reloads become a nuisance, `sessionStorage` is the candidate (survives a reload, dies with
 the tab): the store would read it in its constructor and write it in `set()` and `clear()`; nobody
 else would change. That decision belongs to the front-end architecture document, together with
-the hosting and its Content-Security-Policy. `localStorage` is not a candidate: the tokens would
+the hosting and its Content-Security-Policy; it was not taken with them, and is open there
+(`docs/FRONTEND_ARCHITECTURE.md` section 10, open point O3). `localStorage` is not a candidate: the tokens would
 outlive the tab by up to the refresh token's 7 days.
 
 ### 9.7 Security notes
@@ -775,6 +848,8 @@ outlive the tab by up to the refresh token's 7 days.
   streams (`loginResult$`, `refreshResult$`, and the states) carry `username`, `role` and
   `expiresAt` at most, so clearing the store removes every token from the front end. Until v3 a
   login success carried the `Session`, which `loginResult$` kept replaying after a logout.
+  Since v8 there is one exception, bounded in time: the copy of the refresh token inside the
+  sign-out's revocation request, for at most 10 seconds (rule 9; section 20.7).
 
 ### 9.8 Placement and unit tests
 
@@ -821,7 +896,7 @@ every class.
 
 | Module | Used by | Holds |
 |---|---|---|
-| `cognito.ts` | `LoginService`, `RefreshService` | the `InitiateAuth` request, the error-class mapping, `toSession` |
+| `cognito.ts` | `LoginService`, `RefreshService`; since v8 `LogoutService` | the `InitiateAuth` request, the error-class mapping, `toSession`; since v8 the `RevokeToken` request and the reading of its answer |
 | `api.ts` | `HelloService`, `UsersService` | the authenticated API request: token from the store, bearer header, the 401/403 rule, `ApiErrorBody` → reason |
 
 ### 10.1 `cognito.ts`: `InitiateAuth`
@@ -929,6 +1004,62 @@ export class LoginService {
   }
 }
 ```
+
+**`RevokeToken` (v8).** The module gains the second of Cognito's calls the front end
+makes, for `LogoutService` (section 20; the call on the wire is section 20.1). The request of
+`initiateAuth` becomes one private function, `cognitoRequest`, which both calls use, so the
+address, the method, the two headers and the reading of the body are written once.
+
+```ts
+// One call to Cognito's JSON API. Emits one { status, text } and completes; errors only when
+// fetch rejects. `init` adds to the request what one call needs and the other does not.
+function cognitoRequest(
+  config: CognitoConfig,
+  target: 'InitiateAuth' | 'RevokeToken',
+  body: Record<string, unknown>,
+  init: RequestInit = {},
+): Observable<{ status: number; text: string }> {
+  return fromFetch(config.cognitoUrl, {
+    ...init,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-amz-json-1.1',
+      'X-Amz-Target': `AWSCognitoIdentityProviderService.${target}`,
+    },
+    body: JSON.stringify(body),
+    selector: (response) => response.text().then((text) => ({ status: response.status, text })),
+  });
+}
+
+// initiateAuth(config, flow, parameters): unchanged for its callers; it calls cognitoRequest.
+
+// Asks Cognito to revoke a refresh token. The app client has no secret, so the body is the
+// client id and the token and nothing else. `keepalive` lets the browser finish the request
+// when the page is closed straight after it was sent (decision 56).
+export function revokeToken(config: CognitoConfig, refreshToken: string): Observable<{ status: number; text: string }> {
+  return cognitoRequest(config, 'RevokeToken', { ClientId: config.clientId, Token: refreshToken }, { keepalive: true });
+}
+
+// Why Cognito did not revoke, as far as its answer says (section 20.5).
+export type RevokeFailureReason =
+  | 'token_rejected'    // UnauthorizedException, UnsupportedTokenTypeException; NotAuthorizedException (cognito-local)
+  | 'not_enabled'       // UnsupportedOperationException, OperationNotEnabledException
+  | 'too_many_attempts' // TooManyRequestsException, ThrottlingException
+  | 'server'            // 5xx, or a failure whose body is not JSON
+  | 'unexpected';       // any other __type
+export type RevokeOutcome =
+  | { status: 'success' }
+  | { status: 'failure'; reason: RevokeFailureReason; message: string };
+
+// Reads Cognito's answer to RevokeToken (section 20.5). The message is written here from the
+// status and the error's type: Cognito's own message is never copied (decision 55). The types
+// it knows are the keys of a Map, so only a type written there is ever found.
+export function toRevokeOutcome(status: number, text: string): RevokeOutcome;
+```
+
+`toAuthOutcome` and `toSession` do not change. The two mappings stay apart: a login's
+`NotAuthorizedException` is a wrong password, and `RevokeToken` has error types that
+`InitiateAuth` never answers.
 
 ### 10.2 `api.ts`: one authenticated API call
 
@@ -1064,19 +1195,37 @@ services keep only their subjects, their pipelines and their shape checks:
   `WindowIdParam`, `DateParam`). Query values go through `URLSearchParams`, which encodes them.
 - Nothing is logged.
 
-### 10.3 Known gap: the API has no CORS configuration
+### 10.3 The API has no CORS configuration, and needs none
 
 `backend/template.yaml` declares no `CorsConfiguration` on the HTTP API. A browser page served
-from another origin (the front end's future CloudFront domain, or a dev server on another port)
-therefore cannot call it: the preflight `OPTIONS` that the `Authorization` header triggers is not
-answered with `Access-Control-Allow-*` headers, and the browser rejects the call, which the
-services report as `network`.
+from another origin than the API's therefore cannot call it: the preflight `OPTIONS` that the
+`Authorization` header triggers is not answered with `Access-Control-Allow-*` headers, and the
+browser rejects the call, which the services report as `network`.
 
-This step is not blocked: the unit and integration tests run in Node, which does not apply CORS.
-Fixing the gap is a decision of the front-end architecture document, together with the hosting:
-either the API and the page share one origin (CloudFront in front of both, the API under a path),
-or the HTTP API gets a `CorsConfiguration` naming the page's origin. The back end is not changed
-by this design (decision 27). Cognito and cognito-local already answer the preflight (section 1.1).
+When the services were designed this was recorded as a known gap and not fixed (decision 27),
+with two ways out: the API and the page share one origin, or the HTTP API gets a
+`CorsConfiguration` naming the page's origin.
+
+**The gap is closed: one origin** (decided and deployed on 2026-11-21). The page's CloudFront
+distribution passes `/api/…` on to the API with the prefix removed, as the dev server does
+locally (`docs/FRONTEND_ARCHITECTURE.md` section 13.3). A browser at the page's address
+therefore asks no cross-origin question of the API: the API has no CORS configuration and
+needs none, and the back end did not change. Nothing in the services changed either: `apiUrl`
+is `/api`, at the deployed page as under the dev server. Seen at the deployed page
+(`docs/RUNBOOK.md` section 5.5): signed-in calls with `GET`, `POST`, `PUT` and `DELETE`
+answered through the page's address.
+
+What still crosses origins is Cognito, which the page calls directly. **Cognito answers a
+browser from the page's origin**: seen at the deployed page for the login (`InitiateAuth`) and
+for the sign-out's `RevokeToken`, answered 200 (section 20.9). The renewal of a session is the
+same operation as the login, with another flow; one made by the deployed page is not yet
+looked at (an open item of `docs/RUNBOOK.md` section 5.5). cognito-local answers the preflight
+too (section 1.1).
+
+The API still answers no cross-origin request: a page served from any other address than the
+distribution's (a dev server that does not pass `/api` on, or the API's own address called
+from a browser) meets the gap as before. The unit and integration tests run in Node, which
+does not apply CORS.
 
 ### 10.4 Unit tests
 
@@ -1092,6 +1241,14 @@ section 6, which stays unchanged):
 | no `RefreshToken` and none passed in | `failure unexpected` (the login case) |
 | `NotAuthorizedException`, `UserNotFoundException`, `InvalidPasswordException` | `failure not_authorized` |
 | `describe` | an `Error` gives `Name: message`; anything else its string |
+| request, revoke (v8) | one POST to `cognitoUrl` with `Content-Type: application/x-amz-json-1.1`, `X-Amz-Target: AWSCognitoIdentityProviderService.RevokeToken`, `keepalive: true` and the body `{ ClientId, Token }` exactly: no `ClientSecret`, no `Authorization` header, the token in no address |
+| request, `InitiateAuth` after the refactoring (v8) | the two rows above unchanged, and no `keepalive` |
+| revoke answer 200 (v8) | `{}`, an empty body and a body that is not JSON: each `success` |
+| revoke answer, each error type (v8, `it.each`) | every row of the table of section 20.5: its reason, and the message `Cognito answered <status> <type>` |
+| revoke answer, namespaced type (v8) | `com.amazonaws…#UnauthorizedException` → `token_rejected` |
+| revoke answer, unknown type (v8) | 400 `SomethingElseException` → `unexpected`, the message names the status only; 503 with one → `server`; a `__type` that is the name of something every object has (`constructor`) → `unexpected`, not named |
+| revoke answer, not JSON (v8) | 502 HTML → `server`; 400 with JSON that is not an object → `unexpected` |
+| revoke answer that quotes the request (v8) | a 400 whose `message`, and one whose `__type`, hold the token: the outcome does not contain the token |
 
 `api.test.ts` (every row subscribes to `apiCall(...)` first, with a real `SessionStore`):
 
@@ -1268,6 +1425,20 @@ Reading it:
 | `refresh()`, Cognito answers 400 `NotAuthorizedException` | `pending`, `failure session_rejected` | `failure session_rejected` | `null` |
 | `refresh()`, offline | `pending`, `failure network` | `failure network` | unchanged |
 | `refresh()` with an empty store | `pending`, `failure not_signed_in` | `failure not_signed_in` | (empty) |
+| `reset()` (v8) | `idle`; a refresh in flight is aborted and never reports | (nothing; a late subscriber gets nothing) | unchanged |
+
+**`reset()` (v8).** Like the `LoginService`, this service lives as long as the page,
+and after a renewal its streams hold `{ status: 'success', username, expiresAt }`: the name of
+the person who was signed in. `reset()` is the `LoginService`'s (section 4.4), line for line:
+it aborts a refresh in flight, overwrites the result stream's buffer with an `undefined` that
+is never passed on, and sets the state to `idle`. It leaves the schedule of `start()` alone:
+the schedule belongs to the page, and the `null` that follows a sign-out disarms its timer.
+`LogoutService` calls it at a sign-out (section 20.4, decision 53).
+
+A refresh in flight must be aborted there, not only left to the store's guarded write
+(section 9.2): the guard keeps its late answer out of the store, but that answer would still
+write the person's name into the two streams just emptied. With the abort, the answer is
+never read. The guard stays, for a refresh that a new login overtakes.
 
 ### 11.5 Mapping the answer
 
@@ -1339,6 +1510,9 @@ store's expiry. Every test subscribes first, then calls.
 | start twice | `start()`, `start()` | one fetch at 14 min |
 | constructor | service created, store holds a session, time advances past 14 min | no fetch: nothing starts by itself |
 | no leak | all outcomes | no state or result contains a token |
+| reset after a success (v8) | 200, then `reset()` | `refreshState$` gives `idle`; a late subscriber of `refreshResult$` receives nothing; no value either stream now gives holds the username; the store is untouched |
+| reset while pending (v8) | refresh pending, `reset()`, then the fetch answers 200 | the request's signal is aborted; no outcome; the store still holds the session it held |
+| reset keeps the schedule (v8) | `start()`, `reset()`, a session expiring in 15 min | one refresh fetch at 14 min |
 
 ### 11.9 Integration checks
 
@@ -1635,7 +1809,7 @@ answers `forbidden` otherwise.
   in the create success value. That value is held by `createUserState$` until the next
   `createUser` call (its `pending` replaces it) and by `createUserResult$` until the next
   `createUser` outcome. It is never logged, never in a URL or a message, never stored elsewhere by
-  the service. The later logout `reset()` drops it too.
+  the service. A sign-out drops it with the service: the view layer makes a new `UsersService` for each person, so no `reset()` is needed here (section 20.6).
 - No password of the person signed in is involved.
 - The token rules are those of section 10.2. The username goes into the path only after the
   shared schema has accepted it, and through `encodeURIComponent`.
@@ -1707,7 +1881,9 @@ frontend/src/services/
 ├── calendar.types.ts              # CalendarFailureReason, CalendarResult, CalendarState
 ├── appointments.service.ts        # AppointmentsService (19, v7)
 ├── appointments.types.ts          # Appointments / Book / Cancel / Change / UpdateNote …
-├── assistant.service.ts           # AssistantService (20, v8)
+├── logout.service.ts              # LogoutService, LogoutConfig, Resettable (20, v8)
+├── logout.types.ts                # LogoutFailureReason, LogoutResult, LogoutState
+├── assistant.service.ts           # AssistantService (21, v9)
 └── assistant.types.ts             # AssistantCall, AssistantOutcome, the reasons of each call
 
 frontend/tests/
@@ -1715,18 +1891,19 @@ frontend/tests/
 │                         # login.service, refresh.service, hello.service, users.service,
 │                         # calendar-settings.service, availability-types.service,
 │                         # availability-rules.service (v6); calendar.service,
-│                         # appointments.service (v7); assistant.service (v8);
+│                         # appointments.service (v7); assistant.service (v9);
 │                         # plus fixtures.ts (v5): JWT, Response and session builders,
 │                         # and suite.ts (v6): the per-method suite of the API services
-├── unit/integration/     # claude.test.ts (v8): the check of integration/claude.ts, no stack needed
+├── unit/integration/     # claude.test.ts (v9): the check of integration/claude.ts, no stack needed
 └── integration/
     ├── local.ts           # the local stack's URLs and client id (reads backend/env.local.json);
     │                      # since v6 also `outcome()`, used by calendar.test.ts
     ├── login.service.test.ts  # the same journeys; tokens read from the store (section 9.9)
     ├── journeys.test.ts   # sections 11.9, 12.9, 13.9, in order
+    ├── logout.service.test.ts  # v8: section 20.9, the block `logout`
     ├── calendar.test.ts   # v6: sections 13.9 (listUsers), 15.9, 16.9, 17.9; v7: 18.9, 19.9 (section 14.4)
-    ├── claude.ts          # v8: which Claude the stack is wired to; the journeys refuse the real one
-    └── assistant.test.ts  # v8: section 20.9 (section 14.7)
+    ├── claude.ts          # v9: which Claude the stack is wired to; the journeys refuse the real one
+    └── assistant.test.ts  # v9: section 21.9 (section 14.7)
 ```
 
 `local.ts`, `claude.ts` and `suite.ts` are helpers, not tests (both projects select `*.test.ts` only). Nothing
@@ -1951,7 +2128,7 @@ appointment that `AppointmentsService` makes; the unit tests prove the mapping a
 4. Root `DYNAMODB_PORT=8002 npm run verify`: PASSED (back end 1087 unit + 90 integration, `shared`
    377, front end 639); `git status` shows no change in `backend/` or `shared/`.
 
-### 14.7 The assistant's journeys (v8)
+### 14.7 The assistant's journeys (v9)
 
 `frontend/tests/integration/assistant.test.ts` (`docs/CONVERSATIONAL_PLAN.md` step c11): three
 blocks, each with its page under `docs/journeys/frontend/`. They run `AssistantService` against the
@@ -1959,7 +2136,7 @@ local API with **the fake Claude** of the Docker stack answering for Anthropic
 (`docs/ARCHITECTURE.md` section 8), and read the calendar back through `CalendarService` and
 `AppointmentsService`.
 
-- **They refuse the real Claude** (decision 49). The file's `beforeAll` calls `refuseRealClaude()`
+- **They refuse the real Claude** (decision 62). The file's `beforeAll` calls `refuseRealClaude()`
   of `frontend/tests/integration/claude.ts` before any request: it reads `Parameters` of
   `backend/env.local.json` and throws unless `ANTHROPIC_BASE_URL` is the fake's address and
   `ANTHROPIC_API_KEY` the fake's placeholder, with a message that says what to run and holds
@@ -1968,7 +2145,7 @@ local API with **the fake Claude** of the Docker stack answering for Anthropic
   with no stack: the refusal is shown there, never by wiring the real Claude. The file read is
   what `local:api` was started with only if it was restarted after the last `local:up`, as for
   the back end's check (`docs/COMMANDS.md` section 4).
-- **The sentences are the back end's** (decision 49). The fake answers a message by its exact
+- **The sentences are the back end's** (decision 62). The fake answers a message by its exact
   text, from `backend/tests/integration/fake-claude/answers.json`, and never looks at who asks.
   The three sentences sent, and what each fixes:
 
@@ -2006,7 +2183,7 @@ local API with **the fake Claude** of the Docker stack answering for Anthropic
   events, and the three deleted-user markers of each run, in `calendar`; the conversations and the
   day's count of accounts that no longer exist, in `assistant`, which nobody reads (DynamoDB
   Local may never act on their time to live). No type, no window, nothing booked.
-- **The journey repeats `continue`** (decision 47): the helper `untilTheExchangeEnds` calls it
+- **The journey repeats `continue`** (decision 60): the helper `untilTheExchangeEnds` calls it
   while the reply says `working`, at most `ASSISTANT_LIMITS.modelRequestsPerMessage` times.
 
 | Block | Journey | Expect |
@@ -2015,14 +2192,14 @@ local API with **the fake Claude** of the Docker stack answering for Anthropic
 | a booking confirmed | `send`; `confirm` and `decline` with `not-an-id`; `confirm` with an unknown ULID; `confirm` with the proposal's id (and `continue` while `working`); `AppointmentsService.list` and `CalendarService.load` as the User; `confirm` and `decline` again; `load` | `awaiting_confirmation` with the proposal in the server's words (the summary built with `assistantTexts('en')`), nothing booked; `invalid_request` `proposalId: expected a ULID`, no request sent; `proposal_not_found`, the proposal still waiting; `idle`, the proposal with outcome `done`, one text of the assistant; one appointment 05:00–06:00 of the block's type, booked by the User, and the day's free slots of that type only 06:00; `proposal_not_found` twice, still one appointment; the settled proposal still shown |
 | a proposal declined | `send`, then the day read through `CalendarService`; `decline`; the day and the list read again; `confirm` and `decline` again; `load` | a proposal waits; `idle`, the notice "Nothing was changed.", `proposal` `null`, the day's count unchanged; the day equal to the one read before but for `generatedAt`, no appointment; `proposal_not_found` twice; the request and the notice, nothing to confirm |
 
-### 14.8 Acceptance check (v8, `docs/CONVERSATIONAL_PLAN.md` step c11)
+### 14.8 Acceptance check (v9, `docs/CONVERSATIONAL_PLAN.md` step c11)
 
 1. `npm run verify -w frontend` green with 100 % line coverage on `frontend/src`.
 2. `RUN_INTEGRATION=1 npm run test:integration -w frontend` green against the fake Claude, twice
    in a row; the journeys refuse the real Claude, shown by the unit test of the check.
 3. The root `DYNAMODB_PORT=8002 npm run verify` green; no diff in `backend/` or `shared/`.
 
-**As run (2026-11-22, v8):**
+**As run (2026-11-22, v9):**
 
 1. `npm run verify -w frontend`: typecheck, lint, 2 234 tests in 42 files of the `unit` and
    `views` projects (2 067 before, none of them changed; 160 new in `assistant.service.test.ts`
@@ -2538,13 +2715,512 @@ Section 14.4, blocks "calendar view", "appointments" and "availability conflict"
 
 ---
 
-## 20. `AssistantService` (v8)
+## 20. `LogoutService` (v8)
+
+"Sign out" in two acts, in this order: **the page forgets the person at once**, and **then
+Cognito is told** to revoke the refresh token, so that a copy of it, wherever it may be, can
+make no new access token. The first act cannot fail. The second can, and what the service
+publishes is how the second went.
+
+The direction is `docs/FRONTEND_ARCHITECTURE.md` section 13.7 and section 11, decision 152
+(revoke, and sign out whatever Cognito answers); the nine points decided before this design
+are decisions 46 to 54 of section 8. One of them, decision 47, reverses the order section
+13.7 wrote down in its version 14: that section and decision 152 were corrected with this
+design.
+
+### 20.1 The remote call
+
+`RevokeToken`, one of Cognito's user pool operations, at the address the login uses
+(section 4.1). Read on AWS's pages on 2026-11-21, not from memory:
+
+```http
+POST https://cognito-idp.<region>.amazonaws.com/
+Content-Type: application/x-amz-json-1.1
+X-Amz-Target: AWSCognitoIdentityProviderService.RevokeToken
+
+{ "ClientId": "<client id>", "Token": "<the refresh token>" }
+```
+
+| | What AWS's page says | Source |
+|---|---|---|
+| The body | `ClientId` and `Token` are required; `Token` is "The refresh token that you want to revoke". `ClientSecret` only "if the client has a secret": ours has none (`GenerateSecret: false`, `backend/template.yaml`). `RevokeAssociatedSessions` is optional, default `NONE`, "revokes only the token session that is associated with the refresh token": not sent | [1] |
+| Success | "an HTTP 200 response with an empty HTTP body"; the page's sample answer is `{}` | [1] |
+| Credentials | None of AWS's: "Amazon Cognito doesn't evaluate AWS Identity and Access Management (IAM) policies in requests for this API operation. For this operation, you can't use IAM credentials to authorize requests". No access token either: "`RevokeToken` and `GetTokensFromRefreshToken` take refresh tokens as the authorization parameter. The refresh token serves as the authorizing token, and as the target resource." And: "The RevokeToken operation and the /oauth2/revoke endpoint require no additional authorization unless your app client has a client secret." So `docs/FRONTEND_ARCHITECTURE.md` section 13.7 is confirmed: the refresh token and the client id, nothing else | [1], [3], [2] |
+| The app client | "You can revoke refresh tokens only in app clients with token revocation enabled." Ours has `EnableTokenRevocation: true` (`backend/template.yaml`) | [2] |
+| Errors | Eight, each with its status: `ForbiddenException` 400 (AWS WAF refused the request), `InternalErrorException` 500, `InvalidParameterException` 400, `OperationNotEnabledException` 400 ("not available in the current region or for the current user pool configuration"), `TooManyRequestsException` 400, `UnauthorizedException` 400 ("the request isn't authorized. This can happen due to an invalid access token in the request"), `UnsupportedOperationException` 400 ("an operation that isn't enabled for the user pool client"), `UnsupportedTokenTypeException` 400 ("an unsupported token is passed to an operation"). Among the errors any operation may answer: `ThrottlingException` 400 | [1], [4] |
+
+**What the pages do not say**, and this design therefore does not rely on:
+
+- Which error answers a refresh token that is **already revoked, expired or not a token**; an
+  **unknown client id**; **revocation not enabled** for the client. The types' descriptions
+  suggest `UnauthorizedException` or `UnsupportedTokenTypeException` for the first and
+  `UnsupportedOperationException` for the last; the page ties none of them to a case. The
+  mapping of section 20.5 gives every listed type a reason, so no answer is lost; which type
+  the real Cognito sends for each case can be read at `docs/FRONTEND_DEPLOY_PLAN.md` step 72.
+  **At that step (2026-11-21) none was seen:** the one revocation looked at was answered 200,
+  and no refusal was provoked. The mapping still rests on the types' descriptions.
+- What a second `RevokeToken` of the same token answers.
+- **Whether a browser may call it from another origin.** None of the pages read ([1] to [5])
+  mentions CORS or a browser. What is known is next to it, not it: Cognito answers the
+  preflight of `InitiateAuth` (section 10.3, section 1.1), and `RevokeToken` is the same
+  address, the same method and the same two header names, with another value in
+  `X-Amz-Target`; a preflight asks about the names of the headers, not their values. It is
+  looked at at the deployed page, and on purpose: if the browser
+  refused the call, the result would be `network`, the person would be signed out all the
+  same, and nothing on the page would show it (decision 50). **Seen on 2026-11-21: the
+  browser may.** At the deployed page the request was answered 200 (section 20.9).
+- The page's sample request carries an `Authorization: AWS4-HMAC-SHA256 …` header, although
+  the same page says IAM credentials cannot authorize the operation. This design sends none,
+  as for `InitiateAuth`.
+
+**What revoking does and does not do**, in AWS's words ([2]):
+
+- "When you revoke a refresh token, all access tokens that were previously issued by that
+  refresh token become invalid. The other refresh tokens issued to the user are not affected."
+  So a sign-out on one computer does not sign the same person out on another.
+- "Revoked tokens can't be used with any Amazon Cognito API calls that require a token.
+  However, revoked tokens will still be valid if they are verified using any JWT library that
+  verifies the signature and expiration of the token."
+- That second sentence is this API's case. The authorizer checks an access token's signature
+  and expiry and asks Cognito nothing (`docs/ARCHITECTURE.md` section 7.3). **A copy of the
+  access token therefore still works at the API after a sign-out**, for at most the 15 minutes
+  of its validity plus the 5 minutes the authorizer remembers an answer: the limit already
+  accepted for a deleted user. What the revocation ends is the making of new access tokens,
+  which without it would go on for the refresh token's seven days.
+- The API reference [1] says more than that in one sentence ("you can't use the revoked token
+  to access Amazon Cognito user APIs, or to authorize access to your resource server"); the
+  developer guide [2] says the opposite for a server that only verifies the JWT, which is
+  what ours does. The guide's sentence is the one that matches how the authorizer is built.
+
+**Checked against cognito-local (2026-11-21)**, image `jagregory/cognito-local:5.3.0`, with the
+local stack's emulators running, by a script outside the repository that printed statuses and
+error types and never a token:
+
+| Call | Answer |
+|---|---|
+| `InitiateAuth` as `alice`, then `REFRESH_TOKEN_AUTH` with her refresh token | 200, 200 |
+| `RevokeToken` with that refresh token and the client id | **200**, body `{}`, `Content-Type: application/x-amz-json-1.1` |
+| `REFRESH_TOKEN_AUTH` with the revoked token | **400 `NotAuthorizedException`**, "User not authorized" |
+| `RevokeToken` again with the same token; with `garbage`; with an access token | 400 `NotAuthorizedException` each |
+| `RevokeToken` with an unknown client id | 400 `ResourceNotFoundException` |
+| Two sign-ins of `alice`, the first one's token revoked: a refresh with the second's | 200: the other session is not affected, as in AWS's words |
+| The preflight (`OPTIONS` with `Access-Control-Request-Headers: content-type,x-amz-target`) | 204, `Access-Control-Allow-Origin: *`, both headers allowed |
+| A new sign-in of `alice` afterwards | 200 |
+
+So the emulator implements the call and its consequence, and the sign-out is tested locally
+end to end (section 20.9). The access token of the revoked session against the local API is
+test 4 of that journey: `201`, as AWS's guide says of a server that only verifies the token.
+What the emulator answers to
+a second revocation (`NotAuthorizedException`) is its own choice: AWS's page does not list
+that type for this operation.
+
+Sources, read 2026-11-21:
+
+1. `https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/API_RevokeToken.html`
+2. `https://docs.aws.amazon.com/cognito/latest/developerguide/token-revocation.html`
+3. `https://docs.aws.amazon.com/cognito/latest/developerguide/authentication-flows-public-server-side.html`
+4. `https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/CommonErrors.html`
+5. `https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-using-the-refresh-token.html`
+
+### 20.2 Configuration
+
+```ts
+export type LogoutConfig = CognitoConfig; // the same values as LoginConfig
+```
+
+### 20.3 Types (`logout.types.ts`)
+
+```ts
+import type { RevokeFailureReason } from './cognito';
+
+// Why Cognito did not revoke the refresh token. Never why the person was not signed out:
+// the page forgets the person in every case.
+export type LogoutFailureReason =
+  | 'not_signed_in'    // the store was empty at the press: nothing to revoke, no request
+  | RevokeFailureReason // token_rejected, not_enabled, too_many_attempts, server, unexpected (section 10.1)
+  | 'timeout'          // no whole answer within 10 seconds: the request was given up
+  | 'network';         // fetch rejected: offline, DNS, CORS, refused
+
+// `success`: Cognito answered 200, the refresh token is revoked.
+// `failure`: it is not known to be revoked; at Cognito it may live on, for its seven days at most.
+// Neither holds a token or a name.
+export type LogoutResult =
+  | { status: 'success' }
+  | { status: 'failure'; reason: LogoutFailureReason; message: string };
+
+export type LogoutState = { status: 'idle' } | { status: 'pending' } | LogoutResult;
+```
+
+The names are the other services' (decision 46). What differs is what they are about: every
+other result answers "did what I asked happen?", and a sign-out always happens. This one
+answers "does Cognito know?".
+
+### 20.4 The class
+
+```ts
+import { BehaviorSubject, Observable, ReplaySubject, of } from 'rxjs';
+import { catchError, map, switchMap, take, tap, timeout } from 'rxjs/operators';
+import { describe, revokeToken, toRevokeOutcome, type CognitoConfig } from './cognito';
+import type { LogoutFailureReason, LogoutResult, LogoutState } from './logout.types';
+import type { SessionStore } from './session.store';
+
+export type LogoutConfig = CognitoConfig;
+
+// A service that lives as long as the page and can be put back to its first state.
+export type Resettable = { reset(): void };
+
+const REVOKE_TIMEOUT_MS = 10_000; // how long Cognito is waited for
+
+export class LogoutService {
+  // Pure reactive stream: one outcome per revocation, replayed to late subscribers.
+  private readonly resultSubject = new ReplaySubject<LogoutResult>(1);
+  readonly logoutResult$: Observable<LogoutResult> = this.resultSubject.asObservable();
+
+  // State machine of the latest call: idle → pending → success | failure → pending → …
+  private readonly stateSubject = new BehaviorSubject<LogoutState>({ status: 'idle' });
+  readonly logoutState$: Observable<LogoutState> = this.stateSubject.asObservable();
+
+  private calls = 0; // counts the calls, so that the state follows the latest one only
+
+  constructor(
+    private readonly config: LogoutConfig,
+    private readonly store: SessionStore,
+    private readonly pageWide: readonly Resettable[], // the LoginService and the RefreshService
+  ) {}
+
+  logout(): void {
+    const call = ++this.calls;
+    this.stateSubject.next({ status: 'pending' });
+
+    this.store.session$
+      .pipe(
+        take(1), // whoever is signed in at the press
+        // Forget first. The page-wide services before the store: whoever reacts to the
+        // store's null then finds them in their first state.
+        tap(() => {
+          this.pageWide.forEach((service) => service.reset());
+          this.store.clear();
+        }),
+        // Then tell Cognito, with the refresh token read above: the one copy left.
+        switchMap((session) =>
+          session ? this.revoke(session.refreshToken) : of(failure('not_signed_in', 'Nobody was signed in')),
+        ),
+      )
+      .subscribe((result) => {
+        if (call === this.calls) this.stateSubject.next(result); // a later call owns the state
+        this.resultSubject.next(result); // next only: section 3.2
+      });
+  }
+
+  // One revocation: answered, refused, unreachable, or given up after the time limit.
+  private revoke(refreshToken: string): Observable<LogoutResult> {
+    return revokeToken(this.config, refreshToken).pipe(
+      map(({ status, text }): LogoutResult => toRevokeOutcome(status, text)),
+      timeout({
+        first: REVOKE_TIMEOUT_MS,
+        with: () => of(failure('timeout', `Cognito did not answer within ${REVOKE_TIMEOUT_MS / 1000} seconds`)),
+      }),
+      catchError((err: unknown) => of(failure('network', describe(err)))),
+    );
+  }
+}
+
+function failure(reason: LogoutFailureReason, message: string): LogoutResult {
+  return { status: 'failure', reason, message };
+}
+```
+
+Reading it:
+
+- **Everything up to the request happens inside the call of `logout()`**, before it returns.
+  `session$` is a `BehaviorSubject`'s stream: it gives its value at once, `take(1)` keeps that
+  one, and the `tap` and the start of the request run in the same run of the script. When
+  `logout()` returns, the page-wide services are reset, the store is empty, every subscriber
+  of `session$` has been told `null` (the shell has left the person's frame and shown the
+  login), and the request has left. The order inside is fixed: reset, clear, send.
+- **The store is cleared without a guard** (`clear()`, not `clear(session)`): the session read
+  and the session cleared are the same one, a line apart.
+- **Where the refresh token is** (decision 47). `session` is the parameter of the function
+  given to `switchMap`; `refreshToken` is the parameter of `revoke`; the text of the request's
+  body belongs to `fetch`. No field of the service holds any of the three, and the
+  subscription itself is kept in no field: nothing outside the call can reach them. They are
+  released when the inner stream ends, which is when the answer has been read, when `fetch`
+  rejects, or at the time limit.
+- **The time limit** is RxJS's `timeout` on the stream of the answer already read: 10 seconds
+  from the start of the request to the end of the body. When it fires, the stream of the
+  request is unsubscribed, which aborts the `fetch` (section 4.4, point 1), and the outcome
+  is `failure timeout`.
+- **Nothing cancels a revocation** (decision 48). There is no `pending` field as in the other
+  services: a second `logout()` does not unsubscribe the first, and the service has no
+  teardown. A call ends by itself, in 10 seconds at most.
+- **Two calls** (decision 51). The second finds the store empty, unless somebody signed in in
+  between: then it revokes that person's token. Each outcome goes to `logoutResult$` when it
+  arrives. `logoutState$` belongs to the latest call: an older call's late outcome is not
+  written there.
+- `catchError` is last, so that nothing can reach the subjects as an error (rule 4).
+- Nothing starts in the constructor.
+
+| Event | `logoutState$` | `logoutResult$` | `session$` |
+|---|---|---|---|
+| service created | `idle` | (nothing) | unchanged |
+| `logout()`, someone signed in | `pending` | | `null`, before `logout()` returns |
+| Cognito answers 200 | `success` | `success` | |
+| Cognito answers 400 `UnauthorizedException` | `failure token_rejected` | `failure token_rejected` | |
+| no answer for 10 seconds | `failure timeout` (the request is aborted) | `failure timeout` | |
+| offline | `failure network` | `failure network` | |
+| `logout()` with an empty store | `pending`, `failure not_signed_in`, no request | `failure not_signed_in` | (empty) |
+| `logout()` twice, the first still unanswered | `pending`, `failure not_signed_in`; the first's outcome, later, is not shown | `failure not_signed_in`, then the first's outcome | `null` since the first |
+
+### 20.5 Mapping the answer
+
+`toRevokeOutcome(status, text)` in `cognito.ts` (section 10.1). A 200 is a success and its body
+is not read further. Any other status: the body is parsed as JSON and the error's type is the
+last part of `__type` after a `#`, as for `InitiateAuth` (section 4.5).
+
+| Cognito's answer | Result | Why this reason |
+|---|---|---|
+| 200, any body | `success` | AWS: 200 with an empty body |
+| `UnauthorizedException`, `UnsupportedTokenTypeException` | `failure token_rejected` | Cognito did not take the token: not a refresh token, or no longer one it knows |
+| `NotAuthorizedException` | `failure token_rejected` | cognito-local's answer to a token already revoked or unknown |
+| `UnsupportedOperationException`, `OperationNotEnabledException` | `failure not_enabled` | Revocation is switched off for the app client, or not offered: a fault of the stack's configuration, worth its own name because it means no sign-out ever revokes |
+| `TooManyRequestsException`, `ThrottlingException` | `failure too_many_attempts` | As for a login |
+| `InternalErrorException`; any 5xx; a body that is not JSON | `failure server` | As for a login |
+| `InvalidParameterException`, `ForbiddenException`, `ResourceNotFoundException` | `failure unexpected`, the type named in the message | A request Cognito finds malformed, a web ACL in the way, or (cognito-local) an unknown client id: a wrong build, not something a sign-out can meet in normal use |
+| any other `__type` below 500; JSON that is not an object | `failure unexpected`, the message names the status only | Outside what AWS's page lists |
+| `fetch` rejects | `failure network` (in the service) | |
+| no whole answer in 10 seconds | `failure timeout` (in the service) | |
+| the store was empty | `failure not_signed_in` (in the service), no request | |
+
+The message is written by the front end: `Cognito answered 400 UnauthorizedException`,
+`Cognito answered 503`, `Cognito answered 502 without JSON`. Cognito's own `message` is never
+copied, and a type outside the table is not named (decision 55).
+
+The store is written by no row: it was cleared before the request left.
+
+### 20.6 Use from the view layer
+
+```ts
+// Application start-up (the shell): what lives as long as the page.
+const store = new SessionStore();
+const login = new LoginService({ cognitoUrl, clientId }, store);
+const refresh = new RefreshService({ cognitoUrl, clientId }, store);
+const logout = new LogoutService({ cognitoUrl, clientId }, store, [login, refresh]);
+refresh.start();
+
+signOutButton.onclick = () => logout.logout(); // and nothing else
+```
+
+- **The view calls `logout()` and does nothing else.** It does not clear the store, does not
+  wait, shows no "signing out…" and no message afterwards (decision 50). The screen changes
+  because `session$` says `null`, as it does today, during the call.
+- **The view is handed the method only** (`Pick<LogoutService, 'logout'>`): no view subscribes
+  to `logoutResult$` or `logoutState$`. They are for a developer (a line in the console while
+  working, never in the built page) and for the tests.
+- **One `LogoutService` for the page** (decision 48), next to the `LoginService` and the
+  `RefreshService`; it is not one of the objects made for each person.
+
+**What is left behind after a sign-out** (decision 53):
+
+| Where | Before `logout()` | After |
+|---|---|---|
+| `SessionStore` | the session with its three tokens | `null` |
+| `LoginService` | `success` with `username`, `role`, `expiresAt`, in both streams (confirmed in the code: `login.types.ts`; never a token) | `idle`; nothing replayed |
+| `RefreshService` | after a renewal, `success` with `username`, `expiresAt`; its timer armed | `idle`; nothing replayed; the timer disarmed by the `null` |
+| the services of the person's session (calendar, appointments, users, settings, availability) | that person's data in their replayed streams | dropped with the person's objects by the view layer (`docs/FRONTEND_ARCHITECTURE.md` section 6, point 4): no `reset()` needed |
+| `LogoutService` | the outcome of the sign-out before, if any | `pending`, then this sign-out's outcome: no name, no token; kept until the next sign-out |
+| the one copy of the refresh token | in the store | in the request in flight; gone in 10 seconds at most |
+
+**A renewal under way** (decision 49). The automatic refresh may have a request in flight when
+the person presses "Sign out". The sign-out does not wait for it:
+
+1. `refresh.reset()` aborts the renewal's request; its answer, if one comes, is never read.
+2. The store is cleared; had the answer been read, `store.replace(started, …)` would do
+   nothing, since `started` is no longer the current session (section 9.2).
+3. The `null` disarms the renewal's timer (section 11.4).
+4. The revocation leaves with the refresh token the store held at the press, which is also
+   the one the renewal was using: a renewal never changes it (below).
+
+Nobody is signed in again. What the renewal may have left **at Cognito**, if Cognito served it
+before the abort: an access and an id token that no one received. If Cognito served it before
+the revocation, they are revoked with the rest ("all access tokens that were previously
+issued by that refresh token become invalid", source 2 of section 20.1) and pass the API's
+authorizer for their 15 minutes plus 5 all the same, like every access token of that session;
+if after, Cognito refused the renewal. **No new refresh token can come from it**: "When this
+setting is disabled, token-refresh requests return new access and ID tokens only and the
+original refresh token remains valid" (source 5; the app client of `backend/template.yaml`
+sets no rotation), and with rotation on, "You can't authenticate with `REFRESH_TOKEN_AUTH`
+in app clients with refresh token rotation enabled" (source 5). So `toAuthOutcome`'s line
+that keeps a rotated refresh token (decision 21) cannot run against this pool, and if
+rotation is ever switched on, the refresh itself must change before the sign-out does.
+
+**The other ways a session ends send nothing** (decision 52):
+
+| The session ends by | What is left at Cognito | Why no revocation |
+|---|---|---|
+| **Expiry** (the store's timer, section 9.3). Only when the renewal one minute earlier did not succeed: the network was down, or the computer asleep | The refresh token, until seven days after the sign-in | The person did not ask to leave. The page holds the token no more (memory only: section 9.6), exactly as after closing the tab, which no code sees and which leaves the same token for the same seven days. A revocation here would also be asked of a network that has just failed the renewal |
+| **The API rejected the access token** (401, or 403 without `error`: section 9.4) | The refresh token, as above | The same. And the cause is not known to be the person's: a clock, a deployment, a fault of the authorizer's. Telling Cognito to end a session on a guess would turn a fault of ours into a sign-out everywhere it can |
+| **Cognito refused the renewal** (`session_rejected`) | Nothing usable: Cognito has just said that this refresh token is dead (expired, revoked, the user deleted) | There is nothing to revoke |
+| **The renewed token has no role** (`no_role`, decision 20) | The refresh token, as above | An operator took the account out of its groups: every call it could make answers 403 |
+
+For the first two the accepted limit is the one of every tab closed without "Sign out": the
+refresh token lives its seven days at Cognito and nothing in the browser holds it. "Sign out"
+is how a person ends it sooner, and deleting the user is how the Administrator does
+(`docs/ARCHITECTURE.md` section 6.4).
+
+### 20.7 Security notes
+
+- **The refresh token** is read from the store at the press and goes into the request's body
+  only: never an address, a header, a state, a result, a message or a log. After the store is
+  cleared, one copy exists for the length of the request, 10 seconds at most, where no caller
+  can reach it (section 20.4; rule 9's exception).
+- **No result can carry it**, whatever Cognito answers: a failure's message is written from
+  the status and a type of a fixed list (decision 55). The `network` message is `describe`'s,
+  the error's name and text, which never hold the request's body (section 10.1).
+- **A failed revocation is silent on the page** (decision 50). The person is signed out of the
+  page in every case; what a failure leaves is the refresh token at Cognito, held by nobody
+  the page knows of, for at most seven days after the sign-in. This is what "Sign out" left
+  in every case before v8.
+- **The access token outlives the sign-out** at the API by up to 20 minutes, for whoever
+  copied it before (section 20.1; `docs/ARCHITECTURE.md` section 7.3). The page does not hold
+  it any more.
+- **Only this session.** The person's other sign-ins (another browser, another computer) keep
+  their refresh tokens: `RevokeAssociatedSessions` is not sent. Ending them all is the
+  Administrator's delete, or a design of its own.
+- **The tab closed straight after the press**: the request is sent with `keepalive`, so the
+  browser finishes it (decision 56). Without an answer read, there is no result; nobody is
+  there to read one.
+- **The Content-Security-Policy** already allows the call: Cognito's address is in
+  `connect-src` for the login (`docs/FRONTEND_ARCHITECTURE.md` section 13.4). Locally the
+  call goes to `/cognito/` of the dev server, like the login.
+- Nothing is logged.
+
+### 20.8 Unit tests (`logout.service.test.ts`)
+
+`fetch` stubbed with real `Response` objects; a real `SessionStore`; real `LoginService` and
+`RefreshService` where a row needs them, spies (`{ reset: vi.fn() }`) elsewhere. Fake timers
+for the time limit and the schedule (`setTimeout`, `setInterval`, `Date`: RxJS's `timeout`
+schedules with `setInterval`, like `timer`). The refresh token is a made-up text. Every test
+subscribes first, then calls.
+
+| Test | Setup and stub answer | Expect |
+|---|---|---|
+| success | store holds `a`; 200 `{}` | `logoutResult$` gives exactly `{ status: 'success' }`; states `idle`, `pending`, `success`, the last the same object as the result |
+| request shape | store holds `a` | one POST to `cognitoUrl` with `RevokeToken` in `X-Amz-Target`, the client id and `a.refreshToken` as `Token`, `keepalive: true` |
+| forgotten before the answer | store holds `a`; the fetch never answers | when `logout()` returns: `session$` gives `null`, both spies' `reset` called once, the fetch already sent, the state `pending` |
+| the order inside | spies that record; a subscriber of `session$` that records | `reset` of each page-wide service, then the `null`, then the fetch |
+| each failure (`it.each`) | 400 `UnauthorizedException`; 400 `UnsupportedOperationException`; 400 `TooManyRequestsException`; 500 `InternalErrorException`; 502 HTML; 400 `SomethingElseException` | `token_rejected`; `not_enabled`; `too_many_attempts`; `server`; `server`; `unexpected`; in each the store is empty and stays so |
+| offline | fetch rejects with `TypeError` | `failure network`; the store is empty; a second `logout()` after a new `set()` gives a second result (the subject is alive) |
+| time limit | the fetch never answers | nothing at 10 s − 1 ms; at 10 s `failure timeout`, and the request's `signal.aborted` is `true` |
+| answer just in time | the fetch answers 200 at 9 s | `success`; nothing more at 10 s |
+| no session | empty store | `pending`, then `failure not_signed_in`; fetch never called; `reset` called all the same |
+| two presses | store holds `a`; first fetch unanswered; `logout()` again | one fetch only, not aborted; the second call gives `not_signed_in`; when the first answers 200: `logoutResult$` has `not_signed_in` then `success`, and `logoutState$` still shows `not_signed_in` |
+| a second person | `a` signs out, fetch unanswered; `set(c)`; `logout()` | two fetches, the first with `a`'s refresh token and the second with `c`'s; the first is not aborted; the first's late answer leaves the state at the second's outcome |
+| a session that arrives after the press | `logout()` with the fetch unanswered; `set(c)`; the fetch answers (200, then in another run 400, then a rejection) | `session$` still gives `c` in each: a late answer changes nothing of a session |
+| a renewal in flight | real `RefreshService`, started; store holds `a`; `refresh()` pending; `logout()`; then the refresh's fetch is answered 200 with new tokens | the refresh's signal is aborted; `session$` gives `null` and stays `null`; `refreshState$` is `idle`; the revocation carried `a.refreshToken`; advancing the clock past `a`'s expiry sends no further request |
+| a renewal's answer that slips through | a `Resettable` spy instead of the `RefreshService`, so nothing is aborted; a `RefreshService` on the same store with `refresh()` pending; `logout()`; the refresh answers 200 | `session$` stays `null`: the guarded write alone is enough (section 9.2) |
+| the login back in its first state | real `LoginService` after a successful login; `logout()` | `loginState$` gives `idle`; a late subscriber of `loginResult$` receives nothing; the login's `idle` came before the store's `null` |
+| late subscriber | subscribe after a success | `logoutResult$` replays it; `logoutState$` gives it |
+| constructor | service created with a session in the store; time advances | no fetch, no reset: nothing starts by itself |
+| no leak | every row above | checked after every test of the file (`afterEach`), on everything the test's services published: no state and no result contains a refresh, an access or an id token; the `console`'s five methods, spied for the whole file, were never called. A 400 whose `message` quotes the token gives a result without it (a test of its own); the `success` test checks that no value holds the username |
+
+The rows of `cognito.test.ts` for the request and the mapping are in section 10.4; those of
+`reset()` in sections 6 and 11.8.
+
+**The shell's test** (`docs/FRONTEND_ARCHITECTURE.md` section 8; the cases the design asks of
+it, beyond the ones that must stay green):
+
+| Test | Expect |
+|---|---|
+| "Sign out" calls `logout()` and nothing else | with a fake `logout` that does nothing, the store still holds the session: the shell itself clears nothing |
+| "Sign out" under `runShell` | the login is back before the revocation is answered (the fetch stays unanswered); one request to `cognitoUrl` with `RevokeToken`; the form empty and usable |
+| nothing left of the person | the existing test, with the real `LogoutService`: nothing of the person or of a token in the whole document, in a field or in the address, also while the revocation is unanswered |
+| a second person straight after | `alice` signs out, the revocation unanswered; `admin` signs in: the frame is `admin`'s; the first revocation then answers (200, 400, a rejection): the frame is still `admin`'s, the page is the one `admin` finds alone |
+| a session that ends by itself | `store.clear()` from outside: no request to `cognitoUrl` (decision 52) |
+
+### 20.9 Integration checks
+
+`frontend/tests/integration/logout.service.test.ts`, one `describe`, run in order against the
+local stack (cognito-local on 9229, the API on 3000), with its page
+`docs/journeys/frontend/logout.md`. Real services on real stores; `alice` only; no table is
+touched and no user created.
+
+| # | Journey | Expect |
+|---|---|---|
+| 1 | `alice` signs in twice, into stores A and B; `RefreshService` on A | two sessions with different refresh tokens; A's renewal is `success` (the token is alive before the sign-out) |
+| 2 | `LogoutService` on A: `logout()` | when the call returns, `session$` of A gives `null`; the result is `{ status: 'success' }`, and it holds no token |
+| 3 | a store C set to A's session as it was before the sign-out (the copy a thief would hold); `RefreshService` on C | `failure session_rejected`; `session$` of C gives `null`: **the revoked refresh token makes no new session** |
+| 4 | `HelloService` on a store D set to the same copy | `201`: the access token still passes the authorizer. The limit of section 20.1, written down as a test so that it is not forgotten |
+| 5 | `RefreshService` on B | `success`: the other sign-in is not affected |
+| 6 | `LogoutService` on an empty store (a `fetch` spy counts requests) | `failure not_signed_in`; no request sent |
+| 7 | `alice` signs in again | `success`: a sign-out does not lock the account |
+
+`afterAll` calls `logout()` on every store of the file, so the run leaves no live refresh token
+of its own in cognito-local (an empty store sends nothing; the store holding the copy sends a
+revocation Cognito refuses, and no result is looked at). In the journey the service is built
+with an empty list of page-wide services: what it resets is the unit tests' matter. The file
+needs nothing of the other integration files and leaves them one row in `hello-messages`.
+
+**What only the cloud proves**, at `docs/FRONTEND_DEPLOY_PLAN.md` step 72, where the plan
+has the check in words a person can follow at the deployed page. **As found on 2026-11-21**,
+by the operator in a browser at the page's address (`docs/RUNBOOK.md` section 5.5):
+
+| # | What | Result |
+|---|---|---|
+| 1 | The browser may make the call from the page's origin (CORS, section 20.1): in the network panel the request to Cognito after "Sign out" is answered 200, not blocked | **Seen:** status 200 |
+| 2 | The real Cognito answers 200 to this body (`ClientId`, `Token`), without credentials and without a secret | **Seen**, by the same request: the page sends nothing else. The answer's body was not read |
+| 3 | A refresh with the revoked token is refused by the real Cognito | **Not tried.** The command for it was prepared and tested against cognito-local (200 before a revocation, `400 NotAuthorizedException` after) and not run against the real Cognito. An open item of `docs/RUNBOOK.md` section 5.5 |
+| 4 | Journey 4 with real lifetimes | Not checked, as planned: it would mean waiting 20 minutes with a copied token, and it is AWS's documented behaviour |
+
+Also not tried there: "Sign out" with the network off, and a session renewed after its
+fifteen minutes (section 11; the first time a browser would renew a real session).
+
+Not provable locally and not planned for the cloud: `keepalive` after a closed tab
+(decision 56), and which error type the real Cognito gives each refusal (section 20.1).
+
+### 20.10 Acceptance check (v8, `docs/FRONTEND_DEPLOY_PLAN.md` step 71)
+
+1. `npm run verify -w frontend` green, 100 % line coverage on `frontend/src`.
+2. Root `npm run verify` green, and `RUN_INTEGRATION=1 npm run test:integration -w frontend`
+   green with the journey of section 20.9: the root `verify` runs the back end's integration
+   tests, not the front end's.
+3. In a browser, under `npm run dev -w frontend` against the local stack: "Sign out" shows the
+   login at once, also with the local Cognito stopped; nothing of the person is left in the
+   page or the address.
+4. No token in a log, a result, a state or the console.
+5. A refresh with the revoked token is refused, in the journey.
+
+**As run (2026-11-21):**
+
+1. `npm run verify -w frontend`: green. 2125 unit tests in 41 files (58 more than before the
+   step, one file more), lines 100 % (2139/2139); `sam validate --lint` on the hosting's
+   template green.
+2. Root `DYNAMODB_PORT=8000 npm run verify`: PASSED (`shared` 377 tests, `backend` 1087 unit
+   tests and its 90 journeys, then the front end's `verify`). The stamp says a dirty tree, as
+   it must before a commit. The front end's integration tests are not part of it and were run
+   apart: 53 tests in 4 files green, the 7 of `logout.service.test.ts` among them.
+3. In headless Chromium, under the dev server: the login in the same run of the script as the
+   press, both fields empty, nothing of the person or of a token in the page, a field or the
+   address; one `RevokeToken` to `/cognito/`, answered 200. With the container of
+   cognito-local stopped (and started again afterwards): the same for the person, the
+   request answered 502, no message. `admin` straight after `alice`: the frame is `admin`'s.
+   Beyond the acceptance: the request held and never answered, given up after 10 seconds
+   while another person was signed in, whose frame did not change.
+4. No token in any result or state (the unit tests' check after every test), none written to
+   the console by the code (the spies), none in the browser's console (15 tokens seen on the
+   wire were looked for). The console held `zod`'s one report, and, in the run with Cognito
+   stopped only, the browser's own line about the 502.
+5. Journey 3: `session_rejected`. Journey 4, the limit: the old access token answered `201`.
+
+Not run: anything against the real Cognito (`docs/FRONTEND_DEPLOY_PLAN.md` step 72, point 5);
+the walk of `docs/FRONTEND_WALK.md` in full; a closed tab (`keepalive`, decision 56).
+
+## 21. `AssistantService` (v9)
 
 The person's conversation with the assistant (`docs/CONVERSATIONAL_ARCHITECTURE.md` sections 4 to
 6). One service for the six routes, and **one stream for its six calls** (section 3.4, decision
-46).
+59).
 
-### 20.1 The remote calls
+### 21.1 The remote calls
 
 Both roles; a person only ever reaches their own conversation, found by the token. Codes from
 `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6, which agrees with `docs/ARCHITECTURE.md` section 4
@@ -2562,7 +3238,7 @@ on these routes.
 What the codes mean for the caller is `docs/CONVERSATIONAL_ARCHITECTURE.md` sections 6 and 6.1.
 Three points bear on the service's shape:
 
-- **A call makes one request** (decision 47). A reply whose `status` is `working` asks for
+- **A call makes one request** (decision 60). A reply whose `status` is `working` asks for
   `continue()`; the caller makes that call, and repeats it while the status stays `working`.
 - **The three codes of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1** are three reasons:
   `assistant_limit_reached` (only `send`: the person's messages of the day), and
@@ -2572,11 +3248,11 @@ Three points bear on the service's shape:
 - **A refusal of the calendar at a confirmation is not a failure of the call**: the reply is a
   success whose proposal has an action with `outcome: 'refused'` and the route's code in `error`.
 
-### 20.2 Configuration
+### 21.2 Configuration
 
 As section 15.2.
 
-### 20.3 Types (`assistant.types.ts`)
+### 21.3 Types (`assistant.types.ts`)
 
 The contract is `shared/`'s and is declared nowhere else: `AssistantReply` with its parts, the
 schema `AssistantMessageBody`, `Ulid`, `ASSISTANT_LIMITS`, the codes of `ApiErrorCode`.
@@ -2605,9 +3281,9 @@ and a `switch` over the reasons of one call needs no default (the unit test hold
 so a code added to a route and not handled stops the build). A failure has `status`, `reason` and
 `message` as an `ApiFailure` (section 10.2), without `conflicts`, which no route of the assistant
 answers. There is no `idle` and no `pending` value: the stream carries outcomes only (section
-20.4).
+21.4).
 
-### 20.4 The class
+### 21.4 The class
 
 ```ts
 export class AssistantService {
@@ -2650,9 +3326,9 @@ export class AssistantService {
   since `shared/` has the id's schema and not one for the path). No request is sent.
 - **Nothing of the model is interpreted.** A message's text, the proposal's question, labels and
   summaries and the line of progress are passed on as given. The service builds no sentence and
-  chooses no language (decision 48).
+  chooses no language (decision 61).
 
-### 20.5 Mapping the answer
+### 21.5 Mapping the answer
 
 | Answer | Outcome |
 |---|---|
@@ -2666,7 +3342,7 @@ export class AssistantService {
 
 Every outcome carries the `call` it answers.
 
-### 20.6 Use from the view layer
+### 21.6 Use from the view layer
 
 The view never sees the service: the logic object of the screen does
 (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 13, `docs/CONVERSATIONAL_PLAN.md` step c12). In
@@ -2691,13 +3367,13 @@ form.onSend = (text) => assistant.send(text);
 - The loop on `working` stops after `ASSISTANT_LIMITS.modelRequestsPerMessage` calls, and is not
   started again after `assistant_budget_reached`
   (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 13).
-- The sentences of the three reasons of section 20.1 are `shared/`'s fixed texts, chosen by the
+- The sentences of the three reasons of section 21.1 are `shared/`'s fixed texts, chosen by the
   screen in the conversation's language (`reply.language` of the last reply, English when there
   is none).
 - After a `confirm` whose proposal has an action `done`, the screens that show the calendar
   reload: no service refreshes another.
 
-### 20.7 Security notes
+### 21.7 Security notes
 
 A conversation is personal data: the person's texts, the assistant's, the notes and usernames an
 answer may quote. Nothing of it is logged, put in a URL or kept by the service beyond the last
@@ -2706,12 +3382,12 @@ path is the proposal's id, a ULID checked first. A message's text is plain text:
 not read it, and the view sets it as text, never as markup. The token rules are those of section
 10.2.
 
-### 20.8 Unit tests (`assistant.service.test.ts`)
+### 21.8 Unit tests (`assistant.service.test.ts`)
 
 One suite of its own, run per call (the per-method suite of section 14.1 tests a pair of streams
 per method): the outcome with its `call`; what is sent (the method, the path, the body or its
 absence, the bearer token); **every code of the route**, each with its own reason and the session
-kept; codes of neighbouring routes as `unexpected` (the three reasons of section 20.1 on `load`
+kept; codes of neighbouring routes as `unexpected` (the three reasons of section 21.1 on `load`
 and `end`; `assistant_limit_reached` and `conversation_full` on `continue` and `confirm`; the
 codes of a route that asks Claude on `decline`; `slot_taken` on `send` and `confirm`); answers
 that are not a reply (a 201, `status`, `messages` or `remainingToday` missing or wrong, an empty
@@ -2724,13 +3400,13 @@ the replay to a late subscriber; no token in any outcome.
 Then, for the one stream: the outcomes of five different calls in the order the answers came,
 each with its call; a reply that says `working` passed on with no request following by itself; a
 reply passed on as given (a text with markup and line breaks, a refused change with its code, a
-field the service does not know); the three reasons of section 20.1 each on its own, on every
+field the service does not know); the three reasons of section 21.1 each on its own, on every
 route that answers them; the same code on two routes as two outcomes, and as `unexpected` on a
 third; only the last outcome replayed; no `conflicts` in a failure. The file also holds one
 `switch` without a default per list of reasons, which the typecheck compiles.
 
 `frontend/tests/unit/integration/claude.test.ts` tests the check of section 14.7.
 
-### 20.9 Integration checks
+### 21.9 Integration checks
 
 Section 14.7, its three blocks.

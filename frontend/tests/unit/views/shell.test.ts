@@ -1,5 +1,6 @@
 import { BehaviorSubject, Observable, Subscription } from 'rxjs';
 import type { LoginState, Session } from '../../../src/services/login.types';
+import { LogoutService } from '../../../src/services/logout.service';
 import { SessionStore } from '../../../src/services/session.store';
 import type { LoginDeps } from '../../../src/views/login.view';
 import { mountShell, runShell, SCREENS, type Screen } from '../../../src/views/shell';
@@ -8,8 +9,8 @@ import { call, cognitoError, cognitoTokens, json, jwt, session } from '../servic
 import { find, loadPage, submit, useRealPage } from './page';
 
 // The DOM test of the shell (docs/FRONTEND_ARCHITECTURE.md sections 6 and 8): the real
-// index.html, the real SessionStore (memory only, no remote call), a fake LoginService, and the
-// global fetch a stub: entering the frame creates the real API services, whose first call
+// index.html, the real SessionStore (memory only, no remote call), a fake LoginService, the real
+// LogoutService, and the global fetch a stub: entering the frame creates the real API services, whose first call
 // stays unanswered unless a test answers it.
 
 const CONFIG = { apiUrl: 'http://api.test', cognitoUrl: 'http://cognito.test/', clientId: 'client-123' };
@@ -60,7 +61,10 @@ function mounted(first: Session | null = null, screens?: readonly Screen[]) {
     }),
     login: vi.fn<LoginDeps['login']>(),
   };
-  shell = mountShell(document.body, { config: CONFIG, store, login, ...(screens ? { screens } : {}) });
+  // The real sign-out service on the test's store: its request to Cognito stays unanswered
+  // unless a test answers it. The fake login has nothing to put back.
+  const logout = new LogoutService(CONFIG, store, []);
+  shell = mountShell(document.body, { config: CONFIG, store, login, logout, ...(screens ? { screens } : {}) });
   return {
     store,
     state$,
@@ -157,6 +161,39 @@ describe('mountShell', () => {
     expect(loginRoot.hidden).toBe(false);
     expect(frame.hidden).toBe(true);
     expect(loginMounts()).toBe(1);
+  });
+
+  it('"Sign out" calls the sign-out service and nothing else: the shell itself clears nothing', () => {
+    const store = new SessionStore();
+    store.set(ALICE);
+    const logout = { logout: vi.fn<() => void>() };
+    const login: LoginDeps = { loginState$: new BehaviorSubject<LoginState>({ status: 'idle' }), login: vi.fn<LoginDeps['login']>() };
+    shell = mountShell(document.body, { config: CONFIG, store, login, logout });
+
+    find('#app .sign-out').click();
+    expect(logout.logout).toHaveBeenCalledTimes(1);
+    expect(logout.logout).toHaveBeenCalledWith();
+    // The service of this test does nothing, so the person is still there.
+    expect(find('#app').hidden).toBe(false);
+    expect(find('#app .username').textContent).toBe('alice');
+    expect(cognitoCalls()).toHaveLength(0);
+  });
+
+  it('"Sign out" tells Cognito once, with the person\'s refresh token, and the login is back before any answer', () => {
+    const { loginRoot, signOut } = mounted(ALICE);
+    signOut.click();
+    expect(loginRoot.hidden).toBe(false);
+    expect(cognitoCalls()).toHaveLength(1);
+    const [, init] = cognitoCalls()[0]!;
+    expect((init.headers as Record<string, string>)['X-Amz-Target']).toBe('AWSCognitoIdentityProviderService.RevokeToken');
+    expect(JSON.parse(String(init.body))).toEqual({ ClientId: 'client-123', Token: ALICE.refreshToken });
+  });
+
+  it('a session that ends by itself tells Cognito nothing', () => {
+    const { store, loginRoot } = mounted(ALICE);
+    store.clear();
+    expect(loginRoot.hidden).toBe(false);
+    expect(cognitoCalls()).toHaveLength(0);
   });
 
   it('after signing out, nothing of the session is left in the document', () => {
@@ -312,6 +349,63 @@ describe('runShell', () => {
     expect(find<HTMLButtonElement>('#login button').disabled).toBe(false);
     expect(find('#login .error').textContent).toBe('');
     expect(html()).not.toContain('alice');
+  });
+
+  it('sign out with Cognito silent: the login at once, one revocation sent, and no token in the page, a field or the address', async () => {
+    fetchMock.mockResolvedValueOnce(tokensFor('alice', 'user'));
+    shell = runShell(CONFIG);
+    signIn('alice', 'Secret-Pass-1!');
+    await vi.waitFor(() => expect(find('#app').hidden).toBe(false));
+    const before = cognitoCalls().length;
+
+    // The request that tells Cognito is never answered.
+    find('#app .sign-out').click();
+    expect(find('#login').hidden).toBe(false);
+    expect(find('#app').hidden).toBe(true);
+    expect(cognitoCalls()).toHaveLength(before + 1);
+    expect(JSON.parse(String(cognitoCalls().at(-1)![1].body))).toEqual({ ClientId: 'client-123', Token: 'refresh-token' });
+
+    const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
+    for (const left of ['alice', 'refresh-token', 'id-token', 'Secret-Pass-1!']) {
+      expect(html()).not.toContain(left);
+      expect(fields.join('\n')).not.toContain(left);
+      expect(window.location.href).not.toContain(left);
+    }
+  });
+
+  it.each([
+    ['200', (answer: (r: Response) => void) => answer(json(200, {}))],
+    ['a refusal', (answer: (r: Response) => void) => answer(cognitoError('UnauthorizedException', 'no'))],
+    ['no network', (_answer: (r: Response) => void, reject: (e: unknown) => void) => reject(new TypeError('fetch failed'))],
+  ])('a second person signs in while the first one\'s sign-out is still unanswered: the frame is theirs, also after %s', async (_name, settle) => {
+    // Cognito answers each sign-in; the revocation waits for the test.
+    let answer: (r: Response) => void = () => {};
+    let reject: (e: unknown) => void = () => {};
+    fetchMock.mockImplementation((url: string, init: RequestInit) => {
+      if (url !== CONFIG.cognitoUrl) return unanswered();
+      const body = JSON.parse(String(init.body)) as { AuthParameters?: { USERNAME: string } };
+      if (body.AuthParameters) return Promise.resolve(tokensFor(body.AuthParameters.USERNAME, body.AuthParameters.USERNAME === 'admin' ? 'admin' : 'user'));
+      return new Promise<Response>((resolve, refuse) => {
+        answer = resolve;
+        reject = refuse;
+      });
+    });
+    shell = runShell(CONFIG);
+    signIn('alice', 'Secret-Pass-1!');
+    await vi.waitFor(() => expect(find('#app .username').textContent).toBe('alice'));
+    find('#app .sign-out').click();
+
+    signIn('admin', 'Secret-Pass-1!');
+    await vi.waitFor(() => expect(find('#app .role').textContent).toBe('Administrator'));
+    const page = html();
+    expect(page).not.toContain('alice');
+
+    // The first person's revocation ends, one way or another: nothing of the page changes.
+    settle(answer, reject);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(find('#app').hidden).toBe(false);
+    expect(find('#app .username').textContent).toBe('admin');
+    expect(html()).toBe(page);
   });
 
   it('the automatic refresh runs: one minute before the expiry the session is renewed and the frame stays', async () => {

@@ -428,7 +428,7 @@ of `frontend/src/services/`, as a screen will (`docs/FRONTEND_SERVICES.md` secti
 
 `AssistantService` (`frontend/src/services/assistant.service.ts`) is the one service that does
 not have a stream per method. Its six calls speak of one thing, the person's conversation, so
-they all notify on **one stream, `outcome$`** (`docs/FRONTEND_SERVICES.md` sections 3.4 and 20).
+they all notify on **one stream, `outcome$`** (`docs/FRONTEND_SERVICES.md` sections 3.4 and 21).
 
 | Method | Route |
 |---|---|

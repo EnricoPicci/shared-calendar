@@ -1,0 +1,29 @@
+# SAM CLI settings for the hosting's stack (docs/FRONTEND_ARCHITECTURE.md section 13.2). Each
+# [env.command.parameters] section holds the flags that would otherwise be typed on the command
+# line. Read by sam validate and by sam deploy, which npm run deploy -w frontend
+# (scripts/deploy.sh) runs; that script also reads the stack's name and region from here.
+version = 0.1
+
+# eu-north-1: the account's organization allows regional services only there, and the back
+# end's stack, whose user pool the page signs in to, is there too.
+[default.global.parameters]
+stack_name = "shared-calendar-web"
+region = "eu-north-1"
+
+[default.validate.parameters]
+lint = true
+
+# Nothing more is needed to deploy this template: it has no code to package and is far below
+# the size (51,200 bytes) from which CloudFormation wants a template uploaded, so sam deploy
+# sends it as it is and no bucket for artifacts is named or created; and it creates no role, so
+# no "capabilities" line. The change set is shown and must be confirmed. A release of the page
+# that changes no resource of the stack is not a failure: sam says so and the deploy script goes
+# on to the upload (fail_on_empty_changeset).
+# ApiDomain is deliberately not here: the deploy script reads it from the back end's stack at
+# every run and passes it on the command line. PageDomain and PageCertificateArn (a name of
+# our own for the page and its certificate) are not here either: the deploy script takes them
+# from the environment (PAGE_DOMAIN, PAGE_CERTIFICATE_ARN) the one time they are given, and
+# the stack keeps them.
+[default.deploy.parameters]
+confirm_changeset = true
+fail_on_empty_changeset = false

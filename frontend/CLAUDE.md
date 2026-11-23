@@ -2,15 +2,16 @@
 
 Package `frontend`: the browser's services layer and its view layer, both complete for the
 calendar; the assistant is a panel at the bottom of every screen, not a screen
-(`docs/FRONTEND_ARCHITECTURE.md` section 6.1). It runs locally and is deployed nowhere. This
-file adds to the root `CLAUDE.md`, whose rules all apply here. Paths in this file are relative to `frontend/`.
+(`docs/FRONTEND_ARCHITECTURE.md` section 6.1). It runs locally and is deployed as the stack
+`shared-calendar-web` (`docs/FRONTEND_ARCHITECTURE.md` section 13). This file adds to the root
+`CLAUDE.md`, whose rules all apply here. Paths in this file are relative to `frontend/`.
 
 What each file holds is in the documents, not here: the services in
 `docs/FRONTEND_SERVICES.md`; the page, the views and the shell in
 `docs/FRONTEND_ARCHITECTURE.md` sections 4 and 6; the logic layer in its section 5.1 (one row
 per file); the sizes in its section 7.1. The layout: `docs/FOLDER_STRUCTURE.md` section 7. The
-commands in full (`dev`, `seed:local`, `build`, the integration tests): `docs/COMMANDS.md`
-sections 4 and 5.
+commands in full (`dev`, `seed:local`, `build`, the integration tests, `deploy`):
+`docs/COMMANDS.md` sections 4, 5 and 6.
 
 After a change to the view layer, the check to repeat is the walk, `docs/FRONTEND_WALK.md`, by
 hand in a browser; when a screen changes what one of its checks says, the check changes in the
@@ -20,13 +21,13 @@ when those files are touched (`.claude/rules/frontend-views.md`).
 ## Folder map
 
 - `package.json` (deps `rxjs`, `@shared-calendar/shared`; dev dep `happy-dom`; scripts `dev`,
-  `build`, `seed:local`, `typecheck`, `lint`, `test:unit`, `test:integration`, `verify`; no
+  `build`, `seed:local`, `typecheck`, `lint`, `test:unit`, `test:integration`, `verify`,
   `deploy`), `tsconfig.json` (ES2022 + DOM + DOM.Iterable, no node types), `vitest.config.ts`.
-  No `template.yaml`: the hosting waits for the open points of `docs/FRONTEND_ARCHITECTURE.md`
-  section 10.
+  `template.yaml` (the hosting: a private bucket behind a CloudFront distribution) and
+  `samconfig.toml` (its stack's name and region).
 - `src/services/`: `session.store.ts`; `cognito.ts`, `api.ts` and `jwt.ts`, the building
   blocks; then one `<name>.service.ts` + `<name>.types.ts` per service: `login`, `refresh`,
-  `hello`, `users`, `calendar-settings`, `availability-types`, `availability-rules`,
+  `logout`, `hello`, `users`, `calendar-settings`, `availability-types`, `availability-rules`,
   `calendar`, `appointments`, `assistant`. One result/state pair per method, except `assistant`:
   one stream, `outcome$`, for its six calls. Input checked with the shared schemas before
   sending. Tokens live only in the `SessionStore`: no result, state or service field holds one.
@@ -53,11 +54,11 @@ when those files are touched (`.claude/rules/frontend-views.md`).
   `appointments.screen.ts`, `settings.screen.ts`, `users.screen.ts`, `availability.screen.ts`,
   `date.screen.ts`, `assistant.screen.ts`).
 - `scripts/` (Node, outside the browser's lint rules): `bundle.mjs`, `build.mjs`, `dev.mjs`,
-  `seed-local.mjs`.
+  `seed-local.mjs`; and `deploy.sh`, the release of the page (`npm run deploy -w frontend`).
 - `tests/unit/services/`, `tests/unit/logic/` (project `unit`, in node; `zone.ts`,
   `fixtures.ts`) and `tests/unit/views/` (project `views`, `happy-dom`; `page.ts`,
   `page.test.ts`, `shell.test.ts`) mirror `src/`; `tests/integration/` (`local.ts`,
-  `login.service.test.ts`, `journeys.test.ts`, `calendar.test.ts`; `assistant.test.ts`, against
+  `login.service.test.ts`, `journeys.test.ts`, `logout.service.test.ts`, `calendar.test.ts`; `assistant.test.ts`, against
   the fake Claude only: `claude.ts`, tested in `tests/unit/integration/`) runs the services
   against the local stack.
 - Generated, git-ignored: `coverage/`, `dist/`.

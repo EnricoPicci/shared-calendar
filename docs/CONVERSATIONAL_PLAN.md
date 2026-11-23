@@ -4,7 +4,7 @@
 |---|---|
 | Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`). **Step c09 done** 2026-11-22 (brief `prompts/a11-step-c09-implementation.md`). **Step c10 done** 2026-11-22 (brief `prompts/a12-step-c10-implementation.md`). **Step c11 done** 2026-11-22 (brief `prompts/a13-step-c11-implementation.md`). **Step c12 done** 2026-11-22 (brief `prompts/a14-step-c12-implementation.md`): the assistant is a panel at the bottom of every screen, not a screen, by a decision of the Product Owner. **Step c13 done** 2026-11-23 (brief `prompts/a15-step-c13-implementation.md`): the walk has the panel, open point P6 is closed as built |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown in its panel, deployed to `shared-calendar-api` and smoke-tested |
-| Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which is deployed nowhere today (open point P7, section 2.2). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
+| Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which has its own stack and plan (`docs/FRONTEND_DEPLOY_PLAN.md`); this plan only releases the page again after the back end (step c15). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
 
 ### Change log
@@ -67,7 +67,7 @@ this plan.
 | P4 | Effort level and model | c10 | **Closed** 2026-11-22: `claude-sonnet-5-5` at effort `low`, chosen by the Product Owner on three runs of the evaluation (the note under step c10) |
 | P5 | Blocking time by an override the model works out | c10 | **Closed** 2026-11-22: no `block_time` tool. The nine blocking requests of the evaluation proposed the right hours (the note under step c10) |
 | P6 | A typed "yes" drops the proposal | c13 | **Closed as built** 2026-11-23: in the Product Owner's sessions with the real model a typed answer changed nothing and the assistant pointed at the button; no list of words is added (the note under step c13) |
-| P7 | The front end is deployed nowhere | c16 | **Stays open**, on purpose: this plan does not deploy the front end. Step c12 makes the panel work locally through the dev server. Step c16 adds the assistant's routes to what `docs/FRONTEND_ARCHITECTURE.md` section 10 says a deployment must cover |
+| P7 | The front end is deployed nowhere | c16 | **Met by the page's hosting**, built apart from this plan (`docs/FRONTEND_DEPLOY_PLAN.md`, merged on 2026-11-23): the stack `shared-calendar-web` passes every path under `/api/` on to the API with all seven methods (`docs/FRONTEND_ARCHITECTURE.md` section 13.3), so the `/assistant` routes reach it as the others do. Seen at the deployed page in step c15, point 8 |
 
 ### 2.3 What planning found, each in its step
 
@@ -1239,7 +1239,7 @@ tests, three journeys with their pages, and the documents. Nothing changed in `b
 `frontend/src/views`, `index.html` and `style.css` are untouched.
 
 **Four decisions of the Product Owner, taken before the step**, written in
-`docs/FRONTEND_SERVICES.md` section 8 as decisions 46 to 49:
+`docs/FRONTEND_SERVICES.md` section 8 as decisions 59 to 62:
 
 1. **One stream for the conversation**: `AssistantService` has the one stream `outcome$`, and each
    of its six calls notifies its outcome on it with the call it answers. The pattern of
@@ -1253,7 +1253,7 @@ tests, three journeys with their pages, and the documents. Nothing changed in `b
    not touched.
 
 **The service** (`frontend/src/services/assistant.service.ts`, `assistant.types.ts`;
-`docs/FRONTEND_SERVICES.md` section 20). Six methods, `load`, `end`, `send`, `continue`,
+`docs/FRONTEND_SERVICES.md` section 21). Six methods, `load`, `end`, `send`, `continue`,
 `confirm`, `decline`, each one request through `apiCall`. The types of the contract are imported
 from `shared/` and none is declared again. What the step fixed that the text left open:
 
@@ -1333,8 +1333,8 @@ frontend` and needs no stack: the refusal was never shown by wiring the real Cla
 - The two diagrams of the new pages were rendered on a dark page and looked at
   (`.claude/rules/diagrams.md`). The scratch files are deleted; the stack is left on the fake.
 
-**The documents.** `docs/FRONTEND_SERVICES.md` v8: the note of section 3.4, rule 4 of section 2,
-decisions 46 to 49, sections 14.1, 14.7 and 14.8, the new section 20, and the corrected sentence
+**The documents.** `docs/FRONTEND_SERVICES.md` v9: the note of section 3.4, rule 4 of section 2,
+decisions 59 to 62, sections 14.1, 14.7 and 14.8, the new section 21, and the corrected sentence
 on the layer being complete (true of the routes the API had at v7).
 `docs/CONVERSATIONAL_ARCHITECTURE.md` v14: one sentence of section 13 proved wrong, "the result
 and state streams of the pattern", and was corrected. `docs/COMMANDS.md` section 4,
@@ -1365,7 +1365,7 @@ message, the other calls the messages added); the fake's three sentences and the
 **Goal:** the assistant in the web pages, for both roles, running in a browser against the
 local stack: **a panel at the bottom of every screen**, not a screen. The Product Owner decided
 it before any code, with the choices no document had made; they are written in
-`docs/FRONTEND_ARCHITECTURE.md` section 6.1 and its decisions 138 to 147, and in
+`docs/FRONTEND_ARCHITECTURE.md` section 6.1 and its decisions 159 to 168, and in
 `docs/CONVERSATIONAL_ARCHITECTURE.md` section 13:
 
 1. the panel on every screen once signed in, collapsed to one bar after every load of the
@@ -1444,7 +1444,7 @@ such stream: its row of `SCREENS` ends its `start()` and starts it again, so val
 not saved are lost.
 
 **Where the ten choices could not be applied as written, or were added to**
-(`docs/FRONTEND_ARCHITECTURE.md` section 11, decisions 140 and 148 to 151):
+(`docs/FRONTEND_ARCHITECTURE.md` section 11, decisions 161 and 169 to 172):
 
 - choice 3 said "the server's `error` sentence as given": the contract carries an error code
   there. The outcome reads "Not done." with the page's sentence for that code, and a sentence
@@ -1478,7 +1478,7 @@ gain `tpl-message` and `tpl-proposed`; a block of six tests checks the panel's m
     reload and a sign-in; the panel is then collapsed, and its first opening shows the same
     conversation after one request;
   - a message that got `503` **is counted** by the server against the day's limit, and the
-    line "N messages left today" is one too high until the next reply (decision 151);
+    line "N messages left today" is one too high until the next reply (decision 172);
   - after `fake: overloaded` the conversation stays at work on the server and the fake can
     never finish it: the check pressed "New conversation" before its next sentence;
   - the slot of the booking journey was taken by then, so the message that drops a proposal
@@ -1495,16 +1495,16 @@ gain `tpl-message` and `tpl-proposed`; a block of six tests checks the panel's m
 
 Documents: `docs/CONVERSATIONAL_ARCHITECTURE.md` v15 (section 13 rewritten, "the screen" become
 "the panel", decision 13, the separate screen among the alternatives);
-`docs/FRONTEND_ARCHITECTURE.md` v13 (section 6.1, two rows of section 5.1, section 9, decisions
-138 to 151); `docs/FOLDER_STRUCTURE.md`; `frontend/CLAUDE.md`; `.claude/rules/frontend-views.md`
-(the two counts). `docs/FRONTEND_SERVICES.md` section 20.6 and `docs/COMMANDS.md`: nothing
+`docs/FRONTEND_ARCHITECTURE.md` v19 (section 6.1, two rows of section 5.1, section 9, decisions
+159 to 172); `docs/FOLDER_STRUCTURE.md`; `frontend/CLAUDE.md`; `.claude/rules/frontend-views.md`
+(the two counts). `docs/FRONTEND_SERVICES.md` section 21.6 and `docs/COMMANDS.md`: nothing
 proved wrong.
 
 What step c13 finds ready: the panel on every screen, checked against the fake; the list of
 the browser check above, to turn into the checks of `docs/FRONTEND_WALK.md`; the three things
 only a person with the real model can judge (how the answers read in the panel's width, what
 a screen reader says of `.news`, whether people type instead of pressing: P6); and the two
-points of decision 151, to look at again with real answers.
+points of decision 172, to look at again with real answers.
 
 ---
 
@@ -1551,12 +1551,12 @@ browser showed the day first (`docs/FRONTEND_ARCHITECTURE.md` section 8).
 
 - After a message that got one of the two `503` answers the conversation is read once and not
   continued (`assistant.model.ts`, `assistant.screen.ts`; `docs/FRONTEND_ARCHITECTURE.md`
-  decision 151). Three existing tests of the logic said the opposite and were changed with it,
+  decision 172). Three existing tests of the logic said the opposite and were changed with it,
   and five cases were added.
 - Found by the walk, the heading's arrow was part of the button's name for a screen reader:
-  the style sheet now draws it with no words (decision 152).
+  the style sheet now draws it with no words (decision 173).
 - Found by the walk, a proposal pushed the last message out of sight: the view keeps the
-  conversation at its end (decision 153).
+  conversation at its end (decision 174).
 
 Each with its test; `npm run verify -w frontend` green, 100 % lines.
 
@@ -1607,7 +1607,9 @@ without the cloud.
 - `backend/scripts/smoke.sh` gains one exchange of the assistant, a read, as the throw-away
   user: a message, `continue` until `idle`, the conversation ended. Status and code printed,
   never a text. `npm run smoke -w backend -- local` passes against the fake.
-- `backend/scripts/deploy.sh`: the two new parameters reach the deployment.
+- `backend/scripts/deploy.sh`: the two new parameters reach the deployment. The script sources
+  the deploy gate's check, `scripts/deploy-gate.sh`, which the page's deploy shares: the gate
+  itself is not touched.
 - `docs/RUNBOOK.md`: the order for the operator. On Anthropic's side: a workspace of its own,
   its key, **the monthly spend limit**. On ours: deploy, the key's script, the smoke test,
   what to do when the 5xx alarm arrives for the assistant (the log line's outcome tells an
@@ -1647,6 +1649,11 @@ In order:
 7. One exchange by hand in each language, as the Administrator, against the cloud; the log
    lines of those steps read: the fields of `docs/CONVERSATIONAL_ARCHITECTURE.md` section
    10.1 and no text.
+8. The page released again from the same commit, `npm run deploy -w frontend` (its `--dry-run`
+   first, then the release, each with its own go): until then the deployed page has no panel.
+   At the deployed page, the panel's short walk (`docs/FRONTEND_WALK.md` section 7) and "Sign
+   out" while an answer is awaited. The assistant's functions stop at 29 s and the
+   distribution waits 30 s for the API: a step that runs long shows here first.
 
 **Acceptance:** the smoke test PASS on every line, in the cloud; P1 and P2 written as closed
 in `docs/CONVERSATIONAL_ARCHITECTURE.md` section 18.2; the deployment recorded in
@@ -1664,9 +1671,8 @@ AWS bill's forecast is unchanged.
   cost with Anthropic as the first real cost, the observability.
 - `docs/CONVERSATIONAL_ARCHITECTURE.md`: status "implemented and merged; the architecture wins";
   every open point with its outcome.
-- **P7**, recorded as still open: `docs/FRONTEND_ARCHITECTURE.md` section 10 says that a
-  deployment of the front end must cover the `/assistant` routes with the same origin or CORS
-  answer as the others. Nothing is built for it.
+- **P7**, recorded as met: the page's hosting passes `/api/assistant/…` on like every other
+  route (`docs/FRONTEND_ARCHITECTURE.md` section 13.3), as seen in step c15, point 8.
 - `docs/FRONTEND_SERVICES.md`, `docs/FRONTEND_ARCHITECTURE.md`, `docs/FOLDER_STRUCTURE.md`,
   `docs/COMMANDS.md`, `docs/RUNBOOK.md`, `README.md`: in line with what was built.
 - `CLAUDE.md`, `backend/CLAUDE.md`, `frontend/CLAUDE.md`, `shared/CLAUDE.md`: the new hard
@@ -1705,7 +1711,7 @@ does), c09 (the back end), c10 (the model judged), c13 (the panel), c15 (deploye
 
 | Open point | P1 | P2 | P3 | P4 | P5 | P6 | P7 |
 |---|---|---|---|---|---|---|---|
-| Step | c15 | c15 | c09 | c10 | c10 | c13 | c16, stays open |
+| Step | c15 | c15 | c09 | c10 | c10 | c13 | c15, met by the page's hosting |
 
 ## 7. Risks
 

@@ -38,7 +38,8 @@ the scripts themselves win, and this document is fixed.
 - `npm run typecheck -w frontend`, `npm run lint -w frontend`, `npm run test:unit -w frontend`
   (the vitest projects `unit`, in node, and `views`, in `happy-dom`, with one coverage report:
   100 % line coverage on `frontend/src`, only `src/main.ts` left out), `npm run verify -w frontend`
-  (the three in order, stops at the first failure).
+  (the three in order, then `sam validate --lint` on `frontend/template.yaml`; stops at the first
+  failure; no Docker, but the SAM CLI, any version that lints).
 - `npm run audit -w backend`: `npm audit --audit-level=high` (covers the whole repository: one
   lock file).
 - `sam validate --lint` (inside `backend/`): checks `template.yaml`.
@@ -263,9 +264,10 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
   which refuses any endpoint but `localhost`/`127.0.0.1`): calendar data made by hand is lost
   when they run.
 - `RUN_INTEGRATION=1 npm run test:integration -w frontend`: runs `frontend/tests/integration`
-  (`login.service.test.ts`, `journeys.test.ts`, `calendar.test.ts` and `assistant.test.ts`: the
-  services against cognito-local on 9229 and the API on 3000, `docs/FRONTEND_SERVICES.md`
-  section 14). Needs
+  (`login.service.test.ts`, `journeys.test.ts`, `logout.service.test.ts`, `calendar.test.ts` and
+  `assistant.test.ts`: the services against cognito-local on 9229 and the API on 3000,
+  `docs/FRONTEND_SERVICES.md` section 14; the sign-out's is its section 20.9: `alice` only, no
+  table touched, every session it opens signed out at its end). Needs
   `local:up` + `local:api` running and, in a Codespace, the iptables rule of section 3.3.
   Without `RUN_INTEGRATION=1` it runs nothing and exits 0, like the back end's. Creates and
   removes the throw-away users `fe-journey`, `fe-calendar` and `fe-calendar-b` (removed first
@@ -329,13 +331,16 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
     after a reload of the page; an edit to `dev.mjs` itself needs a restart).
   - Passes `/api/…` on to `http://127.0.0.1:3000` and `/cognito/…` to `http://localhost:9229` so
     that the browser sees one origin (the API has no CORS), sends
-    `Content-Security-Policy: default-src 'self'` with the page, listens on `127.0.0.1` only and
-    never prints a request's body or headers.
+    `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'none'` with
+    the page (so a preview pane that is a frame shows nothing: open a browser tab), listens on
+    `127.0.0.1` only and never prints a request's body or headers.
   - The console's one known report is `zod`'s `eval` probe (`docs/FRONTEND_ARCHITECTURE.md`
     section 10, open point O5). A reload of the page signs out
     (`docs/FRONTEND_ARCHITECTURE.md` section 10, open point O3).
-  - In a Codespace, open the forwarded port 5173: the bundle's addresses have no host, so any
-    origin works.
+  - In a Codespace, open the forwarded port 5173 in a browser tab ("Open in Browser" in the list
+    of ports, then "Continue" on GitHub's notice; not the editor's preview pane, which is a
+    frame): the bundle's addresses have no host, so any origin works. The server must be
+    running: nothing answers on the port otherwise.
 - Stopping a background `dev` by name: `pkill -f 'node scripts/dev[.]mjs'`, in a command that
   holds no other text matching it (a shell whose command line matches is killed too).
 - `npm run seed:local -w frontend` (`frontend/scripts/seed-local.mjs`): gives the local calendar
@@ -360,9 +365,9 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
 - `API_URL=… COGNITO_URL=… CLIENT_ID=… npm run build -w frontend` (`frontend/scripts/build.mjs`):
   writes `frontend/dist/` (git-ignored, emptied first): `index.html`, `style.css`, `app.js`
   (minified) and `app.js.map`, and prints their sizes. The three values come from the
-  environment only, never from a committed file; a missing one stops the build and is named. No
-  deploy of the front end exists (hosting is `docs/FRONTEND_ARCHITECTURE.md` section 10, open
-  point O1), and `backend`'s `build` is another thing (`sam build`).
+  environment only, never from a committed file; a missing one stops the build and is named. The
+  front end's deploy command runs it with the stack's values (section 6); `backend`'s `build` is
+  another thing (`sam build`).
 
 ## 6. The cloud and the operator's scripts
 
@@ -371,24 +376,47 @@ Every command of this section that names a stack acts on a real AWS account. `CL
 
 - **The stack in use:** `shared-calendar-api` in `eu-north-1` (the organization's policy blocks
   regional services in every other region); its tables are `shared-calendar-api-calendar` and
-  `shared-calendar-api-hello-messages`. The old stack `hello-world-api` stays, untouched, as the
-  way back until `docs/IMPLEMENTATION_PLAN.md` step 58: nothing is deployed to it.
+  `shared-calendar-api-hello-messages`. The page is the stack `shared-calendar-web` (a private
+  bucket behind a CloudFront distribution, `docs/FRONTEND_ARCHITECTURE.md` section 13), in the
+  same region and account. The old stack `hello-world-api` is deleted
+  (`docs/IMPLEMENTATION_PLAN.md` step 58); both deploy scripts refuse its name.
 - **Signing in:** the operator signs in with IAM Identity Center:
   `export AWS_PROFILE=shared-calendar-admin`, and when the session expires
   `aws sso login --profile shared-calendar-admin --use-device-code` (device code: the Codespace
-  has no local browser callback). The old profile `hello-admin` (SSO session `hello`) stays
-  beside it until `docs/IMPLEMENTATION_PLAN.md` step 58.
+  has no local browser callback). The old profile `hello-admin` (SSO session `hello`) is no
+  longer used; it may still be in the operator's `~/.aws/config` (`docs/RENAME_PLAN.md`).
 - **Targets.** A stack target reads its ids from the CloudFormation outputs (read-only
   `describe-stacks`) in `samconfig.toml`'s region unless `AWS_REGION` is set. `local` uses
   `env.local.json` and dummy credentials.
 - `npm run deploy -w backend`: refuses (exit 1, names the reason) unless `.verify-ok` is younger
   than 30 minutes, names HEAD and says `clean`, and the whole repository's tree is still clean
-  (front-end work in progress blocks a back-end deploy too); then `npm run build` and
+  (front-end work in progress blocks a back-end deploy too; the check is `scripts/deploy-gate.sh`,
+  which both deploy scripts source); then `npm run build` and
   `sam deploy` with the default config env. Extra arguments go to `sam deploy` (first deploy of
   a stack: `npm run deploy -w backend -- --parameter-overrides AlertEmail=<address>`; later
   deploys reuse the stored value). Never put an e-mail address in `samconfig.toml`: the repo is
-  public. Refuses any argument naming the old stack `hello-world-api` (`docs/RENAME_PLAN.md`
-  section 4.2: its tables would be replaced).
+  public. Refuses any argument naming the deleted stack `hello-world-api` (`docs/RENAME_PLAN.md`
+  section 6.3: sam would create a second, empty stack under the old name).
+- `npm run deploy -w frontend` (`frontend/scripts/deploy.sh`, `docs/FRONTEND_ARCHITECTURE.md`
+  section 13.6): releases the page; the procedure is `docs/RUNBOOK.md` section 2, step 6. In
+  order: the deploy gate (the same stamp `backend/.verify-ok` as the back end's deploy),
+  `npm run verify -w frontend`, a read of the back end's stack (`ApiUrl`, `UserPoolClientId`;
+  stack name and region from the two `samconfig.toml`, which must name one region; `AWS_REGION`
+  wins), `sam deploy` of `frontend/template.yaml` to the stack `shared-calendar-web` with
+  `ApiDomain` (change set confirmed; no `sam build`, no bucket for artifacts; a release that
+  changes no resource asks nothing), a read of its outputs, the build (`API_URL=/api`), four
+  `aws s3 cp` by name with content type and `Cache-Control: no-cache` (`index.html` last; never
+  `sync` or `--delete`: the bucket's policy names four objects), an invalidation of `/*` that it
+  waits for, and four checks with curl and no credentials, PASS or FAIL each (`/` 200 with the
+  Content-Security-Policy, `/app.js` 200, `/api/calendar` 401 and `/api/no-such-route` 404 with
+  the API's JSON).
+  - Its only argument is `--dry-run`: the gate, `verify`, the read, the build, then what it would
+    deploy, upload, invalidate and check; it changes nothing and does not need the hosting's
+    stack. **No switch skips the gate**, for the dry run neither.
+  - The page's own name: `PAGE_DOMAIN` and `PAGE_CERTIFICATE_ARN` (`docs/CUSTOM_DOMAIN.md`).
+  - It refuses any argument naming `hello-world-api`, and takes and prints no token and no
+    password. A fifth file of the page is a change to the bucket's policy in the template and
+    to the script's list.
 - `npm run bootstrap-admin -w backend -- <stack|local>`: sets the admin password (hidden prompt,
   twice, pool policy checked first). Only sets the password. Reads stdin, so
   `printf '%s\n%s\n' "$pw" "$pw" | npm run bootstrap-admin -w backend -- local` works in tests.

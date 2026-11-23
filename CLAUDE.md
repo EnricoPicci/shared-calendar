@@ -12,8 +12,8 @@ World" route for registered users proves the chain API, authorizer, Lambda, Dyna
 TypeScript, AWS Lambda, API Gateway (HTTP API), Amazon Cognito, DynamoDB, deployed with AWS SAM.
 
 The repository is an npm-workspaces monorepo: the back end in `backend/`, the browser front end
-in `frontend/` (a services layer and a view layer; it runs locally and is deployed nowhere),
-and the code both share in `shared/` (package `@shared-calendar/shared`).
+in `frontend/` (a services layer and a view layer; it runs locally and is deployed as the stack
+`shared-calendar-web`), and the code both share in `shared/` (package `@shared-calendar/shared`).
 
 ## Where the truth lives
 
@@ -28,26 +28,25 @@ part you touch.
 - `docs/FRONTEND_SERVICES.md`: the truth for the front end's services layer.
 - `docs/FRONTEND_ARCHITECTURE.md`: the truth for the front end's view layer: the rules of a
   view (its section 3), the shape of a dialog and of a form (4), the logic layer (5.1), the
-  shell (6), the tests (8), the open points before a deployment (10), the tooling (12).
+  shell (6), the tests (8), the open points (10), the tooling (12), the page's hosting (13).
 - `docs/FOLDER_STRUCTURE.md`: the layout and where a new file goes.
 - `docs/CONVERSATIONAL_ARCHITECTURE.md`, `docs/CONVERSATIONAL_PLAN.md`: the assistant, under way.
-- `docs/RENAME_PLAN.md`: the move from the "hello-world" names to "shared-calendar". The stack
-  in use is `shared-calendar-api`; the old stack `hello-world-api` (profile `hello-admin`)
-  stays untouched as the way back until `docs/IMPLEMENTATION_PLAN.md` step 58. The Hello World
-  feature (`/hello`, its table `…hello-messages`) keeps its name.
+- `docs/RENAME_PLAN.md`: the move to the "shared-calendar" names (`hello-world-api` is deleted);
+  the Hello World feature (`/hello`, its table `…hello-messages`) keeps its name.
 - `prompts/`: the numbered briefs behind the documents and the code. Number new ones in sequence.
 
 Not sources of truth; when one disagrees with the documents above or with the tests, it is the
 one that is fixed:
 
 - `README.md` (the newcomer's entry point), `docs/COMMANDS.md` (every command with its notes,
-  the local stack's quirks), `docs/RUNBOOK.md` (what the operator does, in order).
+  the local stack's quirks), `docs/RUNBOOK.md` and `docs/CUSTOM_DOMAIN.md` (the operator's steps).
 - `docs/FRONTEND_WALK.md`: every screen walked by hand in a browser; the check to repeat after
   a change to the view layer.
 - `docs/journeys/`: the integration journeys in simple words, one page per `describe` block,
   written and checked with the project skill `explain-journey`. When a journey changes, its
   page changes in the same commit.
-- `docs/FRONTEND_VIEW_PLAN.md` and `docs/FRONTEND_VIEW_OPTIONS.md`: records of finished work.
+- `docs/FRONTEND_VIEW_PLAN.md`, `docs/FRONTEND_VIEW_OPTIONS.md`, `docs/FRONTEND_DEPLOY_PLAN.md`:
+  records of finished work.
 
 ## Working rhythm
 
@@ -75,13 +74,14 @@ one that is fixed:
 
 ## Cloud safety
 
-- Never run `sam deploy`, `sam delete`, `npm run deploy`, `npm run budget` or an `aws` command
-  that creates, changes or deletes resources unless explicitly instructed in the current request.
-- `npm run verify -w backend` (all local tests) must be green before any deployment. The deploy
-  script enforces this; do not bypass it.
-- Nothing is ever deployed to the old stack `hello-world-api`: its tables would be replaced.
-- Cloud: stack `shared-calendar-api` in `eu-north-1`, profile `shared-calendar-admin`
-  (`aws sso login --profile shared-calendar-admin --use-device-code` when the session expires).
+- Never run `sam deploy`, `sam delete`, `npm run deploy` (`-w backend` or `-w frontend`),
+  `npm run budget` or an `aws` command that creates, changes or deletes resources unless
+  explicitly instructed in the current request.
+- `npm run verify -w backend` (all local tests) must be green before any deployment, of the API
+  or of the page. Both deploy scripts enforce this (`scripts/deploy-gate.sh`); do not bypass it.
+- Cloud: stacks `shared-calendar-api` (the API) and `shared-calendar-web` (the page) in
+  `eu-north-1`, profile `shared-calendar-admin` (`aws sso login --profile shared-calendar-admin
+  --use-device-code` when the session expires).
 - Local development uses the Docker stack (DynamoDB Local, dynamodb-admin, cognito-local, a
   fake Claude) and `sam local start-api`, and needs no AWS account.
 
@@ -125,7 +125,7 @@ npm ci                                              # at the root only, never in
 npm run typecheck                                   # every package
 npm run lint                                        # every package, and the comment rule
 npm run test:unit                                   # every package, no Docker
-npm run verify -w frontend                          # the three above for the front end, no Docker
+npm run verify -w frontend                          # the three above, then lints its template
 
 DYNAMODB_PORT=8002 npm run local:up -w backend      # the emulators, seeded; idempotent
 npm run local:api -w backend                        # the API on http://127.0.0.1:3000, foreground

@@ -26,7 +26,7 @@ Ideas used here, explained once for all journeys:
   (`docs/CONVERSATIONAL_ARCHITECTURE.md` sections 5.4 and 5.5, rule 1).
 - The service refuses an id that is not a ULID before sending anything; an id of no proposal is
   sent, and the API answers `proposal_not_found`, a reason of its own
-  (`docs/FRONTEND_SERVICES.md` sections 20.4 and 20.5).
+  (`docs/FRONTEND_SERVICES.md` sections 21.4 and 21.5).
 - A proposal is settled once: a second `confirm` or `decline` finds none
   (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 5.5, rule 6).
 - The appointment made through the assistant is an ordinary appointment: `AppointmentsService`

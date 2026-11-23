@@ -14,7 +14,7 @@ import type {
 } from './assistant.types';
 import type { SessionStore } from './session.store';
 
-// The person's conversation with the assistant (docs/FRONTEND_SERVICES.md section 20): the six
+// The person's conversation with the assistant (docs/FRONTEND_SERVICES.md section 21): the six
 // routes of docs/CONVERSATIONAL_ARCHITECTURE.md section 6, for both roles. The six calls speak of
 // one thing, so they notify on one stream: each outcome says which call it answers and carries
 // the server's reply as given, or the reason of the failure. A call makes one request: repeating
@@ -168,7 +168,7 @@ function checkedProposalId(proposalId: string): string | ApiFailure<'invalid_req
   return invalidRequest({ issues: parsed.error.issues.map((issue) => ({ path: ['proposalId'], message: issue.message })) });
 }
 
-// The check of a reply (docs/FRONTEND_SERVICES.md section 20.5): a 200 whose body has the status,
+// The check of a reply (docs/FRONTEND_SERVICES.md section 21.5): a 200 whose body has the status,
 // the list of messages and the count of the day; the rest is trusted to the contract and passed on
 // as given.
 function toReply<K extends AssistantCall>(call: K, answer: ApiOk): { call: K; status: 'success'; reply: AssistantReply } | ({ call: K } & ApiFailure<never>) {

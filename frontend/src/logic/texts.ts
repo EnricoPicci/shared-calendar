@@ -142,7 +142,7 @@ const PLAIN_WORDS = new Map<string, string>([
   ['date_in_past', 'This date is now in the past, so it can no longer be changed.'],
   ['override_not_found', 'This day no longer has windows of its own: the weekly patterns apply.'],
   ['window_not_found', 'This extra window no longer exists.'],
-  // The assistant (docs/FRONTEND_SERVICES.md section 20.1): the three answers after which the
+  // The assistant (docs/FRONTEND_SERVICES.md section 21.1): the three answers after which the
   // panel reads the conversation again, so that it shows what the server holds; each sentence
   // says so. The three reasons for which the assistant cannot answer and a full conversation
   // have their sentences in shared/, in the conversation's language.

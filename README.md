@@ -16,7 +16,8 @@ and the username rule) in `shared/`, and in `frontend/` the front end: its servi
 (session store, login, token refresh, Hello World, user administration, the calendar;
 `docs/FRONTEND_SERVICES.md`) and its pages (`docs/FRONTEND_ARCHITECTURE.md`): the login, the
 week calendar, a User's appointments and the Administrator's settings, users and availability.
-They run locally (see "The page, locally" below); the front end is not deployed anywhere yet.
+They run locally (see "The page, locally" below) and are deployed: the page is in use at the
+address given under "The deployed stacks".
 
 Where the full story is:
 
@@ -24,10 +25,13 @@ Where the full story is:
 |---|---|
 | `docs/ARCHITECTURE.md` | What was built and why: API contract, data model, security, local stack, deployment |
 | `docs/IMPLEMENTATION_PLAN.md` | In which order it was built, with an acceptance check per step |
-| `docs/RUNBOOK.md` | What the operator does: daily start, updating the stack, deploying from scratch |
+| `docs/RUNBOOK.md` | What the operator does: daily start, updating the API's stack, releasing the page, deploying from scratch; the record of every deployment |
 | `docs/AWS_ACCOUNTS.md` | Which AWS identity to sign in with, and why |
 | `docs/FOLDER_STRUCTURE.md` | The monorepo layout (back end, front end, shared): which folder holds what, and how the pieces are built |
-| `docs/FRONTEND_SERVICES.md` | The front end's services layer: `SessionStore`, `LoginService`, `RefreshService`, `HelloService`, `UsersService` (implemented in `frontend/src/services/`) |
+| `docs/FRONTEND_SERVICES.md` | The front end's services layer: the `SessionStore` and one service per remote call (login, refresh, logout, Hello World, users, the calendar), in `frontend/src/services/` |
+| `docs/FRONTEND_ARCHITECTURE.md` | The front end's pages: how a view is written, the logic between the services and the views, the shell; and how the page is hosted and deployed (its section 13) |
+| `docs/FRONTEND_DEPLOY_PLAN.md` | In which order the hosting was built and deployed (steps 70 to 73; done, with a few checks at the deployed page still owed, listed in `docs/RUNBOOK.md` section 5.5) |
+| `docs/FRONTEND_WALK.md` | The walk through every screen in a browser, by hand: the check to repeat after a change to the pages |
 | `docs/journeys/` | The integration journeys explained in simple words, one page per `describe` block (index in `docs/journeys/README.md`) |
 | `docs/COMMANDS.md` | The complete list of commands, with the notes that go with each, and the local stack's quirks |
 | `CLAUDE.md` | Working rules for Claude Code (one more per package: `backend/CLAUDE.md`, `frontend/CLAUDE.md`, `shared/CLAUDE.md`; path-scoped rules in `.claude/rules/`) |
@@ -54,12 +58,15 @@ between containers, and the authorizer then times out fetching the signing keys.
 sudo iptables-legacy -I FORWARD -i br-+ -o br-+ -j ACCEPT
 ```
 
-## The deployed stack
+## The deployed stacks
 
-The stack in use is `shared-calendar-api`, created on 2026-11-16 by `docs/IMPLEMENTATION_PLAN.md`
-step 57. The old stack `hello-world-api` (profile `hello-admin`) stays, untouched, as the way back
-until step 58 retires it (`docs/RENAME_PLAN.md` section 4.2); its ids keep working until then, but
-nothing new goes there.
+Two stacks, in one region and one account: the API's and the page's. The page's is never part of
+the API's: a release of the page changes nothing of the API.
+
+The API's stack is `shared-calendar-api`, created on 2026-11-16 by `docs/IMPLEMENTATION_PLAN.md`
+step 57. The old stack `hello-world-api`, which it replaced, was deleted on 2026-11-21
+(`docs/IMPLEMENTATION_PLAN.md` step 58; the record is `docs/RUNBOOK.md` section 5.4): its
+address and its ids no longer exist.
 
 | | |
 |---|---|
@@ -75,6 +82,31 @@ The three ids are not secrets; they come from `sam list stack-outputs --stack-na
 To talk to the stack from the CLI: `export AWS_PROFILE=shared-calendar-admin`, and when the session
 has expired `aws sso login --profile shared-calendar-admin --use-device-code` (`docs/AWS_ACCOUNTS.md`).
 
+The page's stack is `shared-calendar-web`, created on 2026-11-21 by `docs/FRONTEND_DEPLOY_PLAN.md`
+step 72: a private S3 bucket that holds the four built files, behind a CloudFront distribution
+that also passes `/api/…` on to the API, so that a browser sees one address
+(`docs/FRONTEND_ARCHITECTURE.md` section 13).
+
+| | |
+|---|---|
+| Stack | `shared-calendar-web` (same region, same CLI profile) |
+| **The page** (output `PageUrl`) | **https://dfhghsvimmgfm.cloudfront.net** |
+| Bucket (output `BucketName`) | `shared-calendar-web-pagebucket-pmpsh2fgyi1j` (private: its own address answers 403) |
+| Distribution (output `DistributionId`) | `E2V5GRRPLMET12` |
+
+None of the three is a secret; they come from `sam list stack-outputs --stack-name shared-calendar-web`.
+The address is the one AWS gave the distribution, and a new distribution would get a new one.
+
+**Signing in at the page.** Open the address and give a username and its password. `admin` is
+the Administrator; its password is the one set with `bootstrap-admin` ("The administrator's
+password" below). Every other person is a User the Administrator creates, on the page's "Users"
+screen or with `POST /users`: the generated password is shown once and handed over out of band.
+The screens are those of the table under "The page, locally". A reload of the page signs out;
+"Sign out" also tells Cognito to end the session.
+
+What has been seen at the deployed page and what has not yet been looked at there is in
+`docs/RUNBOOK.md` section 5.5 (the record of the first deployment, with its open items).
+
 ## Commands
 
 Once, after cloning, at the repository root: `nvm use && npm ci` (installs all packages, one
@@ -87,7 +119,8 @@ in `backend/` (from inside `backend/`, drop `-w backend` and the `--` before arg
 | `npm run local:api -w backend` | Builds the functions and serves the API on `http://127.0.0.1:3000` (foreground; wait for `Running on http://127.0.0.1:3000`) |
 | `DYNAMODB_PORT=8002 npm run verify -w backend` | The deploy gate: typecheck, lint, audit, template lint, unit tests (of `backend` and `shared`), integration tests against the running local stack. On success writes `backend/.verify-ok` |
 | `npm run deploy -w backend` | Refuses unless `backend/.verify-ok` is younger than 30 minutes, names the current commit and says `clean`, and the tree is still clean. Then `sam build` and `sam deploy` (asks to confirm the change set). Uses your real AWS login |
-| `npm run smoke -w backend -- shared-calendar-api` | After every deploy: creates a throw-away user, runs the journeys against the real API, deletes the user. Prompts for the admin password. `npm run smoke -w backend -- local` runs the same against the local stack |
+| `npm run smoke -w backend -- shared-calendar-api` | After every deploy of the API: creates a throw-away user, runs the journeys against the real API, deletes the user. Prompts for the admin password. `npm run smoke -w backend -- local` runs the same against the local stack |
+| `npm run deploy -w frontend` | Releases the page: behind the same gate as the back end's deploy, it runs the front end's own checks, reads the API's address and the app client from the stack `shared-calendar-api`, deploys the hosting's stack `shared-calendar-web` (asks to confirm a change set only when a resource of the hosting changes), builds, uploads the four files and ends with four checks against the page's address, PASS or FAIL each. Uses your real AWS login. `npm run deploy -w frontend -- --dry-run` goes as far as the build, says what it would do and changes nothing. The procedure, and the order of the two deployments: `docs/RUNBOOK.md` section 2, step 6 |
 | `npm run local:down -w backend` | Stops the Docker stack. The table is in memory and is lost; Cognito data survives in `backend/.cognito/` |
 
 `npm run typecheck`, `npm run lint` and `npm run test:unit` at the root cover every package.
@@ -128,8 +161,9 @@ Good to know: the week is loaded again after every write and every time the brow
 becomes visible again; a reload of the page signs out, since the session is kept in memory
 only; an edit to `frontend/src`, `frontend/index.html` or `frontend/style.css` shows after a
 reload. The dev server passes the page's calls on to the local API and to cognito-local; it is
-for local work only, and the front end is not deployed anywhere yet (what stands between it
-and a deployment: `docs/FRONTEND_ARCHITECTURE.md` section 10).
+for local work only. The deployed page ("The deployed stacks" above) is the same page, built
+once and served by CloudFront, which passes its calls on to the real API
+(`docs/FRONTEND_ARCHITECTURE.md` section 13).
 
 **To check every screen after a change**: `docs/FRONTEND_WALK.md`, one list of checks to do
 by hand in the browser, as `alice` and as `admin`, from a fresh, seeded local stack.

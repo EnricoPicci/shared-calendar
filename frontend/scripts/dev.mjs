@@ -77,8 +77,11 @@ const server = createServer(async (req, res) => {
   try {
     if (url === '/') {
       // A strict policy: this origin's script and style sheet only, nothing inline
-      // (docs/FRONTEND_ARCHITECTURE.md section 3, rule 6).
-      const policy = { 'content-security-policy': "default-src 'self'" };
+      // (docs/FRONTEND_ARCHITECTURE.md section 3, rule 6), no other site may show the page in
+      // a frame, and the page may hold no <base> element. The words the deployed page gets
+      // (docs/FRONTEND_ARCHITECTURE.md section 13.4), without Cognito's address: here the
+      // login goes through this server.
+      const policy = { 'content-security-policy': "default-src 'self'; frame-ancestors 'none'; base-uri 'none'" };
       return send(res, 'text/html; charset=utf-8', await readFile(path('index.html')), policy);
     }
     if (url === '/style.css') return send(res, 'text/css; charset=utf-8', await readFile(path('style.css')));

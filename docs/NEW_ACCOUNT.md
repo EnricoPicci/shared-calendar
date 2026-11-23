@@ -176,6 +176,8 @@ the back-end workspace, `-w backend`): `local:up` + `local:api`, `npm run verify
 `npm run deploy -w backend -- --parameter-overrides AlertEmail=<address>`, confirm the SNS
 subscription e-mail, `npm run bootstrap-admin -w backend -- shared-calendar-api`,
 `npm run budget -w backend -- shared-calendar-api`, `npm run smoke -w backend -- shared-calendar-api`.
+Then the browser page, a second stack that needs the first: `npm run deploy -w frontend`
+(`docs/RUNBOOK.md` section 3.1). In a new account the page gets a new address.
 
 Two things are simpler than in the first account:
 
@@ -205,8 +207,9 @@ Propose and review before editing; none of these are urgent.
 ## 7. The old account
 
 Leave it alone until the new one is deployed and smoke-tested. Then, if you want it gone:
-sign in with the Builder ID at AWS Settings and close the project (`shared-calendar-api` stack
-first, `sam delete`, so nothing keeps billing). Closing it is the only way the Builder ID can
+sign in with the Builder ID at AWS Settings and close the project (the stacks first, so nothing
+keeps billing: `shared-calendar-web` as `docs/RUNBOOK.md` section 3.1 says, then
+`shared-calendar-api` with `sam delete`). Closing it is the only way the Builder ID can
 be deleted (`docs/AWS_ACCOUNTS.md` section 5). Not part of this guide; ask when you get there.
 
 ---

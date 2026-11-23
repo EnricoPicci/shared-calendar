@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v1 — plan, agreed with the Product Owner on 2026-11-16. Step 56 done 2026-11-16 (stage A); step 57 done 2026-11-16: `shared-calendar-api` created and in use, `hello-world-api` untouched (**stage B**, way back section 4.2; record in `docs/RUNBOOK.md` section 5.4). Next: step 58, when the PO decides |
+| Status | v1 — plan, agreed with the Product Owner on 2026-11-16. Step 56 done 2026-11-16 (stage A); step 57 done 2026-11-16: `shared-calendar-api` created and in use, `hello-world-api` untouched (stage B; record in `docs/RUNBOOK.md` section 5.4). **Step 58 done 2026-11-21: `hello-world-api` deleted, with its tables, its user pool and its budget (stage C; the record is in the same section).** The plan is done but for one point of section 6.3: the old profile is still in the operator's `~/.aws/config`. The text below is kept as written, as the record of the plan |
 | Date | 2026-11-16 |
 | Scope | Every name that says "hello-world" (or "hello" for the project as a whole) becomes a "shared-calendar" name: the cloud stack, its tables, the local Docker names, the AWS CLI profile, the documents. The Hello World feature stays. |
 | Plan steps | `docs/IMPLEMENTATION_PLAN.md` steps 56 (repository), 57 (new stack), 58 (old stack retired); step 59 (documentation and hand-over) follows them |
@@ -55,6 +55,9 @@ run step 57 soon after step 56.
 ---
 
 ## 4. The way back
+
+**Since 2026-11-21 the project is at stage C**: the old stack is deleted, sections 4.1 and 4.2
+can no longer be followed, and section 4.3 is what holds.
 
 ### 4.1 From stage A (renamed repository, old stack in use)
 
@@ -192,9 +195,15 @@ From now on the new stack is the one in use; the old one stays as the way back (
 
 New `ApiUrl`, `UserPoolId` and `UserPoolClientId`; the old ones keep working until step 58.
 Every user other than `admin` must be created again in the new pool (on 2026-11-16 there is none).
-No front end is deployed, so nothing else points at the old ids.
+No front end was deployed then, so nothing else pointed at the old ids. The page deployed on
+2026-11-21 (stack `shared-calendar-web`) talks to `shared-calendar-api` only, and its deploy
+command refuses the old stack: still nothing points at the old ids.
 
 ### 6.3 Step 58 — retire `hello-world-api`
+
+**Done on 2026-11-21**, points 1 to 5 (point 1 with no export, by the PO's decision, five days
+after step 57); the record is `docs/RUNBOOK.md` section 5.4. Point 6: the artifacts were deleted too. Point 7,
+the old profile, is not done. The step as planned:
 
 **When:** after the new stack has been in use for a while with no problem (the PO decides; one
 week is a reasonable minimum). Not urgent: both stacks fit the free tier together (section 7).
@@ -226,7 +235,8 @@ at a time, with the PO's go:
 Each stack provisions 11 read and 11 write units (`calendar` 10/10, `hello-messages` 1/1). Both
 stacks together: 22/22, still inside the always-free 25/25 (`docs/ARCHITECTURE.md` section 10).
 Lambda, API Gateway and Cognito stay within their free tiers at this load. A third stack (for
-example a test one) would cross the 25 units: stay at two at most.
+example a test one) would cross the 25 units: stay at two at most. Since step 58 (2026-11-21)
+there is one such stack again: 11/11.
 
 ## 8. Risks
 

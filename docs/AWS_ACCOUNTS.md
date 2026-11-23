@@ -6,8 +6,9 @@ when you do them.
 
 This repository is public. Account ids, e-mail addresses and the access portal URL are
 deliberately not written here. Find them in `~/.aws/config` (profile `shared-calendar-admin`, section
-`sso-session shared-calendar`; until `docs/IMPLEMENTATION_PLAN.md` step 58 also the old
-`hello-admin` / `sso-session hello`, same values) or in the console.
+`sso-session shared-calendar`) or in the console. A machine set up before 2026-11-16 may still
+hold the old sections `hello-admin` / `sso-session hello`, with the same values: the stack they
+were named after is deleted, and they can be removed.
 
 ---
 
@@ -28,7 +29,7 @@ The console's multi-account setup created an AWS Organization with three account
 | Account | Contains | Who signs in there |
 |---|---|---|
 | Management account | Billing, the Organization, IAM Identity Center (home region `us-east-1`). **Not the stack.** | Root, rarely |
-| **"Identity Delegated Admin"** | **The stack `shared-calendar-api`** (and, until `docs/IMPLEMENTATION_PLAN.md` step 58, the old `hello-world-api`) in `eu-north-1`: Lambda functions, HTTP API, Cognito user pool, DynamoDB table, alarms | Identity Center user, role `AdministratorAccess` |
+| **"Identity Delegated Admin"** | **The stack `shared-calendar-api`** in `eu-north-1`: Lambda functions, HTTP API, Cognito user pool, DynamoDB tables, alarms. **The stack `shared-calendar-web`**, the hosting of the browser page: an S3 bucket in `eu-north-1` and a CloudFront distribution (a global service) | Identity Center user, role `AdministratorAccess` |
 | "Side Quest Accepted" | Nothing | Nobody |
 
 How the daily login reaches the stack:
@@ -43,7 +44,7 @@ permission set "AdministratorAccess"
 account "Identity Delegated Admin"
    │  region eu-north-1
    ▼
-stack shared-calendar-api
+stacks shared-calendar-api (the API) and shared-calendar-web (the page)
 ```
 
 The organization policy allows regional services only in `eu-north-1`. In any other region the
@@ -63,8 +64,9 @@ Cognito users, the table and costs.
 2. Sign in as the Identity Center user (its own e-mail, password, MFA).
 3. Expand **"Identity Delegated Admin"** and click **AdministratorAccess**.
 4. In the console, set the region (top right) to **Europe (Stockholm) eu-north-1**.
-5. Now Lambda, API Gateway, Cognito, DynamoDB, CloudWatch and CloudFormation show the stack's
-   resources. Billing → Budgets also works here, because root once enabled "IAM user and role
+5. Now Lambda, API Gateway, Cognito, DynamoDB, S3, CloudWatch and CloudFormation show the stacks'
+   resources. CloudFront, where the page's distribution is, is a global service: its console
+   shows "Global" in the place of the region, and that is right. Billing → Budgets also works here, because root once enabled "IAM user and role
    access to Billing information".
 
 ### CLI (Codespace or laptop)

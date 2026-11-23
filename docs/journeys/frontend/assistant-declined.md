@@ -25,7 +25,7 @@ Ideas used here, explained once for all journeys:
   (`docs/CONVERSATIONAL_ARCHITECTURE.md` sections 5.4 and 5.5).
 - Declining is not a message of the day (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 6).
 - A declined proposal is gone: `confirm` and `decline` answer `proposal_not_found`, each as an
-  outcome of its own call (`docs/FRONTEND_SERVICES.md` section 20.3).
+  outcome of its own call (`docs/FRONTEND_SERVICES.md` section 21.3).
 
 ## Who takes part
 

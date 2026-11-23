@@ -1,5 +1,5 @@
 import { BehaviorSubject, Observable, ReplaySubject, Subscription, of } from 'rxjs';
-import { catchError, map, tap } from 'rxjs/operators';
+import { catchError, filter, map, tap } from 'rxjs/operators';
 import { describe, initiateAuth, toAuthOutcome, type AuthOutcome, type CognitoConfig } from './cognito';
 import type { LoginFailureReason, LoginResult, LoginState } from './login.types';
 import type { SessionStore } from './session.store';
@@ -11,9 +11,13 @@ import type { SessionStore } from './session.store';
 export type LoginConfig = CognitoConfig;
 
 export class LoginService {
-  // Pure reactive stream: outcomes only, replayed to late subscribers.
-  private readonly resultSubject = new ReplaySubject<LoginResult>(1);
-  readonly loginResult$: Observable<LoginResult> = this.resultSubject.asObservable();
+  // Pure reactive stream: outcomes only, replayed to late subscribers. The buffer of one cannot
+  // be emptied, so reset() overwrites it: `undefined` takes the place of the last outcome and
+  // is never passed on.
+  private readonly resultSubject = new ReplaySubject<LoginResult | undefined>(1);
+  readonly loginResult$: Observable<LoginResult> = this.resultSubject.pipe(
+    filter((result): result is LoginResult => result !== undefined),
+  );
 
   // State machine: idle → pending → success | failure → pending → …
   private readonly stateSubject = new BehaviorSubject<LoginState>({ status: 'idle' });
@@ -42,6 +46,17 @@ export class LoginService {
       // after one value, and a completed (or errored) subject ignores every later `next`, so the
       // second login would reach no one (docs/FRONTEND_SERVICES.md section 3.2).
       .subscribe((result) => this.resultSubject.next(result));
+  }
+
+  // Back to the first state, as when the service was created: no attempt in flight, `idle`, and
+  // no outcome to replay. The service lives as long as the page and its last outcome names a
+  // person, so a sign-out calls this (docs/FRONTEND_SERVICES.md section 4.4 and section 8,
+  // decision 53). The store is not touched.
+  reset(): void {
+    this.pending?.unsubscribe(); // an attempt in flight is aborted and never reports
+    this.pending = undefined;
+    this.resultSubject.next(undefined);
+    this.stateSubject.next({ status: 'idle' });
   }
 
   // Writes the session to the store first (docs/FRONTEND_SERVICES.md section 9.4), then returns the

@@ -1,5 +1,5 @@
 import { BehaviorSubject, EMPTY, Observable, ReplaySubject, Subscription, of, timer } from 'rxjs';
-import { catchError, map, switchMap, take, tap } from 'rxjs/operators';
+import { catchError, filter, map, switchMap, take, tap } from 'rxjs/operators';
 import { describe, initiateAuth, toAuthOutcome, type AuthFailureReason, type AuthOutcome, type CognitoConfig } from './cognito';
 import type { Session } from './login.types';
 import type { RefreshFailureReason, RefreshResult, RefreshState } from './refresh.types';
@@ -26,9 +26,12 @@ const REASON: Record<AuthFailureReason, RefreshFailureReason> = {
 };
 
 export class RefreshService {
-  // Pure reactive stream: outcomes only, replayed to late subscribers.
-  private readonly resultSubject = new ReplaySubject<RefreshResult>(1);
-  readonly refreshResult$: Observable<RefreshResult> = this.resultSubject.asObservable();
+  // Pure reactive stream: outcomes only, replayed to late subscribers. reset() overwrites the
+  // buffer of one with an `undefined` that is never passed on.
+  private readonly resultSubject = new ReplaySubject<RefreshResult | undefined>(1);
+  readonly refreshResult$: Observable<RefreshResult> = this.resultSubject.pipe(
+    filter((result): result is RefreshResult => result !== undefined),
+  );
 
   // State machine: idle → pending → success | failure → pending → …
   private readonly stateSubject = new BehaviorSubject<RefreshState>({ status: 'idle' });
@@ -78,6 +81,17 @@ export class RefreshService {
   stop(): void {
     this.schedule?.unsubscribe();
     this.schedule = undefined;
+  }
+
+  // Back to the first state: no refresh in flight, `idle`, and no outcome to replay. A success
+  // names the person signed in, so a sign-out calls this (docs/FRONTEND_SERVICES.md section 11.4
+  // and section 8, decision 53). A refresh in flight is aborted, so that its late answer cannot
+  // write that name back. The schedule of start() is left alone: it belongs to the page.
+  reset(): void {
+    this.pending?.unsubscribe();
+    this.pending = undefined;
+    this.resultSubject.next(undefined);
+    this.stateSubject.next({ status: 'idle' });
   }
 
   // Writes the store first, with the guarded replace or clear of docs/FRONTEND_SERVICES.md
