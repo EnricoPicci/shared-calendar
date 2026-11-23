@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`). **Step c09 done** 2026-11-22 (brief `prompts/a11-step-c09-implementation.md`). **Step c10 done** 2026-11-22 (brief `prompts/a12-step-c10-implementation.md`). **Step c11 done** 2026-11-22 (brief `prompts/a13-step-c11-implementation.md`). **Step c12 done** 2026-11-22 (brief `prompts/a14-step-c12-implementation.md`): the assistant is a panel at the bottom of every screen, not a screen, by a decision of the Product Owner. **Step c13 done** 2026-11-23 (brief `prompts/a15-step-c13-implementation.md`): the walk has the panel, open point P6 is closed as built |
+| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`). **Step c09 done** 2026-11-22 (brief `prompts/a11-step-c09-implementation.md`). **Step c10 done** 2026-11-22 (brief `prompts/a12-step-c10-implementation.md`). **Step c11 done** 2026-11-22 (brief `prompts/a13-step-c11-implementation.md`). **Step c12 done** 2026-11-22 (brief `prompts/a14-step-c12-implementation.md`): the assistant is a panel at the bottom of every screen, not a screen, by a decision of the Product Owner. **Step c13 done** 2026-11-23 (brief `prompts/a15-step-c13-implementation.md`): the walk has the panel, open point P6 is closed as built. **Step c14 done** 2026-11-23 (brief `prompts/a17-step-c14-implementation.md`): the key's script, the smoke test's exchange, the two parameters in `backend/samconfig.toml`, the runbook's section 3.2; nothing deployed |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown in its panel, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which has its own stack and plan (`docs/FRONTEND_DEPLOY_PLAN.md`); this plan only releases the page again after the back end (step c15). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
@@ -1619,6 +1619,72 @@ without the cloud.
 **Acceptance:** the gate green; `smoke local` passes with the new exchange; the script's
 refusals tried (no stack, the old stack); the runbook's section read through by the Product
 Owner.
+
+#### As done (2026-11-23)
+
+Brief `prompts/a17-step-c14-implementation.md`, with three decisions of the Product Owner: the
+daily limit in the cloud is 30, the spend limit on the Anthropic workspace 10 USD, the smoke
+test's sentence "What are the calendar's settings right now?". Nothing changed in
+`backend/src/`, `shared/`, `frontend/` or the template; nothing was deployed and no command
+changed the cloud. All of it on the fake Claude.
+
+**The key's script.** `npm run assistant-key -w backend -- <stack>`
+(`backend/scripts/assistant-key.sh`) stores the key as the SecureString
+`/<stack>/anthropic-api-key` with the account's default key, or replaces it after a `y`. The
+key is typed once without echo and goes on a pipe to `backend/scripts/parameters.mjs`, which
+reads stdin and makes one call, `PutParameter`, and prints an error's name only. Before it asks
+for the key it refuses five things, in this order: not one argument, `local`, `hello-world-api`
+(also as `--stack-name=hello-world-api`; any other argument starting with `-` too), a stack it
+cannot read, a stack without the parameter `AssistantModel`. Its last line describes the
+parameter (name, type, version, date) from `DescribeParameters`; nothing reads the value back.
+One change from the brief: when the parameter exists, the `y` is asked **before** the key, so
+that a key is not typed for nothing. Tried: no argument, two arguments, `local`,
+`hello-world-api` and `--stack-name=hello-world-api`, each refused with its message. **Not
+tried: the refusal of a stack without the assistant.** The profile `shared-calendar-admin` is
+not configured on the machine of the session, and `no-such-stack` and `shared-calendar-api`
+both stopped at "cannot read stack … (stack name, region, AWS login?)" for want of a login,
+before the key was asked for: true, but not the refusal the step meant to see. It is seen at
+the start of step c15, read-only, before the deployment.
+
+**The smoke test** gains the exchange, after the calendar journey and before journey 11: 26
+checks, 7 of them the assistant's (`docs/ARCHITECTURE.md` section 9.3). `npm run smoke -w
+backend -- local`: **26 PASS**, the exchange in 2 steps. A copy of the script kept outside the
+repository, whose sentence was the fake's "fake: the key is refused", gave the expected one
+FAIL, `503 assistant_unavailable: no key yet, or Anthropic unavailable`, and every other check
+passed: what step c15, point 4 expects before the key. The end of the conversation on an exit
+by Ctrl-C was not tried. The sentence was added to the fake's `answers.json`, mapped to the
+recorded answers `tool-get-settings` and `text-last-tool-result`, with a line of its `about`;
+the back end's assistant journeys, 99, passed with it.
+
+**No text in the log.** The kept output of `local:api` after the run: 0 lines with the
+sentence, 0 with the booking's note, 0 with `eyJ`. The exchange wrote one line per step:
+`POST /assistant/messages` with `outcome` `tool_requests`, tool `get_settings`, `steps` 1, and
+`POST /assistant/continue` with `outcome` `text`, `steps` 2; plus the lines of the two ends and
+the read of the conversation.
+
+**The two parameters** are written in `backend/samconfig.toml`: `AssistantModel`
+`claude-sonnet-5-5` and `AssistantDailyMessageLimit` `30`, each with its comment, and the trap
+of a `--parameter-overrides` on the command line, which replaces the whole list. Each name was
+read against the template's parameters and allowed values; `sam validate --lint` valid. The
+gate is not touched; `backend/scripts/deploy.sh` changed in its header comment only, which gave
+the trap's command as an example.
+
+**The runbook**: section 3.2 (Anthropic's side with P1 first, the order of the first
+deployment, P2, the 5xx alarm read by `outcome` and `reason`, the rotation), with the smoke
+test's count in section 2 and the first deploy's command in section 3 repeating the four
+parameters. A finding for P2, in the runbook: the log line cannot tell a missing key from one
+the function may not read, both are `reason` `key_missing`, so after the script has stored the
+key `key_missing` means the read was refused.
+
+Also: `docs/COMMANDS.md` section 6, `docs/ARCHITECTURE.md` sections 9.1, 9.2 and 9.3 and its
+change log, one count in `docs/SHARED_CALENDAR_SPEC.md` section 18.4, `backend/CLAUDE.md` (the
+scripts' list, how the key travels), `CLAUDE.md` ("Cloud safety" names `npm run assistant-key`,
+which is no `aws` command).
+
+What step c15 finds ready: the commands of `docs/RUNBOOK.md` section 3.2 in their order, with
+what each must show; the deployment carrying the two parameters with no argument; the smoke
+test that fails exactly once before the key and passes after it; the refusal of a stack
+without the assistant to be seen first.
 
 ---
 

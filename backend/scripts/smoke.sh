@@ -17,10 +17,24 @@
 # it as that user (upcoming) and cancels it as that user, then deletes the window and the type.
 # Only the API is used; no calendar answer body is ever printed (status and error code only).
 #
+# After the calendar journey and before the user's deletion, one exchange with the assistant as the
+# throw-away user (docs/ARCHITECTURE.md section 9.3): its conversation ended first, the sentence
+# SMOKE_SENTENCE sent, continue asked for while the exchange is working (at most eight times, the
+# limit of requests to Claude for one message), the conversation ended again. The sentence is a
+# read: the fake Claude answers it with a read of the settings and then a text
+# (tests/integration/fake-claude/answers.json), the real model in the same two steps. Only
+# statuses, codes and counts are printed, never a text of the conversation. Against a stack it
+# proves the key, the permissions and the route, and it costs money at Anthropic: about a US cent,
+# up to 4 when nobody has used the assistant for a few minutes
+# (docs/CONVERSATIONAL_ARCHITECTURE.md section 14). So once the assistant is deployed the smoke
+# test needs the key (npm run assistant-key): without it the message answers
+# 503 assistant_unavailable, one FAIL line, and every other check runs as usual.
+#
 # Tokens and passwords stay in shell variables and travel through pipes only: never printed,
 # never command-line arguments, never written to disk. On every exit, also after a failed check
-# or Ctrl-C, the calendar journey's appointment is cancelled and its window and type deleted, and
-# the throw-away user is deleted. What stays, by design, as history: the user's message row, and
+# or Ctrl-C, the assistant's conversation is ended once its message was sent, the calendar
+# journey's appointment is cancelled and its window and type deleted, and the throw-away user is
+# deleted. What stays, by design, as history: the user's message row, and
 # in the calendar table the cancelled appointment (username and type name smoke-<timestamp>), its
 # pointer, its booked and cancelled events, and the deleted-user marker that the user's deletion
 # (docs/IMPLEMENTATION_PLAN.md step 9, journey 11) writes.
@@ -35,6 +49,9 @@ SMOKE_USER="smoke-$(date +%s)"
 # The booking's note: the log search of docs/SHARED_CALENDAR_SPEC.md AC-36 looks for "must never
 # reach a log". Never printed.
 SMOKE_NOTE="smoke-test note ${SMOKE_USER#smoke-}, must never reach a log"
+# The assistant's exchange: a read, the same sentence for the fake Claude and the real model. The
+# local log search looks for it too. Never printed.
+SMOKE_SENTENCE="What are the calendar's settings right now?"
 failures=0
 created=false # POST /users was sent: the user may exist
 deleted=false # DELETE /users/{username} answered 204: nothing left to clean up
@@ -55,10 +72,15 @@ cal_pending=""
 cal_date=""
 cal_start=""
 cal_cleanup_failed=false
+# The assistant's message was sent and its conversation not ended yet: clean-up ends it.
+asst_open=false
 
-# Removes the throw-away user straight in Cognito if the API did not delete it.
+# Ends the throw-away user's conversation with the assistant, then removes what the calendar
+# journey created, then removes the throw-away user straight in Cognito if the API did not
+# delete it.
 cleanup() {
   local status=$? err
+  assistant_cleanup
   calendar_cleanup
   [[ "$cal_cleanup_failed" == true ]] && status=1
   if [[ "$created" == true && "$deleted" == false ]]; then
@@ -369,6 +391,107 @@ calendar_journey() {
   fi
 }
 
+# reply <code>: what the JavaScript body <code> returns for the assistant's answer in BODY, as text
+# (a status, a count; never a text of the conversation). Through cal get, which reads stdin.
+reply() { cal get "return String($1);"; }
+
+# Ends the throw-away user's conversation if the exchange sent its message and did not end it.
+assistant_cleanup() {
+  [[ "$asst_open" == true && -n "${user_token:-}" ]] || return 0
+  asst_open=false
+  api DELETE /assistant/conversation "$user_token"
+  if [[ "$STATUS" == 204 ]]; then
+    echo "cleanup: the assistant's conversation of $SMOKE_USER ended"
+  else
+    cleanup_failed "the assistant's conversation of $SMOKE_USER (it runs out by itself within two days)"
+  fi
+}
+
+# The assistant's exchange, as the throw-away user. Stops at the first failed check, but always
+# ends the conversation once the message was sent.
+assistant_exchange() {
+  local before="" after steps=1 said=0 n status code
+  api DELETE /assistant/conversation "$user_token"
+  if [[ "$STATUS" != 204 ]]; then
+    fail "assistant: DELETE /assistant/conversation -> $STATUS $(error_code)"
+    return 0
+  fi
+  api GET /assistant/conversation "$user_token"
+  [[ "$STATUS" == 200 ]] && before=$(reply 'b.remainingToday') || before=""
+  if [[ "$before" =~ ^[0-9]+$ ]]; then
+    pass "assistant: DELETE /assistant/conversation -> 204, GET -> 200 ($before messages left today)"
+  else
+    fail "assistant: GET /assistant/conversation -> $STATUS $(error_code)"
+    return 0
+  fi
+
+  asst_open=true
+  api POST /assistant/messages "$user_token" "{\"text\": \"$SMOKE_SENTENCE\"}"
+  if [[ "$STATUS" == 200 ]]; then
+    pass "assistant: POST /assistant/messages -> 200, status $(reply 'b.status')"
+  else
+    code=$(error_code)
+    if [[ "$STATUS" == 503 && "$code" == assistant_unavailable ]]; then
+      fail "assistant: POST /assistant/messages -> 503 assistant_unavailable: no key yet, or Anthropic unavailable"
+    else
+      fail "assistant: POST /assistant/messages -> $STATUS $code"
+    fi
+    assistant_end
+    return 0
+  fi
+  said=$(reply '(b.messages || []).filter((m) => m.from === "assistant").length') || said=0
+
+  # The first step was the message; each continue is one step more, eight in all at most.
+  while [[ "$(reply 'b.status')" == working ]] && (( steps < 8 )); do
+    api POST /assistant/continue "$user_token"
+    if [[ "$STATUS" != 200 ]]; then
+      fail "assistant: POST /assistant/continue (step $((steps + 1))) -> $STATUS $(error_code)"
+      assistant_end
+      return 0
+    fi
+    steps=$((steps + 1))
+    n=$(reply '(b.messages || []).filter((m) => m.from === "assistant").length') || n=0
+    said=$((said + ${n:-0}))
+  done
+
+  status=$(reply 'b.status') || status=""
+  if [[ "$status" == idle ]]; then
+    pass "assistant: the exchange ended idle after $steps steps"
+  else
+    fail "assistant: the exchange is $status after $steps steps"
+    assistant_end
+    return 0
+  fi
+  if (( steps >= 2 )); then
+    pass "assistant: a read was run ($steps steps: a read, then the answer)"
+  else
+    fail "assistant: no read was run (answered in $steps step)"
+  fi
+  if (( said >= 1 )); then
+    pass "assistant: the answer holds $said message(s) of the assistant"
+  else
+    fail "assistant: the answer holds no message of the assistant"
+  fi
+  after=$(reply 'b.remainingToday') || after=""
+  if [[ "$after" == "$((before - 1))" ]]; then
+    pass "assistant: $after messages left today, one less"
+  else
+    fail "assistant: $after messages left today, expected $((before - 1))"
+  fi
+  assistant_end
+}
+
+# assistant_end: ends the conversation after the message, as a check of its own.
+assistant_end() {
+  asst_open=false
+  api DELETE /assistant/conversation "$user_token"
+  if [[ "$STATUS" == 204 ]]; then
+    pass "assistant: DELETE /assistant/conversation -> 204, the conversation ended"
+  else
+    fail "assistant: DELETE /assistant/conversation at the end -> $STATUS $(error_code)"
+  fi
+}
+
 IFS= read -rs -p "Password of $ADMIN_USERNAME: " admin_password || die "no password entered."
 echo >&2
 echo "Smoke test of $1 ($API_URL) with throw-away user $SMOKE_USER"
@@ -443,6 +566,9 @@ fi
 
 # The calendar journey (docs/SHARED_CALENDAR_SPEC.md section 18.4), before the user is deleted.
 if [[ -n "$user_token" ]]; then calendar_journey; fi
+
+# The assistant's exchange (docs/ARCHITECTURE.md section 9.3), before the user is deleted.
+if [[ -n "$user_token" ]]; then assistant_exchange; fi
 
 # docs/IMPLEMENTATION_PLAN.md step 9, journey 11: delete the throw-away user; it can no longer
 # sign in; its message row stays.

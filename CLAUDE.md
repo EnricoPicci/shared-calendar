@@ -75,8 +75,8 @@ one that is fixed:
 ## Cloud safety
 
 - Never run `sam deploy`, `sam delete`, `npm run deploy` (`-w backend` or `-w frontend`),
-  `npm run budget` or an `aws` command that creates, changes or deletes resources unless
-  explicitly instructed in the current request.
+  `npm run budget`, `npm run assistant-key` or an `aws` command that creates, changes or deletes
+  resources unless explicitly instructed in the current request.
 - `npm run verify -w backend` (all local tests) must be green before any deployment, of the API
   or of the page. Both deploy scripts enforce this (`scripts/deploy-gate.sh`); do not bypass it.
 - Cloud: stacks `shared-calendar-api` (the API) and `shared-calendar-web` (the page) in

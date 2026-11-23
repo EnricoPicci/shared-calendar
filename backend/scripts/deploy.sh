@@ -10,8 +10,9 @@
 # scripts/deploy-gate.sh at the repository root, which the front end's deploy script uses too.
 #
 # Extra arguments go to sam deploy, e.g. the first deployment of a stack, which needs the alert
-# address (kept out of samconfig.toml): npm run deploy -- --parameter-overrides AlertEmail=you@example.com
-# Uses your real AWS credentials.
+# address (kept out of samconfig.toml). A --parameter-overrides given here replaces the whole list
+# of samconfig.toml instead of adding to it, so it repeats every parameter of that list with its
+# value, then AlertEmail (docs/RUNBOOK.md section 3). Uses your real AWS credentials.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

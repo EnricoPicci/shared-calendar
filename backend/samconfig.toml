@@ -22,15 +22,32 @@ lint = true
 
 # Cloud deployment. eu-north-1: the account's organization allows regional services only there.
 # AlertEmail is deliberately not here (the repository is public): the first deploy of a stack
-# passes it once, npm run deploy -- --parameter-overrides AlertEmail=you@example.com, and
-# CloudFormation keeps it; later deploys leave it out and SAM reuses the stack's stored value.
+# passes it once and CloudFormation keeps it; later deploys leave it out and SAM reuses the
+# stack's stored value.
+#
+# The template's parameters set here, so that what the cloud runs is written in the repository:
+# - AdminUsername: the Administrator's account, created by the deployment. Never changed after
+#   the first deploy, or CloudFormation deletes and recreates the Administrator.
+# - FunctionArchitecture: arm64, the cloud's processor type (the local stack sets its own).
+# - AssistantModel: the Claude model the assistant asks, claude-sonnet-5-5, the one chosen on the
+#   evaluation with the real model (docs/CONVERSATIONAL_PLAN.md section 2.2, open point P4).
+# - AssistantDailyMessageLimit: 30 messages to the assistant per person and day, which with the
+#   other limits bounds what one person can cost at Anthropic
+#   (docs/CONVERSATIONAL_ARCHITECTURE.md section 4.4).
+# The assistant's effort is not a parameter: the template leaves ASSISTANT_EFFORT empty in the
+# cloud, which means the effort low.
+#
+# A trap: a --parameter-overrides typed on the command line (for example the AlertEmail of a
+# first deploy) does not add to the list below, it replaces all of it: a parameter it leaves out
+# is not set from this list at all. So such a command repeats every name below with its value
+# (docs/RUNBOOK.md section 3).
 [default.deploy.parameters]
 region = "eu-north-1"
 capabilities = "CAPABILITY_IAM"
 resolve_s3 = true
 confirm_changeset = true
 s3_prefix = "shared-calendar-api"
-parameter_overrides = "AdminUsername=\"admin\" FunctionArchitecture=\"arm64\""
+parameter_overrides = "AdminUsername=\"admin\" FunctionArchitecture=\"arm64\" AssistantModel=\"claude-sonnet-5-5\" AssistantDailyMessageLimit=\"30\""
 image_repositories = []
 
 # Laptop: sam local start-api against the Docker emulators (docs/IMPLEMENTATION_PLAN.md step 3).

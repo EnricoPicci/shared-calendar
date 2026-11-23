@@ -1507,7 +1507,7 @@ status and the error code only, since an answer may hold a note).
    naming the range (or, when every date was too soon, the setting and the earliest start) and no
    calendar journey. Something created between the read and the writes answers 409: FAIL with
    its code, clean-up, no retry.
-3. **The journey, one check line each** (19 checks with Hello World's 10): the settings read; the
+3. **The journey, one check line each** (19 checks with Hello World's 10; the assistant's exchange of `docs/ARCHITECTURE.md` section 9.3 adds 7): the settings read; the
    free hour found; as the admin, create the type `smoke-<epoch>` (the User's epoch), create the
    one-off window 03:00–04:00 on the date, book it for the User (`username`, `start`, no `end`,
    and the note `smoke-test note <epoch>, must never reach a log`; the answer is `booked`, 60

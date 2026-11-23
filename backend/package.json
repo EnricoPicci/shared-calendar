@@ -20,6 +20,7 @@
     "deploy": "bash scripts/deploy.sh",
     "bootstrap-admin": "bash scripts/bootstrap-admin.sh",
     "smoke": "bash scripts/smoke.sh",
+    "assistant-key": "bash scripts/assistant-key.sh",
     "assistant:eval": "bash scripts/assistant-eval.sh",
     "budget": "bash scripts/budget.sh"
   },

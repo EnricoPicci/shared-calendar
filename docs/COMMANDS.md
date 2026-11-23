@@ -392,9 +392,12 @@ Every command of this section that names a stack acts on a real AWS account. `CL
   than 30 minutes, names HEAD and says `clean`, and the whole repository's tree is still clean
   (front-end work in progress blocks a back-end deploy too; the check is `scripts/deploy-gate.sh`,
   which both deploy scripts source); then `npm run build` and
-  `sam deploy` with the default config env. Extra arguments go to `sam deploy` (first deploy of
-  a stack: `npm run deploy -w backend -- --parameter-overrides AlertEmail=<address>`; later
-  deploys reuse the stored value). Never put an e-mail address in `samconfig.toml`: the repo is
+  `sam deploy` with the default config env, whose `parameter_overrides` in `samconfig.toml` set
+  `AdminUsername`, `FunctionArchitecture`, `AssistantModel` and `AssistantDailyMessageLimit`.
+  Extra arguments go to `sam deploy`. The first deploy of a stack adds `AlertEmail`, and a
+  `--parameter-overrides` on the command line replaces samconfig's whole list, so it repeats the
+  four with their values (`docs/RUNBOOK.md` section 3, step 2); later deploys take no argument
+  and reuse the stored address. Never put an e-mail address in `samconfig.toml`: the repo is
   public. Refuses any argument naming the deleted stack `hello-world-api` (`docs/RENAME_PLAN.md`
   section 6.3: sam would create a second, empty stack under the old name).
 - `npm run deploy -w frontend` (`frontend/scripts/deploy.sh`, `docs/FRONTEND_ARCHITECTURE.md`
@@ -425,11 +428,40 @@ Every command of this section that names a stack acts on a real AWS account. `CL
   last, the calendar journey of `docs/SHARED_CALENDAR_SPEC.md` section 18.4 (a type
   `smoke-<epoch>` and a one-off window on the first free 03:00–04:00 from 50 days ahead, booked
   for the user, listed and cancelled by it, then window and type deleted; settings never
-  changed); 19 checks, PASS/FAIL each. On every exit it removes the type, window and booking and
+  changed), then one exchange with the assistant as the user (its conversation ended, the
+  message "What are the calendar's settings right now?", `continue` while `working`, at most
+  eight steps, the conversation ended again; statuses and counts only, never a text); 26 checks,
+  PASS/FAIL each, 7 of them the assistant's. Against a stack the exchange needs the key
+  (`assistant-key` below) and costs about a US cent at Anthropic; without the key the message
+  answers `503 assistant_unavailable`, one FAIL, and the other checks run. Locally it answers
+  through the fake Claude, whose `answers.json` scripts the sentence as a read of the settings
+  and a text. On every exit it ends the conversation, removes the type, window and booking and
   deletes the user. Prompts for the admin password (stdin). Leaves its message rows and, in
   `calendar`, the cancelled appointment, its events and the user's deleted-user marker
   (history). Its date arithmetic imports `shared/src/calendar/time.ts` in node (Node ≥ 22.18,
   type stripping).
+- `npm run assistant-key -w backend -- <stack>` (`backend/scripts/assistant-key.sh`): stores the
+  Anthropic API key as the SecureString `/<stack>/anthropic-api-key`, encrypted with the
+  account's default key for Parameter Store, or replaces it (a rotation); the procedure is
+  `docs/RUNBOOK.md` section 3.2. **It changes the cloud.** Before it asks for the key it refuses,
+  each with `ERROR:` and exit 1, nothing changed:
+  - no argument, or more than one: `usage: npm run assistant-key -w backend -- <stack-name>`;
+  - `local`: the local stack takes its key from `local:up` (section 3.4);
+  - `hello-world-api`, also as `--stack-name=hello-world-api`: the deleted stack; any other
+    argument starting with `-`: it takes a stack name, not an option;
+  - a stack it cannot read: `cannot read stack <stack> in <region> (stack name, region, AWS
+    login?)` (read-only `describe-stacks`, in `samconfig.toml`'s region unless `AWS_REGION` is
+    set);
+  - a stack without the assistant, whose parameters lack `AssistantModel`: `stack <stack> has no
+    assistant yet (no parameter AssistantModel): deploy it first`.
+  When the parameter exists it says `replacing version N (a rotation)` and asks for `y`. Then it
+  asks for the key once, without echo, and refuses one that does not start with `sk-ant-`, holds
+  a character other than a letter, a digit, `-` or `_`, or is not 40 to 300 characters long, with
+  messages that never show it. The key goes on a pipe to `backend/scripts/parameters.mjs`, which
+  stores it with the AWS SDK (`PutParameter`, overwriting only after the `y`) and prints an
+  error's name, never its message. Afterwards it prints the parameter's name, type, version and
+  date from `DescribeParameters`; no command of the script reads the value back. The functions
+  keep a key ten minutes, so a rotation takes effect within ten minutes.
 - `npm run budget -w backend -- <stack> [--dry-run]`: creates the 1 USD monthly budget
   `<stack>-monthly` (e-mail to the stack's `AlertEmail`) through the Budgets API. Not in
   `template.yaml`: no `AWS::Budgets::Budget` in CloudFormation in `eu-north-1`. Idempotent; no

@@ -1,7 +1,8 @@
 # Operator runbook
 
 What to do, in order, to work on the two deployed stacks, the API's and the page's: the daily
-start, updating the API's stack, releasing the page, deploying from scratch, and the one-time
+start, updating the API's stack, releasing the page, deploying from scratch, the assistant's
+key and alarm, and the one-time
 setup done during plan step 11 that is easy to forget. The tools a machine needs, with their
 versions, are in `README.md`, "Prerequisites". The why behind each rule is in `docs/ARCHITECTURE.md` and `CLAUDE.md`. Which AWS
 identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AWS_ACCOUNTS.md`.
@@ -87,8 +88,10 @@ both fit into its 30 minutes; otherwise run it again before the second.
    Never `> out.txt` inside the repository: the new file makes the tree dirty and the deploy
    refuses, and the change set and its prompt would go to the file instead of the screen.
 5. `npm run smoke -w backend -- shared-calendar-api` (asks for the admin password; `-w backend` is
-   needed, the root has no `smoke` script): all 19 lines must say PASS (10 Hello World checks,
-   9 calendar checks: section 2.1). `script -q -c "…" /tmp/smoke.txt` works here too; the
+   needed, the root has no `smoke` script): all 26 lines must say PASS (10 Hello World checks,
+   9 calendar checks: section 2.1; 7 of the assistant: section 3.2). Once the assistant is
+   deployed the smoke test needs its key (section 3.2), and its exchange costs about a US cent
+   at Anthropic. `script -q -c "…" /tmp/smoke.txt` works here too; the
    password prompt does not echo, so the password does not reach the file.
 6. **Releasing the page**, after the back end's deploy and its smoke test, or alone when only
    `frontend/` changed (then steps 1 to 3, and this one): `npm run deploy -w frontend`, from the
@@ -137,6 +140,9 @@ Rules:
   invalid value makes every calendar request answer 500 (and fires the 5xx alarm).
 - `FunctionArchitecture` stays `arm64` in the cloud; the `x86_64` value is only for the local
   stack on x86 machines (`local-api.sh` sets it).
+- The assistant's model and its daily limit of messages per person are changed in
+  `backend/samconfig.toml` (`AssistantModel`, `AssistantDailyMessageLimit`), committed, then
+  deployed; a new model only after the evaluation with the real model (section 3.2).
 
 ### 2.1 The smoke test's calendar journey
 
@@ -209,19 +215,21 @@ Plan step 11 has the full list; in short:
    put it in `backend/samconfig.toml` (both `region` lines), in `frontend/samconfig.toml` (the
    page's deploy stops when the two files name different regions) and in the profile.
 1. Steps 1 to 3 of section 2 (commit, local stack, verify).
-2. `npm run deploy -w backend -- --parameter-overrides AdminUsername="admin" FunctionArchitecture="arm64" AlertEmail=<alert address>`.
+2. `npm run deploy -w backend -- --parameter-overrides AdminUsername="admin" FunctionArchitecture="arm64" AssistantModel="claude-sonnet-5-5" AssistantDailyMessageLimit="30" AlertEmail=<alert address>`.
    `backend/samconfig.toml` holds everything else (stack, region, capabilities); the address is
    the one value it leaves out, because the repository is public. A `--parameter-overrides` on the
    command line replaces the whole `parameter_overrides` line of `backend/samconfig.toml`, so the
-   command repeats `AdminUsername` and `FunctionArchitecture` (plan step 57 used exactly this
-   command). CloudFormation stores the address with the stack, so later deploys omit it.
+   command repeats every parameter of that line with its value (plan step 57 used this command
+   when the line held only the first two). CloudFormation stores the address with the stack, so later deploys omit it.
    Without the flag the deploy stops before creating anything: `AlertEmail` must have a value.
    Avoid `--guided`; if you use it, answer N to "Save arguments to configuration file", or SAM
    writes the address into `backend/samconfig.toml`.
 3. `npm run bootstrap-admin -w backend -- shared-calendar-api`: sets the admin password. Until then the admin
    status is `FORCE_CHANGE_PASSWORD` and the smoke test cannot sign in.
-4. `npm run smoke -w backend -- shared-calendar-api`: 19 PASS (section 2.1). On a new stack the
-   calendar is empty, so the first date searched is free.
+4. The assistant's key, `npm run assistant-key -w backend -- shared-calendar-api`, after
+   Anthropic's side is ready (section 3.2). Then `npm run smoke -w backend -- shared-calendar-api`:
+   26 PASS (sections 2.1 and 3.2); without the key, 25 and the assistant's one FAIL. On a new
+   stack the calendar is empty, so the first date searched is free.
 5. `npm run budget -w backend -- shared-calendar-api --dry-run`, then
    `npm run budget -w backend -- shared-calendar-api`. The
    budget is **not** in the template (CloudFormation has no `AWS::Budgets::Budget` in
@@ -283,6 +291,127 @@ Disabling and deleting a distribution takes several minutes. Nothing of the stac
 `shared-calendar-api` is touched: the API keeps answering at its own address, and no data is
 in the page's stack. If the deletion was started with the files still there: empty the bucket
 as above and run `delete-stack` again.
+
+### 3.2 The assistant: Anthropic's side, its first deployment, its key, its alarm
+
+The assistant (`docs/CONVERSATIONAL_ARCHITECTURE.md`) asks Claude, at Anthropic, outside AWS.
+The stack holds no key: the operator stores it in Parameter Store with a script, as the
+SecureString `/<stack>/anthropic-api-key`. Until it is there the assistant answers
+`503 assistant_unavailable` and everything else works. Anthropic's bill is the application's
+first real cost; the AWS budget does not see it.
+
+The commands marked **(first run in step c15)** have not been run against a stack yet; they
+are first run in `docs/CONVERSATIONAL_PLAN.md` step c15, which is this section's first use. The
+rest was tried on the local stack.
+
+**On Anthropic's side, before anything is deployed** (the Anthropic Console, signed in as the
+account's owner):
+
+1. **P1, first: the data terms.** Read, for this account, how long Anthropic keeps requests and
+   whether they may be used to train models (the account's settings and the commercial
+   terms). Write what was found, with the date, in `docs/CONVERSATIONAL_ARCHITECTURE.md`
+   section 10.2, and close P1 in its section 18.2. **If the terms are not acceptable, stop
+   here**: nothing is deployed. Until P1 is closed, nobody but the operator uses the assistant.
+2. **A workspace of its own** for this application, so that its key, its use and its limit
+   are apart from any other use of the account.
+3. **Its monthly spend limit: 10 USD.** When it is reached, Anthropic refuses every request of
+   the workspace until the limit is raised or the month ends: people read "The assistant has
+   reached its spending limit…", the 5xx alarm e-mails the operator, the rest of the
+   application works (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 14). The expected use is 1.5
+   to 4 USD a month.
+4. **Its key**, created in that workspace. The Console shows it once: keep it in a password
+   manager until step 4 below, never in a file of the repository, a message or the shell's
+   history.
+
+**On ours, in order:**
+
+1. Section 2, steps 1 to 3: commit, the local stack **with the fake Claude**, `verify`. Before
+   a deployment that changes the instructions, a tool or the model, run the evaluation with the
+   real model first (`docs/COMMANDS.md` section 3.4), then go back to the fake.
+2. `npm run deploy -w backend`, **with no argument** (section 2, step 4). The assistant's two
+   parameters come from `backend/samconfig.toml`: `AssistantModel` `claude-sonnet-5-5` and
+   `AssistantDailyMessageLimit` `30`. Never add `--parameter-overrides` here: it replaces
+   samconfig's whole list, and the two would not be set from it (section 3, step 2).
+   **(First run in step c15.)** Read the change set before the `y`. For the assistant's first
+   deployment, expect **Add**: the table `AssistantTable`, the policies `AssistantReadPolicy`
+   and `AssistantWritePolicy`, and six functions (`GetConversation`, `EndConversation`,
+   `SendAssistantMessage`, `ContinueAssistant`, `ConfirmProposal`, `DeclineProposal`), each
+   with its role, its log group and its permission; **Modify**, replacement `False`, on
+   `HttpApi` (the six routes) and on existing functions whose code changed. **No Remove, no
+   Replace**: any on `UserPool`, `MessagesTable`, `CalendarTable` or `AdminUser` means N.
+3. `npm run smoke -w backend -- shared-calendar-api`, **before the key**. Expected: 25 PASS and
+   one FAIL, `assistant: POST /assistant/messages -> 503 assistant_unavailable: no key yet, or
+   Anthropic unavailable`. It proves that a missing key harms nothing else. That 503 fires the
+   5xx alarm: its e-mail is expected. **(First run in step c15.)**
+4. `npm run assistant-key -w backend -- shared-calendar-api` **(first run in step c15)**. It
+   reads the stack (read-only), says `Stack shared-calendar-api (eu-north-1), model
+   claude-sonnet-5-5. The key goes to the SecureString /shared-calendar-api/anthropic-api-key.`,
+   asks `Anthropic API key:` without echo, and ends with `Stored.` and one line: the name,
+   `SecureString`, version `1`, the date. It never prints the key. Before asking for the key it
+   refuses `local`, `hello-world-api`, a stack it cannot read (no login) and a stack without
+   the assistant (deploy first); a key that does not start with `sk-ant-` or holds a space is
+   refused before anything is stored. `docs/COMMANDS.md` section 6 has its messages.
+5. The smoke test again: **26 PASS**. Its exchange costs about a US cent at Anthropic (up to 4
+   when the assistant has been silent for a few minutes). When the FAIL of step 3 is still
+   there, read the function's log line (below): `key_missing` is P2.
+6. **The page released again**, section 2, step 6, from the same commit and inside the same 30
+   minutes (otherwise `verify` again): until then the deployed page has no panel. Then at the
+   page's address: sign in, open the panel at the bottom, send one message, and the short walk
+   of `docs/FRONTEND_WALK.md` section 7.
+7. The record in section 5: the commit, the change set, the smoke tests' lines, P1 and P2.
+
+**P2: when the key cannot be read.** `docs/CONVERSATIONAL_ARCHITECTURE.md` section 18.2 leaves
+open whether the functions' roles need `kms:Decrypt` besides `ssm:GetParameter`; the deployment
+is made without it. The log line does not tell a missing parameter from one the function may
+not read: both give `reason` `key_missing` (`backend/src/lib/anthropic.ts`). So once step 4
+has printed the parameter, `key_missing` means the read was refused. To see the refusal:
+CloudTrail, Event history, the events `GetParameter` and `Decrypt` of the last minutes, with
+their error code. The fix, decided in step c15 and not before: one statement in the roles of
+the three functions that ask Claude (`SendAssistantMessage`, `ContinueAssistant`,
+`ConfirmProposal`), `kms:Decrypt` on that one key, usable only through Parameter Store; then
+the gate, and a second deployment with its own go; then the smoke test.
+
+**When the 5xx alarm arrives for the assistant.** The alarm counts every 5xx of the API, and the
+assistant answers `503` on purpose when it cannot ask Claude
+(`docs/CONVERSATIONAL_ARCHITECTURE.md` section 15). The log line's `outcome` and `reason` say
+why. CloudWatch, Logs Insights, the log groups `/aws/lambda/shared-calendar-api-sendAssistantMessage`,
+`…-continueAssistant` and `…-confirmProposal`, the hour of the e-mail:
+
+```
+fields @timestamp, route, username, role, conversationId, outcome, reason, status, model, steps, durationMs
+| filter status >= 500
+| sort @timestamp desc
+```
+
+The query names fields only, never `@message`, so nothing but those fields is shown (the lines
+hold no text of a conversation anyway: `docs/CONVERSATIONAL_ARCHITECTURE.md` section 10.1). A
+first message of a conversation fails on the language question, so its outcome starts with
+`language_`.
+
+| `outcome` | `reason` | What happened | What to do |
+|---|---|---|---|
+| `unavailable` or `language_unavailable` | `timeout`, `connection`, `overloaded`, `rate_limit`, `other` | Anthropic unreachable, slow or overloaded | Wait: nothing is lost, and the panel goes on when asked again. Anthropic's status page says whether it is theirs. Many lines over hours: write it in section 5 |
+| the same | `key_missing` | No key in Parameter Store, or the function may not read it | Step 4 above; if the parameter exists, P2 above |
+| the same | `key_refused` | Anthropic refused the key: revoked, deleted, or of another workspace | A new key, as in the rotation below |
+| the same | `request_refused` | Anthropic refused the request itself, a fault of ours | Nothing to wait for: note the time and the route, and look at the last deployment |
+| `budget_reached` or `language_budget_reached` | | **The spend limit is reached** | Raise the workspace's limit in the Console, or wait for the next month. Each function then waits up to ten minutes before it asks Anthropic again |
+
+Another 5xx of an assistant route (`status` 500) is an error of the application, as for any
+other route.
+
+**Rotating the key**, by routine or because it may have leaked:
+
+1. In the Console, a new key in the same workspace. Keep the old one for now.
+2. `npm run assistant-key -w backend -- shared-calendar-api`: it says `The parameter exists:
+   replacing version N (a rotation).` and asks `Replace it? [y/N]`; `y`, then the new key. It
+   ends with version N + 1. **(First run in step c15 or later.)**
+3. Wait ten minutes: each function keeps the key it read for ten minutes, so the old key may
+   still serve until then.
+4. Delete the old key in the Console.
+5. The smoke test: 26 PASS.
+
+A key that leaked is deleted in the Console at once, without waiting: the assistant then
+answers `503` (`key_refused`) until step 2 is done and ten minutes have passed.
 
 ---
 
