@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Done on 2026-11-23: the merge commit on the branch `merge-change-password` whose message begins "Merge branch 'change-password' into main", waiting for review; `main` not moved and not pushed. Nothing was deployed. The decisions of section 3 were taken by the Product Owner the same day, each as recommended |
+| Status | Done on 2026-11-23: the merge commit on the branch `merge-change-password` whose message begins "Merge branch 'change-password' into main", reviewed, then `main` moved to it (fast-forward) and pushed the same day. Nothing was deployed. The decisions of section 3 were taken by the Product Owner the same day, each as recommended |
 | What it is | The steps that join the branch `change-password` to `main`, the decisions the Product Owner takes before they start, and how each conflict is to be resolved |
 | What it is not | A source of truth. What the code and the page are is in the documents of `CLAUDE.md` ("Where the truth lives"); this page only says how two lines of work are joined |
 | Model | `docs/MERGE_DEPLOY_FRONTEND.md`, the merge of `deploy-frontend`, whose strategy this one follows |
