@@ -1,5 +1,6 @@
 import { CALENDAR_LIMITS } from '@shared-calendar/shared';
-import { loadPage, pageAside } from './page';
+import { readFileSync } from 'node:fs';
+import { loadPage, PAGE_FILE, pageAside } from './page';
 
 // index.html itself: what docs/FRONTEND_ARCHITECTURE.md section 3, rules 2 and 6 ask of the page,
 // checked on the file every view's test loads.
@@ -541,6 +542,15 @@ describe('index.html', () => {
       expect([one('.end').textContent, one('.collapse').textContent]).toEqual(['New conversation', 'Close']);
       // What is hidden holds everything of a conversation: collapsed, none of it is reached.
       for (const part of ['.processed', '.messages', '.progress', '.news', '.proposal', '.error', '.remaining']) expect(one('.talk').contains(one(part)), part).toBe(true);
+    });
+
+    it('the arrow the style sheet draws beside the heading has no words for a screen reader: the button is named "Assistant" alone', () => {
+      const sheet = readFileSync(PAGE_FILE.replace('index.html', 'style.css'), 'utf8');
+      const arrows = sheet.split('\n').filter((line) => line.startsWith('.assistant .toggle') && line.includes('::after'));
+      expect(arrows).toHaveLength(2);
+      // The last declaration of each rule is the one a browser that knows the slash applies.
+      for (const rule of arrows) expect(rule.slice(rule.lastIndexOf('content:')), rule).toMatch(/^content: ' [▴▾]' \/ ''; \}$/);
+      expect(one('.toggle').hasAttribute('aria-label')).toBe(false);
     });
 
     it('says who processes the conversation, in fixed words, at the top of the open part', () => {

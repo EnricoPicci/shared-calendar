@@ -160,9 +160,13 @@ export function sendTrouble(reason: AssistantSendFailureReason, language: Assist
   switch (reason) {
     case 'assistant_limit_reached':
       return { ...plain(cannotAnswer(reason, language)), stop: 'day' };
+    // The server may have saved and counted the message before it failed to ask Claude
+    // (docs/CONVERSATIONAL_ARCHITECTURE.md section 6.1): the conversation is read again, so that
+    // the messages left today and the conversation itself are the server's, and Claude is not
+    // asked again by the panel itself.
     case 'assistant_budget_reached':
     case 'assistant_unavailable':
-      return plain(cannotAnswer(reason, language));
+      return { ...plain(cannotAnswer(reason, language)), then: 'read' };
     case 'conversation_full':
       return { ...plain(assistantTexts(language ?? DEFAULT_ASSISTANT_LANGUAGE).conversationFull), stop: 'full' };
     // A step of the conversation waits, or a confirmation is under way: the conversation is

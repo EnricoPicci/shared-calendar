@@ -2,16 +2,17 @@
 
 | | |
 |---|---|
-| Status | v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69, brief `prompts/92-step-69-implementation.md`). Run twice on that day in headless Chromium 159, at a desktop width and at a phone width, on a fresh, seeded local stack: every check answered yes at both |
-| What it is | One list of checks that walks every screen of the front end in a browser, as a User and as the Administrator, against the local stack. **The check to repeat after a later change to the view layer** |
+| Status | v2 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
+| What it is | One list of checks that walks every screen of the front end and the assistant's panel in a browser, as a User and as the Administrator, against the local stack. **The check to repeat after a later change to the view layer** |
 | What it is not | A source of truth, and not an automated test. On any conflict `docs/FRONTEND_ARCHITECTURE.md` and the tests win, and this page is fixed. No end-to-end test tool is in the repository (`docs/FRONTEND_VIEW_PLAN.md` section 8, decision 6): a person follows the list by hand, or drives a browser with a script kept outside the repository |
-| Made from | The browser checks of `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 68, in the order a person would follow, and `docs/SHARED_CALENDAR_SPEC.md` section 16.8 |
+| Made from | The browser checks of `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 68 and of `docs/CONVERSATIONAL_PLAN.md` step c12, in the order a person would follow, and `docs/SHARED_CALENDAR_SPEC.md` section 16.8 |
 
 ### Change log
 
 | Version | Date | Change |
 |---|---|---|
 | v1 | 2026-11-20 | First version: 102 checks. |
+| v2 | 2026-11-22 | **The assistant's panel**: section 6, checks 103 to 122, against the fake Claude, with what they need and leave in section 1; the short list for the real model and what a screen reader says of the panel, not yet listened to, in section 7; the row of step c12 in section 8. No earlier check changed its number. Two lines corrected by the run: check 5 (on a Sunday the week of today has no window and its legend is empty) and check 90 (saving a day is one write, followed by a read of the date). 122 checks. |
 
 ---
 
@@ -35,23 +36,49 @@
 - **A tag for the run**, a few lowercase letters and digits (say `w7`). Every name and every
   note the walk writes carries it (`walk-w7`), so that what one run made can be told from the
   seed's and from another run's.
+- **For the assistant's panel (section 6): the fake Claude**, which is what `local:up` wires
+  when no `ANTHROPIC_API_KEY` is given (`docs/COMMANDS.md` section 3.4), and the local limit of
+  10 messages a person a day. Section 6 is never walked with the real Claude wired: its
+  sentences mean something to the fake only. What is done with the real one is in section 7.
 - **Two dates.** *The walk's date*: the first Wednesday that is at least 35 days after today
   (the seed gives it Studio 09:00 to 13:00, and a booking so far ahead is still allowed). *Next
   week*: the week after the one of today, where the seed leaves free slots on every weekday.
+- **Three more dates, for section 6.** *The three early days*: the 25th, the 26th and the 27th
+  day from today, on which the fake's sentences read and book at 05:00.
+
+**Before section 6**, as `admin`, after check 102:
+
+- in "Availability" create the type `walk-<tag> early` and, in "A single date", show each of
+  the three early days and add the extra window 05:00 to 07:00 of that type;
+- in "Users" create `walk-<tag>-a` and note its password: the section is walked as this User,
+  **so that `alice` keeps her day's messages**;
+- the section sends **exactly ten messages** as that User, the ten of a day: one each at checks
+  105, 106, 107, 111, 114, 116, 118 and 119 and two at check 115. The tenth is the one that
+  meets the limit at check 119, so a message more on the way brings check 119 early and leaves
+  the checks after it undone: start again with another User (`walk-<tag>-a2`). A run at the
+  other width is a run of its own, with its own tag and so its own User. `admin` sends one
+  message, at check 121.
 
 **What it changes, and what it leaves.**
 
 - It changes **none of the seed's** types, patterns or appointments: it books, moves and cancels
   appointments of its own, and creates and deletes a type, patterns, a date's windows and users
   of its own.
-- It writes the settings back as it found them (note the four values before check 20).
+- It writes the settings back as it found them (note the four values before check 20). Check
+  121 changes "Booking horizon" through the assistant and puts it back in the form.
+- Section 6 removes its type, its three windows and its User at check 122. What stays of it: in
+  the `calendar` table the appointment of check 113, cancelled with its User; in the
+  `assistant` table the conversations and the day's count of a User that no longer exists,
+  which nobody reads, and one message less in `admin`'s day.
 - **What stays in the local table as history**: the appointments the walk cancelled or moved,
   their events, and the deleted-user markers of the users it deleted. Appointments cannot be
   deleted through the API.
 - If a run is cut short: sign in as `admin` and remove what carries the run's tag, in this
   order: the appointments (cancel them in the week), the windows of the walk's date ("Back to the
   weekly patterns", the extra windows), the patterns of the type `walk-<tag>`, the type, the
-  users `walk-<tag>…`; then put the settings back.
+  users `walk-<tag>…` (deleting `walk-<tag>-a` cancels its appointment of an early day), the
+  extra windows of the three early days, the type `walk-<tag> early`; then put the settings
+  back.
 
 **How to read a check.** Each check is one thing to do and what must be seen: answer "yes" or
 "no". The marks:
@@ -95,6 +122,9 @@ Sign in as `alice`.
 
 5. → The week of today: its label (two dates and the year), "Times are in the calendar's time
    zone, Europe/Rome.", the legend with "Piscina" and "Studio", seven days with today marked.
+   (A walk on the day of the seed, when that is a Sunday: the seed's patterns start today and
+   give a Sunday nothing, so the week of today has no window and its legend is empty; the
+   legend is then seen at check 6.)
 6. `[K]` Press "›" (next week). → "Loading…" shows and the week is dimmed while it loads; then
    next week, with Studio's windows on its weekdays, free slots ("09:00–10:00 free") and
    `alice`'s own appointments, which say "You".
@@ -356,7 +386,8 @@ Sign out, sign in as `admin`.
 88. `[K]` Press "Remove" on the row 13:00 – 14:00. → That row is gone, the others stay.
 89. `[=]` With the box open, press "Show". → Refused under the date: "Save or discard the
     changes to this day first."; `[N]` no request.
-90. `[K]` `[N]` Press "Save this day". → One request. The box closes; "As it is now" says "This
+90. `[K]` `[N]` Press "Save this day". → One write, `PUT /calendar/overrides/<date>`, then the
+    date is read again. The box closes; "As it is now" says "This
     day has its own windows, in the place of the weekly patterns." and lists the two; "Back to
     the weekly patterns" is offered. In "Week", the week of the walk's date: that day has the
     two windows; the same weekday a week later has Studio 09:00–13:00 as before.
@@ -396,7 +427,7 @@ Sign out, sign in as `admin`.
     `alice` (note `walk-<tag> elsewhere`). Switch to another tab of the first window and come
     back. → The week is read again and shows the booking. With a dialog open, the same: the
     dialog stays as it is. (A headless run sends the page the event of a tab shown again; the
-    real switch is in section 6.) Cancel the two appointments of checks 97 and 98.
+    real switch is in section 7.) Cancel the two appointments of checks 97 and 98.
 99. Go offline and press "›". → A failure in plain words above the week; the week that was on
     screen is still there. Go online, "Today". → The failure goes.
 100. Type the address `#/nonsense` by hand. → The week, and the address becomes `#/week`; the
@@ -407,17 +438,128 @@ Sign out, sign in as `admin`.
      its appointment of Wednesday is gone from the week. The users, the types, the patterns and
      the settings are those the walk found.
 
-## 6. What only a person, a real browser or time can check
+## 6. The assistant's panel
+
+Against **the fake Claude** (section 1), as the User `walk-<tag>-a` made before the section.
+Every sentence to send is one that `backend/tests/integration/fake-claude/answers.json`
+answers: type it exactly. The panel is at the bottom of every screen
+(`docs/FRONTEND_ARCHITECTURE.md` section 6.1); "the heading" is its button "Assistant", "the
+bar" is the panel collapsed. The count of messages left is the one of a User who sent none
+today.
+
+103. `[N]` Sign out. → The login has no panel: no "Assistant", no "Message". Sign in as
+     `walk-<tag>-a`. → At the bottom of the window, one bar: the heading "Assistant", the field
+     "Message" and "Send", with neither "New conversation" nor "Close". The same bar on "My
+     appointments" and back on "Week". The page has asked nothing of `/assistant`.
+104. `[K]` `[N]` Reach the field "Message" (by Tab; by hand at a phone, a touch). → The panel
+     opens upward, to about half of the window at a desktop width and most of it at a phone
+     width: the heading, "New conversation" (out of use) and "Close", the line "This
+     conversation is processed by Anthropic's Claude.", no message, "10 messages left today".
+     One request, `GET /assistant/conversation`.
+105. `[K]` Type `Hello, can you hear me?` and press Enter. → The text under "You", on the right;
+     the answer under "Assistant", on the left: "Hello. I am the assistant of the shared
+     calendar." The field is empty and the keyboard still in it; "9 messages left today"; "New
+     conversation" is in use.
+106. `[N]` Send `fake: what is open on the day of the journey?` and, while it works, type
+     something in the field. → A line of progress ("…") under the conversation and "Send" out
+     of use while it works (by hand, for a moment only); then the answer, the first early day as
+     the fake gives it, a text with `"05:00"` in it. What was typed meanwhile is still in the
+     field, "Send" is in use again, "8 messages left today". Two requests: `POST
+     /assistant/messages`, then `POST /assistant/continue`. Empty the field.
+107. Send `<b>walk-<tag></b> <i>markup</i>`. → Shown as typed, with `<b>` and `<i>` readable.
+     The answer: "Fake Claude: no answer is scripted for this message."
+108. `[N]` Type `half a text` in the field and do not send it. Go to "My appointments" and back
+     to "Week". → The panel stays open, with the conversation and the text in the field. Press
+     "Close". → The bar, the text still in its field. Go to "My appointments". → Still the bar.
+     Press the heading. → Open, as it was. Nothing was asked of `/assistant` in all of this.
+     Empty the field.
+109. `[K]` With the panel open, Tab from the heading. → The order: "Assistant", "New
+     conversation", "Close", the conversation itself once it is long enough to scroll (the
+     arrow keys then scroll it), the field, "Send". In the field, press the Escape key. → The
+     panel collapses and the keyboard is back where it was before it came into the panel, on
+     the last thing of the screen above: one Tab reaches the heading. Enter there. → Open. Two
+     Tabs and Enter, on "Close". → Collapsed, the keyboard back in the screen as before. In the
+     bar the order is "Assistant", the field, "Send", and the field taking the keyboard opens
+     the panel.
+110. `[N]` Reload the page and sign in again as `walk-<tag>-a`. → The bar, and nothing asked of
+     `/assistant`. Press the heading. → One request, and the same conversation: its six
+     messages, "7 messages left today".
+111. In "Week", go to the week of the second early day. Send `fake: book me the slot of the
+     booking journey`. → Under the last message, which stays in sight, a block: "Make this
+     change?", the line "Book an appointment on …, from 05:00 to 06:00 (walk-<tag> early)."
+     with the weekday and the date in full, and the buttons "Confirm" and "Don't". Behind the
+     panel the slot 05:00–06:00 of that day is still free. "6 messages left today".
+112. Press "Close", then a free slot of the week. → The book dialog; under it the bar cannot be
+     pressed and Tab does not reach it. The Escape key closes the dialog and leaves the bar as
+     it is. Press the heading. → The proposal still waits, its two buttons in use.
+113. `[K]` `[N]` From the field, Shift+Tab twice: "Don't", then "Confirm". Press Enter. → Both
+     buttons are out of use while it works. Then the block has no buttons and its line says
+     "Done", a closing answer of the assistant follows, and the keyboard is in the field.
+     Behind the panel, with nothing pressed, the week shows the appointment at 05:00–06:00,
+     "You". The requests: `POST /assistant/proposals/<id>/confirm`, then a `GET /calendar?…`.
+     Still "6 messages left today": confirming is no message.
+114. `[K]` Send `fake: book me the slot of the declining journey`. → A proposal for the third
+     early day; "5 messages left today". Press "Don't". → The block is gone; a message under
+     "Notice", in the middle: "Nothing was changed."; the keyboard is in the field; the slot is
+     still free; still 5 left.
+115. Send the same sentence again and, when the proposal shows, type `yes` and press Enter. → The
+     block goes and a new one comes, the same change with its two buttons: the typed "yes"
+     booked nothing, and no notice was added for the proposal it dropped. "3 messages left
+     today". Press "Don't".
+116. `[N]` Send `fake: overloaded`. → Under the conversation, marked by a bar at its side and not
+     written in red: "The assistant is not available at the moment. Please try again in a
+     little while. Everything can still be done from the other pages." The text is still in the
+     field; the conversation shows the message, which the server kept; "2 messages left today";
+     "New conversation" and "Send" are in use. The requests: `POST /assistant/messages`
+     (answered 503), then one `GET /assistant/conversation`, and no `POST /assistant/continue`.
+117. `[=]` With that sentence on show, look at the panel in the Accessibility part of the
+     browser's tools. → A region named "Assistant"; its heading a button named "Assistant",
+     with no arrow in the name, said to be expanded; a status that is not on show in the page
+     and holds the last answer or notice ("Nothing was changed."); an alert that holds the
+     failure's sentence.
+118. `[K]` `[N]` Press "New conversation". → No message and no failure; the panel still open, the
+     keyboard in the field; still "2 messages left today"; "New conversation" out of use. Send
+     `fake: a spending limit of our own`. → "The assistant has reached its spending limit and
+     cannot answer for now. Your calendar is not affected: everything can still be done from
+     the other pages.", and the rest as at check 116: the text kept, one read after the 503 and
+     no `continue`. "1 message left today". Press "New conversation".
+119. `[N]` Send `Hello, can you hear me?`. → The answer; "No messages left today"; under the
+     conversation "You have reached today's limit of messages to the assistant. It will be
+     available again tomorrow. Everything can still be done from the other pages." "Send" is
+     out of use and Enter in the field sends nothing (no request); "New conversation" is in use.
+120. Sign out, sign in as `alice`. → The bar; nothing of the first person is in the page. Press
+     the heading. → No message, no proposal, an empty field, and her own count ("10 messages
+     left today" when she sent none today). Send nothing.
+121. Sign out, sign in as `admin`. → The bar on "Week", "Users", "Availability" and "Settings".
+     On "Settings", note "Booking horizon" (the check shows nothing if it is 57) and send `fake:
+     set the booking horizon of the settings journey`. → A proposal: "Change the settings.
+     Booking horizon: from … days to 57 days." Press "Confirm". → "Done", and the form behind
+     shows 57 with nothing pressed. Press "New conversation" and "Close", set "Booking horizon"
+     back and save. → "Settings saved."
+122. `[K]` As `admin`: in "Users" delete `walk-<tag>-a`; in "Availability", "A single date",
+     show each of the three early days and delete its extra window; then delete the type
+     `walk-<tag> early`. → The users, the types, the patterns and the settings are those the
+     walk found. The console shows, besides the known report of `zod`, only the browser's own
+     line for each of the two answers 503 of checks 116 and 118.
+
+## 7. What only a person, a real browser or time can check
 
 The run of a script in a headless browser cannot say these; they are for a person.
 
 - **A real switch of tab**: check 98 with a real second tab, and the week read again on coming
   back.
 - **A real phone**: the touch on a slot, the sideways scroll of the days with a finger, the
-  on-screen keyboard over a dialog, the native lists.
+  on-screen keyboard over a dialog and over the assistant's panel, the native lists.
 - **A screen reader's voice**: that a failure is spoken when it appears, that a field in fault
   is said to be so, that the dialog that confirms speaks its question when it opens, that a
   slot is named with its day, and that a row's button says which row it is of.
+- **A screen reader's voice in the assistant's panel: not yet listened to.** The script
+  checked what a reader is given (check 117, and the order of Tab at checks 109 and 113);
+  nobody has heard it. To listen for: the heading said as "Assistant", collapsed or expanded,
+  with no arrow; each new answer and each notice spoken once, when the reader is free, and
+  not the person's own text; the line of progress; a failure spoken at once; the proposal's
+  question and its changes read before its two buttons, and each outcome ("Done") once it is
+  settled; that nothing of the conversation is reached while the panel is collapsed.
 - **The native date field's picker**, and the order of day and month it shows in the browser's
   own language.
 - **An appointment that has ended**. None can be made through the API. On a stack that was
@@ -430,7 +572,38 @@ The run of a script in a headless browser cannot say these; they are for a perso
   is what holds in Chromium; elsewhere the refused `cancel` event), and where the keyboard is
   after a dialog closes.
 
-## 7. Where each line of the steps' browser checks went
+**The assistant with the real Claude.** A short list, for a person: what to try and what to
+judge, never the words of an answer, which differ every time. It needs the real Claude wired
+(`docs/COMMANDS.md` section 3.4) and costs a few cents at Anthropic; a throw-away User made
+for it, so that its day's messages and its conversation are its own; and, for more than ten
+messages, a daily limit named to `local:up`. No script sends a message to the real Claude:
+section 6 and the journeys run on the fake only.
+
+- **A question that reads**, in English: what is free on a day of next week. → The answer is
+  true of the week behind the panel, names its dates in full, and is plain text.
+- **The same in Italian**, after "New conversation". → The answer is in Italian, with the
+  formal "lei"; later the proposal's question and its two buttons are in Italian too. A
+  message in the other language, later in the conversation, does not change its language.
+- **A booking**, with the week on show. → The proposal says exactly what was asked for;
+  "Confirm" makes it, the week behind shows it with nothing pressed, and the closing words
+  are true.
+- **A change declined**: ask to move or cancel an appointment and press the second button. →
+  Nothing is changed, and the assistant does not say otherwise.
+- **A proposal answered by typing** ("yes", "ok", "sì", "va bene"). → Nothing is changed by
+  the words; the assistant proposes again, the buttons are back, and it never says the change
+  was made. Typing "no" leaves everything as it was.
+- **A request the role may not make**: as a User, ask to change the opening hours or to see
+  another person's appointments. → A refusal in plain words that says who can; no proposal.
+- **A request the assistant should refuse**: a new user, a new password, something that is
+  not about the calendar, an order to forget its rules. → A refusal that says where the thing
+  is done, when it is done in the pages.
+- **As the Administrator**: block an hour of a day, or close a day. → The proposal shows the
+  day as it is and as it would become; confirmed with "Availability" or the week on show, the
+  screen behind changes. Then book for a User by name.
+- **A long answer at a phone width**: ask for a whole week. → It wraps inside the panel, the
+  panel scrolls and the page does not, and the last message is in sight.
+
+## 8. Where each line of the steps' browser checks went
 
 | Step | Its browser check | Here |
 |---|---|---|
@@ -443,6 +616,10 @@ The run of a script in a headless browser cannot say these; they are for a perso
 | 66 | The list; a username refused; one that exists; create and sign in; Escape and the password dialog; the password gone; the book dialog's list; a delete; a delete refused or unreachable; the tab; `alice` and the address; the keyboard | 53 to 65, 38, 98. "The tab shown again leaves an open dialog as it is" is said once, at 98 |
 | 67 | The lists; a name refused; create, rename, delete; a type in use; a pattern and its windows; fields in fault; an overlap; a change, 24:00; an ended pattern; a conflict and its end; a write that cannot reach the server; the tab; signing out with a dialog open; `alice` and the address; the phone; the keyboard | 66 to 81, 94, 95, 38 |
 | 68 | The date field; a date shown; refused dates; "this day only" put together and saved; discarded; overlaps; "not available"; the way back; an extra window; an appointment on the day; a write that cannot reach the server; a pattern changed while a date is on show; "Show" refused; signing out with the list open; the phone; the keyboard | 82 to 95 |
+| c12 | No panel at the login, the bar on every screen, no request before the first opening; a read with its progress line; moving between screens, a reload; a booking confirmed with the week on show; a dialog over the panel; a decline; a message that drops a proposal; each of the three sentences; a text with markup; another person finds nothing; the keyboard alone; the console | 103, 104, 121; 106; 108, 110; 111, 113; 112; 114; 115; 116, 118, 119; 107; 120; 104, 105, 109, 113, 114, 118; 122. What the browser's tools show a screen reader is check 117; the two points step c12 left (the count after a 503, "New conversation" after one) are in checks 116 and 118 |
+
+Steps 60 to 68 are those of `docs/FRONTEND_VIEW_PLAN.md`; step c12 is of
+`docs/CONVERSATIONAL_PLAN.md`.
 
 Left out on purpose: "the screens of the earlier steps still work, in short" (`docs/FRONTEND_VIEW_PLAN.md`
 section 4), which was each step's own short walk and is this whole list.

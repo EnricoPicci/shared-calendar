@@ -169,13 +169,13 @@ describe('the assistant\'s model', () => {
       expect(loadTrouble('session_rejected').say).toBe('Your session has ended. Please sign in again.');
     });
 
-    it('send: the three sentences of shared/ in the conversation\'s language, English without one; the day\'s limit closes the field for the day', () => {
+    it('send: the three sentences of shared/ in the conversation\'s language, English without one; the day\'s limit closes the field for the day; after the other two the conversation is read, and not continued', () => {
       expect(sendTrouble('assistant_limit_reached', 'it')).toEqual({ ...plain(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_limit_reached), stop: 'day' });
       expect(sendTrouble('assistant_limit_reached', null)).toEqual({ ...plain(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_limit_reached), stop: 'day' });
-      expect(sendTrouble('assistant_budget_reached', 'it')).toEqual(plain(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_budget_reached));
-      expect(sendTrouble('assistant_budget_reached', null)).toEqual(plain(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_budget_reached));
-      expect(sendTrouble('assistant_unavailable', 'en')).toEqual(plain(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_unavailable));
-      expect(sendTrouble('assistant_unavailable', 'it')).toEqual(plain(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_unavailable));
+      expect(sendTrouble('assistant_budget_reached', 'it')).toEqual({ ...plain(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_budget_reached), then: 'read' });
+      expect(sendTrouble('assistant_budget_reached', null)).toEqual({ ...plain(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_budget_reached), then: 'read' });
+      expect(sendTrouble('assistant_unavailable', 'en')).toEqual({ ...plain(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_unavailable), then: 'read' });
+      expect(sendTrouble('assistant_unavailable', 'it')).toEqual({ ...plain(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_unavailable), then: 'read' });
     });
 
     it('send: a full conversation has the sentence of shared/ and closes the field until a new one', () => {

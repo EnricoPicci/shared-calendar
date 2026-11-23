@@ -63,8 +63,8 @@ What it cannot show is for the browser check.
   for the browser check.
 - A `disabled` button's `click()` does nothing there, as in a browser.
 - A native date field's `value` is set and read as `YYYY-MM-DD` and emptied by `form.reset()`;
-  what can be typed into it is for the browser check, where it is typed as the digits of month,
-  day and year.
+  what can be typed into it is for the browser check, where it is typed as digits in the order
+  the browser shows its parts (the day first, or the month first).
 - A number field's `value` is set and read as text (a text that is not a number reads back
   empty).
 - A checkbox's `click()` sends `change` but no `input` event, so a test of an edit typed into a

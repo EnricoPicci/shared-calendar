@@ -105,6 +105,10 @@ export function mountAssistant(root: HTMLElement, screen: AssistantDeps): Subscr
     // Where the keyboard is, read before anything is hidden: a browser takes it away from a
     // button that is hidden under it.
     const active = root.ownerDocument.activeElement as HTMLElement | null;
+    // Whether the conversation is scrolled to its end, read before anything changes its height:
+    // the proposal and the lines under the list take their room from it.
+    const atEnd = messages.scrollHeight - messages.scrollTop - messages.clientHeight <= 1;
+    const opening = state.open && !open;
     root.classList.toggle('open', state.open);
     toggle.setAttribute('aria-expanded', String(state.open));
     for (const part of [talk, end, collapse]) part.hidden = !state.open;
@@ -114,14 +118,12 @@ export function mountAssistant(root: HTMLElement, screen: AssistantDeps): Subscr
       if (cameFrom?.isConnected) cameFrom.focus();
       else active.blur();
     }
-    // The list is rebuilt only when the stream brings another one, and scrolled to its end
-    // then and when the panel opens.
+    // The list is rebuilt only when the stream brings another one.
     const redrawn = state.messages !== drawn;
     if (redrawn) {
       drawn = state.messages;
       messages.replaceChildren(...drawn.map(messageFor));
     }
-    if (redrawn || (state.open && !open)) messages.scrollTop = messages.scrollHeight;
     open = state.open;
 
     progress.textContent = state.progress ?? '';
@@ -138,6 +140,10 @@ export function mountAssistant(root: HTMLElement, screen: AssistantDeps): Subscr
     remaining.textContent = state.remaining;
     send.disabled = !state.canSend;
     end.disabled = !state.canEnd;
+    // The conversation is scrolled to its end when it was rebuilt, when the panel opens, and
+    // when it was at its end before: a proposal or a line that appears under it must not push
+    // the last message out of sight. A person who scrolled back is left where they are.
+    if (redrawn || opening || atEnd) messages.scrollTop = messages.scrollHeight;
     // The server took a message: the field is emptied, unless the person has typed on since.
     if (state.accepted !== accepted) {
       accepted = state.accepted;

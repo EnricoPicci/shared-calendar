@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v15, under way: steps c00 to c12 of `docs/CONVERSATIONAL_PLAN.md` done |
-| Date | 2026-11-22 |
+| Status | v16, under way: steps c00 to c13 of `docs/CONVERSATIONAL_PLAN.md` done |
+| Date | 2026-11-23 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
 
@@ -26,6 +26,7 @@
 | v12 | 2026-11-22 | Step c09 of `docs/CONVERSATIONAL_PLAN.md` is done: the back end is closed. **Two limits are added** (section 4.4), found when the size of a stored item was worked out: only the first five reads of one answer of the model are run, and the stored size of a conversation is looked at again after every step that would lead to another, so that an exchange stops at most one step past the bound. **Open point P3 has its numbers and its decision** (sections 9 and 18.2). Two journeys are added: a conversation filled to its bound, and a conversation whose mark of the instructions differs (section 12.1); the journeys make a second direct write to the `assistant` table. A sliding window over the conversation is among the alternatives not taken (section 17). No tool, route, function, role or permission is added |
 | v14 | 2026-11-22 | Step c11 of `docs/CONVERSATIONAL_PLAN.md` is done: the front end's `AssistantService`, which `docs/FRONTEND_SERVICES.md` section 20 governs from now on. **One sentence of section 13 was wrong and is corrected**: the service has one stream for its six calls, each outcome saying the call it answers, not a result and a state stream per call (decided by the Product Owner; `docs/FRONTEND_SERVICES.md` section 3.4 and section 8, decision 46). Section 13 also says that a call of the service makes one request, the loop on `continue` being the logic layer's, as its own row already had it. No route, code or behaviour of the API changes |
 | v15 | 2026-11-22 | Step c12 of `docs/CONVERSATIONAL_PLAN.md` is done, and with it a decision of the Product Owner that changes this document: **the assistant is not a screen but a panel at the bottom of every screen**, for both roles, with no address and no navigation entry. Section 13 is rewritten for the panel; `docs/FRONTEND_ARCHITECTURE.md` (sections 6 and 6.1, decisions 138 to 151) governs it. Wherever this document said "the screen" for the page's part of the assistant it now says "the panel" (sections 1 to 8, 12, 17 to 19, the diagrams). Section 10.2: the line about Anthropic is under the heading of the open panel. Section 13 also states what the panel does that this document did not say: the first read at the first opening, the read after a confirmation that got one of the two `503` answers, the outcome of a refused change in the page's own words (the contract carries a code, not a sentence), and that a message which drops a proposal brings no notice. Section 17: a separate screen among the alternatives. Section 18.1: decision 13 |
+| v16 | 2026-11-23 | Step c13 of `docs/CONVERSATIONAL_PLAN.md` is done: the panel walked by a script against the fake Claude (`docs/FRONTEND_WALK.md` v2, 122 checks) and used by the Product Owner with the real model. **Open point P6 is closed as built**: a typed answer to a proposal changed nothing, and no list of words matched in code is added (sections 5.5 and 18.2). Section 13: after a message that got one of the two `503` answers the panel reads the conversation once and does not continue it, so that the count of messages left and the conversation are the server's. |
 
 ---
 
@@ -536,7 +537,10 @@ As built (`backend/src/assistant/`: `exchange.ts` makes the proposal, `confirm.t
 5. **Writing instead of pressing drops the proposal.** A new message while a proposal waits
    ("no, at eleven") declines it; the model is told nothing was changed and reads the new
    message. That includes a typed "yes": the model then proposes again and the panel shows
-   the buttons again. It is the price of rule 1, and it keeps a channel-independent meaning to
+   the buttons again. With the real model, in the Product Owner's sessions of
+   `docs/CONVERSATIONAL_PLAN.md` step c13, a typed "yes" or "sì" changed nothing and the
+   assistant answered that a change is confirmed with the button; a typed "no" left
+   everything as it was. No word typed is matched in code. It is the price of rule 1, and it keeps a channel-independent meaning to
    "confirm" (section 16). The message that drops a proposal is saved in one write with the
    results "not confirmed" and is read by Claude in the same request: one request to Claude,
    one message of the day. A message that is refused (the daily limit, a full conversation, a
@@ -1452,7 +1456,11 @@ The person asks while looking at the calendar, and sees the calendar change.
   `conversation_full`, until "New conversation". After `assistant_busy`, `proposal_not_found`
   and `nothing_to_continue` the conversation is read again, once. After a confirmation that got
   `503 assistant_unavailable` or `assistant_budget_reached` it is read again too, to show each
-  action's outcome, and Claude is not asked again.
+  action's outcome, and Claude is not asked again. After a message that got one of those two
+  answers it is read once as well, and not continued: the server may have saved and counted
+  the message, so the messages left today, the conversation and "New conversation" are then
+  the server's; the text stays in the field, and sending it again is how the person asks for
+  its answer.
 - **After a confirmed change** the other screens must not show stale data: when a reply
   carries a proposal with an action `done`, the logic object tells the screen on show to load
   again, by the stream those screens already reload on when the tab is shown again. The week
@@ -1598,7 +1606,7 @@ Not built now. What the design already gives it, and what it would add:
 | P3 | **The capacity of the `assistant` table** under a long conversation | Measured in step c09 (section 9, "What a step costs the table"): an ordinary step 2 read and 14 write units, the largest 84 write units, a full conversation 30 read units, against 8 / 6 a second and a burst allowance of 2 400 / 1 800. **Closed: the Product Owner decided to keep the 100 KB bound and the 6 KB cut** (2026-11-22) | Nothing |
 | P4 | **Effort level and model** | Measured in step c10 on three runs of the evaluation (section 7.1). **Closed: the Product Owner chose `claude-sonnet-5-5` at effort `low`** (2026-11-22) | Nothing |
 | P5 | **Blocking time by an override the model works out** | Judged in step c10: the nine blocking requests of the evaluation were read one by one on the chosen model (a whole day, a morning, an hour inside a window, an interval over two windows, one that holds an extra window, one over an appointment, a day with hours of its own, a day with none), and each proposed the right hours or rightly none. **Closed: no `block_time` tool** (2026-11-22) | Nothing |
-| P6 | **A typed "yes" drops the proposal** (section 5.5, rule 5) | If the walk shows people type more than they press, accept a typed confirmation only through a fixed list of words matched in code, never through the model. Built as stated; in the trial with the real model a typed "yes" made it ask for the same change again, so the buttons came back | Nothing |
+| P6 | **A typed "yes" drops the proposal** (section 5.5, rule 5) | If the walk shows people type more than they press, accept a typed confirmation only through a fixed list of words matched in code, never through the model. Built as stated; in the trial with the real model a typed "yes" made it ask for the same change again, so the buttons came back. **Closed as built** (2026-11-23, `docs/CONVERSATIONAL_PLAN.md` step c13): in the Product Owner's three sessions with the real model a typed "yes", "sì" and the like changed nothing and the assistant answered that a change is confirmed with the button, and a typed "no" left everything as it was. No list of words is added. The sessions' log was not kept, so there is no count of how often a proposal was answered by typing | Nothing |
 | P7 | **The front end is deployed nowhere** (`docs/FRONTEND_ARCHITECTURE.md` section 10) | Unchanged by this feature: the panel needs the same origin or CORS answer as every other screen | The first deployment of the front end, as today |
 
 ---

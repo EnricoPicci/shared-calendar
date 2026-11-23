@@ -237,8 +237,11 @@ dialog .old { overflow-wrap: anywhere; }
 .assistant-head { display: flex; align-items: center; gap: 0.5rem; }
 .assistant-head h2 { font-size: 1rem; margin-right: auto; }
 .assistant .toggle { font-weight: 600; }
-.assistant .toggle::after { content: ' ▴'; }
-.assistant .toggle[aria-expanded="true"]::after { content: ' ▾'; }
+/* The arrow is drawing only: after the slash it is given no words, so that a screen reader says
+   "Assistant" and whether the panel is open, which the button's own state tells. The first
+   declaration is for a browser that does not know the slash. */
+.assistant .toggle::after { content: ' ▴'; content: ' ▴' / ''; }
+.assistant .toggle[aria-expanded="true"]::after { content: ' ▾'; content: ' ▾' / ''; }
 .compose { flex: 1; min-width: 0; display: flex; align-items: center; gap: 0.5rem; }
 .compose label { flex: 1; min-width: 0; display: flex; align-items: center; gap: 0.5rem; }
 .compose input { min-width: 0; }

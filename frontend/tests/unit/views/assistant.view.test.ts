@@ -228,6 +228,21 @@ describe('mountAssistant', () => {
       expect(list.scrollTop).toBe(800);
     });
 
+    it('a proposal or a line that appears under a list at its end leaves the last message in sight; a person who scrolled back is left there', () => {
+      const { assistant$ } = mounted(opened({ messages: TALK }));
+      const list = one('.messages');
+      Object.defineProperty(list, 'scrollHeight', { configurable: true, get: () => 500 });
+      // The proposal's block takes its room from the list.
+      Object.defineProperty(list, 'clientHeight', { configurable: true, get: () => (one('.proposal').hidden ? 200 : 120) });
+      list.scrollTop = 300; // at its end
+      assistant$.next(opened({ messages: TALK, proposal: proposal() }));
+      expect(list.scrollTop).toBe(500);
+
+      list.scrollTop = 100; // the person scrolled back
+      assistant$.next(opened({ messages: TALK, proposal: proposal({ buttons: 'disabled' }), failure: FAILURE }));
+      expect(list.scrollTop).toBe(100);
+    });
+
     it('the progress line, the news for a screen reader, and the messages left', () => {
       const { assistant$ } = mounted(opened({ progress: 'Looking at the calendar…', news: 'Looking at the calendar…' }));
       expect([one('.progress').textContent, one('.news').textContent, one('.remaining').textContent]).toEqual(['Looking at the calendar…', 'Looking at the calendar…', '10 messages left today']);

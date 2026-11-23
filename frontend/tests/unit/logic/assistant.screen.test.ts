@@ -424,8 +424,6 @@ describe('AssistantScreen', () => {
 
   describe('a message the server does not take', () => {
     it.each([
-      ['assistant_budget_reached', ASSISTANT_TEXTS_EN.cannotAnswer.assistant_budget_reached],
-      ['assistant_unavailable', ASSISTANT_TEXTS_EN.cannotAnswer.assistant_unavailable],
       ['invalid_request', 'A message can be 2000 characters long at most, and cannot be empty.'],
       ['invalid_json', failureText('invalid_json')],
       ['forbidden', failureText('forbidden')],
@@ -445,15 +443,83 @@ describe('AssistantScreen', () => {
       expect(JSON.stringify(last())).not.toContain('for a developer');
     });
 
+    it.each([
+      ['assistant_budget_reached', ASSISTANT_TEXTS_EN.cannotAnswer.assistant_budget_reached],
+      ['assistant_unavailable', ASSISTANT_TEXTS_EN.cannotAnswer.assistant_unavailable],
+    ] as const)('%s on the first message, saved by the server: its sentence, then one read and no step; the count is the server\'s, "New conversation" in use, the field not emptied', (reason, sentence) => {
+      const { screen, opened, answered, failed, calls, last } = screenOf();
+      opened();
+      screen.send('what is open?');
+      failed.send(reason);
+      expect(calls()).toEqual({ ...NO_CALLS, load: 2, send: 1 });
+      expect(last()).toMatchObject({ failure: sentence, remaining: '10 messages left today', canSend: false, canEnd: false });
+      // The server saved the message and counted it, and the conversation waits for a step.
+      answered('load', working({ activity: null, messages: [message(1, 'person', 'what is open?')] }));
+      expect(calls()).toEqual({ ...NO_CALLS, load: 2, send: 1 });
+      expect(last()).toMatchObject({ failure: sentence, progress: null, remaining: '9 messages left today', canSend: true, canEnd: true, accepted: 0 });
+      expect(texts(last())).toEqual(['what is open?']);
+      expect(JSON.stringify(last())).not.toContain('for a developer');
+    });
+
+    it('such an answer when the server saved nothing (the language could not be asked): the read shows no conversation, and nothing else changes', () => {
+      const { screen, opened, answered, failed, calls, last } = screenOf();
+      opened();
+      screen.send('hello');
+      failed.send('assistant_unavailable');
+      answered('load', NONE);
+      expect(calls()).toEqual({ ...NO_CALLS, load: 2, send: 1 });
+      expect(last()).toEqual({ ...START, open: true, failure: ASSISTANT_TEXTS_EN.cannotAnswer.assistant_unavailable, canSend: true, remaining: '10 messages left today' });
+    });
+
+    it('the same text sent again after such an answer: refused as busy, read back, taken and answered', () => {
+      const { screen, opened, answered, failed, calls, last } = screenOf();
+      opened();
+      screen.send('what is open?');
+      failed.send('assistant_unavailable');
+      answered('load', working({ activity: null, messages: [message(1, 'person', 'what is open?')] }));
+      screen.send('what is open?');
+      failed.send('assistant_busy');
+      expect(calls()).toEqual({ ...NO_CALLS, load: 3, send: 2 });
+      answered('load', working({ messages: [message(1, 'person', 'what is open?')] }));
+      expect(calls().continue).toBe(1);
+      expect(last().accepted).toBe(1);
+      answered('continue', reply({ remainingToday: 9, messages: [message(2, 'assistant', 'Tuesday.')] }));
+      expect(texts(last())).toEqual(['what is open?', 'Tuesday.']);
+      expect(last()).toMatchObject({ canSend: true, remaining: '9 messages left today' });
+    });
+
+    it('such an answer while a proposal waited: the read shows what the server holds, and no step is asked for', () => {
+      const { screen, opened, answered, failed, calls, last } = screenOf();
+      opened(waiting({ messages: [message(1, 'person', 'book it')] }));
+      screen.send('no, at eleven');
+      failed.send('assistant_budget_reached');
+      answered('load', working({ activity: null, remainingToday: 8, messages: [message(1, 'person', 'book it'), message(2, 'person', 'no, at eleven')] }));
+      expect(calls()).toEqual({ ...NO_CALLS, load: 2, send: 1 });
+      expect(last()).toMatchObject({ proposal: null, remaining: '8 messages left today', canSend: true, canEnd: true, accepted: 0 });
+    });
+
+    it('the read after such an answer fails too: its own sentence, and the exchange is over', () => {
+      const { screen, opened, failed, calls, last } = screenOf();
+      opened();
+      screen.send('hello');
+      failed.send('assistant_unavailable');
+      failed.load('network');
+      expect(calls()).toEqual({ ...NO_CALLS, load: 2, send: 1 });
+      expect(last()).toMatchObject({ failure: UNREACHABLE, progress: null, canSend: true });
+    });
+
     it('the three sentences of shared/ are said in the conversation\'s language', () => {
-      const { screen, opened, failed, last } = screenOf();
+      const { screen, opened, answered, failed, last } = screenOf();
       opened(reply({ language: 'it', messages: [message(1, 'person', 'ciao')] }));
+      const held = reply({ language: 'it', messages: [message(1, 'person', 'ciao')] });
       screen.send('ancora');
       failed.send('assistant_unavailable');
       expect(last().failure).toBe(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_unavailable);
+      answered('load', held);
       screen.send('ancora');
       failed.send('assistant_budget_reached');
       expect(last().failure).toBe(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_budget_reached);
+      answered('load', held);
       screen.send('ancora');
       failed.send('assistant_limit_reached');
       expect(last().failure).toBe(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_limit_reached);
@@ -519,6 +585,7 @@ describe('AssistantScreen', () => {
       opened();
       screen.send(' what is open? ');
       failed.send('assistant_unavailable'); // saved by the server, which could not ask Claude
+      answered('load', working({ messages: [message(1, 'person', 'what is open?')] }));
       expect(last().accepted).toBe(0);
       screen.send(' what is open? ');
       failed.send('assistant_busy');

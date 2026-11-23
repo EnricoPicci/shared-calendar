@@ -343,6 +343,9 @@ export class AssistantScreen {
     if (trouble.then !== 'nothing' && !this.readAgain) {
       this.readAgain = true;
       this.goOn = trouble.then === 'read-on';
+      // A read that does not go on leaves the person's text in the field, also when the server
+      // holds it: sending it again is how the person asks for its answer.
+      if (!this.goOn) this.sent = null;
       this.show();
       this.assistant.load();
       return;

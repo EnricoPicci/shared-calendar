@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`). **Step c09 done** 2026-11-22 (brief `prompts/a11-step-c09-implementation.md`). **Step c10 done** 2026-11-22 (brief `prompts/a12-step-c10-implementation.md`). **Step c11 done** 2026-11-22 (brief `prompts/a13-step-c11-implementation.md`). **Step c12 done** 2026-11-22 (brief `prompts/a14-step-c12-implementation.md`): the assistant is a panel at the bottom of every screen, not a screen, by a decision of the Product Owner |
+| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`). **Step c09 done** 2026-11-22 (brief `prompts/a11-step-c09-implementation.md`). **Step c10 done** 2026-11-22 (brief `prompts/a12-step-c10-implementation.md`). **Step c11 done** 2026-11-22 (brief `prompts/a13-step-c11-implementation.md`). **Step c12 done** 2026-11-22 (brief `prompts/a14-step-c12-implementation.md`): the assistant is a panel at the bottom of every screen, not a screen, by a decision of the Product Owner. **Step c13 done** 2026-11-23 (brief `prompts/a15-step-c13-implementation.md`): the walk has the panel, open point P6 is closed as built |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown in its panel, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which is deployed nowhere today (open point P7, section 2.2). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
@@ -66,7 +66,7 @@ this plan.
 | P3 | The capacity of the `assistant` table under a long conversation | c09 | Measured (the "As done" note of step c09): an ordinary step 2 read and 14 write units, the largest 84 write units, a full conversation 30 read units, against 8 / 6 a second and a burst allowance of 2 400 / 1 800. **Closed: the Product Owner decided to keep the 100 KB bound and the 6 KB cap** (2026-11-22) |
 | P4 | Effort level and model | c10 | **Closed** 2026-11-22: `claude-sonnet-5-5` at effort `low`, chosen by the Product Owner on three runs of the evaluation (the note under step c10) |
 | P5 | Blocking time by an override the model works out | c10 | **Closed** 2026-11-22: no `block_time` tool. The nine blocking requests of the evaluation proposed the right hours (the note under step c10) |
-| P6 | A typed "yes" drops the proposal | c13 | The walk with the real model, by the Product Owner too. If people type more than they press, the fixed list of words matched in code is proposed, and built only after the go |
+| P6 | A typed "yes" drops the proposal | c13 | **Closed as built** 2026-11-23: in the Product Owner's sessions with the real model a typed answer changed nothing and the assistant pointed at the button; no list of words is added (the note under step c13) |
 | P7 | The front end is deployed nowhere | c16 | **Stays open**, on purpose: this plan does not deploy the front end. Step c12 makes the panel work locally through the dev server. Step c16 adds the assistant's routes to what `docs/FRONTEND_ARCHITECTURE.md` section 10 says a deployment must cover |
 
 ### 2.3 What planning found, each in its step
@@ -1528,6 +1528,70 @@ points of decision 151, to look at again with real answers.
 **Acceptance:** the root gate green on a fresh stack; then, on a second fresh stack, the seed
 and the whole walk, line by line; P6 written as decided in
 `docs/CONVERSATIONAL_ARCHITECTURE.md` sections 5.5 and 18.
+
+#### As done (2026-11-23)
+
+Brief `prompts/a15-step-c13-implementation.md`. Nothing changed in `backend/`, `shared/`,
+`frontend/src/services/`, the fake, the journeys or the instructions.
+
+**The gate and the walk.** The root gate was green on a fresh stack. On a second fresh, seeded
+stack with the fake Claude the whole walk was run by a script in headless Chromium 156, kept
+outside the repository and deleted, at 1280 × 800 and at 390 × 844: **122 checks, every one
+answered yes at both widths**. `docs/FRONTEND_WALK.md` is at v2: its section 6 is the
+assistant's panel (checks 103 to 122, the ten messages of a throw-away User's day), its section
+7 holds the short list for the real model, and no earlier check changed its number.
+
+**What changed in a line of the walk, and why.** Check 5: on a Sunday that is the day of the
+seed, the week of today has no window and an empty legend, which is the seed's doing, not the
+page's. Check 90: "Save this day" is one write followed by a read of the date, where the line
+said "one request". The digits of a date are typed in the order the browser shows them: this
+browser showed the day first (`docs/FRONTEND_ARCHITECTURE.md` section 8).
+
+**What was changed in the panel.**
+
+- After a message that got one of the two `503` answers the conversation is read once and not
+  continued (`assistant.model.ts`, `assistant.screen.ts`; `docs/FRONTEND_ARCHITECTURE.md`
+  decision 151). Three existing tests of the logic said the opposite and were changed with it,
+  and five cases were added.
+- Found by the walk, the heading's arrow was part of the button's name for a screen reader:
+  the style sheet now draws it with no words (decision 152).
+- Found by the walk, a proposal pushed the last message out of sight: the view keeps the
+  conversation at its end (decision 153).
+
+Each with its test; `npm run verify -w frontend` green, 100 % lines.
+
+**Without a mouse**, by the script only: the order of Tab in the bar and in the open panel,
+where the keyboard is after sending, confirming, declining, "Close" and the Escape key, and
+what the browser's accessibility tree holds for the panel (the table in
+`docs/FRONTEND_ARCHITECTURE.md` section 8). **Nobody has listened with a screen reader**: what
+to listen for is in `docs/FRONTEND_WALK.md` section 7.
+
+**The sessions with the real model.** The Product Owner alone, nobody else being at hand:
+three sessions on a fresh stack, a User in English, a User in Italian at a phone width and the
+Administrator, with the lists of `docs/FRONTEND_WALK.md` section 7. Found: everything worked.
+**No numbers**: `local:api` was started without the `tee` of `docs/COMMANDS.md`, so no log
+line of the sessions was kept, and with it no count of messages, steps, proposals or tokens
+and no cost; a second session to get them was not wanted. `docs/COMMANDS.md` now says that
+such a session needs the file.
+
+**P6, closed as built.** A proposal answered by typing "yes", "sì" and the like: nothing was
+changed, and the assistant answered that a change is confirmed only with the button. A typed
+"no": nothing was changed. No fixed list of words is built
+(`docs/CONVERSATIONAL_ARCHITECTURE.md` sections 5.5 and 18.2).
+
+**For the evaluation of step c10**, not put into `prompt.ts`: a request that answers a waiting
+proposal with a typed "yes", in each language, checked for a new proposal of the same change,
+so that the button the answer points at is on show. The sessions did not record whether it
+was.
+
+**Left as found, for a later look:** in an open panel whose conversation scrolls, Tab stops on
+the conversation between "Close" and the field, which is the browser's way of letting a
+keyboard scroll it; the fake's answer to a read is the tool's result as JSON, which wraps in
+the panel at both widths.
+
+What step c14 finds ready: the panel walked and its walk written, with a list for the real
+model; every open point but P1, P2 and P7 closed; the note in `docs/COMMANDS.md` on keeping
+the local API's output, which the smoke test's exchange will want too.
 
 ---
 

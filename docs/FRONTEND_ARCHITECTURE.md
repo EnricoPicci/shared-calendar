@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v13 — **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12). Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
+| Status | v14 — **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12, walked at step c13 on 2026-11-23). Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders |
 | Not in scope | Hosting, the CORS gap, keeping the session across a reload, the Content-Security-Policy of the hosting, logout, the size of the bundle. They are the open points of section 10: the only things between the front end and a deployment |
 | Depends on | `docs/FRONTEND_SERVICES.md` v8 (the services the views use), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work) |
@@ -28,6 +28,7 @@
 | v11 | 2026-11-20 | Plan step 69, the closing. Status: implemented. The text is brought to the present tense: it says what is, not what a step added. Section 3, rule 2: why nothing shows before the script decides. Section 4: the handlers of a view that was left; a slot and an appointment named with their day for a screen reader; the dialogs that ask described by their question; the sentence of an overlap among the windows of "this day only" said once, under "Start", with "End" marked (a field in fault with no words of its own). Section 6: the sequence from "Sign in" to the first week. Section 7: the new sections 7.1, what the code became, and 7.2, the verdict on the fallback, as a proposal. Section 8: the walk, a document of its own (`docs/FRONTEND_WALK.md`); the table of the dialogs and the focus; the two tests of `page.test.ts` on reading the page without a mouse. Section 10: every open point as it stands today. Section 12.1: the size at step 69 and the share of `zod`, measured again. Section 11: decision 106 closed, decision 123 as settled, decisions 129 to 136. The trial's code (`prototypes/`) is deleted; what was still true of its page on the loading sequence is in sections 3, 4 and 6. |
 | v12 | 2026-11-20 | The verdict of section 7.2 taken at the review of plan step 69: section 3, rule 12 and the third condition of section 7 are reworded to allow what `availability.parts.ts` is, a file of helpers shared by the views of one screen, with its bound. Section 7.2 says what was decided, no longer what was proposed. Section 11: decision 135 as taken, decision 137. No code changed. |
 | v13 | 2026-11-22 | Step c12 of `docs/CONVERSATIONAL_PLAN.md`: the assistant's panel, a view that is no screen and lives across the screens, as the Product Owner decided. New section 6.1: what the panel is, what the shell does for it, its logic object and its view, how the screens are told to load again, what its tests hold. Section 5.1: two files more, `assistant.model.ts` and `assistant.screen.ts`. Section 6, point 4: the session's objects include the `AssistantService` and the `AssistantScreen`, and the screens are handed one stream to load again on. Section 9: the new files. Section 11: decisions 138 to 151. The numbers of section 7.1 are those of plan step 69 and are not measured again; the panel's are in section 6.1 |
+| v14 | 2026-11-23 | Step c13 of `docs/CONVERSATIONAL_PLAN.md`: the walk with the assistant's panel (`docs/FRONTEND_WALK.md` v2). Section 6.1: after a message that got one of the two `503` answers the conversation is read once and not continued (decision 151, rewritten as what was done); the conversation stays scrolled to its end when a proposal or a line appears under it; the heading's arrow has no words for a screen reader. Section 8: the panel's rows after the table of the dialogs, and the order a date is typed in. Decisions 152 and 153. |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
 TypeScript module script**. The markup of every screen is in one `index.html`; the script
@@ -1805,18 +1806,25 @@ on the reason.
   `conversation_full` with `shared/`'s too, every other reason with a sentence of `texts.ts`
   in English. The service's `message` never reaches the state. After `assistant_busy`,
   `proposal_not_found` and `nothing_to_continue` the conversation is read again, once in an
-  exchange, and continued if it then waits for a step.
+  exchange, and continued if it then waits for a step. After a message that got
+  `assistant_unavailable` or `assistant_budget_reached` it is read once too and **not**
+  continued, whatever it waits for: the server may have saved and counted the message, so the
+  messages left, the conversation and "New conversation" are the server's, the text stays in
+  the field, and Claude is asked again only when the person sends (decision 151).
 - **"Send" out of use for longer**: after the day's limit, or a reply whose `remainingToday`
   is 0 (the limit's sentence is then shown without a refusal), until the page is loaded again;
   after `conversation_full`, until "New conversation". Reading, confirming and declining
   still work.
 
-**The view** (`assistant.view.ts`, 165 lines; it listens to one stream) finds its elements
+**The view** (`assistant.view.ts`, 171 lines; it listens to one stream) finds its elements
 once, sets every text with `textContent` (the style sheet keeps the line breaks), copies
 `#tpl-message` and `#tpl-proposed`, and forwards seven actions. Its own state is what a view
 may keep: where the keyboard was before it came into the panel, the text last sent, and the
-list it drew, which it rebuilds only when the stream brings another one. The teardown removes
-the conversation, what was typed and everything the view set.
+list it drew, which it rebuilds only when the stream brings another one. The conversation is
+scrolled to its end when it is rebuilt, when the panel opens, and when it was at its end
+before a proposal or a line appeared under it; a person who scrolled back is left there
+(decision 153). The teardown removes the conversation, what was typed and everything the view
+set.
 
 - **The keyboard.** The field taking the keyboard opens the panel. After sending, confirming,
   declining and "New conversation" the keyboard is in the field. Collapsing by "Close" or by
@@ -2140,6 +2148,24 @@ the native modal `<dialog>`, and one `autofocus` in the page (section 11, decisi
 | Change a pattern (`dialog.change`) | A row's "Change" | "Weekday" | Back on the row's "Change" | On nothing (the list was redrawn); one Tab: the first "Change" of the list |
 | The one that confirms (`dialog.delete` of `#availability`) | A row's "Delete", "Not available on this day", "Back to the weekly patterns" | "Keep" | Back on the button that opened it | A type, a pattern or an extra window deleted: on nothing (the row is gone); one Tab: the first button of that list. "Not available": back on its button, which is still there. The way back: on nothing (its button is no longer shown); one Tab: the "Start" list of the form that adds an extra window |
 
+**The assistant's panel**, which is no dialog, as Chromium 156 does it at a desktop width
+(`docs/FRONTEND_WALK.md` checks 104, 105, 109, 113, 114, 117 and 118). Here the view moves the
+focus itself (section 6.1, decision 150).
+
+| The panel | The keyboard is on |
+|---|---|
+| Collapsed, the order of Tab | After the last thing of the screen above: the heading "Assistant", the field, "Send". The field taking the keyboard opens the panel |
+| Open, the order of Tab | The heading, "New conversation", "Close", the conversation itself once it is long enough to scroll (the browser's doing: the arrow keys scroll it), the field, "Send". With a proposal waiting, "Confirm" then "Don't" come between the conversation and the field |
+| After Enter in the field or "Send", "Confirm", "Don't", "New conversation" | The field |
+| After "Close" or the Escape key | Where it was before it came into the panel; one Tab: the heading |
+| While a dialog of the page is open | Never in the panel: Tab stays in the dialog, and the Escape key is the dialog's |
+
+What the browser tells a screen reader of the open panel (its accessibility tree, check 117):
+a region named "Assistant"; a heading whose button is named "Assistant" and said to be
+expanded or collapsed (the arrow beside it is drawn by the style sheet with no words,
+decision 152); a status with the last answer or notice; an alert with the failure's sentence.
+**Nobody has listened to it with a screen reader yet** (`docs/FRONTEND_WALK.md` section 7).
+
 - **Where the keyboard ends on nothing, one more Tab reaches the next sensible thing** in every
   case: the start of the list or of the week that was redrawn, never the top of the page. A
   person who uses a screen reader hears no announcement of where they are until that Tab.
@@ -2295,7 +2321,9 @@ What the tests of a single date rely on (plan step 68), and what was learnt in t
   date too.
 - **A native date field typed by keyboard** (Chromium 159, English): the digits of the
   month, the day and the year one after the other ("11302026"), and Enter in the field
-  sends the form. For the browser check only.
+  sends the form. The order is the browser's: the headless Chromium 156 of
+  `docs/CONVERSATIONAL_PLAN.md` step c13 showed the day first and took "30112026". For the
+  browser check only.
 - **Where the keyboard is after a row is gone**, in Chromium 159: on nothing after "Remove"
   (the rows were redrawn), and the next Tab goes to the first "Remove" left, then to the
   "Start" list of the form that adds; on nothing after "This day only…" and after the way
@@ -2539,7 +2567,9 @@ than what the trial showed: these deserve the first look in a review.
 | 148 | Beyond the Product Owner's choices, found while building: after a confirmation that got `503 assistant_unavailable` or `assistant_budget_reached` the conversation is read once, without a `continue`, to show each outcome; after a confirmation answered `assistant_busy` the screens load again, since the changes were made; the read after `assistant_busy`, `proposal_not_found` or `nothing_to_continue` continues a conversation found `working`, once in an exchange | `docs/CONVERSATIONAL_ARCHITECTURE.md` sections 6 and 6.1 say what the server did in each case; without these the page would show a calendar or a proposal that is no longer true | Beyond |
 | 149 | A message refused as busy whose text the server already holds as the person's last counts as taken, and the field is emptied; "Send" is out of use until the conversation was first read; a first read that failed is tried again at the next opening; a text of spaces only sends nothing | A message that got one of the two `503` answers is saved by the server; sent again it is refused as busy, read back and answered. The others keep the panel from sending before it knows the conversation | Beyond |
 | 150 | The view gives the keyboard back to where it was before the panel when the panel collapses, and puts it in the field after an action | The panel is not a dialog, so the browser does nothing for it (decision 134 stands for the dialogs). Found in the browser: the keyboard must be read before the buttons are hidden | Beyond |
-| 151 | Known and left: after a message that got one of the two `503` answers the line "N messages left today" is one too high until the next reply, since the server counted the message and the failure carries no count; and after such an answer to the first message of a conversation "New conversation" stays out of use until the conversation is read (sending again does it) | Found in the browser check of step c12. Both mend themselves at the next reply; a read after every such failure would be one more request for a line of small print |  |
+| 151 | After a message that got one of the two `503` answers the conversation is read once and not continued; the text stays in the field, and sending it again is how the person asks for its answer (the server answers `assistant_busy` when it holds the message, and the read after that continues it) | The server counted and perhaps saved the message, and the failure carries no count: without the read "N messages left today" was one too high and, after the first message of a conversation, "New conversation" stayed out of use. One more request after a failure; Claude is not asked again by the panel itself, as `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 asks. Decided by the Product Owner for `docs/CONVERSATIONAL_PLAN.md` step c13; step c12 had left both as known |  |
+| 152 | The arrow beside the panel's heading is drawn by the style sheet with an empty alternative text (`content: ' ▾' / ''`, after a plain declaration for a browser that does not know the slash) | Found in the walk: the browser named the button "Assistant ▾", and a screen reader would read the arrow; whether the panel is open is said by `aria-expanded`. `page.test.ts` reads the two rules of the style sheet | |
+| 153 | The view keeps the conversation at its end when something appears under it: it reads whether the list is at its end before it changes anything, and scrolls after | Found in the walk: the proposal's block takes its room from the list, and the last message, the one the proposal answers, went out of sight. A person who scrolled back is not moved | |
 
 ## 12. The tooling (open points O4, O6 and O8, decided)
 

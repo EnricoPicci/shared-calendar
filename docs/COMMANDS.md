@@ -57,8 +57,14 @@ the scripts themselves win, and this document is fixed.
   When its output is to be searched afterwards (that no log line holds a person's text), keep
   it in a file as well: `npm run local:api -w backend 2>&1 | tee /tmp/shared-calendar-local-api.log`.
   The file starts again at every start, and holds the handlers' log lines among SAM's own.
+  The tokens of the assistant's steps are in those lines and nowhere else: a session with the
+  real Claude whose messages, proposals and cost are to be counted afterwards needs this file.
 - `npm run local:down -w backend`: stops the stack. The table is in memory and is lost; Cognito
   data survives in `backend/.cognito/`.
+  Stop `local:api` first. When it answers "Network shared-calendar-local … Resource is still in
+  use", the emulators are stopped all the same and Lambda containers of `sam local` are still
+  on the network: remove them with
+  `docker rm -f $(docker ps -q --filter network=shared-calendar-local)` and run it again.
 - `npm run build -w backend`: `sam build`. Always go through npm: SAM needs the repository's
   `esbuild` on the PATH and `SAM_CLI_BETA_NODEJS_MONOREPO=1`, which the script sets. Without the
   beta, building in source runs `npm update --omit dev` per function, which strips the root's
