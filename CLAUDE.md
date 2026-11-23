@@ -58,8 +58,7 @@ one that is fixed:
 
 ## Hard rules from the design
 
-- Handlers never import the AWS SDK directly. All AWS access goes through the modules under
-  `backend/src/lib`. This keeps later features cheap.
+- Handlers never import the AWS SDK directly: all AWS access goes through `backend/src/lib`.
 - `shared/` imports no AWS SDK, no Node-only module and no DOM API: only TypeScript and `zod`.
   The API contract and the username rule live there and the back end imports them; a new error
   code or response field starts in `shared/src/api.ts`.
@@ -70,6 +69,7 @@ one that is fixed:
   (`docs/ARCHITECTURE.md` section 7.1).
 - Every password is set as permanent. There is no forced password change and no e-mail sending.
 - The API can never create an administrator, delete one, or set its password.
+- A password is changed only by its owner, at Cognito; the API has no route that changes one.
 - Role resolution: `admin` wins over `user`; a token in neither group gets 403.
 
 ## Cloud safety

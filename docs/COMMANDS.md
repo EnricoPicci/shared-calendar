@@ -264,14 +264,16 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
   which refuses any endpoint but `localhost`/`127.0.0.1`): calendar data made by hand is lost
   when they run.
 - `RUN_INTEGRATION=1 npm run test:integration -w frontend`: runs `frontend/tests/integration`
-  (`login.service.test.ts`, `journeys.test.ts`, `logout.service.test.ts`, `calendar.test.ts` and
-  `assistant.test.ts`: the services against cognito-local on 9229 and the API on 3000,
-  `docs/FRONTEND_SERVICES.md` section 14; the sign-out's is its section 20.9: `alice` only, no
-  table touched, every session it opens signed out at its end). Needs
+  (`login.service.test.ts`, `journeys.test.ts`, `logout.service.test.ts`, `calendar.test.ts`,
+  `change-password.test.ts` and `assistant.test.ts`: the services against cognito-local on 9229
+  and the API on 3000, `docs/FRONTEND_SERVICES.md` section 14; the sign-out's is its section
+  20.9: `alice` only, no table touched, every session it opens signed out at its end). Needs
   `local:up` + `local:api` running and, in a Codespace, the iptables rule of section 3.3.
   Without `RUN_INTEGRATION=1` it runs nothing and exits 0, like the back end's. Creates and
   removes the throw-away users `fe-journey`, `fe-calendar` and `fe-calendar-b` (removed first
-  too, so it can be rerun after a failed run). `calendar.test.ts` **never resets the local
+  too, so it can be rerun after a failed run). `change-password.test.ts` changes the password of
+  its own throw-away user `fe-password` only, removed first and last, never of `admin` or
+  `alice`; it leaves that user's deleted-user marker in `calendar`, and nothing else. `calendar.test.ts` **never resets the local
   `calendar` table**:
   - it works on top of what the back-end journeys and the smoke test leave, creates only types
     named `fe-calendar …` and items of those types on free dates from today + 330 days, and

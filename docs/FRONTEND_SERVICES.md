@@ -1,11 +1,11 @@
-# Front end — The services layer: login, session, refresh, logout, Hello World, users, the shared calendar and the assistant
+# Front end — The services layer: login, session, refresh, logout, Hello World, users, the shared calendar, the assistant and the change of password
 
 | | |
 |---|---|
-| Status | v9 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 21), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v8 — implemented (2026-11-21, brief `prompts/95-step-71-implementation.md`, `docs/FRONTEND_DEPLOY_PLAN.md` step 71; the design reviewed before the code): `LogoutService` (section 20), `revokeToken` and `toRevokeOutcome` in `cognito.ts` (section 10.1), `reset()` on `LoginService` and `RefreshService`; proven against cognito-local, and at the deployed page as far as the revocation answered 200 (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; section 20.9 says what was seen and what was not). v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). |
-| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-21; v9 2026-11-22 |
-| Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows); since v7 the calendar view and the appointments; since v8 the sign-out; since v9 the conversation with the assistant |
-| Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), since v6 v12 (sections 3 and 4: the calendar routes as implemented); `docs/SHARED_CALENDAR_SPEC.md` v15 section 16 (v13 when v6 was written), and for v7 sections 8, 11.1 (routes 15–20), 11.2, 11.5, 11.6; for v8 `docs/FRONTEND_ARCHITECTURE.md` section 13.7 and section 11, decision 152 (the direction for logout as v14 had it; its v15 follows this design), and `docs/ARCHITECTURE.md` section 7.3; `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/`; for v9 `docs/CONVERSATIONAL_ARCHITECTURE.md` v14 (sections 4.4, 5.1 to 5.5, 6, 6.1 and 13) and `docs/ARCHITECTURE.md` section 4, "The assistant's routes" |
+| Status | v10 — implemented (2026-11-22, brief `prompts/e03-step-p2-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p2): `ChangePasswordService` (section 22), a person's change of their own password straight at Cognito, with `cognito.ts` making one request for any target of Cognito (section 10.1). v9 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 21), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v8 — implemented (2026-11-21, brief `prompts/95-step-71-implementation.md`, `docs/FRONTEND_DEPLOY_PLAN.md` step 71; the design reviewed before the code): `LogoutService` (section 20), `revokeToken` and `toRevokeOutcome` in `cognito.ts` (section 10.1), `reset()` on `LoginService` and `RefreshService`; proven against cognito-local, and at the deployed page as far as the revocation answered 200 (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; section 20.9 says what was seen and what was not). v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). |
+| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-21; v9 and v10 2026-11-22 |
+| Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows); since v7 the calendar view and the appointments; since v8 the sign-out; since v9 the conversation with the assistant; since v10 the change of one's own password |
+| Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), since v6 v12 (sections 3 and 4: the calendar routes as implemented); `docs/SHARED_CALENDAR_SPEC.md` v15 section 16 (v13 when v6 was written), and for v7 sections 8, 11.1 (routes 15–20), 11.2, 11.5, 11.6; for v8 `docs/FRONTEND_ARCHITECTURE.md` section 13.7 and section 11, decision 152 (the direction for logout as v14 had it; its v15 follows this design), and `docs/ARCHITECTURE.md` section 7.3; `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/`; for v9 `docs/CONVERSATIONAL_ARCHITECTURE.md` v14 (sections 4.4, 5.1 to 5.5, 6, 6.1 and 13) and `docs/ARCHITECTURE.md` section 4, "The assistant's routes"; for v10 `docs/ARCHITECTURE.md` v14 (sections 5.1, 6.9, 7.3 and 8) and `docs/CHANGE_PASSWORD_PLAN.md` |
 
 ### Change log
 
@@ -23,6 +23,7 @@
 | v8, note 2 | 2026-11-21 | With the page deployed (`docs/FRONTEND_DEPLOY_PLAN.md` step 73, brief `prompts/97-step-73-implementation.md`), the text around it brought into line: section 10.3, **the CORS gap is closed**, and how (one origin; the API has no CORS configuration and needs none; Cognito answers a browser from the page's origin, as seen for the login and for `RevokeToken`); sections 1, 1.1, 4.7, 5 and 9.6 and decisions 11, 27, 54 and 57 no longer speak of a hosting or of a first deployment to come; section 20.1 says where the browser's call to `RevokeToken` is looked at. No design and no code changed, and nothing new was proven, so no new version. |
 | v9 | 2026-11-22 | Implemented (brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11). New section 21, `AssistantService`: the six routes of the assistant (`load`, `end`, `send`, `continue`, `confirm`, `decline`). **One stream for the six calls**, `outcome$`, each outcome saying the call it answers: the pattern read in a wider sense, which the new section 3.4 allows and rule 4 of section 2 now names (decision 59). A call makes one request: repeating `continue` is the caller's (decision 60). Every code of a route is a reason of that route alone, as a closed list; the daily limit, the spending limit and the outage are three reasons; the service writes no sentence and keeps no conversation (decision 61). The journeys `frontend/tests/integration/assistant.test.ts` (section 14.7) reuse three sentences of the fake Claude's answers under throw-away accounts of their own, and refuse the real Claude (decision 62). **The v7 sentence "the services layer is complete" is corrected**: it was true of the routes the API had then. No existing service, test or helper changed; `suite.ts` is not used by the new tests, which test one stream. Acceptance in section 14.8. |
 | v9, note | 2026-11-23 | The branch `deploy-frontend` merged into `main`, where `AssistantService` had been written at the same time. The assistant's version, first numbered v8, is v9, after the sign-out's v8; its section, first 20, is section 21, after the sign-out's 20; its decisions, first 46 to 49, are 59 to 62, after the sign-out's 46 to 58; every reference to them was changed with them. No other text changed. |
+| v10 | 2026-11-22 | Implemented (brief `prompts/e03-step-p2-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p2). New section 22, `ChangePasswordService`: `changePassword(current, next)` with `changePasswordResult$` and `changePasswordState$`, straight at Cognito (`ChangePassword`, then `GlobalSignOut`, then the store cleared), no route of the API. The new password checked before any request with the pool's rule of `shared/src/password.ts`, its problems named in `new_password_refused` (decision 63), the current password given again among them (decision 64); one success whatever the sign-out did (decision 65); the sign-out skipped by a value of the configuration, locally only (decision 67); the store cleared unguarded (decision 68). `cognito.ts` makes one request for any target of Cognito (section 10.1, decision 53), with no change to `LoginService` or `RefreshService` and none to their tests. The journey `frontend/tests/integration/change-password.test.ts` under the account `fe-password` (section 14.9). Acceptance in section 14.10. Written on the branch `change-password` at the same time as the sign-out and the assistant on `main`, and first numbered v9, section 21, decisions 50 to 55; on the merge into `main` (`docs/MERGE_CHANGE_PASSWORD.md`) they became v10, section 22, decisions 63 to 68, every reference changed with them. With the merge `cognitoRequest` also serves `RevokeToken` and takes the sign-out's `init` (decision 58). |
 
 ---
 
@@ -44,7 +45,8 @@ helpers (10), token refresh (11), Hello World (12), and user administration (13)
 calendar settings (15), the availability types (16) and the availability rules (17); since v7 the
 calendar view (18) and the appointments (19), which completed the services layer for the routes the
 API had then; since v8 the sign-out (20); since v9 the conversation with the assistant (21), whose
-six routes were added to the API afterwards.
+six routes were added to the API afterwards; since v10 the change of one's own password (22), which
+calls Cognito and no route.
 
 The services layer is implemented in `frontend/src/services/` (v2). It was created ahead of the
 front-end architecture document, as the one exception of `docs/FOLDER_STRUCTURE.md` section 7:
@@ -507,6 +509,7 @@ may use the schema for an early hint if it wishes.
 | `HelloService` | `POST /hello` | `Session.accessToken`, from the store; `HelloResponse` | 12 |
 | `UsersService` | `POST /users`, `DELETE /users/{username}` | `Session.accessToken`, from the store; `CreateUserResponse`, `Username` | 13 |
 | `LogoutService` (v8) | `reset()` on the page-wide `LoginService` and `RefreshService` and `SessionStore.clear()` first; then `RevokeToken` | `Session.refreshToken`, from the store, read at the press. `session$` emits `null` before the request leaves; the result says whether Cognito revoked. The services of one person's session have no `reset()`: the view layer makes new ones for each person (`docs/FRONTEND_ARCHITECTURE.md` section 6, point 4) | 20 |
+| `ChangePasswordService` (v10) | `ChangePassword`, then `GlobalSignOut`, at Cognito | `Session.accessToken`, from the store; the shared `passwordProblems` | 22 |
 
 ---
 
@@ -652,11 +655,17 @@ unexpected`).
 | 55 | A failure of the revocation never carries Cognito's own `message`: the service writes `Cognito answered <status> <type>`, and names the type only when it is one of the table of section 20.5 | The design's own, for review. AWS's validation errors can quote the value they refuse, and here the only value is the refresh token. Decision 46 says no token in a result; this makes it true whatever Cognito answers. A login keeps Cognito's message as before (section 4.5): there the request's secret is the password, and nothing changes in v8. |
 | 56 | The revocation is sent with `keepalive: true` | The design's own, confirmed by the user on review (2026-11-21). A person on a shared computer presses "Sign out" and closes the tab: without it the browser drops a request still in flight, and the refresh token stays valid. With it the browser finishes the request after the page is gone. `fetch`'s standard option, no new import. Not proven by the unit tests beyond the option being set; a browser's behaviour. |
 | 57 | Cognito's error types for `RevokeToken` are mapped in a table of their own, `toRevokeOutcome` in `cognito.ts`: the eight of AWS's API reference for the operation, `ThrottlingException` of its common errors, and the two cognito-local answers (`NotAuthorizedException`, `ResourceNotFoundException`). A 200 is a success whatever its body | The design's own. AWS's page lists the types but does not say which one answers a token already revoked, expired or malformed, an unknown client, or revocation switched off (section 20.1): the mapping follows the types' descriptions; no refusal of the real Cognito was provoked at step 72, so none was read. The reasons differ from a login's (decision 15), so one shared table would mislead. |
-| 58 | `cognito.ts` builds both requests with one private function, `cognitoRequest`; `initiateAuth` keeps its signature | The design's own. The address, the method, the two headers and the body's reading are the same for both calls (section 10.1); written twice they would drift. Decision 14: extracted, not copied. |
+| 58 | `cognito.ts` builds both requests with one function, `cognitoRequest`; `initiateAuth` keeps its signature. Since v10 the function is exported and serves the four targets, with `init` kept for the revocation's `keepalive` (decision 66) | The design's own. The address, the method, the two headers and the body's reading are the same for both calls (section 10.1); written twice they would drift. Decision 14: extracted, not copied. |
 | 59 | **One stream for the conversation.** `AssistantService` has a single public stream, `outcome$` (`ReplaySubject(1)`), and each of its six calls notifies its outcome on it: the reply the server gave, or the reason of the failure, with the call it came from (`call`). No stream per call and no state stream: section 3.4. The rest of the pattern holds: a failure is a value, only `next` is forwarded, the stream lives as long as the service. The stream carries each outcome as the server gave it; putting the added messages together into the whole conversation is the logic layer's work | Decided by the Product Owner, 2026-11-22 (brief `prompts/a13-step-c11-implementation.md`). The six calls speak of one thing, five answer the same `AssistantReply`, and the screen shows one conversation. `docs/CONVERSATIONAL_ARCHITECTURE.md` section 13 said "the result and state streams of the pattern" and was corrected (its v14). |
 | 60 | **The caller repeats `continue`, not the service.** A call of the service makes one HTTP request. The loop "while the status is `working`, continue" belongs to the logic layer (`docs/CONVERSATIONAL_PLAN.md` step c12); in the journeys the test repeats the call itself | Decided by the Product Owner, 2026-11-22. One call, one request, as in every other service; the loop has a limit and a line of progress to show, which are the screen's matters (`docs/CONVERSATIONAL_ARCHITECTURE.md` sections 4.4 and 5.1). |
 | 61 | **The service tells the cases apart and writes no sentence.** Each code a route answers is a reason of that route, typed as a closed list; a code the contract does not give that route is `unexpected`. `assistant_limit_reached`, `assistant_budget_reached` and `assistant_unavailable` are three reasons, never one. Choosing and showing their sentences, which are in `shared/`, is the screen's work: `frontend/src/logic/texts.ts` is not touched by the service. A message's text is passed on as written, no language is chosen, and nothing is kept beyond the last outcome the stream replays: the conversation is the server's, and after a reload the screen asks for it again | Decided by the Product Owner, 2026-11-22. `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1: the screen says what is true for each of the three, in the conversation's language. |
 | 62 | **The assistant's journeys reuse the fake's sentences, under accounts of their own.** They send three sentences `backend/tests/integration/fake-claude/answers.json` already answers; each run creates its throw-away accounts through `UsersService` and deletes them, first and last. A new account has its whole day's count, so the daily limit is never met and no test touches the `assistant` table. Nothing changes in `backend/` or in the fake. The journeys refuse to start unless `backend/env.local.json` wires the fake Claude | Decided by the Product Owner, 2026-11-22, and checked before the journeys were written (section 14.7): the fake chooses by the exact text and never looks at the account; what each sentence fixes is a day and an hour, which the journeys prepare. |
+| 63 | **The new password is checked before any request**, with the pool's rule kept once in `shared/src/password.ts` (`passwordProblems`, `Password`); a new password it refuses is `new_password_refused`, with the list of the conditions it misses (closed names, no sentences: `too_short`, `too_long`, `no_uppercase`, `no_lowercase`, `no_digit`, `no_symbol`, `blank`), and nothing is sent. The rule is checked before the session, as `UsersService` checks a username before the store: with nobody signed in and a refused password the answer is `new_password_refused` | Decided by the Product Owner, 2026-11-22 (`docs/CHANGE_PASSWORD_PLAN.md` finding F1). Real Cognito and the emulator answer a refused new password and a wrong current one with the same name in opposite senses (`docs/ARCHITECTURE.md` section 8); never asking Cognito to refuse a new password lets both names be read as a wrong current password. A unit test of the back end holds the rule to `backend/template.yaml` |
+| 64 | **A new password equal to the current one is refused**, as the problem `same_as_current` of `new_password_refused`, after the rule's problems. That the two new passwords typed are the same is the screen's check: the service receives the new password once | Decided by the Product Owner, 2026-11-22. Cognito accepts it, since the pool keeps no password history, and a "change" to the same password would sign the person out everywhere for nothing |
+| 65 | **One success, whatever the sign-out did.** After Cognito changed the password, a `GlobalSignOut` that is skipped, refused, answers 5xx or never answers gives the same `{ status: 'success' }`, which carries nothing; the store is cleared in every case | Decided by the Product Owner, 2026-11-22. The person reads only "Password changed" (the screen's sentence, `docs/CHANGE_PASSWORD_PLAN.md` step p3). The plan's sentence "a failed sign-out after a successful change is a success that says so" and the same sentence of `docs/ARCHITECTURE.md` section 6.9 were corrected to this |
+| 66 | **`cognito.ts` makes one request for any target of Cognito** (`cognitoRequest`, with `readCognitoBody` and `readCognitoError` to read the answer); `initiateAuth` and `toAuthOutcome` are built on them, unchanged in behaviour | `docs/CHANGE_PASSWORD_PLAN.md` step p2. The three calls share the whole request; each service keeps its own mapping, since the same error class means different things to each (decision 15). The tests of `LoginService` and `RefreshService` did not change |
+| 67 | **The sign-out everywhere is skipped by the configuration**: `ChangePasswordConfig = { cognitoUrl, skipGlobalSignOut }`, injected through the constructor (rule 3), `true` only against the local stack, whose emulator does not implement `GlobalSignOut` (`docs/ARCHITECTURE.md` section 8). No client id: neither call needs one | `docs/CHANGE_PASSWORD_PLAN.md` finding F2, as `SKIP_GLOBAL_SIGN_OUT` does for the back end's `deleteUser`. A value of the configuration rather than a guess from the URL, so that a unit test runs both ways |
+| 68 | **The store is cleared unguarded** (`clear()`, not `clear(session)`), after the sign-out and before the success is emitted, as `LoginService` writes the store before it emits. A call made again abandons the first, as in every service (decision 6): when the first change was already made, its sign-out and its clear are abandoned too, and the screen keeps the button disabled while the state is `pending` so that this cannot happen from the page | A refresh during the change replaces the session object (section 9.2), and a guarded clear would then leave the person signed in after their password changed. The view learns of the end from `session$` first: the login appears at the moment the success is emitted, so the screen of `docs/CHANGE_PASSWORD_PLAN.md` step p3 says "Password changed" where the login is shown |
 
 ---
 
@@ -896,10 +905,44 @@ every class.
 
 | Module | Used by | Holds |
 |---|---|---|
-| `cognito.ts` | `LoginService`, `RefreshService`; since v8 `LogoutService` | the `InitiateAuth` request, the error-class mapping, `toSession`; since v8 the `RevokeToken` request and the reading of its answer |
+| `cognito.ts` | `LoginService`, `RefreshService`; since v8 `LogoutService`; since v10 `ChangePasswordService` | one request for any target of Cognito, `cognitoRequest`, and the reading of its answer; the `InitiateAuth` request, the error-class mapping, `toSession`; since v8 the `RevokeToken` request and the reading of its answer |
 | `api.ts` | `HelloService`, `UsersService` | the authenticated API request: token from the store, bearer header, the 401/403 rule, `ApiErrorBody` → reason |
 
-### 10.1 `cognito.ts`: `InitiateAuth`
+### 10.1 `cognito.ts`: one request to Cognito, and `InitiateAuth`
+
+**One request for any target** (v10, decision 66). Every call the front end makes to Cognito has
+the shape of section 4.1: a `POST` to `cognitoUrl`, `Content-Type: application/x-amz-json-1.1`,
+the action in `X-Amz-Target`, a JSON body, no signing and no secret. One function builds it for
+the four targets the front end uses; `init` adds what one request needs and the others do not,
+the `keepalive` of the revocation (decision 56):
+
+```ts
+export type CognitoTarget = 'InitiateAuth' | 'RevokeToken' | 'ChangePassword' | 'GlobalSignOut';
+
+// Emits one { status, text } and completes; errors only when fetch rejects.
+export function cognitoRequest(
+  config: Pick<CognitoConfig, 'cognitoUrl'>,
+  target: CognitoTarget,
+  body: Record<string, unknown>,
+  init?: RequestInit,
+): Observable<{ status: number; text: string }>;
+
+// The parsed body: an object, {} for JSON that is not an object, undefined when not JSON.
+export function readCognitoBody(text: string): Record<string, unknown> | undefined;
+// The error class without its namespace prefix, and the message when it is a string.
+export function readCognitoError(body: Record<string, unknown>): { type: string; message?: string };
+```
+
+`initiateAuth` (below) is `cognitoRequest(config, 'InitiateAuth', { AuthFlow, ClientId,
+AuthParameters })`, and `toAuthOutcome` reads the answer with the two readers: `LoginService` and
+`RefreshService` behave exactly as before, and none of their tests changed. One detail is
+stricter: a `message` that is not a string is replaced by `Cognito answered <status>`, as a
+missing one always was. `revokeToken` (below) is `cognitoRequest(config, 'RevokeToken', { ClientId,
+Token }, { keepalive: true })`, read by `toRevokeOutcome` as before. `ChangePasswordService`
+(section 22) uses `cognitoRequest` and the two
+readers with a mapping of its own.
+
+**`InitiateAuth`**
 
 **The remote call** is the one of section 4.1, with one of two flows:
 
@@ -1249,6 +1292,8 @@ section 6, which stays unchanged):
 | revoke answer, unknown type (v8) | 400 `SomethingElseException` → `unexpected`, the message names the status only; 503 with one → `server`; a `__type` that is the name of something every object has (`constructor`) → `unexpected`, not named |
 | revoke answer, not JSON (v8) | 502 HTML → `server`; 400 with JSON that is not an object → `unexpected` |
 | revoke answer that quotes the request (v8) | a 400 whose `message`, and one whose `__type`, hold the token: the outcome does not contain the token |
+| `cognitoRequest` (v10) | one POST with `AWSCognitoIdentityProviderService.<target>` for each of the four targets and the body as JSON, no `keepalive` unless `init` gives it; no client id needed; what `init` adds is passed on, its own method, headers and body are not |
+| `readCognitoBody`, `readCognitoError` (v10) | an object as it is, other JSON as `{}`, a text that is not JSON (`''` included) as `undefined`; the class behind a namespace prefix; a message that is not a string as absent |
 
 `api.test.ts` (every row subscribes to `apiCall(...)` first, with a real `SessionStore`):
 
@@ -1884,7 +1929,9 @@ frontend/src/services/
 ├── logout.service.ts              # LogoutService, LogoutConfig, Resettable (20, v8)
 ├── logout.types.ts                # LogoutFailureReason, LogoutResult, LogoutState
 ├── assistant.service.ts           # AssistantService (21, v9)
-└── assistant.types.ts             # AssistantCall, AssistantOutcome, the reasons of each call
+├── assistant.types.ts             # AssistantCall, AssistantOutcome, the reasons of each call
+├── change-password.service.ts     # ChangePasswordService (22, v10)
+└── change-password.types.ts       # ChangePasswordConfig, NewPasswordProblem, the reasons, Result, State
 
 frontend/tests/
 ├── unit/services/        # one file per source file: session.store, cognito, api, jwt,
@@ -1892,18 +1939,21 @@ frontend/tests/
 │                         # calendar-settings.service, availability-types.service,
 │                         # availability-rules.service (v6); calendar.service,
 │                         # appointments.service (v7); assistant.service (v9);
+│                         # change-password.service (v10);
 │                         # plus fixtures.ts (v5): JWT, Response and session builders,
 │                         # and suite.ts (v6): the per-method suite of the API services
 ├── unit/integration/     # claude.test.ts (v9): the check of integration/claude.ts, no stack needed
 └── integration/
     ├── local.ts           # the local stack's URLs and client id (reads backend/env.local.json);
-    │                      # since v6 also `outcome()`, used by calendar.test.ts
+    │                      # since v6 also `outcome()`, used by calendar.test.ts;
+    │                      # since v10 `changePasswordConfig()`, the sign-out skipped
     ├── login.service.test.ts  # the same journeys; tokens read from the store (section 9.9)
     ├── journeys.test.ts   # sections 11.9, 12.9, 13.9, in order
     ├── logout.service.test.ts  # v8: section 20.9, the block `logout`
     ├── calendar.test.ts   # v6: sections 13.9 (listUsers), 15.9, 16.9, 17.9; v7: 18.9, 19.9 (section 14.4)
     ├── claude.ts          # v9: which Claude the stack is wired to; the journeys refuse the real one
-    └── assistant.test.ts  # v9: section 21.9 (section 14.7)
+    ├── assistant.test.ts  # v9: section 21.9 (section 14.7)
+    └── change-password.test.ts  # v10: section 22.9 (section 14.9)
 ```
 
 `local.ts`, `claude.ts` and `suite.ts` are helpers, not tests (both projects select `*.test.ts` only). Nothing
@@ -2215,6 +2265,54 @@ local API with **the fake Claude** of the Docker stack answering for Anthropic
    `shared/`. Sentences of the documents and of the journey pages were corrected after that run
    (the points of the pages' check); the root `npm run typecheck` and `npm run lint` were green
    after them.
+
+
+### 14.9 The change of password journey (v10)
+
+`frontend/tests/integration/change-password.test.ts` (`docs/CHANGE_PASSWORD_PLAN.md` step p2), one
+`describe`, `change password`, with its page `docs/journeys/frontend/change-password.md`. It runs
+`ChangePasswordService` straight at cognito-local, as the page will, with the local configuration
+of `local.ts`, `changePasswordConfig()`: the sign-out everywhere skipped (decision 67).
+
+- **Its account** is `fe-password`, created through `UsersService` as the Administrator in
+  `beforeAll` (after removing it, accepting `user_not_found`) and removed in `afterAll`, so that a
+  run that failed half-way, with the account left at another password, is repeated without a step
+  by hand. `admin` only creates and removes it; neither `admin` nor `alice` changes a password.
+- **What stays behind**: nothing in Cognito; in the `calendar` table the deleted-user marker of
+  `fe-password` of each run, as for every account deleted (`docs/ARCHITECTURE.md` section 4,
+  `DELETE /users/{username}`). The calendar table is never read or emptied.
+
+| # | Journey | Expect |
+|---|---|---|
+| 1 | `changePassword` with a wrong current password; the store; a sign-in with the old password | `wrong_current_password` (the emulator's `InvalidPasswordException`); the session still in the store; `success` |
+| 2 | a new password the rule refuses, then the current one again (a `fetch` spy counts requests) | `new_password_refused` with `too_short`, `no_uppercase`, `no_digit`, `no_symbol`; then with `same_as_current`; no request sent; the session still in the store |
+| 3 | `changePassword` with the current password and a good new one | `{ status: 'success' }`; `session$` gives `null` |
+| 4 | a sign-in with the old password | `invalid_credentials` |
+| 5 | a sign-in with the new password; `admin` signs in with its local password | `success` as `fe-password`, `role: 'user'`, the session in the store; `admin` `success`, its password unchanged |
+
+### 14.10 Acceptance check (v10, `docs/CHANGE_PASSWORD_PLAN.md` step p2)
+
+1. The root `DYNAMODB_PORT=8002 npm run verify` green, with `local:up` and `local:api` running:
+   typecheck, lint, unit tests with 100 % lines on `shared/src` and `frontend/src`.
+2. `RUN_INTEGRATION=1 npm run test:integration -w frontend`, the new journey with the others,
+   green twice in a row; no account `fe-password` left in the local pool.
+3. The back end's unit tests that hold the shared rule to `backend/template.yaml` and the password
+   generator to the rule exist and pass.
+4. `git status` shows no change under `backend/src` or in `backend/template.yaml`.
+
+**As run (2026-11-22, v9):**
+
+1. Root `DYNAMODB_PORT=8002 npm run verify`: PASSED (back end 1 737 unit tests, 1 735 before,
+   and 189 journeys, audit clean; `shared` 489, 437 before; front end 2 282 tests in 43 files,
+   2 234 before, of which 42 in `change-password.service.test.ts` and 6 new in
+   `cognito.test.ts`; no existing test changed), 100 % lines on `frontend/src` (2 173 of 2 173)
+   and `shared/src`.
+2. `RUN_INTEGRATION=1 npm run test:integration -w frontend`: 70 tests in 5 files (the new
+   journey's 5 with the 65 before), green twice in a row; afterwards the local pool held
+   `admin` and `alice` only.
+3. `backend/tests/unit/lib/password.test.ts`: the pool's policy and 2 000 generated passwords
+   held to the shared rule, both green.
+4. `git status`: no change under `backend/src` or in `backend/template.yaml`.
 
 ---
 
@@ -3410,3 +3508,179 @@ third; only the last outcome replayed; no `conflicts` in a failure. The file als
 ### 21.9 Integration checks
 
 Section 14.7, its three blocks.
+
+---
+
+## 22. `ChangePasswordService` (v10)
+
+The signed-in person, User or Administrator, changes their own password, knowing the current one
+(`docs/ARCHITECTURE.md` section 6.9, `docs/CHANGE_PASSWORD_PLAN.md`). The browser talks to
+Cognito directly, as for the sign-in: no route of the API, no Lambda. One method, with a result
+stream and a state stream (section 3.3).
+
+### 22.1 The remote calls
+
+Both through `cognitoRequest` (section 10.1), each with the person's access token as its only
+authority: Cognito evaluates no IAM permission, and an access token from `USER_PASSWORD_AUTH`
+carries the scope both need (`docs/ARCHITECTURE.md` section 6.9).
+
+| Call | `X-Amz-Target` | Body | Success |
+|---|---|---|---|
+| the change | `AWSCognitoIdentityProviderService.ChangePassword` | `{ "AccessToken", "PreviousPassword", "ProposedPassword" }` | `200`, an empty body (`{}` from Cognito, possibly nothing from the emulator) |
+| the sign-out everywhere | `AWSCognitoIdentityProviderService.GlobalSignOut` | `{ "AccessToken" }` | `200`; every refresh token of the person revoked |
+
+No username is sent: Cognito changes the password of the token's owner and of nobody else, so
+"only one's own" holds by construction (`docs/CHANGE_PASSWORD_PLAN.md` section 2, decision D1).
+A refusal is a 400 whose body names the error class, as for `InitiateAuth` (section 4.1).
+
+### 22.2 Configuration
+
+```ts
+export type ChangePasswordConfig = {
+  cognitoUrl: string;         // the same URL as LoginConfig's
+  skipGlobalSignOut: boolean; // true only against the local stack (decision 67)
+};
+```
+
+Plus the `SessionStore` as the second argument. How the page fills this object is
+`docs/CHANGE_PASSWORD_PLAN.md` step p3's: the shell already receives `cognitoUrl`, and
+`skipGlobalSignOut` is a value it does not have yet (the proposal is in that plan's "As done" note
+of step p2).
+
+### 22.3 Types (`change-password.types.ts`)
+
+```ts
+import type { PasswordProblem } from '@shared-calendar/shared';
+
+export type NewPasswordProblem = PasswordProblem | 'same_as_current';
+
+export type ChangePasswordFailureReason =
+  | 'not_signed_in'          // the store is empty: no request
+  | 'new_password_refused'   // the shared rule or the current password refuses it: no request
+  | 'wrong_current_password' // NotAuthorizedException, InvalidPasswordException
+  | 'too_many_attempts'      // LimitExceededException, TooManyRequestsException
+  | 'network'                // fetch rejected
+  | 'server'                 // 5xx, or a failure whose body is not JSON
+  | 'unexpected';            // anything else, PasswordHistoryPolicyViolationException included
+
+export type ChangePasswordResult =
+  | { status: 'success' } // nothing more, whatever the sign-out did (decision 65)
+  | { status: 'failure'; reason: 'new_password_refused'; message: string; problems: NewPasswordProblem[] }
+  | { status: 'failure'; reason: Exclude<ChangePasswordFailureReason, 'new_password_refused'>; message: string };
+
+export type ChangePasswordState = { status: 'idle' } | { status: 'pending' } | ChangePasswordResult;
+```
+
+`pending` carries nothing, unlike decision 31's rule for the API services: both arguments are
+passwords (rule 6). `PasswordProblem` is the shared list of decision 63.
+
+### 22.4 The class
+
+```ts
+export class ChangePasswordService {
+  readonly changePasswordResult$: Observable<ChangePasswordResult>; // ReplaySubject(1)
+  readonly changePasswordState$: Observable<ChangePasswordState>;   // BehaviorSubject, idle first
+  constructor(config: ChangePasswordConfig, store: SessionStore) {}
+  changePassword(current: string, next: string): void;
+}
+```
+
+`changePassword(current, next)`, in order:
+
+1. Abandons the call in flight (decision 68), then `pending`.
+2. `passwordProblems(next)`, then `same_as_current` when `next === current`: any problem is
+   `new_password_refused` with the list, and nothing is sent (decisions 63 and 64).
+3. The session, read from the store at the moment of the call (`take(1)`, section 9.5): none is
+   `not_signed_in`, and nothing is sent.
+4. `ChangePassword` with the session's access token and both passwords. A refusal is mapped
+   (section 22.5) and ends the call; the store is left as it is.
+5. After a change, `GlobalSignOut` with the same access token, unless `skipGlobalSignOut`; its
+   answer, a failure or a rejected fetch included, is not read (decision 65).
+6. `store.clear()`, unguarded (decision 68), then `{ status: 'success' }` on both streams.
+
+### 22.5 Mapping the answer
+
+| Answer of `ChangePassword` | Outcome |
+|---|---|
+| `200`, any body | the change is made: steps 5 and 6 of section 22.4, `success` |
+| `NotAuthorizedException`, `InvalidPasswordException` | `wrong_current_password` |
+| `LimitExceededException`, `TooManyRequestsException` | `too_many_attempts` |
+| any other class, `PasswordHistoryPolicyViolationException`, `PasswordResetRequiredException`, `UserNotFoundException`, `InvalidParameterException` included | `unexpected` |
+| 5xx without a class known above | `server` |
+| a failure whose body is not JSON | `server`, `Cognito answered <status> without JSON` |
+| any other 2xx | `unexpected` |
+| fetch rejects | `network`, `TypeError: …` |
+
+The class is read behind a namespace prefix; the message is Cognito's when it is a string, else
+`Cognito answered <status>`. How the classes are read is `docs/ARCHITECTURE.md` section 6.9, row
+2: since the rule was checked first, `InvalidPasswordException` is the emulator's wrong current
+password, never a new password the pool refuses. `NotAuthorizedException` is also Cognito's
+answer to an access token it no longer accepts (an account deleted meanwhile, a token revoked):
+it is told as a wrong current password too, and the next API call signs a deleted person out
+(`docs/CHANGE_PASSWORD_PLAN.md` finding F5). Which class real Cognito gives to which refusal is
+proved only by the smoke test (`docs/CHANGE_PASSWORD_PLAN.md` step p4).
+
+### 22.6 Use from the view layer
+
+```ts
+const changes = new ChangePasswordService({ cognitoUrl, skipGlobalSignOut }, store);
+changes.changePasswordState$.subscribe((state) => {
+  saveButton.disabled = state.status === 'pending'; // decision 68
+  if (state.status === 'failure') hint.textContent = sentenceFor(state); // the screen's words
+});
+form.onsubmit = () => {
+  if (newInput.value !== againInput.value) return showDifferent(); // the screen's check (decision 64)
+  changes.changePassword(currentInput.value, newInput.value);
+};
+// After a success the store is empty: session$ gives null and the shell shows the login, where
+// the screen's sentence "Password changed" is shown (decision 68).
+```
+
+For hints while the person types, the screen calls `passwordProblems` of `shared/` itself, with
+no service. The sentences of the reasons and of the problems are the screen's
+(`docs/CHANGE_PASSWORD_PLAN.md` step p3).
+
+### 22.7 Security notes
+
+- **Both passwords** live in the method's arguments and in the request body only (rule 6): never
+  on the instance, in `pending`, a state, a result, a message or a log. A refusal lists the names
+  of the conditions missed, never the text.
+- **The access token** is read from the store at the moment of the call and goes into the two
+  request bodies only (rule 9); the service keeps no copy.
+- **What does not end with the sign-out**: an access token already issued is accepted by the API
+  until it expires, 15 minutes at most plus up to 5 minutes of the authorizer's cache
+  (`docs/ARCHITECTURE.md` section 7.3). Locally the sign-out is skipped, so the person's other
+  sessions stay signed in (`docs/ARCHITECTURE.md` section 8).
+- A wrong current password counts towards Cognito's lockout (`too_many_attempts`), as a wrong
+  sign-in does.
+- Nothing is logged.
+
+### 22.8 Unit tests (`change-password.service.test.ts`)
+
+`fetch` stubbed with real `Response` objects; every test subscribes first, then calls; after
+every test, every value either stream emitted is serialized and searched for both passwords and
+the session's three tokens.
+
+| Test | Expect |
+|---|---|
+| success | states `idle`, `pending`, `success`, the same object in both streams; two requests; the session still in the store while `GlobalSignOut` is sent; `session$` gives `null` after |
+| the two requests | `ChangePassword` with both headers and `{ AccessToken, PreviousPassword, ProposedPassword }`, then `GlobalSignOut` with `{ AccessToken }` |
+| an empty 200 | `success` |
+| skipped | one request, `ChangePassword` only; the store cleared; `success` |
+| a failed sign-out | refused, unsupported, a 502, offline: `success`, the store cleared |
+| a refresh during the change | the store cleared all the same |
+| token at call time | the token of the session in the store when the call is made |
+| every class | the four of section 22.5 with their reason and Cognito's message; five others `unexpected`; the store kept, no sign-out |
+| namespace prefix | `…#NotAuthorizedException` is `wrong_current_password` |
+| answers outside the contract | a 500 without a class (`server`), a 502 that is not JSON (`server`), a 400 whose JSON is not an object (`unexpected`), a message that is not a string, a 202 (`unexpected`) |
+| offline, then success | `network`, the store kept; the next call succeeds |
+| refused by the rule | each condition alone, a space, a tab, several at once: `new_password_refused` with the list, no request, the store kept |
+| equal to the current one | `same_as_current`, no request; with the rule's problems, the rule's first |
+| nobody signed in | `not_signed_in`, no request; with a refused password, `new_password_refused` |
+| cancel | a second call aborts the first request; one result |
+| late subscriber | the last result and the current state |
+| no password on the service | no field of the instance is a string |
+
+### 22.9 Integration checks
+
+Section 14.9, its five journeys.

@@ -13,6 +13,9 @@ adds to the root `CLAUDE.md`, whose rules all apply here. Paths are relative to 
 - `src/api.ts`: response and error body types, `ApiErrorCode`.
 - `src/roles.ts`: `Role`, `resolveRole`.
 - `src/username.ts`: the username pattern and zod schemas.
+- `src/password.ts`: the pool's password rule (`PASSWORD_POLICY`, `PASSWORD_SYMBOLS`,
+  `passwordProblems`, `Password`); a unit test of the back end holds it to
+  `backend/template.yaml`, so a change of the pool's policy is a change of both.
 - `src/calendar/`: the shared calendar. `time.ts`, the time-zone helpers; `schemas.ts`, the zod
   schemas: primitives, request bodies, path and query parameters; `types.ts`, the response and
   event types; `rules.ts`, the pure rules: defined and effective windows, slots, overlap,

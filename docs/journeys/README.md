@@ -102,6 +102,7 @@ The pages written so far. Which pages are still to come, and in which order, is 
 | [`frontend/assistant-booking.md`](frontend/assistant-booking.md) | `frontend/tests/integration/assistant.test.ts`, `a booking confirmed` |
 | [`frontend/assistant-declined.md`](frontend/assistant-declined.md) | `frontend/tests/integration/assistant.test.ts`, `a proposal declined` |
 | [`frontend/logout.md`](frontend/logout.md) | `frontend/tests/integration/logout.service.test.ts`, `logout` |
+| [`frontend/change-password.md`](frontend/change-password.md) | `frontend/tests/integration/change-password.test.ts`, `change password` |
 
 ### Back end
 

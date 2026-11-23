@@ -16,6 +16,7 @@ Each section explains one idea in simple words and names the document that defin
 | `fe-calendar`, `fe-calendar-b` | throw-away Users of the front end's calendar journeys | `frontend/tests/integration/calendar.test.ts` |
 | `fe-journey` | a throw-away User of the front end's Hello World journeys | `frontend/tests/integration/journeys.test.ts` |
 | `fe-assistant-read`, `fe-assistant-book`, `fe-assistant-decline` | throw-away Users of the front end's assistant journeys, one per block | `frontend/tests/integration/assistant.test.ts` |
+| `fe-password` | a throw-away User of the front end's change of password journey, the only account whose password a journey changes | `frontend/tests/integration/change-password.test.ts` |
 | `chat-text`, `chat-lingua`, `chat-read`, `chat-book`, `chat-decline`, `chat-trouble`, `chat-note`, `chat-move`, `chat-cancel`, `chat-limit`, `chat-down`, `chat-notadmin`, `chat-full`, `chat-mark` | throw-away Users of the assistant's journeys, one per block | `backend/tests/integration/assistant.test.ts` |
 | `chat-rival` | a second throw-away User of one assistant journey, who books through the calendar's own route | `backend/tests/integration/assistant.test.ts` |
 | `chat-booked` | the throw-away User the Administrator books for through the assistant; it only reads its own list | `backend/tests/integration/assistant.test.ts` |
