@@ -13,6 +13,8 @@
     <!-- The login view (src/views/login.view.ts) -->
     <main id="login" class="login" hidden>
       <h1>Shared calendar</h1>
+      <!-- What the page says after the person changed their password, until the next "Sign in" -->
+      <p class="notice" role="status"></p>
       <form>
         <label>Username <input name="username" autocomplete="username" autocapitalize="none" required /></label>
         <label>Password <input name="password" type="password" autocomplete="current-password" required /></label>
@@ -566,6 +568,41 @@
               <button type="button" class="danger submit">Confirm</button>
             </div>
           </dialog>
+        </section>
+
+        <!-- The password (src/views/password.view.ts), at the address #/password: the person
+             changes their own password. One fixed form, three fields, each a .field with its
+             hint; what the new password still misses is a list under it. The browser's own
+             check is off: the script says in words what is missing. After a change the person
+             signs in again. -->
+        <section id="password" class="password-screen" hidden>
+          <div class="toolbar">
+            <h2>Password</h2>
+          </div>
+          <form class="change-password" novalidate>
+            <div class="field current-field">
+              <label>Current password <input name="current" type="password" autocomplete="current-password" aria-describedby="current-hint" /></label>
+              <p class="hint" id="current-hint"></p>
+              <p class="error refusal" role="alert"></p>
+            </div>
+            <div class="field new-field">
+              <label>New password <input name="next" type="password" autocomplete="new-password" aria-describedby="next-needs" /></label>
+              <ul class="needs hint" id="next-needs"></ul>
+            </div>
+            <div class="field again-field">
+              <label>New password again <input name="again" type="password" autocomplete="new-password" aria-describedby="again-hint" /></label>
+              <p class="hint" id="again-hint"></p>
+            </div>
+            <p class="about">After the change you are signed out, here and on every other device, and sign in again with the new password.</p>
+            <p class="error failure" role="alert"></p>
+            <div class="actions">
+              <button class="primary submit">Change password</button>
+            </div>
+          </form>
+          <!-- One condition the new password still misses -->
+          <template id="tpl-password-need">
+            <li class="need"></li>
+          </template>
         </section>
       </main>
 

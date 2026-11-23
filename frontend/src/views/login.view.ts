@@ -7,17 +7,22 @@ export type LoginDeps = Pick<LoginService, 'login' | 'loginState$'>;
 
 // The login view (docs/FRONTEND_ARCHITECTURE.md section 4): wires the element #login of
 // index.html. The password is read from the form at submit and goes straight into the call's
-// argument (docs/FRONTEND_SERVICES.md section 2, rule 6).
-export function mountLogin(root: HTMLElement, login: LoginDeps): Subscription {
+// argument (docs/FRONTEND_SERVICES.md section 2, rule 6). `notice` is what the shell has the login
+// say when it is shown, "Password changed" after a change of password and nothing otherwise
+// (docs/FRONTEND_ARCHITECTURE.md section 6); it stays until the next "Sign in".
+export function mountLogin(root: HTMLElement, login: LoginDeps, notice = ''): Subscription {
   // 1. Find the elements, once.
   const form = root.querySelector('form')!;
   const button = root.querySelector('button')!;
   const error = root.querySelector('.error')!;
+  const said = root.querySelector('.notice')!;
+  said.textContent = notice;
 
   // 2. The user's action becomes a call. Without preventDefault the browser would send the form
   // itself and load the page again.
   form.onsubmit = (event) => {
     event.preventDefault();
+    said.textContent = '';
     const data = new FormData(form);
     login.login(String(data.get('username')), String(data.get('password')));
   };
@@ -34,6 +39,7 @@ export function mountLogin(root: HTMLElement, login: LoginDeps): Subscription {
   subscription.add(() => {
     form.reset();
     error.textContent = '';
+    said.textContent = '';
   });
   return subscription;
 }

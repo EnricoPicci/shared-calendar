@@ -1,4 +1,5 @@
-import { ASSISTANT_LIMITS, CALENDAR_LIMITS, localDateOf, localTimeOf, toInstant } from '@shared-calendar/shared';
+import { ASSISTANT_LIMITS, CALENDAR_LIMITS, localDateOf, localTimeOf, PASSWORD_POLICY, PASSWORD_SYMBOLS, toInstant } from '@shared-calendar/shared';
+import type { NewPasswordProblem } from '../services/change-password.types';
 
 // The texts that depend on data (docs/FRONTEND_ARCHITECTURE.md section 5 and section 12.4): a
 // date, a time, a range, a date with a time, a week's label, a UTC offset, and a failure in plain
@@ -156,6 +157,10 @@ const PLAIN_WORDS = new Map<string, string>([
   ['password_reset_required', 'Your password must be reset before you can sign in. Please ask the Administrator.'],
   ['challenge', 'This account needs a sign-in step that this page does not offer. Please ask the Administrator.'],
   ['no_role', 'Your account has no role yet, so it cannot use the calendar. Please ask the Administrator.'],
+  // The change of one's own password (docs/FRONTEND_SERVICES.md section 22.3). Its other reasons
+  // have the sentences above: `too_many_attempts` is the login's, since a wrong current password
+  // counts towards the same lockout at Cognito.
+  ['wrong_current_password', 'The current password is not correct.'],
 ]);
 
 // What was being attempted when a call failed, where the same reason needs other words for it.
@@ -192,3 +197,26 @@ const AFTER: Record<Attempt, Map<string, string>> = {
 export function failureText(reason: string, attempt?: Attempt): string {
   return (attempt === undefined ? undefined : AFTER[attempt].get(reason)) ?? PLAIN_WORDS.get(reason) ?? GENERAL;
 }
+
+// The change of one's own password (docs/FRONTEND_ARCHITECTURE.md section 5.1): what a new
+// password still misses, one sentence per name of the shared rule (shared/src/password.ts) and
+// for being the current password again, with the rule's own numbers and its 32 symbols.
+export const PASSWORD_PROBLEM_TEXT: Record<NewPasswordProblem, string> = {
+  too_short: `At least ${PASSWORD_POLICY.minimumLength} characters.`,
+  too_long: `At most ${PASSWORD_POLICY.maximumLength} characters.`,
+  no_uppercase: 'An upper-case letter, A to Z.',
+  no_lowercase: 'A lower-case letter, a to z.',
+  no_digit: 'A digit, 0 to 9.',
+  no_symbol: `One of these symbols: ${[...PASSWORD_SYMBOLS].join(' ')}`,
+  blank: 'No space, and no other blank character.',
+  same_as_current: 'Not the same as the current password.',
+};
+
+// The other words of the password screen: the field of the current password while it is empty,
+// the repeated new password while it is empty or differs, and what the login says after a change.
+export const PASSWORD_TEXTS = {
+  currentEmpty: 'Type the password you use now.',
+  againEmpty: 'Type the new password once more.',
+  differ: 'The two new passwords are not the same.',
+  changed: 'Password changed.',
+} as const;

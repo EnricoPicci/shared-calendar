@@ -123,18 +123,21 @@ stays at the root.
 │   │   │                        # appointments.screen.ts, settings.model.ts, settings.screen.ts,
 │   │   │                        # users.model.ts, users.screen.ts, availability.model.ts,
 │   │   │                        # conflicts.ts, availability.screen.ts, date.model.ts,
-│   │   │                        # date.screen.ts, assistant.model.ts, assistant.screen.ts
+│   │   │                        # date.screen.ts, assistant.model.ts, assistant.screen.ts,
+│   │   │                        # password.model.ts, password.screen.ts
 │   │   └── views/               # shell.ts (with the table of screens) and one <name>.view.ts per
 │   │                            # view: login.view.ts, week.view.ts, appointments.view.ts,
 │   │                            # settings.view.ts, users.view.ts, availability.view.ts and
 │   │                            # date.view.ts (two views of one screen, with what they share
 │   │                            # in availability.parts.ts); detail.view.ts, the appointment's
 │   │                            # dialog that two views mount; assistant.view.ts, the
-│   │                            # assistant's panel, at the bottom of every screen
+│   │                            # assistant's panel, at the bottom of every screen;
+│   │                            # password.view.ts, the change of one's own password
 │   ├── tests/
 │   │   ├── unit/                # mirrors src/ (plus services/fixtures.ts, logic/zone.ts and
 │   │   │                        # logic/fixtures.ts, views/page.ts); integration/claude.test.ts,
-│   │   │                        # the test of the journeys' check of which Claude is wired
+│   │   │                        # the test of the journeys' check of which Claude is wired;
+│   │   │                        # scripts/bundle.test.ts, the bundle's constants
 │   │   └── integration/         # login, logout and the services' journeys against the local stack;
 │   │                            # assistant.test.ts against the fake Claude, with claude.ts,
 │   │                            # the check that refuses the real one; change-password.test.ts,
@@ -505,6 +508,12 @@ headless browser is not in the repository, and no end-to-end test tool is.
   (`src/views/shell.ts`). Tests: `tests/unit/services/logout.service.test.ts` and
   `tests/integration/logout.service.test.ts`, the latter with its page
   `docs/journeys/frontend/logout.md`. No new dependency, no new allowed import.
+- **The password screen, since 2026-11-23** (`docs/CHANGE_PASSWORD_PLAN.md` step p3):
+  `src/logic/password.model.ts` and `src/logic/password.screen.ts`, `src/views/password.view.ts`
+  (its element `#password` in `index.html`), the sixth entry of the table of screens in
+  `src/views/shell.ts`, the bundle's fourth constant (`scripts/bundle.mjs`, `scripts/dev.mjs`,
+  `src/main.ts`) and its test, `tests/unit/scripts/bundle.test.ts`. No new script and no new
+  dependency.
 
 **The hosting is deployed** (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; the record is
 `docs/RUNBOOK.md` section 5.5), as the stack `shared-calendar-web`. What the folder holds and

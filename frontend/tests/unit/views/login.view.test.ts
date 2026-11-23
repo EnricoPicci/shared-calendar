@@ -150,4 +150,23 @@ describe('mountLogin', () => {
     expect(first.login.login).not.toHaveBeenCalled();
     expect(second.login.login).toHaveBeenCalledWith('admin', PASSWORD);
   });
+
+  it('a notice given by the shell is said until the next "Sign in", and gone when the view is left', () => {
+    const state$ = new BehaviorSubject<LoginState>({ status: 'idle' });
+    const login = { loginState$: state$.asObservable(), login: vi.fn<LoginDeps['login']>() };
+    const subscription = mountLogin(find('#login'), login, 'Password changed.');
+    const notice = find('#login .notice');
+    expect(notice.textContent).toBe('Password changed.');
+    submit(find<HTMLFormElement>('#login form'));
+    expect(notice.textContent).toBe('');
+    subscription.unsubscribe();
+    const again = mountLogin(find('#login'), login, 'Password changed.');
+    again.unsubscribe();
+    expect(notice.textContent).toBe('');
+  });
+
+  it('without a notice the place stays empty', () => {
+    mounted();
+    expect(find('#login .notice').textContent).toBe('');
+  });
 });

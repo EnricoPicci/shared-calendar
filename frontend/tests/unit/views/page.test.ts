@@ -29,10 +29,10 @@ describe('index.html', () => {
   it('every screen of the frame has an id and starts hidden; the navigation and the lists start empty', () => {
     loadPage();
     const screens = [...document.querySelectorAll<HTMLElement>('#app main.screen > :not(template)')];
-    expect(screens.map((element) => element.id)).toEqual(['week', 'appointments', 'settings', 'users', 'availability']);
+    expect(screens.map((element) => element.id)).toEqual(['week', 'appointments', 'settings', 'users', 'availability', 'password']);
     expect(screens.every((element) => element.hidden)).toBe(true);
     expect(document.querySelector('#app .nav')!.children).toHaveLength(0);
-    for (const list of document.querySelectorAll('#week .legend, #week .hours, #week .days, #appointments .list, #users .list, #availability .list, #availability .groups, #availability .conflicts-list')) expect(list.children).toHaveLength(0);
+    for (const list of document.querySelectorAll('#week .legend, #week .hours, #week .days, #appointments .list, #users .list, #availability .list, #availability .groups, #availability .conflicts-list, #password .needs')) expect(list.children).toHaveLength(0);
   });
 
   it('every <template> has an id of its own and holds exactly one element', () => {
@@ -57,6 +57,7 @@ describe('index.html', () => {
       'tpl-date-window',
       'tpl-draft-row',
       'tpl-extra-row',
+      'tpl-password-need',
       'tpl-message',
       'tpl-proposed',
     ]);
@@ -76,7 +77,7 @@ describe('index.html', () => {
 
     it('every field has its label: a <label> around it, with words of its own', () => {
       const fields = everywhere('input, select, textarea');
-      expect(fields).toHaveLength(37);
+      expect(fields).toHaveLength(40);
       for (const field of fields) {
         const label = field.closest('label');
         expect(label, field.getAttribute('name')!).not.toBeNull();
@@ -113,14 +114,15 @@ describe('index.html', () => {
       const place = (element: Element) => [...element.classList].join('.');
       const alerts = everywhere('[role="alert"]');
       const failures = everywhere('.error');
-      expect(failures).toHaveLength(49);
+      expect(failures).toHaveLength(51);
       expect(alerts).toEqual(failures);
       for (const alert of alerts) expect(['P', alert.textContent], place(alert)).toEqual(['P', '']);
       const loading = everywhere('.loading');
       expect(loading.map((element) => [element.getAttribute('role'), element.textContent, element.hidden])).toEqual(Array.from({ length: 6 }, () => ['status', 'Loading…', true]));
-      // What else is news: the appointment being moved, the list of Users being read for the
-      // book dialog, "Settings saved.", and what the assistant answers.
-      expect(everywhere('[role="status"]:not(.loading)').map((element) => place(element) || place(element.parentElement!))).toEqual(['moving', 'users-message', 'saved', 'news']);
+      // What else is news: "Password changed" at the login, the appointment being moved, the
+      // list of Users being read for the book dialog, "Settings saved.", and what the assistant
+      // answers.
+      expect(everywhere('[role="status"]:not(.loading)').map((element) => place(element) || place(element.parentElement!))).toEqual(['notice', 'moving', 'users-message', 'saved', 'news']);
     });
   });
 
@@ -285,6 +287,40 @@ describe('index.html', () => {
     expect([one('.saved').textContent, one('.saved').getAttribute('role'), one('.failure').getAttribute('role')]).toEqual(['Settings saved.', 'status', 'alert']);
     expect([one('.submit').textContent, one('.retry').textContent]).toEqual(['Save', 'Try again']);
     expect([one('.zone-name').textContent, one('.last-saved').textContent]).toEqual(['', '']);
+  });
+
+  it('the login has a place for its notice, empty, read when the reader is free, before the form', () => {
+    loadPage();
+    const notice = document.querySelector('#login .notice')!;
+    expect([notice.tagName, notice.getAttribute('role'), notice.textContent]).toEqual(['P', 'status', '']);
+    expect(notice.nextElementSibling!.tagName).toBe('FORM');
+  });
+
+  it('the password screen is one form of three password fields, each in a field of its own with its label and its hint; the browser offers to save the new one', () => {
+    loadPage();
+    const one = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector<T>(`#password ${selector}`)!;
+    const form = one<HTMLFormElement>('form.change-password');
+    // The script says in words what a new password still misses: the browser's own check is off.
+    expect(form.noValidate).toBe(true);
+    const fields = [...document.querySelectorAll<HTMLInputElement>('#password input, #password select, #password textarea')];
+    expect(fields.map((field) => [field.name, field.type, field.value, field.getAttribute('autocomplete'), field.closest('label')!.textContent.trim()])).toEqual([
+      ['current', 'password', '', 'current-password', 'Current password'],
+      ['next', 'password', '', 'new-password', 'New password'],
+      ['again', 'password', '', 'new-password', 'New password again'],
+    ]);
+    for (const field of fields) {
+      // What a password must be comes from the script, with the shared rule: nothing in the page.
+      expect(['pattern', 'minlength', 'maxlength', 'required', 'value', 'aria-invalid'].filter((name) => field.hasAttribute(name)), field.name).toEqual([]);
+      const box = field.closest('.field')!;
+      expect(box.closest('form'), field.name).toBe(form);
+      const hint = document.getElementById(field.getAttribute('aria-describedby')!)!;
+      expect([hint.closest('.field'), hint.classList.contains('hint'), hint.textContent], field.name).toEqual([box, true, '']);
+    }
+    expect(one('.new-field .needs').tagName).toBe('UL');
+    expect([one('.current-field .refusal').getAttribute('role'), one('.current-field .refusal').textContent]).toEqual(['alert', '']);
+    expect([one('.failure').getAttribute('role'), one('.failure').textContent, one('.failure').closest('form')]).toEqual(['alert', '', form]);
+    expect([...form.querySelectorAll('button')].map((button) => [button.textContent, button.getAttribute('type')])).toEqual([['Change password', null]]);
+    expect(document.querySelector<HTMLTemplateElement>('#tpl-password-need')!.content.firstElementChild!.outerHTML).toBe('<li class="need"></li>');
   });
 
   it('the users start with the form empty and the list empty: one text field in a field of its own, with its label, its hint and its refusal, which a browser neither offers nor corrects', () => {

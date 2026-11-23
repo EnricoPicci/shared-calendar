@@ -2,8 +2,8 @@
 
 Package `frontend`: the browser's services layer and its view layer, both complete for the
 calendar; the assistant is a panel at the bottom of every screen, not a screen
-(`docs/FRONTEND_ARCHITECTURE.md` section 6.1); the change of one's own password has its service
-and no screen yet. It runs locally and is deployed as the stack `shared-calendar-web`
+(`docs/FRONTEND_ARCHITECTURE.md` section 6.1); "Password", last for both roles, changes one's
+own password. It runs locally and is deployed as the stack `shared-calendar-web`
 (`docs/FRONTEND_ARCHITECTURE.md` section 13). This file adds to the root `CLAUDE.md`, whose
 rules all apply here. Paths in this file are relative to `frontend/`.
 
@@ -35,31 +35,33 @@ when those files are touched (`.claude/rules/frontend-views.md`).
   `SessionStore`: no result, state or service field holds one.
 - `index.html`: all the markup, everything `hidden`: the login `#login`; the frame `#app` with
   the header, the navigation and `main.screen`, which holds one element per screen (`#week`,
-  `#appointments`, `#settings`, `#users`, `#availability`), each with its dialogs and its
+  `#appointments`, `#settings`, `#users`, `#availability`, `#password`), each with its dialogs and its
   `<template>`s; and, in no screen, `dialog#detail` and the assistant's panel `#assistant`. One module script `app.js`, one style
   sheet, nothing inline. No range, pattern, length or choice of a list is written in the page:
   the script sets them.
 - `style.css`: the one style sheet.
 - `src/main.ts`: the bundle's entry, one statement, the only file that knows `API_URL`,
-  `COGNITO_URL` and `CLIENT_ID`.
+  `COGNITO_URL`, `CLIENT_ID` and `SKIP_GLOBAL_SIGN_OUT` (true only in the dev server's bundle).
 - `src/views/`: `shell.ts` (`runShell`, `mountShell`, the table `SCREENS`, `sessionObjects`:
   new services and logic objects per person, a second `CalendarService` for a single date,
   never the week's; the assistant's panel, mounted once per session and in no row of
   `SCREENS`); one `<name>.view.ts` per view, `mount<Name>(root, deps): Subscription`: `login`,
   `week`, `appointments`, `settings`, `users`, `availability` and `date` (two views of one
-  screen), `assistant`; `detail.view.ts`, the dialog two views mount; `availability.parts.ts`, the
+  screen), `assistant`, `password`; `detail.view.ts`, the dialog two views mount; `availability.parts.ts`, the
   helpers the availability's two views share, with `mountConfirm`.
 - `src/logic/`: pure models (`texts.ts`, `week.model.ts`, `booking.ts`,
   `appointment.detail.ts`, `appointments.model.ts`, `settings.model.ts`, `users.model.ts`,
-  `availability.model.ts`, `conflicts.ts`, `date.model.ts`, `assistant.model.ts`) and one class
+  `availability.model.ts`, `conflicts.ts`, `date.model.ts`, `assistant.model.ts`,
+  `password.model.ts`) and one class
   per screen, and one for the panel, with one stream and `start()` (`week.screen.ts`,
   `appointments.screen.ts`, `settings.screen.ts`, `users.screen.ts`, `availability.screen.ts`,
-  `date.screen.ts`, `assistant.screen.ts`).
+  `date.screen.ts`, `assistant.screen.ts`, `password.screen.ts`).
 - `scripts/` (Node, outside the browser's lint rules): `bundle.mjs`, `build.mjs`, `dev.mjs`,
   `seed-local.mjs`; and `deploy.sh`, the release of the page (`npm run deploy -w frontend`).
 - `tests/unit/services/`, `tests/unit/logic/` (project `unit`, in node; `zone.ts`,
   `fixtures.ts`) and `tests/unit/views/` (project `views`, `happy-dom`; `page.ts`,
-  `page.test.ts`, `shell.test.ts`) mirror `src/`; `tests/integration/` (`local.ts`,
+  `page.test.ts`, `shell.test.ts`) mirror `src/`; `tests/unit/scripts/bundle.test.ts` (project
+  `unit`) holds the bundle's constants; `tests/integration/` (`local.ts`,
   `login.service.test.ts`, `journeys.test.ts`, `logout.service.test.ts`, `calendar.test.ts`,
   `change-password.test.ts`; `assistant.test.ts`, against the fake Claude only: `claude.ts`,
   tested in `tests/unit/integration/`) runs the services against the local stack.

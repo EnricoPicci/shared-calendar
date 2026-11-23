@@ -1,5 +1,5 @@
-import { CALENDAR_LIMITS } from '@shared-calendar/shared';
-import { dateText, dateTimeText, failureText, longDateText, offsetChangesOn, offsetText, rangeText, timeText, weekLabel } from '../../../src/logic/texts';
+import { CALENDAR_LIMITS, PASSWORD_PROBLEMS, PASSWORD_SYMBOLS } from '@shared-calendar/shared';
+import { dateText, dateTimeText, failureText, longDateText, offsetChangesOn, offsetText, PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS, rangeText, timeText, weekLabel } from '../../../src/logic/texts';
 import { useFarBrowserZone } from './zone';
 
 describe('texts', () => {
@@ -297,6 +297,46 @@ describe('texts', () => {
     ])('%s has a sentence of its own, not the general one', (reason, sentence) => {
       expect(failureText(reason)).toBe(sentence);
       expect(failureText(reason)).not.toBe(failureText('no such reason'));
+    });
+  });
+
+  describe('the change of one\'s own password', () => {
+    it('one sentence per condition of the shared rule, and one for the current password again', () => {
+      expect(Object.keys(PASSWORD_PROBLEM_TEXT).sort()).toEqual([...PASSWORD_PROBLEMS, 'same_as_current'].sort());
+      expect(PASSWORD_PROBLEM_TEXT).toEqual({
+        too_short: 'At least 12 characters.',
+        too_long: 'At most 256 characters.',
+        no_uppercase: 'An upper-case letter, A to Z.',
+        no_lowercase: 'A lower-case letter, a to z.',
+        no_digit: 'A digit, 0 to 9.',
+        no_symbol: 'One of these symbols: ^ $ * . [ ] { } ( ) ? " ! @ # % & / \\ , > < \' : ; | _ ~ ` = + -',
+        blank: 'No space, and no other blank character.',
+        same_as_current: 'Not the same as the current password.',
+      });
+    });
+
+    it('the sentence of a missing symbol lists the 32 symbols, each once', () => {
+      const listed = PASSWORD_PROBLEM_TEXT.no_symbol.slice('One of these symbols: '.length).split(' ');
+      expect(listed).toEqual([...PASSWORD_SYMBOLS]);
+      expect(listed).toHaveLength(32);
+    });
+
+    it('every reason of the service but the refused new password has a sentence of its own', () => {
+      expect(failureText('wrong_current_password')).toBe('The current password is not correct.');
+      expect(failureText('too_many_attempts')).toBe('Too many attempts. Please wait a few minutes and try again.');
+      expect(failureText('network')).toBe('The server cannot be reached. Check the connection and try again.');
+      expect(failureText('server')).toBe('The server is not answering as it should. Please try again in a moment.');
+      expect(failureText('unexpected')).toBe('Something went wrong. Please try again.');
+      expect(failureText('not_signed_in')).toBe('You are not signed in. Please sign in again.');
+    });
+
+    it('the other words of the screen and of the login', () => {
+      expect(PASSWORD_TEXTS).toEqual({
+        currentEmpty: 'Type the password you use now.',
+        againEmpty: 'Type the new password once more.',
+        differ: 'The two new passwords are not the same.',
+        changed: 'Password changed.',
+      });
     });
   });
 });

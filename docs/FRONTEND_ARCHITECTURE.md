@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v20 — the view layer **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12, walked at step c13 on 2026-11-23); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`), **written** (`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21, brief `prompts/94-step-70-implementation.md`: the template, the deploy command and its gate) **and deployed** (step 72, 2026-11-21, brief `prompts/96-step-72-implementation.md`): the stack `shared-calendar-web` exists and the page is in use at the address of its output `PageUrl`; section 13 says what is built and deployed, with how each thing was seen. `docs/FRONTEND_DEPLOY_PLAN.md` is done (its step 73, 2026-11-21, brief `prompts/97-step-73-implementation.md`), **with checks at the deployed page still owed**: a refresh with the revoked token refused by the real Cognito, a session renewed after its fifteen minutes, "Sign out" with the network off, a reload and the console, and the rest of the walk with the phone width (the open items of `docs/RUNBOOK.md` section 5.5); **logout is built** (step 71, 2026-11-21, brief `prompts/95-step-71-implementation.md`: `docs/FRONTEND_SERVICES.md` v8, section 20; here sections 6 and 13.7), proven against the local stack, and at the deployed page as far as the revocation answered 200. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
+| Status | v21 — **the password screen built** (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3, brief `prompts/e05-step-p3-implementation.md`): a sixth screen, "Password", last for both roles (section 6), its logic in section 5.1, the login's "Password changed" and the reaction of the shell to a change (section 6), the bundle's fourth constant (section 12.1); walked against the local stack (`docs/FRONTEND_WALK.md` section 9). v20 — the view layer **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12, walked at step c13 on 2026-11-23); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`), **written** (`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21, brief `prompts/94-step-70-implementation.md`: the template, the deploy command and its gate) **and deployed** (step 72, 2026-11-21, brief `prompts/96-step-72-implementation.md`): the stack `shared-calendar-web` exists and the page is in use at the address of its output `PageUrl`; section 13 says what is built and deployed, with how each thing was seen. `docs/FRONTEND_DEPLOY_PLAN.md` is done (its step 73, 2026-11-21, brief `prompts/97-step-73-implementation.md`), **with checks at the deployed page still owed**: a refresh with the revoked token refused by the real Cognito, a session renewed after its fifteen minutes, "Sign out" with the network off, a reload and the console, and the rest of the walk with the phone width (the open items of `docs/RUNBOOK.md` section 5.5); **logout is built** (step 71, 2026-11-21, brief `prompts/95-step-71-implementation.md`: `docs/FRONTEND_SERVICES.md` v8, section 20; here sections 6 and 13.7), proven against the local stack, and at the deployed page as far as the revocation answered 200. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders; and, since v13, how the page is hosted and deployed (section 13) |
 | Not in scope | Keeping the session across a reload, the size of the bundle, a domain of our own: open points of section 10, none of which blocked the deployment. The design of the logout service: it is `docs/FRONTEND_SERVICES.md` section 20; section 13.7 here keeps the direction and what follows from it for the page |
 | Depends on | `docs/FRONTEND_SERVICES.md` v9 (the services the views use, the sign-out and the assistant among them), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work of the views), `docs/FRONTEND_DEPLOY_PLAN.md` (the order of work of the hosting) |
@@ -35,6 +35,7 @@
 | v18 | 2026-11-21 | **The text brought into line with the page being deployed** (`docs/FRONTEND_DEPLOY_PLAN.md` step 73, brief `prompts/97-step-73-implementation.md`). No design and no code changed, and nothing new was proven: the text says what is, where it still spoke of a deployment to come. Status. Section 1. Section 9: the tree names the hosting's three files. Section 10: every row as it stands with the page deployed (O1, O2 and O5 built and deployed, O7 with what the deployed page showed, O3, O9 and O10 open), and the paragraph under the table. Section 11: one clause on the decisions the first deployment confirmed (138 to 140, 142, 144, 145, 149, 150, 152, 154, 155). Section 13: the opening, section 13.2 (the account and the distribution), section 13.3, rule 1, section 13.6 (the procedure is in `docs/RUNBOOK.md`; the command as run). **Corrected:** section 13.4 said that `zod`'s report is seen under the distribution's policy; it was seen under the dev server's, and the console at the deployed page is not yet looked at. Checked again that day, read-only: the stack, the bucket's policy and settings, the distribution's rules, the headers, and a "not changed" (304) to a second question for each file (section 13.5). The checks at the deployed page that `docs/RUNBOOK.md` section 5.5 lists as open are still open, and no sentence here says otherwise. |
 | v19 | 2026-11-22 | Step c12 of `docs/CONVERSATIONAL_PLAN.md`: the assistant's panel, a view that is no screen and lives across the screens, as the Product Owner decided. New section 6.1: what the panel is, what the shell does for it, its logic object and its view, how the screens are told to load again, what its tests hold. Section 5.1: two files more, `assistant.model.ts` and `assistant.screen.ts`. Section 6, point 4: the session's objects include the `AssistantService` and the `AssistantScreen`, and the screens are handed one stream to load again on. Section 9: the new files. Section 11: decisions 159 to 172. The numbers of section 7.1 are those of plan step 69 and are not measured again; the panel's are in section 6.1 |
 | v20 | 2026-11-23 | Step c13 of `docs/CONVERSATIONAL_PLAN.md`: the walk with the assistant's panel (`docs/FRONTEND_WALK.md` v3). Section 6.1: after a message that got one of the two `503` answers the conversation is read once and not continued (decision 172, rewritten as what was done); the conversation stays scrolled to its end when a proposal or a line appears under it; the heading's arrow has no words for a screen reader. Section 8: the panel's rows after the table of the dialogs, and the order a date is typed in. Decisions 173 and 174. |
+| v21 | 2026-11-23 | `docs/CHANGE_PASSWORD_PLAN.md` step p3 (brief `prompts/e05-step-p3-implementation.md`): the password screen. Section 5.1: twenty files (`password.model.ts` and `password.screen.ts` are new), the sentences of `texts.ts` for the new password's conditions and the screen. Section 6: the sixth entry of `SCREENS`, `#/password`, "Password", both roles, last; the `ChangePasswordService` and the `PasswordScreen` among a session's objects; the shell's reaction to a change (the page-wide services put back, the login's notice) and the sequence of a change; `mountShell` takes `pageWide`. Section 9: the tree. Section 12.1: the fourth constant, `SKIP_GLOBAL_SIGN_OUT`. Section 11: decision 16 amended, decisions 175 to 183. The service changed with it: `docs/FRONTEND_SERVICES.md` v11, decision 69 (the success before the store is cleared). |
 | v20, note | 2026-11-23 | The branch `deploy-frontend` merged into `main`, where the assistant's panel had been written at the same time. The panel's two versions, first numbered v13 and v14, are v19 and v20, after the hosting's v13 to v18; its decisions, first numbered 138 to 153, are 159 to 174, after the hosting's 138 to 158; every reference to them was changed with them. The status row says both. No other text changed. |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
@@ -834,15 +835,16 @@ Its rules:
 7. **Tested like the services**: unit tests with no network and no DOM, inside the 100 % line
    coverage of `frontend/src`.
 
-### 5.1 As built: eighteen files
+### 5.1 As built: twenty files
 
-`frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` steps 61 to 68, and
-`docs/CONVERSATIONAL_PLAN.md` step c12 for the assistant's two), each with its test in
+`frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` steps 61 to 68,
+`docs/CONVERSATIONAL_PLAN.md` step c12 for the assistant's two and `docs/CHANGE_PASSWORD_PLAN.md`
+step p3 for the password's two), each with its test in
 `frontend/tests/unit/logic/`:
 
 | File | What it holds |
 |---|---|
-| `texts.ts` | Pure functions: a date (`dateText`, "Mon 16 Nov"), a time (`timeText`, "09:00"), a range (`rangeText`, "09:00–10:00"), a date with a time (`dateTimeText`, "Mon 23 Nov, 10:00"), a date with its year (`longDateText`, "20 November 2026"), a week's label (`weekLabel`, "16 Nov – 22 Nov 2026"), a UTC offset (`offsetText`, "+02:00"), whether a day's offset changes (`offsetChangesOn`), and a failure in plain words (`failureText`) |
+| `texts.ts` | Pure functions: a date (`dateText`, "Mon 16 Nov"), a time (`timeText`, "09:00"), a range (`rangeText`, "09:00–10:00"), a date with a time (`dateTimeText`, "Mon 23 Nov, 10:00"), a date with its year (`longDateText`, "20 November 2026"), a week's label (`weekLabel`, "16 Nov – 22 Nov 2026"), a UTC offset (`offsetText`, "+02:00"), whether a day's offset changes (`offsetChangesOn`), a failure in plain words (`failureText`); and the words of the password screen: one sentence per condition a new password can miss (`PASSWORD_PROBLEM_TEXT`, with the shared rule's numbers and its 32 symbols) and the screen's other sentences, "Password changed" among them (`PASSWORD_TEXTS`) |
 | `week.model.ts` | Pure: `weekModel(view, role)`, a `CalendarView` in, the week ready to draw out |
 | `booking.ts` | Pure, for the book dialog: what is booked in words (`bookingText`), the times the Administrator may choose (`timeChoice`), the Users to choose from (`userChoice`), and from what the dialog holds to the argument of `AppointmentsService.book` (`bookingFor`) or, when it confirms a change, of `AppointmentsService.change` (`changeFor`) |
 | `appointment.detail.ts` | Pure: `appointmentDetail(appointment, role, now, zone)`, an `Appointment` in, what the detail dialog shows out, with which of its three actions are offered (the note, "Change", "Cancel appointment"), the note as a text and as a field's value, and the sentence about them; `movingOf(detail, role)`, an appointment being moved, in the words of the banner and of the confirmation |
@@ -860,6 +862,8 @@ Its rules:
 | `date.screen.ts` | The class `DateScreen`: the date on show, its day read from the calendar view and read again after every write, the windows of "this day only" being put together, and the five writes on a date |
 | `assistant.model.ts` | Pure, for the assistant's panel (section 6.1): the conversation put together from the replies with no message twice (`joined`) and ready to draw (`messageRows`); what a reply added for a screen reader (`newsOf`); the proposal with what became of each change and whether its buttons are offered (`proposalShown`); whether a change was made (`changeMade`); the line that counts the messages left (`remainingText`); and, one function per call, what the panel says and does about each reason of a failure (`loadTrouble`, `sendTrouble`, `continueTrouble`, `confirmTrouble`, `declineTrouble`): a `switch` over the call's closed list of reasons with no default, so a code added to a route does not compile until it is named |
 | `assistant.screen.ts` | The class `AssistantScreen`: whether the panel is open, the first read at the first opening, the conversation on show, the loop that calls `continue`, the proposal, the failure line, what is in use, one state on one stream (`assistant$`), and `changed$`, which tells the shell that a change was made. Its methods: `open`, `close`, `toggle`, `send`, `confirm`, `decline`, `end` |
+| `password.model.ts` | Pure, for the password screen: what a new password still misses (`newProblems`: the shared rule's conditions, then being the current one again), their sentences (`problemTexts`), the hints of the three fields from what they hold (`passwordHints`, `EMPTY_HINTS`: the current password missing, the conditions, the new one again missing or different), whether one stands (`hintStands`), and where a failure is said (`failurePlace`: a wrong current password under its field, the rest under the form). It keeps no text typed |
+| `password.screen.ts` | The class `PasswordScreen`: the hints while the person types (`typed`), the change asked of the `ChangePasswordService` only when no hint stands and none is under way (`change`), the button disabled meanwhile, and what each outcome means for the form: the fields emptied after a success and after a wrong current password, the other failures said under the form. One stream, `password$`; no password on it or on the object |
 
 **"Now" is passed in.** Nothing in `logic/` reads the clock by itself. `WeekScreen` receives a
 function `now: () => Date` through its constructor (the shell passes `() => new Date()`, a test a
@@ -1639,7 +1643,7 @@ their sentences here.
 
 The shell is the start-up code, one function called by the entry file of the bundle:
 `runShell(config)`, in `frontend/src/views/shell.ts`. It creates what lives as long as the page
-(point 1) and calls `mountShell(root, { config, store, login, logout })`, which does the rest and is
+(point 1) and calls `mountShell(root, { config, store, login, logout, pageWide })`, which does the rest and is
 what the shell's DOM test drives, with a store, a login and a sign-out service of its own. `mountShell` gets the
 API's configuration and the whole store because it creates the API services of each session
 (point 4), which read the token from the store at each call.
@@ -1651,7 +1655,8 @@ API's configuration and the whole store because it creates the API services of e
    (`docs/FRONTEND_SERVICES.md` section 11.6). The `LogoutService` is created with the store
    and with the two services before it, which it puts back to their first state at a sign-out
    (`docs/FRONTEND_SERVICES.md` section 20.6); `mountShell` is handed its one method,
-   `logout`, beside `login`. It is not one of the objects of point 4: the teardown of the
+   `logout`, beside `login`, and the `LoginService` and the `RefreshService` as `pageWide`, which
+   it puts back to their first state after a change of password (below). The `LogoutService` is not one of the objects of point 4: the teardown of the
    person who leaves must not cancel the request that tells Cognito. Ending the shell does
    not end it either: a request under way ends by itself, in 10 seconds at most.
 2. **It subscribes to `store.session$`** (`docs/FRONTEND_SERVICES.md` section 9.5). `null` shows
@@ -1664,7 +1669,9 @@ API's configuration and the whole store because it creates the API services of e
    nothing and shows nothing about Cognito's answer. The screen changes because the service
    clears the `SessionStore` during that call, and `session$` then notifies `null`. A session
    that ends by itself (its expiry, a token rejected) reaches the shell the same way, as a
-   `null`, with no call to the service.
+   `null`, with no call to the service. The login view is mounted with a notice, empty but
+   after a change of password, when it is "Password changed." (`PASSWORD_TEXTS.changed`): the
+   view says it until the next "Sign in" and wipes it when it is left; the shell gives it once.
 3. **A refreshed session is the same person.** The shell reacts only when the username or the
    role changes (`distinctUntilChanged`), so a token refresh leaves the screen as it is. The session is
    reduced to the username and the role before anything else sees it (section 3, rule 11).
@@ -1680,7 +1687,11 @@ API's configuration and the whole store because it creates the API services of e
    which is given the session's `UsersService`, the one the week's book dialog asks for its list, the `AvailabilityTypesService`, the `AvailabilityRulesService` and the `AvailabilityScreen`, which is given both and the session's `CalendarSettingsService`, and the `DateScreen`, which is given the `AvailabilityScreen`'s `known$`, the two availability services and **a second `CalendarService`**, of its own: the service has one pair of streams and one pending call, and `reload()` runs its last range again, so the week's must never be asked for a single date. They live as long as the person's session, not as long as a screen is on
    show: coming back to a screen finds its logic object as it was left. The same function builds
    the stream the week, the list, the users and the availability screens reload on (section 5.1): the document's `visibilitychange` event,
-   keeping the notifications at which `document.visibilityState` is `visible`. Each screen
+   keeping the notifications at which `document.visibilityState` is `visible`. And the
+   `ChangePasswordService`, with Cognito's address and the skip value of the configuration
+   (`skipGlobalSignOut`, true only when the configuration says exactly so; section 12.1), with
+   the `PasswordScreen` given it: each person changes their own password through a service of
+   their own, holding their own token. Each screen
    listens to it only while it is started, so the screen on show is the one that loads again,
    and nothing is loaded at the login or after signing out.
 5. **Mounting.** To show a view the shell un-hides its element, calls its mount function, then
@@ -1705,9 +1716,10 @@ export type Screen = {
 };
 ```
 
-There are five entries: `#/week`, "Week", both roles; `#/appointments`, "My
+There are six entries: `#/week`, "Week", both roles; `#/appointments`, "My
 appointments", the role `user` only; `#/settings`, "Settings", `#/users`, "Users", and
-`#/availability`, "Availability", the role `admin` only. The dialogs have no address. A new screen is a new entry,
+`#/availability`, "Availability", the role `admin` only; and last `#/password`, "Password",
+both roles (`docs/CHANGE_PASSWORD_PLAN.md` section 2, decisions D1 and D3). The dialogs have no address. A new screen is a new entry,
 its element in `index.html`, and its services and logic object in `sessionObjects`; the code
 that reads the address, fills the navigation and switches between screens does not change: it
 was written for the first entry and not touched for the four that followed. `mountShell` takes the table as an optional dependency, which a
@@ -1775,6 +1787,24 @@ mounts the login view on the same, emptied, form. Last, the request that tells C
 leaves. All of it is one run of the script, inside the handler: the person sees the login at
 once, and Cognito's answer, whenever it comes and whatever it says, changes nothing on the
 page.
+
+**A change of password** (`docs/FRONTEND_SERVICES.md` section 22) ends the session too, in
+this order, all in one run of the script once Cognito answered:
+
+1. The person presses "Change password", with no hint standing; the `PasswordScreen` calls
+   `changePassword(current, next)`, the state says `pending` and the button is out of use.
+2. Cognito changes the password; the service sends `GlobalSignOut` (skipped against the local
+   stack) and whatever it answers says `success` on both streams **while the person is still
+   signed in** (`docs/FRONTEND_SERVICES.md` section 8, decision 69).
+3. The screen hears it and the view empties the three fields. The shell, subscribed to the
+   service's result for the whole session, puts the `LoginService` and the `RefreshService`
+   back to their first state, as at a sign-out, and keeps "Password changed." for the login.
+4. The service clears the store; `session$` says `null`; the shell leaves the person's frame,
+   as at a sign-out, and mounts the login view with the notice.
+
+The shell's subscription is one of the session's: it ends with the person. A change made from
+the screen and answered after the person left it still ends the session, and still has the
+login say so, since the service and the shell's subscription live as long as the session.
 
 ### 6.1 The assistant's panel: a view that lives across the screens
 
@@ -1925,6 +1955,15 @@ Measured at `docs/FRONTEND_VIEW_PLAN.md` step 69 (2026-11-20), with every screen
 | `week.view.ts` | 315 | 227 | 47 | 4 | 1 (the book dialog, in its two modes); it mounts the detail |
 | `availability.view.ts` | 213 | 159 | 23 | 3 | 2 (rename, change); it opens the one that confirms |
 | `date.view.ts` | 174 | 131 | 18 | 1 | 0; it opens the one that confirms |
+| 175 | The password is a screen of its own, `#/password`, "Password", the last row of `SCREENS`, for both roles; its service and its logic object are the session's, like every screen's (section 6) | The Product Owner's decisions D1 and D3 of `docs/CHANGE_PASSWORD_PLAN.md` section 2. Nothing of the shell's switching changed: one more row | |
+| 176 | The hints are the logic layer's, computed at each keystroke from the three fields handed over as arguments (`typed`, `change`); nothing keeps a password typed, and no state holds one | `docs/FRONTEND_SERVICES.md` section 2, rule 6 holds for the logic layer too: the passwords are in the fields and in the call's arguments only. The service checks the rule again before any request (`docs/FRONTEND_SERVICES.md` section 8, decision 63) | |
+| 177 | "Change password" is out of use while a hint stands and while the change is under way; the hints of an empty form say what to type (the current password, the new one's five conditions, the new one again), so the button is out of use at the start | The service abandons a first change on a second call (`docs/FRONTEND_SERVICES.md` section 8, decision 68): the button keeps that from the page. An empty current password would reach Cognito as a refusal of its own, which the page never asks for | Beyond: the two sentences of an empty current and an empty second field |
+| 178 | What a new password still misses is a list under its field, one item per condition, redrawn only when it changes; the comparisons ("not the same", "the same as the current") stand under the field they concern | The Product Owner asked to see "in words what the new one still misses while typing". A list reads each condition on its own and shrinks as the person types | |
+| 179 | The view empties the three fields after a success, after a wrong current password and on leaving; another failure keeps what was typed | `docs/FRONTEND_ARCHITECTURE.md` section 3, rule 9, and `docs/CHANGE_PASSWORD_PLAN.md` step p3. After a wrong current password the person types all three again, as after a refused sign-in; after a network failure they can press again | |
+| 180 | "Password changed." is shown by the login view, in an element of its own (`#login .notice`, `role="status"`), given by the shell when it mounts the login after a change, and wiped at the next "Sign in" and when the login is left; no timer | Decided by the Product Owner at the start of `docs/CHANGE_PASSWORD_PLAN.md` step p3. The password screen is gone when the person is signed out; the login is where they look next. `mountLogin` takes it as an optional third argument, so the login's tests did not change | |
+| 181 | The skip value is the bundle's fourth constant, `SKIP_GLOBAL_SIGN_OUT`: `true` only in the dev server's bundle, `false` in every build, with no variable to set it; the shell takes anything but `true` as `false` (section 12.1) | Decided by the Product Owner at the start of `docs/CHANGE_PASSWORD_PLAN.md` step p3. A cloud build cannot skip the sign-out everywhere by a mistake in the environment; `frontend/tests/unit/scripts/bundle.test.ts` is the first test of a script of the front end | |
+| 182 | After a change the shell puts the `LoginService` and the `RefreshService` back to their first state, in its reaction to the success, before the store is cleared (section 6); `mountShell` takes them as `pageWide`, none unless given | Decided by the Product Owner at the start of `docs/CHANGE_PASSWORD_PLAN.md` step p3, with the order of `docs/FRONTEND_SERVICES.md` section 8, decision 69, that makes it possible: a change ends the session as "Sign out" does, and leaves nothing of the person in a service (`docs/FRONTEND_SERVICES.md` section 8, decision 53) | |
+| 183 | The tests of the shell and of the page that list the navigation or count the page's fields and failure lines gained the new screen's | A link for both roles changes every list of links; `tests/unit/views/page.test.ts` counts the fields (40) and the places of a failure (51) on purpose. No other test of a screen, of the login or of the sign-out changed | |
 | `users.view.ts` | 172 | 121 | 25 | 3 | 2 (the password, the delete) |
 | `availability.parts.ts` | 160 | 107 | 19 | 0 | 1 (the one that confirms, `mountConfirm`) |
 | `detail.view.ts` | 134 | 89 | 10 | 2 | 1 (the detail) |
@@ -2397,20 +2436,22 @@ frontend/
 │   │                          # settings.model.ts, settings.screen.ts, users.model.ts,
 │   │                          # users.screen.ts, availability.model.ts, conflicts.ts,
 │   │                          # availability.screen.ts, date.model.ts, date.screen.ts,
-│   │                          # assistant.model.ts, assistant.screen.ts (the panel, section 6.1)
+│   │                          # assistant.model.ts, assistant.screen.ts (the panel, section 6.1),
+│   │                          # password.model.ts, password.screen.ts
 │   └── views/                 # shell.ts and one <name>.view.ts per view: login.view.ts, week.view.ts,
 │                              # appointments.view.ts, settings.view.ts, users.view.ts,
 │                              # availability.view.ts and date.view.ts, the two views of one screen,
 │                              # with availability.parts.ts, what the two share; detail.view.ts,
 │                              # the dialog two views mount; assistant.view.ts, the panel at the
-│                              # bottom of every screen (section 6.1)
+│                              # bottom of every screen (section 6.1); password.view.ts
 ├── tests/
 │   └── unit/
 │       ├── services/          # vitest project `unit`, in node
 │       ├── logic/             # mirrors src/logic; project `unit`; zone.ts (the browser's zone of
 │       │                      # the tests), fixtures.ts (calendar views)
-│       └── views/             # mirrors src/views: the DOM tests, vitest project `views` (happy-dom);
-│                              # page.ts loads the real index.html
+│       ├── views/             # mirrors src/views: the DOM tests, vitest project `views` (happy-dom);
+│       │                      # page.ts loads the real index.html
+│       └── scripts/           # bundle.test.ts: the bundle's constants, project `unit`
 └── dist/                      # generated, git-ignored: index.html, style.css, app.js, app.js.map
 ```
 
@@ -2482,7 +2523,7 @@ than what the trial showed: these deserve the first look in a review.
 | 13 | Two lint rules, in place since the first view: no `innerHTML` and its relatives; no DOM in `logic/` and `services/` (section 9) | A rule that lint can check is not left to review | The second one, yes |
 | 14 | The logic layer is inside the 100 % line coverage of `frontend/src` (section 5, rule 7) | It is where the rules of the screens are; it needs no DOM to be tested | Yes |
 | 15 | esbuild bundles; two Node scripts, `build.mjs` and `dev.mjs`, and a third file, `bundle.mjs`, with the options they share (section 12.1) | Already a development dependency; no configuration file of a tool. The shared file keeps the dev server and the build from drifting apart (the target, the format, the constants) | The third file |
-| 16 | The configuration is three constants, `API_URL`, `COGNITO_URL` and `CLIENT_ID`, put in by esbuild's `define` and read in `src/main.ts` only (section 12.1) | `docs/FRONTEND_SERVICES.md` section 2, rule 3: nothing below the entry file knows where a value comes from; nothing about a stack is in a committed file | |
+| 16 | The configuration is three constants, `API_URL`, `COGNITO_URL` and `CLIENT_ID`, put in by esbuild's `define` and read in `src/main.ts` only (section 12.1); a fourth, `SKIP_GLOBAL_SIGN_OUT`, by decision 181 | `docs/FRONTEND_SERVICES.md` section 2, rule 3: nothing below the entry file knows where a value comes from; nothing about a stack is in a committed file | |
 | 17 | Under the dev server the two addresses have no host: `/api` and `/cognito/` (section 12.2) | The browser completes them with the origin the page came from, so the same bundle works on `localhost` and through a forwarded port of a Codespace, where the server cannot know its public name | Yes: "the dev server's own origin" was first meant as a full address |
 | 18 | The dev server listens on `127.0.0.1` only, and answers `/favicon.ico` with an empty 204 (section 12.2) | It passes requests on to the local stack: not for the network. A 404 for the icon would be an error in the browser's console at every load | Yes |
 | 19 | The views' tests run in a vitest project of their own, `views`, with `happy-dom`; the `unit` project stays in `node` (section 12.3) | A folder gets an environment through a project; the alternative vitest offers, a `@vitest-environment` comment, is per file and can be forgotten. In `node` a DOM global in a service or in the logic fails the test | |
@@ -2655,7 +2696,7 @@ than what the trial showed: these deserve the first look in a review.
 | `dist/app.js` | `src/main.ts` and everything it imports, as one minified module script (esbuild: `bundle`, format `esm`, target `es2022`) |
 | `dist/app.js.map` | The source map, a file of its own, named in the last line of `app.js` |
 
-**The configuration** reaches the bundle as three constants, which esbuild's `define` writes in
+**The configuration** reaches the bundle as four constants, which esbuild's `define` writes in
 place of their names:
 
 | Constant | What | In a build | Under the dev server |
@@ -2663,10 +2704,16 @@ place of their names:
 | `API_URL` | The API's base address, no trailing slash | Environment variable `API_URL` | `/api` |
 | `COGNITO_URL` | Where `InitiateAuth` is posted | Environment variable `COGNITO_URL` | `/cognito/` |
 | `CLIENT_ID` | The app client of the user pool | Environment variable `CLIENT_ID` | `AuthorizerFunction.CLIENT_ID` of `backend/env.local.json` |
+| `SKIP_GLOBAL_SIGN_OUT` | Whether a change of password skips the sign-out everywhere that follows it (`docs/FRONTEND_SERVICES.md` section 22.2) | `false`, always: no variable is read for it | `true`: cognito-local has no `GlobalSignOut` (`docs/ARCHITECTURE.md` section 8) |
 
 They are declared and read in `frontend/src/main.ts` and nowhere else; it hands them to the shell
 as one plain object (`docs/FRONTEND_SERVICES.md` section 2, rule 3). A build with one of the
-three variables missing stops and names it. No value is written in a committed file
+three variables missing stops and names it. The fourth is `false` in every build: `bundleOptions`
+of `frontend/scripts/bundle.mjs` writes `true` only for a configuration holding exactly `true`,
+which only the dev server gives, and the build reads no variable for it, so a page built for the
+cloud always signs a person out everywhere after a change of password.
+`frontend/tests/unit/scripts/bundle.test.ts` holds this, down to the bundle built with the
+build's configuration. No value is written in a committed file
 (`docs/FOLDER_STRUCTURE.md` section 7). Which values a deployment uses, and the script that reads
 them from the stack's outputs, are in section 13.6.
 

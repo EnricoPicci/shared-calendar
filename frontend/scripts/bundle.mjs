@@ -7,8 +7,12 @@ export const FRONTEND = new URL('../', import.meta.url);
 
 export const path = (relative) => fileURLToPath(new URL(relative, FRONTEND));
 
-// The esbuild options common to both. `config` holds the three values that src/main.ts declares
-// as constants; esbuild writes each one into the bundle in place of its name.
+// The esbuild options common to both. `config` holds the values that src/main.ts declares as
+// constants; esbuild writes each one into the bundle in place of its name. SKIP_GLOBAL_SIGN_OUT is
+// true only when `config` holds exactly true, which only the dev server gives, for the local
+// stack whose Cognito emulator has no GlobalSignOut (docs/FRONTEND_SERVICES.md section 8,
+// decision 67): a build that gives nothing, as `npm run build` does, always signs a person out
+// everywhere after a change of password.
 export function bundleOptions(config) {
   return {
     entryPoints: [path('src/main.ts')],
@@ -20,6 +24,7 @@ export function bundleOptions(config) {
       API_URL: JSON.stringify(config.API_URL),
       COGNITO_URL: JSON.stringify(config.COGNITO_URL),
       CLIENT_ID: JSON.stringify(config.CLIENT_ID),
+      SKIP_GLOBAL_SIGN_OUT: JSON.stringify(config.SKIP_GLOBAL_SIGN_OUT === true),
     },
   };
 }

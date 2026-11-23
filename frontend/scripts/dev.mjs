@@ -38,9 +38,10 @@ try {
 
 // The bundle for this server. The two addresses have no host: the browser completes them with
 // the origin the page came from, whichever name it reached this server by (localhost, or a
-// forwarded port of a Codespace).
+// forwarded port of a Codespace). The sign-out everywhere after a change of password is skipped:
+// cognito-local does not implement GlobalSignOut (docs/ARCHITECTURE.md section 8).
 async function bundle() {
-  const config = { API_URL: '/api', COGNITO_URL: '/cognito/', CLIENT_ID: await clientId() };
+  const config = { API_URL: '/api', COGNITO_URL: '/cognito/', CLIENT_ID: await clientId(), SKIP_GLOBAL_SIGN_OUT: true };
   const result = await build({ ...bundleOptions(config), sourcemap: 'inline', write: false });
   return result.outputFiles[0].text;
 }

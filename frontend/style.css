@@ -26,6 +26,9 @@ label { display: grid; gap: 0.25rem; font-size: 0.85rem; color: #52606d; }
 .login { max-width: 20rem; margin: 12vh auto 0; padding: 1.5rem; background: #fff; border-radius: 10px; box-shadow: 0 1px 4px #0002; }
 .login h1 { font-size: 1.4rem; }
 .login form { display: grid; gap: 0.9rem; margin-top: 1rem; }
+/* After a change of password, until the next "Sign in" */
+.login .notice { margin: 0.75rem 0 0; color: #1b6e3c; }
+.login .notice:empty { display: none; }
 
 /* The frame: the header with who is signed in, the navigation, the screen */
 .bar { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 1rem; background: #1f2933; color: #fff; }
@@ -150,6 +153,14 @@ dialog .password { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "
 /* The heading that takes the keyboard when the password dialog opens shows no ring */
 dialog h3:focus { outline: none; }
 dialog .question { overflow-wrap: anywhere; }
+
+/* The password: one narrow form; under the new password, the list of what it still misses */
+.change-password { display: grid; gap: 0.75rem; max-width: 26rem; margin-top: 0.75rem; }
+.change-password p { margin: 0; }
+.change-password .about { font-size: 0.8rem; color: #52606d; }
+.change-password .failure:empty { display: none; }
+.change-password .actions { justify-content: flex-start; }
+.field .needs { margin: 0; padding-left: 1.2rem; }
 
 /* The availability: the types and the weekly patterns, each a form that creates one and its
    list. The six fields of a pattern stand side by side while there is room, and wrap. */

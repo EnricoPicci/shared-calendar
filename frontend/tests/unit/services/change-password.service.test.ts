@@ -71,12 +71,22 @@ function body(i: number): unknown {
 // Test names: the architecture is docs/ARCHITECTURE.md, which reads Cognito's errors.
 describe('ChangePasswordService', () => {
   describe('a change that succeeds', () => {
-    it('ChangePassword, then GlobalSignOut, then the store cleared, then the one success', async () => {
+    it('ChangePassword, then GlobalSignOut, then the one success, then the store cleared', async () => {
       const run = make();
       let sessionAtSignOut: Session | null | undefined;
       fetchMock.mockResolvedValueOnce(ok()).mockImplementationOnce(async () => {
         sessionAtSignOut = await current(run.store);
         return ok();
+      });
+      // What the store holds when each stream says success: the person is still signed in.
+      const sessions: (Session | null)[] = [];
+      run.store.session$.subscribe((s) => sessions.push(s));
+      const atSuccess: (Session | null | undefined)[] = [];
+      run.service.changePasswordState$.subscribe((s) => {
+        if (s.status === 'success') atSuccess.push(sessions.at(-1));
+      });
+      run.service.changePasswordResult$.subscribe((r) => {
+        if (r.status === 'success') atSuccess.push(sessions.at(-1));
       });
       run.service.changePassword(CURRENT, NEXT);
       const result = await settled(run);
@@ -86,6 +96,8 @@ describe('ChangePasswordService', () => {
       expect(run.states.at(-1)).toBe(result);
       expect(fetchMock).toHaveBeenCalledTimes(2);
       expect(sessionAtSignOut).toBe(ALICE); // the store is cleared after the sign-out, not before
+      expect(atSuccess).toEqual([ALICE, ALICE]); // and after the success, on both streams
+      expect(sessions).toEqual([ALICE, null]);
       expect(await current(run.store)).toBeNull();
     });
 

@@ -59,11 +59,19 @@ export class ChangePasswordService {
             switchMap((session) => (session ? this.change(session, current, next) : of(failure('not_signed_in', 'Nobody is signed in')))),
           );
 
-    this.pending = call
-      .pipe(tap((result) => this.stateSubject.next(result)))
+    this.pending = call.pipe(tap((result) => this.stateSubject.next(result))).subscribe((result) => {
       // Forward `next` only: a completed or errored subject would ignore every later call
       // (docs/FRONTEND_SERVICES.md section 3.2).
-      .subscribe((result) => this.resultSubject.next(result));
+      this.resultSubject.next(result);
+      // After a change the store is cleared last, once both streams said so: whoever reacts to
+      // the success (the shell puts the page-wide services back to their first state and words
+      // the login's notice) does it while the person is still signed in, and the login view,
+      // mounted when the store's null arrives, finds it done (docs/FRONTEND_SERVICES.md section 8,
+      // decision 69). Unguarded: a refresh during the change replaces the session object, and the
+      // person must sign in again with the new password in every case (docs/FRONTEND_SERVICES.md
+      // section 8, decision 68).
+      if (result.status === 'success') this.store.clear();
+    });
   }
 
   // ChangePassword, and after a change the end of every session of the person.
@@ -81,20 +89,14 @@ export class ChangePasswordService {
 
   // GlobalSignOut revokes every refresh token of the person, so their other devices are signed out
   // at their next refresh (docs/ARCHITECTURE.md section 6.9, row 3). Skipped when the configuration
-  // says so. Whatever it answers, even a failure or no answer at all, the change is made: the store
-  // is cleared and the outcome is the one success (docs/FRONTEND_SERVICES.md section 8, decision 65).
-  // The store is cleared whatever session it holds by then: a refresh during the change replaces
-  // the session object, and the person must sign in again with the new password in every case.
+  // says so. Whatever it answers, even a failure or no answer at all, the change is made and the
+  // outcome is the one success (docs/FRONTEND_SERVICES.md section 8, decision 65); the store is
+  // cleared after it, in changePassword.
   private signOutEverywhere(session: Session): Observable<ChangePasswordResult> {
     const signOut: Observable<unknown> = this.config.skipGlobalSignOut
       ? of(undefined)
       : cognitoRequest(this.config, 'GlobalSignOut', { AccessToken: session.accessToken }).pipe(catchError(() => of(undefined)));
-    return signOut.pipe(
-      map((): ChangePasswordResult => {
-        this.store.clear();
-        return { status: 'success' };
-      }),
-    );
+    return signOut.pipe(map((): ChangePasswordResult => ({ status: 'success' })));
   }
 }
 

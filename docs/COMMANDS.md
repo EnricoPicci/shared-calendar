@@ -331,6 +331,9 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
     file is missing) and, to sign in, `local:api`.
   - Serves `/`, `/style.css` and `/app.js` (bundled by esbuild at every request: an edit shows
     after a reload of the page; an edit to `dev.mjs` itself needs a restart).
+  - Its bundle skips the sign-out everywhere after a change of password
+    (`SKIP_GLOBAL_SIGN_OUT` true): cognito-local has no `GlobalSignOut`, so another browser
+    signed in as the same person stays signed in (`docs/FRONTEND_ARCHITECTURE.md` section 12.1).
   - Passes `/api/…` on to `http://127.0.0.1:3000` and `/cognito/…` to `http://localhost:9229` so
     that the browser sees one origin (the API has no CORS), sends
     `Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; base-uri 'none'` with
@@ -367,7 +370,9 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
 - `API_URL=… COGNITO_URL=… CLIENT_ID=… npm run build -w frontend` (`frontend/scripts/build.mjs`):
   writes `frontend/dist/` (git-ignored, emptied first): `index.html`, `style.css`, `app.js`
   (minified) and `app.js.map`, and prints their sizes. The three values come from the
-  environment only, never from a committed file; a missing one stops the build and is named. The
+  environment only, never from a committed file; a missing one stops the build and is named.
+  No variable turns off the sign-out everywhere after a change of password: a build always
+  does it. The
   front end's deploy command runs it with the stack's values (section 6); `backend`'s `build` is
   another thing (`sam build`).
 

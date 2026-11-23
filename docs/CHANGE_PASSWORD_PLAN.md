@@ -1,10 +1,10 @@
 # Shared Calendar: a person changes their own password (implementation plan)
 
-**Version:** v5 (2026-11-23): steps p1 and p2 done, then merged into `main`
-(`docs/MERGE_CHANGE_PASSWORD.md`), where the page is deployed and has a sign-out; steps p3 and p4
-amended for both. The design is in `docs/ARCHITECTURE.md` (v14,
+**Version:** v6 (2026-11-23): steps p1, p2 and p3 done; step p4 left. v5: steps p1 and p2
+merged into `main` (`docs/MERGE_CHANGE_PASSWORD.md`), where the page is deployed and has a
+sign-out; steps p3 and p4 amended for both. The design is in `docs/ARCHITECTURE.md` (v14,
 section 6.9); the shared rule and `ChangePasswordService` are built (`docs/FRONTEND_SERVICES.md`
-v10, section 22); no screen yet.
+v11, section 22), and the screen "Password" (`docs/FRONTEND_ARCHITECTURE.md` v21).
 **Governed by:** `docs/ARCHITECTURE.md` (section 7.4, option B), `docs/FRONTEND_SERVICES.md`,
 `docs/FRONTEND_ARCHITECTURE.md`. On any conflict those documents win, and this plan is fixed.
 
@@ -277,6 +277,89 @@ nothing deployed, no `aws` command run.
 **Check:** the gate; the new checks of the walk done by hand in a browser against the local
 stack, at the two widths, as `alice` and as `admin`, then the stack restarted so that the
 local accounts have their documented passwords again.
+
+**As done (2026-11-23).** Brief `prompts/e05-step-p3-implementation.md`. Nothing under
+`backend/` or `shared/src` changed; nothing deployed, no `aws` command run.
+
+- *The three decisions taken before the code* (by the Product Owner, on the recommendations):
+  1. **After a change the shell puts the `LoginService` and the `RefreshService` back** to their
+     first state, as "Sign out" does; the service takes no page-wide service. What the code
+     showed: without it nothing on screen goes wrong (the login view reads only `loginState$`,
+     whose last value is the person's own success, which shows no text; a refresh in flight
+     cannot write the store back, `replace` being guarded), but the person's name stays in the
+     two services' last outcome, which `docs/FRONTEND_SERVICES.md` section 8, decision 53 means
+     to prevent. And with the store cleared before the success, nothing of the session could
+     hear the success: the person's teardown had ended every subscription first. So **the order
+     of decision 68 is reversed**: the service says `success` on both streams, then clears the
+     store (`docs/FRONTEND_SERVICES.md` v11, sections 22.4 and 22.6, decision 69). The shell's
+     reaction is a subscription of the session to the service's result.
+  2. **The skip value is the bundle's fourth constant, `SKIP_GLOBAL_SIGN_OUT`**: `bundleOptions`
+     of `frontend/scripts/bundle.mjs` writes `true` only for a configuration holding exactly
+     `true`, which only `dev.mjs` gives; `build.mjs`, which `deploy.sh` runs, reads no variable
+     for it. `frontend/tests/unit/scripts/bundle.test.ts`, the first test of a script of the
+     front end, proves it: `build.mjs` reads its three variables only, a text "true" or 1 does not
+     skip, `dev.mjs` gives `true`, and the bundle built in memory with the build's configuration
+     hands the shell `skipGlobalSignOut: false`. The shell takes anything but `true` as `false`.
+  3. **"Password changed." is shown by the login view**, in its own element `#login .notice`
+     (`role="status"`), given by the shell as the optional third argument of `mountLogin` when it
+     mounts the login after a change; wiped at the next "Sign in" and when the login is left; no
+     timer.
+- *The logic*: `frontend/src/logic/password.model.ts` (`newProblems`, `problemTexts`,
+  `passwordHints`, `EMPTY_HINTS`, `hintStands`, `failurePlace`) and `password.screen.ts`
+  (`PasswordScreen`: `password$`, `start()`, `typed(fields)`, `change(fields)`). The fields are
+  arguments only; no state holds a password. The button is out of use while a hint stands and
+  while the state is `pending`. An empty form has hints too ("Type the password you use now.",
+  the five conditions, "Type the new password once more."), so the button is out of use at the
+  start; `same_as_current` is said only once a current password is typed.
+- *The sentences* in `logic/texts.ts`: `PASSWORD_PROBLEM_TEXT` (one per name of the shared rule,
+  with its numbers and its 32 symbols, and `same_as_current`), `PASSWORD_TEXTS` (the two empty
+  fields, the two new passwords that differ, "Password changed."), and `wrong_current_password`
+  in `failureText`; the service's other reasons have the sentences the login and the API already
+  had.
+- *The view*: `frontend/src/views/password.view.ts`, its element `#password` in `index.html`
+  (three `type="password"` fields, `autocomplete` `current-password` then `new-password` twice;
+  what the new one misses as a list from the template `#tpl-password-need`), `style.css` (the
+  form's classes and the login's notice).
+- *The shell*: the sixth row of `SCREENS`; `ChangePasswordService` and `PasswordScreen` in
+  `sessionObjects`; `mountShell` takes `pageWide`, `runShell` gives `[login, refresh]`;
+  `AppConfig` and the shell's configuration gain `skipGlobalSignOut`; `main.ts` reads the fourth
+  constant.
+- *Tests changed, a finding as the brief asked*: the service's test "ChangePassword, then
+  GlobalSignOut, then the one success, then the store cleared" (its name, and two assertions:
+  the person still in the store when each stream says `success`); the shell's tests that list
+  the links or count them (the link "Password" added); `page.test.ts`: the screens'
+  list, the templates' list, the fields (37 to 40), the failure lines (49 to 51), the status
+  elements (the login's notice first). No test of another screen, of the login or of the
+  sign-out changed otherwise; the login's has two new tests.
+- *New tests*: `tests/unit/logic/password.model.test.ts`, `password.screen.test.ts`, the
+  password's part of `texts.test.ts`; `tests/unit/views/password.view.test.ts`; the shell's
+  block "the password, the last screen of both roles" (the row; both roles; the hints; a change
+  by each role with their own token, the page-wide services put back while still signed in,
+  "Password changed."; the notice said once; the skip value true and false; a wrong current
+  password; a service per person; signing out and leaving the screen leave nothing); the
+  login's notice; the page's markup of the screen and of the notice.
+- *Documents*: `docs/FRONTEND_ARCHITECTURE.md` v21 (sections 5.1, 6, 9, 12.1; decision 16
+  amended, decisions 175 to 183); `docs/FRONTEND_SERVICES.md` v11; `docs/FRONTEND_WALK.md` v4
+  (section 9, checks 123 to 133; checks 3 and 40); `docs/ARCHITECTURE.md` (the sentence of step
+  p3; section 6.9's title and the "Account hygiene" row no longer say "not built yet");
+  `docs/FOLDER_STRUCTURE.md`, `docs/COMMANDS.md` section 5, `frontend/CLAUDE.md`,
+  `.claude/rules/frontend-views.md` (the page's counts).
+- *Check*: root `DYNAMODB_PORT=8002 npm run verify` PASSED (back end 1 737 unit tests and 189
+  journeys, audit clean; `shared` 489 tests; front end 2 581 tests in 51 files; 100 % lines on
+  `backend/src/lib` and `src/assistant`, `shared/src` and `frontend/src`).
+  `RUN_INTEGRATION=1 npm run test:integration -w frontend`: 77 tests in 6 files, the change of
+  password's journey with them. The walk's section 9 (checks 123 to 133) run by a script outside
+  the repository in headless Chromium against the dev server and the local stack, at 1280 × 800
+  and at 390 × 844, as `alice` and as `admin`: every check yes at both widths. Check 133's
+  first wording forgot the 400 of check 128's wrong sign-in and was corrected. The stack was then
+  restarted (`local:down`, `local:up`, `local:api`). `git status`: nothing under `backend/` or
+  `shared/src`.
+- **Step p4 finds ready:** the screen, deployable as it is: a build from `main` signs out
+  everywhere after a change (decision 181 of `docs/FRONTEND_ARCHITECTURE.md`), which only the
+  deployed page can show, with a second browser signed in as the same person; the walk's
+  section 9 to repeat at the deployed page with a throw-away User (its passwords then that
+  User's). Still open for the smoke test: which error real Cognito gives to which refusal
+  (finding F1), that `ChangePassword` alone revokes nothing and `GlobalSignOut` does (F2).
 
 ### Step p4 — The proof against real Cognito, and the hand-over (≈ 3 h; the cloud run needs explicit instruction)
 

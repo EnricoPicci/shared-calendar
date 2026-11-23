@@ -5,7 +5,9 @@
 // app.js is src/main.ts bundled and minified, with its source map beside it; index.html and
 // style.css are copied as they are. The configuration comes from the three environment variables
 // and from nowhere else: nothing about a deployed stack is written in a committed file
-// (docs/FOLDER_STRUCTURE.md section 7).
+// (docs/FOLDER_STRUCTURE.md section 7). No variable turns off the sign-out everywhere after a
+// change of password: the bundle's SKIP_GLOBAL_SIGN_OUT is false in every build
+// (scripts/bundle.mjs).
 import { build } from 'esbuild';
 import { copyFile, mkdir, readFile, rm } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';

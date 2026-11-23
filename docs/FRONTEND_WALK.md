@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
+| Status | v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
 | What it is | One list of checks that walks every screen of the front end and the assistant's panel in a browser, as a User and as the Administrator, against the local stack. **The check to repeat after a later change to the view layer** |
 | What it is not | A source of truth, and not an automated test. On any conflict `docs/FRONTEND_ARCHITECTURE.md` and the tests win, and this page is fixed. No end-to-end test tool is in the repository (`docs/FRONTEND_VIEW_PLAN.md` section 8, decision 6): a person follows the list by hand, or drives a browser with a script kept outside the repository |
 | Made from | The browser checks of `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 68 and of `docs/CONVERSATIONAL_PLAN.md` step c12, in the order a person would follow, and `docs/SHARED_CALENDAR_SPEC.md` section 16.8 |
@@ -15,6 +15,7 @@
 | v2 | 2026-11-21 | `docs/FRONTEND_DEPLOY_PLAN.md` step 71: "Sign out" also tells Cognito. Check 4 now looks at that request too (mark `[N]`); 102 checks still. Check 4 was done in that step's browser check, by a script; the walk was not run again in full. |
 | v2, note | 2026-11-21 | `docs/FRONTEND_DEPLOY_PLAN.md` step 73: section 1 says where the walk stands at the deployed page. No check changed. |
 | v3 | 2026-11-22 | **The assistant's panel**: section 6, checks 103 to 122, against the fake Claude, with what they need and leave in section 1; the short list for the real model and what a screen reader says of the panel, not yet listened to, in section 7; the row of step c12 in section 8. No earlier check changed its number. Two lines corrected by the run: check 5 (on a Sunday the week of today has no window and its legend is empty) and check 90 (saving a day is one write, followed by a read of the date). 122 checks. |
+| v4 | 2026-11-23 | `docs/CHANGE_PASSWORD_PLAN.md` step p3: **the password screen**, section 9, checks 123 to 133, as `alice` and as `admin`, with what they need and leave in its opening; it is walked last, after section 6, since it changes both local passwords, and puts them back itself. Checks 3 and 40: "Password" is last in each role's navigation. The row of step p3 in section 8. No earlier check changed its number. 133 checks. |
 | v3, note | 2026-11-23 | The branch `deploy-frontend` merged into `main`: the panel's version, first numbered v2, is v3, after the sign-out's v2. Walked on the merged page that day by a script in headless Chromium, at a desktop and a phone width, against the local stack with the fake Claude, as `alice`: checks 3, 4 (one `RevokeToken`, answered 200) and 103 to 105, then "Sign out" while the panel waited for an answer (the login at once, the panel gone, no `continue` sent after it, the conversation read again at the next sign-in); all yes. The console held `zod`'s `eval` probe only. The rest of the walk was not run again. |
 
 ---
@@ -119,8 +120,8 @@ The widths: 1280 × 800 for the desktop, 390 × 844 for the phone.
    or the password is wrong; the form is still usable, the username still in its field.
 2. `[=]` Sign in as `alice` with the right password, and watch the button. → "Sign in" is
    disabled while the call is under way (the first call after the stack starts takes seconds).
-3. `[K]` → The frame: the header says `alice` and "User"; the navigation holds "Week" and "My
-   appointments" and nothing else; the address ends in `#/week`.
+3. `[K]` → The frame: the header says `alice` and "User"; the navigation holds "Week", "My
+   appointments" and "Password" and nothing else; the address ends in `#/week`.
 4. `[K]` `[N]` Press "Sign out". → The login again, at once, both fields empty, no failure shown.
    In the Network panel: one request to `/cognito/` sent at the press, its header
    `X-Amz-Target` ending in `RevokeToken`, answered 200. (With the local Cognito stopped the
@@ -264,7 +265,7 @@ Sign in as `alice`.
 Sign out, sign in as `admin`.
 
 40. `[K]` → The header says `admin` and "Administrator"; the navigation holds "Week",
-    "Settings", "Users" and "Availability", and no "My appointments". `[=]` The address
+    "Settings", "Users", "Availability" and "Password", and no "My appointments". `[=]` The address
     `#/appointments`, typed by hand, shows the week.
 
 **The week.** In next week.
@@ -631,8 +632,63 @@ section 6 and the journeys run on the fake only.
 | 68 | The date field; a date shown; refused dates; "this day only" put together and saved; discarded; overlaps; "not available"; the way back; an extra window; an appointment on the day; a write that cannot reach the server; a pattern changed while a date is on show; "Show" refused; signing out with the list open; the phone; the keyboard | 82 to 95 |
 | c12 | No panel at the login, the bar on every screen, no request before the first opening; a read with its progress line; moving between screens, a reload; a booking confirmed with the week on show; a dialog over the panel; a decline; a message that drops a proposal; each of the three sentences; a text with markup; another person finds nothing; the keyboard alone; the console | 103, 104, 121; 106; 108, 110; 111, 113; 112; 114; 115; 116, 118, 119; 107; 120; 104, 105, 109, 113, 114, 118; 122. What the browser's tools show a screen reader is check 117; the two points step c12 left (the count after a 503, "New conversation" after one) are in checks 116 and 118 |
 
+| p3 | The hints while typing, the two new ones differing, a wrong current password, a change that succeeds, "Password changed" at the login, the old password refused, the new one accepted; as `alice` and as `admin`, at the two widths | 123 to 133 |
+
 Steps 60 to 68 are those of `docs/FRONTEND_VIEW_PLAN.md`; step c12 is of
-`docs/CONVERSATIONAL_PLAN.md`.
+`docs/CONVERSATIONAL_PLAN.md`; step p3 of `docs/CHANGE_PASSWORD_PLAN.md`.
 
 Left out on purpose: "the screens of the earlier steps still work, in short" (`docs/FRONTEND_VIEW_PLAN.md`
 section 4), which was each step's own short walk and is this whole list.
+
+## 9. The password
+
+Walked **last**, after section 6: it changes the password of `alice` and of `admin` and then
+puts each back, so that a check cut short leaves an account with the walk's password. If a run
+is cut short, or anyway after the walk, restart the stack (`npm run local:down -w backend`,
+`npm run local:up -w backend`, `npm run local:api -w backend`): the seed of the local pool gives
+both accounts their passwords of `CLAUDE.md` again. A run at the other width walks the section
+again from check 123.
+
+The walk's passwords: `Walk-<tag>-Alice-1!` and `Walk-<tag>-Admin-1!`. On the local stack the
+sign-out everywhere after a change is skipped (its emulator has none, `docs/ARCHITECTURE.md`
+section 8): what it does at the real Cognito is walked at the deployed page
+(`docs/CHANGE_PASSWORD_PLAN.md` step p4). A second window signed in as the same person stays
+signed in here, and is not a check.
+
+123. `[K]` As `alice`, press "Password", the last link. → The address ends in `#/password`, the
+     link is the one marked. One form: "Current password", "New password", "New password
+     again", each empty. Under the first "Type the password you use now."; under the second the
+     five conditions, "At least 12 characters.", "An upper-case letter, A to Z.", "A lower-case
+     letter, a to z.", "A digit, 0 to 9." and "One of these symbols:" followed by the 32 symbols;
+     under the third "Type the new password once more."; the sentence that the change signs out
+     everywhere; "Change password" out of use. The page has asked nothing of `/cognito/`.
+124. `[K]` In "New password" type `walk`, then go on to `Walk-<tag>-Alice-1!` one character at a
+     time. → Each condition goes from the list as soon as it is met, and the list is empty at
+     the end. Type a space in it. → "No space, and no other blank character."; take it out.
+125. `[K]` In "New password again" type the new password with its last character missing. → "The
+     two new passwords are not the same."; with it whole, the sentence goes. Type in "Current
+     password" the new password itself. → Under the new one, "Not the same as the current
+     password."; "Change password" still out of use.
+126. `[K]` `[N]` "Current password" `Wrong-Pass-1!`, the new one twice, "Change password". → "The
+     current password is not correct." under the first field, which is marked; the three
+     fields empty; still signed in, on `#/password`. One request to `/cognito/`, its
+     `X-Amz-Target` ending in `ChangePassword`, answered 400.
+127. `[N]` "Current password" `Alice-Local-Pass-1!`, the new one twice, "Change password". → The
+     button out of use while the call is under way; then the login, at once, saying "Password
+     changed.", both its fields empty. One request ending in `ChangePassword`, answered 200, and
+     no `GlobalSignOut`. No password in the address, nor anywhere in the page.
+128. `[K]` Sign in as `alice` with `Alice-Local-Pass-1!`. → "Password changed." goes at the
+     press; the sentence that the username or the password is wrong.
+129. `[K]` Sign in as `alice` with `Walk-<tag>-Alice-1!`. → The frame, on `#/password` again (the
+     address was kept), the form empty with the hints of check 123. Press "Sign out". → The
+     login, with no "Password changed.".
+130. Sign in with the walk's password, type something in the three fields of "Password", press
+     "Week", then "Password". → The three fields empty, the hints of check 123.
+131. Change it back: "Current password" `Walk-<tag>-Alice-1!`, new `Alice-Local-Pass-1!` twice. →
+     "Password changed." at the login; `alice` signs in with `Alice-Local-Pass-1!`; sign out.
+132. As `admin`, checks 123, 126, 127 (with `Admin-Local-Pass-1!` and `Walk-<tag>-Admin-1!`),
+     128 and 129, then 131 back to `Admin-Local-Pass-1!`. → The same, with "Password" after
+     "Availability".
+133. `[=]` The console. → Besides the known report of `zod`, only the browser's own line for each
+     answer 400, those of checks 126 and of the wrong sign-ins of check 128. No password, no token
+     in any line.
