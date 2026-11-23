@@ -1639,12 +1639,12 @@ cannot read, a stack without the parameter `AssistantModel`. Its last line descr
 parameter (name, type, version, date) from `DescribeParameters`; nothing reads the value back.
 One change from the brief: when the parameter exists, the `y` is asked **before** the key, so
 that a key is not typed for nothing. Tried: no argument, two arguments, `local`,
-`hello-world-api` and `--stack-name=hello-world-api`, each refused with its message. **Not
-tried: the refusal of a stack without the assistant.** The profile `shared-calendar-admin` is
-not configured on the machine of the session, and `no-such-stack` and `shared-calendar-api`
-both stopped at "cannot read stack … (stack name, region, AWS login?)" for want of a login,
-before the key was asked for: true, but not the refusal the step meant to see. It is seen at
-the start of step c15, read-only, before the deployment.
+`hello-world-api` and `--stack-name=hello-world-api`, each refused with its message. With the
+operator's login, read-only and with stdin closed: `no-such-stack` refused with "cannot read
+stack no-such-stack in eu-north-1 (stack name, region, AWS login?)", and `shared-calendar-api`
+with "stack shared-calendar-api has no assistant yet (no parameter AssistantModel): deploy it
+first", both before the key was asked for. The profile `shared-calendar-admin` was first set up
+on this machine for that check.
 
 **The smoke test** gains the exchange, after the calendar journey and before journey 11: 26
 checks, 7 of them the assistant's (`docs/ARCHITECTURE.md` section 9.3). `npm run smoke -w
@@ -1683,8 +1683,8 @@ which is no `aws` command).
 
 What step c15 finds ready: the commands of `docs/RUNBOOK.md` section 3.2 in their order, with
 what each must show; the deployment carrying the two parameters with no argument; the smoke
-test that fails exactly once before the key and passes after it; the refusal of a stack
-without the assistant to be seen first.
+test that fails exactly once before the key and passes after it; the key's script, which
+refuses the stack until the assistant is deployed there.
 
 ---
 
