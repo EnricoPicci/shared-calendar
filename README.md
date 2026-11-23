@@ -75,7 +75,7 @@ address and its ids no longer exist.
 | API | `https://kk32tyn1s4.execute-api.eu-north-1.amazonaws.com` |
 | User pool | `eu-north-1_mG58Opv7F` |
 | App client | `3gisesgktkagt34c3lentr5dmd` |
-| Tables | `shared-calendar-api-calendar`, `shared-calendar-api-hello-messages` |
+| Tables | `shared-calendar-api-calendar`, `shared-calendar-api-hello-messages`, `shared-calendar-api-assistant` (the assistant's conversations) |
 | CLI profile | `shared-calendar-admin` (IAM Identity Center) |
 
 The three ids are not secrets; they come from `sam list stack-outputs --stack-name shared-calendar-api`.

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`). **Step c09 done** 2026-11-22 (brief `prompts/a11-step-c09-implementation.md`). **Step c10 done** 2026-11-22 (brief `prompts/a12-step-c10-implementation.md`). **Step c11 done** 2026-11-22 (brief `prompts/a13-step-c11-implementation.md`). **Step c12 done** 2026-11-22 (brief `prompts/a14-step-c12-implementation.md`): the assistant is a panel at the bottom of every screen, not a screen, by a decision of the Product Owner. **Step c13 done** 2026-11-23 (brief `prompts/a15-step-c13-implementation.md`): the walk has the panel, open point P6 is closed as built. **Step c14 done** 2026-11-23 (brief `prompts/a17-step-c14-implementation.md`): the key's script, the smoke test's exchange, the two parameters in `backend/samconfig.toml`, the runbook's section 3.2; nothing deployed |
+| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`). **Step c09 done** 2026-11-22 (brief `prompts/a11-step-c09-implementation.md`). **Step c10 done** 2026-11-22 (brief `prompts/a12-step-c10-implementation.md`). **Step c11 done** 2026-11-22 (brief `prompts/a13-step-c11-implementation.md`). **Step c12 done** 2026-11-22 (brief `prompts/a14-step-c12-implementation.md`): the assistant is a panel at the bottom of every screen, not a screen, by a decision of the Product Owner. **Step c13 done** 2026-11-23 (brief `prompts/a15-step-c13-implementation.md`): the walk has the panel, open point P6 is closed as built. **Step c14 done** 2026-11-23 (brief `prompts/a17-step-c14-implementation.md`): the key's script, the smoke test's exchange, the two parameters in `backend/samconfig.toml`, the runbook's section 3.2; nothing deployed. **Step c15 done** 2026-11-23 (brief `prompts/a18-step-c15-implementation.md`): the assistant deployed to `shared-calendar-api`, the key stored, the page released again with the panel; P1 and P2 closed, P7 seen |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown in its panel, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which has its own stack and plan (`docs/FRONTEND_DEPLOY_PLAN.md`); this plan only releases the page again after the back end (step c15). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
@@ -62,7 +62,7 @@ this plan.
 | # | Point | Step | How it is closed there |
 |---|---|---|---|
 | P1 | Anthropic's data terms for the account in use | c15 | The operator reads the account's settings and terms. The result is written in `docs/CONVERSATIONAL_ARCHITECTURE.md` section 10.2. Until then nobody but the operator is invited. **Closed** 2026-11-23, by the operator, before any deployment: the requests are not used for training and not retained by default (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 10.2) |
-| P2 | Whether reading the key needs `kms:Decrypt` | c15 | The deployment is made without the statement. The smoke test's exchange tells. If the key cannot be read: one statement naming the key, a second deployment, each with its own go |
+| P2 | Whether reading the key needs `kms:Decrypt` | c15 | The deployment is made without the statement. The smoke test's exchange tells. If the key cannot be read: one statement naming the key, a second deployment, each with its own go. **Closed** 2026-11-23: not needed, the smoke test passed with `ssm:GetParameter` alone (the note under step c15) |
 | P3 | The capacity of the `assistant` table under a long conversation | c09 | Measured (the "As done" note of step c09): an ordinary step 2 read and 14 write units, the largest 84 write units, a full conversation 30 read units, against 8 / 6 a second and a burst allowance of 2 400 / 1 800. **Closed: the Product Owner decided to keep the 100 KB bound and the 6 KB cap** (2026-11-22) |
 | P4 | Effort level and model | c10 | **Closed** 2026-11-22: `claude-sonnet-5-5` at effort `low`, chosen by the Product Owner on three runs of the evaluation (the note under step c10) |
 | P5 | Blocking time by an override the model works out | c10 | **Closed** 2026-11-22: no `block_time` tool. The nine blocking requests of the evaluation proposed the right hours (the note under step c10) |
@@ -1725,6 +1725,48 @@ In order:
 in `docs/CONVERSATIONAL_ARCHITECTURE.md` section 18.2; the deployment recorded in
 `docs/RUNBOOK.md` section 5 with the commit; the Anthropic Console shows the spend limit; the
 AWS bill's forecast is unchanged.
+
+#### As done (2026-11-23)
+
+Brief `prompts/a18-step-c15-implementation.md`, with three decisions of the Product Owner: one
+change confirmed through the panel in the cloud, the spending limit not provoked, the commits
+pushed before the deployment. The record, with every figure, is `docs/RUNBOOK.md` section 5.6;
+here what bears on the plan. The operator ran every command that changed the cloud, each on
+its own go, and everything at the page; the session ran the gate and read-only commands only,
+and never saw the key. Nothing changed in `backend/src/`, `shared/`, `frontend/` or the
+template.
+
+- **P1** was closed before anything was deployed: the account's requests are not used for
+  training and not retained by default (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 10.2).
+- **The deployment** of `949a048`, pushed first: 27 Add and 25 Modify without replacement, as
+  worked out beforehand from the template of the deployed commit. The 24 existing functions
+  but the authorizer were modified in their code only, because the shared package they bundle
+  had grown; the list made before had said "possibly", not which.
+- **The smoke test**: before the key 25 PASS and the one expected FAIL, `503
+  assistant_unavailable` (`language_unavailable`, `key_missing`), which fired the 5xx alarm
+  for seven minutes; after the key **26 PASS**.
+- **P2 closed: no `kms:Decrypt`.** The key, stored under the default key `alias/aws/ssm`, is
+  read with `ssm:GetParameter` alone. No second deployment.
+- **The page** released again from `main`, the gate run a second time first because the first
+  one's 30 minutes had passed. **P7 seen**: the confirmation and the decline, which only the
+  page sends, reached the API through the distribution.
+- **At the deployed page** the operator did the list in an order of their own; everything was
+  reported as working, both languages and "Sign out" during an answer among it. The logs show
+  one change confirmed by a throw-away User, its booking made by the route's own handler
+  (`201`) and cancelled from the page eight seconds later. The slowest step took 6.0 s.
+- **No text and no token** in the six assistant log groups: 0 rows of 132 records scanned for a
+  word the operator typed, the smoke test's sentence and note, and `eyJ`.
+- **Cost:** 0.10 USD at Anthropic for the month so far; AWS 0 USD, its forecast still not given.
+
+**Found on the way, not of this step:** the stack `shared-calendar-web` was updated on
+2026-11-22, and the calendar and the pool hold data made through the page on that day; neither
+is in `docs/RUNBOOK.md` section 5 before 5.6, which now mentions both. The machine of the
+session had no AWS profile until this step: it was set up for the read-only refusal of step
+c14.
+
+What step c16 finds ready: the assistant running in the cloud and recorded; every open point
+closed or met (P1 to P7); the documents to bring together into `docs/ARCHITECTURE.md` and the
+others, as its text says; the rotation of the key written but never run.
 
 ---
 
