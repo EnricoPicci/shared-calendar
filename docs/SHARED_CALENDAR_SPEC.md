@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v16 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; implemented (plan steps 41–59). v17 — the capacity of a type (decisions D24 to D31): several people in one slot; specified, **not built yet** (`docs/CAPACITY_PLAN.md`) |
+| Status | v16 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; implemented (plan steps 41–59). v17 — the capacity of a type (decisions D24 to D31): several people in one slot; implemented and deployed (`docs/CAPACITY_PLAN.md` steps u1–u7, 2026-11-24; `docs/RUNBOOK.md` section 5.8). v18 — status only |
 | Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10, v11, v12 and v13 2026-11-14; v14 and v15 2026-11-15; v16 2026-11-16; v17 2026-11-24 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
@@ -29,6 +29,7 @@
 | v15 | 2026-11-15 | Error codes of the timing rules renamed after the rule they break and its setting (user's decision, before plan step 54): `booking_too_soon` split into `booking_in_past` (R-BOOK-03) and `booking_notice_too_short` (R-BOOK-04, `minBookingNoticeHours`); `booking_too_far` → `booking_beyond_horizon` (R-BOOK-05, `bookingHorizonDays`); `cancellation_too_late` → `cancellation_notice_too_short` (R-CAN-03, `cancellationNoticeHours`). Statuses, order of the checks and messages unchanged (8.2, 8.3, 8.4, 11.1, 11.3, 18.3). |
 | v16 | 2026-11-16 | Brief 71 (`docs/RENAME_PLAN.md`, plan step 56): the table's physical name in the cloud follows the stack, `<stack>-calendar`; locally it stays `calendar` (13.1). The plan's calendar steps run 41–59. |
 | v17 | 2026-11-24 | Brief `prompts/e11-step-u1-implementation.md` (`docs/CAPACITY_PLAN.md` step u1), decided by the Product Owner on 2026-11-24. **The capacity of a type**: a type holds 1 to 100 people at the same time, default 1 (D24 to D31, 6.1, R-TYPE-05). The people in an interval are counted at their peak; a slot is free while they are fewer than the capacity, and says its places left (glossary, R-SLOT-02 to R-SLOT-05, 11.6). A User never holds two appointments at the same time, `409 user_busy` (R-BOOK-12). The Administrator goes over the capacity only with `overbook: true` (R-BOOK-07, R-BOOK-13, R-CHG-01, the order of the checks in 8.2 and 8.4). `busy` is the time that is full (R-SLOT-06); the Administrator's slots include the full ones (11.6, R-VIEW-01). `capacity` optional in the type's bodies (11.1, 11.4); `capacity` on the `TYPE` item, absent = 1 (13.2). Group appointments no longer out of scope as several Users each with their own appointment (1.3). The views' needs (16.8), privacy (17), unit tests (18.1), AC-37 to AC-44 (18.3). The 11.6 example gains `capacity` and `placesLeft` on each slot and keeps every other value. AC-15 answers `user_busy`, since the 09:15 it overlaps is alice's own (found at `docs/CAPACITY_PLAN.md` step u3). Not built yet. |
+| v18 | 2026-11-24 | Brief `prompts/e17-step-u7-implementation.md` (`docs/CAPACITY_PLAN.md` step u7). Status only: the capacity of a type (decisions D24 to D31) is built and deployed to `shared-calendar-api` and `shared-calendar-web`, and proven there by the smoke test's capacity journey (`docs/RUNBOOK.md` sections 2.3 and 5.8); the marks "not built yet" of section 3, the `TYPE` item, the slots and the booking checks removed. No rule changes. |
 
 ---
 
@@ -144,8 +145,8 @@ notifications will be added as a future feature, so no decision may make them ha
 | D23 | Settings | Changed by the Administrator through the API (`GET`/`PUT /calendar/settings`). |
 
 Decisions D24 to D31, the capacity of a type, were taken by the Product Owner on 2026-11-24
-(`docs/CAPACITY_PLAN.md` sections 2 and 3). They are designed and not built yet: `docs/CAPACITY_PLAN.md`
-builds them.
+(`docs/CAPACITY_PLAN.md` sections 2 and 3), built by `docs/CAPACITY_PLAN.md` and deployed on the
+same day.
 
 | # | Topic | Decision |
 |---|---|---|
@@ -244,7 +245,6 @@ fall-back day, and a zone with a non-whole-hour offset.
 | `capacity` | an integer 1–100, default 1: how many people the type holds at the same time (D24) |
 | `createdAt`, `updatedAt` | instants |
 
-Not built yet: the capacity of a type is designed (decisions D24 to D31) and built by `docs/CAPACITY_PLAN.md`.
 
 - **R-TYPE-01** Create: the name must be valid and unique (otherwise `409 type_name_exists`).
   At most 20 types exist at the same time (`409 limit_reached`).
@@ -408,7 +408,6 @@ real hours and gives four slots: 01:00 (+02:00), 02:00 (+02:00), 02:00 (+01:00) 
 Each lasts 60 real minutes, and all of them are free and bookable like any other slot. An instant
 names each slot without ambiguity.
 
-Not built yet: the capacity of a type is designed (decisions D24 to D31) and built by `docs/CAPACITY_PLAN.md`.
 
 **R-SLOT-02 — Free.** The *people in* an interval are the most active appointments that overlap
 at one instant of it: their peak, not their sum (D25). Overlap is computed on real instants (`[a, b)`
@@ -511,7 +510,6 @@ Request: `{ start, end?, username?, note?, overbook? }` (section 11.7).
 | **R-BOOK-12** One place per person | no active appointment of the target User overlaps `[start, end)` (D27) | same; `overbook` does not lift it | `409 user_busy` |
 | **R-BOOK-13** Going over the capacity | `overbook` absent or `false` | `overbook: true` lifts R-BOOK-07, and nothing else (D26) | `403 forbidden` (a User sending `true`) |
 
-Not built yet: the capacity of a type is designed (decisions D24 to D31) and built by `docs/CAPACITY_PLAN.md`.
 
 The checks run in this order, and the first that fails decides the answer, so the same request
 always gets the same error:

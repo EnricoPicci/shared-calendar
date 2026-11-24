@@ -930,6 +930,51 @@ credentials, and saw no password and no token. The commits were not pushed befor
 
 ---
 
+### 5.8 The capacity of a type (`docs/CAPACITY_PLAN.md` step u7, 2026-11-24)
+
+The API deployed to `shared-calendar-api` and the page released to `shared-calendar-web`, from
+`main`, with the capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` decisions D24 to D31). Who
+did what: the operator ran the API's deployment and the smoke test in a terminal inside
+`script -q`, typed `y` and the admin password, and looked at the deployed page by hand from a
+short list; the session ran the gates, the page's release, read-only `aws` commands and curl
+without credentials, and saw no password and no token. When to deploy was the operator's choice;
+nobody was told beforehand. The commits were not pushed before, during or after the release.
+
+- **The smoke test locally first**, with its new capacity journey (section 2.3): 47 PASS and the
+  2 SKIP of `GlobalSignOut`, 49 lines; a stop halfway cleaned up everything it had made.
+- **The gate:** root `DYNAMODB_PORT=8002 npm run verify` PASSED on the clean tree at `e0e36f6`.
+- **Deployment of the API**, `npm run deploy -w backend` at `e0e36f6`, no argument. On macOS
+  `script` takes the file first and has no `-c`: `script -q /tmp/deploy.txt npm run deploy -w
+  backend`. **Change set: 31 Modify, all with replacement `False`, no Add, no Remove, no
+  Replace**, read back by the session with `describe-change-set` before the operator's `y`: the
+  30 functions but the authorizer, `Code` their only change; `HttpApi`, all of whose details are
+  its `Body`, "Dynamic", caused by a function's `Arn` (the API names the updated functions; their
+  ARNs do not change). `UPDATE_COMPLETE` at 17:08 UTC. The mark of the assistant's instructions
+  changed with this code, so every conversation in progress ended.
+- **The smoke test**, `npm run smoke -w backend -- shared-calendar-api` at `e0e36f6`, inside
+  `script -q`: **49 PASS**, throw-away user `smoke-1795540210`, the capacity journey on
+  2027-01-13 03:00–04:00 (Europe/Rome).
+- **The log search** of section 2.1, over the stack's 32 log groups from ten minutes before the
+  run, 255 records: 0 rows for the note, for `eyJ` (a token), for the assistant's sentence, for
+  `ChangePassword`, `GlobalSignOut`, `REFRESH_TOKEN` and for a non-empty `"password":"…"`; control
+  searches for the user's name (27 lines in 12 groups) and for the capacity journey's names
+  (12 lines in 6 groups) matched.
+- **The gate again** on the clean tree at `3deee68` (the record of the API's deployment
+  committed), then **the release**, `npm run deploy -w frontend`: SAM `No changes to deploy` for
+  `shared-calendar-web`; the build `index.html` 37 665 bytes (6 770 gzipped), `style.css` 23 955
+  (6 738), `app.js` 613 856 (138 924); the four uploads, `index.html` last; the invalidation of
+  `/*` on `E2V5GRRPLMET12` waited for; the four checks PASS. Read back with curl: the served
+  `app.js` is byte for byte the build.
+- **The quick look at the deployed page** (operator, by hand, as the Administrator), five yes:
+  the type `look-cap` created with capacity 2, the list saying "look-cap · 2 places"; the user
+  `look-u7` created, its password shown once; an extra window 15:00–17:00 of `look-cap` on a free
+  day of the next week saved; in the week, the slots 15:00 and 16:00 each saying "2 of 2 places
+  left"; the window, the type and the user deleted. The walk of `docs/FRONTEND_WALK.md` section
+  10 was not repeated at the deployed page, by the Product Owner's decision.
+- **What stays**, by design: the smoke test's history (sections 2.1 and 2.3); of the quick look,
+  the deleted user's `DELETEDUSER` marker. No type, window or user made for the release is left.
+- **Cost:** AWS within the free tier; at Anthropic the smoke test's one exchange, about a US cent.
+
 ## 6. A person's password: what to tell them
 
 Nobody can change another person's password: not the Administrator, not the API, not the

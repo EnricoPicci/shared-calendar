@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v20, deployed as v19: steps c00 to c15 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` section 5.6); step c16, the hand-over, to come. v20 adds the capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` decisions D24 to D31), built in step u6 of `docs/CAPACITY_PLAN.md` and not yet deployed |
+| Status | v20, deployed: steps c00 to c15 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` section 5.6); step c16, the hand-over, to come. v20 adds the capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` decisions D24 to D31), built in step u6 of `docs/CAPACITY_PLAN.md` and deployed on 2026-11-24 (`docs/RUNBOOK.md` section 5.8) |
 | Date | 2026-11-23 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |

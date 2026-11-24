@@ -1,6 +1,6 @@
 # Shared Calendar: several people in one slot, a capacity per type (implementation plan)
 
-**Version:** v10 (2026-11-24): step u7 part B done, the API deployed to `shared-calendar-api` and the smoke test green there (49 PASS); the page not released yet. v9 (2026-11-24): step u7 part A done, the smoke test's capacity journey, run locally. v8 (2026-11-24): step u6 done, the assistant; F8 decided. v7 (2026-11-24): step u5 done, the front end's screens; a slot under appointments drawn as a tab beside them (found in the walk, the Product Owner's choice). v6 (2026-11-24): step u4 done, the front end's services; the Administrator's
+**Version:** v11 (2026-11-24): **the plan is finished.** Step u7 part C done: the page released to `shared-calendar-web` and looked at by the operator; the documents closed (`docs/RUNBOOK.md` section 5.8). v10 (2026-11-24): step u7 part B done, the API deployed to `shared-calendar-api` and the smoke test green there (49 PASS); the page not released yet. v9 (2026-11-24): step u7 part A done, the smoke test's capacity journey, run locally. v8 (2026-11-24): step u6 done, the assistant; F8 decided. v7 (2026-11-24): step u5 done, the front end's screens; a slot under appointments drawn as a tab beside them (found in the walk, the Product Owner's choice). v6 (2026-11-24): step u4 done, the front end's services; the Administrator's
 sentence of `user_busy` moved to step u5 (the Product Owner's decision). v5 (2026-11-24): step u3 done, the back end; AC-15 answers `user_busy` (the Product
 Owner's decision), its page in step u5. v4 (2026-11-24): step u2 done, the shared contract in `shared/`; the response
 fields moved from step u2 to step u3 (the Product Owner's decision). v3 (2026-11-24): step u1 done, the rules in the governing documents
@@ -736,6 +736,24 @@ commands, and saw no password and no token. Nothing pushed.
   for the assistant's sentence, for `ChangePassword`, `GlobalSignOut` and `REFRESH_TOKEN`, and for
   a non-empty `"password":"…"`. Control searches: the user's name in 27 lines of 12 groups;
   `smoke-cap-<epoch>`, `-b` and `-c` in 12 lines of 6 groups.
+
+**As done, part C, the page (2026-11-24).** The record of the release is `docs/RUNBOOK.md`
+section 5.8. Nothing under `backend/src`, `frontend/src`, `shared/src` or in either
+`template.yaml` changed in step u7. Nothing pushed.
+
+- *The gate* again on the clean tree at `3deee68` (part B's note committed), then
+  `npm run deploy -w frontend`: `No changes to deploy` for `shared-calendar-web`; `index.html`
+  37 665 bytes, `style.css` 23 955, `app.js` 613 856; the four uploads, the invalidation waited
+  for, the four checks PASS; the served `app.js` byte for byte the build.
+- *The quick look* by the operator as the Administrator, five yes: a type of capacity 2 shown
+  "· 2 places", a user created, an extra window of that type saved, its slots saying "2 of 2 places
+  left", the window, the type and the user deleted. No check of `docs/FRONTEND_WALK.md` proved
+  inexact; that document is unchanged.
+- *Documents closed:* `docs/SHARED_CALENDAR_SPEC.md` v18 (status only: the status line, the
+  sentence of section 3 and the three "Not built yet" lines removed); `docs/ARCHITECTURE.md` v15
+  closed; `docs/CONVERSATIONAL_ARCHITECTURE.md` status line (v20 deployed); `docs/RUNBOOK.md`
+  section 5.8. `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` needed nothing:
+  their status lines do not say the capacity is undeployed.
 
 ## 6. Out of this plan
 
