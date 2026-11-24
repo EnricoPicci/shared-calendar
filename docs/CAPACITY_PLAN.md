@@ -1,6 +1,7 @@
 # Shared Calendar: several people in one slot, a capacity per type (implementation plan)
 
-**Version:** v3 (2026-11-24): step u1 done, the rules in the governing documents
+**Version:** v4 (2026-11-24): step u2 done, the shared contract in `shared/`; the response
+fields moved from step u2 to step u3 (the Product Owner's decision). v3 (2026-11-24): step u1 done, the rules in the governing documents
 (`docs/SHARED_CALENDAR_SPEC.md` v17, `docs/ARCHITECTURE.md` v15 open). v2 (2026-11-24): the four proposals of planning (F4 to F7) decided by the Product
 Owner, F6 changed: side by side up to three people. v1 (2026-11-24): the plan, after the Product
 Owner's answers to eight questions (section 2). No step done.
@@ -214,8 +215,10 @@ counting for `peopleIn` is R-SLOT-02 and D25, its unit tests 18.1.
   `CALENDAR_LIMITS`.
 - `shared/src/calendar/schemas.ts`: `TypeBody` with `capacity` optional (integer 1–100);
   `BookBody` and `ChangeBody` with `overbook` optional (boolean).
-- `shared/src/calendar/types.ts`: `AvailabilityType.capacity`, `Slot.capacity`,
-  `Slot.placesLeft`.
+- `shared/src/calendar/types.ts`: unchanged. The response fields `AvailabilityType.capacity`,
+  `Slot.capacity` and `Slot.placesLeft` move to step u3 (decided by the Product Owner,
+  2026-11-24): required here, they would break the typecheck of files outside `shared/` before
+  the back end fills them in.
 - `shared/src/api.ts`: the code `user_busy`.
 - `shared/src/calendar/rules.ts`: `peopleIn(interval, appointments)`, the peak of K3, pure, so
   that the back end and the assistant share one counting.
@@ -223,8 +226,59 @@ counting for `peopleIn` is R-SLOT-02 and D25, its unit tests 18.1.
 **Check:** the root `verify`; unit tests of `peopleIn` (touching appointments are not
 simultaneous, the example pair of K3, the night clocks go back).
 
+**As done (2026-11-24).** Only `shared/` and the documents changed; nothing under `backend/` or
+`frontend/`, nothing deployed, no `aws` command run. Brief `prompts/e12-step-u2-implementation.md`.
+
+- *Two decisions of the Product Owner at the start.* The three response fields move to step u3
+  (above, and u3's list). The short gap below is accepted, with no temporary check.
+- *`shared/src/calendar/defaults.ts`:* `TYPE_CAPACITY = { min: 1, max: 100, default: 1 }`, a
+  constant of its own beside `SETTINGS_RANGES` rather than inside `CALENDAR_LIMITS`, whose
+  values are single numbers; the default is there for the handler, not used by the schema.
+- *`shared/src/calendar/schemas.ts`:* `TypeBody` gains `capacity`, optional, an integer within
+  `TYPE_CAPACITY`, no default (absent means 1 at creation, the stored value at an edit: only the
+  handler tells them apart); `BookBody` and `ChangeBody` gain `overbook`, an optional boolean.
+  All three stay `.strict()`.
+- *`shared/src/api.ts`:* `user_busy` after `slot_taken`; `slot_taken`'s comment says "no place
+  left in the time asked".
+- *`shared/src/calendar/rules.ts`:* `peopleIn(interval, appointments)`: each appointment that
+  overlaps the interval, cut to it, counts +1 at its start and −1 at its end, the ends first at
+  one instant; the answer is the highest running count. Exported through `shared/src/index.ts`
+  as the rest of `rules.ts`.
+- *Tests:* `shared/tests/calendar/schemas.test.ts` (capacity absent, 1, 100 accepted; 0, 101,
+  2.5, `"3"`, `null` refused; `overbook` absent, `true`, `false` accepted, `"true"` and `1`
+  refused, in both bodies; an unknown field still refused in each body);
+  `shared/tests/calendar/rules.test.ts`, `peopleIn` with the cases of the brief and two more
+  (three touching in a row under one across them; the same appointment passed twice is counted
+  twice, since the caller chooses). 100 % line coverage on `shared/src` kept.
+- *Documents:* `docs/SHARED_CALENDAR_SPEC.md` section 12 (the rows of `rules.ts` and
+  `defaults.ts`), `shared/CLAUDE.md`'s folder map, the v15 row of `docs/ARCHITECTURE.md`.
+- *Known gap, accepted:* the back end's schemas accept `capacity` and `overbook`, the handlers do
+  not read them: a `capacity` sent is dropped, and a User's `overbook: true` is not refused with
+  `403`. No back-end test asserted that either field is refused, so none changed. Nothing is
+  deployed between steps u2 and u3.
+- *Found: the root `verify` fails on two back-end unit tests, from step u1.*
+  `backend/tests/unit/lib/calendarView.test.ts` and `backend/tests/unit/handlers/getCalendar.test.ts`
+  compare the view with the example of `docs/SHARED_CALENDAR_SPEC.md` section 11.6, read from the
+  document; step u1 gave its slots `"capacity": 1, "placesLeft": 1`, which the back end does not
+  produce yet. They fail the same way without this step's changes. Decided by the Product Owner:
+  left red, no test changed; step u3 turns them green when it adds the two fields. Step u1's check
+  was `npm run lint` only, which is why it did not show.
+- *Checked:* `npm run typecheck`, `npm run lint` green; `npm run test:unit` green in `shared/`
+  (100 % lines) and `frontend/`, red in `backend/` on the two tests above only (1 735 pass). The
+  root `DYNAMODB_PORT=8002 npm run verify`, with `local:up` and `local:api` running, **FAILED**
+  on those two tests, before its journeys; run apart, the back end's journeys passed (189) and
+  `npm run verify -w frontend` passed.
+
+**Step u3 finds ready:** from `@shared-calendar/shared`, `TYPE_CAPACITY` (range and default),
+`TypeBody.capacity`, `BookBody.overbook`, `ChangeBody.overbook`, the code `user_busy`, and
+`peopleIn` for R-BOOK-07 and R-SLOT-02 to R-SLOT-06. It adds the three response fields to
+`shared/src/calendar/types.ts` with the code that fills them in, and turns the two tests of the
+11.6 example green.
+
 ### Step u3 — The back end
 
+- `shared/src/calendar/types.ts`: `AvailabilityType.capacity`, `Slot.capacity` and
+  `Slot.placesLeft`, moved here from step u2, added together with the code that produces them.
 - `backend/src/lib/calendarDb.ts`: `capacity` written and read on the `TYPE` item, 1 when absent.
 - `createAvailabilityType.ts` and `renameAvailabilityType.ts` (the file keeps its name, the
   route its path): the capacity of the body, F7.

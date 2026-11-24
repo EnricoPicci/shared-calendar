@@ -245,6 +245,7 @@ describe('UpdateSettingsBody', () => {
   });
 });
 
+// Test names: section numbers and R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('TypeBody', () => {
   it('accepts a name, trimmed', () => {
     expect(TypeBody.safeParse({ name: ' Studio ' })).toEqual({ success: true, data: { name: 'Studio' } });
@@ -257,6 +258,18 @@ describe('TypeBody', () => {
     ['an unknown field', { name: 'Studio', typeId: STUDIO }, ['(root)']],
   ])('rejects %s', (_case, body, paths) => {
     expect(rejectedPaths(TypeBody, body)).toEqual(paths);
+  });
+
+  it.each([
+    ['absent, with no default: 1 at creation, the stored value at an edit (11.4)', { name: 'Pool' }],
+    ['1', { name: 'Pool', capacity: 1 }],
+    ['100', { name: 'Pool', capacity: 100 }],
+  ])('accepts a capacity %s (R-TYPE-05)', (_case, body) => {
+    expect(TypeBody.safeParse(body)).toEqual({ success: true, data: body });
+  });
+
+  it.each([0, 101, 2.5, '3', null])('rejects a capacity of %j (R-TYPE-05)', (capacity) => {
+    expect(rejectedPaths(TypeBody, { name: 'Pool', capacity })).toEqual(['capacity']);
   });
 });
 
@@ -391,6 +404,20 @@ describe('BookBody and ChangeBody', () => {
     expect(rejectedPaths(BookBody, body)).toEqual(paths);
   });
 
+  it.each([
+    ['absent', { start }],
+    ['true', { start, overbook: true }],
+    ['false', { start, overbook: false }],
+  ])('BookBody and ChangeBody accept overbook %s; whether a User may send true is the handler\'s check (R-BOOK-13)', (_case, body) => {
+    expect(BookBody.safeParse(body)).toEqual({ success: true, data: body });
+    expect(ChangeBody.safeParse(body)).toEqual({ success: true, data: body });
+  });
+
+  it.each(['true', 1])('BookBody and ChangeBody reject overbook %j (R-BOOK-13)', (overbook) => {
+    expect(rejectedPaths(BookBody, { start, overbook })).toEqual(['overbook']);
+    expect(rejectedPaths(ChangeBody, { start, overbook })).toEqual(['overbook']);
+  });
+
   it('ChangeBody keeps "note absent" (keep the old note) apart from "note: null" (clear it), R-CHG-03', () => {
     expect(ChangeBody.parse({ start })).toEqual({ start });
     expect(ChangeBody.parse({ start, note: null })).toEqual({ start, note: null });
@@ -399,6 +426,7 @@ describe('BookBody and ChangeBody', () => {
   it.each([
     ['a username: the User of a change never changes (8.4)', { start, username: 'alice' }, ['(root)']],
     ['end before start', { start, end: '2026-11-16T07:45:00.000Z' }, ['end']],
+    ['an unknown field', { start, capacity: 2 }, ['(root)']],
   ])('ChangeBody rejects %s', (_case, body, paths) => {
     expect(rejectedPaths(ChangeBody, body)).toEqual(paths);
   });

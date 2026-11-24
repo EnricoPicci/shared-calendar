@@ -32,3 +32,9 @@ export const SETTINGS_RANGES = {
   bookingHorizonDays: { min: 1, max: 365 },
   maxFutureAppointmentsPerUser: { min: 1, max: 100 },
 } as const;
+
+// How many people an availability type holds at the same time, inclusive, and the capacity of a
+// type created without one (docs/SHARED_CALENDAR_SPEC.md decision D24, R-TYPE-05). TypeBody reads
+// the range; the default is applied by the handler, since an edit without a capacity keeps the
+// stored one (docs/SHARED_CALENDAR_SPEC.md section 11.4).
+export const TYPE_CAPACITY = { min: 1, max: 100, default: 1 } as const;

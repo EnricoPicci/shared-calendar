@@ -123,6 +123,33 @@ export function overlaps(a: { start: string; end: string }, b: { start: string; 
   return a.start < b.end && b.start < a.end;
 }
 
+/**
+ * The people in `interval` (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02, decision D25): the most of
+ * `appointments` present at one instant inside it, their peak, not their sum. Intervals are
+ * `[start, end)`, so two that touch are never present together, and one that only touches the
+ * interval's edge is not in it. All are instants in the toISOString form, which compare as
+ * strings. The caller chooses what to pass (the active appointments, the old one of a change left
+ * out, the User's own or not): this only counts.
+ */
+export function peopleIn(interval: { start: string; end: string }, appointments: readonly { start: string; end: string }[]): number {
+  // Each appointment, cut to the interval, gives +1 at its start and -1 at its end. At the same
+  // instant the ends come first, so that one leaving and one arriving are never counted together.
+  const steps: [string, number][] = [];
+  for (const a of appointments) {
+    if (!overlaps(a, interval)) continue;
+    steps.push([a.start > interval.start ? a.start : interval.start, 1]);
+    steps.push([a.end < interval.end ? a.end : interval.end, -1]);
+  }
+  steps.sort(([t1, d1], [t2, d2]) => (t1 < t2 ? -1 : t1 > t2 ? 1 : d1 - d2));
+  let present = 0;
+  let peak = 0;
+  for (const [, delta] of steps) {
+    present += delta;
+    peak = Math.max(peak, present);
+  }
+  return peak;
+}
+
 // The minute of the local clock of `zone` at `instant`, or -1 when the instant has seconds.
 function localMinute(instant: string, zone: string): number {
   if (Date.parse(instant) % MINUTE_MS !== 0) return -1;

@@ -7,6 +7,7 @@ import {
   localDateOf,
   localTimeOf,
   overlaps,
+  peopleIn,
   slotsOf,
   toInstantWindows,
   type OneOffInput,
@@ -303,6 +304,44 @@ describe('overlaps (R-SLOT-02, R-AV-01)', () => {
   it('local times of one date, with 24:00 last', () => {
     expect(overlaps({ start: '22:00', end: '24:00' }, { start: '23:00', end: '23:30' })).toBe(true);
     expect(overlaps({ start: '12:00', end: '24:00' }, { start: '08:00', end: '12:00' })).toBe(false);
+  });
+});
+
+// Test names: R-… rules and D… decisions are those of docs/SHARED_CALENDAR_SPEC.md.
+describe('peopleIn (R-SLOT-02, D25)', () => {
+  const at = (start: string, end: string) => ({ start: `2026-11-16T${start}:00.000Z`, end: `2026-11-16T${end}:00.000Z` });
+  const slot = at('10:00', '11:00');
+
+  it.each([
+    ['no appointment', [], 0],
+    ['one inside', [at('10:15', '10:45')], 1],
+    ['two that touch', [at('10:00', '10:30'), at('10:30', '11:00')], 1],
+    ['D25, the pair that leaves a place in a capacity of 2: 10:00–10:30 and 10:30–11:00', [at('10:30', '11:00'), at('10:00', '10:30')], 1],
+    ['D25, the pair that fills a capacity of 2: 10:00–10:30 and 10:15–11:00', [at('10:00', '10:30'), at('10:15', '11:00')], 2],
+    ['one that only touches the start of the interval', [at('09:00', '10:00')], 0],
+    ['one that only touches the end of the interval', [at('11:00', '12:00')], 0],
+    ['one that covers the whole interval', [at('09:00', '12:00')], 1],
+    ['three nested', [at('09:00', '12:00'), at('10:00', '11:00'), at('10:15', '10:30')], 3],
+    ['three in a row, each touching the next, and one across them', [at('10:00', '10:15'), at('10:15', '10:30'), at('10:30', '11:00'), at('09:30', '11:30')], 2],
+    ['the same appointment twice (the caller passes what is counted)', [at('10:00', '11:00'), at('10:00', '11:00')], 2],
+  ])('%s → %s', (_case, appointments, expected) => {
+    expect(peopleIn(slot, appointments)).toBe(expected);
+  });
+
+  it('the order of the list does not matter', () => {
+    const list = [at('10:45', '11:00'), at('09:00', '10:30'), at('10:15', '10:50'), at('10:30', '10:45'), at('10:00', '10:20')];
+    const counts = [list, [...list].reverse(), [list[2], list[0], list[4], list[1], list[3]]].map((l) => peopleIn(slot, l as typeof list));
+    expect(counts).toEqual([3, 3, 3]);
+  });
+
+  it('the night clocks go back (Europe/Rome, 2026-10-25): two appointments at local 02:00, an hour apart, are never together', () => {
+    // 02:00 +02:00 is 00:00Z, 02:00 +01:00 is 01:00Z: the same local time, two real hours that touch.
+    const first = { start: '2026-10-25T00:00:00.000Z', end: '2026-10-25T01:00:00.000Z' };
+    const second = { start: '2026-10-25T01:00:00.000Z', end: '2026-10-25T02:00:00.000Z' };
+    expect([first.start, second.start].map((t) => localTimeOf(t, ROME))).toEqual(['02:00', '02:00']);
+    expect(peopleIn({ start: first.start, end: second.end }, [first, second])).toBe(1);
+    expect(peopleIn(first, [first, second])).toBe(1);
+    expect(peopleIn(second, [first, { ...second, end: '2026-10-25T01:30:00.000Z' }, second])).toBe(2);
   });
 });
 

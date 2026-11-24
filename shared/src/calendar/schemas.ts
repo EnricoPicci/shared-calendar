@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Username } from '../username';
-import { CALENDAR_LIMITS, SETTINGS_RANGES } from './defaults';
+import { CALENDAR_LIMITS, SETTINGS_RANGES, TYPE_CAPACITY } from './defaults';
 import { addDays } from './time';
 
 // The primitive schemas of the calendar contract (docs/SHARED_CALENDAR_SPEC.md R-TIME-02,
@@ -122,8 +122,15 @@ export const UpdateSettingsBody = z
   .strict();
 export type UpdateSettingsBody = z.infer<typeof UpdateSettingsBody>;
 
-/** POST /calendar/types, PUT /calendar/types/{typeId}. */
-export const TypeBody = z.object({ name: TypeName }).strict();
+/**
+ * POST /calendar/types, PUT /calendar/types/{typeId}: the name, and the capacity, an integer 1–100
+ * (docs/SHARED_CALENDAR_SPEC.md R-TYPE-05). The capacity is optional and has no default here:
+ * absent means 1 at creation and "keep the stored capacity" at an edit
+ * (docs/SHARED_CALENDAR_SPEC.md section 11.4), which only the handler can tell apart.
+ */
+export const TypeBody = z
+  .object({ name: TypeName, capacity: z.number().int().min(TYPE_CAPACITY.min).max(TYPE_CAPACITY.max).optional() })
+  .strict();
 export type TypeBody = z.infer<typeof TypeBody>;
 
 const windowFields = { start: LocalTime, end: LocalEndTime, typeId: Ulid };
@@ -161,7 +168,9 @@ export type OneOffWindowBody = z.infer<typeof OneOffWindowBody>;
 
 // Instants; `end` absent means start + 60 minutes. `note` absent and `note: null` differ in a
 // change: absent keeps the old note, null clears it (docs/SHARED_CALENDAR_SPEC.md R-CHG-03).
-const appointmentFields = { start: Instant, end: Instant.optional(), note: Note.optional() };
+// `overbook: true` asks to book over the capacity; absent means false. Only the Administrator may
+// send true, which the handler checks, not the schema (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13).
+const appointmentFields = { start: Instant, end: Instant.optional(), note: Note.optional(), overbook: z.boolean().optional() };
 
 /** POST /calendar/appointments. Whether `username` and a custom `end` are allowed depends on the role. */
 export const BookBody = z

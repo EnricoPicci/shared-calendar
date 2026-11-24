@@ -1059,8 +1059,8 @@ Following "a new error code or response field starts in `shared/src/api.ts`" (CL
 | `shared/src/calendar/types.ts` | The response types of 11.5 and 11.6, `Actor`, `CalendarEventType` (section 15) |
 | `shared/src/calendar/schemas.ts` | `zod` schemas: `LocalDate`, `LocalTime`, `LocalEndTime`, `Weekday`, `Instant`, `Ulid`, `Note`, `TypeName`, and the bodies and queries of 11.2 and 11.4 (`.strict()`), with cross-field rules (`start < end`, `validFrom ≤ validUntil`, range spans) |
 | `shared/src/calendar/time.ts` | The time helpers of R-TIME-06 |
-| `shared/src/calendar/rules.ts` | Pure functions both sides use: `definedWindows(date, patterns, override, oneOffs)`, `effectiveWindows`, `slotsOf(window)`, `overlaps(a, b)`, `isWholeLocalHour`, `isOnQuarterGrid`, `cancellableUntil(appointment, settings)` |
-| `shared/src/calendar/defaults.ts` | The default settings and the limits (20 types, 50 patterns, 10 windows per date, 500-character note, 31/92-day ranges) |
+| `shared/src/calendar/rules.ts` | Pure functions both sides use: `definedWindows(date, patterns, override, oneOffs)`, `effectiveWindows`, `slotsOf(window)`, `overlaps(a, b)`, `peopleIn(interval, appointments)` (the people in an interval, R-SLOT-02), `isWholeLocalHour`, `isOnQuarterGrid`, `cancellableUntil(appointment, settings)` |
+| `shared/src/calendar/defaults.ts` | The default settings and the limits (20 types, 50 patterns, 10 windows per date, 500-character note, 31/92-day ranges), the range and default of a type's capacity (1–100, default 1) |
 | `shared/src/index.ts` | re-exports them |
 
 `shared/` keeps its 100 % line coverage. The rules functions are where most of the edge cases

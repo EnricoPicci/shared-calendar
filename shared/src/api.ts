@@ -29,7 +29,8 @@ export type ApiErrorCode =
   | 'booking_notice_too_short' // 409, docs/SHARED_CALENDAR_SPEC.md R-BOOK-04: too little notice
   | 'booking_beyond_horizon' // 409, docs/SHARED_CALENDAR_SPEC.md R-BOOK-05: past the horizon
   | 'outside_availability' // 409, docs/SHARED_CALENDAR_SPEC.md R-BOOK-06
-  | 'slot_taken' // 409, docs/SHARED_CALENDAR_SPEC.md R-BOOK-07
+  | 'slot_taken' // 409, docs/SHARED_CALENDAR_SPEC.md R-BOOK-07: no place left in the time asked
+  | 'user_busy' // 409, docs/SHARED_CALENDAR_SPEC.md R-BOOK-12: the User already holds an appointment at that time
   | 'appointment_limit_reached' // 409, docs/SHARED_CALENDAR_SPEC.md R-BOOK-09
   | 'appointment_not_active' // 409, docs/SHARED_CALENDAR_SPEC.md R-CAN-02, R-NOTE-01
   | 'cancellation_notice_too_short' // 403, docs/SHARED_CALENDAR_SPEC.md R-CAN-03: too little notice
