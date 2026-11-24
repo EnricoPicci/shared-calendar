@@ -1,6 +1,6 @@
 # Shared Calendar: several people in one slot, a capacity per type (implementation plan)
 
-**Version:** v9 (2026-11-24): step u7 part A done, the smoke test's capacity journey, run locally; the API and the page not deployed yet. v8 (2026-11-24): step u6 done, the assistant; F8 decided. v7 (2026-11-24): step u5 done, the front end's screens; a slot under appointments drawn as a tab beside them (found in the walk, the Product Owner's choice). v6 (2026-11-24): step u4 done, the front end's services; the Administrator's
+**Version:** v10 (2026-11-24): step u7 part B done, the API deployed to `shared-calendar-api` and the smoke test green there (49 PASS); the page not released yet. v9 (2026-11-24): step u7 part A done, the smoke test's capacity journey, run locally. v8 (2026-11-24): step u6 done, the assistant; F8 decided. v7 (2026-11-24): step u5 done, the front end's screens; a slot under appointments drawn as a tab beside them (found in the walk, the Product Owner's choice). v6 (2026-11-24): step u4 done, the front end's services; the Administrator's
 sentence of `user_busy` moved to step u5 (the Product Owner's decision). v5 (2026-11-24): step u3 done, the back end; AC-15 answers `user_busy` (the Product
 Owner's decision), its page in step u5. v4 (2026-11-24): step u2 done, the shared contract in `shared/`; the response
 fields moved from step u2 to step u3 (the Product Owner's decision). v3 (2026-11-24): step u1 done, the rules in the governing documents
@@ -710,6 +710,32 @@ places, all deleted), not the walk's checks, which changes this step's check as 
   section 2.1, the lock's count; section 2.3 new), `docs/ARCHITECTURE.md` (section 9.3, the v15
   row's sentence of step u7, still open), `docs/COMMANDS.md` (`smoke`), `README.md` (the smoke
   test's row; the capacity in the screens' table).
+
+**As done, part B, the API (2026-11-24).** Who did what: the operator ran the deployment and the
+smoke test in a terminal, inside `script -q` (on macOS `script -q <file> <command>`, with no
+`-c`), and typed `y` and the admin password; the session ran the gate and read-only `aws`
+commands, and saw no password and no token. Nothing pushed.
+
+- *The gate:* root `DYNAMODB_PORT=8002 npm run verify` PASSED on the clean tree at `e0e36f6`
+  (17:35 local).
+- *The deployment*, `npm run deploy -w backend` at `e0e36f6` ("verify passed 29 min ago"),
+  parameters as before (`AdminUsername`, `FunctionArchitecture` `arm64`, `AssistantModel`
+  `claude-sonnet-5-5`, `AssistantDailyMessageLimit` 30). **Change set: 31 Modify, all with
+  replacement `False`, no Add, no Remove, no Replace**, read by the session with
+  `describe-change-set` before the operator's `y`: the 30 functions but the authorizer, each with
+  `Code` as its only change; `HttpApi`, whose 30 details are all its `Body`, "Dynamic", caused by
+  a function's `Arn` (CloudFormation marks the API because the functions it names are updated; the
+  ARNs do not change). `UPDATE_COMPLETE` at 17:08 UTC. The deployment ended every assistant
+  conversation in progress (the mark of the instructions changed in step u6).
+- *The smoke test*, `npm run smoke -w backend -- shared-calendar-api`: **49 PASS**, throw-away
+  user `smoke-1795540210`, the 16 `capacity:` lines among them, on 2027-01-13 03:00–04:00
+  (Europe/Rome); the real Cognito answered `NotAuthorizedException` where section 2.2 of
+  `docs/RUNBOOK.md` expects it.
+- *The log search* (`docs/RUNBOOK.md` section 2.1), Logs Insights over the stack's 32 log groups
+  from ten minutes before the run, 255 records scanned: 0 rows for the note, for `eyJ` (a token),
+  for the assistant's sentence, for `ChangePassword`, `GlobalSignOut` and `REFRESH_TOKEN`, and for
+  a non-empty `"password":"…"`. Control searches: the user's name in 27 lines of 12 groups;
+  `smoke-cap-<epoch>`, `-b` and `-c` in 12 lines of 6 groups.
 
 ## 6. Out of this plan
 
