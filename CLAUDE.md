@@ -30,9 +30,9 @@ part you touch.
   view (its section 3), the shape of a dialog and of a form (4), the logic layer (5.1), the
   shell (6), the tests (8), the open points (10), the tooling (12), the page's hosting (13).
 - `docs/FOLDER_STRUCTURE.md`: the layout and where a new file goes.
-- `docs/CONVERSATIONAL_ARCHITECTURE.md`, `docs/CONVERSATIONAL_PLAN.md`: the assistant, under way.
-- `docs/RENAME_PLAN.md`: the move to the "shared-calendar" names (`hello-world-api` is deleted);
-  the Hello World feature (`/hello`, its table `…hello-messages`) keeps its name.
+- `docs/CONVERSATIONAL_ARCHITECTURE.md`: the assistant's design, its instructions, tools and
+  evaluation. Where it is merged into the architecture, the architecture wins as usual.
+- `docs/RENAME_PLAN.md`: why Hello World (`/hello`, `…hello-messages`) kept its name.
 - `prompts/`: the numbered briefs behind the documents and the code. Number new ones in sequence.
 
 Not sources of truth; when one disagrees with the documents above or with the tests, it is the
@@ -45,8 +45,8 @@ one that is fixed:
 - `docs/journeys/`: the integration journeys in simple words, one page per `describe` block,
   written and checked with the project skill `explain-journey`. When a journey changes, its
   page changes in the same commit.
-- `docs/FRONTEND_VIEW_PLAN.md`, `docs/FRONTEND_VIEW_OPTIONS.md`, `docs/FRONTEND_DEPLOY_PLAN.md`:
-  records of finished work.
+- `docs/FRONTEND_VIEW_PLAN.md`, `docs/FRONTEND_VIEW_OPTIONS.md`, `docs/FRONTEND_DEPLOY_PLAN.md`,
+  `docs/CONVERSATIONAL_PLAN.md`: records of finished work.
 
 ## Working rhythm
 
@@ -62,7 +62,10 @@ one that is fixed:
 - `shared/` imports no AWS SDK, no Node-only module and no DOM API: only TypeScript and `zod`.
   The API contract and the username rule live there and the back end imports them; a new error
   code or response field starts in `shared/src/api.ts`.
-- Logs never contain tokens, passwords or the body of the create-user response.
+- Logs never contain tokens, passwords, the body of the create-user response or a text of a
+  conversation with the assistant (a message, an answer, a tool's input or result).
+- The assistant changes the calendar only through `confirmProposal`, after the person's button,
+  and reaches it through a route's handler, never through `backend/src/lib/calendarDb.ts`.
 - IAM policies never use a wildcard action or resource. One role per function, granting only
   what its route needs, scoped to the user pool and/or table it uses. The calendar's DynamoDB
   permissions are shared managed policies on the `calendar` table, attached per role
@@ -169,12 +172,8 @@ The annotated tree and where a new file goes: `docs/FOLDER_STRUCTURE.md` section
 
 - Root: the workspaces' `package.json`, the one `package-lock.json`, `tsconfig.base.json`,
   `eslint.config.js`, `docs/`, `prompts/`, `scripts/` (the comment check), `.claude/`.
-- `backend/`: the API. `src/handlers/` (one Lambda entry point per file), `src/lib/` (the only
-  place that touches the AWS SDK), `src/assistant/`, `tests/`, `scripts/`, `template.yaml`.
-- `frontend/`: `src/services/`, `src/logic/`, `src/views/`, `index.html`, `style.css`,
-  `tests/`, `scripts/`.
-- `shared/`: the API contract types, `Role`/`resolveRole`, the username schemas, and the
-  calendar's time helpers, schemas and pure rules.
+- `backend/` (the API), `frontend/` (the page), `shared/` (the code both import): each
+  package's own `CLAUDE.md` has its folder map.
 
 ## Changing these files
 

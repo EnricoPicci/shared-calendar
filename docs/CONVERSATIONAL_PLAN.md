@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`). **Step c09 done** 2026-11-22 (brief `prompts/a11-step-c09-implementation.md`). **Step c10 done** 2026-11-22 (brief `prompts/a12-step-c10-implementation.md`). **Step c11 done** 2026-11-22 (brief `prompts/a13-step-c11-implementation.md`). **Step c12 done** 2026-11-22 (brief `prompts/a14-step-c12-implementation.md`): the assistant is a panel at the bottom of every screen, not a screen, by a decision of the Product Owner. **Step c13 done** 2026-11-23 (brief `prompts/a15-step-c13-implementation.md`): the walk has the panel, open point P6 is closed as built. **Step c14 done** 2026-11-23 (brief `prompts/a17-step-c14-implementation.md`): the key's script, the smoke test's exchange, the two parameters in `backend/samconfig.toml`, the runbook's section 3.2; nothing deployed. **Step c15 done** 2026-11-23 (brief `prompts/a18-step-c15-implementation.md`): the assistant deployed to `shared-calendar-api`, the key stored, the page released again with the panel; P1 and P2 closed, P7 seen |
+| Status | v3, **done** (2026-11-24): every step c00 to c16 with its acceptance check; the assistant is built, merged into `docs/ARCHITECTURE.md` (its change log, v13, closed) and deployed. v2, planned (2026-11-21, brief `prompts/a2-plan-implementation-conversational-interface.md`). Steps c00 to c16. **Step c00 done** 2026-11-21 (brief `prompts/a3-step-c00-implementation.md`). **Step c01 done** 2026-11-21 (brief `prompts/a4-step-c01-implementation.md`). **Step c02 done** 2026-11-21 (brief `prompts/a5-step-c02-implementation.md`). **Step c03 done** 2026-11-21 (no brief: asked for in the session of step c02). **Step c04 done** 2026-11-21 (brief `prompts/a6-step-c04-implementation.md`). **Step c05 done** 2026-11-21 (brief `prompts/a7-step-c05-implementation.md`). **Step c06 done** 2026-11-22 (brief `prompts/a8-step-c06-implementation.md`). **Step c07 done** 2026-11-22 (brief `prompts/a9-step-c07-implementation.md`). **Step c08 done** 2026-11-22 (brief `prompts/a10-step-c08-implementation.md`). **Step c09 done** 2026-11-22 (brief `prompts/a11-step-c09-implementation.md`). **Step c10 done** 2026-11-22 (brief `prompts/a12-step-c10-implementation.md`). **Step c11 done** 2026-11-22 (brief `prompts/a13-step-c11-implementation.md`). **Step c12 done** 2026-11-22 (brief `prompts/a14-step-c12-implementation.md`): the assistant is a panel at the bottom of every screen, not a screen, by a decision of the Product Owner. **Step c13 done** 2026-11-23 (brief `prompts/a15-step-c13-implementation.md`): the walk has the panel, open point P6 is closed as built. **Step c14 done** 2026-11-23 (brief `prompts/a17-step-c14-implementation.md`): the key's script, the smoke test's exchange, the two parameters in `backend/samconfig.toml`, the runbook's section 3.2; nothing deployed. **Step c15 done** 2026-11-23 (brief `prompts/a18-step-c15-implementation.md`): the assistant deployed to `shared-calendar-api`, the key stored, the page released again with the panel; P1 and P2 closed, P7 seen. **Step c16 done** 2026-11-24 (brief `prompts/a19-step-c16-implementation.md`): the hand-over, documents only |
 | Scope | Everything needed to go from `docs/CONVERSATIONAL_ARCHITECTURE.md` v2, a proposal, to the assistant built, tested locally, judged with the real model, shown in its panel, deployed to `shared-calendar-api` and smoke-tested |
 | Not in scope | A second channel (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 16). The deployment of the front end, which has its own stack and plan (`docs/FRONTEND_DEPLOY_PLAN.md`); this plan only releases the page again after the back end (step c15). Creating and deleting users by conversation (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3.1) |
 | Governed by | `docs/CONVERSATIONAL_ARCHITECTURE.md` for what is not built yet. `docs/ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` for everything that exists, and for each part of the assistant from the step that merges it into them (section 4). On any conflict with this plan, they win |
@@ -13,6 +13,7 @@
 |---|---|---|
 | v1 | 2026-11-21 | First version: seventeen steps, numbered 70 to 86 |
 | v2 | 2026-11-21 | **The steps renamed** c00 to c16, in order: c00 is the former 70, c16 the former 86. The letter and the two digits keep them apart from the numbered steps of the other plans and from the briefs in `prompts/` (`a1-…`, `a2-…`). Commits and briefs written before this version use the numbers. No step changes |
+| v3 | 2026-11-24 | **Done.** Step c16's "As done" note; the risk about `CLAUDE.md`'s size with its outcome. No step changes |
 
 ---
 
@@ -1795,6 +1796,56 @@ others, as its text says; the rotation of the key written but never run.
 to a section that moved); no document says the assistant is a proposal; the check of
 `CLAUDE.md`'s last section run and reported.
 
+#### As done (2026-11-24)
+
+Brief `prompts/a19-step-c16-implementation.md`. The Product Owner confirmed four proposals
+before anything was written: `docs/CONVERSATIONAL_ARCHITECTURE.md` stays as the assistant's
+design, the way `docs/SHARED_CALENDAR_SPEC.md` stayed for the calendar; `docs/ARCHITECTURE.md`
+gets requirement F6 and the assistant in the overview's diagram; root `CLAUDE.md` gains two
+rules and makes room; no tag, no push, no deployment. The Product Owner also asked for the
+lines found stale outside the assistant to be fixed in the same step.
+
+- **Already merged before the step**, by each step's point 5 of section 4: the routes and codes
+  (`docs/ARCHITECTURE.md` section 4), the table (5.4), "One secret" and the assistant's
+  threats and risks (7), the commands and the smoke test (9.1 to 9.3), the cost with Anthropic
+  (10), the log lines (11), the folders and import rules (12); `docs/FRONTEND_SERVICES.md`
+  section 21; `docs/FRONTEND_ARCHITECTURE.md` section 6.1; `docs/FOLDER_STRUCTURE.md`,
+  `docs/COMMANDS.md`, `docs/RUNBOOK.md` section 3.2. P7 was already recorded as met (section
+  2.2 and `docs/MERGE_DEPLOY_FRONTEND.md` section 5). Most of the hard rules were already in
+  `backend/CLAUDE.md`.
+- **`docs/ARCHITECTURE.md`**: requirement F6 and a sentence in section 1; the diagram of
+  section 2 with the assistant's functions, its table, the key and Anthropic, redrawn by
+  `.claude/rules/diagrams.md` (a light frame, short labels, a table of the numbered arrows); the
+  assistant's six functions in section 2.1; the status line; the v13 row closed with the
+  sentence of step c16. Stale lines from v12, v14 and v15 fixed: F5 "In progress", "being
+  built route by route", the password change "designed, not built yet" or "being built" (sections 1.1, 2.1, 6.1
+  and 7.4),
+  v15 "open" in the status line.
+- **`docs/CONVERSATIONAL_ARCHITECTURE.md`** v21: the status line and section 1 say which
+  document wins and what this one keeps; sections 10.3 and 19 say they are done and where the
+  result lives; P7 blocks nothing (section 18.2).
+- **`README.md`**: the opening says what the application is today (the calendar and the
+  assistant, not "v1" and "three routes"); the assistant's design in the documents' table;
+  the panel in the screens' table; `src/assistant/` in the layout; the logs and the security
+  paragraph with the one secret, its rotation, and no text of a conversation in a log.
+- **The `CLAUDE.md` files.** Root `CLAUDE.md`: the logging rule names a text of a conversation;
+  a new rule, the assistant changes the calendar only through `confirmProposal` and reaches it
+  through a route's handler; `docs/CONVERSATIONAL_ARCHITECTURE.md` described as the design,
+  `docs/CONVERSATIONAL_PLAN.md` among the records of finished work. Room: the entry of
+  `docs/RENAME_PLAN.md` shortened to one line, and the three package lines of the folder map
+  folded into one, since each package's `CLAUDE.md` has its own map. 198 lines.
+  `backend/CLAUDE.md`: its three lines that said the same now say only what they add, the
+  modules and the lint checks; 199 lines. `frontend/CLAUDE.md`, `shared/CLAUDE.md` and
+  `.claude/rules/` unchanged. The check of the last point of "Changing these files" was run:
+  no section was renamed or removed, and nothing points at what changed.
+- Nothing under `backend/src`, `frontend/src`, `shared/src`, the tests or either
+  `template.yaml`; no cloud command.
+
+What other branches will have to merge: the worktree `../shared-calendar-whatsapp` (branch
+`whatsapp`) builds on `docs/CONVERSATIONAL_ARCHITECTURE.md`, whose status line, change log,
+sections 1, 10.3, 18.2 and 19 changed here, and on root `CLAUDE.md`, whose lists and folder map
+changed.
+
 ---
 
 ## 6. Order of work and checkpoints
@@ -1834,7 +1885,7 @@ does), c09 (the back end), c10 (the model judged), c13 (the panel), c15 (deploye
 | The model words blocked time wrongly (P5) and nobody notices | The confirmation shows the day as it is and as it would become, in the server's words (step c08); step c10 reads the blocking requests one by one |
 | Text of a conversation reaches a log | Every test asserts the log line (section 4); the search of step c09 over a whole run; the cloud's lines read in step c15 |
 | The back end's calendar journeys and the assistant's disturb each other on one local table | One file at a time, as today; the assistant's journeys own their types, dates and people (section 4) |
-| `CLAUDE.md` outgrows its 200 lines with the new rules | Step c16 moves what concerns one package into that package's file and reports what moved |
+| `CLAUDE.md` outgrows its 200 lines with the new rules | Step c16 moves what concerns one package into that package's file and reports what moved. As done: most of the rules were already in `backend/CLAUDE.md`; root `CLAUDE.md` gained two and ends at 198 lines (the note under step c16) |
 | The spending limit is never set, and the daily limits are the only bound | It is a line of the runbook (step c14) and a line of step c15's acceptance |
 
 ## 8. Decisions and assumptions

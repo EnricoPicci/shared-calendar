@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v20, deployed: steps c00 to c15 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` section 5.6); step c16, the hand-over, to come. v20 adds the capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` decisions D24 to D31), built in step u6 of `docs/CAPACITY_PLAN.md` and deployed on 2026-11-24 (`docs/RUNBOOK.md` section 5.8) |
-| Date | 2026-11-23 |
+| Status | v21, implemented, merged and deployed: steps c00 to c16 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` sections 5.6 and 5.8). Where this document is merged into `docs/ARCHITECTURE.md` (its change log, v13), `docs/FRONTEND_SERVICES.md` or `docs/FRONTEND_ARCHITECTURE.md`, those documents win. This one stays as the assistant's design and the home of what only it holds: the instructions, the tools' four parts, the evaluation, the alternatives, a second channel (section 16) |
+| Date | 2026-11-24 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
 
@@ -31,6 +31,7 @@
 | v18 | 2026-11-23 | **Open point P1 closed** by the operator, before any deployment (`docs/CONVERSATIONAL_PLAN.md` step c15, point 1): the account's requests are not used for training and not retained by default (section 10.2). Nothing else changed |
 | v19 | 2026-11-23 | **Deployed**, in `docs/CONVERSATIONAL_PLAN.md` step c15 (`docs/RUNBOOK.md` section 5.6). **Open point P2 closed**: the key is read with `ssm:GetParameter` alone, no `kms:Decrypt` statement is needed (sections 10.1 and 18.2). P7 seen at the deployed page. Nothing else changed |
 | v20 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u6: **the capacity of a type**. `get_calendar` says a slot's places left, a window's capacity and the Administrator's full times (section 8.3); `book_appointment` and `change_appointment` take the Administrator's `overbook`, the proposal says when a time goes over the capacity, and the Administrator's booking or move of a User already busy then is refused at the proposal with `user_busy` (sections 3 and 8.2); rule 4 counts the places of a slot (section 5.5); `create_type` takes a capacity and **`rename_type` became `edit_type`**, for the name, the capacity or both (sections 3, 8.2, 8.3); the instructions gain a paragraph on places (section 7.3); the panel says a refused change for the person's role (section 13); the evaluation gains a type of capacity 3 and six requests (section 12.3); decisions 14 to 20 (section 18.1), decided by the Product Owner. The mark of the instructions changes, which ends the conversations in progress |
+| v21 | 2026-11-24 | `docs/CONVERSATIONAL_PLAN.md` step c16, the hand-over: **implemented, merged and deployed**. The status line and section 1 say which document wins: where this one is merged, `docs/ARCHITECTURE.md` and the front end's two documents. Sections 10.3 and 19 say they are done and where the result lives; P7 blocks nothing (section 18.2). No design changed |
 
 ---
 
@@ -45,15 +46,15 @@ It is written like `docs/ARCHITECTURE.md`: for a reader who knows TypeScript and
 an expert in Infrastructure as Code or in language models. Every choice is explained in plain
 terms.
 
-**Where it stands.** `docs/ARCHITECTURE.md` stays the truth for everything that exists. This
-document governs the assistant until its parts are built; each plan step then merges what it
-built into `docs/ARCHITECTURE.md` (routes, table, roles, security rows, cost), into
-`docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md` (the panel), as the calendar
-did with `docs/SHARED_CALENDAR_SPEC.md`. From step c00 of `docs/CONVERSATIONAL_PLAN.md` on, each
-part of the assistant is governed by `docs/ARCHITECTURE.md` and the two front-end documents from
-the step that merges it into them (the change log of `docs/ARCHITECTURE.md`, v13, says which
-step merged what). Nothing here changes a rule of the calendar: the assistant is a second way to
-reach the same routes, with the same checks.
+**Where it stands.** The assistant is built and deployed, and `docs/ARCHITECTURE.md` is the
+truth for it as for everything that exists: the routes, the table, the roles, the security rows,
+the cost (its change log, v13, says which step merged what). `docs/FRONTEND_SERVICES.md` and
+`docs/FRONTEND_ARCHITECTURE.md` are the truth for the panel. This document stays as the
+assistant's design, as `docs/SHARED_CALENDAR_SPEC.md` stayed for the calendar: on a conflict with
+those three documents, they win. It is the home of what they do not hold: the instructions
+(section 7.3), the tools' four parts (section 8), the evaluation (section 12.3), the alternatives
+(section 17) and a second channel (section 16). Nothing here changes a rule of the calendar: the
+assistant is a second way to reach the same routes, with the same checks.
 
 ### 1.1 Requirements
 
@@ -1231,6 +1232,9 @@ This is accepted by building the feature, and stated rather than hidden:
 
 ### 10.3 Changes to `docs/ARCHITECTURE.md` section 7
 
+Done: `docs/ARCHITECTURE.md` section 7 holds them (the row "One secret" in section 7.1, the
+threats in section 7.2, the residual risks in section 7.3). What was asked:
+
 The row "No secrets" becomes "one secret, the Anthropic API key, in Parameter Store". The
 threats table gains the rows above. The residual risks gain: a conversation can be read in the
 table by whoever administers the AWS account, for up to two days plus the deletion delay; and
@@ -1696,13 +1700,14 @@ Not built now. What the design already gives it, and what it would add:
 | P4 | **Effort level and model** | Measured in step c10 on three runs of the evaluation (section 7.1). **Closed: the Product Owner chose `claude-sonnet-5-5` at effort `low`** (2026-11-22) | Nothing |
 | P5 | **Blocking time by an override the model works out** | Judged in step c10: the nine blocking requests of the evaluation were read one by one on the chosen model (a whole day, a morning, an hour inside a window, an interval over two windows, one that holds an extra window, one over an appointment, a day with hours of its own, a day with none), and each proposed the right hours or rightly none. **Closed: no `block_time` tool** (2026-11-22) | Nothing |
 | P6 | **A typed "yes" drops the proposal** (section 5.5, rule 5) | If the walk shows people type more than they press, accept a typed confirmation only through a fixed list of words matched in code, never through the model. Built as stated; in the trial with the real model a typed "yes" made it ask for the same change again, so the buttons came back. **Closed as built** (2026-11-23, `docs/CONVERSATIONAL_PLAN.md` step c13): in the Product Owner's three sessions with the real model a typed "yes", "sì" and the like changed nothing and the assistant answered that a change is confirmed with the button, and a typed "no" left everything as it was. No list of words is added. The sessions' log was not kept, so there is no count of how often a proposal was answered by typing | Nothing |
-| P7 | **The front end is deployed nowhere** (`docs/FRONTEND_ARCHITECTURE.md` section 10) | **Met by the page's hosting**: the stack `shared-calendar-web` passes every path under `/api/` on to the API with all seven methods (`docs/FRONTEND_ARCHITECTURE.md` section 13.3), the `/assistant` routes among them; seen at the deployed page in `docs/CONVERSATIONAL_PLAN.md` step c15 | A release of the page after the back end's deployment |
+| P7 | **The front end is deployed nowhere** (`docs/FRONTEND_ARCHITECTURE.md` section 10) | **Met by the page's hosting**: the stack `shared-calendar-web` passes every path under `/api/` on to the API with all seven methods (`docs/FRONTEND_ARCHITECTURE.md` section 13.3), the `/assistant` routes among them; seen at the deployed page in `docs/CONVERSATIONAL_PLAN.md` step c15 | Nothing |
 
 ---
 
 ## 19. What the implementation plan must cover
 
-An outline, in an order where each step can be checked by itself:
+Done: the outline became the steps c00 to c16 of `docs/CONVERSATIONAL_PLAN.md`, every one done
+with its acceptance check. The outline, in an order where each step can be checked by itself:
 
 1. **The contract in `shared/`**: the error codes, `AssistantReply`, the languages, the limits,
    the fixed texts in English and Italian.

@@ -118,14 +118,14 @@ the line.
   words them with a function of `shared/src/assistant/`, both languages) and `toModel`; then one
   line in `list.ts` and one in `changeHandlers.ts`. Its file imports no handler that changes
   the calendar.
-- **No request of the model and no text anybody typed runs a change**: only `confirm.ts` does,
-  reached from `handlers/confirmProposal.ts` alone (`npm run lint` refuses any other import of
-  it, of `changeHandlers.ts`, or of a change handler under `src/assistant`).
-- **It reaches the calendar by calling a route's handler, never through `lib/calendarDb.ts`,
-  `lib/calendarRules.ts` or `lib/calendarEvents.ts`** (`npm run lint` refuses the import).
-- **Never log a text, a tool's input or a tool's result.** The log fields come back from the
-  core as `log`; token counts are `usage: { input, output, cacheRead, cacheWrite }`, because the
-  logger blanks every field whose name holds "token".
+- The root rule on `confirmProposal`, in code: only `confirm.ts` runs a change, reached from
+  `handlers/confirmProposal.ts` alone (`npm run lint` refuses any other import of it, of
+  `changeHandlers.ts`, or of a change handler under `src/assistant`).
+- The root rule on the calendar, in code: `npm run lint` refuses an import of
+  `lib/calendarDb.ts`, `lib/calendarRules.ts` or `lib/calendarEvents.ts` under `src/assistant`.
+- The log fields come back from the core as `log`, holding no text (the root rule on logs);
+  token counts are `usage: { input, output, cacheRead, cacheWrite }`, because the logger blanks
+  every field whose name holds "token".
 
 ## `src/handlers/`, the calendar
 

@@ -1,21 +1,24 @@
 # Shared Calendar
 
-The back end of a shared calendar, serverless on AWS. The calendar's routes are described in
-`docs/SHARED_CALENDAR_SPEC.md` (this README gains its calendar sections in
-`docs/IMPLEMENTATION_PLAN.md` step 59). The part below is the base the calendar is built on, and
-its Hello World route proves that the whole chain works. Signed-in users call `POST /hello` and get a message
-back that is also stored in a database; an administrator creates and deletes users. Two roles:
-**user** (may call Hello World) and **admin** (may also create and delete users). Three routes:
-`POST /hello`, `POST /users`, `DELETE /users/{username}`. TypeScript on AWS Lambda behind an
-HTTP API, identities in Amazon Cognito, messages in DynamoDB, everything declared in one SAM
-template and fully testable on a laptop before anything reaches the cloud.
+A shared calendar, serverless on AWS. The Administrator publishes availability and manages
+users; Users book, cancel and change appointments; both can also do it by conversation, in
+English or Italian, with an assistant built on Anthropic's Claude that proposes every change and
+makes it only when the person confirms. The calendar is described in `docs/ARCHITECTURE.md`
+(with `docs/SHARED_CALENDAR_SPEC.md`), the assistant in `docs/ARCHITECTURE.md` (with
+`docs/CONVERSATIONAL_ARCHITECTURE.md`). Underneath, a Hello World route proves that the whole
+chain works: signed-in users call `POST /hello` and get a message back that is also stored in a
+database. Two roles: **user** and **admin**; only an admin creates and deletes users.
+TypeScript on AWS Lambda behind an HTTP API, identities in Amazon Cognito, data in DynamoDB,
+everything declared in one SAM template and fully testable on a laptop before anything reaches
+the cloud.
 
-This is v1 of the back end of a larger application. The repository is a monorepo: the back end
+The repository is a monorepo: the back end
 in `backend/`, the code it shares with the browser front end (the API contract
 and the username rule) in `shared/`, and in `frontend/` the front end: its services layer
-(session store, login, token refresh, Hello World, user administration, the calendar;
-`docs/FRONTEND_SERVICES.md`) and its pages (`docs/FRONTEND_ARCHITECTURE.md`): the login, the
-week calendar, a User's appointments and the Administrator's settings, users and availability.
+(session store, login, token refresh, Hello World, user administration, the calendar, the
+assistant, the change of one's password; `docs/FRONTEND_SERVICES.md`) and its pages
+(`docs/FRONTEND_ARCHITECTURE.md`): the login, the week calendar, a User's appointments, the
+Administrator's settings, users and availability, and the assistant's panel under every screen.
 They run locally (see "The page, locally" below) and are deployed: the page is in use at the
 address given under "The deployed stacks".
 
@@ -28,6 +31,7 @@ Where the full story is:
 | `docs/RUNBOOK.md` | What the operator does: daily start, updating the API's stack, releasing the page, deploying from scratch; the record of every deployment |
 | `docs/AWS_ACCOUNTS.md` | Which AWS identity to sign in with, and why |
 | `docs/FOLDER_STRUCTURE.md` | The monorepo layout (back end, front end, shared): which folder holds what, and how the pieces are built |
+| `docs/CONVERSATIONAL_ARCHITECTURE.md` | The assistant's design: its instructions, its tools, its evaluation with the real model, the alternatives; where it is merged into `docs/ARCHITECTURE.md`, the architecture wins |
 | `docs/FRONTEND_SERVICES.md` | The front end's services layer: the `SessionStore` and one service per remote call (login, refresh, logout, Hello World, users, the calendar), in `frontend/src/services/` |
 | `docs/FRONTEND_ARCHITECTURE.md` | The front end's pages: how a view is written, the logic between the services and the views, the shell; and how the page is hosted and deployed (its section 13) |
 | `docs/FRONTEND_DEPLOY_PLAN.md` | In which order the hosting was built and deployed (steps 70 to 73; done, with a few checks at the deployed page still owed, listed in `docs/RUNBOOK.md` section 5.5) |
@@ -156,6 +160,7 @@ each of them finds:
 | Settings (`#/settings`) | Administrator | The cancellation notice, the booking notice, the booking horizon and the maximum of upcoming appointments |
 | Users (`#/users`) | Administrator | The list, a form that creates a user and shows the generated password once, a "Delete" per row that asks first |
 | Availability (`#/availability`) | Administrator | The availability types, each with its capacity (how many people at the same time, 1 to 100), the weekly patterns, and a single date: its own windows ("This day only…"), "Not available on this day", extra windows. A change that would leave a booked appointment outside the hours open for booking is refused and lists the appointments in the way |
+| The assistant's panel | both, under every screen | A conversation in English or Italian: questions about the calendar, and changes the assistant proposes and the person confirms with a button. Up to 30 messages a day per person; each conversation runs out a day after its last message |
 | Password (`#/password`) | both, last link | The change of one's own password: the current one, the new one twice, with what the new one still misses said under it while typing. After a change the person is signed out everywhere and the login says "Password changed." |
 
 Good to know: the week is loaded again after every write and every time the browser's tab
@@ -170,7 +175,7 @@ once and served by CloudFront, which passes its calls on to the real API
 by hand in the browser, as `alice` and as `admin`, from a fresh, seeded local stack.
 
 Layout: `backend/` holds `src/handlers/` (one Lambda per file), `src/lib/` (the only code that
-touches the AWS SDK), `tests/`, `scripts/`, `template.yaml` and `docker-compose.yml`; `shared/src/`
+touches the AWS SDK), `src/assistant/` (the assistant's core), `tests/`, `scripts/`, `template.yaml` and `docker-compose.yml`; `shared/src/`
 holds the API contract types and the username rule that the handlers import. The annotated tree
 is in `docs/FOLDER_STRUCTURE.md` section 2.
 
@@ -265,9 +270,10 @@ The API can never create an administrator, delete one, or set its password.
   functions' log lines in the `npm run local:api -w backend` terminal.
 - **Cloud:** DynamoDB → `shared-calendar-api-hello-messages` → Explore items, in the console
   (region `eu-north-1`). Logs in CloudWatch: `/aws/lambda/shared-calendar-api-<function>` for
-  `authorizer`, `hello`, `createUser`, `deleteUser`, and `/aws/apigateway/shared-calendar-api-access`
+  each function (`authorizer`, `hello`, the users', the calendar's and the assistant's), and `/aws/apigateway/shared-calendar-api-access`
   for one line per request. Each function writes one structured JSON line per request with the
-  request id, route, username, role, outcome and duration, never a token or a password.
+  request id, route, username, role, outcome and duration, never a token, a password or a text
+of a conversation with the assistant.
 
 ## The administrator's password
 
@@ -281,10 +287,15 @@ integration tests fail.
 
 ## Security in one paragraph
 
-There is no secret in the repository and none in the cloud to rotate: the functions use IAM
-roles, token verification uses Cognito's public keys, and the only password-like values are the
-two local emulator accounts. Each function has its own IAM role limited to the exact actions it
+There is no secret in the repository, and one in the cloud: the Anthropic API key, an encrypted
+parameter in Parameter Store that the operator stores and rotates with
+`npm run assistant-key -w backend -- shared-calendar-api` (`docs/RUNBOOK.md` section 3.2) and
+that only the three functions asking Claude may read. Otherwise the functions use IAM roles,
+token verification uses Cognito's public keys, and the only password-like values are the two
+local emulator accounts. Each function has its own IAM role limited to the exact actions it
 needs on the one pool or table it uses, with no wildcard. Every request is verified by a Lambda
-authorizer, and every handler checks the role again. Tokens, passwords and the create-user
-response never reach the logs. The alert e-mail address is a stack parameter passed once on the
+authorizer, and every handler checks the role again. Tokens, passwords, the create-user
+response and the text of a conversation never reach the logs. The assistant changes the calendar
+only when the person presses the button of a proposal the server worded, and what a person
+writes to it is sent to Anthropic (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 10.2). The alert e-mail address is a stack parameter passed once on the
 first deploy and is never written into `backend/samconfig.toml`, because this repository is public.
