@@ -1,6 +1,6 @@
 import type { AppointmentConflict, AvailabilityType, WeeklyPattern } from '@shared-calendar/shared';
 import { BehaviorSubject } from 'rxjs';
-import { NO_TYPE_YET, patternFor, patternGroups, startingFields, TYPE_NAME_HINT, typeChoices, typeRows, type PatternFields } from '../../../src/logic/availability.model';
+import { NO_TYPE_YET, patternFor, patternGroups, startingFields, TYPE_CAPACITY_HINT, TYPE_NAME_HINT, typeChoices, typeRows, type PatternFields } from '../../../src/logic/availability.model';
 import type { Ask, AvailabilityState } from '../../../src/logic/availability.screen';
 import { conflictList } from '../../../src/logic/conflicts';
 import type { DeletePatternState } from '../../../src/services/availability-rules.types';
@@ -39,7 +39,7 @@ const QUIET: Ask<never> = { about: '', busy: false, refusals: {}, failure: null,
 const ROWS = typeRows(TYPES);
 const GROUPS = patternGroups(PATTERNS, TYPES, '2026-11-20');
 const CHOICES = typeChoices(TYPES);
-const TYPE_FIELD = { name: '' };
+const TYPE_FIELDS = { name: '', capacity: '1' };
 const STARTING = startingFields('2026-11-20');
 const state = (over: Partial<AvailabilityState> = {}): AvailabilityState => ({
   loading: false,
@@ -51,7 +51,7 @@ const state = (over: Partial<AvailabilityState> = {}): AvailabilityState => ({
   patternsEmpty: null,
   choices: [],
   typeHint: '',
-  typeField: TYPE_FIELD,
+  typeFields: TYPE_FIELDS,
   patternFields: STARTING,
   typeCreate: QUIET,
   rename: QUIET,
@@ -127,6 +127,7 @@ const dialog = (name: 'rename' | 'change' | 'delete') => one<HTMLDialogElement>(
 const removeSubmit = () => one<HTMLButtonElement>('dialog.delete .submit');
 const ask = (over: Partial<Ask<string>>): Ask<string> => ({ ...QUIET, ...over });
 
+// Test names: section numbers and D… decisions are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('mountAvailability', () => {
   useRealPage();
 
@@ -170,8 +171,8 @@ describe('mountAvailability', () => {
       mounted();
       expect(typeNames()).toEqual(['Piscina', 'Studio']);
       expect(typeItems().map((item) => [...item.querySelectorAll('button')].map((button) => [button.textContent, button.getAttribute('aria-label')]))).toEqual([
-        [['Rename', 'Rename Piscina'], ['Delete', 'Delete Piscina']],
-        [['Rename', 'Rename Studio'], ['Delete', 'Delete Studio']],
+        [['Edit', 'Edit Piscina'], ['Delete', 'Delete Piscina']],
+        [['Edit', 'Edit Studio'], ['Delete', 'Delete Studio']],
       ]);
     });
 
@@ -329,7 +330,7 @@ describe('mountAvailability', () => {
       field(CREATE_TYPE, 'name').value = ' Sala ';
       const before = html();
       expect(submit(form(CREATE_TYPE)).prevented).toBe(true);
-      expect(screen.createType.mock.calls).toEqual([[' Sala ']]);
+      expect(screen.createType.mock.calls).toEqual([[{ name: ' Sala ', capacity: '1' }]]);
       expect(writes()).toEqual([1, 0, 0, 0, 0, 0]);
       expect(html()).toBe(before);
       expect(field(CREATE_TYPE, 'name').value).toBe(' Sala ');
@@ -338,7 +339,7 @@ describe('mountAvailability', () => {
     it('an empty field goes as an empty text: the view checks nothing', () => {
       const { screen } = mounted();
       submit(form(CREATE_TYPE));
-      expect(screen.createType).toHaveBeenCalledWith('');
+      expect(screen.createType).toHaveBeenCalledWith({ name: '', capacity: '1' });
       expect(field(CREATE_TYPE, 'name').hasAttribute('aria-invalid')).toBe(false);
     });
 
@@ -349,7 +350,7 @@ describe('mountAvailability', () => {
       availability$.next(listed({ typeCreate: ask({ failure: FAILURE }) }));
       availability$.next(listed({ types: typeRows([type(STUDIO, 'Studio')]), typeCreate: ask({ done: true }) }));
       expect(field(CREATE_TYPE, 'name').value).toBe('Sala');
-      availability$.next(listed({ typeField: { name: '' }, typeCreate: ask({ done: true }) }));
+      availability$.next(listed({ typeFields: { name: '', capacity: '1' }, typeCreate: ask({ done: true }) }));
       expect(field(CREATE_TYPE, 'name').value).toBe('');
     });
 
@@ -360,6 +361,67 @@ describe('mountAvailability', () => {
       one('.patterns .retry').click();
       expect([screen.retryTypes.mock.calls.length, screen.retryPatterns.mock.calls.length]).toEqual([1, 1]);
       expect(writes()).toEqual([0, 0, 0, 0, 0, 0]);
+    });
+  });
+
+  describe('the capacity of a type (6.1, D24)', () => {
+    // Piscina holds 3 people, Studio 1.
+    const WITH_THREE = typeRows([{ ...type(POOL, 'Piscina'), capacity: 3 }, type(STUDIO, 'Studio')]);
+    const placesOf = () => typeItems().map((item) => item.querySelector('.places')!.textContent);
+
+    it('a number field in the form that creates and in the dialog that edits, each with the hint of the bounds under it', () => {
+      mounted(state());
+      for (const selector of [CREATE_TYPE, RENAME]) {
+        const input = field(selector, 'capacity');
+        expect([input.type, input.closest('label')!.firstChild!.textContent!.trim(), one(`${selector} .capacity-hint`).textContent]).toEqual(['number', 'Capacity', TYPE_CAPACITY_HINT]);
+        expect(input.getAttribute('aria-describedby')).toBe(one(`${selector} .capacity-hint`).id);
+      }
+      expect(field(CREATE_TYPE, 'capacity').value).toBe('1');
+    });
+
+    it('a row says its places beside the name only for a capacity above one', () => {
+      mounted(listed({ types: WITH_THREE }));
+      expect(placesOf()).toEqual(['· 3 places', '']);
+    });
+
+    it('"Create type" sends the capacity the field holds, as text', () => {
+      const { screen } = mounted();
+      field(CREATE_TYPE, 'name').value = 'Vasca';
+      field(CREATE_TYPE, 'capacity').value = '3';
+      submit(form(CREATE_TYPE));
+      expect(screen.createType.mock.calls).toEqual([[{ name: 'Vasca', capacity: '3' }]]);
+    });
+
+    it('"Edit" opens with the type\'s own capacity; "Save" sends the field as it holds it', () => {
+      const { screen } = mounted(listed({ types: WITH_THREE }));
+      typeButton('Piscina', '.ask-rename').click();
+      expect(field(RENAME, 'capacity').value).toBe('3');
+      field(RENAME, 'capacity').value = '2';
+      submit(form(RENAME));
+      expect(screen.rename.mock.calls).toEqual([[POOL, { name: 'Piscina', capacity: '2' }]]);
+    });
+
+    it('a capacity refused: its sentence under its field, announced, the field marked, the name not; in the form and in the dialog', () => {
+      const { availability$ } = mounted();
+      availability$.next(listed({ typeCreate: ask({ refusals: { capacity: TYPE_CAPACITY_HINT } }) }));
+      expect([refusalOf(CREATE_TYPE, 'capacity').textContent, refusalOf(CREATE_TYPE, 'capacity').getAttribute('role'), field(CREATE_TYPE, 'capacity').getAttribute('aria-invalid'), field(CREATE_TYPE, 'name').hasAttribute('aria-invalid')]).toEqual([
+        TYPE_CAPACITY_HINT,
+        'alert',
+        'true',
+        false,
+      ]);
+      typeButton('Studio', '.ask-rename').click();
+      field(RENAME, 'capacity').value = '0';
+      submit(form(RENAME));
+      availability$.next(listed({ rename: ask({ about: STUDIO, refusals: { capacity: TYPE_CAPACITY_HINT } }) }));
+      expect([refusalOf(RENAME, 'capacity').textContent, field(RENAME, 'capacity').getAttribute('aria-invalid'), dialog('rename').open, field(RENAME, 'capacity').value]).toEqual([TYPE_CAPACITY_HINT, 'true', true, '0']);
+    });
+
+    it('after a create the form is filled again with the capacity the stream brings', () => {
+      const { availability$ } = mounted();
+      field(CREATE_TYPE, 'capacity').value = '7';
+      availability$.next(listed({ typeFields: { name: '', capacity: '1' }, typeCreate: ask({ done: true }) }));
+      expect(field(CREATE_TYPE, 'capacity').value).toBe('1');
     });
   });
 
@@ -429,7 +491,7 @@ describe('mountAvailability', () => {
     });
   });
 
-  describe('the dialog that renames a type', () => {
+  describe('the dialog that edits a type', () => {
     const opened = (name = 'Studio', first: AvailabilityState = listed()) => {
       const made = mounted(first);
       typeButton(name, '.ask-rename').click();
@@ -440,9 +502,9 @@ describe('mountAvailability', () => {
       return submit(form(RENAME));
     };
 
-    it('"Rename" on a row opens it with the type\'s name in its field, and no call', () => {
+    it('"Edit" on a row opens it with the type\'s name and capacity in their fields, and no call', () => {
       const { writes } = opened();
-      expect([dialog('rename').open, field(RENAME, 'name').value, one('dialog.rename h3').textContent]).toEqual([true, 'Studio', 'Rename type']);
+      expect([dialog('rename').open, field(RENAME, 'name').value, field(RENAME, 'capacity').value, one('dialog.rename h3').textContent]).toEqual([true, 'Studio', '1', 'Edit type']);
       expect(one(`${RENAME} .hint`).textContent).toBe(TYPE_NAME_HINT);
       expect(writes()).toEqual([0, 0, 0, 0, 0, 0]);
     });
@@ -456,10 +518,10 @@ describe('mountAvailability', () => {
       expect(writes()).toEqual([0, 0, 0, 0, 0, 0]);
     });
 
-    it('"Rename" calls rename() with the type\'s id and the field as it is, once, and changes nothing by itself', () => {
+    it('"Save" calls rename() with the type\'s id and the two fields as they are, once, and changes nothing by itself', () => {
       const { screen, writes } = opened();
       expect(rename(' Sala ').prevented).toBe(true);
-      expect(screen.rename.mock.calls).toEqual([[STUDIO, ' Sala ']]);
+      expect(screen.rename.mock.calls).toEqual([[STUDIO, { name: ' Sala ', capacity: '1' }]]);
       expect(writes()).toEqual([0, 1, 0, 0, 0, 0]);
       expect([dialog('rename').open, field(RENAME, 'name').value, failureOf(RENAME).textContent]).toEqual([true, ' Sala ', '']);
     });
@@ -482,7 +544,7 @@ describe('mountAvailability', () => {
       expect([failureOf(RENAME).textContent, failureOf(RENAME).getAttribute('role'), dialog('rename').open, field(RENAME, 'name').value, submitOf(RENAME).disabled]).toEqual(['A type with this name exists already. Choose another name.', 'alert', true, 'Piscina', false]);
       expect(failureOf(CREATE_TYPE).textContent).toBe('');
       rename('Sala');
-      expect(screen.rename).toHaveBeenLastCalledWith(STUDIO, 'Sala');
+      expect(screen.rename).toHaveBeenLastCalledWith(STUDIO, { name: 'Sala', capacity: '1' });
     });
 
     it('a success closes it', () => {
@@ -521,7 +583,7 @@ describe('mountAvailability', () => {
       availability$.next(listed({ loading: true, rename: ask({ about: STUDIO, refusals: { name: TYPE_NAME_HINT }, failure: FAILURE }) }));
       expect([refusalOf(RENAME, 'name').textContent, failureOf(RENAME).textContent]).toEqual(['', '']);
       rename('Vasca');
-      expect(screen.rename).toHaveBeenLastCalledWith(POOL, 'Vasca');
+      expect(screen.rename).toHaveBeenLastCalledWith(POOL, { name: 'Vasca', capacity: '1' });
     });
 
     it('a close event that arrives after the dialog was opened again changes nothing: the dialog still acts on what it shows', () => {
@@ -530,7 +592,7 @@ describe('mountAvailability', () => {
       typeButton('Piscina', '.ask-rename').click();
       dialog('rename').dispatchEvent(new Event('close')); // the browser's late event of the first close
       rename('Vasca');
-      expect(screen.rename).toHaveBeenLastCalledWith(POOL, 'Vasca');
+      expect(screen.rename).toHaveBeenLastCalledWith(POOL, { name: 'Vasca', capacity: '1' });
       availability$.next(listed({ rename: ask({ about: POOL, done: true }) }));
       expect(dialog('rename').open).toBe(false);
     });
@@ -546,7 +608,7 @@ describe('mountAvailability', () => {
       const rows = typeRows([type(STUDIO, SCRIPT)]);
       mounted(listed({ types: rows, choices: typeChoices([type(STUDIO, SCRIPT)]) }));
       expect(typeNames()).toEqual([SCRIPT]);
-      expect(typeButton(SCRIPT, '.ask-rename').getAttribute('aria-label')).toBe(`Rename ${SCRIPT}`);
+      expect(typeButton(SCRIPT, '.ask-rename').getAttribute('aria-label')).toBe(`Edit ${SCRIPT}`);
       expect(options(CREATE_PATTERN, 'typeId')).toEqual([[STUDIO, SCRIPT]]);
       typeButton(SCRIPT, '.ask-rename').click();
       expect(field(RENAME, 'name').value).toBe(SCRIPT);
@@ -898,7 +960,7 @@ describe('mountAvailability', () => {
       const option = field(CREATE_PATTERN, 'typeId').querySelector('option');
       availability$.next(listed({ loading: true }));
       availability$.next(listed({ typeCreate: ask({ failure: FAILURE }), patternCreate: ask({ refusals: { typeId: 'Type must be chosen.' } }) }));
-      availability$.next(listed({ typeField: { name: '' }, patternFields: startingFields('2026-11-20') }));
+      availability$.next(listed({ typeFields: { name: '', capacity: '1' }, patternFields: startingFields('2026-11-20') }));
       expect([typeButton('Studio', '.ask-rename'), patternButton(0, '.ask-change'), field(CREATE_PATTERN, 'typeId').querySelector('option')]).toEqual([rename, change, option]);
       expect(typeButton('Studio', '.ask-rename')).toBe(rename);
       expect(patternButton(0, '.ask-change')).toBe(change);
@@ -950,8 +1012,8 @@ describe('mountAvailability', () => {
       expect(all('li, option, .groups section')).toHaveLength(0);
       for (const gone of ['Studio', 'Piscina', 'alice', 'bob', 'Sala nuova', 'Mon 23 Nov', 'appointments are in the way', 'Monday', TYPE_NAME_HINT, FAILURE, 'Delete the', STUDIO, POOL, P2]) expect(anywhere(gone), gone).toBe(false);
       const fields = [...find('#availability').querySelectorAll<HTMLInputElement | HTMLSelectElement>('input, select, textarea')];
-      // The 14 fields of this view's four forms, and the 7 of the part about a single date.
-      expect([fields.length, fields.map((each) => each.value).join('')]).toEqual([21, '']);
+      // The 16 fields of this view's four forms, and the 7 of the part about a single date.
+      expect([fields.length, fields.map((each) => each.value).join('')]).toEqual([23, '']);
       expect(all('[aria-invalid], :disabled')).toHaveLength(0);
       // The page is the one index.html has.
       expect(html()).toBe(untouched);
@@ -973,7 +1035,7 @@ describe('mountAvailability', () => {
       expect([typeNames(), dialog('rename').open, options(CREATE_PATTERN, 'weekday').length]).toEqual([['Piscina', 'Studio'], false, 7]);
       typeButton('Piscina', '.ask-rename').click();
       submit(form(RENAME));
-      expect(screen.rename.mock.calls).toEqual([[POOL, 'Piscina']]);
+      expect(screen.rename.mock.calls).toEqual([[POOL, { name: 'Piscina', capacity: '1' }]]);
       expect(first.screen.rename).not.toHaveBeenCalled();
     });
   });

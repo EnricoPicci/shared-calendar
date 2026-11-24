@@ -1,7 +1,8 @@
 import type { Role } from '@shared-calendar/shared';
 import { BehaviorSubject } from 'rxjs';
 import type { AppointmentDetail, Moving } from '../../../src/logic/appointment.detail';
-import type { DayModel, Placed, SlotBlock, WeekModel } from '../../../src/logic/week.model';
+import { refusalOf } from '../../../src/logic/booking';
+import type { DayModel, GroupBlock, Placed, SlotBlock, WeekModel } from '../../../src/logic/week.model';
 import type { WeekState } from '../../../src/logic/week.screen';
 import type { BookState, CancelState, ChangeState, UpdateNoteState } from '../../../src/services/appointments.types';
 import type { ListUsersState } from '../../../src/services/users.types';
@@ -17,7 +18,7 @@ import { find, submit, useRealPage } from './page';
 const SCRIPT = '<script>window.hacked = true</script><b>bold</b>';
 const FAILURE = 'The server cannot be reached. Check the connection and try again.';
 
-const at = (top: string, height: string, time: string, lane: 0 | 1 = 0, lanes: 1 | 2 = 1): Placed => ({ top, height, time, lane, lanes });
+const at = (top: string, height: string, time: string, lane = 0, lanes = 1): Placed => ({ top, height, time, lane, lanes });
 const day = (date: string, label: string, over: Partial<DayModel> = {}): DayModel => ({
   date,
   label,
@@ -26,6 +27,7 @@ const day = (date: string, label: string, over: Partial<DayModel> = {}): DayMode
   slots: [],
   busy: [],
   appointments: [],
+  groups: [],
   ...over,
 });
 
@@ -39,6 +41,9 @@ const slot = (placed: Placed, colour: number, over: Partial<SlotBlock> = {}): Sl
   day: 'Mon 16 Nov',
   typeName: 'Studio',
   window: { start: '2026-11-16T07:00:00.000Z', end: '2026-11-16T11:00:00.000Z' },
+  places: 'free',
+  full: false,
+  tab: null,
   ...over,
 });
 const APPOINTMENT = '01M6DMQ0000000000000000001';
@@ -61,7 +66,7 @@ const WEEK: WeekModel = {
         slot(at('60%', '10%', '02:00 +01:00 – 03:00 +01:00', 1, 2), 5),
       ],
       busy: [at('10%', '10%', '09:00–10:00')],
-      appointments: [{ ...at('30%', '12.5%', '11:00–12:15'), appointmentId: APPOINTMENT, who: 'You', typeName: 'Studio', note: 'First lesson', colour: 2 }],
+      appointments: [{ ...at('30%', '12.5%', '11:00–12:15'), appointmentId: APPOINTMENT, who: 'You', typeName: 'Studio', note: 'First lesson', colour: 2, beside: false }],
     }),
     day('2026-11-17', 'Tue 17 Nov', { today: true }),
     ...['Wed 18 Nov', 'Thu 19 Nov', 'Fri 20 Nov', 'Sat 21 Nov', 'Sun 22 Nov'].map((label, i) => day(`2026-11-${18 + i}`, label)),
@@ -75,7 +80,7 @@ const OTHER: WeekModel = {
   legend: [{ name: 'Piscina', colour: 1 }],
   days: [
     day('2026-11-23', 'Mon 23 Nov', {
-      appointments: [{ ...at('0%', '50%', '06:00–07:00'), appointmentId: OTHER_APPOINTMENT, who: 'bob', typeName: 'Piscina', note: '', colour: 1 }],
+      appointments: [{ ...at('0%', '50%', '06:00–07:00'), appointmentId: OTHER_APPOINTMENT, who: 'bob', typeName: 'Piscina', note: '', colour: 1, beside: false }],
     }),
   ],
 };
@@ -112,6 +117,9 @@ function mounted(first: WeekState = state(), role: Role = 'user', details: Appoi
     detail: vi.fn<WeekDeps['screen']['detail']>((id) => details.find((detail) => detail.appointmentId === id) ?? null),
     move: vi.fn<WeekDeps['screen']['move']>(),
     keep: vi.fn<WeekDeps['screen']['keep']>(),
+    // The words of a refusal as the logic layer chooses them, with no appointment of the week to
+    // name: a test that needs one answers it itself.
+    refusal: vi.fn<WeekDeps['screen']['refusal']>((reason, asked) => refusalOf(reason, asked, role, [])),
   };
   const appointments = {
     bookState$: bookState$.asObservable(),
@@ -133,6 +141,7 @@ const all = (selector: string) => [...document.querySelectorAll<HTMLElement>(`#w
 const texts = (selector: string) => all(selector).map((element) => element.textContent);
 const html = () => document.documentElement.outerHTML;
 
+// Test names: section numbers and R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('mountWeek', () => {
   useRealPage();
 
@@ -303,7 +312,7 @@ describe('mountWeek', () => {
           windows: [{ ...at('0%', '10%', SCRIPT), typeName: SCRIPT, colour: 0 }],
           slots: [slot(at('0%', '10%', SCRIPT), 0)],
           busy: [at('0%', '10%', SCRIPT)],
-          appointments: [{ ...at('0%', '10%', SCRIPT), appointmentId: APPOINTMENT, who: SCRIPT, typeName: SCRIPT, note: SCRIPT, colour: 0 }],
+          appointments: [{ ...at('0%', '10%', SCRIPT), appointmentId: APPOINTMENT, who: SCRIPT, typeName: SCRIPT, note: SCRIPT, colour: 0, beside: false }],
         }),
       ],
     };
@@ -744,7 +753,7 @@ describe('mountWeek', () => {
   it('a note and a username containing <script> are shown as text in both dialogs', () => {
     const week: WeekModel = { ...WEEK, days: [day('2026-11-16', 'Mon 16 Nov', {
       slots: [slot(at('0%', '10%', SCRIPT), 0, { day: SCRIPT, typeName: SCRIPT })],
-      appointments: [{ ...at('0%', '10%', '11:00–12:15'), appointmentId: APPOINTMENT, who: SCRIPT, typeName: SCRIPT, note: SCRIPT, colour: 0 }],
+      appointments: [{ ...at('0%', '10%', '11:00–12:15'), appointmentId: APPOINTMENT, who: SCRIPT, typeName: SCRIPT, note: SCRIPT, colour: 0, beside: false }],
     })] };
     const scripted: AppointmentDetail = { ...DETAIL, when: SCRIPT, typeName: SCRIPT, who: SCRIPT, note: SCRIPT, booked: SCRIPT, hint: SCRIPT };
     const { listUsersState$ } = mounted(state({ week }), 'admin', [scripted]);
@@ -920,12 +929,12 @@ describe('mountWeek', () => {
   const inChange = () => all('dialog.book .in-change').map((element) => element.hidden);
   const inBooking = () => all('dialog.book .in-booking').map((element) => element.hidden);
 
-  const MOVING: Moving = { appointmentId: APPOINTMENT, when: 'Mon 16 Nov, 11:00–12:15', what: 'Mon 16 Nov, 11:00–12:15 · Studio', note: 'First lesson' };
+  const MOVING: Moving = { appointmentId: APPOINTMENT, when: 'Mon 16 Nov, 11:00–12:15', what: 'Mon 16 Nov, 11:00–12:15 · Studio', who: 'You', note: 'First lesson' };
   // The week with a second appointment on Monday.
   const TWO: WeekModel = {
     ...WEEK,
     days: [
-      { ...WEEK.days[0]!, appointments: [...WEEK.days[0]!.appointments, { ...at('70%', '10%', '15:00–16:00'), appointmentId: OTHER_APPOINTMENT, who: 'You', typeName: 'Swimming Pool', note: '', colour: 5 }] },
+      { ...WEEK.days[0]!, appointments: [...WEEK.days[0]!.appointments, { ...at('70%', '10%', '15:00–16:00'), appointmentId: OTHER_APPOINTMENT, who: 'You', typeName: 'Swimming Pool', note: '', colour: 5, beside: false }] },
       ...WEEK.days.slice(1),
     ],
   };
@@ -970,7 +979,7 @@ describe('mountWeek', () => {
     });
 
     it('for the Administrator the banner carries the User\'s name, as the stream gives it', () => {
-      moving('admin', WEEK, { ...MOVING, what: 'Mon 16 Nov, 11:00–12:15 · Studio · alice' });
+      moving('admin', WEEK, { ...MOVING, what: 'Mon 16 Nov, 11:00–12:15 · Studio · alice', who: 'alice' });
       expect(find('#week .moving p').textContent).toBe('Moving: Mon 16 Nov, 11:00–12:15 · Studio · alice. Choose a free time.');
     });
 
@@ -1033,8 +1042,8 @@ describe('mountWeek', () => {
         const { appointments, users } = moving();
         find('#week .slot').click();
         expect(book().open).toBe(true);
-        expect(inChange()).toEqual([false, false, false, false]);
-        expect(inBooking()).toEqual([true, true, true]);
+        expect(inChange()).toEqual([false, false, false, false, false, false]);
+        expect(inBooking()).toEqual([true, true, true, true, true]);
         expect(shownTexts('h3 span')).toEqual(['Change appointment']);
         expect(find('#week dialog.book .old').parentElement!.textContent).toBe('From: Mon 16 Nov, 11:00–12:15');
         expect(find('#week dialog.book .what').parentElement!.textContent).toBe('To: Mon 16 Nov, 08:00–09:00 · Studio');
@@ -1201,7 +1210,7 @@ describe('mountWeek', () => {
     });
 
     describe('the confirmation, for the Administrator', () => {
-      const FOR_ALICE = { ...MOVING, what: 'Mon 16 Nov, 11:00–12:15 · Studio · alice' };
+      const FOR_ALICE = { ...MOVING, what: 'Mon 16 Nov, 11:00–12:15 · Studio · alice', who: 'alice' };
 
       it('shows the two times, set to the slot\'s own, and no choice of User: the list of users is not asked for', () => {
         const { users } = moving('admin', WEEK, FOR_ALICE);
@@ -1270,8 +1279,8 @@ describe('mountWeek', () => {
         week$.next(state({ week: WEEK, moving: null }));
 
         find('#week .slot').click();
-        expect(inChange()).toEqual([true, true, true, true]);
-        expect(inBooking()).toEqual([false, false, false]);
+        expect(inChange()).toEqual([true, true, true, true, true, true]);
+        expect(inBooking()).toEqual([false, false, false, false, false]);
         expect(shownTexts('h3 span')).toEqual(['Book an appointment']);
         expect(shownTexts('.submit span')).toEqual(['Book']);
         expect(find('#week dialog.book .old').textContent).toBe('');
@@ -1334,7 +1343,7 @@ describe('mountWeek', () => {
     });
 
     it('the texts of a move containing <script> are shown as text, and the note is put in the field as text', () => {
-      moving('user', WEEK, { appointmentId: APPOINTMENT, when: SCRIPT, what: SCRIPT, note: SCRIPT });
+      moving('user', WEEK, { appointmentId: APPOINTMENT, when: SCRIPT, what: SCRIPT, who: 'You', note: SCRIPT });
       expect(find('#week .moving-what').textContent).toBe(SCRIPT);
       expect(find('#week .moving-what').children).toHaveLength(0);
       find('#week .slot').click();
@@ -1364,7 +1373,7 @@ describe('mountWeek', () => {
     describe('leaving the view', () => {
       it('while moving, with the confirmation open after a failure: no banner, no dialog, and the page as index.html has it', () => {
         const before = html();
-        const { subscription, changeState$ } = moving('admin', TWO, { ...MOVING, what: 'Mon 16 Nov, 11:00–12:15 · Studio · alice' });
+        const { subscription, changeState$ } = moving('admin', TWO, { ...MOVING, what: 'Mon 16 Nov, 11:00–12:15 · Studio · alice', who: 'alice' });
         find('#week .slot').click();
         note().value = 'A private note';
         submit(bookForm());
@@ -1378,8 +1387,8 @@ describe('mountWeek', () => {
         expect(find('#week .moving-what').textContent).toBe('');
         expect(note().value).toBe('');
         expect(find('#week dialog.book .old').textContent).toBe('');
-        expect(inChange()).toEqual([true, true, true, true]);
-        expect(inBooking()).toEqual([false, false, false]);
+        expect(inChange()).toEqual([true, true, true, true, true, true]);
+        expect(inBooking()).toEqual([false, false, false, false, false]);
         expect(html()).not.toContain('alice');
         expect(html()).not.toContain('Mon 16 Nov');
         expect(html()).toBe(before);
@@ -1419,6 +1428,266 @@ describe('mountWeek', () => {
         keep().click();
         expect([first.appointments.updateNote, first.screen.move, first.screen.keep].map((spy) => spy.mock.calls.length)).toEqual([0, 0, 0]);
         expect([second.appointments.updateNote, second.screen.move, second.screen.keep].map((spy) => spy.mock.calls.length)).toEqual([1, 1, 1]);
+      });
+    });
+  });
+  describe('the capacity of a type (16.8)', () => {
+    const book = () => find<HTMLDialogElement>('#week dialog.book');
+    const bookForm = () => find<HTMLFormElement>('#week dialog.book form');
+    const bookError = () => find('#week dialog.book .error');
+    const anyway = () => find('#week dialog.book .anyway');
+    const force = () => find<HTMLButtonElement>('#week dialog.book .force');
+    const shown = (element: Element) => [...element.querySelectorAll<HTMLElement>('span')].filter((part) => !part.hidden).map((part) => part.textContent).join('');
+    const FULL = 'This time is full: there is no place left.';
+    const ALICE_AND_BOB: ListUsersState = { status: 'success', users: [{ username: 'alice' }, { username: 'bob' }] as never };
+    // What the Administrator sends for the full slot, 09:00–10:00 in Rome, for alice.
+    const SLOT_BODY = { start: '2026-11-16T08:00:00.000Z', end: '2026-11-16T09:00:00.000Z', username: 'alice', note: 'Extra' };
+    const taken = { status: 'failure' as const, reason: 'slot_taken' as const, message: 'x' };
+
+    // Monday: a slot with places left, a full one, and a group of four at 14:00.
+    const GROUP: GroupBlock = {
+      ...at('60%', '10%', '14:00–15:00'),
+      what: '4 people · Swimming Pool',
+      when: 'Mon 16 Nov, 14:00–15:00',
+      colour: 5,
+      beside: false,
+      rows: [
+        { appointmentId: APPOINTMENT, time: '14:00–15:00', who: 'alice' },
+        { appointmentId: OTHER_APPOINTMENT, time: '14:00–15:00', who: SCRIPT },
+        { appointmentId: 'appt-c', time: '14:15–15:00', who: 'carol' },
+        { appointmentId: 'appt-d', time: '14:30–15:00', who: 'dan' },
+      ],
+    };
+    const CAPACITY: WeekModel = {
+      ...WEEK,
+      days: [
+        day('2026-11-16', 'Mon 16 Nov', {
+          slots: [
+            slot(at('0%', '10%', '08:00–09:00'), 5, { places: '2 of 3 places left', typeName: 'Swimming Pool' }),
+            slot(at('10%', '10%', '09:00–10:00'), 5, { places: 'Full', full: true, start: '2026-11-16T08:00:00.000Z', end: '2026-11-16T09:00:00.000Z' }),
+          ],
+          appointments: [
+            { ...at('30%', '10%', '11:00–12:00', 0, 3), appointmentId: 'appt-x', who: 'erin', typeName: 'Swimming Pool', note: '', colour: 5, beside: false },
+            { ...at('30%', '10%', '11:00–12:00', 1, 3), appointmentId: 'appt-y', who: 'fred', typeName: 'Swimming Pool', note: '', colour: 5, beside: false },
+            { ...at('30%', '10%', '11:00–12:00', 2, 3), appointmentId: 'appt-z', who: 'gina', typeName: 'Swimming Pool', note: '', colour: 5, beside: false },
+          ],
+          groups: [GROUP],
+        }),
+      ],
+    };
+    const slots = () => all('.slot') as HTMLButtonElement[];
+    const group = () => find<HTMLDialogElement>('#week dialog.group');
+    const groupBlock = () => find<HTMLButtonElement>('#week .group');
+
+    // The Administrator's book dialog on a slot, the list of Users loaded, a note typed, "Book".
+    const asked = (index = 1) => {
+      const view = mounted(state({ week: CAPACITY }), 'admin');
+      slots()[index]!.click();
+      view.listUsersState$.next(ALICE_AND_BOB);
+      find<HTMLTextAreaElement>('#week dialog.book [name="note"]').value = 'Extra';
+      submit(bookForm());
+      return view;
+    };
+
+    describe('the places of a slot', () => {
+      it('a slot says its places beside its time; a full one says "Full" and is marked apart; both are named with their day', () => {
+        mounted(state({ week: CAPACITY }), 'admin');
+        expect(slots().map((button) => [button.textContent, button.classList.contains('full'), button.getAttribute('aria-label')])).toEqual([
+          ['08:00–09:00 2 of 3 places left', false, 'Mon 16 Nov 08:00–09:00 2 of 3 places left'],
+          ['09:00–10:00 Full', true, 'Mon 16 Nov 09:00–10:00 Full'],
+        ]);
+      });
+
+      it('a full slot opens the book dialog like a free one', () => {
+        mounted(state({ week: CAPACITY }), 'admin');
+        slots()[1]!.click();
+        expect([book().open, find('#week dialog.book .what').textContent]).toEqual([true, 'Mon 16 Nov, 09:00–10:00 · Studio']);
+      });
+
+      it('a slot that appointments overlap is a tab with its short text, named in full; an appointment and a group beside it are marked to leave it room', () => {
+        const besides: WeekModel = {
+          ...CAPACITY,
+          days: [
+            {
+              ...CAPACITY.days[0]!,
+              slots: [slot(at('30%', '10%', '11:00–12:00'), 5, { places: 'Full', full: true, tab: 'Full' }), slot(at('60%', '10%', '14:00–15:00'), 5, { places: '1 of 3 places left', tab: '1 left' })],
+              appointments: CAPACITY.days[0]!.appointments.map((a) => ({ ...a, beside: true })),
+              groups: [{ ...GROUP, beside: true }],
+            },
+          ],
+        };
+        mounted(state({ week: besides }), 'admin');
+        expect(slots().map((button) => [button.querySelector('.places')!.textContent, button.classList.contains('tab'), button.classList.contains('full'), button.getAttribute('aria-label')])).toEqual([
+          ['Full', true, true, 'Mon 16 Nov 11:00–12:00 Full'],
+          ['1 left', true, false, 'Mon 16 Nov 14:00–15:00 1 of 3 places left'],
+        ]);
+        expect(all('.appointment').map((button) => button.classList.contains('beside'))).toEqual([true, true, true, true]);
+        slots()[0]!.click();
+        expect(book().open).toBe(true);
+      });
+
+      it('a slot drawn whole is no tab, and the blocks are not marked', () => {
+        mounted(state({ week: CAPACITY }), 'admin');
+        expect([...slots(), ...all('.appointment')].some((element) => element.classList.contains('tab') || element.classList.contains('beside'))).toBe(false);
+      });
+
+      it('a slot of capacity one says "free", as the page always did', () => {
+        mounted(state({ week: WEEK }));
+        expect(slots()[0]!.textContent).toBe('08:00–09:00 free');
+      });
+    });
+
+    describe('"Book anyway" (R-BOOK-13)', () => {
+      it('the Administrator refused because the time is full: the dialog stays open with the sentence and the offer', () => {
+        const { bookState$, screen } = asked();
+        bookState$.next({ status: 'pending', booking: SLOT_BODY });
+        bookState$.next(taken);
+        expect([book().open, bookError().textContent, anyway().hidden, shown(anyway().querySelector('p')!), shown(force())]).toEqual([true, FULL, false, 'Book anyway, over the capacity?', 'Book anyway']);
+        // The screen was asked for the words with what the dialog sent.
+        expect(screen.refusal).toHaveBeenLastCalledWith('slot_taken', {
+          slot: CAPACITY.days[0]!.slots[1],
+          zone: 'Europe/Rome',
+          fields: { note: 'Extra', username: 'alice', start: '09:00', end: '10:00' },
+          moving: null,
+        });
+      });
+
+      it('"Book anyway" sends the same booking again with overbook: true; a success closes the dialog', () => {
+        const { bookState$, appointments } = asked();
+        bookState$.next(taken);
+        force().click();
+        expect(appointments.book.mock.calls).toEqual([[SLOT_BODY], [{ ...SLOT_BODY, overbook: true }]]);
+        bookState$.next({ status: 'pending', booking: { ...SLOT_BODY, overbook: true } });
+        expect([bookError().textContent, anyway().hidden, force().disabled]).toEqual(['', true, true]);
+        bookState$.next(booked());
+        expect(book().open).toBe(false);
+      });
+
+      it('changing anything in the dialog hides the offer: it is for the request refused only', () => {
+        const { bookState$ } = asked();
+        for (const change of [
+          () => find('#week dialog.book [name="note"]').dispatchEvent(new Event('input', { bubbles: true })),
+          () => find('#week dialog.book [name="start"]').dispatchEvent(new Event('change', { bubbles: true })),
+          () => find('#week dialog.book [name="username"]').dispatchEvent(new Event('change', { bubbles: true })),
+        ]) {
+          bookState$.next(taken);
+          expect(anyway().hidden).toBe(false);
+          change();
+          expect(anyway().hidden).toBe(true);
+        }
+        // The sentence stays: the time asked was full.
+        expect(bookError().textContent).toBe(FULL);
+      });
+
+      it('a new opening shows no offer', () => {
+        const { bookState$ } = asked();
+        bookState$.next(taken);
+        book().close();
+        slots()[0]!.click();
+        expect([anyway().hidden, bookError().textContent]).toEqual([true, '']);
+      });
+
+      it('a User refused because the time is full gets the sentence of every page, and no offer', () => {
+        const { bookState$ } = mounted(state({ week: CAPACITY }));
+        slots()[0]!.click();
+        submit(bookForm());
+        bookState$.next(taken);
+        expect([bookError().textContent, anyway().hidden]).toEqual(['This time is full: there is no place left. The calendar has been refreshed: please choose another time.', true]);
+      });
+
+      it('user_busy is said in the words the screen chooses, the appointment named, and nothing is offered (R-BOOK-12)', () => {
+        const { bookState$, screen } = asked();
+        screen.refusal.mockReturnValueOnce({ text: 'alice already has an appointment at this time (09:15–10:00 · Studio).', offer: false });
+        bookState$.next({ status: 'failure', reason: 'user_busy', message: 'x' });
+        expect([bookError().textContent, anyway().hidden]).toEqual(['alice already has an appointment at this time (09:15–10:00 · Studio).', true]);
+        expect(screen.refusal.mock.lastCall![0]).toBe('user_busy');
+      });
+
+      it('in a change: "Change anyway" sends the same change again with overbook: true', () => {
+        const view = mounted(state({ week: CAPACITY }), 'admin');
+        const moved: Moving = { appointmentId: APPOINTMENT, when: 'Mon 16 Nov, 11:00–12:15', what: 'Mon 16 Nov, 11:00–12:15 · Studio · alice', who: 'alice', note: '' };
+        view.week$.next(state({ week: CAPACITY, moving: moved }));
+        slots()[1]!.click();
+        submit(bookForm());
+        view.changeState$.next(taken);
+        expect([bookError().textContent, anyway().hidden, shown(anyway().querySelector('p')!), shown(force())]).toEqual([FULL, false, 'Change anyway, over the capacity?', 'Change anyway']);
+        expect(view.screen.refusal.mock.lastCall![1].moving).toBe(moved);
+        force().click();
+        const body = { start: '2026-11-16T08:00:00.000Z', end: '2026-11-16T09:00:00.000Z', note: '' };
+        expect(view.appointments.change.mock.calls).toEqual([[APPOINTMENT, body], [APPOINTMENT, { ...body, overbook: true }]]);
+        view.changeState$.next({ status: 'pending', appointmentId: APPOINTMENT, change: { ...body, overbook: true } });
+        expect(force().disabled).toBe(true);
+        view.changeState$.next(changed());
+        expect(book().open).toBe(false);
+      });
+    });
+
+    describe('the Administrator\'s appointments at the same time', () => {
+      it('three side by side, each in its column', () => {
+        mounted(state({ week: CAPACITY }), 'admin');
+        expect((all('.appointment:not(.group)') as HTMLButtonElement[]).map((button) => [button.querySelector('.who')!.textContent, [...button.classList].find((name) => name.startsWith('lane-'))])).toEqual([
+          ['erin', 'lane-0-of-3'],
+          ['fred', 'lane-1-of-3'],
+          ['gina', 'lane-2-of-3'],
+        ]);
+      });
+
+      it('four or more are one block: its time and "4 people · Swimming Pool", the type\'s colour, named with its day', () => {
+        mounted(state({ week: CAPACITY }), 'admin');
+        const block = groupBlock();
+        expect([block.tagName, block.textContent, block.classList.contains('type-5'), block.classList.contains('appointment'), block.style.top, block.getAttribute('aria-label')]).toEqual([
+          'BUTTON',
+          '14:00–15:00 4 people · Swimming Pool',
+          true,
+          true,
+          '60%',
+          'Mon 16 Nov 14:00–15:00 4 people · Swimming Pool',
+        ]);
+        expect(group().open).toBe(false);
+      });
+
+      it('the block opens the list: its heading, its time, one row per appointment with its time and its User; a name with <script> stays text', () => {
+        mounted(state({ week: CAPACITY }), 'admin');
+        groupBlock().click();
+        expect([group().open, find('#week dialog.group .what').textContent, find('#week dialog.group .when').textContent]).toEqual([true, '4 people · Swimming Pool', 'Mon 16 Nov, 14:00–15:00']);
+        const rows = all('dialog.group .people li');
+        expect(rows.map((row) => [row.querySelector('.time')!.textContent, row.querySelector('.who')!.textContent])).toEqual(GROUP.rows.map((row) => [row.time, row.who]));
+        expect(rows[1]!.querySelector('.who')!.children).toHaveLength(0);
+      });
+
+      it('a row closes the list and opens the appointment\'s detail, as a block does', () => {
+        const { screen } = mounted(state({ week: CAPACITY }), 'admin');
+        groupBlock().click();
+        all('dialog.group .person')[0]!.click();
+        expect(group().open).toBe(false);
+        expect(screen.detail).toHaveBeenLastCalledWith(APPOINTMENT);
+        expect(find<HTMLDialogElement>('dialog.detail').open).toBe(true);
+      });
+
+      it('opened again, the list holds only the rows of the block pressed; "Close" closes it with no call', () => {
+        const { screen } = mounted(state({ week: CAPACITY }), 'admin');
+        groupBlock().click();
+        find('#week dialog.group .close').click();
+        expect(group().open).toBe(false);
+        groupBlock().click();
+        expect(all('dialog.group .people li')).toHaveLength(4);
+        expect(screen.detail).not.toHaveBeenCalled();
+      });
+
+      it('while an appointment is being moved the block cannot be pressed, like every appointment', () => {
+        const view = mounted(state({ week: CAPACITY }), 'admin');
+        view.week$.next(state({ week: CAPACITY, moving: { appointmentId: 'appt-x', when: 'w', what: 'w', who: 'erin', note: '' } }));
+        expect(groupBlock().disabled).toBe(true);
+      });
+
+      it('leaving the view closes the list and empties it: the page as index.html has it', () => {
+        const before = html();
+        const { subscription } = mounted(state({ week: CAPACITY }), 'admin');
+        groupBlock().click();
+        slots()[1]!.click();
+        subscription.unsubscribe();
+        expect([group().open, all('dialog.group li').length, find('#week dialog.group .what').textContent, anyway().hidden]).toEqual([false, 0, '', true]);
+        expect(html()).toBe(before);
       });
     });
   });

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v21 — **the password screen built** (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3, brief `prompts/e05-step-p3-implementation.md`): a sixth screen, "Password", last for both roles (section 6), its logic in section 5.1, the login's "Password changed" and the reaction of the shell to a change (section 6), the bundle's fourth constant (section 12.1); walked against the local stack (`docs/FRONTEND_WALK.md` section 9). v20 — the view layer **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12, walked at step c13 on 2026-11-23); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`), **written** (`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21, brief `prompts/94-step-70-implementation.md`: the template, the deploy command and its gate) **and deployed** (step 72, 2026-11-21, brief `prompts/96-step-72-implementation.md`): the stack `shared-calendar-web` exists and the page is in use at the address of its output `PageUrl`; section 13 says what is built and deployed, with how each thing was seen. `docs/FRONTEND_DEPLOY_PLAN.md` is done (its step 73, 2026-11-21, brief `prompts/97-step-73-implementation.md`), **with checks at the deployed page still owed**: a refresh with the revoked token refused by the real Cognito, a session renewed after its fifteen minutes, "Sign out" with the network off, a reload and the console, and the rest of the walk with the phone width (the open items of `docs/RUNBOOK.md` section 5.5); **logout is built** (step 71, 2026-11-21, brief `prompts/95-step-71-implementation.md`: `docs/FRONTEND_SERVICES.md` v8, section 20; here sections 6 and 13.7), proven against the local stack, and at the deployed page as far as the revocation answered 200. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it **Not yet in line with the capacity of a type** (`docs/SHARED_CALENDAR_SPEC.md` v17, decisions D24 to D31): this document changes for it in step u5 of `docs/CAPACITY_PLAN.md`, and until then says nothing of a type's capacity, of `overbook` or of a slot's places left. |
+| Status | v22 — **the capacity of a type on the screens** (2026-11-24, `docs/CAPACITY_PLAN.md` step u5, brief `prompts/e15-step-u5-implementation.md`): a slot's places, the Administrator's full slot and a slot under appointments as a tab beside them, the Administrator's overlapping appointments side by side or as one block with its list, "Book anyway" after `slot_taken`, the `user_busy` sentences that name the appointment in the way, a type's capacity in the form and in the dialog "Edit type" (sections 4, 5.1 and 11); walked against the local stack (`docs/FRONTEND_WALK.md` section 10). v21 — **the password screen built** (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3, brief `prompts/e05-step-p3-implementation.md`): a sixth screen, "Password", last for both roles (section 6), its logic in section 5.1, the login's "Password changed" and the reaction of the shell to a change (section 6), the bundle's fourth constant (section 12.1); walked against the local stack (`docs/FRONTEND_WALK.md` section 9). v20 — the view layer **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12, walked at step c13 on 2026-11-23); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`), **written** (`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21, brief `prompts/94-step-70-implementation.md`: the template, the deploy command and its gate) **and deployed** (step 72, 2026-11-21, brief `prompts/96-step-72-implementation.md`): the stack `shared-calendar-web` exists and the page is in use at the address of its output `PageUrl`; section 13 says what is built and deployed, with how each thing was seen. `docs/FRONTEND_DEPLOY_PLAN.md` is done (its step 73, 2026-11-21, brief `prompts/97-step-73-implementation.md`), **with checks at the deployed page still owed**: a refresh with the revoked token refused by the real Cognito, a session renewed after its fifteen minutes, "Sign out" with the network off, a reload and the console, and the rest of the walk with the phone width (the open items of `docs/RUNBOOK.md` section 5.5); **logout is built** (step 71, 2026-11-21, brief `prompts/95-step-71-implementation.md`: `docs/FRONTEND_SERVICES.md` v8, section 20; here sections 6 and 13.7), proven against the local stack, and at the deployed page as far as the revocation answered 200. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it. |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders; and, since v13, how the page is hosted and deployed (section 13) |
 | Not in scope | Keeping the session across a reload, the size of the bundle, a domain of our own: open points of section 10, none of which blocked the deployment. The design of the logout service: it is `docs/FRONTEND_SERVICES.md` section 20; section 13.7 here keeps the direction and what follows from it for the page |
 | Depends on | `docs/FRONTEND_SERVICES.md` v9 (the services the views use, the sign-out and the assistant among them), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work of the views), `docs/FRONTEND_DEPLOY_PLAN.md` (the order of work of the hosting) |
@@ -36,6 +36,7 @@
 | v19 | 2026-11-22 | Step c12 of `docs/CONVERSATIONAL_PLAN.md`: the assistant's panel, a view that is no screen and lives across the screens, as the Product Owner decided. New section 6.1: what the panel is, what the shell does for it, its logic object and its view, how the screens are told to load again, what its tests hold. Section 5.1: two files more, `assistant.model.ts` and `assistant.screen.ts`. Section 6, point 4: the session's objects include the `AssistantService` and the `AssistantScreen`, and the screens are handed one stream to load again on. Section 9: the new files. Section 11: decisions 159 to 172. The numbers of section 7.1 are those of plan step 69 and are not measured again; the panel's are in section 6.1 |
 | v20 | 2026-11-23 | Step c13 of `docs/CONVERSATIONAL_PLAN.md`: the walk with the assistant's panel (`docs/FRONTEND_WALK.md` v3). Section 6.1: after a message that got one of the two `503` answers the conversation is read once and not continued (decision 172, rewritten as what was done); the conversation stays scrolled to its end when a proposal or a line appears under it; the heading's arrow has no words for a screen reader. Section 8: the panel's rows after the table of the dialogs, and the order a date is typed in. Decisions 173 and 174. |
 | v21 | 2026-11-23 | `docs/CHANGE_PASSWORD_PLAN.md` step p3 (brief `prompts/e05-step-p3-implementation.md`): the password screen. Section 5.1: twenty files (`password.model.ts` and `password.screen.ts` are new), the sentences of `texts.ts` for the new password's conditions and the screen. Section 6: the sixth entry of `SCREENS`, `#/password`, "Password", both roles, last; the `ChangePasswordService` and the `PasswordScreen` among a session's objects; the shell's reaction to a change (the page-wide services put back, the login's notice) and the sequence of a change; `mountShell` takes `pageWide`. Section 9: the tree. Section 12.1: the fourth constant, `SKIP_GLOBAL_SIGN_OUT`. Section 11: decision 16 amended, decisions 175 to 183. The service changed with it: `docs/FRONTEND_SERVICES.md` v11, decision 69 (the success before the store is cleared). |
+| v22 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u5 (brief `prompts/e15-step-u5-implementation.md`), with the Product Owner's four decisions and one found in the walk: the capacity of a type on the screens. Section 4: the slot's template says its places; a slot that appointments overlap is a tab beside them; the group block and its list dialog, `dialog.group`; "Book anyway" in the book dialog; the types' form and the dialog "Edit type" gain the capacity. Section 5.1: `week.model.ts` (places, `full`, `tab`, `beside`, the columns and the groups), `booking.ts` (`overbook`, `inTheWay`, `refusalOf`), `availability.model.ts` (`TypeFields`, `typeFor`), `texts.ts` (`failureText` told who attempted), `Moving.who`, `WeekScreen.refusal`; the lanes paragraph widened to the Administrator's overlapping appointments; the Administrator's sentence of `user_busy`. Section 8: the table of where the keyboard is. Section 11: decisions 184 to 193. |
 | v20, note | 2026-11-23 | The branch `deploy-frontend` merged into `main`, where the assistant's panel had been written at the same time. The panel's two versions, first numbered v13 and v14, are v19 and v20, after the hosting's v13 to v18; its decisions, first numbered 138 to 153, are 159 to 174, after the hosting's 138 to 158; every reference to them was changed with them. The status row says both. No other text changed. |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
@@ -245,7 +246,7 @@ const copy = <T extends HTMLElement = HTMLElement>(id: string) =>
 
 ```html
 <template id="tpl-slot">
-  <button type="button" class="block slot"><span class="time"></span> free</button>
+  <button type="button" class="block slot"><span class="time"></span> <span class="places"></span></button>
 </template>
 ```
 
@@ -262,25 +263,45 @@ const place = (id: string, block: Placed, colour?: number) => {
 const slotFor = (block: SlotBlock, timeZone: string) => {
   const element = place('tpl-slot', block, block.colour);
   element.querySelector('.time')!.textContent = block.time;
+  element.querySelector('.places')!.textContent = block.tab ?? block.places;
+  element.classList.toggle('full', block.full);
+  element.classList.toggle('tab', block.tab !== null);
+  element.setAttribute('aria-label', `${block.day} ${block.time} ${block.places}`);
   element.onclick = () => openBook(block, timeZone); // a click only opens a dialog
   return element;
 };
 ```
 
-The view does no arithmetic here: `top`, `height`, `time`, the lane and the colour's number
-arrive ready from the logic layer, and the style sheet says what a lane and a colour look like
-(`.lane-1-of-2`, `.type-3`).
+The view does no arithmetic here: `top`, `height`, `time`, the lane, the places and the colour's
+number arrive ready from the logic layer, and the style sheet says what a lane and a colour look
+like (`.lane-1-of-2`, `.type-3`).
 
 **The week's templates, as built** (`docs/FRONTEND_VIEW_PLAN.md` step 61), all inside the week's
 element `#week`: `tpl-day` (a heading and the day's body), `tpl-window`, `tpl-busy`, `tpl-slot`,
-`tpl-appointment`, two for the lists beside the days, `tpl-legend-item` and `tpl-hour`, and one
+`tpl-appointment`, `tpl-group` (the block of four or more of the Administrator's appointments
+that overlap) and `tpl-person` (a row of its list), two for the lists beside the days, `tpl-legend-item` and `tpl-hour`, and one
 for a choice of a list in the book dialog, `tpl-option`. The navigation's link has one too,
 `tpl-nav-link`, in the frame. A slot and an appointment are `<button type="button">` elements
 (`docs/FRONTEND_VIEW_PLAN.md` step 62): a keyboard reaches them. On the screen each shows its
 time, and its day is the column it stands in; a screen reader reaches a button without its
 column, so the view gives each a name (`aria-label`) made of the day's label and the button's
-own words: "Mon 23 Nov 09:00–10:00 free", "Mon 23 Nov 11:00–12:15 You First lesson". A window
-and a busy block stay plain elements. The
+own words: "Mon 23 Nov 09:00–10:00 free", "Mon 23 Nov 11:00–12:15 You First lesson"; a slot's
+name is its day, its time and its places in full, whatever it shows. A window and a busy block
+stay plain elements.
+
+**A type's capacity in the week** (`docs/SHARED_CALENDAR_SPEC.md` section 16.8). A slot says its
+places beside its time: "free" for a capacity of one, "2 of 3 places left" above. The
+Administrator's full slot says "Full", is grey and hatched, and opens the book dialog like any
+slot. A slot that the Administrator's appointments overlap would lie under them, out of reach of
+a click: it is drawn instead as a narrow tab at the right of its time, in front, with a short
+text read downwards ("Full", "2 left"), and the appointments and the group beside it leave the
+tab room (the classes `tab` and `beside`, from the model). In the Administrator's week,
+appointments that overlap stand side by side, up to three, by `lane` and `lanes`; four or more
+at their peak are one block, "4 people · Swimming Pool", which opens `dialog.group`: its heading,
+its day and time, and one row per appointment, its time and its User, by start. A row closes the
+list and opens the appointment's detail, as an appointment's block does. A User's week is drawn
+as before: a User's own appointments never overlap (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-12),
+and other people's time is a busy block. The
 number of hours shown is set on each day's body as
 the custom property `--hours`, so nothing the script sets stays on an element that outlives the
 week. The view redraws the days only when the stream brings another week object, not at every
@@ -292,28 +313,28 @@ book dialog is inside `#week`, the detail belongs to no screen, see "A dialog us
 views" below):
 
 ```ts
-// What the dialog is about, replaced at every opening; null until the first one. And whether
-// its action was asked for since it opened.
+// What the dialog is about, replaced at every opening; null until the first one. And what its
+// action sent since it opened, null until then.
 let booking: { slot: SlotBlock; zone: string } | null = null;
-let bookAsked = false;
+let asked: Asked | null = null;
 
 const openBook = (slot: SlotBlock, timeZone: string) => {
   bookForm.reset();              // opened a second time, it shows nothing of the first
   bookError.textContent = '';
   booking = { slot, zone: timeZone };
-  bookAsked = false;
+  asked = null;
   bookWhat.textContent = bookingText(slot);
   book.showModal();
 };                               // no handler of the close event: see "A close does nothing" below
 bookForm.onsubmit = (event) => {
   event.preventDefault();
-  bookAsked = true;
+  asked = { ...booking!, fields };
   appointments.book(bookingFor(booking!.slot, booking!.zone, role, fields));
 };
 appointments.bookState$.subscribe((state) => {
   bookSubmit.disabled = state.status === 'pending';
-  if (!bookAsked) return;        // not this opening's booking
-  bookError.textContent = state.status === 'failure' ? failureText(state.reason) : '';
+  if (asked === null) return;    // not this opening's booking
+  bookError.textContent = state.status === 'failure' ? screen.refusal(state.reason, asked).text : '';
   if (state.status === 'success') book.close();
 });
 ```
@@ -389,6 +410,15 @@ appointments.bookState$.subscribe((state) => {
   apart by that copy: a state of `bookState$` is shown only in a dialog that books, one of
   `changeState$` only in a dialog that confirms a change, so a call left under way by one mode
   never shows in the other. The button is disabled by the state of its own mode's call.
+- **"Book anyway"** (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-13). When the Administrator's booking
+  or change is refused with `slot_taken`, the dialog stays open with "This time is full: there
+  is no place left." and, under it, the fixed part `.anyway` of `index.html`: "Book anyway, over
+  the capacity?" and its button "Book anyway" (in a change "Change anyway, over the capacity?"
+  and "Change anyway", by the same `in-booking` and `in-change` marks). The button sends again
+  what was asked, the same fields, with `overbook: true`. Any `input` or `change` event in the
+  dialog's form hides the offer, which is for the request refused only; an opening hides it.
+  Whether to offer it is the logic layer's (`screen.refusal`): never to a User, never for
+  `user_busy`.
 - **A change's success only closes the dialog.** The banner goes because the week screen heard
   `changeResult$` and `week$` says so, not because the view did anything. After a refusal the
   dialog stays open with what was typed; closed, by "Close" or the Escape key, it leaves the
@@ -630,8 +660,9 @@ screen: a fixed form that creates, the failure of its read with "Try again", the
 an empty list, and the list. What is new:
 
 - **Creating is a fixed form, changing is a dialog.** A row holds buttons only (section 3,
-  rule 4): "Rename" and "Delete" for a type, "Change" and "Delete" for a pattern. "Rename" and
-  "Change" open a dialog filled with the row's values: `dialog.rename`, one name field, and
+  rule 4): "Edit" and "Delete" for a type, "Change" and "Delete" for a pattern. "Edit" and
+  "Change" open a dialog filled with the row's values: `dialog.rename`, titled "Edit type",
+  the name and the capacity, and
   `dialog.change`, the six fields of the form that creates a pattern, written a second time in
   `index.html`. Both are forms with "Close" before their action, as the book dialog is. A
   button of a row says which row it is of to a screen reader (`aria-label`, "Change Monday
@@ -645,6 +676,11 @@ an empty list, and the list. What is new:
   fault marked with its sentence under it, the failure, the appointments in the way. They set
   values and texts of elements found once; none builds a node. They are in the file the
   screen's two views share ("A screen with two views" below).
+- **A type's capacity** (`docs/SHARED_CALENDAR_SPEC.md` section 6.1) is a number field beside
+  the name, in the form that creates (filled with 1) and in "Edit type" (filled with the
+  type's own); both always send it. Its hint, under it, says the bounds in words ("How many
+  people at the same time: a whole number from 1 to 100."), and its refusal is that sentence.
+  A type's row says "· 3 places" beside its name for a capacity above one, nothing for one.
 - **A pattern's six fields**: "Weekday", "Start", "End" and "Type" are native lists, "Valid
   from" and "Valid until" native date fields; "Valid until" says under it "Leave empty for no
   end." The choices of the weekday and of the two times are fixed, and the script sets them
@@ -845,9 +881,9 @@ step p3 for the password's two), each with its test in
 | File | What it holds |
 |---|---|
 | `texts.ts` | Pure functions: a date (`dateText`, "Mon 16 Nov"), a time (`timeText`, "09:00"), a range (`rangeText`, "09:00–10:00"), a date with a time (`dateTimeText`, "Mon 23 Nov, 10:00"), a date with its year (`longDateText`, "20 November 2026"), a week's label (`weekLabel`, "16 Nov – 22 Nov 2026"), a UTC offset (`offsetText`, "+02:00"), whether a day's offset changes (`offsetChangesOn`), a failure in plain words (`failureText`); and the words of the password screen: one sentence per condition a new password can miss (`PASSWORD_PROBLEM_TEXT`, with the shared rule's numbers and its 32 symbols) and the screen's other sentences, "Password changed" among them (`PASSWORD_TEXTS`) |
-| `week.model.ts` | Pure: `weekModel(view, role)`, a `CalendarView` in, the week ready to draw out |
-| `booking.ts` | Pure, for the book dialog: what is booked in words (`bookingText`), the times the Administrator may choose (`timeChoice`), the Users to choose from (`userChoice`), and from what the dialog holds to the argument of `AppointmentsService.book` (`bookingFor`) or, when it confirms a change, of `AppointmentsService.change` (`changeFor`) |
-| `appointment.detail.ts` | Pure: `appointmentDetail(appointment, role, now, zone)`, an `Appointment` in, what the detail dialog shows out, with which of its three actions are offered (the note, "Change", "Cancel appointment"), the note as a text and as a field's value, and the sentence about them; `movingOf(detail, role)`, an appointment being moved, in the words of the banner and of the confirmation |
+| `week.model.ts` | Pure: `weekModel(view, role)`, a `CalendarView` in, the week ready to draw out; a slot's places in words (`placesOf`) |
+| `booking.ts` | Pure, for the book dialog: what is booked in words (`bookingText`), the times the Administrator may choose (`timeChoice`), the Users to choose from (`userChoice`), and from what the dialog holds to the argument of `AppointmentsService.book` (`bookingFor`) or, when it confirms a change, of `AppointmentsService.change` (`changeFor`), each with `overbook: true` when asked; what a refusal says in the dialog and whether it offers "Book anyway" (`refusalOf`, with `FULL_FOR_ADMIN`), and the appointment of the shown week in the way of a `user_busy` (`inTheWay`) |
+| `appointment.detail.ts` | Pure: `appointmentDetail(appointment, role, now, zone)`, an `Appointment` in, what the detail dialog shows out, with which of its three actions are offered (the note, "Change", "Cancel appointment"), the note as a text and as a field's value, and the sentence about them; `movingOf(detail, role)`, an appointment being moved, in the words of the banner and of the confirmation, with whose it is (`who`: the User's name for the Administrator, "You" for a User) |
 | `week.screen.ts` | The class `WeekScreen`: which week is on screen, its loads and reloads, the detail of one of its appointments, and the appointment being moved to another time, one of its own or one handed over by the list screen |
 | `appointments.model.ts` | Pure, for "My appointments": `appointmentRows(appointments, now, zone)`, the list ready to draw (date, time, type, note, and the status in words); the two sentences of an empty list (`emptyText`); the period the history opens on (`defaultPeriod`) and the period's own checks (`periodRefusal`) |
 | `appointments.screen.ts` | The class `AppointmentsScreen`: which of the two lists is on show, the period of the history, the time zone read from the settings, the loads and reloads, the detail of one of its appointments, and the hand-over of one to the week screen |
@@ -855,7 +891,7 @@ step p3 for the password's two), each with its test in
 | `settings.screen.ts` | The class `SettingsScreen`: the settings read when the screen is shown, the save with its checks, and the read that follows every save |
 | `users.model.ts` | Pure, for the users screen: the list ready to draw (`userRows`: the username, and whom its "Delete" button deletes), the sentence of an empty list (`NO_USERS`), what a username is in words (`USERNAME_HINT`), from what the field holds to the username to create or to the refusal (`usernameFor`), and the words of the dialog that confirms a deletion (`deleteQuestion`) |
 | `users.screen.ts` | The class `UsersScreen`: the list read when the screen is shown, a create with its check, and the list read again after every create and delete and when the page becomes visible |
-| `availability.model.ts` | Pure, for the availability screen. The types: the list ready to draw (`typeRows`), the sentence of an empty list (`NO_TYPES`), what a name is in words (`TYPE_NAME_HINT`), from what the field holds to the name or to the refusal (`typeNameFor`), the question before a deletion (`deleteTypeQuestion`). The patterns: the choices of the form's lists (`WEEKDAY_CHOICES`, `START_CHOICES`, `END_CHOICES`, `typeChoices`), what the form starts with (`startingFields`), the fields of an existing pattern (`patternFields`), from what the form holds to the body or to the refusals (`patternFor`), the list grouped by weekday and ready to draw (`patternGroups`), the question before a deletion (`deletePatternQuestion`) |
+| `availability.model.ts` | Pure, for the availability screen. The types: the list ready to draw (`typeRows`, with "· 3 places" and the fields "Edit type" opens with), the sentence of an empty list (`NO_TYPES`), what a name and a capacity are in words (`TYPE_NAME_HINT`, `TYPE_CAPACITY_HINT`), what the form starts with (`STARTING_TYPE`), from what the field holds to the name or to the refusal (`typeNameFor`), from the two fields to the type or to the refusals (`typeFor`), the question before a deletion (`deleteTypeQuestion`). The patterns: the choices of the form's lists (`WEEKDAY_CHOICES`, `START_CHOICES`, `END_CHOICES`, `typeChoices`), what the form starts with (`startingFields`), the fields of an existing pattern (`patternFields`), from what the form holds to the body or to the refusals (`patternFor`), the list grouped by weekday and ready to draw (`patternGroups`), the question before a deletion (`deletePatternQuestion`) |
 | `conflicts.ts` | Pure: `conflictList(conflicts, zone)`, the appointments in the way of a refused change of availability, ready to draw, with the sentence that counts them |
 | `availability.screen.ts` | The class `AvailabilityScreen`: the settings (for the time zone), the types and the patterns read when the screen is shown, the four writes that have a check, and the lists read again after every write and when the page becomes visible; and `known$`, what it knows, for the object of a single date |
 | `date.model.ts` | Pure, for a single date: the date chosen checked (`dateFor`), a date in words (`dateWords`), the day as the weekly patterns give it and as it is now, with the three questions of the dialog (`dayModel`), the windows "this day only" starts from (`startingWindows`), those windows ready to draw (`draftModel`), one more of them or why not (`draftAdd`), and an extra window's body from its form (`windowFor`) |
@@ -902,6 +938,15 @@ changed.
   each half the width, the earlier on the left: the model says `lane` 0 or 1 of `lanes` 2, the
   view applies it as a class. Blocks of different kinds in that place are not moved apart: an
   appointment in one of the two hours covers a free slot in the other.
+- One placement serves that night and the Administrator's appointments that overlap
+  (`columnsOf`): the blocks of a kind, taken by their clock time and then by their real start,
+  are chained while one starts before the latest end so far (`[start, end)`: touching blocks
+  are not chained); each takes the leftmost column free at its start, and every block of a
+  chain says the chain's number of columns, which is its peak. A chain of 10:00–10:30,
+  10:15–10:45, 10:30–11:00 and 10:45–11:15 is two columns. The style sheet has the classes for
+  two and three; a chain of the Administrator's appointments with four columns or more becomes
+  one group block (below). On the night the clocks go back a chain and its peak are taken on
+  the clock, so the repeated hour keeps its two lanes in the same model.
 - The night the clocks go forward needs nothing: no block exists in the missing hour, and a slot
   across it is two hours tall on the clock, as `docs/SHARED_CALENDAR_SPEC.md` R-TIME-03 has it.
 
@@ -920,13 +965,26 @@ an appointment carries its `appointmentId`. The window is the whole stretch of t
 two windows that touch and share a type count as one, through `shared/`'s `effectiveWindows`
 (`docs/SHARED_CALENDAR_SPEC.md` section 6.6).
 
+The capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` R-SLOT-02 to R-SLOT-04 and section 16.8):
+a slot carries `places` ("free" for a capacity of one, "2 of 3 places left" above, "Full" at
+no place left, which only the Administrator is sent) and `full`; and `tab`, null for a slot
+drawn whole, or the short text of a slot that appointments overlap on the clock ("Full",
+"2 left"), drawn as a tab beside them. An appointment and a group carry `beside`, true when a
+slot of the day overlaps them, so that they leave the tab room. For the Administrator, a chain
+of appointments whose peak is more than three (`SIDE_BY_SIDE`) is one `GroupBlock` over the
+chain's span on the clock, in `groups` and no longer in `appointments`: its time from the
+earliest start to the latest end, "N people · <type>" (the type of the earliest: windows of
+one date never overlap, `docs/SHARED_CALENDAR_SPEC.md` R-AV-01), its heading with the day, and
+its rows by start, each with the time, the User and the `appointmentId` the detail opens with.
+A User is never grouped.
+
 **The week screen:**
 
 ```ts
 // The last week loaded stays in `week` while another loads or fails. `moving` is the
 // appointment being moved to another time, in words, or null.
 export type WeekState = { label: string; loading: boolean; failure: string | null; week: WeekModel | null; moving: Moving | null };
-export type Moving = { appointmentId: string; when: string; what: string; note: string };
+export type Moving = { appointmentId: string; when: string; what: string; who: string; note: string };
 
 export class WeekScreen {
   readonly week$: Observable<WeekState>;
@@ -946,12 +1004,15 @@ export class WeekScreen {
   move(appointmentId: string): void { … } // starts the move of an appointment of the week on screen
   handOver(moving: Moving, date: string): void { … } // another screen's appointment to move
   keep(): void { … }                      // ends it, leaving the appointment as it is
+  refusal(reason: string, asked: Asked): Refusal { … } // what a refused booking or change says
 }
 ```
 
 The view subscribes to `week$` and forwards three buttons to `previous()`, `today()` and
 `next()`, "Change" to `move(…)` and the banner's button to `keep()`. It knows nothing of
-Mondays, of loads, or of what ends a move.
+Mondays, of loads, or of what ends a move. A refused booking or change is put in words by
+`refusal(reason, asked)`, with the role and the appointments of the week last loaded: the
+`refusalOf` of `booking.ts`.
 
 - A change of week loads at once. While it loads, the last week stays, with `loading` true and
   the new label, in one notification.
@@ -1279,7 +1340,7 @@ export type Ask<F extends string> = {
 
 // `types` and `groups` are the two lists as last read: null until there is one and after a
 // read that failed, and another object only when what was read differs from what is on show.
-// `choices` are the types to choose from in the two pattern forms. `typeField` and
+// `choices` are the types to choose from in the two pattern forms. `typeFields` and
 // `patternFields` are what the two forms that create are filled with: another object only
 // when the form is to be filled again.
 export type AvailabilityState = {
@@ -1287,8 +1348,8 @@ export type AvailabilityState = {
   typesUnread: string | null; types: readonly TypeRow[] | null; typesEmpty: string | null;
   patternsUnread: string | null; groups: readonly PatternGroup[] | null; patternsEmpty: string | null;
   choices: readonly Choice[]; typeHint: string;
-  typeField: { name: string }; patternFields: PatternFields;
-  typeCreate: Ask<'name'>; rename: Ask<'name'>; patternCreate: Ask<PatternField>; change: Ask<PatternField>;
+  typeFields: TypeFields; patternFields: PatternFields;
+  typeCreate: Ask<keyof TypeFields>; rename: Ask<keyof TypeFields>; patternCreate: Ask<PatternField>; change: Ask<PatternField>;
 };
 
 export class AvailabilityScreen {
@@ -1300,8 +1361,8 @@ export class AvailabilityScreen {
   start(): Subscription { … }                    // reads the settings, the types and the patterns
   retryTypes(): void { … }                       // reads the types again, after a read that failed
   retryPatterns(): void { … }                    // the patterns, and the settings while the zone is not known
-  createType(text: string): void { … }           // checks the name; creates, or says why not
-  rename(typeId: string, text: string): void { … }
+  createType(fields: TypeFields): void { … }     // checks the name and the capacity; creates, or says why not
+  rename(typeId: string, fields: TypeFields): void { … } // "Edit type": the name and the capacity
   createPattern(fields: PatternFields): void { … } // checks the six fields; creates, or says which are in fault
   change(patternId: string, fields: PatternFields): void { … } // one call that replaces the pattern's fields
   conflicts(conflicts: readonly AppointmentConflict[] | undefined): ConflictList | null { … }
@@ -1327,7 +1388,8 @@ export class AvailabilityScreen {
   as data), so the view redraws nothing and the keyboard stays on a row's button; a dialog
   that is open is left as it is in every case.
 - **A type's rows** (`typeRows`): the name, in the server's order (by name), and the names of
-  its two buttons for a screen reader ("Rename Studio", "Delete Studio").
+  its two buttons for a screen reader ("Edit Studio", "Delete Studio"), "· 3 places" for a
+  capacity above one, and the fields "Edit type" opens with.
 - **A pattern's rows** (`patternGroups`): one group per weekday, Monday to Sunday, a weekday
   with no pattern left out; in a group by start, then by end, then by the first date of
   validity. A row has its hours ("09:00 – 13:00"; an end at midnight is "24:00"), the name of
@@ -1349,6 +1411,11 @@ export class AvailabilityScreen {
   its capitals, and the limit of types are the server's to say: the form's failure, the field
   not marked. The page never compares a name with the list on show. A rename to the same name
   is sent as it is.
+- **A type's capacity is checked with its name** (`typeFor`): digits only, spaces around them
+  aside, within `TYPE_CAPACITY` of `shared/` (1 to 100), so that 0, 101, 2.5, an empty field
+  and a text are refused with one sentence, the hint under the field (`TYPE_CAPACITY_HINT`).
+  A name and a capacity both in fault are both said. Both are always sent, at a create and at
+  an edit: the field starts at 1 and "Edit type" opens with the type's own.
 - **A pattern's fields are checked here, before any call** (`patternFor`). The refusals: "End
   must be later than Start."; "Type must be chosen."; "Valid from must be a date."; "Valid
   until must be a date, or left empty."; "Valid until must not be before Valid from." Every
@@ -1596,8 +1663,18 @@ longer exists." The sentence of `slot_taken`, "This time is full: there is no pl
 calendar has been refreshed: please choose another time.", holds for a capacity of one place or
 more, and says that the calendar has been refreshed, which the reload above makes true.
 `user_busy` (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-12) is "You already have an appointment at
-this time. To move it, change that appointment instead.", the same for both roles until the
-screens tell the Administrator's attempt apart (`docs/CAPACITY_PLAN.md` step u5). `invalid_request` has one
+this time. To move it, change that appointment instead." for a User and "This User already has
+an appointment at this time." for the Administrator: **a third, optional argument says who
+attempted** (`failureText(reason, attempt, role)`), and only `user_busy` reads it. In the book
+dialog `refusalOf` (`booking.ts`) goes further: it looks among the shown week's appointments
+for the target User's active one that overlaps the time asked, the moved one left out in a
+change, the earliest first, and names it: "You already have an appointment at this time
+(09:15–10:00 · Studio); open it to change it." or "alice already has an appointment at this
+time (09:15–10:00 · Studio)."; found nowhere, the sentence of `failureText`. A User's page seldom
+holds it: the server offers a User no slot over the User's own appointment, so a User meets
+`user_busy` on a page read before the appointment was made, which the page does not hold. For
+the Administrator `slot_taken` is "This time is full: there is no place left." with the offer
+"Book anyway" (section 4); nothing else offers it. `invalid_request` has one
 sentence for every case and every screen, "The request was not accepted. Check what you entered
 and try again.": an end not after the start has no sentence of its own, and the logic layer
 does not check the two times. **A second, optional argument says what was attempted**
@@ -2186,7 +2263,7 @@ first and the third held by `page.test.ts` from now on:
 - **Every field has its label.** Each of the 36 `input`, `select` and `textarea` elements of
   `index.html` is inside a `<label>` that has words of its own and holds no other field. A
   button whose words do not say what it acts on gets a name from the script, with the words
-  of the logic layer: a row's "Delete", "Rename", "Change" and "Remove" (which row), and a
+  of the logic layer: a row's "Delete", "Edit", "Change" and "Remove" (which row), and a
   slot and an appointment of the week (which day). The five "Try again" and the two arrows of
   the week have theirs in the page.
 - **Every dialog takes the focus and gives it back**: the table below.
@@ -2209,11 +2286,12 @@ the native modal `<dialog>`, and one `autofocus` in the page (section 11, decisi
 |---|---|---|---|---|
 | Book (`dialog.book`), a booking | A free slot | The note; for the Administrator the "For" list | Back on the slot | "Book": on nothing, since the week was redrawn; one Tab: the first slot or appointment of the week |
 | Book, confirming a change | A free slot, while moving | The note | Back on the slot | "Change": on nothing (the week was redrawn); one Tab: the first slot or appointment of the week |
+| The list of a group (`dialog.group`) | The Administrator's block of four or more | The first row | Back on the block | A row closes it and opens the detail: the keyboard is in the detail, and after it on nothing |
 | Detail (`dialog#detail`), from the week | An appointment | The note's field; "Close" when the note cannot be edited | Back on the appointment | "Save note" and "Cancel appointment" close it: on nothing (the week was redrawn; after a cancellation the appointment is gone); one Tab: the first slot or appointment of the week. "Change": on nothing, since the appointment's button is disabled while moving; one Tab: the next slot after it |
 | Detail, from "My appointments" | A row | The same | Back on the row | "Save note", "Cancel appointment": on nothing (the list was redrawn, or the row is gone); one Tab: the first row. "Change": the week is shown |
 | The password (`dialog.created`) | "Create user", or Enter in the field | Its heading, "User created" (`autofocus`): Enter and the space bar do nothing there; one Tab: its button | The Escape key does not close it | Its button: back where the keyboard was, the username field or "Create user" |
 | Delete a user (`dialog.delete` of `#users`) | A row's "Delete" | "Keep" | Back on the row's "Delete" | "Delete user": on nothing (the row is gone); one Tab: the first "Delete" of the list |
-| Rename (`dialog.rename`) | A row's "Rename" | The name | Back on the row's "Rename" | On nothing (the list was redrawn); one Tab: the first "Rename" of the list |
+| Edit type (`dialog.rename`) | A row's "Edit" | The name | Back on the row's "Edit" | On nothing (the list was redrawn); one Tab: the first "Edit" of the list |
 | Change a pattern (`dialog.change`) | A row's "Change" | "Weekday" | Back on the row's "Change" | On nothing (the list was redrawn); one Tab: the first "Change" of the list |
 | The one that confirms (`dialog.delete` of `#availability`) | A row's "Delete", "Not available on this day", "Back to the weekly patterns" | "Keep" | Back on the button that opened it | A type, a pattern or an extra window deleted: on nothing (the row is gone); one Tab: the first button of that list. "Not available": back on its button, which is still there. The way back: on nothing (its button is no longer shown); one Tab: the "Start" list of the form that adds an extra window |
 
@@ -2686,6 +2764,16 @@ than what the trial showed: these deserve the first look in a review.
 | 172 | After a message that got one of the two `503` answers the conversation is read once and not continued; the text stays in the field, and sending it again is how the person asks for its answer (the server answers `assistant_busy` when it holds the message, and the read after that continues it) | The server counted and perhaps saved the message, and the failure carries no count: without the read "N messages left today" was one too high and, after the first message of a conversation, "New conversation" stayed out of use. One more request after a failure; Claude is not asked again by the panel itself, as `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 asks. Decided by the Product Owner for `docs/CONVERSATIONAL_PLAN.md` step c13; step c12 had left both as known |  |
 | 173 | The arrow beside the panel's heading is drawn by the style sheet with an empty alternative text (`content: ' ▾' / ''`, after a plain declaration for a browser that does not know the slash) | Found in the walk: the browser named the button "Assistant ▾", and a screen reader would read the arrow; whether the panel is open is said by `aria-expanded`. `page.test.ts` reads the two rules of the style sheet | |
 | 174 | The view keeps the conversation at its end when something appears under it: it reads whether the list is at its end before it changes anything, and scrolls after | Found in the walk: the proposal's block takes its room from the list, and the last message, the one the proposal answers, went out of sight. A person who scrolled back is not moved | |
+| 184 | A slot says its places beside its time from the model's `places`: "free" for a capacity of one, "2 of 3 places left" above, "Full" for the Administrator's slot with no place left, grey and hatched, which opens the book dialog (section 4) | `docs/SHARED_CALENDAR_SPEC.md` section 16.8. "free" kept for a capacity of one, so that a calendar of one-person types reads as it always did | |
+| 185 | A slot that appointments overlap, the Administrator's only, is a narrow tab at the right of its time, in front, "Full" or "2 left"; the appointments and the group beside it leave it room (`tab`, `beside`, section 5.1) | Found in the walk of `docs/CAPACITY_PLAN.md` step u5: drawn whole, the slot lay under the appointments that fill it and could not be clicked, though section 16.8 of `docs/SHARED_CALENDAR_SPEC.md` asks that the Administrator's full slot can be. The Product Owner chose the tab of three ways (the slot hidden again, a column of its own); it serves a slot with places left too, which was covered the same way | Yes |
+| 186 | The Administrator's appointments that overlap are chained by `[start, end)` and placed by interval colouring, the earliest first in the leftmost free column; a peak of three or less is drawn side by side, four or more is one block "N people · <type>" with its list in `dialog.group`, each row opening the detail (section 5.1) | The Product Owner's decision at `docs/CAPACITY_PLAN.md` step u5. One placement serves this and the repeated hour of the night the clocks go back, whose `lane` and `lanes` were widened from two to any number | |
+| 187 | "Book anyway" comes only through the 409: the Administrator's `slot_taken` keeps the dialog open with the offer, which sends the same request with `overbook: true`; in a change "Change anyway"; any change in the form hides it; never for a User or for `user_busy` (section 4) | The Product Owner's decision at `docs/CAPACITY_PLAN.md` step u5 (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-13). The question of a change reads "Change anyway, over the capacity?", the same shape as the booking's | The words of a change, yes |
+| 188 | `user_busy` names the appointment in the way, found among the shown week's appointments, the moved one left out; found nowhere, a fixed sentence per role; nothing more is offered (`refusalOf`, section 5.1) | The Product Owner's decision at `docs/CAPACITY_PLAN.md` step u5. A User's page seldom holds the appointment (the server offers a User no slot over the User's own), so a User mostly reads the fixed sentence; the Product Owner kept the named one all the same | |
+| 189 | `failureText` is told who attempted by a third, optional argument, the role; the book dialog's words go through `WeekScreen.refusal`, which knows the role and the week | The simplest way: the role is known where the failure is put in words, and only `user_busy` differs by role. The Administrator's target User comes from `Moving.who`, a field added for it | |
+| 190 | The type's capacity is a number field beside the name, starting at 1 in the form and at the type's own in "Edit type", always sent; checked with `TYPE_CAPACITY` of `shared/` (digits only, 1 to 100), refused in words under the field; a row says "· N places" above one (section 4) | The Product Owner's decision at `docs/CAPACITY_PLAN.md` step u5. Sending it always keeps the page's form the whole truth of what is saved | |
+| 191 | "Rename" became "Edit" in the words of the page; the names in the code (`rename`, `dialog.rename`, `.ask-rename`) are kept | They match the service's method `rename`, and the tests and the walk find the dialog by them | |
+| 192 | `date.model.ts` and `date.screen.ts` are unchanged by the capacity | A single date draws windows and type names only, no slot and no appointment of its own; its conflicts list is about availability, not places | |
+| 193 | A slot's name for a screen reader is set by the view from the model (its day, its time and its places in full), not from what the button shows | A tab shows "2 left" only; a screen reader must still hear "2 of 3 places left" | |
 
 ## 12. The tooling (open points O4, O6 and O8, decided)
 
@@ -2786,13 +2874,14 @@ list, the name of a row's button for a screen reader and the question of the del
 (`users.model.ts`); the fixed words of the two dialogs of the users ("User created", "This
 password cannot be shown again. Give it to the user now.", "I have noted the password",
 "Delete user", "Keep") are in the page. Those of the availability are made by the logic
-layer too: what a type's name is, which is the hint and the refusal, the refusals of a
+layer too: what a type's name and its capacity are, which are the hints and the refusals,
+a type's places ("· 3 places"), the refusals of a
 pattern's fields, the two sentences of an empty list, the word for a type that is not known,
 that a type must be created first, the names of the weekdays, a pattern's validity, the names
 of a row's buttons for a screen reader, the two questions before a deletion
 (`availability.model.ts`) and the sentence that counts the appointments in the way
 (`conflicts.ts`); the fixed words of the screen ("Types", "Weekly patterns", the six labels,
-"Leave empty for no end.", "ended", "Rename type", "Change pattern", "Confirm the deletion",
+"Leave empty for no end.", "ended", "Edit type", "Capacity", "Change pattern", "Confirm the deletion",
 "Close", "Keep", "Delete") are in the page; since plan step 68 the dialog that confirms
 says "Please confirm", "Keep" and "Confirm". Those of a single date are made by the logic
 layer too (`date.model.ts`): the refusals of the date, the date in words, the sentences of

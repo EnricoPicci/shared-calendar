@@ -46,6 +46,8 @@ describe('index.html', () => {
       'tpl-busy',
       'tpl-slot',
       'tpl-appointment',
+      'tpl-group',
+      'tpl-person',
       'tpl-option',
       'tpl-appointment-row',
       'tpl-user-row',
@@ -77,7 +79,7 @@ describe('index.html', () => {
 
     it('every field has its label: a <label> around it, with words of its own', () => {
       const fields = everywhere('input, select, textarea');
-      expect(fields).toHaveLength(40);
+      expect(fields).toHaveLength(42);
       for (const field of fields) {
         const label = field.closest('label');
         expect(label, field.getAttribute('name')!).not.toBeNull();
@@ -114,7 +116,7 @@ describe('index.html', () => {
       const place = (element: Element) => [...element.classList].join('.');
       const alerts = everywhere('[role="alert"]');
       const failures = everywhere('.error');
-      expect(failures).toHaveLength(51);
+      expect(failures).toHaveLength(53);
       expect(alerts).toEqual(failures);
       for (const alert of alerts) expect(['P', alert.textContent], place(alert)).toEqual(['P', '']);
       const loading = everywhere('.loading');
@@ -131,29 +133,34 @@ describe('index.html', () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('of the week\'s templates only a slot and an appointment can be clicked: each is one button of type "button"; nothing in a template can be typed in', () => {
+  it('of the week\'s templates only a slot, an appointment, a group and a row of a group\'s list can be clicked: each block is one button of type "button", the row a list item holding one; nothing in a template can be typed in', () => {
     const templates = [...pageAside().querySelectorAll<HTMLTemplateElement>('#week template')];
     const clickable = templates.filter((template) => template.content.querySelector('button, a') !== null).map((template) => template.id);
-    expect(clickable).toEqual(['tpl-slot', 'tpl-appointment']);
-    for (const id of clickable) {
-      const block = pageAside().querySelector<HTMLTemplateElement>(`#${id}`)!.content.firstElementChild!;
+    expect(clickable).toEqual(['tpl-slot', 'tpl-appointment', 'tpl-group', 'tpl-person']);
+    const first = (id: string) => pageAside().querySelector<HTMLTemplateElement>(`#${id}`)!.content.firstElementChild!;
+    for (const id of ['tpl-slot', 'tpl-appointment', 'tpl-group']) {
+      const block = first(id);
       expect([block.tagName, block.getAttribute('type')], id).toEqual(['BUTTON', 'button']);
       expect(block.querySelectorAll('button, a'), id).toHaveLength(0);
     }
+    const row = first('tpl-person');
+    expect([row.tagName, row.querySelectorAll('button').length, row.querySelector('button')!.getAttribute('type'), row.querySelectorAll('a').length]).toEqual(['LI', 1, 'button', 0]);
     for (const template of templates) expect(template.content.querySelectorAll('input, select, textarea'), template.id).toHaveLength(0);
   });
 
-  it('the page has seven dialogs, closed, each named by its heading: the book dialog is the week\'s, two are the users\' and three the availability\'s, outside the regions that are redrawn; the detail belongs to no screen', () => {
+  it('the page has eight dialogs, closed, each named by its heading: the book dialog and the list of a group are the week\'s, two are the users\' and three the availability\'s, outside the regions that are redrawn; the detail belongs to no screen', () => {
     loadPage();
     const dialogs = [...document.querySelectorAll<HTMLDialogElement>('dialog')];
-    expect(dialogs.map((dialog) => dialog.className)).toEqual(['book', 'created', 'delete', 'rename', 'change', 'delete', 'detail']);
+    expect(dialogs.map((dialog) => dialog.className)).toEqual(['book', 'group', 'created', 'delete', 'rename', 'change', 'delete', 'detail']);
     for (const dialog of dialogs) {
       expect(dialog.open, dialog.className).toBe(false);
       expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)!.tagName, dialog.className).toBe('H3');
     }
-    const [book, created, remove, rename, change, removeAvailability, detail] = dialogs as [HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement];
-    expect(book.parentElement!.id).toBe('week');
-    expect(book.closest('.week')).toBeNull();
+    const [book, group, created, remove, rename, change, removeAvailability, detail] = dialogs as [HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement];
+    for (const dialog of [book, group]) {
+      expect(dialog.parentElement!.id, dialog.className).toBe('week');
+      expect(dialog.closest('.week'), dialog.className).toBeNull();
+    }
     for (const dialog of [created, remove]) {
       expect(dialog.parentElement!.id, dialog.className).toBe('users');
       expect(dialog.closest('.list'), dialog.className).toBeNull();
@@ -175,6 +182,27 @@ describe('index.html', () => {
     expect(document.querySelector<HTMLElement>('dialog.book .choices')!.hidden).toBe(true);
     expect(document.querySelector('dialog.book textarea')!.getAttribute('maxlength')).toBe(String(CALENDAR_LIMITS.noteLength));
     expect(document.querySelector<HTMLElement>('dialog.detail .cancel')!.hidden).toBe(true);
+  });
+
+  it('the book dialog\'s "Book anyway" starts hidden, after the failure and before the dialog\'s own buttons; its button sends no form and is described by its question', () => {
+    loadPage();
+    const anyway = document.querySelector<HTMLElement>('dialog.book .anyway')!;
+    const force = anyway.querySelector('button')!;
+    expect(anyway.hidden).toBe(true);
+    expect([anyway.previousElementSibling!.className, anyway.nextElementSibling!.className]).toEqual(['error', 'actions']);
+    expect([force.className, force.getAttribute('type'), document.getElementById(force.getAttribute('aria-describedby')!)]).toEqual(['danger force', 'button', anyway.querySelector('p')]);
+    // Its words in the two modes of the dialog, the second hidden as the dialog opens.
+    const words = (element: Element) => [...element.children].map((part) => [part.className, part.textContent, part.hasAttribute('hidden')]);
+    expect(words(anyway.querySelector('p')!)).toEqual([['in-booking', 'Book anyway, over the capacity?', false], ['in-change', 'Change anyway, over the capacity?', true]]);
+    expect(words(force)).toEqual([['in-booking', 'Book anyway', false], ['in-change', 'Change anyway', true]]);
+  });
+
+  it('the list of a group starts empty, with its heading and "Close" and nothing to type', () => {
+    loadPage();
+    const group = document.querySelector<HTMLDialogElement>('dialog.group')!;
+    expect([group.querySelector('.what')!.textContent, group.querySelector('.when')!.textContent, group.querySelector('.people')!.children.length]).toEqual(['', '', 0]);
+    expect([...group.querySelectorAll('button')].map((button) => [button.textContent, button.className])).toEqual([['Close', 'close']]);
+    expect(group.querySelectorAll('input, select, textarea, form')).toHaveLength(0);
   });
 
   it('every button outside a form says its type, so that none sends a form by accident', () => {
@@ -405,7 +433,7 @@ describe('index.html', () => {
       expect([one('.types form .submit').textContent, one('.patterns form .submit').textContent]).toEqual(['Create type', 'Create pattern']);
     });
 
-    it('a name is typed in one text field, in the form that creates a type and in the dialog that renames one: its label, its hint, its refusal, and no length or pattern in the page', () => {
+    it('a name is typed in one text field, in the form that creates a type and in the dialog that edits one: its label, its hint, its refusal, and no length or pattern in the page', () => {
       loadPage();
       const fields = [one<HTMLInputElement>('form.create-type [name="name"]'), one<HTMLInputElement>('dialog.rename [name="name"]')];
       for (const field of fields) {
@@ -416,7 +444,18 @@ describe('index.html', () => {
         expect([box.querySelector('.refusal')!.getAttribute('role'), box.querySelector('.refusal')!.textContent]).toEqual(['alert', '']);
         const form = field.closest('form')!;
         expect([form.noValidate, form.querySelector('.failure')!.getAttribute('role'), form.querySelector('.failure')!.textContent]).toEqual([true, 'alert', '']);
-        expect(form.querySelectorAll('input, select, textarea')).toHaveLength(1);
+        expect(form.querySelectorAll('input, select, textarea')).toHaveLength(2);
+      }
+    });
+
+    it('a capacity is typed in one number field, beside the name, in the same two places: its label, its hint, its refusal, and no range in the page', () => {
+      loadPage();
+      for (const field of [one<HTMLInputElement>('form.create-type [name="capacity"]'), one<HTMLInputElement>('dialog.rename [name="capacity"]')]) {
+        expect([field.type, field.value, field.closest('label')!.textContent.trim(), field.getAttribute('inputmode')]).toEqual(['number', '', 'Capacity', 'numeric']);
+        expect(['min', 'max', 'step', 'required', 'aria-invalid'].filter((name) => field.hasAttribute(name))).toEqual([]);
+        const box = field.closest('.field')!;
+        expect([box.querySelector('.hint')!.textContent, box.querySelector('.hint')!.id]).toEqual(['', field.getAttribute('aria-describedby')]);
+        expect([box.querySelector('.refusal')!.getAttribute('role'), box.querySelector('.refusal')!.textContent]).toEqual(['alert', '']);
       }
     });
 
@@ -451,10 +490,10 @@ describe('index.html', () => {
       expect(row.querySelectorAll('button, a, input, select, textarea')).toHaveLength(0);
     });
 
-    it('a row of the types is the name and two buttons of type "button", "Rename" and "Delete"; a row of the patterns its three texts, "ended", hidden, and "Change" and "Delete"; nothing in either can be typed in', () => {
+    it('a row of the types is the name, its places and two buttons of type "button", "Edit" and "Delete"; a row of the patterns its three texts, "ended", hidden, and "Change" and "Delete"; nothing in either can be typed in', () => {
       const template = (id: string) => pageAside().querySelector<HTMLTemplateElement>(`#${id}`)!.content.firstElementChild!;
       const parts = (row: Element) => [...row.children].map((part) => [part.tagName, part.className, part.textContent]);
-      expect(parts(template('tpl-type-row'))).toEqual([['SPAN', 'name', ''], ['BUTTON', 'ask-rename', 'Rename'], ['BUTTON', 'danger ask-delete', 'Delete']]);
+      expect(parts(template('tpl-type-row'))).toEqual([['SPAN', 'name', ''], ['SPAN', 'places', ''], ['BUTTON', 'ask-rename', 'Edit'], ['BUTTON', 'danger ask-delete', 'Delete']]);
       expect(parts(template('tpl-pattern-row'))).toEqual([
         ['SPAN', 'time', ''],
         ['SPAN', 'type-name', ''],
@@ -474,11 +513,11 @@ describe('index.html', () => {
       expect(template('tpl-choice').tagName).toBe('OPTION');
     });
 
-    it('the dialogs that rename and change are forms with "Close" before their action; the one that confirms has neutral words, "Keep" before "Confirm", and nothing to type; all close with the Escape key', () => {
+    it('the dialogs that edit and change are forms with "Close" before their action; the one that confirms has neutral words, "Keep" before "Confirm", and nothing to type; all close with the Escape key', () => {
       loadPage();
       const buttons = (selector: string) => all<HTMLButtonElement>(`${selector} button`).map((button) => [button.textContent, button.getAttribute('type'), button.disabled]);
-      expect([one('dialog.rename h3').textContent, one('dialog.change h3').textContent, one('dialog.delete h3').textContent]).toEqual(['Rename type', 'Change pattern', 'Please confirm']);
-      expect(buttons('dialog.rename')).toEqual([['Close', 'button', false], ['Rename', null, false]]);
+      expect([one('dialog.rename h3').textContent, one('dialog.change h3').textContent, one('dialog.delete h3').textContent]).toEqual(['Edit type', 'Change pattern', 'Please confirm']);
+      expect(buttons('dialog.rename')).toEqual([['Close', 'button', false], ['Save', null, false]]);
       expect(buttons('dialog.change')).toEqual([['Close', 'button', false], ['Change', null, false]]);
       expect(buttons('dialog.delete')).toEqual([['Keep', 'button', false], ['Confirm', 'button', false]]);
       expect(one('dialog.delete').querySelectorAll('input, select, textarea, form')).toHaveLength(0);

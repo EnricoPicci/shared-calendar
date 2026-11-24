@@ -1,4 +1,4 @@
-import { ASSISTANT_LIMITS, CALENDAR_LIMITS, localDateOf, localTimeOf, PASSWORD_POLICY, PASSWORD_SYMBOLS, toInstant } from '@shared-calendar/shared';
+import { ASSISTANT_LIMITS, CALENDAR_LIMITS, localDateOf, localTimeOf, PASSWORD_POLICY, PASSWORD_SYMBOLS, toInstant, type Role } from '@shared-calendar/shared';
 import type { NewPasswordProblem } from '../services/change-password.types';
 
 // The texts that depend on data (docs/FRONTEND_ARCHITECTURE.md section 5 and section 12.4): a
@@ -196,10 +196,17 @@ const AFTER: Record<Attempt, Map<string, string>> = {
   message: new Map([['invalid_request', `A message can be ${ASSISTANT_LIMITS.messageLength} characters long at most, and cannot be empty.`]]),
 };
 
+// Who attempted, where the same reason needs other words for the Administrator. `user_busy`
+// is about the User the Administrator booked for, not about the Administrator
+// (docs/SHARED_CALENDAR_SPEC.md R-BOOK-12).
+const BY_ADMIN = new Map([['user_busy', 'This User already has an appointment at this time.']]);
+
 // A failure's `reason` as a sentence; a reason without a sentence of its own gets the general
-// one. `attempt` says what was attempted, for the reasons whose sentence depends on it.
-export function failureText(reason: string, attempt?: Attempt): string {
-  return (attempt === undefined ? undefined : AFTER[attempt].get(reason)) ?? PLAIN_WORDS.get(reason) ?? GENERAL;
+// one. `attempt` says what was attempted and `role` who attempted, for the reasons whose sentence
+// depends on them; what was attempted comes first.
+export function failureText(reason: string, attempt?: Attempt, role?: Role): string {
+  const after = attempt === undefined ? undefined : AFTER[attempt].get(reason);
+  return after ?? (role === 'admin' ? BY_ADMIN.get(reason) : undefined) ?? PLAIN_WORDS.get(reason) ?? GENERAL;
 }
 
 // The change of one's own password (docs/FRONTEND_ARCHITECTURE.md section 5.1): what a new

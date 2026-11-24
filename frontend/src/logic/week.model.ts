@@ -7,15 +7,20 @@ import { dateText, offsetChangesOn, rangeText } from './texts';
 // the view received, its `generatedAt` and its time zone included.
 
 // A block's place in its day column, as CSS percentages of the hours shown, and its times as
-// text. `lanes` is 2 for two blocks of the same kind that the clock puts in the same place (the
-// hour repeated on the night the clocks go back): each takes half the width, the earlier one
-// (`lane` 0) on the left.
-export type Placed = { top: string; height: string; time: string; lane: 0 | 1; lanes: 1 | 2 };
+// text. Blocks that the clock puts in the same place stand side by side, in `lanes` columns of
+// equal width, this one in column `lane` (0 is the leftmost): the Administrator's appointments
+// that overlap, up to three (docs/SHARED_CALENDAR_SPEC.md section 16.8), and two blocks of the
+// hour repeated on the night the clocks go back. A block alone in its place is `lane` 0 of 1.
+export type Placed = { top: string; height: string; time: string; lane: number; lanes: number };
 // `colour` is one of the type colours the style sheet defines: the class `type-<colour>`.
 export type WindowBlock = Placed & { typeName: string; colour: number };
-// A free slot also carries what the book dialog needs: its own instants, its day in words, its
-// type's name, and the instants of the window that holds it, between which the Administrator
-// may choose other times (docs/SHARED_CALENDAR_SPEC.md R-BOOK-08).
+// A slot also carries what the book dialog needs: its own instants, its day in words, its type's
+// name, and the instants of the window that holds it, between which the Administrator may choose
+// other times (docs/SHARED_CALENDAR_SPEC.md R-BOOK-08). `places` is what it says beside its time
+// and `full` whether it has no place left, which only the Administrator is shown
+// (docs/SHARED_CALENDAR_SPEC.md R-SLOT-04). `tab` is null for a slot drawn whole; for a slot
+// that appointments overlap, which only the Administrator sees, it is the short text of a narrow
+// tab drawn beside them, so that the slot can still be pressed: "Full" or "2 left".
 export type SlotBlock = Placed & {
   colour: number;
   start: string;
@@ -23,6 +28,9 @@ export type SlotBlock = Placed & {
   day: string; // "Mon 16 Nov"
   typeName: string;
   window: { start: string; end: string };
+  places: string; // "free", "2 of 3 places left" or "Full"
+  full: boolean;
+  tab: string | null;
 };
 export type BusyBlock = Placed;
 export type AppointmentBlock = Placed & {
@@ -31,6 +39,18 @@ export type AppointmentBlock = Placed & {
   typeName: string;
   note: string; // '' when there is none
   colour: number;
+  beside: boolean; // a slot's tab stands beside it, and it leaves the tab room
+};
+// Four or more of the Administrator's appointments that overlap, drawn as one block over their
+// whole span that opens the list of them (docs/SHARED_CALENDAR_SPEC.md section 16.8). `what`
+// counts them with the type of their window, which is one: windows of one date never overlap
+// (docs/SHARED_CALENDAR_SPEC.md R-AV-01). Each row opens its appointment's detail.
+export type GroupBlock = Placed & {
+  what: string; // "4 people · Swimming Pool"
+  when: string; // "Mon 16 Nov, 10:00–11:15", the list's heading
+  colour: number;
+  rows: { appointmentId: string; time: string; who: string }[];
+  beside: boolean;
 };
 export type DayModel = {
   date: string;
@@ -40,6 +60,7 @@ export type DayModel = {
   slots: SlotBlock[];
   busy: BusyBlock[];
   appointments: AppointmentBlock[];
+  groups: GroupBlock[]; // the Administrator's only; a User's own appointments never overlap
 };
 export type WeekModel = {
   timeZone: string;
@@ -52,6 +73,8 @@ const COLOURS = 6; // the type colours of the style sheet: type-0 … type-5
 const DAY_MINUTES = 24 * 60;
 const FIRST_HOUR = 8 * 60; // the hours always shown: 08:00 to 18:00
 const LAST_HOUR = 18 * 60;
+// The most of the Administrator's appointments drawn side by side; more become one block.
+const SIDE_BY_SIDE = 3;
 
 // The same colour for a type in every week: a number from its id.
 export function colourOf(typeId: string): number {
@@ -82,19 +105,47 @@ function spanOf(interval: Interval, date: string, zone: string): Span {
   return { from, to: Math.min(from + real, DAY_MINUTES) };
 }
 
-// The lane of each interval among those of its kind in one day: two that share a place on the
-// clock without sharing a moment go side by side, the earlier on the left.
-function lanesOf(intervals: readonly Interval[], spans: readonly Span[]): Pick<Placed, 'lane' | 'lanes'>[] {
-  const lanes = intervals.map((): Pick<Placed, 'lane' | 'lanes'> => ({ lane: 0, lanes: 1 }));
-  intervals.forEach((a, i) => {
-    intervals.forEach((b, j) => {
-      const sameMoment = a.start < b.end && b.start < a.end;
-      const samePlace = spans[i]!.from < spans[j]!.to && spans[j]!.from < spans[i]!.to;
-      if (i === j || sameMoment || !samePlace) return;
-      lanes[i] = { lane: a.start < b.start ? 0 : 1, lanes: 2 };
-    });
-  });
-  return lanes;
+// The places of the blocks of one kind in one day. Blocks are chained while each starts before
+// the chain's last end on the clock; in a chain each takes, the earliest first, the leftmost
+// column free at its start, so a chain has as many columns as blocks at its peak. On every day
+// but one the clock is real time, so a chain is appointments that overlap ([start, end): two that
+// touch are not chained) and its peak is the people at once (docs/SHARED_CALENDAR_SPEC.md
+// R-SLOT-02). On the night the clocks go back two blocks an hour apart can share a place on the
+// clock: they are chained too, and stand side by side, the earlier on the left.
+type Columned = Pick<Placed, 'lane' | 'lanes'> & { chain: number };
+function columnsOf(intervals: readonly Interval[], spans: readonly Span[]): Columned[] {
+  const order = intervals.map((_, i) => i).sort((a, b) => spans[a]!.from - spans[b]!.from || Date.parse(intervals[a]!.start) - Date.parse(intervals[b]!.start));
+  const placed: Columned[] = intervals.map(() => ({ lane: 0, lanes: 1, chain: 0 }));
+  let chains = 0;
+  let chain: number[] = [];
+  let ends: number[] = []; // the clock's minute at which each column of the chain is free again
+  const close = () => {
+    for (const i of chain) placed[i]!.lanes = ends.length;
+  };
+  for (const i of order) {
+    const { from, to } = spans[i]!;
+    if (chain.length > 0 && from >= Math.max(...ends)) {
+      close();
+      chains += 1;
+      chain = [];
+      ends = [];
+    }
+    const free = ends.findIndex((end) => end <= from);
+    const lane = free === -1 ? ends.length : free;
+    ends[lane] = to;
+    chain.push(i);
+    placed[i] = { lane, lanes: 1, chain: chains };
+  }
+  close();
+  return placed;
+}
+
+// What a slot says beside its time (docs/SHARED_CALENDAR_SPEC.md section 16.8): "free" with
+// one place, its places left when it has more ("2 of 3 places left"), and "Full" when none is
+// left, which only an Administrator's slot can be (docs/SHARED_CALENDAR_SPEC.md R-SLOT-04).
+export function placesOf(capacity: number, placesLeft: number): Pick<SlotBlock, 'places' | 'full'> {
+  if (placesLeft <= 0) return { places: 'Full', full: true };
+  return { places: capacity > 1 ? `${placesLeft} of ${capacity} places left` : 'free', full: false };
 }
 
 export function weekModel(view: CalendarView, role: Role): WeekModel {
@@ -127,25 +178,57 @@ export function weekModel(view: CalendarView, role: Role): WeekModel {
       // (docs/SHARED_CALENDAR_SPEC.md section 6.6): a slot lies inside one of them.
       const merged = effectiveWindows(day.windows);
       // The blocks of one kind, each placed among the others of that kind.
-      const placed = <T extends Interval>(intervals: readonly T[]): (T & Placed)[] => {
+      const top = (span: Span) => `${((span.from - first) / (last - first)) * 100}%`;
+      const height = (span: Span) => `${((span.to - span.from) / (last - first)) * 100}%`;
+      const placed = <T extends Interval>(intervals: readonly T[]): (T & Columned & Omit<Placed, 'lane' | 'lanes'>)[] => {
         const daySpans = intervals.map((interval) => spanOf(interval, day.date, zone));
-        const lanes = lanesOf(intervals, daySpans);
+        const columns = columnsOf(intervals, daySpans);
         return intervals.map((interval, i) => ({
           ...interval,
-          top: `${((daySpans[i]!.from - first) / (last - first)) * 100}%`,
-          height: `${((daySpans[i]!.to - daySpans[i]!.from) / (last - first)) * 100}%`,
+          top: top(daySpans[i]!),
+          height: height(daySpans[i]!),
           time: rangeText(interval.start, interval.end, zone, offsetChanges),
-          ...lanes[i]!,
+          ...columns[i]!,
         }));
       };
       const place = ({ top, height, time, lane, lanes }: Placed): Placed => ({ top, height, time, lane, lanes });
+      // A slot and an appointment overlap on the clock, [from, to), as they are drawn.
+      const slotSpans = day.slots.map((s) => spanOf(s, day.date, zone));
+      const appointmentSpans = day.appointments.map((a) => spanOf(a, day.date, zone));
+      const overlaps = (span: Span, others: Span[]) => others.some((other) => span.from < other.to && other.from < span.to);
+      // The Administrator's appointments: a chain of more than three, at its peak, is one block.
+      const appointments = placed(day.appointments);
+      const grouped = (a: (typeof appointments)[number]) => role === 'admin' && a.lanes > SIDE_BY_SIDE;
+      const chains = new Map<number, typeof appointments>();
+      for (const a of appointments.filter(grouped)) chains.set(a.chain, [...(chains.get(a.chain) ?? []), a]);
+      const groups = [...chains.values()].map((members): GroupBlock => {
+        const byStart = [...members].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+        const spans = members.map((a) => spanOf(a, day.date, zone));
+        const span = { from: Math.min(...spans.map((s) => s.from)), to: Math.max(...spans.map((s) => s.to)) };
+        const earliest = byStart[0]!;
+        const end = members.map((a) => a.end).reduce((a, b) => (Date.parse(b) > Date.parse(a) ? b : a));
+        const time = rangeText(earliest.start, end, zone, offsetChanges);
+        return {
+          top: top(span),
+          height: height(span),
+          time,
+          lane: 0,
+          lanes: 1,
+          what: `${members.length} people · ${earliest.typeName}`,
+          when: `${dateText(day.date)}, ${time}`,
+          colour: colourOf(earliest.typeId),
+          rows: byStart.map((a) => ({ appointmentId: a.appointmentId, time: a.time, who: a.username })),
+          beside: overlaps(span, slotSpans),
+        };
+      });
       return {
         date: day.date,
         label: dateText(day.date),
         today: day.date === today,
         windows: placed(day.windows).map((w) => ({ ...place(w), typeName: w.typeName, colour: colourOf(w.typeId) })),
-        slots: placed(day.slots).map((s) => {
+        slots: placed(day.slots).map((s, i) => {
           const holder = merged.find((w) => w.start <= s.start && s.end <= w.end) ?? s;
+          const shown = placesOf(s.capacity, s.placesLeft);
           return {
             ...place(s),
             colour: colourOf(s.typeId),
@@ -154,19 +237,25 @@ export function weekModel(view: CalendarView, role: Role): WeekModel {
             day: dateText(day.date),
             typeName: typeNames.get(s.typeId) ?? '',
             window: { start: holder.start, end: holder.end },
+            ...shown,
+            tab: overlaps(slotSpans[i]!, appointmentSpans) ? (shown.full ? 'Full' : `${s.placesLeft} left`) : null,
           };
         }),
         busy: placed(day.busy).map(place),
         // The Administrator's view holds everyone's appointments, a User's only the User's own
         // (docs/SHARED_CALENDAR_SPEC.md section 11.6): nothing is added to what the server sent.
-        appointments: placed(day.appointments).map((a) => ({
-          ...place(a),
-          appointmentId: a.appointmentId,
-          who: role === 'admin' ? a.username : 'You',
-          typeName: a.typeName,
-          note: a.note ?? '',
-          colour: colourOf(a.typeId),
-        })),
+        appointments: appointments
+          .filter((a) => !grouped(a))
+          .map((a) => ({
+            ...place(a),
+            appointmentId: a.appointmentId,
+            who: role === 'admin' ? a.username : 'You',
+            typeName: a.typeName,
+            note: a.note ?? '',
+            colour: colourOf(a.typeId),
+            beside: overlaps(spanOf(a, day.date, zone), slotSpans),
+          })),
+        groups,
       };
     }),
   };

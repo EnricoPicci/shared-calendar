@@ -1,5 +1,5 @@
 import type { CalendarView } from '@shared-calendar/shared';
-import { colourOf, weekModel } from '../../../src/logic/week.model';
+import { colourOf, placesOf, weekModel } from '../../../src/logic/week.model';
 import { appointment, POOL, STUDIO, view, winterWeek } from './fixtures';
 import { useFarBrowserZone } from './zone';
 
@@ -47,6 +47,9 @@ describe('weekModel', () => {
           day: 'Mon 16 Nov',
           typeName: 'Studio',
           window: { start: z('2026-11-16T07:00'), end: z('2026-11-16T11:00') },
+          places: 'free',
+          full: false,
+          tab: null,
         },
         {
           top: '60%',
@@ -59,6 +62,9 @@ describe('weekModel', () => {
           day: 'Mon 16 Nov',
           typeName: 'Swimming Pool',
           window: { start: z('2026-11-16T13:00'), end: z('2026-11-16T17:00') },
+          places: 'free',
+          full: false,
+          tab: null,
         },
       ]);
     });
@@ -69,7 +75,7 @@ describe('weekModel', () => {
 
     it('the User\'s own appointment says "You", with its type and its note', () => {
       expect(monday.appointments).toEqual([
-        { top: '30%', height: '10%', time: '11:00–12:00', ...FULL, appointmentId: 'appt-2026-11-16T10:00:00.000Z', who: 'You', typeName: 'Studio', note: 'First lesson', colour: colourOf(STUDIO) },
+        { top: '30%', height: '10%', time: '11:00–12:00', ...FULL, appointmentId: 'appt-2026-11-16T10:00:00.000Z', who: 'You', typeName: 'Studio', note: 'First lesson', colour: colourOf(STUDIO), beside: false },
       ]);
     });
 
@@ -81,7 +87,7 @@ describe('weekModel', () => {
     });
 
     it('the other days are empty', () => {
-      for (const day of model.days.slice(1)) expect([day.windows, day.slots, day.busy, day.appointments]).toEqual([[], [], [], []]);
+      for (const day of model.days.slice(1)) expect([day.windows, day.slots, day.busy, day.appointments, day.groups]).toEqual([[], [], [], [], []]);
     });
   });
 
@@ -354,6 +360,170 @@ describe('weekModel', () => {
       ]);
       expect(slots.map((s) => s.day)).toEqual(['Sun 31 Oct', 'Sun 31 Oct']);
       expect(slots[1]!.window).toEqual({ start: z('2027-10-30T23:00'), end: z('2027-10-31T03:00') });
+    });
+  });
+
+  describe('the places of a slot (R-SLOT-02, R-SLOT-04, 16.8)', () => {
+    const slot = (capacity: number, placesLeft: number) => ({ start: z('2026-11-16T08:00'), end: z('2026-11-16T09:00'), typeId: POOL, capacity, placesLeft });
+    const slotOf = (capacity: number, placesLeft: number, role: 'admin' | 'user') =>
+      weekModel(view('2026-11-16', {}, [{ date: '2026-11-16', slots: [slot(capacity, placesLeft)] }]), role).days[0]!.slots[0]!;
+
+    it('a capacity of 1 says "free", as a slot always did', () => {
+      expect(slotOf(1, 1, 'user')).toMatchObject({ places: 'free', full: false, time: '09:00–10:00' });
+    });
+
+    it('a capacity of 3 with 2 left says so, for a User and for the Administrator', () => {
+      for (const role of ['user', 'admin'] as const) expect(slotOf(3, 2, role)).toMatchObject({ places: '2 of 3 places left', full: false });
+      expect(slotOf(3, 1, 'user').places).toBe('1 of 3 places left');
+    });
+
+    it('the Administrator\'s full slot, at 0 places left, is "Full" and marked full, whatever its capacity', () => {
+      expect(slotOf(3, 0, 'admin')).toMatchObject({ places: 'Full', full: true });
+      expect(slotOf(1, 0, 'admin')).toMatchObject({ places: 'Full', full: true });
+    });
+
+    it('placesOf never answers a negative number of places', () => {
+      expect(placesOf(2, -1)).toEqual({ places: 'Full', full: true });
+    });
+  });
+
+  describe('a slot that appointments overlap: a tab beside them (16.8)', () => {
+    // Monday 2026-11-16 in Rome, UTC+1: the slot 09:00–10:00 local, of capacity 3.
+    const slot = (placesLeft: number, from = '08:00', to = '09:00') => ({ start: z(`2026-11-16T${from}`), end: z(`2026-11-16T${to}`), typeId: POOL, capacity: 3, placesLeft });
+    const booked = (username: string, from = '08:00', to = '09:00') =>
+      appointment({ appointmentId: `appt-${username}`, start: z(`2026-11-16T${from}`), end: z(`2026-11-16T${to}`), date: '2026-11-16', username, typeId: POOL, typeName: 'Swimming Pool' });
+    const dayOf = (slots: ReturnType<typeof slot>[], appointments: ReturnType<typeof booked>[]) =>
+      weekModel(view('2026-11-16', { appointments }, [{ date: '2026-11-16', slots }]), 'admin').days[0]!;
+
+    it('a slot with no appointment over it is drawn whole: no tab; an appointment with no slot under it leaves no room', () => {
+      const day = dayOf([slot(3)], [booked('alice', '10:00', '11:00')]);
+      expect([day.slots[0]!.tab, day.appointments[0]!.beside]).toEqual([null, false]);
+    });
+
+    it('a slot with places left under an appointment is a tab "2 left"; the appointment leaves it room', () => {
+      const day = dayOf([slot(2)], [booked('alice')]);
+      expect([day.slots[0]!.tab, day.slots[0]!.places, day.appointments[0]!.beside]).toEqual(['2 left', '2 of 3 places left', true]);
+    });
+
+    it('a full slot under its three appointments is a tab "Full"; the three, side by side, leave it room', () => {
+      const day = dayOf([slot(0)], ['alice', 'bob', 'carol'].map((who) => booked(who)));
+      expect([day.slots[0]!.tab, day.slots[0]!.full]).toEqual(['Full', true]);
+      expect(day.appointments.map((a) => [a.lane, a.lanes, a.beside])).toEqual([
+        [0, 3, true],
+        [1, 3, true],
+        [2, 3, true],
+      ]);
+    });
+
+    it('a group over a full slot leaves it room too; a group with no slot under it does not', () => {
+      const four = ['a', 'b', 'c', 'd'].map((who) => booked(who));
+      expect(dayOf([slot(0)], four).groups[0]!.beside).toBe(true);
+      expect(dayOf([slot(0, '12:00', '13:00')], four).groups[0]!.beside).toBe(false);
+    });
+
+    it('a slot and an appointment that only touch do not overlap', () => {
+      const day = dayOf([slot(3, '09:00', '10:00')], [booked('alice')]);
+      expect([day.slots[0]!.tab, day.appointments[0]!.beside]).toEqual([null, false]);
+    });
+  });
+
+  describe('the Administrator\'s appointments that overlap (16.8)', () => {
+    // Monday 2026-11-16 in Rome, UTC+1: 10:00 local is 09:00Z. Each appointment a User of its own.
+    const at = (from: string, to: string, username: string, typeName = 'Swimming Pool') =>
+      appointment({ appointmentId: `appt-${username}`, start: z(`2026-11-16T${from}`), end: z(`2026-11-16T${to}`), date: '2026-11-16', username, typeId: POOL, typeName });
+    const dayOf = (appointments: ReturnType<typeof at>[], role: 'admin' | 'user' = 'admin') => weekModel(view('2026-11-16', { appointments }), role).days[0]!;
+    const columns = (day: ReturnType<typeof dayOf>) => day.appointments.map((a) => [a.who, a.lane, a.lanes]);
+    const shown = 600; // 08:00 to 18:00
+
+    it('one appointment alone keeps the whole width', () => {
+      const day = dayOf([at('09:00', '10:00', 'alice')]);
+      expect(columns(day)).toEqual([['alice', 0, 1]]);
+      expect(day.groups).toEqual([]);
+    });
+
+    it('two at the same time stand side by side, the order of the answer kept', () => {
+      expect(columns(dayOf([at('09:00', '10:00', 'bob'), at('09:00', '10:00', 'alice')]))).toEqual([
+        ['bob', 0, 2],
+        ['alice', 1, 2],
+      ]);
+    });
+
+    it('three that overlap are three columns; the earliest takes the leftmost', () => {
+      const day = dayOf([at('09:30', '10:00', 'carol'), at('09:00', '10:00', 'alice'), at('09:15', '10:00', 'bob')]);
+      expect(columns(day)).toEqual([
+        ['carol', 2, 3],
+        ['alice', 0, 3],
+        ['bob', 1, 3],
+      ]);
+      expect(day.groups).toEqual([]);
+    });
+
+    it('four that overlap are one block over their span, which lists them by start', () => {
+      const day = dayOf([at('09:00', '10:00', 'dan'), at('09:00', '10:00', 'alice'), at('08:30', '09:30', 'bob'), at('09:15', '10:45', 'carol')]);
+      expect(day.appointments).toEqual([]);
+      expect(day.groups).toEqual([
+        {
+          top: percent(90, shown),
+          height: percent(135, shown),
+          time: '09:30–11:45',
+          lane: 0,
+          lanes: 1,
+          what: '4 people · Swimming Pool',
+          when: 'Mon 16 Nov, 09:30–11:45',
+          colour: colourOf(POOL),
+          rows: [
+            { appointmentId: 'appt-bob', time: '09:30–10:30', who: 'bob' },
+            { appointmentId: 'appt-dan', time: '10:00–11:00', who: 'dan' },
+            { appointmentId: 'appt-alice', time: '10:00–11:00', who: 'alice' },
+            { appointmentId: 'appt-carol', time: '10:15–11:45', who: 'carol' },
+          ],
+          beside: false,
+        },
+      ]);
+    });
+
+    it('a chain of four whose peak is two is two columns, side by side, not one block', () => {
+      // 10:00–10:30, 10:15–10:45, 10:30–11:00, 10:45–11:15 local.
+      const day = dayOf([at('09:00', '09:30', 'a'), at('09:15', '09:45', 'b'), at('09:30', '10:00', 'c'), at('09:45', '10:15', 'd')]);
+      expect(columns(day)).toEqual([
+        ['a', 0, 2],
+        ['b', 1, 2],
+        ['c', 0, 2],
+        ['d', 1, 2],
+      ]);
+      expect(day.groups).toEqual([]);
+    });
+
+    it('appointments that touch are not chained: each keeps the whole width', () => {
+      expect(columns(dayOf([at('09:00', '10:00', 'alice'), at('10:00', '11:00', 'bob'), at('08:00', '09:00', 'carol')]))).toEqual([
+        ['alice', 0, 1],
+        ['bob', 0, 1],
+        ['carol', 0, 1],
+      ]);
+    });
+
+    it('a chain is apart from the next one: four at 10:00 are a block, two at 14:00 side by side', () => {
+      const four = ['a', 'b', 'c', 'd'].map((who) => at('09:00', '10:00', who));
+      const day = dayOf([...four, at('13:00', '14:00', 'e'), at('13:30', '14:00', 'f')]);
+      expect(day.groups.map((g) => [g.what, g.time])).toEqual([['4 people · Swimming Pool', '10:00–11:00']]);
+      expect(columns(day)).toEqual([
+        ['e', 0, 2],
+        ['f', 1, 2],
+      ]);
+    });
+
+    it('two chains of four are two blocks, each with its own count', () => {
+      const day = dayOf([...['a', 'b', 'c', 'd', 'e'].map((who) => at('09:00', '10:00', who)), ...['f', 'g', 'h', 'i'].map((who) => at('13:00', '14:00', who))]);
+      expect(day.groups.map((g) => [g.what, g.rows.length])).toEqual([
+        ['5 people · Swimming Pool', 5],
+        ['4 people · Swimming Pool', 4],
+      ]);
+    });
+
+    it('a User\'s week draws no block: a User\'s own appointments never overlap (R-BOOK-12)', () => {
+      const day = dayOf(['a', 'b', 'c', 'd'].map((who) => at('09:00', '10:00', who)), 'user');
+      expect(day.groups).toEqual([]);
+      expect(day.appointments).toHaveLength(4);
     });
   });
 

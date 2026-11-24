@@ -294,6 +294,32 @@ describe('texts', () => {
     });
   });
 
+  describe('failureText, who attempted', () => {
+    const USERS = 'You already have an appointment at this time. To move it, change that appointment instead.';
+    const ADMINS = 'This User already has an appointment at this time.';
+
+    it('user_busy is about the User booked for: the Administrator reads that the User has an appointment then', () => {
+      expect(failureText('user_busy', undefined, 'admin')).toBe(ADMINS);
+      expect(failureText('user_busy', 'change', 'admin')).toBe(ADMINS);
+    });
+
+    it('a User, and nobody named, read the User\'s sentence', () => {
+      expect(failureText('user_busy', undefined, 'user')).toBe(USERS);
+      expect(failureText('user_busy', 'change', 'user')).toBe(USERS);
+      expect(failureText('user_busy')).toBe(USERS);
+    });
+
+    it('what was attempted comes before who attempted', () => {
+      expect(failureText('cancellation_notice_too_short', 'change', 'admin')).toBe('It is too late to change this appointment.');
+    });
+
+    it('every other reason has the same sentence for the Administrator', () => {
+      for (const reason of ['slot_taken', 'booking_in_past', 'outside_availability', 'user_not_found', 'network', '', 'constructor']) {
+        expect(failureText(reason, undefined, 'admin'), reason).toBe(failureText(reason));
+      }
+    });
+  });
+
   describe('failureText, a single date', () => {
     it.each([
       ['date_in_past', 'This date is now in the past, so it can no longer be changed.'],

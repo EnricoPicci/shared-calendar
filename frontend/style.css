@@ -90,13 +90,33 @@ label { display: grid; gap: 0.25rem; font-size: 0.85rem; color: #52606d; }
 .slot { border: 1px dashed hsl(var(--c)); background: #fff; color: hsl(var(--c)); }
 .appointment { border: 1px solid #fff; background: hsl(var(--c)); color: #fff; }
 .appointment .note { opacity: 0.85; }
-/* Two blocks in the same place on the clock, the night the clocks go back: half the width each */
+/* The Administrator's slot with no place left: grey and hatched, its border still its type's */
+.slot.full { color: #52606d; background: repeating-linear-gradient(135deg, #fff 0 6px, #eceff3 6px 12px); }
+/* Four or more appointments at once, one block that opens their list: a double border */
+.appointment.group { border: 3px double #fff; font-weight: 600; }
+/* Blocks in the same place on the clock stand side by side, two or three, the width shared:
+   the Administrator's appointments that overlap, and the hour the clocks go back repeats */
 .block.lane-0-of-2 { right: 50%; }
 .block.lane-1-of-2 { left: 50%; }
+.block.lane-0-of-3 { right: 66.667%; }
+.block.lane-1-of-3 { left: 33.333%; right: 33.333%; }
+.block.lane-2-of-3 { left: 66.667%; }
 /* A slot and an appointment are buttons. A button does not stretch between left and right as a
    plain element does, so its width is said; its text starts at the top left like the others'. */
 button.block { display: flex; flex-wrap: wrap; align-content: flex-start; column-gap: 0.3em; width: calc(100% - 8px); text-align: left; }
 button.block.lane-0-of-2, button.block.lane-1-of-2 { width: calc(50% - 4px); }
+button.block.lane-0-of-3, button.block.lane-1-of-3, button.block.lane-2-of-3 { width: calc(33.333% - 4px); padding-inline: 0.2rem; }
+/* A slot that appointments overlap, the Administrator's only, is a narrow tab at the right of
+   its time, in front, its short text read downwards; the appointments beside it leave it room
+   (--room), their columns shared in what is left. */
+button.block.slot.tab { left: auto; right: 4px; width: 1.5rem; z-index: 1; padding: 0.25rem 0; justify-content: center; writing-mode: vertical-rl; font-weight: 600; }
+.slot.tab .time { display: none; }
+button.block.beside { --room: 1.7rem; width: calc(100% - 8px - var(--room)); }
+button.block.beside.lane-0-of-2 { width: calc((100% - var(--room)) / 2 - 4px); }
+button.block.beside.lane-1-of-2 { left: calc((100% - var(--room)) / 2); width: calc((100% - var(--room)) / 2 - 4px); }
+button.block.beside.lane-0-of-3 { width: calc((100% - var(--room)) / 3 - 4px); }
+button.block.beside.lane-1-of-3 { left: calc((100% - var(--room)) / 3); width: calc((100% - var(--room)) / 3 - 4px); }
+button.block.beside.lane-2-of-3 { left: calc((100% - var(--room)) * 2 / 3); width: calc((100% - var(--room)) / 3 - 4px); }
 button.block:hover { filter: brightness(0.95); }
 button.block:focus-visible { outline-offset: 1px; z-index: 1; }
 
@@ -175,7 +195,9 @@ dialog .question { overflow-wrap: anywhere; }
 .field .hint:empty { display: none; }
 .type-row, .pattern-row { align-items: center; gap: 0.15rem 0.75rem; padding: 0.4rem 0.4rem 0.4rem 0.75rem; border: 1px solid #d9dee5; border-radius: 6px; background: #fff; }
 .type-row { display: flex; flex-wrap: wrap; }
-.type-row .name { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.type-row .name { flex: 0 1 auto; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+/* "· 3 places" beside the name; empty for a capacity of one, and still taking the room left */
+.type-row .places { flex: 1; color: #52606d; font-size: 0.85rem; white-space: nowrap; }
 .type-row button { flex: none; }
 /* A pattern's row: its hours and its type on a first line with "ended" and the two buttons,
    its validity below the hours */
@@ -240,6 +262,11 @@ dialog dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 dialog .noted { display: contents; }
 dialog .note-form .submit { justify-self: end; }
 dialog .old { overflow-wrap: anywhere; }
+/* "Book anyway": the question and its button, apart from the dialog's own two buttons */
+dialog .anyway { display: grid; gap: 0.5rem; justify-items: start; padding: 0.6rem 0.75rem; border: 1px solid #b3261e; border-radius: 6px; background: #fdf1f0; }
+/* The list of a group: one button per appointment, its time and its User */
+dialog .people { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+dialog .person { display: flex; flex-wrap: wrap; gap: 0 0.75rem; width: 100%; text-align: left; overflow-wrap: anywhere; }
 .actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 0.5rem; }
 
 /* The assistant: a panel fixed to the bottom of the window, over whichever screen is on show.

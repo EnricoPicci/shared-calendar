@@ -3,6 +3,7 @@ import { BehaviorSubject, type Observable, type Subscription } from 'rxjs';
 import type { AppointmentsService } from '../services/appointments.service';
 import type { CalendarService } from '../services/calendar.service';
 import { appointmentDetail, movingOf, type AppointmentDetail, type Moving } from './appointment.detail';
+import { refusalOf, type Asked, type Refusal } from './booking';
 import { failureText, weekLabel } from './texts';
 import { weekModel, type WeekModel } from './week.model';
 
@@ -107,6 +108,12 @@ export class WeekScreen {
   detail(appointmentId: string): AppointmentDetail | null {
     const appointment = this.view?.appointments.find((a) => a.appointmentId === appointmentId);
     return appointment ? appointmentDetail(appointment, this.role, this.now(), this.view!.timeZone) : null;
+  }
+
+  // What the book dialog says when the server refused what it `asked`, the appointment in the
+  // way looked for among those of the last week loaded.
+  refusal(reason: string, asked: Asked): Refusal {
+    return refusalOf(reason, asked, this.role, this.view?.appointments ?? []);
   }
 
   // Starts the move of the appointment `appointmentId` of the last week loaded to another

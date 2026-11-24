@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Status | v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
+| Status | v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
 | What it is | One list of checks that walks every screen of the front end and the assistant's panel in a browser, as a User and as the Administrator, against the local stack. **The check to repeat after a later change to the view layer** |
 | What it is not | A source of truth, and not an automated test. On any conflict `docs/FRONTEND_ARCHITECTURE.md` and the tests win, and this page is fixed. No end-to-end test tool is in the repository (`docs/FRONTEND_VIEW_PLAN.md` section 8, decision 6): a person follows the list by hand, or drives a browser with a script kept outside the repository |
-| Made from | The browser checks of `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 68 and of `docs/CONVERSATIONAL_PLAN.md` step c12, in the order a person would follow, and `docs/SHARED_CALENDAR_SPEC.md` section 16.8 |
+| Made from | The browser checks of `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 68, of `docs/CONVERSATIONAL_PLAN.md` step c12 and of `docs/CAPACITY_PLAN.md` step u5, in the order a person would follow, and `docs/SHARED_CALENDAR_SPEC.md` section 16.8 |
 
 ### Change log
 
@@ -17,6 +17,7 @@
 | v3 | 2026-11-22 | **The assistant's panel**: section 6, checks 103 to 122, against the fake Claude, with what they need and leave in section 1; the short list for the real model and what a screen reader says of the panel, not yet listened to, in section 7; the row of step c12 in section 8. No earlier check changed its number. Two lines corrected by the run: check 5 (on a Sunday the week of today has no window and its legend is empty) and check 90 (saving a day is one write, followed by a read of the date). 122 checks. |
 | v4 | 2026-11-23 | `docs/CHANGE_PASSWORD_PLAN.md` step p3: **the password screen**, section 9, checks 123 to 133, as `alice` and as `admin`, with what they need and leave in its opening; it is walked last, after section 6, since it changes both local passwords, and puts them back itself. Checks 3 and 40: "Password" is last in each role's navigation. The row of step p3 in section 8. No earlier check changed its number. 133 checks. |
 | v3, note | 2026-11-23 | The branch `deploy-frontend` merged into `main`: the panel's version, first numbered v2, is v3, after the sign-out's v2. Walked on the merged page that day by a script in headless Chromium, at a desktop and a phone width, against the local stack with the fake Claude, as `alice`: checks 3, 4 (one `RevokeToken`, answered 200) and 103 to 105, then "Sign out" while the panel waited for an answer (the login at once, the panel gone, no `continue` sent after it, the conversation read again at the next sign-in); all yes. The console held `zod`'s `eval` probe only. The rest of the walk was not run again. |
+| v5 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u5: **the capacity of a type**, section 10, checks 134 to 156, with what they need and leave in its opening; the row of step u5 in section 8. Check 12: the Administrator's booking for `alice` makes `alice`'s attempt a `user_busy`, whose sentence it quotes. Check 41: the tab "Full" beside an appointment. Checks 66 and 70: "Edit" in the place of "Rename", and the capacity. Walked that day by a script in headless Chromium (Playwright 1.62), at 1280 × 800 and at 390 × 844, on a fresh, seeded local stack, as `admin`, `alice` and three Users of the run: every check of section 10 answered yes at both widths, and check 12 as written; at check 140 the tab "1 left" was seen on top and within reach, not pressed, and check 150 was seen on the screenshots, its tabs not pressed. The console held the known report of `zod` and the browser's own line for each answer 409 of checks 144, 145, 146 and 152. The rest of the walk was not run again. 156 checks. |
 
 ---
 
@@ -157,10 +158,12 @@ Sign in as `alice`.
     and no failure, and Escape closed it; nothing was booked.
 12. `[2]` Leave the week as it is. In the second window, as `admin`, book the free slot of
     Tuesday 11:00–12:00 for `alice` (note `walk-<tag> elsewhere`). Back in the first window,
-    press that slot, still shown as free, and "Book". → The booking is refused in plain words
-    ("This time is full: there is no place left. The calendar has been refreshed…"), the dialog stays open, and behind it the week is read again: the
-    slot is gone and the appointment is there. Close the dialog. In the second window, cancel
-    that appointment.
+    press that slot, still shown as free, and "Book". → The booking is refused in plain words,
+    since `alice` already holds that time ("You already have an appointment at this time. To
+    move it, change that appointment instead."; the page did not hold the appointment, so it is
+    not named), with no "Book anyway"; the dialog stays open, and behind it the week is read
+    again: the slot is gone and the appointment is there. Close the dialog. In the second
+    window, cancel that appointment. A full time refused to a User is check 144.
 
 **The detail and the note.**
 
@@ -270,7 +273,8 @@ Sign out, sign in as `admin`.
 
 **The week.** In next week.
 
-41. → Every appointment carries its User's name: `alice`'s say "alice", none says "You".
+41. → Every appointment carries its User's name: `alice`'s say "alice", none says "You". At the
+    right of each, a narrow tab "Full", the slot its appointment fills (check 150).
 42. `[K]` Press the free slot of Monday 09:00–10:00. → The dialog has "For", a list that holds
     `alice`, and "Start" and "End", two lists of times a quarter of an hour apart, set to 09:00
     and 10:00. Choose `alice`, type the note `walk-<tag> admin`, "Book". → The appointment is
@@ -339,7 +343,8 @@ Sign out, sign in as `admin`.
 **The availability: the types and the weekly patterns.**
 
 66. `[K]` `[N]` Press "Availability". → Three parts. "Types": "Piscina" and "Studio", each with
-    "Rename" and "Delete". "Weekly patterns": the seed's eight, under "Monday" to "Saturday",
+    "Edit" and "Delete", and no places beside the name (a capacity of one); the form has "Name"
+    and "Capacity", set to 1. "Weekly patterns": the seed's eight, under "Monday" to "Saturday",
     each with its hours ("09:00 – 13:00"), its type and its validity with the year. Three
     requests: the settings, the types, the patterns.
 67. `[K]` `[=]` In "Types" press "Create type" with an empty name, then with a name of 41
@@ -347,8 +352,9 @@ Sign out, sign in as `admin`.
 68. `[K]` Type `studio`, "Create type". → The server's refusal in plain words: a type with this
     name exists already.
 69. `[K]` Create the type `walk-<tag>`. → It is in the list, and the field is empty again.
-70. `[K]` Press its "Rename". → A dialog with the name in its field, the keyboard there. Change
-    it to `walk-<tag> two`, "Rename". → The dialog closes; the list has the new name.
+70. `[K]` Press its "Edit". → The dialog "Edit type" with the name and the capacity 1 in their
+    fields, the keyboard on the name. Change it to `walk-<tag> two`, "Save". → The dialog
+    closes; the list has the new name.
 71. `[K]` In "Weekly patterns" choose Sunday, 05:00, 07:00, the type `walk-<tag> two`, and press
     "Create pattern". → Under "Sunday": "05:00 – 07:00", the type, "from" today's date.
 72. Press "Week", then "›". → With no reload of the page: Sunday has a window 05:00–07:00 of the
@@ -632,10 +638,12 @@ section 6 and the journeys run on the fake only.
 | 68 | The date field; a date shown; refused dates; "this day only" put together and saved; discarded; overlaps; "not available"; the way back; an extra window; an appointment on the day; a write that cannot reach the server; a pattern changed while a date is on show; "Show" refused; signing out with the list open; the phone; the keyboard | 82 to 95 |
 | c12 | No panel at the login, the bar on every screen, no request before the first opening; a read with its progress line; moving between screens, a reload; a booking confirmed with the week on show; a dialog over the panel; a decline; a message that drops a proposal; each of the three sentences; a text with markup; another person finds nothing; the keyboard alone; the console | 103, 104, 121; 106; 108, 110; 111, 113; 112; 114; 115; 116, 118, 119; 107; 120; 104, 105, 109, 113, 114, 118; 122. What the browser's tools show a screen reader is check 117; the two points step c12 left (the count after a 503, "New conversation" after one) are in checks 116 and 118 |
 
+| u5 | A type's capacity: created, refused, edited; the places left; a time full for Users, busy for a fourth, refused to a page read before; the Administrator's full slot as a tab, refused, "Book anyway", the offer hidden by a change; two and three side by side, four as one block and its list; `user_busy` named for the Administrator; the User's own time not offered | 134 to 156, 12, 41, 66, 70 |
 | p3 | The hints while typing, the two new ones differing, a wrong current password, a change that succeeds, "Password changed" at the login, the old password refused, the new one accepted; as `alice` and as `admin`, at the two widths | 123 to 133 |
 
 Steps 60 to 68 are those of `docs/FRONTEND_VIEW_PLAN.md`; step c12 is of
-`docs/CONVERSATIONAL_PLAN.md`; step p3 of `docs/CHANGE_PASSWORD_PLAN.md`.
+`docs/CONVERSATIONAL_PLAN.md`; step p3 of `docs/CHANGE_PASSWORD_PLAN.md`; step u5 of
+`docs/CAPACITY_PLAN.md`.
 
 Left out on purpose: "the screens of the earlier steps still work, in short" (`docs/FRONTEND_VIEW_PLAN.md`
 section 4), which was each step's own short walk and is this whole list.
@@ -692,3 +700,79 @@ signed in here, and is not a check.
 133. `[=]` The console. → Besides the known report of `zod`, only the browser's own line for each
      answer 400, those of checks 126 and of the wrong sign-ins of check 128. No password, no token
      in any line.
+
+## 10. The capacity of a type
+
+Walked as `admin`, `alice` and three Users of the run, in **next week's Sunday**, which the
+seed leaves without windows. **What it needs**: the second window, and two more (a private
+window each, or other browsers): the section has up to four people signed in at once. As
+`admin`, in "Users", create `walk-<tag>-b`, `walk-<tag>-c` and `walk-<tag>-d` and note their
+passwords. **What it leaves**: nothing, after check 156. A run at the other width is a run of
+its own, with its own tag, on the Sunday after.
+
+**The type.** As `admin`, in "Availability".
+
+134. `[K]` `[=]` In "Types", type the name `walk-<tag> group`, then press "Create type" with the
+     capacity `0`, `101`, `2.5`, then emptied. → Each time refused under "Capacity": "How many
+     people at the same time: a whole number from 1 to 100."; `[N]` no request.
+135. `[K]` Capacity `3`, "Create type". → In the list: "walk-<tag> group · 3 places"; the form's
+     name empty and its capacity 1 again.
+136. `[K]` Its "Edit". → "Edit type", the name and 3 in the fields. Capacity `2`, "Save". → The
+     row says "· 2 places". "Edit" again: 2 in the field. Back to `3`, "Save": "· 3 places".
+137. In "Weekly patterns" create Sunday, 09:00, 12:00, the type `walk-<tag> group`, valid from
+     next week's Sunday to the same date. → The pattern under "Sunday".
+
+**Places.** In next week, Sunday.
+
+138. As `alice`: the slot 09:00–10:00 says "3 of 3 places left". Book it (note `walk-<tag>
+     one`). → The dialog closes; the appointment is there, "You".
+139. `[2]` As `walk-<tag>-b`: the same slot says "2 of 3 places left". As `walk-<tag>-d`, in a
+     third window, show next week and leave it so. As `walk-<tag>-b`, book the slot. → Booked.
+140. As `admin`: the two appointments of 09:00 stand side by side, half the width each, each
+     with its User; at their right a narrow tab "1 left", which can be pressed and opens the
+     book dialog. Close it.
+141. As `walk-<tag>-c`: "1 of 3 places left". Book it. → Booked.
+142. Sign in as `walk-<tag>-d` in a new window. → In next week's Sunday no slot at 09:00, and a
+     busy block "09:00–10:00 busy". Close that window.
+143. As `admin`, next week again: the three of 09:00 side by side, a third of the width each; at
+     their right the tab "Full", grey and hatched, in front, which a screen reader names "Sun …
+     09:00–10:00 Full". The page does not scroll sideways.
+144. In the third window, `walk-<tag>-d`'s page of check 139, still offering the slot with a
+     place: press it, "Book". → "This time is full: there is no place left. The calendar has
+     been refreshed: please choose another time.", no "Book anyway"; behind the dialog the slot
+     is gone. Close the dialog.
+
+**Over the capacity.** As `admin`.
+
+145. `[K]` Press the tab "Full". → The book dialog of 09:00–10:00. Choose `walk-<tag>-d`, note
+     `walk-<tag>`, "Book". → "This time is full: there is no place left." and, under it, "Book
+     anyway, over the capacity?" with the button "Book anyway"; the dialog stays open.
+146. `[K]` Type a letter in the note. → The offer is gone, the sentence stays. Put the note back,
+     "Book". → The offer again.
+147. `[K]` "Book anyway". → The dialog closes. The four of 09:00 are one block "09:00–10:00 4
+     people · walk-<tag> group", with a double border, and at its right the tab "Full".
+148. `[K]` Press the block. → A list headed "4 people · walk-<tag> group", the day and the time
+     under it, one row per appointment with its time and its User: `alice`, `walk-<tag>-b`,
+     `walk-<tag>-c`, `walk-<tag>-d`.
+149. `[K]` Press each row in turn, opening the list again each time. → The list closes and the
+     appointment's detail opens, with that User; "Close". Four times.
+150. → The Studio hours under `alice`'s appointments of the seed are tabs "Full" at their right,
+     each opening the book dialog.
+
+**One person, one place** (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-12).
+
+151. As `alice`, next week: the type's slot 09:00–10:00 is not offered to her; her appointment
+     is there.
+152. As `admin`: press the slot 10:00–11:00 of the type, choose `alice`, "Start" 09:30, "End"
+     10:30, "Book". → "alice already has an appointment at this time (09:00–10:00 · walk-<tag>
+     group).", no "Book anyway"; the dialog stays open. Close it.
+153. As `alice`: book the type's 10:00–11:00 (note `walk-<tag> two`). Open the appointment of
+     09:00, "Change". → The banner; the slot 10:00–11:00 of the type is not offered to her.
+     "Keep the appointment as it is".
+154. → At both widths: at 390 × 844 the block of four, the tabs and the list's rows can be
+     pressed, and the page does not scroll sideways.
+155. `[=]` The console. → Besides the known report of `zod`, only the browser's own line for each
+     answer 409 (checks 144, 145, 146, 152).
+156. Clean up as `admin`: in "Users" delete `walk-<tag>-b`, `-c` and `-d` (their appointments go
+     with them); as `alice` cancel `walk-<tag> one` and `walk-<tag> two`; in "Availability"
+     delete the pattern of check 137, then the type. → The type is gone from the list.

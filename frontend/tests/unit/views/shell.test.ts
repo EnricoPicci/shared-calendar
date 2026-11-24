@@ -2040,7 +2040,7 @@ describe('the navigation', () => {
     const SALA = '01M6DN5A1A0000000000000000';
     const P1 = '01M6PATTERN000000000000001';
     const P2 = '01M6PATTERN000000000000002';
-    const type = (typeId: string, name: string) => ({ typeId, name, ...STAMPS });
+    const type = (typeId: string, name: string) => ({ typeId, name, capacity: 1, ...STAMPS });
     const pattern = (patternId: string, over: object = {}) => ({ patternId, weekday: 1, start: '09:00', end: '13:00', typeId: STUDIO, validFrom: '2026-11-20', validUntil: null, ...STAMPS, ...over });
     const TYPES = [type(POOL, 'Piscina'), type(STUDIO, 'Studio')];
     const PATTERNS = [pattern(P1), pattern(P2, { weekday: 2, start: '15:00', end: '18:00', typeId: POOL })];
@@ -2164,9 +2164,27 @@ describe('the navigation', () => {
       expect(one<HTMLButtonElement>('form.create-type .submit').disabled).toBe(true);
       await typesListed('Piscina', 'Sala', 'Studio');
       expect(sent()).toEqual([...READS, 'POST /calendar/types', 'GET /calendar/types']);
-      expect([bodyOf(3), (calls()[3]![1].headers as Record<string, string>).Authorization]).toEqual([{ name: 'Sala' }, BEARER]);
+      expect([bodyOf(3), (calls()[3]![1].headers as Record<string, string>).Authorization]).toEqual([{ name: 'Sala', capacity: 1 }, BEARER]);
       expect([field('form.create-type', 'name').value, one<HTMLButtonElement>('form.create-type .submit').disabled]).toEqual(['', false]);
       for (const formOf of ['form.create-pattern', 'dialog.change']) expect([...field(formOf, 'typeId').querySelectorAll('option')].map((option) => option.textContent), formOf).toEqual(['Piscina', 'Sala', 'Studio']);
+    });
+
+    it('a capacity is sent as the field holds it, a number; one out of its bounds is refused under its field with no request', async () => {
+      await onAvailability();
+      for (const text of ['0', '101', '2.5', '']) {
+        field('form.create-type', 'name').value = 'Vasca';
+        field('form.create-type', 'capacity').value = text;
+        submit(one<HTMLFormElement>('form.create-type'));
+        expect(field('form.create-type', 'capacity').closest('.field')!.querySelector('.refusal')!.textContent, text).toBe('How many people at the same time: a whole number from 1 to 100.');
+      }
+      expect(sent()).toEqual(READS);
+      fetchMock.mockResolvedValueOnce(json(201, { ...type(SALA, 'Vasca'), capacity: 3 })).mockResolvedValueOnce(typesOf([TYPES[0]!, TYPES[1]!, { ...type(SALA, 'Vasca'), capacity: 3 }]));
+      field('form.create-type', 'capacity').value = '3';
+      submit(one<HTMLFormElement>('form.create-type'));
+      await typesListed('Piscina', 'Studio', 'Vasca');
+      expect(bodyOf(3)).toEqual({ name: 'Vasca', capacity: 3 });
+      expect(one('.types .list li:nth-child(3) .places').textContent).toBe('· 3 places');
+      expect(field('form.create-type', 'capacity').value).toBe('1');
     });
 
     it('a name that is not one is refused under its field with no request; a name that exists is the server\'s to refuse, in plain words, and what was typed stays', async () => {
@@ -2187,10 +2205,10 @@ describe('the navigation', () => {
       expect([field('form.create-type', 'name').value, field('form.create-type', 'name').hasAttribute('aria-invalid'), html().includes('a type named')]).toEqual(['studio', false, false]);
     });
 
-    it('a type is renamed: the dialog opens with its name, "Close" asks nothing, a refused name stays in the dialog, a good one sends the PUT, the dialog closes, and the patterns\' rows say the new name with no read of the patterns', async () => {
+    it('a type is edited: the dialog opens with its name and its capacity, "Close" asks nothing, a refused name stays in the dialog, a good one sends the PUT, the dialog closes, and the patterns\' rows say the new name with no read of the patterns', async () => {
       await onAvailability();
       one('.types .list li:nth-child(2) .ask-rename').click();
-      expect([dialog('rename').open, field('dialog.rename', 'name').value]).toEqual([true, 'Studio']);
+      expect([dialog('rename').open, field('dialog.rename', 'name').value, field('dialog.rename', 'capacity').value]).toEqual([true, 'Studio', '1']);
       one('dialog.rename .close').click();
       expect([dialog('rename').open, sent()]).toEqual([false, READS]);
 
@@ -2209,7 +2227,7 @@ describe('the navigation', () => {
       await typesListed('Piscina', 'Sala');
       await patternsListed('Monday: 09:00 – 13:00 Sala', TUESDAY);
       expect(sent()).toEqual([...READS, `PUT /calendar/types/${STUDIO}`, 'GET /calendar/types', `PUT /calendar/types/${STUDIO}`, 'GET /calendar/types']);
-      expect(bodyOf(5)).toEqual({ name: 'Sala' });
+      expect(bodyOf(5)).toEqual({ name: 'Sala', capacity: 1 });
     });
 
     it('a type is deleted: the dialog names it, "Keep" asks nothing; in use, the server\'s refusal says why and the dialog stays open; then the DELETE, the dialog closes and the types are read again', async () => {

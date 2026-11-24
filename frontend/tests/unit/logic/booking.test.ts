@@ -1,8 +1,9 @@
 import { BookBody, ChangeBody } from '@shared-calendar/shared';
-import { bookingFor, bookingText, changeFor, timeChoice, userChoice, type BookingFields } from '../../../src/logic/booking';
+import type { Moving } from '../../../src/logic/appointment.detail';
+import { bookingFor, bookingText, changeFor, FULL_FOR_ADMIN, inTheWay, refusalOf, timeChoice, userChoice, type Asked, type BookingFields } from '../../../src/logic/booking';
 import { weekModel } from '../../../src/logic/week.model';
 import type { SlotBlock } from '../../../src/logic/week.model';
-import { STUDIO, view } from './fixtures';
+import { appointment, POOL, STUDIO, view } from './fixtures';
 import { useFarBrowserZone } from './zone';
 
 const z = (instant: string) => `${instant}:00.000Z`;
@@ -299,6 +300,115 @@ describe('booking', () => {
       const slot = winter();
       const body = changeFor(slot, 'Europe/Rome', 'admin', untouched(slot, 'Europe/Rome', { username: 'bob' }));
       expect(ChangeBody.safeParse(body).success).toBe(true);
+    });
+  });
+  describe('over the capacity: overbook (R-BOOK-13)', () => {
+    it('the Administrator\'s "Book anyway" sends overbook: true with the same booking; otherwise the key is not there', () => {
+      const slot = winter();
+      const asked = untouched(slot, 'Europe/Rome', { note: 'Extra' });
+      const forced = bookingFor(slot, 'Europe/Rome', 'admin', asked, true);
+      expect(forced).toEqual({ ...bookingFor(slot, 'Europe/Rome', 'admin', asked), overbook: true });
+      expect(BookBody.safeParse(forced).success).toBe(true);
+      expect(bookingFor(slot, 'Europe/Rome', 'admin', asked, false)).not.toHaveProperty('overbook');
+      expect(bookingFor(slot, 'Europe/Rome', 'admin', asked)).not.toHaveProperty('overbook');
+    });
+
+    it('"Change anyway" the same, with the change\'s own body', () => {
+      const slot = winter();
+      const forced = changeFor(slot, 'Europe/Rome', 'admin', untouched(slot, 'Europe/Rome', { start: '10:15' }), true);
+      expect(forced).toEqual({ start: z('2026-11-23T09:15'), end: z('2026-11-23T10:00'), note: '', overbook: true });
+      expect(ChangeBody.safeParse(forced).success).toBe(true);
+      expect(changeFor(slot, 'Europe/Rome', 'admin', untouched(slot))).not.toHaveProperty('overbook');
+    });
+  });
+
+  describe('what the dialog says when the server refuses (R-BOOK-07, R-BOOK-12, R-BOOK-13, R-CHG-01)', () => {
+    // Monday 23 November 2026 in Rome: the slot 09:00–10:00 local, in a window 08:30–12:00.
+    const nine = () => slotOf('2026-11-23', ['2026-11-23T07:30', '2026-11-23T11:00'], ['2026-11-23T08:00', '2026-11-23T09:00']);
+    // alice's own 09:15–10:00 local, as in docs/SHARED_CALENDAR_SPEC.md AC-15; bob's 10:00–11:00, which only touches the slot.
+    const ALICES = appointment({ appointmentId: 'appt-alice', start: z('2026-11-23T08:15'), end: z('2026-11-23T09:00'), date: '2026-11-23' });
+    const BOBS = appointment({ appointmentId: 'appt-bob', start: z('2026-11-23T09:00'), end: z('2026-11-23T10:00'), date: '2026-11-23', username: 'bob', typeId: POOL, typeName: 'Swimming Pool' });
+    const moving = (appointmentId: string, who: string): Moving => ({ appointmentId, when: 'Mon 23 Nov, 11:00–12:00', what: 'Mon 23 Nov, 11:00–12:00 · Studio', who, note: '' });
+    const asked = (over: Partial<Asked> = {}): Asked => {
+      const slot = nine();
+      return { slot, zone: 'Europe/Rome', fields: untouched(slot), moving: null, ...over };
+    };
+    const USERS = 'You already have an appointment at this time. To move it, change that appointment instead.';
+    const ADMINS = 'This User already has an appointment at this time.';
+
+    describe('user_busy names the appointment in the way, or says it plainly; nothing is offered', () => {
+      it('a User booking over her own appointment: its time and its type, and to open it', () => {
+        expect(refusalOf('user_busy', asked(), 'user', [ALICES])).toEqual({
+          text: 'You already have an appointment at this time (09:15–10:00 · Studio); open it to change it.',
+          offer: false,
+        });
+      });
+
+      it('the Administrator booking for alice over hers: her name, its time and its type', () => {
+        expect(refusalOf('user_busy', asked(), 'admin', [BOBS, ALICES])).toEqual({ text: 'alice already has an appointment at this time (09:15–10:00 · Studio).', offer: false });
+      });
+
+      it('none found in the week shown: the sentences without the appointment, the User\'s and the Administrator\'s', () => {
+        expect(refusalOf('user_busy', asked(), 'user', [])).toEqual({ text: USERS, offer: false });
+        expect(refusalOf('user_busy', asked(), 'admin', [])).toEqual({ text: ADMINS, offer: false });
+      });
+
+      it('the Administrator booking for bob: alice\'s appointment is not his, so none is found', () => {
+        const forBob = asked({ fields: untouched(nine(), 'Europe/Rome', { username: 'bob' }) });
+        expect(refusalOf('user_busy', forBob, 'admin', [ALICES])).toEqual({ text: ADMINS, offer: false });
+      });
+
+      it('a change leaves the appointment being moved out: alone in the way, none is found; another one is', () => {
+        expect(refusalOf('user_busy', asked({ moving: moving('appt-alice', 'You') }), 'user', [ALICES])).toEqual({ text: USERS, offer: false });
+        expect(refusalOf('user_busy', asked({ moving: moving('appt-other', 'You') }), 'user', [ALICES]).text).toBe(
+          'You already have an appointment at this time (09:15–10:00 · Studio); open it to change it.',
+        );
+      });
+
+      it('the Administrator\'s change: the User is the moved appointment\'s, not the one the form holds', () => {
+        const change = asked({ moving: moving('appt-other', 'alice'), fields: untouched(nine(), 'Europe/Rome', { username: '' }) });
+        expect(refusalOf('user_busy', change, 'admin', [ALICES]).text).toBe('alice already has an appointment at this time (09:15–10:00 · Studio).');
+      });
+    });
+
+    describe('inTheWay', () => {
+      it('the Administrator\'s own times: 10:00–10:15 local only touches alice\'s, 09:45–10:15 overlaps it', () => {
+        const slot = nine();
+        expect(inTheWay([ALICES], 'admin', asked({ fields: untouched(slot, 'Europe/Rome', { start: '10:00', end: '10:15' }) }))).toBeNull();
+        expect(inTheWay([ALICES], 'admin', asked({ fields: untouched(slot, 'Europe/Rome', { start: '09:45', end: '10:15' }) }))).toBe(ALICES);
+      });
+
+      it('an appointment that touches the slot is not in the way; of several in the way, the earliest', () => {
+        const forBob = asked({ fields: untouched(nine(), 'Europe/Rome', { username: 'bob' }) });
+        expect(inTheWay([BOBS], 'admin', forBob)).toBeNull();
+        const early = appointment({ appointmentId: 'appt-early', start: z('2026-11-23T07:30'), end: z('2026-11-23T08:30'), date: '2026-11-23' });
+        expect(inTheWay([ALICES, early], 'user', asked())).toBe(early);
+      });
+
+      it('a User\'s slot ends where the slot ends: the server takes the end as the slot\'s', () => {
+        const late = appointment({ appointmentId: 'appt-late', start: z('2026-11-23T08:59'), end: z('2026-11-23T09:30'), date: '2026-11-23' });
+        expect(inTheWay([late], 'user', asked())).toBe(late);
+      });
+    });
+
+    describe('slot_taken: the Administrator is offered to go over the capacity; a User is not', () => {
+      it('the Administrator, booking or changing: the time is full, and the offer', () => {
+        expect(refusalOf('slot_taken', asked(), 'admin', [])).toEqual({ text: FULL_FOR_ADMIN, offer: true });
+        expect(refusalOf('slot_taken', asked({ moving: moving('appt-alice', 'alice') }), 'admin', [])).toEqual({ text: FULL_FOR_ADMIN, offer: true });
+        expect(FULL_FOR_ADMIN).toBe('This time is full: there is no place left.');
+      });
+
+      it('a User: the sentence of every page, with the week read again, and no offer', () => {
+        expect(refusalOf('slot_taken', asked(), 'user', [ALICES])).toEqual({
+          text: 'This time is full: there is no place left. The calendar has been refreshed: please choose another time.',
+          offer: false,
+        });
+      });
+    });
+
+    it('every other reason is failureText\'s, with what was attempted', () => {
+      expect(refusalOf('cancellation_notice_too_short', asked({ moving: moving('appt-alice', 'You') }), 'user', [])).toEqual({ text: 'It is too late to change this appointment.', offer: false });
+      expect(refusalOf('booking_in_past', asked(), 'admin', [ALICES])).toEqual({ text: 'This time has already passed. Please choose a later one.', offer: false });
     });
   });
 });

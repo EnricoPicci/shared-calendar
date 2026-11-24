@@ -1,6 +1,6 @@
 import type { AppointmentConflict, AvailabilityType, CalendarSettings, WeeklyPattern } from '@shared-calendar/shared';
 import { ReplaySubject, Subject } from 'rxjs';
-import { NO_PATTERNS, NO_TYPE_YET, NO_TYPES, startingFields, TYPE_NAME_HINT, type PatternFields } from '../../../src/logic/availability.model';
+import { NO_PATTERNS, NO_TYPE_YET, NO_TYPES, startingFields, TYPE_CAPACITY_HINT, TYPE_NAME_HINT, type PatternFields } from '../../../src/logic/availability.model';
 import { AvailabilityScreen, type Ask, type AvailabilityRules, type AvailabilityState, type AvailabilityTypes, type Known } from '../../../src/logic/availability.screen';
 import type { CreatePatternResult, DeletePatternResult, PatternsResult, UpdatePatternResult } from '../../../src/services/availability-rules.types';
 import type { CreateTypeResult, RemoveTypeResult, RenameTypeResult, TypesResult } from '../../../src/services/availability-types.types';
@@ -27,7 +27,7 @@ const START: AvailabilityState = {
   patternsEmpty: null,
   choices: [],
   typeHint: '',
-  typeField: { name: '' },
+  typeFields: { name: '', capacity: '1' },
   patternFields: startingFields(null),
   typeCreate: QUIET,
   rename: QUIET,
@@ -48,6 +48,8 @@ const BODY = { weekday: 3, start: '09:00', end: '13:00', typeId: STUDIO, validFr
 const CONFLICTS: AppointmentConflict[] = [{ appointmentId: 'appt-1', username: 'alice', start: '2026-11-23T08:00:00.000Z', end: '2026-11-23T09:00:00.000Z' }];
 const IN_THE_WAY = { sentence: '1 appointment is in the way:', rows: [{ date: 'Mon 23 Nov', time: '09:00–10:00', username: 'alice' }] };
 const settingsOf = (timeZone: string): CalendarSettings => ({ timeZone, cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: null, updatedAt: null, updatedBy: null });
+// What the form of a type holds: a name, and a capacity of 1 unless another is given.
+const fields = (name: string, capacity = '1') => ({ name, capacity });
 const failure = <R extends string>(reason: R) => ({ status: 'failure' as const, reason, message: 'for a developer' });
 
 function screenOf(now: Date = NOW) {
@@ -117,9 +119,9 @@ describe('AvailabilityScreen', () => {
 
     it('no write and no new try does anything', () => {
       const { screen, types, rules, reads, states } = screenOf();
-      screen.createType('Studio');
-      screen.createType('');
-      screen.rename(STUDIO, 'Sala');
+      screen.createType(fields('Studio'));
+      screen.createType(fields(''));
+      screen.rename(STUDIO, fields('Sala'));
       screen.createPattern(FIELDS);
       screen.change(P1, FIELDS);
       screen.retryTypes();
@@ -157,8 +159,8 @@ describe('AvailabilityScreen', () => {
       screen.start();
       typed(POOL_TYPE, STUDIO_TYPE);
       expect(last().types).toEqual([
-        { typeId: POOL, name: 'Piscina', renameLabel: 'Rename Piscina', deleteLabel: 'Delete Piscina' },
-        { typeId: STUDIO, name: 'Studio', renameLabel: 'Rename Studio', deleteLabel: 'Delete Studio' },
+        { typeId: POOL, name: 'Piscina', places: '', editLabel: 'Edit Piscina', deleteLabel: 'Delete Piscina', fields: { name: 'Piscina', capacity: '1' } },
+        { typeId: STUDIO, name: 'Studio', places: '', editLabel: 'Edit Studio', deleteLabel: 'Delete Studio', fields: { name: 'Studio', capacity: '1' } },
       ]);
       expect(last().choices).toEqual([{ value: POOL, label: 'Piscina' }, { value: STUDIO, label: 'Studio' }]);
       expect([last().typesEmpty, last().typeHint, last().typesUnread]).toEqual([null, '', null]);
@@ -358,8 +360,8 @@ describe('AvailabilityScreen', () => {
     it('a name: it goes to the service, once, and the screen says a create is under way; nothing is read yet', () => {
       const { shown, screen, types, reads, last } = screenOf();
       shown();
-      screen.createType('Sala');
-      expect(types.create.mock.calls).toEqual([['Sala']]);
+      screen.createType(fields('Sala'));
+      expect(types.create.mock.calls).toEqual([['Sala', 1]]);
       expect(last().typeCreate).toEqual({ ...QUIET, busy: true });
       expect(reads()).toEqual([1, 1, 1]);
     });
@@ -367,43 +369,43 @@ describe('AvailabilityScreen', () => {
     it('spaces around the name are removed before it is sent', () => {
       const { shown, screen, types } = screenOf();
       shown();
-      screen.createType('  Sala grande ');
-      expect(types.create).toHaveBeenCalledWith('Sala grande');
+      screen.createType(fields('  Sala grande '));
+      expect(types.create).toHaveBeenCalledWith('Sala grande', 1);
     });
 
     it.each([[''], ['   '], ['a'.repeat(41)], ['Sala\tgrande']])('"%s" is refused by the check: its sentence, no call, no read, and the lists kept', (text) => {
       const { shown, screen, types, reads, last } = screenOf();
       shown();
-      const { types: listed, groups, typeField } = last();
-      screen.createType(text);
+      const { types: listed, groups, typeFields } = last();
+      screen.createType(fields(text));
       expect(types.create).not.toHaveBeenCalled();
       expect(last().typeCreate).toEqual({ ...QUIET, refusals: { name: TYPE_NAME_HINT } });
       expect(reads()).toEqual([1, 1, 1]);
-      expect([last().types, last().groups, last().typeField]).toEqual([listed, groups, typeField]);
-      expect(last().typeField).toBe(typeField);
+      expect([last().types, last().groups, last().typeFields]).toEqual([listed, groups, typeFields]);
+      expect(last().typeFields).toBe(typeFields);
     });
 
     it('"studio" passes the check: the server is the one to say that the name exists, and the field is not in fault', () => {
       const { shown, screen, results, types, last } = screenOf();
       shown();
-      const field = last().typeField;
-      screen.createType('studio');
-      expect(types.create).toHaveBeenCalledWith('studio');
+      const field = last().typeFields;
+      screen.createType(fields('studio'));
+      expect(types.create).toHaveBeenCalledWith('studio', 1);
       results.create.next(failure('type_name_exists'));
       expect(last().typeCreate).toEqual({ ...QUIET, failure: 'A type with this name exists already. Choose another name.' });
       // What was typed stays: the field is not to be filled again.
-      expect(last().typeField).toBe(field);
+      expect(last().typeFields).toBe(field);
     });
 
     it('a create that succeeds: done, the field to empty, and the types read again, not the patterns', () => {
       const { shown, screen, results, typed, reads, last, names } = screenOf();
       shown();
-      const field = last().typeField;
-      screen.createType('Sala');
+      const field = last().typeFields;
+      screen.createType(fields('Sala'));
       results.create.next({ status: 'success', type: type('01M6SALA000000000000000000', 'Sala') });
       expect(last().typeCreate).toEqual({ ...QUIET, done: true });
-      expect(last().typeField).toEqual({ name: '' });
-      expect(last().typeField).not.toBe(field);
+      expect(last().typeFields).toEqual({ name: '', capacity: '1' });
+      expect(last().typeFields).not.toBe(field);
       expect(reads()).toEqual([1, 2, 1]);
       expect(last().loading).toBe(true);
       typed(POOL_TYPE, type('01M6SALA000000000000000000', 'Sala'), STUDIO_TYPE);
@@ -414,7 +416,7 @@ describe('AvailabilityScreen', () => {
     it('the limit met says how many types the calendar holds', () => {
       const { shown, screen, results, last } = screenOf();
       shown();
-      screen.createType('Sala');
+      screen.createType(fields('Sala'));
       results.create.next(failure('limit_reached'));
       expect(last().typeCreate.failure).toBe('The calendar can hold 20 types at most. Delete one to create another.');
     });
@@ -422,11 +424,11 @@ describe('AvailabilityScreen', () => {
     it('a create that cannot reach the server: why, the types read again all the same, and what was typed kept', () => {
       const { shown, screen, results, reads, last } = screenOf();
       shown();
-      const field = last().typeField;
-      screen.createType('Sala');
+      const field = last().typeFields;
+      screen.createType(fields('Sala'));
       results.create.next(failure('network'));
       expect(last().typeCreate).toEqual({ ...QUIET, failure: UNREACHABLE });
-      expect(last().typeField).toBe(field);
+      expect(last().typeFields).toBe(field);
       expect(reads()).toEqual([1, 2, 1]);
       expect(JSON.stringify(last())).not.toContain('for a developer');
     });
@@ -434,21 +436,21 @@ describe('AvailabilityScreen', () => {
     it('a refusal takes an earlier failure away, and the next create that is sent takes the refusal away', () => {
       const { shown, screen, results, last } = screenOf();
       shown();
-      screen.createType('Sala');
+      screen.createType(fields('Sala'));
       results.create.next(failure('network'));
-      screen.createType('');
+      screen.createType(fields(''));
       expect(last().typeCreate).toEqual({ ...QUIET, refusals: { name: TYPE_NAME_HINT } });
-      screen.createType('Sala');
+      screen.createType(fields('Sala'));
       expect(last().typeCreate).toEqual({ ...QUIET, busy: true });
     });
 
     it('a second create while one is under way is not taken, sent or refused', () => {
       const { shown, screen, types, last } = screenOf();
       shown();
-      screen.createType('Sala');
-      screen.createType('Altra');
-      screen.createType('');
-      expect(types.create.mock.calls).toEqual([['Sala']]);
+      screen.createType(fields('Sala'));
+      screen.createType(fields('Altra'));
+      screen.createType(fields(''));
+      expect(types.create.mock.calls).toEqual([['Sala', 1]]);
       expect(last().typeCreate).toEqual({ ...QUIET, busy: true });
     });
   });
@@ -457,22 +459,22 @@ describe('AvailabilityScreen', () => {
     it('a name: it goes to the service with the type\'s id, and the outcome says which type it is about', () => {
       const { shown, screen, types, last } = screenOf();
       shown();
-      screen.rename(STUDIO, ' Sala ');
-      expect(types.rename.mock.calls).toEqual([[STUDIO, 'Sala']]);
+      screen.rename(STUDIO, fields(' Sala '));
+      expect(types.rename.mock.calls).toEqual([[STUDIO, 'Sala', 1]]);
       expect(last().rename).toEqual({ ...QUIET, about: STUDIO, busy: true });
     });
 
     it('a rename to the same name is sent as it is', () => {
       const { shown, screen, types } = screenOf();
       shown();
-      screen.rename(STUDIO, 'Studio');
-      expect(types.rename).toHaveBeenCalledWith(STUDIO, 'Studio');
+      screen.rename(STUDIO, fields('Studio'));
+      expect(types.rename).toHaveBeenCalledWith(STUDIO, 'Studio', 1);
     });
 
     it('a text that is not a name is refused: its sentence, about that type, no call and no read', () => {
       const { shown, screen, types, reads, last } = screenOf();
       shown();
-      screen.rename(POOL, '  ');
+      screen.rename(POOL, fields('  '));
       expect(types.rename).not.toHaveBeenCalled();
       expect(last().rename).toEqual({ ...QUIET, about: POOL, refusals: { name: TYPE_NAME_HINT } });
       expect(reads()).toEqual([1, 1, 1]);
@@ -483,8 +485,8 @@ describe('AvailabilityScreen', () => {
     it('a rename that succeeds: done, the types read again, and the patterns\' rows say the new name with no read of the patterns', () => {
       const { shown, screen, results, typed, reads, last, rows, names } = screenOf();
       shown();
-      const { groups, typeField } = last();
-      screen.rename(STUDIO, 'Sala');
+      const { groups, typeFields } = last();
+      screen.rename(STUDIO, fields('Sala'));
       results.rename.next({ status: 'success', type: type(STUDIO, 'Sala') });
       expect(last().rename).toEqual({ ...QUIET, about: STUDIO, done: true });
       expect(reads()).toEqual([1, 2, 1]);
@@ -496,7 +498,7 @@ describe('AvailabilityScreen', () => {
       expect(last().groups![0]!.rows[0]!.changeLabel).toBe('Change Monday 09:00 – 13:00 Sala');
       expect(reads()).toEqual([1, 2, 1]);
       // The form that creates a type is not emptied by a rename.
-      expect(last().typeField).toBe(typeField);
+      expect(last().typeFields).toBe(typeFields);
     });
 
     it.each([
@@ -507,7 +509,7 @@ describe('AvailabilityScreen', () => {
     ] as const)('a rename that fails with %s: why, about that type, and the types read again all the same', (reason, sentence) => {
       const { shown, screen, results, reads, last } = screenOf();
       shown();
-      screen.rename(STUDIO, 'Piscina');
+      screen.rename(STUDIO, fields('Piscina'));
       results.rename.next(failure(reason));
       expect(last().rename).toEqual({ ...QUIET, about: STUDIO, failure: sentence });
       expect(reads()).toEqual([1, 2, 1]);
@@ -516,16 +518,85 @@ describe('AvailabilityScreen', () => {
     it('a second rename while one is under way is not taken, also for another type: the answer that arrives is about the first', () => {
       const { shown, screen, results, types, last } = screenOf();
       shown();
-      screen.rename(STUDIO, 'Sala');
-      screen.rename(POOL, 'Vasca');
-      screen.rename(POOL, '');
-      expect(types.rename.mock.calls).toEqual([[STUDIO, 'Sala']]);
+      screen.rename(STUDIO, fields('Sala'));
+      screen.rename(POOL, fields('Vasca'));
+      screen.rename(POOL, fields(''));
+      expect(types.rename.mock.calls).toEqual([[STUDIO, 'Sala', 1]]);
       results.rename.next(failure('network'));
       expect(last().rename).toEqual({ ...QUIET, about: STUDIO, failure: UNREACHABLE });
       // Answered, the next one goes.
-      screen.rename(POOL, 'Vasca');
-      expect(types.rename.mock.calls).toEqual([[STUDIO, 'Sala'], [POOL, 'Vasca']]);
+      screen.rename(POOL, fields('Vasca'));
+      expect(types.rename.mock.calls).toEqual([[STUDIO, 'Sala', 1], [POOL, 'Vasca', 1]]);
       expect(last().rename).toEqual({ ...QUIET, about: POOL, busy: true });
+    });
+  });
+
+  describe('the capacity of a type', () => {
+    it('created with the capacity its field holds: 3 is sent as 3', () => {
+      const { shown, screen, types } = screenOf();
+      shown();
+      screen.createType(fields('Piscina grande', ' 3 '));
+      expect(types.create.mock.calls).toEqual([['Piscina grande', 3]]);
+    });
+
+    it('edited with the capacity its field holds, changed or not: 2, then 1 again', () => {
+      const { shown, screen, results, types } = screenOf();
+      shown();
+      screen.rename(POOL, fields('Piscina', '2'));
+      results.rename.next({ status: 'success', type: { ...POOL_TYPE, capacity: 2 } });
+      screen.rename(POOL, fields('Piscina'));
+      expect(types.rename.mock.calls).toEqual([
+        [POOL, 'Piscina', 2],
+        [POOL, 'Piscina', 1],
+      ]);
+    });
+
+    it.each(['0', '101', '2.5', '', 'three', '-1'])('a capacity of "%s" is refused under its field, in the words of its hint, at creation and at an edit, with no call', (capacity) => {
+      const { shown, screen, types, last } = screenOf();
+      shown();
+      screen.createType(fields('Sala', capacity));
+      screen.rename(STUDIO, fields('Sala', capacity));
+      expect(last().typeCreate).toEqual({ ...QUIET, refusals: { capacity: TYPE_CAPACITY_HINT } });
+      expect(last().rename).toEqual({ ...QUIET, about: STUDIO, refusals: { capacity: TYPE_CAPACITY_HINT } });
+      expect(types.create).not.toHaveBeenCalled();
+      expect(types.rename).not.toHaveBeenCalled();
+    });
+
+    it('the bounds 1 and 100 are sent', () => {
+      const { shown, screen, results, types } = screenOf();
+      shown();
+      screen.createType(fields('Uno', '1'));
+      results.create.next({ status: 'success', type: type(STUDIO, 'Uno') });
+      screen.createType(fields('Cento', '100'));
+      expect(types.create.mock.calls).toEqual([
+        ['Uno', 1],
+        ['Cento', 100],
+      ]);
+    });
+
+    it('a name and a capacity both in fault are both said', () => {
+      const { shown, screen, last } = screenOf();
+      shown();
+      screen.createType(fields('', '0'));
+      expect(last().typeCreate.refusals).toEqual({ name: TYPE_NAME_HINT, capacity: TYPE_CAPACITY_HINT });
+    });
+
+    it('after a create with 3, the form is filled again with no name and a capacity of 1', () => {
+      const { shown, screen, results, last } = screenOf();
+      shown();
+      screen.createType(fields('Sala', '3'));
+      results.create.next({ status: 'success', type: { ...type(STUDIO, 'Sala'), capacity: 3 } });
+      expect(last().typeFields).toEqual({ name: '', capacity: '1' });
+    });
+
+    it('a type of capacity 3 has "· 3 places" in its row and its capacity in its fields; one of 1 has nothing beside its name', () => {
+      const { shown, results, last } = screenOf();
+      shown();
+      results.types.next({ status: 'success', types: [{ ...POOL_TYPE, capacity: 3 }, STUDIO_TYPE] });
+      expect(last().types!.map((row) => [row.name, row.places, row.fields.capacity])).toEqual([
+        ['Piscina', '· 3 places', '3'],
+        ['Studio', '', '1'],
+      ]);
     });
   });
 
@@ -791,7 +862,7 @@ describe('AvailabilityScreen', () => {
     it('both lists are read again, each time, not the settings; what the forms say stays', () => {
       const { shown, screen, visible$, reads, last } = screenOf();
       shown();
-      screen.createType('');
+      screen.createType(fields(''));
       visible$.next();
       expect(reads()).toEqual([1, 2, 2]);
       expect(last().loading).toBe(true);
@@ -815,13 +886,13 @@ describe('AvailabilityScreen', () => {
     it('everything is forgotten, no stream is heard, and nothing is read or written', () => {
       const { shown, screen, results, visible$, types, rules, reads, last } = screenOf();
       const started = shown();
-      screen.createType('');
+      screen.createType(fields(''));
       started.unsubscribe();
       expect(last()).toEqual(START);
       expect([...Object.values(results).map((subject) => subject.observed), visible$.observed]).toEqual(Array(10).fill(false));
       visible$.next();
-      screen.createType('Sala');
-      screen.rename(STUDIO, 'Sala');
+      screen.createType(fields('Sala'));
+      screen.rename(STUDIO, fields('Sala'));
       screen.createPattern(FIELDS);
       screen.change(P1, FIELDS);
       screen.retryTypes();
@@ -847,14 +918,14 @@ describe('AvailabilityScreen', () => {
     it('left while a write was under way, its late answer is not the next start\'s, and the next write goes', () => {
       const { shown, screen, results, types, reads, last } = screenOf();
       const started = shown();
-      screen.createType('Sala');
+      screen.createType(fields('Sala'));
       started.unsubscribe();
       results.create.next(failure('network'));
       screen.start();
       expect(reads()).toEqual([2, 2, 2]);
       expect(last().typeCreate).toEqual(QUIET);
-      screen.createType('Altra');
-      expect(types.create.mock.calls).toEqual([['Sala'], ['Altra']]);
+      screen.createType(fields('Altra'));
+      expect(types.create.mock.calls).toEqual([['Sala', 1], ['Altra', 1]]);
     });
   });
 

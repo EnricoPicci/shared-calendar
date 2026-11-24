@@ -565,7 +565,7 @@ describe('AppointmentsScreen', () => {
       screen.move('booked');
       expect(handOver).toHaveBeenCalledTimes(1);
       expect(handOver).toHaveBeenCalledWith(
-        { appointmentId: 'booked', when: 'Mon 23 Nov, 10:00–11:00', what: 'Mon 23 Nov, 10:00–11:00 · Studio', note: 'First lesson' },
+        { appointmentId: 'booked', when: 'Mon 23 Nov, 10:00–11:00', what: 'Mon 23 Nov, 10:00–11:00 · Studio', who: 'You', note: 'First lesson' },
         '2026-11-23',
       );
       expect(handOver.mock.calls[0]![0]).toEqual(movingOf(appointmentDetail(BOOKED, 'user', new Date(NOW), 'Europe/Rome'), 'user'));

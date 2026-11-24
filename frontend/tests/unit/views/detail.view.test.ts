@@ -101,7 +101,8 @@ const WEEK: WeekModel = {
       windows: [],
       slots: [],
       busy: [],
-      appointments: SHOWN.map((appointmentId, i) => ({ top: `${i * 50}%`, height: '50%', time: '11:00–12:00', lane: 0, lanes: 1, appointmentId, who: 'You', typeName: 'Studio', note: '', colour: 2 })),
+      appointments: SHOWN.map((appointmentId, i) => ({ top: `${i * 50}%`, height: '50%', time: '11:00–12:00', lane: 0, lanes: 1, appointmentId, who: 'You', typeName: 'Studio', note: '', colour: 2, beside: false })),
+      groups: [],
     },
   ],
 };
@@ -119,6 +120,7 @@ const BY_THE_WEEK: Host = {
         detail,
         move,
         keep: vi.fn(),
+        refusal: vi.fn(),
       },
       appointments: {
         ...appointments,

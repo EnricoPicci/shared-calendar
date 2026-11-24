@@ -1,21 +1,21 @@
 import type { Role } from '@shared-calendar/shared';
 import type { Subscription } from 'rxjs';
 import type { Moving } from '../logic/appointment.detail';
-import { bookingFor, bookingText, changeFor, timeChoice, userChoice } from '../logic/booking';
-import { failureText } from '../logic/texts';
-import type { AppointmentBlock, BusyBlock, DayModel, Placed, SlotBlock, WeekModel, WindowBlock } from '../logic/week.model';
+import { bookingFor, bookingText, changeFor, timeChoice, userChoice, type Asked } from '../logic/booking';
+import type { AppointmentBlock, BusyBlock, DayModel, GroupBlock, Placed, SlotBlock, WeekModel, WindowBlock } from '../logic/week.model';
 import type { WeekScreen } from '../logic/week.screen';
 import type { AppointmentsService } from '../services/appointments.service';
 import type { UsersService } from '../services/users.service';
 import { mountDetail } from './detail.view';
 
 // What the week view uses: of the WeekScreen its stream, the three changes of week, the detail
-// of an appointment, and the start and the end of an appointment's move to another time; of the
+// of an appointment, the start and the end of an appointment's move to another time, and what
+// the book dialog says about a refusal; of the
 // AppointmentsService the four writes, each with its state; of the UsersService the list of
 // Users, which only the Administrator's book dialog asks for; and the role, for which parts of
 // the book dialog to show.
 export type WeekDeps = {
-  screen: Pick<WeekScreen, 'week$' | 'previous' | 'next' | 'today' | 'detail' | 'move' | 'keep'>;
+  screen: Pick<WeekScreen, 'week$' | 'previous' | 'next' | 'today' | 'detail' | 'move' | 'keep' | 'refusal'>;
   appointments: Pick<
     AppointmentsService,
     'book' | 'bookState$' | 'cancel' | 'cancelState$' | 'change' | 'changeState$' | 'updateNote' | 'updateNoteState$'
@@ -26,11 +26,13 @@ export type WeekDeps = {
 
 // The week view (docs/FRONTEND_ARCHITECTURE.md sections 3 and 4): wires the element #week of
 // index.html. It draws what the logic layer hands over ready (places, times and names as text),
-// forwards three buttons, and opens two dialogs: a free slot opens the book dialog, which is
-// the week's own, and an appointment its detail, the frame's dialog, which this view mounts
-// while the week is on show (src/views/detail.view.ts) and whose "Change" starts the
-// appointment's move to another time. While an appointment is being moved a banner says so,
-// and a free slot opens the book dialog in its second mode, as the confirmation of the change.
+// forwards three buttons, and opens three dialogs: a slot opens the book dialog, which is the
+// week's own, an appointment its detail, the frame's dialog, which this view mounts while the
+// week is on show (src/views/detail.view.ts) and whose "Change" starts the appointment's move
+// to another time, and the Administrator's block of four or more appointments the list of them,
+// the week's own too, whose rows open their detail. While an appointment is being moved a
+// banner says so, and a slot opens the book dialog in its second mode, as the confirmation of
+// the change.
 export function mountWeek(root: HTMLElement, { screen, appointments, users, role }: WeekDeps): Subscription {
   // 1. Find the elements, once.
   const find = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
@@ -65,6 +67,13 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
   const bookEnd = find<HTMLSelectElement>('dialog.book [name="end"]');
   const bookError = find('dialog.book .error');
   const bookSubmit = find<HTMLButtonElement>('dialog.book .submit');
+  const anyway = find('dialog.book .anyway');
+  const force = find<HTMLButtonElement>('dialog.book .force');
+
+  const group = find<HTMLDialogElement>('dialog.group');
+  const groupWhat = find('dialog.group .what');
+  const groupWhen = find('dialog.group .when');
+  const groupPeople = find('dialog.group .people');
 
   // The appointment detail is the frame's dialog, outside this view's element: mounted here for
   // as long as the week is on show. It asks the week screen for an appointment's detail, and
@@ -86,7 +95,9 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
   // null while the book dialog is closed. `moving` is the appointment the dialog moves to the
   // slot, in its second mode; null when it books the slot.
   let booking: { slot: SlotBlock; zone: string; moving: Moving | null } | null = null;
-  let bookAsked = false; // "Book" or "Change", whichever the dialog's mode has
+  // What this opening last sent, by "Book" or "Change", whichever the dialog's mode has, or by
+  // "Book anyway"; null until it sent something.
+  let asked: Asked | null = null;
   let bookPending = false;
   let changePending = false;
   let usersReady = false; // the Administrator has a User to choose
@@ -94,6 +105,7 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
   // The confirmation of a change waits for a change under way only: it asks for no User.
   const enableBook = () => {
     bookSubmit.disabled = booking?.moving ? changePending : bookPending || (role === 'admin' && !usersReady);
+    force.disabled = booking?.moving ? changePending : bookPending;
   };
 
   // 3. Drawing a week: copies of the templates, filled with textContent. A place is set as a
@@ -118,9 +130,16 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
     element.querySelector('.time')!.textContent = block.time;
     return element;
   };
+  // A full slot, the Administrator's only, is drawn apart and opens the book dialog all the same.
+  // A slot that appointments overlap is a narrow tab beside them, which shows its short text; a
+  // screen reader is told its time and its places in full all the same.
   const slotFor = (block: SlotBlock, timeZone: string) => {
     const element = place('tpl-slot', block, block.colour);
     element.querySelector('.time')!.textContent = block.time;
+    element.querySelector('.places')!.textContent = block.tab ?? block.places;
+    element.classList.toggle('full', block.full);
+    element.classList.toggle('tab', block.tab !== null);
+    element.setAttribute('aria-label', `${block.day} ${block.time} ${block.places}`);
     element.onclick = () => openBook(block, timeZone);
     return element;
   };
@@ -129,7 +148,16 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
     element.querySelector('.time')!.textContent = block.time;
     element.querySelector('.who')!.textContent = block.who;
     element.querySelector('.note')!.textContent = block.note;
+    element.classList.toggle('beside', block.beside);
     element.onclick = () => detail.open(block.appointmentId);
+    return element;
+  };
+  const groupFor = (block: GroupBlock) => {
+    const element = place('tpl-group', block, block.colour);
+    element.querySelector('.time')!.textContent = block.time;
+    element.querySelector('.what')!.textContent = block.what;
+    element.classList.toggle('beside', block.beside);
+    element.onclick = () => openGroup(block);
     return element;
   };
 
@@ -144,10 +172,12 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
       ...day.busy.map(busyFor),
       ...day.slots.map((slot) => slotFor(slot, model.timeZone)),
       ...day.appointments.map(appointmentFor),
+      ...day.groups.map(groupFor),
     );
-    // A slot and an appointment show their time, and their day is the column they stand in: a
-    // screen reader, which reaches a button without its column, is told the day first.
-    for (const button of body.querySelectorAll('button')) button.setAttribute('aria-label', `${day.label} ${button.textContent.trim()}`);
+    // An appointment and a group show their time, and their day is the column they stand in: a
+    // screen reader, which reaches a button without its column, is told the day first. A slot
+    // has its name already.
+    for (const button of body.querySelectorAll('button:not(.slot)')) button.setAttribute('aria-label', `${day.label} ${button.textContent.trim()}`);
     return element;
   };
   const itemFor = (id: string, text: string, colour?: number) => {
@@ -185,8 +215,9 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
   const openBook = (slot: SlotBlock, timeZone: string) => {
     bookForm.reset();
     bookError.textContent = '';
+    anyway.hidden = true;
     booking = { slot, zone: timeZone, moving };
-    bookAsked = false;
+    asked = null;
     bookMode(moving !== null);
     bookWhat.textContent = bookingText(slot);
     // What a change adds: the time the appointment is moved from, and its note in the field.
@@ -210,7 +241,26 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
     }
     enableBook();
   };
-  // Nothing is done when it closes, by "Close", by the Escape key or after a success: what it
+  // The list of a group: its rows are drawn at every opening, from the block pressed. A row
+  // closes the list and opens its appointment's detail.
+  const openGroup = (block: GroupBlock) => {
+    groupWhat.textContent = block.what;
+    groupWhen.textContent = block.when;
+    groupPeople.replaceChildren(
+      ...block.rows.map((row) => {
+        const item = copy('tpl-person');
+        item.querySelector('.time')!.textContent = row.time;
+        item.querySelector('.who')!.textContent = row.who;
+        item.querySelector<HTMLElement>('.person')!.onclick = () => {
+          group.close();
+          detail.open(row.appointmentId);
+        };
+        return item;
+      }),
+    );
+    group.showModal();
+  };
+  // Nothing is done when either closes, by "Close", by the Escape key or after a success: what it
   // was about is replaced at the next opening. A browser sends the close event a moment after
   // the close, which can be after the dialog was opened again: a handler that forgot would
   // then forget the new opening.
@@ -222,16 +272,27 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
   find('.today').onclick = () => screen.today();
   find('.next').onclick = () => screen.next();
   find('dialog.book .close').onclick = () => book.close();
+  find('dialog.group .close').onclick = () => group.close();
+  // Sends what was asked: the change of the appointment being moved, or the booking; over the
+  // capacity when `overbook`.
+  const send = (sent: Asked, overbook: boolean) => {
+    asked = sent;
+    const { slot, zone: timeZone, fields, moving: moved } = sent;
+    if (moved) appointments.change(moved.appointmentId, changeFor(slot, timeZone, role, fields, overbook));
+    else appointments.book(bookingFor(slot, timeZone, role, fields, overbook));
+  };
   // Without preventDefault the browser would send the form itself and load the page again.
   bookForm.onsubmit = (event) => {
     event.preventDefault();
     const data = new FormData(bookForm);
     const field = (name: string) => String(data.get(name) ?? '');
-    const fields = { note: field('note'), username: field('username'), start: field('start'), end: field('end') };
-    const { slot, zone: timeZone, moving: moved } = booking!;
-    bookAsked = true;
-    if (moved) appointments.change(moved.appointmentId, changeFor(slot, timeZone, role, fields));
-    else appointments.book(bookingFor(slot, timeZone, role, fields));
+    send({ ...booking!, fields: { note: field('note'), username: field('username'), start: field('start'), end: field('end') } }, false);
+  };
+  // "Book anyway" sends the request that was refused again, over the capacity. It is offered for
+  // that request only: anything changed in the dialog hides it.
+  force.onclick = () => send(asked!, true);
+  bookForm.oninput = bookForm.onchange = () => {
+    anyway.hidden = true;
   };
   find('.keep').onclick = () => screen.keep();
 
@@ -250,6 +311,14 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
     bannerWhat.textContent = moving?.what ?? '';
     for (const button of all<HTMLButtonElement>('.appointment')) button.disabled = moving !== null;
   });
+  // What a refusal says in the dialog, in the words the week screen chooses, with "Book anyway"
+  // when it offers it; nothing of an earlier answer while another one is awaited.
+  const answered = (state: { status: string; reason?: string }) => {
+    const refusal = state.status === 'failure' ? screen.refusal(state.reason!, asked!) : null;
+    bookError.textContent = refusal?.text ?? '';
+    anyway.hidden = refusal?.offer !== true;
+    if (state.status === 'success') book.close();
+  };
   // A booking: "Book" is disabled while one is under way; the dialog that asked for it closes
   // on its success and shows its failure in plain words, staying open with what was typed. The
   // confirmation of a change is the same dialog and did not ask for a booking.
@@ -257,9 +326,8 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
     appointments.bookState$.subscribe((state) => {
       bookPending = state.status === 'pending';
       enableBook();
-      if (!bookAsked || booking!.moving) return;
-      bookError.textContent = state.status === 'failure' ? failureText(state.reason) : '';
-      if (state.status === 'success') book.close();
+      if (asked === null || booking!.moving) return;
+      answered(state);
     }),
   );
   // A change, the same way, for the dialog that asked for it as a confirmation. Its success
@@ -268,9 +336,8 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
     appointments.changeState$.subscribe((state) => {
       changePending = state.status === 'pending';
       enableBook();
-      if (!bookAsked || !booking!.moving) return;
-      bookError.textContent = state.status === 'failure' ? failureText(state.reason, 'change') : '';
-      if (state.status === 'success') book.close();
+      if (asked === null || !booking!.moving) return;
+      answered(state);
     }),
   );
   // The list of Users, for the book dialog that asked for it: the picker's choices are rebuilt
@@ -295,6 +362,7 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
   subscription.add(detail.subscription);
   subscription.add(() => {
     book.close();
+    group.close();
     draw(null);
     label.textContent = '';
     loading.hidden = true;
@@ -306,10 +374,11 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
 
     bookForm.reset();
     bookMode(false);
-    for (const list of [bookUser, bookStart, bookEnd]) list.replaceChildren();
-    for (const text of [bannerWhat, bookWhat, bookOld, bookUsersMessage, bookError]) text.textContent = '';
+    anyway.hidden = true;
+    for (const list of [bookUser, bookStart, bookEnd, groupPeople]) list.replaceChildren();
+    for (const text of [bannerWhat, bookWhat, bookOld, bookUsersMessage, bookError, groupWhat, groupWhen]) text.textContent = '';
     bookChoices.hidden = true;
-    bookSubmit.disabled = false;
+    bookSubmit.disabled = force.disabled = false;
   });
   return subscription;
 }

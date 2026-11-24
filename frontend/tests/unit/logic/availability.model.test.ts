@@ -1,4 +1,4 @@
-import { CALENDAR_LIMITS, PatternBody, TypeBody, type AvailabilityType, type WeeklyPattern } from '@shared-calendar/shared';
+import { CALENDAR_LIMITS, PatternBody, TYPE_CAPACITY, TypeBody, type AvailabilityType, type WeeklyPattern } from '@shared-calendar/shared';
 import {
   deletePatternQuestion,
   deleteTypeQuestion,
@@ -12,8 +12,11 @@ import {
   patternGroups,
   START_CHOICES,
   startingFields,
+  STARTING_TYPE,
+  TYPE_CAPACITY_HINT,
   TYPE_NAME_HINT,
   typeChoices,
+  typeFor,
   typeNameFor,
   typeRows,
   UNKNOWN_TYPE,
@@ -49,8 +52,8 @@ describe('availability.model', () => {
   describe('typeRows (6.1)', () => {
     it('several types: one row each, in the server\'s order, with the names of its two buttons', () => {
       expect(typeRows(TYPES)).toEqual([
-        { typeId: POOL, name: 'Piscina', renameLabel: 'Rename Piscina', deleteLabel: 'Delete Piscina' },
-        { typeId: STUDIO, name: 'Studio', renameLabel: 'Rename Studio', deleteLabel: 'Delete Studio' },
+        { typeId: POOL, name: 'Piscina', places: '', editLabel: 'Edit Piscina', deleteLabel: 'Delete Piscina', fields: { name: 'Piscina', capacity: '1' } },
+        { typeId: STUDIO, name: 'Studio', places: '', editLabel: 'Edit Studio', deleteLabel: 'Delete Studio', fields: { name: 'Studio', capacity: '1' } },
       ]);
       // Not sorted again here: the order given is kept.
       expect(typeRows([...TYPES].reverse()).map((row) => row.name)).toEqual(['Studio', 'Piscina']);
@@ -63,11 +66,58 @@ describe('availability.model', () => {
     });
 
     it('a name containing <script> is kept as text, in the row and in the names of its buttons', () => {
-      expect(typeRows([type(STUDIO, SCRIPT)])).toEqual([{ typeId: STUDIO, name: SCRIPT, renameLabel: `Rename ${SCRIPT}`, deleteLabel: `Delete ${SCRIPT}` }]);
+      expect(typeRows([type(STUDIO, SCRIPT)])).toEqual([
+        { typeId: STUDIO, name: SCRIPT, places: '', editLabel: `Edit ${SCRIPT}`, deleteLabel: `Delete ${SCRIPT}`, fields: { name: SCRIPT, capacity: '1' } },
+      ]);
     });
 
     it('the words of the dialog that deletes a type name it', () => {
       expect(deleteTypeQuestion(typeRows(TYPES)[1]!)).toBe('Delete the type Studio? This cannot be undone.');
+    });
+  });
+
+  describe('a type\'s capacity in its row (6.1, D24)', () => {
+    it('"· 3 places" beside the name only for a capacity above one; the dialog opens with the capacity as text', () => {
+      const rows = typeRows([{ ...type(POOL, 'Piscina'), capacity: 3 }, type(STUDIO, 'Studio'), { ...type(STUDIO, 'Grande'), capacity: 100 }]);
+      expect(rows.map((row) => [row.places, row.fields])).toEqual([
+        ['· 3 places', { name: 'Piscina', capacity: '3' }],
+        ['', { name: 'Studio', capacity: '1' }],
+        ['· 100 places', { name: 'Grande', capacity: '100' }],
+      ]);
+    });
+  });
+
+  describe('typeFor (6.1, R-TYPE-01, D24)', () => {
+    it('a name and a capacity within the bounds: both, the capacity a number, spaces around either removed', () => {
+      expect(typeFor({ name: ' Piscina ', capacity: ' 3 ' })).toEqual({ type: { name: 'Piscina', capacity: 3 } });
+      expect(typeFor({ name: 'Uno', capacity: '1' })).toEqual({ type: { name: 'Uno', capacity: 1 } });
+      expect(typeFor({ name: 'Cento', capacity: '100' })).toEqual({ type: { name: 'Cento', capacity: 100 } });
+    });
+
+    it.each(['0', '101', '2.5', '', '  ', '-1', '3e1', 'three'])('a capacity of "%s" is refused, in the words of the hint', (capacity) => {
+      expect(typeFor({ name: 'Sala', capacity })).toEqual({ refusals: { capacity: TYPE_CAPACITY_HINT } });
+    });
+
+    it('every value it accepts the shared schema accepts too, and the two bounds outside it refuses', () => {
+      for (const capacity of [TYPE_CAPACITY.min, 7, TYPE_CAPACITY.max]) {
+        const checked = typeFor({ name: 'Sala', capacity: String(capacity) });
+        expect('type' in checked && TypeBody.safeParse(checked.type).success).toBe(true);
+      }
+      for (const capacity of [TYPE_CAPACITY.min - 1, TYPE_CAPACITY.max + 1]) expect(TypeBody.safeParse({ name: 'Sala', capacity }).success).toBe(false);
+    });
+
+    it('a name in fault and a capacity in fault are both refused; a name alone in fault is the only refusal', () => {
+      expect(typeFor({ name: '', capacity: '0' })).toEqual({ refusals: { name: TYPE_NAME_HINT, capacity: TYPE_CAPACITY_HINT } });
+      expect(typeFor({ name: '', capacity: '3' })).toEqual({ refusals: { name: TYPE_NAME_HINT } });
+    });
+
+    it('the hint says the bounds of shared/', () => {
+      expect(TYPE_CAPACITY_HINT).toBe('How many people at the same time: a whole number from 1 to 100.');
+      expect(TYPE_CAPACITY_HINT.match(/\d+/g)).toEqual([String(TYPE_CAPACITY.min), String(TYPE_CAPACITY.max)]);
+    });
+
+    it('a new type starts with no name and the default capacity', () => {
+      expect(STARTING_TYPE).toEqual({ name: '', capacity: String(TYPE_CAPACITY.default) });
     });
   });
 

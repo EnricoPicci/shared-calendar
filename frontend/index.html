@@ -84,11 +84,29 @@
               </div>
               <label>Note <textarea name="note" rows="3" maxlength="500"></textarea></label>
               <p class="error" role="alert"></p>
+              <!-- Offered to the Administrator after a refusal because the time is full, for the
+                   request refused only: it sends that request again over the capacity, and
+                   changing anything in the dialog hides it. -->
+              <div class="anyway" hidden>
+                <p id="anyway-question"><span class="in-booking">Book anyway, over the capacity?</span><span class="in-change" hidden>Change anyway, over the capacity?</span></p>
+                <button type="button" class="danger force" aria-describedby="anyway-question"><span class="in-booking">Book anyway</span><span class="in-change" hidden>Change anyway</span></button>
+              </div>
               <div class="actions">
                 <button type="button" class="close">Close</button>
                 <button class="primary submit"><span class="in-booking">Book</span><span class="in-change" hidden>Change</span></button>
               </div>
             </form>
+          </dialog>
+
+          <!-- The Administrator's list of four or more appointments at the same time, opened by
+               their block: each row opens the appointment's detail. -->
+          <dialog class="group" aria-labelledby="group-title">
+            <h3 id="group-title" class="what"></h3>
+            <p class="when"></p>
+            <ul class="people"></ul>
+            <div class="actions">
+              <button type="button" class="close">Close</button>
+            </div>
           </dialog>
 
           <!-- The pieces the script copies to draw a week. A slot and an appointment show
@@ -113,10 +131,17 @@
             <div class="block busy"><span class="time"></span> busy</div>
           </template>
           <template id="tpl-slot">
-            <button type="button" class="block slot"><span class="time"></span> free</button>
+            <button type="button" class="block slot"><span class="time"></span> <span class="places"></span></button>
           </template>
           <template id="tpl-appointment">
             <button type="button" class="block appointment"><span class="time"></span> <strong class="who"></strong> <span class="note"></span></button>
+          </template>
+          <template id="tpl-group">
+            <button type="button" class="block appointment group"><span class="time"></span> <strong class="what"></strong></button>
+          </template>
+          <!-- A row of the list of a group: its time and its User -->
+          <template id="tpl-person">
+            <li><button type="button" class="person"><span class="time"></span> <strong class="who"></strong></button></li>
           </template>
           <!-- A choice of a list in the book dialog -->
           <template id="tpl-option">
@@ -278,12 +303,17 @@
 
           <section class="types">
             <h3>Types</h3>
-            <!-- novalidate: a text that is not a name is refused by the script, in words,
-                 under the field -->
+            <!-- novalidate: a text that is not a name, or a capacity out of its bounds, is
+                 refused by the script, in words, under its field -->
             <form class="create create-type" novalidate>
               <div class="field">
                 <label>Name <input name="name" autocomplete="off" aria-describedby="type-name-hint" /></label>
                 <p class="hint name-hint" id="type-name-hint"></p>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <div class="field">
+                <label>Capacity <input type="number" name="capacity" inputmode="numeric" aria-describedby="type-capacity-hint" /></label>
+                <p class="hint capacity-hint" id="type-capacity-hint"></p>
                 <p class="error refusal" role="alert"></p>
               </div>
               <p class="error failure" role="alert"></p>
@@ -455,7 +485,7 @@
           <!-- A row of the types: the name and its two buttons, whose names for a screen
                reader the script completes with the name -->
           <template id="tpl-type-row">
-            <li class="type-row"><span class="name"></span> <button type="button" class="ask-rename">Rename</button> <button type="button" class="danger ask-delete">Delete</button></li>
+            <li class="type-row"><span class="name"></span> <span class="places"></span> <button type="button" class="ask-rename">Edit</button> <button type="button" class="danger ask-delete">Delete</button></li>
           </template>
           <!-- The patterns of one weekday, under its name -->
           <template id="tpl-pattern-group">
@@ -491,19 +521,24 @@
             <li class="window-row"><span class="time"></span> <span class="type-name"></span> <button type="button" class="danger ask-delete">Delete</button></li>
           </template>
 
-          <!-- Renames a type: opened with its name -->
+          <!-- Edits a type: its name and its capacity, opened with its own -->
           <dialog class="rename" aria-labelledby="rename-title">
             <form novalidate>
-              <h3 id="rename-title">Rename type</h3>
+              <h3 id="rename-title">Edit type</h3>
               <div class="field">
                 <label>Name <input name="name" autocomplete="off" aria-describedby="rename-hint" /></label>
                 <p class="hint name-hint" id="rename-hint"></p>
                 <p class="error refusal" role="alert"></p>
               </div>
+              <div class="field">
+                <label>Capacity <input type="number" name="capacity" inputmode="numeric" aria-describedby="rename-capacity-hint" /></label>
+                <p class="hint capacity-hint" id="rename-capacity-hint"></p>
+                <p class="error refusal" role="alert"></p>
+              </div>
               <p class="error failure" role="alert"></p>
               <div class="actions">
                 <button type="button" class="close">Close</button>
-                <button class="primary submit">Rename</button>
+                <button class="primary submit">Save</button>
               </div>
             </form>
           </dialog>

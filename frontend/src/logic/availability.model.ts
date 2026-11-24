@@ -1,4 +1,4 @@
-import { CALENDAR_LIMITS, LocalDate, TypeName, type AvailabilityType, type PatternBody, type WeeklyPattern } from '@shared-calendar/shared';
+import { CALENDAR_LIMITS, LocalDate, TYPE_CAPACITY, TypeName, type AvailabilityType, type PatternBody, type WeeklyPattern } from '@shared-calendar/shared';
 import { longDateText } from './texts';
 
 // The availability screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the availability types
@@ -10,13 +10,29 @@ import { longDateText } from './texts';
 
 // ── The types ───────────────────────────────────────────────────────────────────────────────
 
-// A row of the list of types: the name, and the names a screen reader says for its two
-// buttons, which tell which type they rename and delete.
-export type TypeRow = { typeId: string; name: string; renameLabel: string; deleteLabel: string };
+// The two fields of a type, as text: what the form that creates one and the dialog that edits
+// one hold.
+export type TypeFields = { name: string; capacity: string };
+// What the form that creates a type starts with: no name, and the default capacity
+// (docs/SHARED_CALENDAR_SPEC.md decision D24).
+export const STARTING_TYPE: TypeFields = { name: '', capacity: String(TYPE_CAPACITY.default) };
+
+// A row of the list of types: the name; its places beside it, "· 3 places", only for a
+// capacity above one, which is every type's until it is changed; the names a screen reader says
+// for its two buttons, which tell which type they edit and delete; and its fields for the
+// dialog that edits it.
+export type TypeRow = { typeId: string; name: string; places: string; editLabel: string; deleteLabel: string; fields: TypeFields };
 
 // The rows, in the order the server gives: by name (docs/FRONTEND_SERVICES.md section 16.1).
 export function typeRows(types: readonly AvailabilityType[]): TypeRow[] {
-  return types.map(({ typeId, name }) => ({ typeId, name, renameLabel: `Rename ${name}`, deleteLabel: `Delete ${name}` }));
+  return types.map(({ typeId, name, capacity }) => ({
+    typeId,
+    name,
+    places: capacity > 1 ? `· ${capacity} places` : '',
+    editLabel: `Edit ${name}`,
+    deleteLabel: `Delete ${name}`,
+    fields: { name, capacity: String(capacity) },
+  }));
 }
 
 // The sentence of a list of types with no row.
@@ -33,6 +49,24 @@ export const TYPE_NAME_HINT = `A name has 1 to ${CALENDAR_LIMITS.typeNameLength}
 export function typeNameFor(text: string): { name: string } | { refusal: string } {
   const parsed = TypeName.safeParse(text);
   return parsed.success ? { name: parsed.data } : { refusal: TYPE_NAME_HINT };
+}
+
+// What a type's capacity is (docs/SHARED_CALENDAR_SPEC.md decision D24), with the shared
+// bounds: the hint under the field, and the refusal of a text that is not one.
+export const TYPE_CAPACITY_HINT = `How many people at the same time: a whole number from ${TYPE_CAPACITY.min} to ${TYPE_CAPACITY.max}.`;
+
+// From what the two fields hold to the name and the capacity to send, or to the refusals of
+// the fields in fault, both said when both are. The capacity is written with digits only,
+// spaces around it aside, so that a fraction, an empty field and a text are refused, and it is
+// within the shared bounds. Both are always sent: the capacity the field holds, never left to the server.
+export function typeFor(fields: TypeFields): { type: { name: string; capacity: number } } | { refusals: Partial<Record<keyof TypeFields, string>> } {
+  const name = typeNameFor(fields.name);
+  const text = fields.capacity.trim();
+  const capacity = /^\d+$/.test(text) ? Number(text) : Number.NaN;
+  const refusals: Partial<Record<keyof TypeFields, string>> = {};
+  if ('refusal' in name) refusals.name = name.refusal;
+  if (!(capacity >= TYPE_CAPACITY.min && capacity <= TYPE_CAPACITY.max)) refusals.capacity = TYPE_CAPACITY_HINT;
+  return 'name' in name && refusals.capacity === undefined ? { type: { name: name.name, capacity } } : { refusals };
 }
 
 // What the dialog asks before a type is deleted.

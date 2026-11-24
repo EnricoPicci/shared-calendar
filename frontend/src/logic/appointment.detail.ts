@@ -76,6 +76,7 @@ export type Moving = {
   appointmentId: string;
   when: string; // "Mon 23 Nov, 11:00–12:00", the time it is moved from
   what: string; // "Mon 23 Nov, 11:00–12:00 · Studio"; for the Administrator "… · Studio · alice"
+  who: string; // the User's name for the Administrator, "You" for a User: whose time the move is
   note: string; // its note, the value the confirmation's field opens with: empty when there is none
 };
 
@@ -85,6 +86,7 @@ export function movingOf(detail: AppointmentDetail, role: Role): Moving {
     appointmentId: detail.appointmentId,
     when: detail.when,
     what: role === 'admin' ? `${what} · ${detail.who}` : what,
+    who: detail.who,
     note: detail.noteValue,
   };
 }

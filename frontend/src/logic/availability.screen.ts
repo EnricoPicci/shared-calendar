@@ -10,13 +10,15 @@ import {
   patternFor,
   patternGroups,
   startingFields,
+  STARTING_TYPE,
   typeChoices,
-  typeNameFor,
+  typeFor,
   typeRows,
   type Choice,
   type PatternField,
   type PatternFields,
   type PatternGroup,
+  type TypeFields,
   type TypeRow,
 } from './availability.model';
 import { conflictList, type ConflictList } from './conflicts';
@@ -24,12 +26,12 @@ import { failureText, type Attempt } from './texts';
 
 // The availability screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the availability types
 // and the weekly patterns read when the screen is shown, the four writes that have a check
-// (a type created and renamed, a pattern created and changed), and both lists read again after
+// (a type created and edited, a pattern created and changed), and both lists read again after
 // every write and every time the page becomes visible. Shaped like a service: one public
 // stream, `void` methods, nothing started by the constructor.
 
 // What one of the four writes says to the form or the dialog that asked for it, replaced
-// whole at every new ask: `about`, the id of the type renamed or of the pattern changed, empty
+// whole at every new ask: `about`, the id of the type edited or of the pattern changed, empty
 // for a create; `busy` while its call is under way; `refusals`, why a field was not accepted,
 // with no call made (a field named with an empty sentence is in fault without words of its
 // own: another field's sentence names it); `failure`, why a call that was made did not succeed, with `conflicts`,
@@ -53,7 +55,7 @@ export type AskName = 'typeCreate' | 'rename' | 'patternCreate' | 'change';
 //   `typesEmpty` and `patternsEmpty` are the sentences of a list with no row.
 // - `choices` are the types to choose from in the two pattern forms, and `typeHint` says,
 //   while no type exists, that one must be created first.
-// - `typeField` and `patternFields` are what the two forms that create are filled with:
+// - `typeFields` and `patternFields` are what the two forms that create are filled with:
 //   another object only when the form is to be filled again.
 // - `typeCreate`, `rename`, `patternCreate` and `change` are the outcomes of the four writes.
 export type AvailabilityState = {
@@ -66,10 +68,10 @@ export type AvailabilityState = {
   patternsEmpty: string | null;
   choices: readonly Choice[];
   typeHint: string;
-  typeField: { name: string };
+  typeFields: TypeFields;
   patternFields: PatternFields;
-  typeCreate: Ask<'name'>;
-  rename: Ask<'name'>;
+  typeCreate: Ask<keyof TypeFields>;
+  rename: Ask<keyof TypeFields>;
   patternCreate: Ask<PatternField>;
   change: Ask<PatternField>;
 };
@@ -105,7 +107,7 @@ const NOTHING: AvailabilityState = {
   patternsEmpty: null,
   choices: [],
   typeHint: '',
-  typeField: { name: '' },
+  typeFields: STARTING_TYPE,
   patternFields: startingFields(null),
   typeCreate: QUIET,
   rename: QUIET,
@@ -191,7 +193,7 @@ export class AvailabilityScreen {
     // The four writes that went through the check. On a success of a create its form is to be
     // filled again with its starting values; on a failure what was typed stays.
     hear(this.types.createResult$, (result) => {
-      this.answer('typeCreate', result, 'type', result.status === 'success' ? { typeField: { name: '' } } : {});
+      this.answer('typeCreate', result, 'type', result.status === 'success' ? { typeFields: { ...STARTING_TYPE } } : {});
       this.read('types');
     });
     hear(this.types.renameResult$, (result) => {
@@ -237,16 +239,19 @@ export class AvailabilityScreen {
     if (this.started) this.readAll('patterns');
   }
 
-  // "Create type", with the name field as the form holds it. A text that is not a name is
-  // said and nothing is sent (docs/SHARED_CALENDAR_SPEC.md R-TYPE-01).
-  createType(text: string): void {
-    this.named('typeCreate', '', text, (name) => this.types.create(name));
+  // "Create type", with the name and the capacity as the form holds them. A text that is not a
+  // name, or a capacity out of its bounds, is said and nothing is sent
+  // (docs/SHARED_CALENDAR_SPEC.md R-TYPE-01 and decision D24).
+  createType(fields: TypeFields): void {
+    this.typed('typeCreate', '', fields, ({ name, capacity }) => this.types.create(name, capacity));
   }
 
-  // "Rename", from its dialog, with the name field as it holds it. A rename to the same name
-  // is sent like any other (docs/SHARED_CALENDAR_SPEC.md R-TYPE-02).
-  rename(typeId: string, text: string): void {
-    this.named('rename', typeId, text, (name) => this.types.rename(typeId, name));
+  // "Save", from the dialog that edits a type, with its two fields as it holds them: the name
+  // and the capacity are both sent, changed or not (docs/SHARED_CALENDAR_SPEC.md R-TYPE-02).
+  // A capacity lowered below the people booked cancels nothing
+  // (docs/SHARED_CALENDAR_SPEC.md R-TYPE-05).
+  rename(typeId: string, fields: TypeFields): void {
+    this.typed('rename', typeId, fields, ({ name, capacity }) => this.types.rename(typeId, name, capacity));
   }
 
   // "Create pattern", with the six fields as the form holds them. Every field in fault is
@@ -268,16 +273,16 @@ export class AvailabilityScreen {
     return this.zone === null ? null : conflictList(conflicts, this.zone);
   }
 
-  // A write with a name. While one of its kind is under way another is not taken.
-  private named(ask: 'typeCreate' | 'rename', about: string, text: string, call: (name: string) => void): void {
+  // A write with a type's fields. While one of its kind is under way another is not taken.
+  private typed(ask: 'typeCreate' | 'rename', about: string, fields: TypeFields, call: (type: { name: string; capacity: number }) => void): void {
     if (!this.started || this.state.getValue()[ask].busy) return;
-    const checked = typeNameFor(text);
-    if ('refusal' in checked) {
-      this.patch({ [ask]: { ...QUIET, about, refusals: { name: checked.refusal } } });
+    const checked = typeFor(fields);
+    if ('refusals' in checked) {
+      this.patch({ [ask]: { ...QUIET, about, refusals: checked.refusals } });
       return;
     }
     this.patch({ [ask]: { ...QUIET, about, busy: true } });
-    call(checked.name);
+    call(checked.type);
   }
 
   // A write with a pattern's fields. While one of its kind is under way another is not taken.

@@ -1,14 +1,15 @@
-import { localDateOf, localTimeOf, toInstant, type BookBody, type ChangeBody, type Role } from '@shared-calendar/shared';
+import { localDateOf, localTimeOf, toInstant, type Appointment, type BookBody, type ChangeBody, type Role } from '@shared-calendar/shared';
 import type { ListUsersState } from '../services/users.types';
-import { failureText } from './texts';
+import type { Moving } from './appointment.detail';
+import { failureText, offsetChangesOn, rangeText } from './texts';
 import type { SlotBlock } from './week.model';
 
 // The book dialog's logic (docs/FRONTEND_ARCHITECTURE.md section 5): what is being booked in
 // words, the times and the Users the Administrator may choose, and the way from what the dialog
 // holds to the argument of AppointmentsService.book or, when the dialog confirms the move of an
-// appointment, of AppointmentsService.change. Pure. Whether a booking or a change is allowed is
-// the server's to say (docs/FRONTEND_SERVICES.md section 8, decision 42): nothing is checked
-// here.
+// appointment, of AppointmentsService.change, and what the dialog says when the server refuses
+// one. Pure. Whether a booking or a change is allowed is the server's to say
+// (docs/FRONTEND_SERVICES.md section 8, decision 42): nothing is checked here.
 
 const DAY_MINUTES = 24 * 60;
 const GRID = 15; // the Administrator's times are on 15-minute steps (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02)
@@ -78,12 +79,14 @@ function timesFor(slot: SlotBlock, zone: string, role: Role, fields: Pick<Bookin
 
 // The argument of AppointmentsService.book. A blank note is left out. A User sends nothing
 // about the person; the Administrator sends the User chosen
-// (docs/SHARED_CALENDAR_SPEC.md R-BOOK-01).
-export function bookingFor(slot: SlotBlock, zone: string, role: Role, fields: BookingFields): BookBody {
+// (docs/SHARED_CALENDAR_SPEC.md R-BOOK-01). `overbook` is the Administrator's "Book anyway",
+// sent only when true (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13).
+export function bookingFor(slot: SlotBlock, zone: string, role: Role, fields: BookingFields, overbook = false): BookBody {
   const note = fields.note.trim();
   const noted = note === '' ? {} : { note };
   const times = timesFor(slot, zone, role, fields);
-  return role === 'admin' ? { ...times, username: fields.username, ...noted } : { ...times, ...noted };
+  const forced = overbook ? { overbook } : {};
+  return role === 'admin' ? { ...times, username: fields.username, ...noted, ...forced } : { ...times, ...noted, ...forced };
 }
 
 // The argument of AppointmentsService.change, when the dialog confirms the move of an
@@ -91,7 +94,64 @@ export function bookingFor(slot: SlotBlock, zone: string, role: Role, fields: Bo
 // (docs/SHARED_CALENDAR_SPEC.md section 8.4). The note is always sent, as the field holds it:
 // the field opens with the old appointment's note, so left alone it stays, edited it changes,
 // and emptied it is cleared, since the shared schema makes a blank note `null`
-// (docs/SHARED_CALENDAR_SPEC.md R-CHG-03).
-export function changeFor(slot: SlotBlock, zone: string, role: Role, fields: Pick<BookingFields, 'note' | 'start' | 'end'>): ChangeBody {
-  return { ...timesFor(slot, zone, role, fields), note: fields.note };
+// (docs/SHARED_CALENDAR_SPEC.md R-CHG-03). `overbook` is the Administrator's "Change anyway".
+export function changeFor(slot: SlotBlock, zone: string, role: Role, fields: Pick<BookingFields, 'note' | 'start' | 'end'>, overbook = false): ChangeBody {
+  return { ...timesFor(slot, zone, role, fields), note: fields.note, ...(overbook ? { overbook } : {}) };
+}
+
+// What the book dialog asked, kept from its "Book" or "Change" until its answer: the slot, the
+// calendar's time zone, the fields as they were sent, and the appointment being moved, or null.
+export type Asked = { slot: SlotBlock; zone: string; fields: BookingFields; moving: Moving | null };
+
+// What the dialog says when the server refuses: the sentence, and whether "Book anyway" (or
+// "Change anyway") is offered under it.
+export type Refusal = { text: string; offer: boolean };
+
+// The Administrator's refusal for a time that is full, which "Book anyway, over the capacity?"
+// follows in the page: the week is read again, but the time is still the one to book.
+export const FULL_FOR_ADMIN = 'This time is full: there is no place left.';
+
+// The interval asked for: the two instants the Administrator sent, or a User's slot, whose end
+// the server takes as the slot's (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02).
+function intervalOf({ slot, zone, fields }: Asked, role: Role): { start: string; end: string } {
+  const times = timesFor(slot, zone, role, fields);
+  return { start: times.start, end: times.end ?? slot.end };
+}
+
+// The appointment that a refusal `user_busy` met (docs/SHARED_CALENDAR_SPEC.md R-BOOK-12), found
+// among `appointments`, those of the week on show: one of the target User's that overlaps the
+// time asked, the earliest if several do; null when the week shows none. On a change the
+// appointment being moved is left out, as the server leaves it out
+// (docs/SHARED_CALENDAR_SPEC.md R-CHG-01). The target User is the one chosen in the dialog, or
+// the moved appointment's; a User's week holds the User's own appointments only.
+export function inTheWay(appointments: readonly Appointment[], role: Role, asked: Asked): Appointment | null {
+  const { start, end } = intervalOf(asked, role);
+  const who = asked.moving?.who ?? asked.fields.username;
+  const found = appointments
+    .filter((a) => a.appointmentId !== asked.moving?.appointmentId && (role !== 'admin' || a.username === who))
+    .filter((a) => Date.parse(a.start) < Date.parse(end) && Date.parse(start) < Date.parse(a.end))
+    .sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+  return found[0] ?? null;
+}
+
+// What the dialog says about a refused booking or change.
+// - `slot_taken` for the Administrator: the time is full, and the same request may be sent
+//   again over the capacity (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13). A User's is the sentence
+//   of every page, with the week read again.
+// - `user_busy` names the appointment in the way, its time and its type, when the week on show
+//   holds it; the person opens it and changes it. Nothing is offered: the force does not lift
+//   the rule (docs/SHARED_CALENDAR_SPEC.md R-BOOK-12).
+// - Everything else is failureText's, with what was attempted and who attempted it.
+export function refusalOf(reason: string, asked: Asked, role: Role, appointments: readonly Appointment[]): Refusal {
+  if (reason === 'slot_taken' && role === 'admin') return { text: FULL_FOR_ADMIN, offer: true };
+  const found = reason === 'user_busy' ? inTheWay(appointments, role, asked) : null;
+  if (found !== null) {
+    const what = `${rangeText(found.start, found.end, asked.zone, offsetChangesOn(found.date, asked.zone))} · ${found.typeName}`;
+    const text =
+      role === 'admin'
+        ? `${found.username} already has an appointment at this time (${what}).`
+        : `You already have an appointment at this time (${what}); open it to change it.`;
+    return { text, offer: false };
+  }
+  return { text: failureText(reason, asked.moving === null ? undefined : 'change', role), offer: false };
 }

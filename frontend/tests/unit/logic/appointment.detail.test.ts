@@ -249,15 +249,17 @@ describe('appointmentDetail', () => {
         appointmentId: '01M6DMQ0000000000000000001',
         when: 'Mon 23 Nov, 10:00–11:00',
         what: 'Mon 23 Nov, 10:00–11:00 · Studio',
+        who: 'You',
         note: 'First lesson',
       });
     });
 
-    it('the Administrator: the same, with the User\'s name', () => {
+    it('the Administrator: the same, with the User\'s name, which also says whose time the move is', () => {
       expect(movingOf(appointmentDetail(FOR_ADMIN, 'admin', BEFORE, 'Europe/Rome'), 'admin')).toEqual({
         appointmentId: '01M6DMQ0000000000000000001',
         when: 'Mon 23 Nov, 10:00–11:00',
         what: 'Mon 23 Nov, 10:00–11:00 · Studio · alice',
+        who: 'alice',
         note: 'First lesson',
       });
     });

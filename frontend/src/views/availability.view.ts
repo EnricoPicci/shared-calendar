@@ -5,12 +5,14 @@ import {
   END_CHOICES,
   PATTERN_FIELDS,
   START_CHOICES,
+  TYPE_CAPACITY_HINT,
   TYPE_NAME_HINT,
   WEEKDAY_CHOICES,
   type Choice,
   type PatternFields,
   type PatternGroup,
   type PatternRow,
+  type TypeFields,
   type TypeRow,
 } from '../logic/availability.model';
 import type { AskName, AvailabilityScreen } from '../logic/availability.screen';
@@ -43,8 +45,8 @@ export function mountAvailability(root: HTMLElement, { screen, types, rules, con
   const find = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
   const { copy, choices, form } = availabilityParts(root);
   const forms: Record<AskName, ReturnType<typeof form>> = {
-    typeCreate: form('form.create-type', ['name']),
-    rename: form('dialog.rename form', ['name']),
+    typeCreate: form('form.create-type', ['name', 'capacity']),
+    rename: form('dialog.rename form', ['name', 'capacity']),
     patternCreate: form('form.create-pattern', PATTERN_FIELDS),
     change: form('dialog.change form', PATTERN_FIELDS),
   };
@@ -54,14 +56,16 @@ export function mountAvailability(root: HTMLElement, { screen, types, rules, con
     patterns: { unread: find('.patterns .unread'), why: find('.patterns .unread .error'), empty: find('.patterns .empty'), rows: find('.patterns .groups') },
   };
   const nameHints = [...root.querySelectorAll('.name-hint')];
+  const capacityHints = [...root.querySelectorAll('.capacity-hint')];
   const typeHints = [...root.querySelectorAll('.type-hint')];
   const typeLists = [forms.patternCreate, forms.change].map(({ fields }) => fields[3]!.input);
   const dialogs = { rename: find<HTMLDialogElement>('dialog.rename'), change: find<HTMLDialogElement>('dialog.change') };
 
   // The choices of the weekday and of the two times never change; those of the type follow
-  // the stream. What a name is stands under its field.
+  // the stream. What a name and a capacity are stands under their fields.
   for (const { fields } of [forms.patternCreate, forms.change]) [WEEKDAY_CHOICES, START_CHOICES, END_CHOICES].forEach((list, i) => choices(fields[i]!.input, list));
   for (const hint of nameHints) hint.textContent = TYPE_NAME_HINT;
+  for (const hint of capacityHints) hint.textContent = TYPE_CAPACITY_HINT;
 
   // 2. Pure view state (docs/FRONTEND_ARCHITECTURE.md section 3, rule 10): which type or
   // pattern each open dialog is about, and whether its action was asked for since it opened.
@@ -97,7 +101,8 @@ export function mountAvailability(root: HTMLElement, { screen, types, rules, con
   const typeRow = (row: TypeRow) => {
     const item = copy('tpl-type-row');
     item.querySelector('.name')!.textContent = row.name;
-    button(item, '.ask-rename', row.renameLabel, () => openForm('rename', row.typeId, { name: row.name }));
+    item.querySelector('.places')!.textContent = row.places;
+    button(item, '.ask-rename', row.editLabel, () => openForm('rename', row.typeId, row.fields));
     button(item, '.ask-delete', row.deleteLabel, () => openDelete('type', row.typeId, deleteTypeQuestion(row)));
     return item;
   };
@@ -120,7 +125,7 @@ export function mountAvailability(root: HTMLElement, { screen, types, rules, con
   // the stream brings another object for it, so the keyboard stays on a row's button and
   // what is being typed or chosen is left alone.
   let drawn: { types: readonly TypeRow[] | null; groups: readonly PatternGroup[] | null; choices: readonly Choice[] | null } = { types: null, groups: null, choices: null };
-  let filled: { typeField: object | null; patternFields: object | null } = { typeField: null, patternFields: null };
+  let filled: { typeFields: object | null; patternFields: object | null } = { typeFields: null, patternFields: null };
 
   // 5. The user's actions become calls: what follows on screen comes from the streams. Without
   // preventDefault the browser would send a form itself and load the page again. The fields go
@@ -132,8 +137,8 @@ export function mountAvailability(root: HTMLElement, { screen, types, rules, con
       send(forms[name].held());
     };
   };
-  onSubmit('typeCreate', ({ name }) => screen.createType(name!));
-  onSubmit('rename', ({ name }) => screen.rename(open.rename.about, name!));
+  onSubmit('typeCreate', (fields) => screen.createType(fields as TypeFields));
+  onSubmit('rename', (fields) => screen.rename(open.rename.about, fields as TypeFields));
   onSubmit('patternCreate', (fields) => screen.createPattern(fields as PatternFields));
   onSubmit('change', (fields) => screen.change(open.change.about, fields as PatternFields));
   find('.types .retry').onclick = () => screen.retryTypes();
@@ -161,9 +166,9 @@ export function mountAvailability(root: HTMLElement, { screen, types, rules, con
     }
     drawn = { types: state.types, groups: state.groups, choices: state.choices };
     for (const hint of typeHints) hint.textContent = state.typeHint;
-    if (state.typeField !== filled.typeField) forms.typeCreate.fill(state.typeField);
+    if (state.typeFields !== filled.typeFields) forms.typeCreate.fill(state.typeFields);
     if (state.patternFields !== filled.patternFields) forms.patternCreate.fill(state.patternFields);
-    filled = { typeField: state.typeField, patternFields: state.patternFields };
+    filled = { typeFields: state.typeFields, patternFields: state.patternFields };
     // A button is disabled while a write of its kind is under way, whoever asked for it.
     for (const name of ['typeCreate', 'rename', 'patternCreate', 'change'] as const) forms[name].submit.disabled = state[name].busy;
     forms.typeCreate.say(state.typeCreate);
@@ -207,7 +212,7 @@ export function mountAvailability(root: HTMLElement, { screen, types, rules, con
       list.rows.replaceChildren();
     }
     loading.hidden = true;
-    for (const text of [...nameHints, ...typeHints, lists.types.why, lists.types.empty, lists.patterns.why, lists.patterns.empty]) text.textContent = '';
+    for (const text of [...nameHints, ...capacityHints, ...typeHints, lists.types.why, lists.types.empty, lists.patterns.why, lists.patterns.empty]) text.textContent = '';
   });
   return subscription;
 }

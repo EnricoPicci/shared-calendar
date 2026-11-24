@@ -21,7 +21,7 @@ sections 8 and 12.3). Paths are relative to `frontend/`.
   (its block "without a mouse"): every field inside a `<label>` with words of its own; every
   button with words or a name; every `.error` a `role="alert"` and nothing else an alert; every
   "Loading…" a `role="status"`; the two dialogs that ask described by their question. It counts
-  the fields (40) and the places of a failure (51): a new field or a new failure line changes a
+  the fields (42) and the places of a failure (53): a new field or a new failure line changes a
   number there, on purpose.
 - What a screen reader says aloud, and where the keyboard is after a dialog closes (the table
   of `docs/FRONTEND_ARCHITECTURE.md` section 8), are for the walk (`docs/FRONTEND_WALK.md`).
@@ -98,7 +98,7 @@ What it cannot show is for the browser check.
   `mountConfirm(find('#availability'))`, hand it to the mount function and add its subscription
   to the view's, as the shell does; what neither view can see alone (an opening made after
   another is the only one told) is in `availability.parts.test.ts`.
-- A count of the fields of `#availability` counts the screen's three parts (21: the 14 of the
+- A count of the fields of `#availability` counts the screen's three parts (23: the 16 of the
   first view's four forms and the 7 of a single date).
 - The view's test of a single date builds its states with the logic layer's own `dayModel`,
   `draftModel` and `conflictList`, and runs the dialog's cases once per kind (`describe.each`).

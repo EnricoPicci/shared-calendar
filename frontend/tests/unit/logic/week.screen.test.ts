@@ -385,6 +385,28 @@ describe('WeekScreen', () => {
     });
   });
 
+  describe('refusal(reason, asked)', () => {
+    const OWN = winterWeek().appointments[0]!; // Monday 16 November, 11:00–12:00 in Rome
+    // A slot of the week over the User's own appointment, as the book dialog would have sent it.
+    const asked = () => {
+      const slot = weekModel(winterWeek(), 'user').days[0]!.slots[0]!;
+      return { slot: { ...slot, start: OWN.start, end: OWN.end }, zone: 'Europe/Rome', fields: { note: '', username: '', start: '', end: '' }, moving: null };
+    };
+
+    it('user_busy names the appointment in the way, looked for in the last week loaded', () => {
+      const { screen, succeed } = screenAt();
+      screen.start();
+      expect(screen.refusal('user_busy', asked())).toEqual({ text: 'You already have an appointment at this time. To move it, change that appointment instead.', offer: false });
+      succeed();
+      expect(screen.refusal('user_busy', asked())).toEqual({ text: 'You already have an appointment at this time (11:00–12:00 · Studio); open it to change it.', offer: false });
+    });
+
+    it('the role is the screen\'s: the Administrator is offered "Book anyway" after slot_taken, a User is not', () => {
+      expect(screenAt(NOW, 'admin').screen.refusal('slot_taken', asked())).toEqual({ text: 'This time is full: there is no place left.', offer: true });
+      expect(screenAt(NOW, 'user').screen.refusal('slot_taken', asked()).offer).toBe(false);
+    });
+  });
+
   describe('detail(appointmentId)', () => {
     const OWN = winterWeek().appointments[0]!; // Monday 16 November, 11:00–12:00 in Rome, "First lesson"
 
@@ -521,7 +543,7 @@ describe('WeekScreen', () => {
   describe('moving an appointment to another time', () => {
     const OWN = winterWeek().appointments[0]!; // Monday 16 November, 11:00–12:00 in Rome, "First lesson"
     const EARLY = '2026-11-14T10:00:00.000Z'; // Saturday: the appointment can still be changed
-    const MOVING = { appointmentId: OWN.appointmentId, when: 'Mon 16 Nov, 11:00–12:00', what: 'Mon 16 Nov, 11:00–12:00 · Studio', note: 'First lesson' };
+    const MOVING = { appointmentId: OWN.appointmentId, when: 'Mon 16 Nov, 11:00–12:00', what: 'Mon 16 Nov, 11:00–12:00 · Studio', who: 'You', note: 'First lesson' };
     const CHANGED: ChangeResult = { status: 'success', cancelled: { ...OWN, status: 'cancelled', cancelReason: 'changed' }, booked: OWN };
     const refused = (reason: 'booking_notice_too_short' | 'slot_taken' | 'appointment_not_found' | 'appointment_not_active' | 'cancellation_notice_too_short' | 'user_not_found' | 'network'): ChangeResult => ({
       status: 'failure',
@@ -561,7 +583,7 @@ describe('WeekScreen', () => {
 
     it('for the Administrator the words carry the User\'s name', () => {
       const { last } = movingOwn('admin');
-      expect(last().moving).toEqual({ ...MOVING, what: 'Mon 16 Nov, 11:00–12:00 · Studio · alice' });
+      expect(last().moving).toEqual({ ...MOVING, what: 'Mon 16 Nov, 11:00–12:00 · Studio · alice', who: 'alice' });
     });
 
     it('an appointment without a note is moved with an empty note', () => {
@@ -743,13 +765,13 @@ describe('WeekScreen', () => {
       screen.keep();
       succeed({ ...winterWeek(), appointments: [OWN, other] });
       screen.move(other.appointmentId);
-      expect(last().moving).toEqual({ appointmentId: other.appointmentId, when: 'Tue 17 Nov, 10:00–11:00', what: 'Tue 17 Nov, 10:00–11:00 · Studio', note: '' });
+      expect(last().moving).toEqual({ appointmentId: other.appointmentId, when: 'Tue 17 Nov, 10:00–11:00', what: 'Tue 17 Nov, 10:00–11:00 · Studio', who: 'You', note: '' });
     });
   });
 
   describe('an appointment handed over by another screen', () => {
     // An appointment of Monday 7 December, three weeks after the week of "now".
-    const HANDED = { appointmentId: '01M6DMQ0000000000000000009', when: 'Mon 7 Dec, 10:00–11:00', what: 'Mon 7 Dec, 10:00–11:00 · Studio', note: 'Handed over' };
+    const HANDED = { appointmentId: '01M6DMQ0000000000000000009', when: 'Mon 7 Dec, 10:00–11:00', what: 'Mon 7 Dec, 10:00–11:00 · Studio', who: 'You', note: 'Handed over' };
     const CHANGED: ChangeResult = { status: 'success', cancelled: { ...BOOKED.appointment, status: 'cancelled', cancelReason: 'changed' }, booked: BOOKED.appointment };
 
     it('before start() it loads nothing and the stream says nothing of it', () => {

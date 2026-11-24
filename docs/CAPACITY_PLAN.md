@@ -1,6 +1,6 @@
 # Shared Calendar: several people in one slot, a capacity per type (implementation plan)
 
-**Version:** v6 (2026-11-24): step u4 done, the front end's services; the Administrator's
+**Version:** v7 (2026-11-24): step u5 done, the front end's screens; a slot under appointments drawn as a tab beside them (found in the walk, the Product Owner's choice). v6 (2026-11-24): step u4 done, the front end's services; the Administrator's
 sentence of `user_busy` moved to step u5 (the Product Owner's decision). v5 (2026-11-24): step u3 done, the back end; AC-15 answers `user_busy` (the Product
 Owner's decision), its page in step u5. v4 (2026-11-24): step u2 done, the shared contract in `shared/`; the response
 fields moved from step u2 to step u3 (the Product Owner's decision). v3 (2026-11-24): step u1 done, the rules in the governing documents
@@ -469,6 +469,103 @@ full ones with `placesLeft: 0`.
 
 **Check:** the root `verify`; the front end's journeys; the new checks of the walk in headless
 Chromium at both widths, after a restart of the stack and `seed:local`.
+
+**As done (2026-11-24).** Changes under `frontend/src/logic`, `frontend/src/views`,
+`frontend/index.html`, `frontend/style.css`, `frontend/tests/unit` and `docs/` only; nothing under
+`frontend/src/services`, `backend/` or `shared/`; no journey changed; nothing deployed, no `aws`
+command run. Brief `prompts/e15-step-u5-implementation.md`.
+
+- *Decision 1, `user_busy` names the appointment in the way:* `refusalOf` and `inTheWay` in
+  `frontend/src/logic/booking.ts`. The page looks among the shown week's active appointments for
+  the target User's (the User's own for a User; for the Administrator the User chosen, or the
+  moved appointment's User, `Moving.who`, a field added in `appointment.detail.ts`) that overlaps
+  the time asked, `[start, end)`, the moved one left out in a change, the earliest first. Found:
+  "You already have an appointment at this time (09:15–10:00 · Studio); open it to change it." or
+  "alice already has an appointment at this time (09:15–10:00 · Studio)."; not found, the User's
+  sentence of step u4 or "This User already has an appointment at this time." No one-click change.
+  Found in the walk: the server offers a User no slot over the User's own appointment, so a User
+  meets `user_busy` on a page read before the appointment was made, which the page does not hold:
+  the User mostly reads the fixed sentence (check 12 of `docs/FRONTEND_WALK.md`). The Product
+  Owner kept the named sentence.
+- *Decision 2, "Book anyway?" through the 409:* the Administrator's `slot_taken` gives "This time
+  is full: there is no place left." (`FULL_FOR_ADMIN`) and the part `.anyway` of the book dialog:
+  "Book anyway, over the capacity?" and "Book anyway", in a change "Change anyway, over the
+  capacity?" and "Change anyway" (the same shape, chosen while building). The button sends the
+  same fields again with `overbook: true` (`bookingFor` and `changeFor` take it). An `input` or
+  `change` event in the form, and an opening, hide the offer. A User's `slot_taken` keeps its
+  sentence; `user_busy` gets no offer.
+- *Decision 3, the Administrator's week by the peak:* `columnsOf` in `week.model.ts` replaces the
+  two lanes of the repeated hour: blocks taken by clock time then real start, chained while one
+  starts before the latest end, `[start, end)`; each in the leftmost free column; `lanes` is the
+  chain's column count. Up to three side by side (classes for two and three in `style.css`); a
+  chain of four columns or more is one `GroupBlock` (`DayModel.groups`) over its span, "N people ·
+  <type>", which opens `dialog.group`, one row per appointment by start (`tpl-person`), each row
+  closing the list and opening the detail. The chain of 10:00–10:30, 10:15–10:45, 10:30–11:00,
+  10:45–11:15 is two columns. On the night the clocks go back a chain and its peak are taken on
+  the clock. A User's week is drawn as before.
+- *Decision 4, the types screen:* "Edit" opens "Edit type" with the name and the capacity,
+  prefilled; the new-type form's capacity starts at 1; both always send it
+  (`AvailabilityScreen.createType(fields)`, `rename(typeId, fields)`); `typeFor` in
+  `availability.model.ts` checks digits only within `TYPE_CAPACITY` and says
+  `TYPE_CAPACITY_HINT` under the field; a row says "· 3 places" above one. The names in the code
+  (`rename`, `dialog.rename`, `.ask-rename`) are kept, as the service's method.
+- *The places:* `placesOf` gives "free" (capacity 1), "2 of 3 places left", or "Full" with `full`
+  at no place left; the full slot is grey and hatched and opens the book dialog.
+- *Found in the walk, decided by the Product Owner (option 1 of three):* a slot that appointments
+  overlap lay under them and could not be clicked, so the Administrator could not reach a full
+  slot as `docs/SHARED_CALENDAR_SPEC.md` section 16.8 asks. The model gives such a slot `tab`
+  ("Full", "2 left") and the blocks over it `beside`; the view draws it as a narrow tab at the
+  right of its time, in front, and the blocks leave it room. Its name for a screen reader keeps
+  the places in full. It holds for Studio's full hours too. The spec was not changed.
+- *How `failureText` learns who attempted:* a third, optional argument, the role
+  (`failureText(reason, attempt?, role?)`); only `user_busy` reads it. The book dialog's words go
+  through `WeekScreen.refusal(reason, asked)`, which adds the role and the week's appointments.
+- *`date.model.ts` and `date.screen.ts`:* nothing needed. A single date draws windows and type
+  names only, no slots and no appointments of its own.
+- *Unit tests:* `week.model.test.ts` "the places of a slot" (capacity 1, 3 with 2 and 1 left, 0
+  for the Administrator, never negative), "a slot that appointments overlap" (whole, "2 left",
+  "Full" beside three, a group beside it or not, touching), "the Administrator's appointments
+  that overlap" (one; two; three; four as one block with its rows; the chain of four as two
+  columns; touching; two chains; a User never grouped); `texts.test.ts` "failureText, who
+  attempted"; `booking.test.ts` `overbook` in both bodies, and the refusals: `user_busy` found and
+  not found for both roles, in a booking and a change, the moved appointment left out, the
+  Administrator's change target, custom times, touching, the earliest, `slot_taken` with the offer
+  for the Administrator and without for a User, every other reason; `week.screen.test.ts`
+  `refusal`; `availability.model.test.ts` the row's places and fields, `typeFor` (0, 101, 2.5,
+  empty, spaces, −1, 3e1, words refused; both refusals; agreement with the shared bounds);
+  `availability.screen.test.ts` "the capacity of a type"; the views: `week.view.test.ts` "the
+  capacity of a type" (places, the full slot, the tab and `beside`, the offer shown, sent with
+  `overbook: true` in a booking and a change, hidden by a change in the form and at an opening,
+  never for a User nor for `user_busy`, three side by side, the group block, its list and its
+  rows, `<script>` as text, the teardown); `availability.view.test.ts` "the capacity of a type";
+  `page.test.ts` the new templates, the eighth dialog, the offer, the capacity fields (fields 42,
+  failures 53); `shell.test.ts` a capacity sent and refused through the real service. Front end
+  2 702 tests, 100 % lines on `frontend/src`.
+- *The walk:* section 10 of `docs/FRONTEND_WALK.md`, checks 134 to 156, by a script in headless
+  Chromium at 1280 × 800 and 390 × 844 on a fresh, seeded stack: the type created with 0, 101,
+  2.5 and empty refused, 3, edited to 2 and back: yes; `alice` books ("3 of 3"), a second User
+  sees "2 of 3", a third "1 of 3" and fills it: yes; the slot gone and "busy" for a fourth User:
+  yes; a fourth User's page read before refused with `slot_taken`, no offer: yes; two and three
+  side by side for the Administrator, the tab "1 left" and "Full" on top and within reach: yes
+  (the first run, before the tab, found the full slot covered: the finding above); the
+  Administrator refused, the offer hidden by a change and shown again, "Book anyway" books a
+  fourth: yes; the four as one block, its list, each row opening its detail: yes; the
+  Administrator booking 09:30–10:30 for `alice`: "alice already has an appointment at this time
+  (09:00–10:00 · walk-… group).": yes; `alice` not offered a slot over her own, also while moving:
+  yes. Check 12 walked again: `user_busy` with the User's sentence, no offer, the slot gone: yes.
+  Checks 41, 66 and 70 brought in line, not walked again.
+- *Documents:* `docs/FRONTEND_ARCHITECTURE.md` v22 (status line, the "Not yet in line" sentence
+  removed, sections 4, 5.1, 8, 12.4, decisions 184 to 193); `docs/FRONTEND_WALK.md` v5; the v15
+  row of `docs/ARCHITECTURE.md` (still open). `docs/SHARED_CALENDAR_SPEC.md` unchanged.
+- *Checked:* `npm run typecheck`, `npm run lint`, `npm run test:unit` green; with `local:up` and
+  `local:api` running, the root `DYNAMODB_PORT=8002 npm run verify` **PASSED**; then apart
+  `RUN_INTEGRATION=1 npm run test:integration -w frontend` passed unchanged (79).
+
+**Step u6 finds ready:** the page shows a type's capacity and every slot's places, and the
+Administrator can force a booking or a change over the capacity; the assistant's panel and
+`backend/src/assistant` are untouched: `get_calendar` and the facts still take only slots with a
+place left, and the panel's own sentences of `user_busy` and `slot_taken` are those of
+`failureText` without a role (the User's), which step u6 decides for its own proposals.
 
 ### Step u6 — The assistant
 
