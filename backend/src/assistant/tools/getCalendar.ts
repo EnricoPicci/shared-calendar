@@ -1,6 +1,7 @@
-import { LocalDate, localTimeOf, type CalendarView } from '@shared-calendar/shared';
+import { LocalDate, localTimeOf, type CalendarView, type ListTypesResponse, type Slot } from '@shared-calendar/shared';
 import { z } from 'zod';
 import { handler } from '../../handlers/getCalendar';
+import { handler as listTypes } from '../../handlers/listAvailabilityTypes';
 import { appointmentForModel, localEndTime, slotTime, WEEKDAY_NAMES } from './result';
 import type { ReadTool, ToolDefinition } from './tool';
 
@@ -10,6 +11,10 @@ import type { ReadTool, ToolDefinition } from './tool';
 // Administrator every appointment. The Administrator is also given what the tools that change the
 // opening hours need: the id of each window's type, where each window comes from, the id of an
 // extra window, and whether the date has hours of its own (docs/SHARED_CALENDAR_SPEC.md section 11.6).
+// A type may hold several people at the same time: a window gives its type's capacity when it is
+// above 1, read from GET /calendar/types, and a free slot its places left
+// (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02). A User never learns who holds the other places
+// (docs/SHARED_CALENDAR_SPEC.md decision D29).
 
 // The dates are local dates, as the route takes them: nothing is converted on the way in. The
 // route refuses a period that ends before it starts or is longer than 31 days.
@@ -26,45 +31,70 @@ export const getCalendarDefinition: ToolDefinition = {
     'Reads the calendar of a period of at most 31 days, day by day. For each day: the hours open for appointments ("windows", each with its type), ' +
     'the start times that are still free and that the person may book ("freeSlots", each free slot lasts one hour), and the appointments that start on that day ' +
     "(the person's own for a User, everybody's for the Administrator). A day that is not in the answer has no open hours and no appointments. " +
+    'A type may hold several people at the same time: a window then gives its "capacity", and each of its free slots is followed by its places left in brackets, as "10:00 (2 of 3 places left)". ' +
+    'A window without "capacity" holds one person at a time. ' +
     'On the one night a year when the clocks go back, a time comes twice: the second of the two free slots is then written with " (second)" after it. ' +
+    'To book a free slot, give book_appointment its time alone, without the brackets (and "occurrence" for a second time). ' +
     'Use it for every question about free times or about what a day or a week looks like. All dates and times are in the calendar\'s time zone.',
   descriptionForAdmin:
     'For the Administrator each window also gives the id of its type ("typeId"), the one to give when hours are set, and says where it comes from ("source"): "pattern" for a weekly pattern, "override" for the hours that date has of its own in the place of the patterns, ' +
     '"one_off" for an extra window added on that date, which then has its "id" too. Each day says whether it has such hours of its own ("hasOverride"): ' +
-    'a day with "hasOverride" true and no window from an override is closed as far as the weekly patterns go.',
+    'a day with "hasOverride" true and no window from an override is closed as far as the weekly patterns go. ' +
+    'A day also gives the start times of the slots that are full ("fullSlots"), which only a booking over the capacity can take.',
   kind: 'read',
   roles: ['admin', 'user'],
   input: () => Input,
   reads: 'calendar',
 };
 
+// A free slot as Claude reads it: its time, then its places left when its type holds more than
+// one person: "10:00 (2 of 3 places left)".
+const freeSlot = (slot: Slot, timeZone: string) =>
+  slotTime(slot.start, timeZone) + (slot.capacity > 1 ? ` (${slot.placesLeft} of ${slot.capacity} places left)` : '');
+
 const parts: ReadTool<z.infer<typeof Input>> = {
   definition: getCalendarDefinition,
-  toHandler: { handler, request: ({ from, to }) => ({ routeKey: 'GET /calendar', path: '/calendar', query: { from, to } }) },
+  toHandler: {
+    handler,
+    request: ({ from, to }) => ({ routeKey: 'GET /calendar', path: '/calendar', query: { from, to } }),
+    also: { handler: listTypes, call: { routeKey: 'GET /calendar/types', path: '/calendar/types' } },
+  },
   // A day as its windows, its free slot starts and its appointments, in wall-clock times. The days
   // with nothing on them are left out, which keeps a month of mostly closed days small; the busy
-  // time of other people stays out, and so do the full slots the route gives the Administrator
-  // (docs/SHARED_CALENDAR_SPEC.md decision D30): a free slot has a place left. The id of a window's type, where the window comes from, the
-  // id of an extra window and whether the date has hours of its own are given to the
-  // Administrator only, who alone can change the hours; a day closed by hours of its own is then kept.
-  toModel: (body, { timeZone, role }) => {
+  // time of other people stays out. A free slot has a place left; the full slots the route gives
+  // the Administrator (docs/SHARED_CALENDAR_SPEC.md decision D30) are given apart, as
+  // "fullSlots", on the days that have one. The id of a window's type, where the window comes
+  // from, the id of an extra window and whether the date has hours of its own are given to the
+  // Administrator only, who alone can change the hours; a day closed by hours of its own is then
+  // kept. A window's capacity is given when it is above 1, which keeps the calendar of one person
+  // per type as small as it was.
+  toModel: (body, { timeZone, role }, also) => {
     const view = body as CalendarView;
     const admin = role === 'admin';
+    const capacities = new Map((also as ListTypesResponse).types.map((type) => [type.typeId, type.capacity]));
     const days = view.days
-      .map((day) => ({
-        date: day.date,
-        weekday: WEEKDAY_NAMES[day.weekday - 1],
-        ...(admin && { hasOverride: day.hasOverride === true }),
-        windows: day.windows.map((window) => ({
-          start: localTimeOf(window.start, timeZone),
-          end: localEndTime(window.end, day.date, timeZone),
-          type: window.typeName,
-          ...(admin && { typeId: window.typeId, source: window.source }),
-          ...(admin && window.source === 'one_off' && { id: window.sourceId }),
-        })),
-        freeSlots: day.slots.filter((slot) => slot.placesLeft > 0).map((slot) => slotTime(slot.start, timeZone)),
-        appointments: view.appointments.filter((appointment) => appointment.date === day.date).map((appointment) => appointmentForModel(appointment, timeZone)),
-      }))
+      .map((day) => {
+        const full = day.slots.filter((slot) => slot.placesLeft === 0).map((slot) => slotTime(slot.start, timeZone));
+        return {
+          date: day.date,
+          weekday: WEEKDAY_NAMES[day.weekday - 1],
+          ...(admin && { hasOverride: day.hasOverride === true }),
+          windows: day.windows.map((window) => {
+            const capacity = capacities.get(window.typeId) ?? 1;
+            return {
+              start: localTimeOf(window.start, timeZone),
+              end: localEndTime(window.end, day.date, timeZone),
+              type: window.typeName,
+              ...(capacity > 1 && { capacity }),
+              ...(admin && { typeId: window.typeId, source: window.source }),
+              ...(admin && window.source === 'one_off' && { id: window.sourceId }),
+            };
+          }),
+          freeSlots: day.slots.filter((slot) => slot.placesLeft > 0).map((slot) => freeSlot(slot, timeZone)),
+          ...(admin && full.length > 0 && { fullSlots: full }),
+          appointments: view.appointments.filter((appointment) => appointment.date === day.date).map((appointment) => appointmentForModel(appointment, timeZone)),
+        };
+      })
       .filter((day) => day.windows.length > 0 || day.appointments.length > 0 || day.hasOverride === true);
     return { fields: { from: view.from, to: view.to }, list: { name: 'days', items: days } };
   },

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v19, deployed: steps c00 to c15 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` section 5.6); step c16, the hand-over, to come **Not yet in line with the capacity of a type** (`docs/SHARED_CALENDAR_SPEC.md` v17, decisions D24 to D31): this document changes for it in step u6 of `docs/CAPACITY_PLAN.md`, and until then says nothing of a type's capacity, of `overbook` or of a slot's places left. |
+| Status | v20, deployed as v19: steps c00 to c15 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` section 5.6); step c16, the hand-over, to come. v20 adds the capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` decisions D24 to D31), built in step u6 of `docs/CAPACITY_PLAN.md` and not yet deployed |
 | Date | 2026-11-23 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
@@ -30,6 +30,7 @@
 | v17 | 2026-11-23 | The branch `deploy-frontend` merged: the page is deployed as the stack `shared-calendar-web`, whose distribution passes every path under `/api/` on to the API. **Open point P7 is met by it** (section 18.2), to be seen at the deployed page once the assistant is deployed (`docs/CONVERSATIONAL_PLAN.md` step c15). Nothing else changed |
 | v18 | 2026-11-23 | **Open point P1 closed** by the operator, before any deployment (`docs/CONVERSATIONAL_PLAN.md` step c15, point 1): the account's requests are not used for training and not retained by default (section 10.2). Nothing else changed |
 | v19 | 2026-11-23 | **Deployed**, in `docs/CONVERSATIONAL_PLAN.md` step c15 (`docs/RUNBOOK.md` section 5.6). **Open point P2 closed**: the key is read with `ssm:GetParameter` alone, no `kms:Decrypt` statement is needed (sections 10.1 and 18.2). P7 seen at the deployed page. Nothing else changed |
+| v20 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u6: **the capacity of a type**. `get_calendar` says a slot's places left, a window's capacity and the Administrator's full times (section 8.3); `book_appointment` and `change_appointment` take the Administrator's `overbook`, the proposal says when a time goes over the capacity, and the Administrator's booking or move of a User already busy then is refused at the proposal with `user_busy` (sections 3 and 8.2); rule 4 counts the places of a slot (section 5.5); `create_type` takes a capacity and **`rename_type` became `edit_type`**, for the name, the capacity or both (sections 3, 8.2, 8.3); the instructions gain a paragraph on places (section 7.3); the panel says a refused change for the person's role (section 13); the evaluation gains a type of capacity 3 and six requests (section 12.3); decisions 14 to 20 (section 18.1), decided by the Product Owner. The mark of the instructions changes, which ends the conversations in progress |
 
 ---
 
@@ -154,7 +155,7 @@ within their own rights as `docs/ARCHITECTURE.md` section 3 gives them.
 | `list_users` | `GET /users` (to book for a User) | admin | read |
 | `list_patterns` | `GET /calendar/patterns` | admin | read |
 | `update_settings` | `PUT /calendar/settings` | admin | change |
-| `create_type`, `rename_type`, `delete_type` | the three writes of `/calendar/types` | admin | change |
+| `create_type`, `edit_type`, `delete_type` | the three writes of `/calendar/types` (`edit_type` calls `PUT /calendar/types/{typeId}`: the name, the capacity or both) | admin | change |
 | `create_pattern`, `update_pattern`, `delete_pattern` | the three writes of `/calendar/patterns` | admin | change |
 | `set_date_override`, `delete_date_override` | `PUT` and `DELETE /calendar/overrides/{date}` | admin | change |
 | `create_one_off_window`, `delete_one_off_window` | `POST /calendar/windows` and `DELETE /calendar/windows/{windowId}` | admin | change |
@@ -178,6 +179,16 @@ stays open, the deletion before the creation; the three make one proposal, confi
 button. When only an extra window is in the blocked time, the day's hours are not touched at
 all. Blocking is the model's work, from the instructions (section 7.3): there is no tool for
 it, and whether one is needed is open point P5 of `docs/CONVERSATIONAL_PLAN.md`.
+
+**The capacity of a type** (`docs/SHARED_CALENDAR_SPEC.md` R-SLOT-02, R-BOOK-07, R-BOOK-12,
+R-BOOK-13). A type holds a number of people at the same time. The assistant reads it
+(`list_types`, and `get_calendar` with each free slot's places left), sets it (`create_type`,
+`edit_type`), and keeps to it: a full time is refused before any proposal, several bookings of
+one answer into one slot are proposed while they fit, and only the Administrator, when the
+person asked for it, books or moves over the capacity, with `overbook`. Nobody holds two
+appointments at the same time: the Administrator's booking or move of a User who already has an
+appointment then is refused at the proposal with `user_busy`, naming that appointment. A User
+never learns who holds the other places.
 
 As built: every tool of the table exists. `list_patterns` calls `GET /calendar/types` too, to
 give each pattern the name of its type. With the person the assistant uses the words of the
@@ -530,12 +541,16 @@ As built (`backend/src/assistant/`: `exchange.ts` makes the proposal, `confirm.t
    cannot be proposed, none is**: that one gets its own error (an appointment not found, no
    free slot), the others the error `not_proposed`, and the model tells the person and asks
    again for what can be done. A proposal is therefore always the whole of what the model
-   asked for. **Two changes of one answer about the same thing** (the same appointment, two
-   bookings or moves into the same slot, the same type or type name, two of the settings, the
+   asked for. **Two changes of one answer about the same thing** (the same appointment, the same type or type name, two of the settings, the
    same weekly pattern, the hours of the same date, the same extra window, or twice the same
    new pattern or new window) are one that cannot be proposed: the second gets
    `same_thing_twice`. The hours of a date and an extra window of that date are two things, so
-   a block may change both in one proposal. **A change that would change nothing** is not proposed either: a move
+   a block may change both in one proposal. **Bookings and moves into one slot are
+   counted against its places left**, read with the facts: they are proposed while they fit;
+   the first that does not, and every one after it, gets `same_thing_twice` with a message
+   saying how many places were left, and so does the same User twice in one slot. A change
+   the Administrator marked `overbook` takes no place in the count (it may not fit by
+   definition); a move out of a slot frees none (decided by the Product Owner). **A change that would change nothing** is not proposed either: a move
    to the time the appointment has, the note it has, a removal where there is no note.
 5. **Writing instead of pressing drops the proposal.** A new message while a proposal waits
    ("no, at eleven") declines it; the model is told nothing was changed and reads the new
@@ -875,6 +890,11 @@ conversation's language) say, in prose:
   the patterns or of the day's own hours, keep each piece with the type of the window it was
   cut from, give `set_date_override` everything that is left, untouched windows included, and
   treat an extra window in the blocked time with its own two tools; how to open a day again;
+- places at the same time: a type's capacity is one unless `list_types` or `get_calendar` say
+  more, a slot with places left takes several people, one call each; a full time is said to be
+  full, and only to the Administrator offered over the capacity, with `overbook` given only
+  after they asked for it; nobody holds two appointments at the same time, and the person is
+  offered to move the one in the way instead;
 - what the calendar's refusals mean, so that an error code becomes a helpful sentence ("you
   can cancel up to 24 hours before") and, where it helps, an alternative;
 - to answer in the conversation's language, in plain text without markup, briefly, with dates
@@ -986,6 +1006,16 @@ out one proposed change, `changeHandlers.ts` names the handler of each change to
   error result that tells Claude to ask the person, and the proposal of the second one says
   so in words. A time the day does not have (the night the clocks go forward) is an error
   result too. Several bookings are asked for in one answer, one request each.
+  **The Administrator's input has `overbook` too** (`change_appointment`'s as well), a boolean
+  to give only when the person asked to go over the capacity. Without it a full time is
+  `no_free_slot`, whose message tells the Administrator it can be booked over the capacity if
+  the person asks. With it a full time (no place left) is proposed, the route is called with
+  `overbook: true`, and the sentence adds "Over the capacity: it will hold 4 people, its
+  capacity is 3.", the people counted at their peak (`peopleIn`) plus this one; on a time with
+  a place left it is sent and the sentence says nothing more. **For the Administrator, a User
+  already busy** at that time (an active appointment of theirs that overlaps the slot, the
+  moved one left out) is `user_busy` at the proposal, with that appointment's day, times and
+  type, read from the same `GET /calendar`. A User's input has no `overbook`.
 - **`cancel_appointment`**, **`change_appointment`** and **`set_appointment_note`**, for both
   roles. Each takes the appointment's id and nothing that names it another way: no date, no
   username. `change_appointment` adds a day, a local start time and the optional
@@ -999,10 +1029,18 @@ out one proposed change, `changeHandlers.ts` names the handler of each change to
 - **`update_settings`**, for the Administrator: any of the four settings, at least one, each
   within the range the route accepts; `null` lifts the limit of upcoming appointments. The
   time zone is not among them, and the description says so.
-- **`create_type`**, **`rename_type`** and **`delete_type`**, for the Administrator: a name,
-  an id and a name, an id. A type is never named by its name in an input.
+- **`create_type`**, **`edit_type`** and **`delete_type`**, for the Administrator: a name
+  and an optional `capacity` (1 to 100, 1 when not given; the sentence says it when above 1:
+  "Create the appointment type "Yoga", for 8 people at the same time."); an id with a new
+  name, a new capacity or both, at least one; an id. A type is never named by its name in an
+  input. In `edit_type` a value equal to the present one counts as not given, and nothing left
+  to change is `type_unchanged`; the sentence says each change ("Change the appointment type
+  "Swimming Pool": capacity from 3 to 5."), and a capacity lowered under the people already
+  booked at some upcoming time adds that nobody is cancelled. The route takes the name always,
+  so the present one is sent when it does not change; the capacity only when it changes.
 - **A read tool may ask a second route** after the first answered: `list_patterns` asks for
-  the types to turn each pattern's type id into a name.
+  the types to turn each pattern's type id into a name, and `get_calendar` asks for them to give
+  each window its type's capacity.
 - **`create_pattern`** and **`update_pattern`**, for the Administrator: a weekday as an English
   word (`Monday` to `Sunday`, never a number), a start and an end on the quarter hour, the end
   after the start and `24:00` allowed, a type's id, the first valid day and the last, or `null`
@@ -1051,14 +1089,14 @@ As built:
 | Tool | Input | Result |
 |---|---|---|
 | `get_settings` | none | the time zone, the three notice and horizon values, the limit of future appointments; not who saved them |
-| `list_types` | none | `types`: each an id and a name |
-| `get_calendar` | `from`, `to`: local dates, at most 31 days | `days`: each a date, its weekday in words, `windows` (start, end, type name), `freeSlots` (the start times the caller may book) and the `appointments` that start that day. A day with no window and no appointment is left out. Not in it: the ids of types, other people's busy time. **For the Administrator only**: each window's `source` (`pattern`, `override`, `one_off`), the `id` of a window that is `one_off`, and per day `hasOverride`; a day closed by hours of its own is kept, since those hours can be taken away. A User's result has none of the three |
+| `list_types` | none | `types`: each an id, a name and its `capacity` |
+| `get_calendar` | `from`, `to`: local dates, at most 31 days | `days`: each a date, its weekday in words, `windows` (start, end, type name), `freeSlots` (the start times the caller may book, "10:00 (2 of 3 places left)" when the type holds more than one; the time alone is what `book_appointment` takes) and the `appointments` that start that day. A window gives its type's `capacity` when above 1 (read through `GET /calendar/types`, the tool's second route); a User never learns who holds the other places. A day with no window and no appointment is left out. Not in it: the ids of types, other people's busy time. **For the Administrator only**: each window's `source` (`pattern`, `override`, `one_off`), the `id` of a window that is `one_off`, and per day `hasOverride` and, when there are, `fullSlots`, the times with no place left; a day closed by hours of its own is kept, since those hours can be taken away. A User's result has none of the four |
 | `list_appointments` | `from` and `to` (at most 92 days) or neither, for the upcoming ones; `status`; for the Administrator `username` | `appointments`: each its id, date, start, end, type name, username, note, status and, for a User, `cancellableUntil` as a local date and time |
 | `list_users` | none | `users`: the usernames, nothing else of an account |
 | `list_patterns` | none | `patterns`: each its id, its weekday in words, start, end, type name, and the dates it holds from and until |
 
-A change of settings gives back the settings as `get_settings` does, a type created or renamed
-its id and name, a type deleted the word that it was. A pattern created or changed comes back
+A change of settings gives back the settings as `get_settings` does, a type created or edited
+its id, name and capacity, a type deleted the word that it was. A pattern created or changed comes back
 with its id, its weekday in words, its hours and its dates; an extra window created with its
 id, date and hours; the hours set for a date as the date and its hours; a deletion as the word
 that it was done.
@@ -1368,13 +1406,16 @@ A separate command, **outside** `verify` because it costs money and is not deter
 DYNAMODB_PORT=8002 npm run assistant:eval -w backend -- --ceiling 4 --out run.json --hand answers.txt
 ```
 
-**What it plays.** A list of 51 requests, 55 messages, 28 in English and 23 in Italian
+**What it plays.** A list of 57 requests, 62 messages, 31 in English and 26 in Italian
 (`backend/tests/eval/requests.ts`): the first brief's examples; relative dates ("dopodomani",
 "next Friday", the last day of the month); readings; each kind of change, by a User and by
 the Administrator for a User, with a setting, a type, a weekly pattern and a day's hours; nine
 wordings of blocking time; ambiguity that must produce a question; what the web pages keep; a
 tool of the Administrator asked for by a User; a note that tries to give orders; a message in
-the other language later in a conversation. Each request starts a conversation of its own.
+the other language later in a conversation; and six on the capacity of a type: what is free
+(the places said), a type's capacity changed, two Users into one slot, a User asking for a full
+time (nothing over the capacity offered), the Administrator asking for one and then "book it
+anyway" (`overbook` only after that second message), and a User already busy at that time. Each request starts a conversation of its own.
 
 **How it sees an exchange.** It drives the routes of section 6 as a person's page does and
 never calls Anthropic itself. The reply gives the status, the language, the proposal and the
@@ -1384,7 +1425,8 @@ from the log line the step wrote (section 15), in the file that keeps the output
 `npm run local:api`. A proposal is declined, except in the one request whose check needs the
 outcome, where it is confirmed through the route.
 
-**The known week.** It makes, through the API, two types whose names start with "eval" and
+**The known week.** It makes, through the API, three types whose names start with "eval", one of
+them, "eval Swimming Pool", of capacity 3 with a slot partly taken in the week after, and
 two accounts, `eval-anna` and `eval-bruno` (`backend/tests/eval/week.ts`): weekly patterns for
 six weeks, and in the coming week four appointments, a day with hours of its own, a day with
 only an extra window and a day with no hours; one note reads like an order. The settings are
@@ -1413,7 +1455,19 @@ nor a token of an account.
 machine, when the local table cannot be read, when the log file is missing.
 
 It is run before a deployment that changes the instructions, the tools or the model; a whole
-run on the chosen model costs about 40 US cents and takes four minutes. The post-deploy smoke
+run on the chosen model costs about 40 US cents and takes four minutes.
+
+**The run for the capacity of a type** (2026-11-24, `docs/CAPACITY_PLAN.md` step u6, ceiling
+US$1, `claude-sonnet-5-5` at effort `low`): 57 of 57 passed, 113 steps, 45.20 US cents. Read by
+hand: to a User the assistant gave the places left ("16:00 (3 of 3 places left)") and named no
+one else; asked for a full time by the Administrator it said the time was full, named who held
+it and offered to book over the capacity, and gave `overbook` only after "book it anyway",
+the proposal saying "it will hold 2 people, its capacity is 1"; the Administrator's booking of
+a User already there was not proposed, and the answer offered to move that appointment. One
+answer is weaker than it could be, and left as it is: a User asking for a full time is told it
+"is not among the bookable times", not that it is full, since a User's `get_calendar` holds no
+other people's busy time; nothing over the capacity was offered. Nothing in the instructions or
+the tools was changed after the run. The post-deploy smoke
 test gains one real exchange (a read), which proves the key, the permissions and the route.
 
 ---
@@ -1453,8 +1507,12 @@ The person asks while looking at the calendar, and sees the calendar change.
   channel show the same proposal.
 - **The proposal** is shown once, under the last message. Once settled the same block stays
   without its buttons and each action says what became of it: "Done"; or "Not done." with the
-  page's own English sentence for the error code the action carries (the contract of section 6
-  gives a code there, not a sentence); or that it is not known whether it was done. A declined
+  page's own English sentence for the error code the action carries, for the person's role (the
+  contract of section 6 gives a code there, not a sentence): to the Administrator `user_busy`
+  reads "This User already has an appointment at this time." and `slot_taken` "This time is
+  full: there is no place left.", without the words that the calendar was refreshed; a User's
+  sentences are those of the other screens. The panel offers no "Book anyway": going over the
+  capacity is asked for in the conversation; or that it is not known whether it was done. A declined
   proposal is gone, and the server's notice says so. A message written instead drops the
   proposal: the block goes with the reply, and no notice is added.
 - **While the assistant works** the field stays writable, "Send" is out of use and nothing is
@@ -1605,6 +1663,28 @@ Not built now. What the design already gives it, and what it would add:
     about ten people (N6).
 13. In the web pages the assistant is a panel at the bottom of every screen, not a screen
     (section 13): a decision of the Product Owner, taken when the plan reached it.
+14. The Administrator's `book_appointment` and `change_appointment` take `overbook`, set only
+    when the person asked to go over the capacity; the proposal says so with the people the
+    time will hold; a User's input has none (sections 3 and 8.2). Decided by the Product Owner.
+15. One person, one place, at the proposal: the Administrator's booking or move of a User who
+    already holds an overlapping appointment is refused with `user_busy`, naming it (section
+    8.2). Decided by the Product Owner.
+16. Rule 4 counts the places of a slot: changes into one slot are proposed while they fit, the
+    same User twice never; an overbooked change is not counted, a move out frees no place
+    (section 5.5). Decided by the Product Owner.
+17. `create_type` takes a capacity; `rename_type` became `edit_type`, for the name, the
+    capacity or both, at least one; nothing left to change is `type_unchanged`. Only the
+    assistant's tool is renamed: the route, its handler and the page keep their names (section
+    8.2). Decided by the Product Owner; the code `type_unchanged` was chosen in the
+    implementation, after the tools' other `…_unchanged` codes.
+18. `get_calendar` writes a slot's places in brackets after its time when the type holds more
+    than one, gives a window its capacity when above 1, and gives the Administrator the full
+    times; a User never learns who holds the other places (section 8.3). Decided by the
+    Product Owner.
+19. The panel says a refused change for the person's role, and offers no "Book anyway"
+    (section 13). Decided by the Product Owner.
+20. The instructions gain a short paragraph on places and `overbook` (section 7.3); the mark
+    changes, which ends the conversations in progress. Decided by the Product Owner.
 
 ### 18.2 Open points
 

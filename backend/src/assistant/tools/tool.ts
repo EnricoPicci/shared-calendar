@@ -74,9 +74,16 @@ export type CallRoute = (handler: RouteHandler, call: ToolCall) => Promise<Route
 // will be sent at the confirmation, exactly, and the facts the proposal shows. When it cannot (the
 // facts could not be read, or they say the change cannot be made): a code and a sentence for
 // Claude, and nothing is proposed. `subjects` names what the change acts on (an appointment, a
-// slot): two changes of one answer of Claude that share a subject are not proposed together, since
-// the second would be refused once the first was made.
-export type ConfirmationRead<Facts> = { ok: true; call: ToolCall; facts: Facts; subjects?: string[] } | { ok: false; error: string; message: string };
+// type): two changes of one answer of Claude that share a subject are not proposed together, since
+// the second would be refused once the first was made. `place` is the place a booking or a move
+// takes in a slot, which is counted instead (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5, rule 4).
+export type ConfirmationRead<Facts> = { ok: true; call: ToolCall; facts: Facts; subjects?: string[]; place?: Place } | { ok: false; error: string; message: string };
+
+// The place a booking or a move takes in a slot: the slot, by its start; the places it had left
+// when the calendar was read; who takes the place (the User's username, or "" for the person
+// asking, a User); and whether the Administrator asked to go over the capacity, which takes no
+// place from the others (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13).
+export type Place = { slot: string; left: number; who: string; overbook: boolean };
 
 // The fourth part, of a change tool only (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5, rule
 // 2): it reads the facts a proposal shows, through the handler of a route that only reads, and

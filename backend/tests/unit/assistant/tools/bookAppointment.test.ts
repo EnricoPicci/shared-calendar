@@ -25,6 +25,7 @@ const view = (date: string, windowStart: string, windowEnd: string, slotStarts: 
         busy: [],
       },
     ],
+    appointments: [] as unknown[],
   },
 });
 // Tuesday 24 November 2026, open 09:00-12:00 local, 10:00 and 11:00 free.
@@ -46,7 +47,7 @@ describe('book_appointment: what Claude is given (3, 8.2)', () => {
 
   it("the Administrator's input has a required username, a User's has none: the two schemas", () => {
     const admin = forClaude(bookAppointmentDefinition, 'admin').input_schema;
-    expect(Object.keys(admin.properties as object)).toEqual(['username', 'date', 'time', 'occurrence', 'note']);
+    expect(Object.keys(admin.properties as object)).toEqual(['username', 'date', 'time', 'occurrence', 'note', 'overbook']);
     expect(admin.required).toEqual(['username', 'date', 'time']);
     expect(admin.additionalProperties).toBe(false);
 
@@ -56,6 +57,20 @@ describe('book_appointment: what Claude is given (3, 8.2)', () => {
     expect(forAdmin.safeParse({ date: '2026-11-24', time: '10:00' }).success).toBe(false);
     expect(forAdmin.safeParse({ username: 'Not A Username', date: '2026-11-24', time: '10:00' }).success).toBe(false);
     expect(bookAppointmentDefinition.input('user').safeParse({ username: 'alice', date: '2026-11-24', time: '10:00' }).success).toBe(false);
+  });
+
+  it("overbook is in the Administrator's input only, a boolean, and the Administrator alone is told when to give it", () => {
+    const forAdmin = bookAppointmentDefinition.input('admin');
+    expect(forAdmin.safeParse({ username: 'alice', date: '2026-11-24', time: '10:00', overbook: true }).success).toBe(true);
+    expect(forAdmin.safeParse({ username: 'alice', date: '2026-11-24', time: '10:00', overbook: false }).success).toBe(true);
+    expect(forAdmin.safeParse({ username: 'alice', date: '2026-11-24', time: '10:00', overbook: 'true' }).success).toBe(false);
+    // A User's request with overbook is refused by the schema, before anything is read.
+    expect(bookAppointmentDefinition.input('user').safeParse({ date: '2026-11-24', time: '10:00', overbook: true }).success).toBe(false);
+    const property = (forClaude(bookAppointmentDefinition, 'admin').input_schema.properties as Record<string, { type: string; description: string }>).overbook!;
+    expect(property.type).toBe('boolean');
+    expect(property.description).toContain('never on your own');
+    expect(forClaude(bookAppointmentDefinition, 'admin').description).toContain('"overbook": true');
+    expect(forClaude(bookAppointmentDefinition, 'user').description).not.toContain('overbook');
   });
 
   it('only the Administrator is told about booking for a User', () => {
@@ -108,9 +123,9 @@ describe('book_appointment: the facts of the confirmation (5.5 rule 2)', () => {
     expect(result).toEqual({
       ok: true,
       call: { routeKey: 'POST /calendar/appointments', path: '/calendar/appointments', body: { start: '2026-11-24T09:00:00.000Z' } },
-      // What another change of the same answer must not also fill.
-      subjects: ['slot 2026-11-24T09:00:00.000Z'],
-      facts: { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', note: null, secondTime: false, username: null },
+      // The place it takes, which the exchange counts against the other changes of the answer.
+      place: { slot: 'slot 2026-11-24T09:00:00.000Z', left: 1, who: '', overbook: false },
+      facts: { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', note: null, secondTime: false, username: null, over: null },
     });
   });
 
@@ -143,7 +158,11 @@ describe('book_appointment: the facts of the confirmation (5.5 rule 2)', () => {
     const full = structuredClone(TUESDAY);
     full.body.days[0]!.slots[1]!.placesLeft = 0;
     route.mockResolvedValue(full);
-    expect(await read({ date: '2026-11-24', time: '11:00' })).toMatchObject({ ok: false, error: 'no_free_slot' });
+    const refused = await read({ date: '2026-11-24', time: '11:00' });
+    expect(refused).toMatchObject({ ok: false, error: 'no_free_slot' });
+    // The message says the time is full, and when it can be booked all the same.
+    expect(refused.ok === false && refused.message).toContain('is full: its 1 place is taken');
+    expect(refused.ok === false && refused.message).toContain('"overbook": true');
     expect(await read({ date: '2026-11-24', time: '10:00' })).toMatchObject({ ok: true });
   });
 
@@ -182,8 +201,8 @@ describe('book_appointment for a User, by the Administrator (5.4, 5.5 rule 2)', 
     expect(result).toEqual({
       ok: true,
       call: { routeKey: 'POST /calendar/appointments', path: '/calendar/appointments', body: { start: '2026-11-24T09:00:00.000Z', username: 'alice', note: 'First visit' } },
-      subjects: ['slot 2026-11-24T09:00:00.000Z'],
-      facts: { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', note: 'First visit', secondTime: false, username: 'alice' },
+      place: { slot: 'slot 2026-11-24T09:00:00.000Z', left: 1, who: 'alice', overbook: false },
+      facts: { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', note: 'First visit', secondTime: false, username: 'alice', over: null },
     });
   });
 
@@ -263,7 +282,7 @@ describe('book_appointment: the two nights the clocks change (8.3)', () => {
 
 // Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
 describe('book_appointment: the words of the proposal and the result (5.5 rule 2, 8.3)', () => {
-  const FACTS: BookingSummary = { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', note: 'Bring the forms', secondTime: false, username: null };
+  const FACTS: BookingSummary = { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', note: 'Bring the forms', secondTime: false, username: null, over: null };
 
   it('the summary is the fixed text of the language, filled with the facts', () => {
     expect(tool.confirmation.summary(ASSISTANT_TEXTS_EN, FACTS)).toBe('Book an appointment on Tuesday 24 November 2026, from 10:00 to 11:00 (Visit). Note: "Bring the forms"');
@@ -294,5 +313,100 @@ describe('book_appointment: the words of the proposal and the result (5.5 rule 2
     };
     const { fields } = tool.toModel(appointment, USER);
     expect(fields.appointment).toMatchObject({ id: '01JD0000000000000000APPT01', date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit' });
+  });
+});
+
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md; R-… rules and D…
+// decisions those of docs/SHARED_CALENDAR_SPEC.md.
+describe('book_appointment and the capacity of a type (8.2, R-BOOK-07, R-BOOK-12, R-BOOK-13)', () => {
+  const USERS = { status: 200, body: { users: [{ username: 'alice', createdAt: '2026-11-01T10:00:00.000Z' }, { username: 'bob', createdAt: '2026-11-02T10:00:00.000Z' }] } };
+  const asAdmin = (input: Record<string, unknown>) => tool.confirmation.read(input, ADMIN, route);
+  // An active appointment of the day, as the Administrator's view gives it.
+  const appointment = (id: string, username: string, start: string, end: string, status = 'booked') => ({
+    appointmentId: id,
+    username,
+    date: '2026-11-24',
+    start,
+    end,
+    typeId: TYPE,
+    typeName: 'Swimming Pool',
+    status,
+  });
+  // Tuesday's 10:00 (09:00Z) of a type that holds 3, with these appointments and places left.
+  const pool = (placesLeft: number, appointments: unknown[]) => {
+    const day = structuredClone(TUESDAY);
+    day.body.days[0]!.windows[0]!.typeName = 'Swimming Pool';
+    for (const slot of day.body.days[0]!.slots) Object.assign(slot, { capacity: 3, placesLeft: 3 });
+    day.body.days[0]!.slots[0]!.placesLeft = placesLeft;
+    day.body.appointments = appointments;
+    return day;
+  };
+  const THREE = [
+    appointment('A1', 'bob', '2026-11-24T09:00:00.000Z', '2026-11-24T10:00:00.000Z'),
+    appointment('A2', 'carol', '2026-11-24T09:00:00.000Z', '2026-11-24T10:00:00.000Z'),
+    appointment('A3', 'dan', '2026-11-24T09:00:00.000Z', '2026-11-24T10:00:00.000Z'),
+  ];
+  const routes = (day: RouteAnswer) => route.mockImplementation((_handler, call) => Promise.resolve((call as { routeKey: string }).routeKey === 'GET /users' ? USERS : day));
+
+  it('a full slot is refused without overbook, and proposed with it: the route is sent overbook, the sentence says the people it will hold', async () => {
+    routes(pool(0, THREE));
+    expect(await asAdmin({ username: 'alice', date: '2026-11-24', time: '10:00' })).toMatchObject({ ok: false, error: 'no_free_slot' });
+    const result = await asAdmin({ username: 'alice', date: '2026-11-24', time: '10:00', overbook: true });
+    expect(result).toMatchObject({
+      ok: true,
+      call: { body: { start: '2026-11-24T09:00:00.000Z', username: 'alice', overbook: true } },
+      place: { slot: 'slot 2026-11-24T09:00:00.000Z', left: 0, who: 'alice', overbook: true },
+      facts: { type: 'Swimming Pool', over: { people: 4, capacity: 3 } },
+    });
+    expect(result.ok && tool.confirmation.summary(ASSISTANT_TEXTS_EN, result.facts)).toBe(
+      'Book an appointment for alice on Tuesday 24 November 2026, from 10:00 to 11:00 (Swimming Pool). Over the capacity: it will hold 4 people, its capacity is 3.',
+    );
+  });
+
+  it('a time already over its capacity says its true number; cancelled appointments and touching ones are not counted', async () => {
+    const more = [
+      ...THREE,
+      appointment('A4', 'erin', '2026-11-24T09:30:00.000Z', '2026-11-24T10:00:00.000Z'),
+      appointment('A5', 'fred', '2026-11-24T09:00:00.000Z', '2026-11-24T10:00:00.000Z', 'cancelled'),
+      appointment('A6', 'gina', '2026-11-24T10:00:00.000Z', '2026-11-24T11:00:00.000Z'),
+    ];
+    routes(pool(0, more));
+    expect(await asAdmin({ username: 'alice', date: '2026-11-24', time: '10:00', overbook: true })).toMatchObject({ ok: true, facts: { over: { people: 5, capacity: 3 } } });
+  });
+
+  it('overbook on a slot with a place left is not an error: it is sent, and the sentence says nothing more', async () => {
+    routes(pool(1, THREE.slice(0, 2)));
+    const result = await asAdmin({ username: 'alice', date: '2026-11-24', time: '10:00', overbook: true });
+    expect(result).toMatchObject({ ok: true, call: { body: { overbook: true } }, place: { left: 1, overbook: true }, facts: { over: null } });
+    // overbook false is not sent.
+    const plain = await asAdmin({ username: 'alice', date: '2026-11-24', time: '10:00', overbook: false });
+    expect(plain.ok && plain.call.body).toEqual({ start: '2026-11-24T09:00:00.000Z', username: 'alice' });
+  });
+
+  it('user_busy at the proposal: the User the Administrator books for holds an appointment over the time, named by its time and type, overbook or not', async () => {
+    routes(pool(2, [appointment('A1', 'alice', '2026-11-24T09:30:00.000Z', '2026-11-24T10:30:00.000Z'), appointment('A2', 'alice', '2026-11-24T09:15:00.000Z', '2026-11-24T09:45:00.000Z')]));
+    for (const overbook of [false, true]) {
+      const result = await asAdmin({ username: 'alice', date: '2026-11-24', time: '10:00', overbook });
+      expect(result).toMatchObject({ ok: false, error: 'user_busy' });
+      // The earliest of the two is named.
+      expect(result.ok === false && result.message).toContain('alice already has an appointment at this time: on 2026-11-24 from 10:15 to 10:45 (Swimming Pool)');
+    }
+  });
+
+  it('user_busy is not met by an appointment that touches the time, a cancelled one, or another User\'s', async () => {
+    routes(
+      pool(2, [
+        appointment('A1', 'alice', '2026-11-24T08:00:00.000Z', '2026-11-24T09:00:00.000Z'),
+        appointment('A2', 'alice', '2026-11-24T10:00:00.000Z', '2026-11-24T11:00:00.000Z'),
+        appointment('A3', 'alice', '2026-11-24T09:00:00.000Z', '2026-11-24T10:00:00.000Z', 'cancelled'),
+        appointment('A4', 'bob', '2026-11-24T09:00:00.000Z', '2026-11-24T10:00:00.000Z'),
+      ]),
+    );
+    expect(await asAdmin({ username: 'alice', date: '2026-11-24', time: '10:00' })).toMatchObject({ ok: true, place: { left: 2 } });
+  });
+
+  it("a User's booking of a slot with places left takes one place, as the person asking", async () => {
+    route.mockResolvedValue(pool(2, []));
+    expect(await read({ date: '2026-11-24', time: '10:00' })).toMatchObject({ ok: true, place: { slot: 'slot 2026-11-24T09:00:00.000Z', left: 2, who: '', overbook: false }, facts: { over: null } });
   });
 });

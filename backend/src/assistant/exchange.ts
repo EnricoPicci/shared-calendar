@@ -8,7 +8,7 @@ import { INSTRUCTIONS, timeLine } from './prompt';
 import { TOOLS } from './tools/list';
 import { asUnknown, isWaiting, proposalOf, settledWithout, takenState, type Proposal, type ProposedChange } from './proposal';
 import { asksForChange, notRun, proposeChange, runRead, type FactsRead, type Proposable, type ToolLog } from './tools/run';
-import type { Tool, ToolResultBlock } from './tools/tool';
+import type { Place, Tool, ToolResultBlock } from './tools/tool';
 
 // The part of the assistant's core that asks Claude (docs/CONVERSATIONAL_ARCHITECTURE.md section
 // 5.6): what a new message of the person adds to the conversation, then one step, which is one
@@ -158,6 +158,40 @@ export async function continueExchange(identity: Identity, now: string, request:
   return runStep({ ...step, language: conversation.language, added: [], proposal: proposalOf(conversation) });
 }
 
+/**
+ * The places the bookings and moves of one answer take in each slot
+ * (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5, rule 4). A slot takes the changes of one answer
+ * while they fit the places it had left when the calendar was read; the first that does not fit is
+ * refused, and so is every one after it. A person takes one place at a time, so the same person
+ * twice in one slot is refused too. A change the Administrator asked to make over the capacity
+ * takes no place from the others. A move out of a slot frees no place for another change of the
+ * same answer: the places are those of the reading.
+ */
+export class Places {
+  private readonly taken = new Map<string, number>();
+  private readonly people = new Set<string>();
+
+  /** Why a change cannot take its place, or null when it can, or takes none. */
+  refusal(place: Place | null): string | null {
+    if (place === null) return null;
+    if (this.people.has(`${place.slot} ${place.who}`)) {
+      return 'Another change asked for in the same answer already puts the same person into this slot, and a person holds one place at a time: nothing was proposed. Ask for one change of it.';
+    }
+    if (place.overbook) return null;
+    const taken = this.taken.get(place.slot) ?? 0;
+    if (taken < place.left) return null;
+    const left = place.left === 1 ? '1 place was' : `${place.left} places were`;
+    return `This slot cannot take this change too: ${left} left in it, and the changes before this one in the same answer take ${place.left === 1 ? 'it' : 'them'}. Nothing was proposed. Ask for at most ${place.left} ${place.left === 1 ? 'change' : 'changes'} into this slot.`;
+  }
+
+  /** Counts the place of a change that is proposed. */
+  take(place: Place | null): void {
+    if (place === null) return;
+    this.people.add(`${place.slot} ${place.who}`);
+    if (!place.overbook) this.taken.set(place.slot, (this.taken.get(place.slot) ?? 0) + 1);
+  }
+}
+
 export type StepInput = {
   identity: Identity;
   current: Current;
@@ -258,6 +292,7 @@ export async function runStep(input: StepInput): Promise<CoreResult> {
       // One reading of the calendar for all the changes of this answer.
       const facts: FactsRead = new Map();
       const subjects = new Set<string>();
+      const places = new Places();
       // What each request of the answer came to, in the order asked: the result of a read or of
       // a request that was refused, or a change that can be proposed.
       const answered: ({ result: ToolResultBlock } | { change: ProposedChange; log: number })[] = [];
@@ -281,19 +316,27 @@ export async function runStep(input: StepInput): Promise<CoreResult> {
         const proposed: Proposable = tooMany
           ? { ok: false, outcome: notRun(asked.id, asked.name, 'too_many_changes', `Ask for at most ${ASSISTANT_LIMITS.changesPerProposal} changes in one answer: nothing was proposed. Call the tools again for the first ${ASSISTANT_LIMITS.changesPerProposal}, and for the others after the person has confirmed those.`) }
           : await proposeChange(asked, tools, caller, context, texts, now, facts);
-        // Two changes of one answer on the same appointment or into the same slot: the second
-        // would be refused once the first was made, so it is not proposed.
+        // Two changes of one answer about the same thing: the second would be refused once the
+        // first was made, so it is not proposed. Into one slot, the changes are counted instead,
+        // against the places it had left (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5, rule 4).
         const twice = proposed.ok && proposed.subjects.some((subject) => subjects.has(subject));
-        if (!proposed.ok || twice) {
-          const refused = proposed.ok
-            ? notRun(asked.id, proposed.tool, 'same_thing_twice', 'Another change asked for in the same answer is about the same thing (the same appointment, slot, type, pattern, date or window): nothing was proposed. Ask for one change of it.')
-            : proposed.outcome;
+        const unplaced = proposed.ok && !twice ? places.refusal(proposed.place) : null;
+        if (!proposed.ok || twice || unplaced !== null) {
+          const refused = !proposed.ok
+            ? proposed.outcome
+            : notRun(
+                asked.id,
+                proposed.tool,
+                'same_thing_twice',
+                unplaced ?? 'Another change asked for in the same answer is about the same thing (the same appointment, type, pattern, date or window): nothing was proposed. Ask for one change of it.',
+              );
           answered.push({ result: refused.result });
           ran.push(refused.log);
           refusedChange = true;
           continue;
         }
         for (const subject of proposed.subjects) subjects.add(subject);
+        places.take(proposed.place);
         ran.push(proposed.log);
         answered.push({ change: { toolUseId: asked.id, tool: proposed.tool, call: proposed.call, summary: proposed.summary, outcome: null, error: null }, log: ran.length - 1 });
       }

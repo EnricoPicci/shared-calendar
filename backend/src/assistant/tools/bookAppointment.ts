@@ -1,6 +1,6 @@
 import { LocalDate, LocalTime, Note, Username, type Appointment, type BookingSummary, type Role } from '@shared-calendar/shared';
 import { z } from 'zod';
-import { freeSlotAt, instantOf, plainUser, slotSubject } from './facts';
+import { freeSlotAt, instantOf, OVERBOOK, plainUser, slotKey } from './facts';
 import { appointmentForModel } from './result';
 import type { ChangeTool, Tool, ToolDefinition } from './tool';
 
@@ -14,7 +14,9 @@ import type { ChangeTool, Tool, ToolDefinition } from './tool';
 // The input differs by role, as the route's body does (docs/SHARED_CALENDAR_SPEC.md R-BOOK-01):
 // the Administrator must name the User the appointment is for, and a User's input has no
 // username at all. The Administrator books a free slot of one hour, like a User: the custom times
-// the route also takes from the Administrator stay in the web pages.
+// the route also takes from the Administrator stay in the web pages. The Administrator's input also
+// has `overbook`, to book a time that is full over its capacity (docs/SHARED_CALENDAR_SPEC.md
+// R-BOOK-13); a User's has none, as the route refuses it from a User.
 
 const fields = {
   date: LocalDate.describe("The day of the appointment, a date of the calendar's time zone as YYYY-MM-DD."),
@@ -32,11 +34,11 @@ const fields = {
 };
 const UserInput = z.object(fields).strict();
 const AdminInput = z
-  .object({ username: Username.describe('The username of the User the appointment is for, exactly as list_users gives it. Never a guess.'), ...fields })
+  .object({ username: Username.describe('The username of the User the appointment is for, exactly as list_users gives it. Never a guess.'), ...fields, overbook: OVERBOOK })
   .strict();
 const INPUTS: Record<Role, z.ZodType> = { user: UserInput, admin: AdminInput };
-// What either schema gives: `username` is there for the Administrator only.
-type Input = z.infer<typeof UserInput> & { username?: string };
+// What either schema gives: `username` and `overbook` are there for the Administrator only.
+type Input = z.infer<typeof UserInput> & { username?: string; overbook?: boolean };
 
 export const bookAppointmentDefinition: ToolDefinition = {
   name: 'book_appointment',
@@ -47,7 +49,8 @@ export const bookAppointmentDefinition: ToolDefinition = {
     "All dates and times are in the calendar's time zone.",
   descriptionForAdmin:
     'As the Administrator you book for a User, never for yourself: give the username of that User in "username", exactly as list_users gives it. ' +
-    'The limits a User books under (the minimum notice, the booking horizon, the highest number of future appointments) do not apply to a booking you make.',
+    'The limits a User books under (the minimum notice, the booking horizon, the highest number of future appointments) do not apply to a booking you make. ' +
+    'A time that is full ("fullSlots" in get_calendar) is refused, unless the person asked to book it over the capacity: only then give "overbook": true.',
   kind: 'change',
   roles: ['admin', 'user'],
   input: (role) => INPUTS[role],
@@ -57,10 +60,12 @@ export const bookAppointmentDefinition: ToolDefinition = {
 const parts: ChangeTool<Input, BookingSummary> = {
   definition: bookAppointmentDefinition,
   confirmation: {
-    // The facts of a booking: that the slot is there and free for this person, and the type of
-    // the hours it lies in. They are what GET /calendar answers this person for that day. For the
-    // Administrator also the person: that the username names a User, as GET /users lists them.
-    read: async ({ date, time, occurrence, note: written, username }, { timeZone }, route) => {
+    // The facts of a booking: that the slot is there and has a place for this person, and the type
+    // of the hours it lies in. They are what GET /calendar answers this person for that day. For
+    // the Administrator also the person: that the username names a User, as GET /users lists them,
+    // and holds no appointment at that time; and, over the capacity, how many people the time will
+    // hold. `overbook` is sent to the route as asked, also for a time with a place left.
+    read: async ({ date, time, occurrence, note: written, username, overbook }, { timeZone }, route) => {
       const when = instantOf(date, time, occurrence, timeZone);
       if (!when.ok) return when;
       const { start } = when;
@@ -75,17 +80,18 @@ const parts: ChangeTool<Input, BookingSummary> = {
         const user = await plainUser(route, username);
         if (!user.ok) return user;
       }
-      const slot = await freeSlotAt(route, date, time, start, timeZone);
+      const forced = overbook === true;
+      const slot = await freeSlotAt(route, date, time, start, timeZone, { overbook: forced, username: username ?? null, leaveOut: null });
       if (!slot.ok) return slot;
       return {
         ok: true,
         call: {
           routeKey: 'POST /calendar/appointments',
           path: '/calendar/appointments',
-          body: { start, ...(username !== undefined && { username }), ...(note.data !== null && { note: note.data }) },
+          body: { start, ...(username !== undefined && { username }), ...(note.data !== null && { note: note.data }), ...(forced && { overbook: true }) },
         },
-        subjects: [slotSubject(start)],
-        facts: { date, start: time, end: slot.end, type: slot.type, note: note.data, secondTime: when.secondTime, username: username ?? null },
+        place: { slot: slotKey(start), left: slot.placesLeft, who: username ?? '', overbook: forced },
+        facts: { date, start: time, end: slot.end, type: slot.type, note: note.data, secondTime: when.secondTime, username: username ?? null, over: slot.over },
       };
     },
     summary: (texts, facts) => texts.changes.bookAppointment(facts),

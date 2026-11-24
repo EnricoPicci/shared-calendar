@@ -16,6 +16,9 @@ import recorded from './recorded/routes.json';
 const ROME = 'Europe/Rome';
 const USER = { timeZone: ROME, role: 'user' as const };
 const ADMIN = { timeZone: ROME, role: 'admin' as const };
+// The types GET /calendar/types answers, which get_calendar asks after the calendar: one type, of
+// capacity 1.
+const TYPES = recorded.user.types;
 
 // Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
 describe('the list of tools (3, 8.2)', () => {
@@ -26,7 +29,7 @@ describe('the list of tools (3, 8.2)', () => {
       'list_patterns',
       'update_settings',
       'create_type',
-      'rename_type',
+      'edit_type',
       'delete_type',
       'create_pattern',
       'update_pattern',
@@ -95,9 +98,9 @@ describe('get_settings and list_types (3, 8.3)', () => {
     });
   });
 
-  it('give each type as its id and its name', () => {
+  it('give each type as its id, its name and its capacity', () => {
     const result = listTypes.toModel(recorded.user.types, USER);
-    expect(result).toEqual({ fields: {}, list: { name: 'types', items: [{ id: recorded.user.types.types[0]?.typeId, name: 'Trial visit' }] } });
+    expect(result).toEqual({ fields: {}, list: { name: 'types', items: [{ id: recorded.user.types.types[0]?.typeId, name: 'Trial visit', capacity: 1 }] } });
   });
 });
 
@@ -123,7 +126,7 @@ describe('get_calendar (3, 8.3)', () => {
   });
 
   it("gives a User the days with open hours, their free slots and the User's own appointments, in local time", () => {
-    const { fields, list } = getCalendar.toModel(recorded.user.calendar, USER);
+    const { fields, list } = getCalendar.toModel(recorded.user.calendar, USER, TYPES);
     expect(fields).toEqual({ from: '2026-11-23', to: '2026-11-29' });
     expect(list?.name).toBe('days');
     // Saturday and Sunday have nothing on them and are left out.
@@ -153,7 +156,7 @@ describe('get_calendar (3, 8.3)', () => {
   });
 
   it('gives the Administrator the free slots only: the full ones the route also gives are left out', () => {
-    const { list } = getCalendar.toModel(recorded.admin.calendar, ADMIN);
+    const { list } = getCalendar.toModel(recorded.admin.calendar, ADMIN, TYPES);
     // Tuesday 10:00 is alice's appointment: the route gives the Administrator that slot with no
     // place left, and the model is not told it is free.
     expect(recorded.admin.calendar.days[1]!.slots.map((slot) => slot.placesLeft)).toEqual([1, 0, 1]);
@@ -161,7 +164,7 @@ describe('get_calendar (3, 8.3)', () => {
   });
 
   it("gives the Administrator everybody's appointments", () => {
-    const { list } = getCalendar.toModel(recorded.admin.calendar, ADMIN);
+    const { list } = getCalendar.toModel(recorded.admin.calendar, ADMIN, TYPES);
     expect(list?.items[2]).toMatchObject({
       date: '2026-11-25',
       appointments: [{ username: 'trialbob', start: '11:00', end: '12:00', note: 'First visit' }],
@@ -170,10 +173,10 @@ describe('get_calendar (3, 8.3)', () => {
   });
 
   it("leaves out every internal field: no instant, no busy time, no author; and for a User, no type id, no source of a window and no word on the day's own hours", () => {
-    const forAdmin = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, ADMIN));
+    const forAdmin = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, ADMIN, TYPES));
     for (const internal of ['sourceId', 'busy', 'createdBy', 'updatedAt', 'generatedAt', '.000Z']) expect(forAdmin).not.toContain(internal);
     // The very answer the route gave the Administrator, turned into a User's result: none of it.
-    const forUser = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, USER));
+    const forUser = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, USER, TYPES));
     for (const internal of ['typeId', 'sourceId', 'source', 'one_off', 'hasOverride', recorded.admin.calendar.days[0]!.windows[0]!.sourceId]) expect(forUser).not.toContain(internal);
   });
 
@@ -193,7 +196,7 @@ describe('get_calendar (3, 8.3)', () => {
       ],
       appointments: [],
     };
-    expect(getCalendar.toModel(view, ADMIN).list?.items).toEqual([
+    expect(getCalendar.toModel(view, ADMIN, TYPES).list?.items).toEqual([
       {
         date: '2026-11-23',
         weekday: 'Monday',
@@ -209,7 +212,7 @@ describe('get_calendar (3, 8.3)', () => {
       // Kept for the Administrator: the day is closed by hours of its own, which can be taken away.
       { date: '2026-11-25', weekday: 'Wednesday', hasOverride: true, windows: [], freeSlots: [], appointments: [] },
     ]);
-    expect(getCalendar.toModel(view, USER).list?.items).toEqual([
+    expect(getCalendar.toModel(view, USER, TYPES).list?.items).toEqual([
       {
         date: '2026-11-23',
         weekday: 'Monday',
@@ -225,10 +228,13 @@ describe('get_calendar (3, 8.3)', () => {
   });
 
   it("what the Administrator's result adds: 20 bytes a day and 57 to 60 a window, 34 more for an extra window; the description says it to the Administrator only", () => {
-    const admin = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, ADMIN).list?.items);
-    const user = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, USER).list?.items);
-    // Five days, each with one extra window: 20 + 57 + 34 bytes each, 38 of the 57 the type's id.
-    expect(admin.length - user.length).toBe(5 * (20 + 57 + 34));
+    const admin = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, ADMIN, TYPES).list?.items);
+    const user = JSON.stringify(getCalendar.toModel(recorded.admin.calendar, USER, TYPES).list?.items);
+    // Five days, each with one extra window: 20 + 57 + 34 bytes each, 38 of the 57 the type's id;
+    // and the three days with a full slot of one hour each, `,"fullSlots":["10:00"]`, 22 bytes.
+    const full = (getCalendar.toModel(recorded.admin.calendar, ADMIN, TYPES).list?.items as { fullSlots?: string[] }[]).filter((day) => day.fullSlots !== undefined);
+    expect(full.map((day) => day.fullSlots!.length)).toEqual([1, 1, 1]);
+    expect(admin.length - user.length).toBe(5 * (20 + 57 + 34) + 3 * 22);
     expect(forClaude(getCalendar.definition, 'admin').description).toContain('"typeId"');
     const forAdmin = forClaude(getCalendar.definition, 'admin').description ?? '';
     const forUser = forClaude(getCalendar.definition, 'user').description ?? '';
@@ -258,17 +264,84 @@ describe('get_calendar (3, 8.3)', () => {
 
   it('the night the clocks go forward (29 March 2026): 02:00 does not exist, and the day ends at 24:00', () => {
     const view = day('2026-03-29', 7, '2026-03-28T23:00:00.000Z', '2026-03-29T22:00:00.000Z', ['2026-03-28T23:00:00.000Z', '2026-03-29T00:00:00.000Z', '2026-03-29T01:00:00.000Z']);
-    expect(getCalendar.toModel(view, USER).list?.items).toEqual([
+    expect(getCalendar.toModel(view, USER, TYPES).list?.items).toEqual([
       { date: '2026-03-29', weekday: 'Sunday', windows: [{ start: '00:00', end: '24:00', type: 'Visit' }], freeSlots: ['00:00', '01:00', '03:00'], appointments: [] },
     ]);
   });
 
   it('the night the clocks go back (25 October 2026): 02:00 comes twice, and the second one says so', () => {
     const view = day('2026-10-25', 7, '2026-10-24T22:00:00.000Z', '2026-10-25T23:00:00.000Z', ['2026-10-24T23:00:00.000Z', '2026-10-25T00:00:00.000Z', '2026-10-25T01:00:00.000Z', '2026-10-25T02:00:00.000Z']);
-    expect(getCalendar.toModel(view, USER).list?.items[0]).toMatchObject({
+    expect(getCalendar.toModel(view, USER, TYPES).list?.items[0]).toMatchObject({
       windows: [{ start: '00:00', end: '24:00', type: 'Visit' }],
       freeSlots: ['01:00', '02:00', '02:00 (second)', '03:00'],
     });
+  });
+});
+
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md; R-… rules and D…
+// decisions those of docs/SHARED_CALENDAR_SPEC.md.
+describe('get_calendar and the capacity of a type (8.3, R-SLOT-02, D29, D30)', () => {
+  const POOL = '01JD00000000000000000TYPE3';
+  const slot = (start: string, placesLeft: number, capacity = 3) => ({ start, end: start, typeId: POOL, capacity, placesLeft });
+  // Tuesday 24 November 2026, a window 09:00-12:00 of the Swimming Pool, which holds 3: 09:00 with
+  // 2 places left, 10:00 with 3, 11:00 full.
+  const view = (slots: ReturnType<typeof slot>[]): CalendarView => ({
+    timeZone: ROME,
+    from: '2026-11-24',
+    to: '2026-11-24',
+    generatedAt: '2026-11-21T10:00:00.000Z',
+    days: [{ date: '2026-11-24', weekday: 2, slots, busy: [], windows: [{ start: '2026-11-24T08:00:00.000Z', end: '2026-11-24T11:00:00.000Z', typeId: POOL, typeName: 'Swimming Pool' }] }],
+    appointments: [],
+  });
+  const types = (capacity: number) => ({ types: [{ typeId: POOL, name: 'Swimming Pool', capacity, createdAt: '2026-11-01T10:00:00.000Z', updatedAt: '2026-11-01T10:00:00.000Z' }] });
+  const POOL_DAY = view([slot('2026-11-24T08:00:00.000Z', 2), slot('2026-11-24T09:00:00.000Z', 3), slot('2026-11-24T10:00:00.000Z', 0)]);
+
+  it('asks GET /calendar/types after the calendar, for the capacities', () => {
+    expect(getCalendar.toHandler.also?.call).toEqual({ routeKey: 'GET /calendar/types', path: '/calendar/types' });
+  });
+
+  it("a User: the window's capacity, each free slot with its places left, no full slot and nobody's name", () => {
+    // A User is never given a full slot by the route (docs/SHARED_CALENDAR_SPEC.md decision D30); here it is, and it stays out.
+    expect(getCalendar.toModel(POOL_DAY, USER, types(3)).list?.items).toEqual([
+      {
+        date: '2026-11-24',
+        weekday: 'Tuesday',
+        windows: [{ start: '09:00', end: '12:00', type: 'Swimming Pool', capacity: 3 }],
+        freeSlots: ['09:00 (2 of 3 places left)', '10:00 (3 of 3 places left)'],
+        appointments: [],
+      },
+    ]);
+  });
+
+  it("the Administrator: the same, and the day's full slots apart, as fullSlots", () => {
+    expect(getCalendar.toModel(POOL_DAY, ADMIN, types(3)).list?.items[0]).toMatchObject({
+      windows: [{ start: '09:00', end: '12:00', type: 'Swimming Pool', capacity: 3, typeId: POOL }],
+      freeSlots: ['09:00 (2 of 3 places left)', '10:00 (3 of 3 places left)'],
+      fullSlots: ['11:00'],
+    });
+  });
+
+  it('a capacity of 1 reads as before: a free slot is its time, a window has no capacity, and a day with no full slot no fullSlots', () => {
+    const single = view([slot('2026-11-24T08:00:00.000Z', 1, 1), slot('2026-11-24T09:00:00.000Z', 1, 1)]);
+    for (const context of [USER, ADMIN]) {
+      const [day] = getCalendar.toModel(single, context, types(1)).list?.items as Record<string, unknown>[];
+      expect(day!.freeSlots).toEqual(['09:00', '10:00']);
+      expect(day!.windows).toEqual([expect.not.objectContaining({ capacity: expect.anything() })]);
+      expect(day).not.toHaveProperty('fullSlots');
+    }
+  });
+
+  it('a window whose type is not among those read holds one person', () => {
+    expect(getCalendar.toModel(POOL_DAY, USER, { types: [] }).list?.items[0]).toMatchObject({ windows: [{ start: '09:00', end: '12:00', type: 'Swimming Pool' }] });
+  });
+
+  it('the description says what the brackets mean, and that the time alone is booked; fullSlots to the Administrator only', () => {
+    const forUser = forClaude(getCalendar.definition, 'user').description ?? '';
+    const forAdmin = forClaude(getCalendar.definition, 'admin').description ?? '';
+    expect(forUser).toContain('"10:00 (2 of 3 places left)"');
+    expect(forUser).toContain('its time alone, without the brackets');
+    expect(forUser).not.toContain('fullSlots');
+    expect(forAdmin).toContain('"fullSlots"');
   });
 });
 

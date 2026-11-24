@@ -8,7 +8,7 @@ import { handler as deleteType } from '../../handlers/deleteAvailabilityType';
 import { handler as deleteOneOffWindow } from '../../handlers/deleteOneOffWindow';
 import { handler as deleteDateOverride } from '../../handlers/deleteOverride';
 import { handler as deletePattern } from '../../handlers/deletePattern';
-import { handler as renameType } from '../../handlers/renameAvailabilityType';
+import { handler as editType } from '../../handlers/renameAvailabilityType';
 import { handler as setDateOverride } from '../../handlers/setOverride';
 import { handler as setAppointmentNote } from '../../handlers/updateAppointmentNote';
 import { handler as updateSettings } from '../../handlers/updateCalendarSettings';
@@ -27,7 +27,7 @@ export const CHANGE_HANDLERS: Readonly<Record<string, RouteHandler>> = {
   set_appointment_note: setAppointmentNote,
   update_settings: updateSettings,
   create_type: createType,
-  rename_type: renameType,
+  edit_type: editType,
   delete_type: deleteType,
   create_pattern: createPattern,
   update_pattern: updatePattern,

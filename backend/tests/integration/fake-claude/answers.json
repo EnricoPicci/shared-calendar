@@ -9,7 +9,8 @@
     "The request to change a setting (tool-update-settings-horizon-57) and the request to book for a User (tool-book-for-user-…) are the content blocks the real model sent, as the Administrator, in the trial of the step that built the Administrator's tools: \"set the booking horizon to 40 days\" and \"book alice on Thursday at 14:00\" (the block with its id, name and caller; an input of the one setting, and of a username, a date and a time). The number of days is replaced by the one the settings journey uses, the username by the journey's own User, the date by a mark and the time by the hour the journey opens. The same request for the setting is scripted for a User, who is not offered that tool: the real model never sent it for a User, and the journey shows what the server answers if it did.",
     "The requests about the opening hours are the content blocks the real model sent, as the Administrator, in the trial of the step that built those tools. For \"block Saturday from 10:00 to 11:00\" it read the day (tool-get-calendar-saturday12, -day19), said \"I need the type id.\" and read the types (tool-list-types), then asked for the day's own hours with what was left of it (tool-override-saturday…-block-0500): here the date is the mark {{saturday+N}}, the first Saturday on or after the date N days ahead, a day on which the local calendar holds nothing but the journey's own hours; the hours are those the journey's pattern leaves around 05:00 to 06:00, and the id of the type is the mark {{id:types:NAME}}, which the fake replaces with the id of the type of that name in the list of types the request holds. For \"every Sunday from 10 to 12\" it asked for the pattern (tool-create-pattern-sunday: here a Sunday between two dates a week apart, so that the pattern opens one day) and for \"delete it\" for its deletion (tool-delete-pattern-of-journey), by the id it had from the creation; the journey's fake reads the list of patterns first (tool-list-patterns, written for the journey: the real model did not need it) and takes the id from it with {{id:patterns:NAME}}.",
     "The answer tool-get-calendar-month-six-times is written by hand, not recorded: six requests for the same 31 days in one answer, given again at every step of its sentence, which no model would send. It is how a journey fills a conversation to its bound with the largest results a User's tools give, and meets the limit of reads run for one answer. The sentence \"fake: what was the last result you were given?\" gets the last result of a tool that the request holds, or the words that there is none: a journey reads from it whether an earlier conversation was sent to Claude.",
-    "One message is not a journey's: \"What are the calendar's settings right now?\" is the exchange of the smoke test (backend/scripts/smoke.sh), which needs it to be a read followed by a text, in English. In the cloud the real model answers the same sentence."
+    "One message is not a journey's: \"What are the calendar's settings right now?\" is the exchange of the smoke test (backend/scripts/smoke.sh), which needs it to be a read followed by a text, in English. In the cloud the real model answers the same sentence.",
+    "The requests about the capacity of a type (tool-get-calendar-day20, tool-book-capacity-…, tool-create-type-with-capacity, tool-edit-type-capacity) are written by hand for the journeys, in the shape of the recorded requests: no model was asked. Two bookings into one slot in one answer, the same User twice, a third User into a full slot without and with \"overbook\", and a type created with a capacity, then edited by its id, which {{id:types:NAME}} takes from the list of types read before."
   ],
   "answers": {
     "not-scripted": {
@@ -1157,6 +1158,294 @@
           "output_tokens": 0
         }
       }
+    },
+    "tool-book-capacity-same-user-twice": {
+      "source": "fake",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_book_capacity_same_user_twice",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_fake_tool_book_capacity_same_user_twice_0",
+            "name": "book_appointment",
+            "input": {
+              "username": "chat-cap-one",
+              "date": "{{date+20}}",
+              "time": "05:00"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          },
+          {
+            "type": "tool_use",
+            "id": "toolu_fake_tool_book_capacity_same_user_twice_1",
+            "name": "book_appointment",
+            "input": {
+              "username": "chat-cap-one",
+              "date": "{{date+20}}",
+              "time": "05:00"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-book-capacity-both": {
+      "source": "fake",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_book_capacity_both",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_fake_tool_book_capacity_both_0",
+            "name": "book_appointment",
+            "input": {
+              "username": "chat-cap-one",
+              "date": "{{date+20}}",
+              "time": "05:00"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          },
+          {
+            "type": "tool_use",
+            "id": "toolu_fake_tool_book_capacity_both_1",
+            "name": "book_appointment",
+            "input": {
+              "username": "chat-cap-two",
+              "date": "{{date+20}}",
+              "time": "05:00"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-book-capacity-third": {
+      "source": "fake",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_book_capacity_third",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_fake_tool_book_capacity_third_0",
+            "name": "book_appointment",
+            "input": {
+              "username": "chat-cap-three",
+              "date": "{{date+20}}",
+              "time": "05:00"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-book-capacity-third-overbook": {
+      "source": "fake",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_book_capacity_third_overbook",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_fake_tool_book_capacity_third_overbook_0",
+            "name": "book_appointment",
+            "input": {
+              "username": "chat-cap-three",
+              "date": "{{date+20}}",
+              "time": "05:00",
+              "overbook": true
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-book-capacity-first-again": {
+      "source": "fake",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_book_capacity_first_again",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_fake_tool_book_capacity_first_again_0",
+            "name": "book_appointment",
+            "input": {
+              "username": "chat-cap-one",
+              "date": "{{date+20}}",
+              "time": "05:00"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-create-type-with-capacity": {
+      "source": "fake",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_create_type_with_capacity",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_fake_tool_create_type_with_capacity_0",
+            "name": "create_type",
+            "input": {
+              "name": "assistant type capacity journey",
+              "capacity": 4
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-edit-type-capacity": {
+      "source": "fake",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_edit_type_capacity",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_fake_tool_edit_type_capacity_0",
+            "name": "edit_type",
+            "input": {
+              "typeId": "{{id:types:assistant type capacity journey}}",
+              "capacity": 2
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    "tool-get-calendar-day20": {
+      "source": "fake",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_get_calendar_day20",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_fake_tool_get_calendar_day21_0",
+            "name": "get_calendar",
+            "input": {
+              "from": "{{date+20}}",
+              "to": "{{date+20}}"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
     }
   },
   "otherwise": "not-scripted",
@@ -1302,6 +1591,39 @@
     ],
     "What are the calendar's settings right now?": [
       "tool-get-settings",
+      "text-last-tool-result"
+    ],
+    "fake: what is free on the day of the capacity journey?": [
+      "tool-get-calendar-day20",
+      "text-last-tool-result"
+    ],
+    "fake: book the first User of the capacity journey twice": [
+      "tool-book-capacity-same-user-twice",
+      "text-last-tool-result"
+    ],
+    "fake: book both Users of the capacity journey": [
+      "tool-book-capacity-both",
+      "text-last-tool-result"
+    ],
+    "fake: book the third User of the capacity journey": [
+      "tool-book-capacity-third",
+      "text-last-tool-result"
+    ],
+    "fake: book the third User of the capacity journey anyway": [
+      "tool-book-capacity-third-overbook",
+      "text-last-tool-result"
+    ],
+    "fake: book the first User of the capacity journey again": [
+      "tool-book-capacity-first-again",
+      "text-last-tool-result"
+    ],
+    "fake: create the type of the capacity journey for four people": [
+      "tool-create-type-with-capacity",
+      "text-last-tool-result"
+    ],
+    "fake: let the type of the capacity journey hold two people": [
+      "tool-list-types",
+      "tool-edit-type-capacity",
       "text-last-tool-result"
     ]
   }

@@ -1,5 +1,5 @@
 import { weekdayOf } from '../calendar/time';
-import type { AppointmentSummary, AssistantSettingName, AssistantTexts, DayHours, HoursSummary, PatternSummary, SettingChange } from './texts';
+import type { AppointmentSummary, AssistantSettingName, AssistantTexts, DayHours, HoursSummary, OverCapacity, PatternSummary, SettingChange, TypeEditSummary } from './texts';
 
 const WEEKDAYS = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
 const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
@@ -52,6 +52,20 @@ const dayThen = (day: DayHours) => `Come diventerebbe${day.from === 'own' ? '' :
 const extraWindows = (extras: HoursSummary[]) =>
   extras.length === 0 ? '' : extras.length === 1 ? ` La finestra aggiuntiva ${hours(extras[0]!)} di questo giorno non cambia.` : ` Le finestre aggiuntive ${extras.map(hours).join(', ')} di questo giorno non cambiano.`;
 
+// A booking or a move over the capacity of its type: " Oltre la capienza: ospiterà 4 persone, la
+// sua capienza è 3." Nothing when it stays within it.
+const overCapacity = (over: OverCapacity | null | undefined) => (over === null || over === undefined ? '' : ` Oltre la capienza: ospiterà ${over.people} persone, la sua capienza è ${over.capacity}.`);
+
+// An edited type: a new name alone keeps the words of a rename; a capacity says both numbers.
+const editedType = ({ name, newName, capacity, bookedAbove }: TypeEditSummary) => {
+  const kept = bookedAbove
+    ? ' Nessuna prenotazione esistente viene annullata: dove le persone prenotate sono più della nuova capienza, nessun altro può prenotare finché qualcuno non lascia il posto.'
+    : '';
+  if (capacity === null) return `Rinominare il tipo di appuntamento «${name}» in «${newName ?? name}».`;
+  const parts = [...(newName === null ? [] : [`nome in «${newName}»`]), `capienza da ${capacity.from} a ${capacity.to}`];
+  return `Modificare il tipo di appuntamento «${name}»: ${parts.join(', ')}.${kept}`;
+};
+
 // The fixed texts in Italian, key by key the ones of the English object. The person is addressed
 // with the formal "lei" throughout. The second button is not "Annulla": in a calendar that word
 // would read as cancelling the appointment.
@@ -75,21 +89,23 @@ export const ASSISTANT_TEXTS_IT: AssistantTexts = {
   confirmLabel: 'Conferma',
   declineLabel: 'Non lo faccia',
   changes: {
-    bookAppointment: ({ date, start, end, type, note, secondTime, username }) =>
+    bookAppointment: ({ date, start, end, type, note, secondTime, username, over }) =>
       `Prenotare${username === null ? '' : ` per ${username}`} un appuntamento per ${fullDate(date)}, dalle ${start} alle ${end} (${type}).` +
       (secondTime ? ` È la seconda volta che quella notte l'orologio segna le ${start}: torna l'ora solare.` : '') +
+      overCapacity(over) +
       (note === null ? '' : ` Nota: «${note}»`),
     cancelAppointment: (appointment) => `Annullare ${theAppointment(appointment)}.`,
     changeAppointment: ({ appointment, to }) =>
       `Spostare ${theAppointment(appointment)}, a ${fullDate(to.date)}, dalle ${to.start} alle ${to.end} (${to.type}).` +
-      (to.secondTime ? ` È la seconda volta che quella notte l'orologio segna le ${to.start}: torna l'ora solare.` : ''),
+      (to.secondTime ? ` È la seconda volta che quella notte l'orologio segna le ${to.start}: torna l'ora solare.` : '') +
+      overCapacity(to.over),
     setAppointmentNote: ({ appointment, note, previous }) =>
       note === null
         ? `Togliere la nota del${theAppointment(appointment)}. La nota è: «${previous ?? ''}»`
         : `Impostare la nota del${theAppointment(appointment)}: «${note}»` + (previous === null ? '' : ` Sostituisce la nota: «${previous}»`),
     updateSettings: ({ changes }) => ['Modificare le impostazioni.', ...changes.map(settingChange)].join(' '),
-    createType: ({ name }) => `Creare il tipo di appuntamento «${name}».`,
-    renameType: ({ from, to }) => `Rinominare il tipo di appuntamento «${from}» in «${to}».`,
+    createType: ({ name, capacity }) => `Creare il tipo di appuntamento «${name}»${capacity > 1 ? `, per ${capacity} persone contemporaneamente` : ''}.`,
+    editType: editedType,
     deleteType: ({ name }) => `Eliminare il tipo di appuntamento «${name}».`,
     createPattern: (pattern) => `Creare un orario settimanale: ${thePattern(pattern)}.`,
     updatePattern: ({ from, to }) => `Modificare un orario settimanale. Com'è ora: ${thePattern(from)}. Come diventerebbe: ${thePattern(to)}.`,

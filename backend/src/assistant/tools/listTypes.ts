@@ -12,7 +12,7 @@ const Input = z.object({}).strict();
 export const listTypesDefinition: ToolDefinition = {
   name: 'list_types',
   description:
-    'Lists the appointment types of the calendar (for example "Visit" or "Phone call"), each with its id and its name. ' +
+    'Lists the appointment types of the calendar (for example "Visit" or "Phone call"), each with its id, its name and its capacity: how many people it holds at the same time. ' +
     'Every bookable time belongs to one type. Use it when the person asks which kinds of appointment exist.',
   kind: 'read',
   roles: ['admin', 'user'],

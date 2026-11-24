@@ -8,6 +8,7 @@ import {
   type AssistantProposalAction,
   type AssistantReply,
   type AssistantStatus,
+  type Role,
 } from '@shared-calendar/shared';
 import type {
   AssistantConfirmFailureReason,
@@ -17,6 +18,7 @@ import type {
   AssistantLoadFailureReason,
   AssistantSendFailureReason,
 } from '../services/assistant.types';
+import { FULL_FOR_ADMIN } from './booking';
 import { failureText } from './texts';
 
 // Pure functions for the assistant's panel (docs/FRONTEND_ARCHITECTURE.md section 5.1): the
@@ -81,27 +83,30 @@ export type ShownProposal = {
 
 // What became of one change. A refused change carries the error code of its route
 // (docs/CONVERSATIONAL_ARCHITECTURE.md section 6): it is said with the sentence the other
-// screens have for that code.
-function outcomeWords(action: AssistantProposalAction): string {
+// screens have for that code, for the role of the person, so that the Administrator reads that
+// the User booked for is busy (docs/SHARED_CALENDAR_SPEC.md R-BOOK-12). A full time is said to
+// the Administrator without "The calendar has been refreshed": the panel reads no calendar; the
+// conversation offers to book over the capacity (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13).
+function outcomeWords(action: AssistantProposalAction, role: Role): string {
   switch (action.outcome) {
     case null:
       return '';
     case 'done':
       return 'Done';
     case 'refused':
-      return `Not done. ${failureText(action.error)}`;
+      return `Not done. ${role === 'admin' && action.error === 'slot_taken' ? FULL_FOR_ADMIN : failureText(action.error, undefined, role)}`;
     case 'unknown':
       return 'It is not known whether this was done. Please check the calendar.';
   }
 }
 
-export function proposalShown(proposal: AssistantProposal | null, status: AssistantStatus, away: boolean): ShownProposal | null {
+export function proposalShown(proposal: AssistantProposal | null, status: AssistantStatus, away: boolean, role: Role): ShownProposal | null {
   if (proposal === null) return null;
   return {
     question: proposal.question,
     confirmLabel: proposal.confirmLabel,
     declineLabel: proposal.declineLabel,
-    actions: proposal.actions.map((action) => ({ summary: action.summary, outcome: outcomeWords(action) })),
+    actions: proposal.actions.map((action) => ({ summary: action.summary, outcome: outcomeWords(action, role) })),
     buttons: status !== 'awaiting_confirmation' ? 'none' : away ? 'disabled' : 'offered',
   };
 }

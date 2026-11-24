@@ -118,8 +118,9 @@ function sessionObjects(config: ShellConfig, store: SessionStore, person: Person
   const visible$ = fromEvent(document, 'visibilitychange').pipe(filter(() => document.visibilityState === 'visible'));
   // The assistant's panel. A change it made is one more moment at which the screen on show
   // must load again: the screens are handed one stream for both, and none of them knows the
-  // panel (docs/FRONTEND_ARCHITECTURE.md section 6.1).
-  const assistant = new AssistantScreen(new AssistantService(config, store));
+  // panel (docs/FRONTEND_ARCHITECTURE.md section 6.1). The panel is told the role, as the week
+  // is, to say a refused change for it.
+  const assistant = new AssistantScreen(new AssistantService(config, store), person.role);
   const again$ = merge(visible$, assistant.changed$);
   const now = () => new Date();
   const week = new WeekScreen(calendar, appointments, person.role, now, again$);

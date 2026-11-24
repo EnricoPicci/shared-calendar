@@ -595,7 +595,7 @@ describe('the tools and the roles (3, 7.4)', () => {
     'list_patterns',
     'update_settings',
     'create_type',
-    'rename_type',
+    'edit_type',
     'delete_type',
     'create_pattern',
     'update_pattern',
@@ -630,7 +630,7 @@ describe('the tools and the roles (3, 7.4)', () => {
     ['list_patterns', {}],
     ['update_settings', { cancellationNoticeHours: 1 }],
     ['create_type', { name: 'Phone call' }],
-    ['rename_type', { typeId: '01JD00000000000000000TYPE1', name: 'Phone call' }],
+    ['edit_type', { typeId: '01JD00000000000000000TYPE1', name: 'Phone call' }],
     ['delete_type', { typeId: '01JD00000000000000000TYPE1' }],
   ])("%s asked for by Claude for a User is answered as a tool that does not exist: no handler is called, nothing is read, no proposal", async (name, input) => {
     const { DEFINITIONS, TOOLS: deployed } = await import('../../../src/assistant/tools/list');
@@ -911,7 +911,7 @@ describe('confirmProposal (POST /assistant/proposals/{proposalId}/confirm, 5.4, 
       set_appointment_note: (await import('../../../src/handlers/updateAppointmentNote')).handler,
       update_settings: (await import('../../../src/handlers/updateCalendarSettings')).handler,
       create_type: (await import('../../../src/handlers/createAvailabilityType')).handler,
-      rename_type: (await import('../../../src/handlers/renameAvailabilityType')).handler,
+      edit_type: (await import('../../../src/handlers/renameAvailabilityType')).handler,
       delete_type: (await import('../../../src/handlers/deleteAvailabilityType')).handler,
       create_pattern: (await import('../../../src/handlers/createPattern')).handler,
       update_pattern: (await import('../../../src/handlers/updatePattern')).handler,
@@ -1164,6 +1164,7 @@ describe('the log lines of a proposal (10.1)', () => {
     readRoutes.getCalendar.mockImplementation(() =>
       routeAnswer({
         days: [{ date: '2026-11-27', weekday: 5, windows: [{ start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T11:00:00.000Z', typeId: TYPE, typeName: 'Visit' }], slots: [{ start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T09:00:00.000Z', typeId: TYPE, capacity: 1, placesLeft: 1 }], busy: [] }],
+        appointments: [],
       }),
     );
     const mark = prompt.promptVersion(prompt.INSTRUCTIONS, prompt.contextBlock(ALICE, 'Europe/Rome'), toolsForClaude(DEFINITIONS, 'user'));
@@ -1239,6 +1240,7 @@ describe('the log lines of a proposal (10.1)', () => {
     readRoutes.getCalendar.mockImplementation(() =>
       routeAnswer({
         days: [{ date: '2026-11-27', weekday: 5, windows: [{ start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T11:00:00.000Z', typeId: VISIT, typeName: 'Visit' }], slots: [{ start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T09:00:00.000Z', typeId: VISIT, capacity: 1, placesLeft: 1 }], busy: [] }],
+        appointments: [],
       }),
     );
     const mark = prompt.promptVersion(prompt.INSTRUCTIONS, prompt.contextBlock(ADMIN, 'Europe/Rome'), toolsForClaude(DEFINITIONS, 'admin'));
@@ -1249,7 +1251,7 @@ describe('the log lines of a proposal (10.1)', () => {
         use('toolu_settings', 'update_settings', { bookingHorizonDays: 317 }),
         use('toolu_book', 'book_appointment', { username: 'roberta', date: '2026-11-27', time: '09:00' }),
         use('toolu_delete', 'delete_type', { typeId: VISIT }),
-        use('toolu_rename', 'rename_type', { typeId: CHECKUP, name: 'Controllo' }),
+        use('toolu_rename', 'edit_type', { typeId: CHECKUP, name: 'Controllo' }),
       ),
     );
     const forbidden = ['roberta', 'Telefonata', 'Controllo', 'Checkup', 'Visit', '317', VISIT, CHECKUP, MADE, '2026-11-2', 'novembre', 'impostazioni', CLAUDE_SAID, TEXT];
@@ -1272,7 +1274,7 @@ describe('the log lines of a proposal (10.1)', () => {
       'Eliminare il tipo di appuntamento «Visit».',
       'Rinominare il tipo di appuntamento «Checkup» in «Controllo».',
     ]);
-    const NAMES = ['create_type', 'update_settings', 'book_appointment', 'delete_type', 'rename_type'];
+    const NAMES = ['create_type', 'update_settings', 'book_appointment', 'delete_type', 'edit_type'];
     expect(proposed.log).toMatchObject({ outcome: 'proposal', proposed: NAMES, tools: NAMES.map((name) => ({ name, status: 200, ms: 0, proposed: true })) });
     clean(proposed.log);
 
@@ -1285,7 +1287,7 @@ describe('the log lines of a proposal (10.1)', () => {
     // The type is in use, by the appointment just booked: the route says so, under its lock.
     const remove = vi.fn(() => routeAnswer({ error: 'type_in_use', message: 'The type is still used by availability or by appointments that have not ended' }, 409));
     const rename = vi.fn(() => routeAnswer(type(CHECKUP, 'Controllo')));
-    const confirmed = await confirm.confirmProposal(ADMIN, stored.proposalId, NOW, REQUEST, undefined, { create_type: create, update_settings: save, book_appointment: book, delete_type: remove, rename_type: rename });
+    const confirmed = await confirm.confirmProposal(ADMIN, stored.proposalId, NOW, REQUEST, undefined, { create_type: create, update_settings: save, book_appointment: book, delete_type: remove, edit_type: rename });
 
     // Each route was sent exactly what the proposal stored, with the Administrator's identity.
     expect(create.mock.calls[0]).toMatchObject([{ routeKey: 'POST /calendar/types', body: JSON.stringify({ name: 'Telefonata' }) }]);
@@ -1304,7 +1306,7 @@ describe('the log lines of a proposal (10.1)', () => {
       ['update_settings', 'done', null],
       ['book_appointment', 'done', null],
       ['delete_type', 'refused', 'type_in_use'],
-      ['rename_type', 'done', null],
+      ['edit_type', 'done', null],
     ]);
     expect(confirmed.log).toMatchObject({
       proposalId: stored.proposalId,
@@ -1313,7 +1315,7 @@ describe('the log lines of a proposal (10.1)', () => {
         { name: 'update_settings', status: 200, ms: 0 },
         { name: 'book_appointment', status: 201, ms: 0 },
         { name: 'delete_type', status: 409, ms: 0 },
-        { name: 'rename_type', status: 200, ms: 0 },
+        { name: 'edit_type', status: 200, ms: 0 },
       ],
     });
     clean(confirmed.log);
@@ -1332,11 +1334,11 @@ describe('the log lines of a proposal (10.1)', () => {
       return (await exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST)).log;
     };
 
-    expect(await ask(use('a', 'rename_type', { typeId: VISIT, name: 'Check-up' }), use('b', 'delete_type', { typeId: VISIT }))).toMatchObject({
-      tools: [{ name: 'rename_type', notRun: 'not_proposed' }, { name: 'delete_type', notRun: 'same_thing_twice' }],
+    expect(await ask(use('a', 'edit_type', { typeId: VISIT, name: 'Check-up' }), use('b', 'delete_type', { typeId: VISIT }))).toMatchObject({
+      tools: [{ name: 'edit_type', notRun: 'not_proposed' }, { name: 'delete_type', notRun: 'same_thing_twice' }],
     });
-    expect(await ask(use('a', 'create_type', { name: 'Check-up' }), use('b', 'rename_type', { typeId: VISIT, name: 'check-UP' }))).toMatchObject({
-      tools: [{ name: 'create_type', notRun: 'not_proposed' }, { name: 'rename_type', notRun: 'same_thing_twice' }],
+    expect(await ask(use('a', 'create_type', { name: 'Check-up' }), use('b', 'edit_type', { typeId: VISIT, name: 'check-UP' }))).toMatchObject({
+      tools: [{ name: 'create_type', notRun: 'not_proposed' }, { name: 'edit_type', notRun: 'same_thing_twice' }],
     });
     expect(await ask(use('a', 'update_settings', { bookingHorizonDays: 40 }), use('b', 'update_settings', { cancellationNoticeHours: 72 }))).toMatchObject({
       tools: [{ name: 'update_settings', notRun: 'not_proposed' }, { name: 'update_settings', notRun: 'same_thing_twice' }],
@@ -1493,5 +1495,90 @@ describe('the log lines of a proposal (10.1)', () => {
         ['create_one_off_window', undefined],
       ]);
     });
+  });
+});
+
+// Test names: the rules are those of docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5.
+describe('rule 4 and the places of a slot (5.5)', () => {
+  // A stand-in for a booking or a move: it takes a place in the slot it names, which had `left`
+  // places when it was read, for `who`, over the capacity when `overbook` is true.
+  const seat: Tool = {
+    definition: {
+      name: 'seat',
+      description: 'A place of the test.',
+      kind: 'change',
+      roles: ['admin', 'user'],
+      input: () => z.object({ slot: z.string(), left: z.number(), who: z.string(), overbook: z.boolean().optional() }).strict(),
+      reads: 'calendar',
+    },
+    confirmation: {
+      read: async (input) => {
+        const { slot, left, who, overbook } = input as { slot: string; left: number; who: string; overbook?: boolean };
+        return { ok: true, call: { routeKey: 'POST /seat', path: '/seat', body: { slot, who } }, place: { slot, left, who, overbook: overbook === true }, facts: { slot, who } };
+      },
+      summary: (_texts, facts) => JSON.stringify(facts),
+    },
+    toModel: (body) => ({ fields: { seated: body } }),
+  };
+  const SEATS = [calendar, seat];
+  const place = (id: string, slot: string, left: number, who: string, overbook?: boolean) => use(id, 'seat', { slot, left, who, ...(overbook !== undefined && { overbook }) });
+  const markForSeats = (person: typeof ALICE | typeof ADMIN) =>
+    prompt.promptVersion(prompt.INSTRUCTIONS, prompt.contextBlock(person, 'Europe/Rome'), toolsForClaude(SEATS.map((tool) => tool.definition), person.role));
+  const ask = async (...blocks: ReturnType<typeof use>[]) => {
+    db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: markForSeats(ADMIN) }), messages: EARLIER });
+    claude.askStep.mockResolvedValue(asksFor(...blocks));
+    return exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST, SEATS);
+  };
+  const errors = () => {
+    const step = steps()[0];
+    const results = (step?.messages.at(-1)?.content as { content: { content: string }[] }).content;
+    return results.map((one) => JSON.parse(one.content) as { error: string; message: string });
+  };
+
+  it('two changes into one slot with two places left are proposed together', async () => {
+    const result = await ask(place('a', 'slot 10', 2, 'alice'), place('b', 'slot 10', 2, 'bob'));
+    expect(result).toMatchObject({ ok: true, reply: { status: 'awaiting_confirmation' }, log: { proposed: ['seat', 'seat'] } });
+  });
+
+  it('three into two places left: the third, and every one after it, is refused with the places left; the others are not proposed', async () => {
+    const result = await ask(place('a', 'slot 10', 2, 'alice'), place('b', 'slot 10', 2, 'bob'), place('c', 'slot 10', 2, 'carol'), place('d', 'slot 10', 2, 'dan'));
+    expect(result.log).toMatchObject({
+      tools: [
+        { name: 'seat', notRun: 'not_proposed' },
+        { name: 'seat', notRun: 'not_proposed' },
+        { name: 'seat', notRun: 'same_thing_twice' },
+        { name: 'seat', notRun: 'same_thing_twice' },
+      ],
+    });
+    const [, , third] = errors();
+    expect(third!.message).toBe(
+      'This slot cannot take this change too: 2 places were left in it, and the changes before this one in the same answer take them. Nothing was proposed. Ask for at most 2 changes into this slot.',
+    );
+  });
+
+  it('one place left: the second is refused, and the message says one place', async () => {
+    await ask(place('a', 'slot 10', 1, 'alice'), place('b', 'slot 10', 1, 'bob'));
+    expect(errors()[1]!.message).toBe(
+      'This slot cannot take this change too: 1 place was left in it, and the changes before this one in the same answer take it. Nothing was proposed. Ask for at most 1 change into this slot.',
+    );
+  });
+
+  it('the same User twice in one slot is refused, with places left and over the capacity alike', async () => {
+    await ask(place('a', 'slot 10', 3, 'alice'), place('b', 'slot 10', 3, 'alice'));
+    expect(errors().map((one) => one.error)).toEqual(['not_proposed', 'same_thing_twice']);
+    expect(errors()[1]!.message).toContain('a person holds one place at a time');
+    db.saveStep.mockClear();
+    await ask(place('a', 'slot 10', 0, 'alice', true), place('b', 'slot 10', 0, 'alice', true));
+    expect(errors().map((one) => one.error)).toEqual(['not_proposed', 'same_thing_twice']);
+  });
+
+  it('a change the Administrator marked overbook is not counted against the places', async () => {
+    const result = await ask(place('a', 'slot 10', 1, 'alice'), place('b', 'slot 10', 1, 'bob', true), place('c', 'slot 10', 0, 'carol', true));
+    expect(result).toMatchObject({ ok: true, log: { proposed: ['seat', 'seat', 'seat'] } });
+  });
+
+  it('another slot is not affected, and the same User may be in two slots', async () => {
+    const result = await ask(place('a', 'slot 10', 1, 'alice'), place('b', 'slot 11', 1, 'bob'), place('c', 'slot 12', 1, 'alice'));
+    expect(result).toMatchObject({ ok: true, log: { proposed: ['seat', 'seat', 'seat'] } });
   });
 });

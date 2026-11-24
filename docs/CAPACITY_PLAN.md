@@ -1,6 +1,6 @@
 # Shared Calendar: several people in one slot, a capacity per type (implementation plan)
 
-**Version:** v7 (2026-11-24): step u5 done, the front end's screens; a slot under appointments drawn as a tab beside them (found in the walk, the Product Owner's choice). v6 (2026-11-24): step u4 done, the front end's services; the Administrator's
+**Version:** v8 (2026-11-24): step u6 done, the assistant; F8 decided. v7 (2026-11-24): step u5 done, the front end's screens; a slot under appointments drawn as a tab beside them (found in the walk, the Product Owner's choice). v6 (2026-11-24): step u4 done, the front end's services; the Administrator's
 sentence of `user_busy` moved to step u5 (the Product Owner's decision). v5 (2026-11-24): step u3 done, the back end; AC-15 answers `user_busy` (the Product
 Owner's decision), its page in step u5. v4 (2026-11-24): step u2 done, the shared contract in `shared/`; the response
 fields moved from step u2 to step u3 (the Product Owner's decision). v3 (2026-11-24): step u1 done, the rules in the governing documents
@@ -107,6 +107,11 @@ Decided by the Product Owner on 2026-11-24.
   a slot than its places left, or the same User twice". Changing the instructions changes their
   mark, which ends the open conversations, and the paid evaluation is run again
   (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3): its cost is said before it runs.
+  **Decided** (the Product Owner, 2026-11-24, brief `prompts/e16-step-u6-implementation.md`):
+  changes of one answer into one slot are proposed while they fit its places left; the first
+  that does not, and every one after it, and the same User twice, get `same_thing_twice` with
+  the places left in the message; an overbooked change is not counted, a move out frees no
+  place.
 - **F9. Whether a booking was forced is not stored.** `createdBy` already says the
   Administrator booked it, and "over the capacity" is a fact of one moment (K5: the capacity can
   change afterwards). The event `appointment.booked` (`docs/SHARED_CALENDAR_SPEC.md` section
@@ -580,6 +585,76 @@ place left, and the panel's own sentences of `user_busy` and `slot_taken` are th
   agrees**.
 
 **Check:** the root `verify`; the assistant's journeys; the evaluation's result, if run.
+
+**As done (2026-11-24).** Changes under `backend/src/assistant`, `backend/tests/unit/assistant`,
+`backend/tests/integration/assistant.test.ts` and `fake-claude/answers.json`, `backend/tests/eval`,
+`shared/src/assistant`, `shared/tests/assistant`, `frontend/src/logic`, `frontend/src/views/shell.ts`,
+`frontend/tests/unit` and `docs/` only; no route, handler, contract or `shared/src/calendar` file
+changed; nothing deployed, no `aws` command run. Brief `prompts/e16-step-u6-implementation.md`.
+
+- *Decision 1, `overbook`:* `OVERBOOK` in `backend/src/assistant/tools/facts.ts`, in the
+  Administrator's input of `book_appointment` and `change_appointment` only. `freeSlotAt` now
+  finds the slot whatever its places and reads the day's appointments of the same
+  `GET /calendar`: a full time without `overbook` is `no_free_slot` with "It can be booked over
+  the capacity if the person asks for it"; with it, the proposal's sentence adds "Over the
+  capacity: it will hold N people, its capacity is C." (`over`, people by `peopleIn` plus one) and
+  the body carries `overbook: true`; on a time with a place left it is sent and says nothing more.
+  `user_busy` at the proposal for the Administrator's booking for a User and move of a User's
+  appointment (the moved one left out; its place counted again when it lies over the slot),
+  naming the day, times and type. Found while building: the day's appointments are those that
+  start on that date, so one that crosses midnight from the day before is not counted; the route
+  counts it at the confirmation.
+- *Decision 2, rule 4 counts the places:* `Places` in `backend/src/assistant/exchange.ts`; a
+  change tool returns `place` (`slot`, `left`, `who`, `overbook`, `tool.ts`) instead of a slot
+  subject. Two into two places proposed; the third and after refused with how many were left;
+  the same User twice refused, overbooked or not; an overbooked change not counted.
+- *Decision 3, the type tools:* `create_type` with `capacity` (`CAPACITY`, from `TYPE_CAPACITY`),
+  sent only when given; `editType.ts` (`git mv` of `renameType.ts`), the tool `edit_type`: a new
+  name, a new capacity or both, a value equal to the present one not given, nothing left is
+  **`type_unchanged`** (after the tools' other `…_unchanged` codes); `bookedAbove` reads the
+  upcoming appointments only when the capacity is lowered, for the sentence "Nobody already
+  booked is cancelled…". `list_types` and `typeForModel` give `capacity`. The route,
+  `renameAvailabilityType.ts`, the db functions and the page keep their names.
+- *Decision 5, `get_calendar`:* the tool reads `GET /calendar/types` as its second route for the
+  windows' capacities; "10:00 (2 of 3 places left)" above one place, `capacity` on a window above
+  1, the Administrator's `fullSlots` only when there are; a result of capacity 1 is as before.
+- *Decision 6, the panel:* `proposalShown(…, role)` and `outcomeWords` in `assistant.model.ts`,
+  `AssistantScreen(assistant, role)`, `shell.ts` passes `person.role`
+  (`docs/FRONTEND_ARCHITECTURE.md` v23, decision 194).
+- *Decision 7, the instructions:* one paragraph "Places at the same time" in `prompt.ts`; the
+  refusals' sentence says "a time became full in the meantime". The mark changes.
+- *Texts:* `changes.createType(type)`, `changes.editType(edit)`, `over` in `BookingSummary` and
+  `MoveSummary.to`, in both languages (`shared/src/assistant/`).
+- *Journeys:* two new blocks in `backend/tests/integration/assistant.test.ts`, with the fake's
+  hand-written answers (no new mark was needed): "the places of a type through the assistant"
+  (places read, the same User twice refused, two Users in one proposal, a full time refused, then
+  proposed with `overbook` and confirmed, `user_busy`) and "a type created with a capacity and
+  edited through the assistant"; pages `docs/journeys/backend/assistant-places.md` and
+  `assistant-type-capacity.md`, `docs/journeys/concepts.md` ("Places through the assistant",
+  `edit_type`). No earlier journey named `rename_type`.
+- *Evaluation:* `week.ts` gains "eval Swimming Pool", capacity 3, an extra window on Wednesday of
+  the week after with eval-anna and eval-bruno at 15:00; `requests.ts` six requests of kind
+  `capacity` and `change-type-rename` on `edit_type`; `checks.ts` gains `notBefore`, and
+  `run.ts` tells each tool request its message. The unit test of `notBefore` would live in
+  `backend/tests/unit/eval/`, outside the step's paths: not written.
+- *The paid run:* once, `--ceiling 1`, 2026-11-24, `claude-sonnet-5-5` at `low`: **57 of 57
+  passed**, 113 steps, **45.20 US cents** (253.93 without the cache). By hand: places said to a
+  User, no one named; the Administrator's full time said full and offered over the capacity,
+  `overbook` only after "book it anyway"; `user_busy` explained with an offer to move. A User's
+  full time is called "not bookable" rather than full (a User's `get_calendar` has no busy
+  time), with no forcing offered: left as it is. Nothing changed after the run
+  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3).
+- *Checks:* typecheck, lint, unit tests green, 100 % lines on `backend/src/assistant`, `shared/src`
+  and `frontend/src`; the assistant's journeys (107) passed; the root
+  `DYNAMODB_PORT=8002 npm run verify` PASSED (back end 1 831 unit tests and 208 journey tests,
+  shared 518, front end 2 705); then, apart, the front end's journeys passed (79).
+  `docs/COMMANDS.md` section 3.4 follows the list (57 requests, the third type).
+
+Step u7 finds ready: the API and the page as built here; the smoke test still to write
+(`backend/scripts/smoke.sh`, the journey of a type of capacity 2), then the order of step u7:
+the gate, `npm run deploy -w backend`, the smoke test, `npm run deploy -w frontend`, the walk's
+checks at the deployed address. The deployment of the API ends every conversation in progress
+(the mark changes).
 
 ### Step u7 — The release (each command on the operator's explicit instruction)
 

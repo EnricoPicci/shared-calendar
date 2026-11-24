@@ -1,5 +1,7 @@
 import {
   LocalEndTime,
+  overlaps,
+  peopleIn,
   LocalTime,
   localDateOf,
   localTimeOf,
@@ -16,10 +18,12 @@ import {
   type ListPatternsResponse,
   type ListTypesResponse,
   type ListUsersResponse,
+  type OverCapacity,
   type PatternSummary,
   type WeeklyPattern,
   type WindowSource,
 } from '@shared-calendar/shared';
+import { z } from 'zod';
 import { handler as getCalendar } from '../../handlers/getCalendar';
 import { handler as getSettings } from '../../handlers/getCalendarSettings';
 import { handler as listAppointments } from '../../handlers/listAppointments';
@@ -69,27 +73,85 @@ export function instantOf(date: string, time: string, occurrence: 'first' | 'sec
   return { ok: true, start: occurrence === 'second' ? second : first, secondTime: occurrence === 'second' };
 }
 
+// The Administrator's input of a booking and of a move that goes over the capacity of a full time
+// (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13). A User's input has no such field.
+export const OVERBOOK = z
+  .boolean()
+  .optional()
+  .describe(
+    'Only when the person asked to go over the capacity of a time that is full: true books it all the same. Set it only when the person asked for it, never on your own; leave it out otherwise.',
+  );
+
+// What a booking or a move asks of the slot it goes to, besides its start. `overbook` is the
+// Administrator's request to go over the capacity (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13).
+// `username` is the User the appointment is for, given for the Administrator only, whose view
+// holds every appointment; `leaveOut` is the appointment a move takes away, left out of the
+// counting as the route leaves it out (docs/SHARED_CALENDAR_SPEC.md R-CHG-01).
+export type SlotAsked = { overbook: boolean; username: string | null; leaveOut: string | null };
+const PLAIN_ASK: SlotAsked = { overbook: false, username: null, leaveOut: null };
+
+// The slot a change goes to, as the proposal shows it: its end, the name of its type, the places
+// it had left when it was read, and, for a booking over the capacity, the people it will hold.
+export type SlotFound = { ok: true; end: string; type: string; placesLeft: number; over: OverCapacity | null };
+
 /**
- * The free slot that starts at an instant, as GET /calendar answers the person for that day: its
- * end as a wall-clock time and the name of the type of the hours it lies in. The route gives a
- * person only the slots that person may book, so a time outside the open hours, taken, in the
- * past or, for a User, outside the period open to bookings has no slot. The Administrator also gets
- * the full slots (docs/SHARED_CALENDAR_SPEC.md decision D30), with no place left: they are not free.
+ * The slot that starts at an instant, as GET /calendar answers the person for that day: its end
+ * as a wall-clock time, the name of the type of the hours it lies in, and its places left. The
+ * route gives a person only the slots that person may book, so a time outside the open hours, full,
+ * in the past or, for a User, outside the period open to bookings or over one of the User's own
+ * appointments has no slot. The Administrator also gets the full slots
+ * (docs/SHARED_CALENDAR_SPEC.md decision D30), with no place left: one is refused unless the
+ * Administrator asked to go over the capacity, and then the proposal says how many people the time
+ * will hold, counted at their peak with the appointments of that day
+ * (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02), plus the one booked. Before the places, as the route
+ * checks them, one person holds one place at a time (docs/SHARED_CALENDAR_SPEC.md R-BOOK-12): when
+ * the Administrator books for a User, or moves a User's appointment, an active appointment of that
+ * User over the time is refused with the route's code.
  */
-export async function freeSlotAt(route: CallRoute, date: string, time: string, start: string, timeZone: string): Promise<{ ok: true; end: string; type: string } | NotPossible> {
+export async function freeSlotAt(route: CallRoute, date: string, time: string, start: string, timeZone: string, asked: SlotAsked = PLAIN_ASK): Promise<SlotFound | NotPossible> {
   const answer = await route(getCalendar, { routeKey: 'GET /calendar', path: '/calendar', query: { from: date, to: date } });
   if (!succeeded(answer)) return { ok: false, ...refusalOf(answer, 'The calendar could not be read.') };
-  const day = (answer.body as CalendarView).days.find((candidate) => candidate.date === date);
-  const slot = day?.slots.find((candidate) => candidate.start === start && candidate.placesLeft > 0);
+  const view = answer.body as CalendarView;
+  const day = view.days.find((candidate) => candidate.date === date);
+  const slot = day?.slots.find((candidate) => candidate.start === start);
   const window = day?.windows.find((candidate) => candidate.typeId === slot?.typeId);
   if (!slot || !window) {
     return {
       ok: false,
       error: 'no_free_slot',
-      message: `There is no free slot for the person on ${date} at ${time}: the time is outside the open hours, already taken, in the past, or outside the period in which a User may book. Use get_calendar to see the free slots of that day.`,
+      message: `There is no free slot for the person on ${date} at ${time}: the time is outside the open hours, full, in the past, or outside the period in which a User may book. Use get_calendar to see the free slots of that day.`,
     };
   }
-  return { ok: true, end: localEndTime(slot.end, date, timeZone), type: window.typeName };
+  // The active appointments of the day that count in the slot: the one a move takes away is not
+  // among them.
+  const present = view.appointments.filter((appointment) => appointment.status === 'booked' && appointment.appointmentId !== asked.leaveOut);
+  const busy = present.filter((appointment) => appointment.username === asked.username && overlaps(appointment, slot)).sort((a, b) => (a.start < b.start ? -1 : 1))[0];
+  if (busy) {
+    const from = localTimeOf(busy.start, timeZone);
+    const to = localEndTime(busy.end, busy.date, timeZone);
+    return {
+      ok: false,
+      error: 'user_busy',
+      message:
+        `${busy.username} already has an appointment at this time: on ${busy.date} from ${from} to ${to} (${busy.typeName}). ` +
+        'A person holds one place at a time, also over the capacity. To move that appointment instead, use change_appointment on it.',
+    };
+  }
+  // The route counted a moved appointment that lies over the slot: without it, the places are
+  // counted again from the day's appointments.
+  const movedHere = view.appointments.some((appointment) => appointment.appointmentId === asked.leaveOut && appointment.status === 'booked' && overlaps(appointment, slot));
+  const people = peopleIn(slot, present);
+  const placesLeft = movedHere ? Math.max(0, slot.capacity - people) : slot.placesLeft;
+  if (placesLeft === 0 && !asked.overbook) {
+    return {
+      ok: false,
+      error: 'no_free_slot',
+      message:
+        `The time on ${date} at ${time} is full: its ${slot.capacity} ${slot.capacity === 1 ? 'place is' : 'places are'} taken. ` +
+        'It can be booked over the capacity if the person asks for it: only then give "overbook": true. Otherwise use get_calendar to see the free slots of that day.',
+    };
+  }
+  return { ok: true, end: localEndTime(slot.end, date, timeZone), type: window.typeName, placesLeft, over: placesLeft === 0 ? { people: people + 1, capacity: slot.capacity } : null };
 }
 
 /**
@@ -268,12 +330,11 @@ export async function presentDay(route: CallRoute, date: string, timeZone: strin
 export const namedHours = ({ start, end, type }: HoursSummary): HoursSummary => ({ start, end, type });
 
 // What two changes of one answer of Claude must not share: the appointment a change acts on, the
-// slot a change would fill, the settings, a type, the name a type would get, a weekly pattern, the
+// settings, a type, the name a type would get, a weekly pattern, the
 // hours a date has of its own, and an extra window. A pattern or an extra window still to be
 // created is the weekday or the date with the hours it would open, and for a pattern its two
 // dates: two that share all of it are one asked for twice.
 export const appointmentSubject = (appointmentId: string) => `appointment ${appointmentId}`;
-export const slotSubject = (start: string) => `slot ${start}`;
 export const SETTINGS_SUBJECT = 'settings';
 export const typeSubject = (typeId: string) => `type ${typeId}`;
 export const typeNameSubject = (name: string) => `type name ${typeNameKey(name)}`;
@@ -283,3 +344,8 @@ export const newPatternSubject = (pattern: { weekday: number; start: string; end
 export const overrideSubject = (date: string) => `override ${date}`;
 export const windowSubject = (windowId: string) => `window ${windowId}`;
 export const newWindowSubject = (window: { date: string; start: string; end: string }) => `new window ${window.date} ${window.start}-${window.end}`;
+
+
+// The slot a booking or a move takes a place in, as the exchange counts the places
+// (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5, rule 4).
+export const slotKey = (start: string) => `slot ${start}`;

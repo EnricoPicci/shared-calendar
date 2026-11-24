@@ -11,19 +11,32 @@ import {
 
 // A booking as its proposal words it: a Tuesday, with a note and without, and the second 02:00 of
 // the night the clocks go back in Europe/Rome.
-const BOOKING = { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', note: null, secondTime: false, username: null };
+const BOOKING = { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', note: null, secondTime: false, username: null, over: null };
 const BOOKING_WITH_NOTE = { ...BOOKING, note: 'Bring the documents' };
 // The same booking made by the Administrator for a User.
 const BOOKING_FOR_ALICE = { ...BOOKING_WITH_NOTE, username: 'alice' };
-const BOOKING_SECOND_TIME = { date: '2026-10-25', start: '02:00', end: '03:00', type: 'Visit', note: null, secondTime: true, username: null };
+const BOOKING_SECOND_TIME = { date: '2026-10-25', start: '02:00', end: '03:00', type: 'Visit', note: null, secondTime: true, username: null, over: null };
+// The Administrator's booking for alice over the capacity of a type that holds 3: the time will
+// hold 4 people.
+const BOOKING_OVER = { ...BOOKING_FOR_ALICE, type: 'Swimming Pool', over: { people: 4, capacity: 3 } };
 
 // An appointment as the proposal of a change names it: a User's own, which names nobody, and
 // alice's as the Administrator is shown it. A move to a slot of another type, and to the second
 // 02:00 of the night the clocks go back. A note set, set over another, and removed.
 const OWN = { date: '2026-11-24', start: '10:00', end: '11:00', type: 'Visit', username: null };
 const OF_ALICE = { ...OWN, username: 'alice' };
-const TO = { date: '2026-11-26', start: '09:00', end: '10:00', type: 'Checkup', secondTime: false };
-const TO_SECOND_TIME = { date: '2026-10-25', start: '02:00', end: '03:00', type: 'Visit', secondTime: true };
+const TO = { date: '2026-11-26', start: '09:00', end: '10:00', type: 'Checkup', secondTime: false, over: null };
+const TO_SECOND_TIME = { date: '2026-10-25', start: '02:00', end: '03:00', type: 'Visit', secondTime: true, over: null };
+const TO_OVER = { ...TO, type: 'Swimming Pool', over: { people: 5, capacity: 3 } };
+
+// A type created with the capacity of 1 and with 8; an edited type: renamed, its capacity raised,
+// both, and its capacity lowered below the people already booked.
+const TYPE_ONE = { name: 'Phone call', capacity: 1 };
+const TYPE_EIGHT = { name: 'Yoga', capacity: 8 };
+const RENAMED = { name: 'Visit', newName: 'Check-up', capacity: null, bookedAbove: false };
+const RAISED = { name: 'Swimming Pool', newName: null, capacity: { from: 3, to: 5 }, bookedAbove: false };
+const BOTH = { name: 'Swimming Pool', newName: 'Pool', capacity: { from: 3, to: 5 }, bookedAbove: false };
+const LOWERED = { name: 'Swimming Pool', newName: null, capacity: { from: 3, to: 1 }, bookedAbove: true };
 const NOTE_SET = { appointment: OWN, note: 'Bring the documents', previous: null };
 const NOTE_REPLACED = { appointment: OF_ALICE, note: 'Bring the documents', previous: 'First visit' };
 const NOTE_REMOVED = { appointment: OWN, note: null, previous: 'First visit' };
@@ -68,13 +81,13 @@ const WINDOW = { date: DAY, ...EXTRA };
 // the test below fails.
 const SAMPLES: Record<string, unknown[][]> = {
   proposalQuestion: Array.from({ length: ASSISTANT_LIMITS.changesPerProposal }, (_, i) => [i + 1]),
-  'changes.bookAppointment': [[BOOKING], [BOOKING_WITH_NOTE], [BOOKING_SECOND_TIME], [BOOKING_FOR_ALICE]],
+  'changes.bookAppointment': [[BOOKING], [BOOKING_WITH_NOTE], [BOOKING_SECOND_TIME], [BOOKING_FOR_ALICE], [BOOKING_OVER]],
   'changes.cancelAppointment': [[OWN], [OF_ALICE]],
-  'changes.changeAppointment': [[{ appointment: OWN, to: TO }], [{ appointment: OF_ALICE, to: TO }], [{ appointment: OWN, to: TO_SECOND_TIME }]],
+  'changes.changeAppointment': [[{ appointment: OWN, to: TO }], [{ appointment: OF_ALICE, to: TO }], [{ appointment: OWN, to: TO_SECOND_TIME }], [{ appointment: OF_ALICE, to: TO_OVER }]],
   'changes.setAppointmentNote': [[NOTE_SET], [NOTE_REPLACED], [NOTE_REMOVED]],
   'changes.updateSettings': [[ONE_SETTING], [ALL_SETTINGS], [LIMIT_LIFTED]],
-  'changes.createType': [[{ name: 'Phone call' }]],
-  'changes.renameType': [[{ from: 'Visit', to: 'Check-up' }]],
+  'changes.createType': [[TYPE_ONE], [TYPE_EIGHT]],
+  'changes.editType': [[RENAMED], [RAISED], [BOTH], [LOWERED]],
   'changes.deleteType': [[{ name: 'Visit' }]],
   'changes.createPattern': [[PATTERN], [PATTERN_ENDING]],
   'changes.updatePattern': [[{ from: PATTERN, to: PATTERN_ENDING }]],
@@ -256,13 +269,47 @@ describe('assistantTexts', () => {
     expect(updateSettings(LIMIT_LIFTED)).toBe('Modificare le impostazioni. Numero massimo di appuntamenti futuri per persona: da 1 appuntamento a nessun limite.');
   });
 
-  it('a type created, renamed and deleted is named by its name, a rename by the old and the new: both languages', () => {
-    expect(ASSISTANT_TEXTS_EN.changes.createType({ name: 'Phone call' })).toBe('Create the appointment type "Phone call".');
-    expect(ASSISTANT_TEXTS_EN.changes.renameType({ from: 'Visit', to: 'Check-up' })).toBe('Rename the appointment type "Visit" to "Check-up".');
-    expect(ASSISTANT_TEXTS_EN.changes.deleteType({ name: 'Visit' })).toBe('Delete the appointment type "Visit".');
-    expect(ASSISTANT_TEXTS_IT.changes.createType({ name: 'Phone call' })).toBe('Creare il tipo di appuntamento «Phone call».');
-    expect(ASSISTANT_TEXTS_IT.changes.renameType({ from: 'Visit', to: 'Check-up' })).toBe('Rinominare il tipo di appuntamento «Visit» in «Check-up».');
-    expect(ASSISTANT_TEXTS_IT.changes.deleteType({ name: 'Visit' })).toBe('Eliminare il tipo di appuntamento «Visit».');
+  it('a type created, edited and deleted is named by its name; a capacity above 1 is said: both languages', () => {
+    const en = ASSISTANT_TEXTS_EN.changes;
+    const it_ = ASSISTANT_TEXTS_IT.changes;
+    expect(en.createType(TYPE_ONE)).toBe('Create the appointment type "Phone call".');
+    expect(en.createType(TYPE_EIGHT)).toBe('Create the appointment type "Yoga", for 8 people at the same time.');
+    expect(en.deleteType({ name: 'Visit' })).toBe('Delete the appointment type "Visit".');
+    expect(it_.createType(TYPE_ONE)).toBe('Creare il tipo di appuntamento «Phone call».');
+    expect(it_.createType(TYPE_EIGHT)).toBe('Creare il tipo di appuntamento «Yoga», per 8 persone contemporaneamente.');
+    expect(it_.deleteType({ name: 'Visit' })).toBe('Eliminare il tipo di appuntamento «Visit».');
+  });
+
+  it('an edited type says each change: a name alone as a rename, a capacity with both numbers, and that nobody is cancelled when it goes below the people booked', () => {
+    const en = ASSISTANT_TEXTS_EN.changes.editType;
+    const it_ = ASSISTANT_TEXTS_IT.changes.editType;
+    expect(en(RENAMED)).toBe('Rename the appointment type "Visit" to "Check-up".');
+    expect(en(RAISED)).toBe('Change the appointment type "Swimming Pool": capacity from 3 to 5.');
+    expect(en(BOTH)).toBe('Change the appointment type "Swimming Pool": name to "Pool", capacity from 3 to 5.');
+    expect(en(LOWERED)).toBe(
+      'Change the appointment type "Swimming Pool": capacity from 3 to 1. Nobody already booked is cancelled: where more people are booked than the new capacity, nobody else can book until some leave.',
+    );
+    expect(it_(RENAMED)).toBe('Rinominare il tipo di appuntamento «Visit» in «Check-up».');
+    expect(it_(RAISED)).toBe('Modificare il tipo di appuntamento «Swimming Pool»: capienza da 3 a 5.');
+    expect(it_(BOTH)).toBe('Modificare il tipo di appuntamento «Swimming Pool»: nome in «Pool», capienza da 3 a 5.');
+    expect(it_(LOWERED)).toBe(
+      'Modificare il tipo di appuntamento «Swimming Pool»: capienza da 3 a 1. Nessuna prenotazione esistente viene annullata: dove le persone prenotate sono più della nuova capienza, nessun altro può prenotare finché qualcuno non lascia il posto.',
+    );
+  });
+
+  it('a booking and a move over the capacity say how many people the time will hold and its capacity: both languages', () => {
+    expect(ASSISTANT_TEXTS_EN.changes.bookAppointment(BOOKING_OVER)).toBe(
+      'Book an appointment for alice on Tuesday 24 November 2026, from 10:00 to 11:00 (Swimming Pool). Over the capacity: it will hold 4 people, its capacity is 3. Note: "Bring the documents"',
+    );
+    expect(ASSISTANT_TEXTS_IT.changes.bookAppointment(BOOKING_OVER)).toBe(
+      'Prenotare per alice un appuntamento per martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Swimming Pool). Oltre la capienza: ospiterà 4 persone, la sua capienza è 3. Nota: «Bring the documents»',
+    );
+    expect(ASSISTANT_TEXTS_EN.changes.changeAppointment({ appointment: OF_ALICE, to: TO_OVER })).toBe(
+      'Move the appointment of alice on Tuesday 24 November 2026, from 10:00 to 11:00 (Visit), to Thursday 26 November 2026, from 09:00 to 10:00 (Swimming Pool). Over the capacity: it will hold 5 people, its capacity is 3.',
+    );
+    expect(ASSISTANT_TEXTS_IT.changes.changeAppointment({ appointment: OF_ALICE, to: TO_OVER })).toBe(
+      "Spostare l'appuntamento di alice di martedì 24 novembre 2026, dalle 10:00 alle 11:00 (Visit), a giovedì 26 novembre 2026, dalle 09:00 alle 10:00 (Swimming Pool). Oltre la capienza: ospiterà 5 persone, la sua capienza è 3.",
+    );
   });
 
   it('a weekly pattern is named by its weekday, its hours, its type and its dates, in both languages', () => {

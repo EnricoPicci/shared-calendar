@@ -8,6 +8,7 @@ import {
   isChange,
   type CallRoute,
   type ChangeTool,
+  type Place,
   type ReadTool,
   type RouteAnswer,
   type RouteHandler,
@@ -154,8 +155,9 @@ export function asksForChange(request: ToolRequest, tools: readonly Tool[], call
 
 // A change that can be proposed: the tool, what its route will be sent at the confirmation, and
 // the server's own words for it in the conversation's language.
-// `subjects` is what the change acts on, as its tool names it.
-export type Proposable = { ok: true; tool: string; call: ToolCall; summary: string; subjects: string[]; log: ToolLog } | { ok: false; outcome: ToolOutcome };
+// `subjects` is what the change acts on, as its tool names it, and `place` the place a booking or a
+// move takes in a slot, or null.
+export type Proposable = { ok: true; tool: string; call: ToolCall; summary: string; subjects: string[]; place: Place | null; log: ToolLog } | { ok: false; outcome: ToolOutcome };
 
 // The answers of the read routes the confirmations of one answer of Claude have asked for, by
 // what was asked: the changes of one answer are worked out on one reading of the calendar, and a
@@ -199,5 +201,5 @@ export async function proposeChange(
   if (!read.ok) {
     return { ok: false, outcome: { result: errorResult(request.id, read.error, read.message), log: { name, notRun: 'not_possible', status, ms }, reads } };
   }
-  return { ok: true, tool: name, call: read.call, summary: tool.confirmation.summary(texts, read.facts), subjects: read.subjects ?? [], log: { name, status, ms, proposed: true } };
+  return { ok: true, tool: name, call: read.call, summary: tool.confirmation.summary(texts, read.facts), subjects: read.subjects ?? [], place: read.place ?? null, log: { name, status, ms, proposed: true } };
 }

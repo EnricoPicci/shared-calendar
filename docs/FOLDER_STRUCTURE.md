@@ -381,7 +381,7 @@ date and time, the free slot at an instant, the appointment an id stands for).
 
 Step c07 of `docs/CONVERSATIONAL_PLAN.md` (2026-11-22) added the Administrator's tools,
 `tools/listUsers.ts`, `tools/listPatterns.ts`, `tools/updateSettings.ts`, `tools/createType.ts`,
-`tools/renameType.ts` and `tools/deleteType.ts`, with their four sentences in `changes` and two
+`tools/editType.ts` (named `renameType.ts` until the capacity of a type, `docs/CAPACITY_PLAN.md` step u6) and `tools/deleteType.ts`, with their four sentences in `changes` and two
 kinds of read (users, patterns). `tools/facts.ts` gained the reads of the present settings, the
 present types and the users' list.
 

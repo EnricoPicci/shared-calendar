@@ -4,8 +4,10 @@ import { daysFrom, type Days } from './dates';
 
 // The known week of the evaluation (docs/CONVERSATIONAL_ARCHITECTURE.md section 12.3): what the
 // local calendar holds while the list of requests is played, so that the right answer to a
-// request is a fact. Everything is made through the API, as the Administrator, under two
+// request is a fact. Everything is made through the API, as the Administrator, under three
 // appointment types and two accounts whose names start with "eval", and removed by those names.
+// Two types hold one person at a time; "eval Swimming Pool" holds three
+// (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02).
 //
 //   every week, from today for six weeks
 //     Monday to Friday      09:00-13:00  eval Visit    (weekly patterns)
@@ -18,12 +20,16 @@ import { daysFrom, type Days } from './dates';
 //     Friday     eval-bruno 11:00
 //     Saturday   an extra window 10:00-12:00 eval Lesson, the day's only hours
 //     Sunday     no hours at all
-//   the week after: the weekly patterns alone, and no appointment
+//   the week after: the weekly patterns, and
+//     Wednesday  an extra window 15:00-17:00 eval Swimming Pool, capacity 3:
+//                eval-anna and eval-bruno at 15:00 (one place left), 16:00 free (three)
 //
 // The settings are set to the calendar's defaults for the run and put back at its end.
 
 export const VISIT = 'eval Visit';
 export const LESSON = 'eval Lesson';
+export const POOL = 'eval Swimming Pool';
+export const POOL_CAPACITY = 3;
 export const ANNA = 'eval-anna';
 export const BRUNO = 'eval-bruno';
 const ACCOUNTS = [ANNA, BRUNO];
@@ -44,12 +50,12 @@ export type World = {
   days: Days;
   // The access tokens of the three people who ask. Never printed.
   tokens: { admin: string; anna: string; bruno: string };
-  types: { visit: string; lesson: string };
+  types: { visit: string; lesson: string; pool: string };
   // The ids of the weekly patterns, by type and ISO weekday: `visit-1` is Monday's.
   patterns: Record<string, string>;
   // The id of Saturday's extra window.
   extraWindow: string;
-  appointments: { annaMonday: string; annaThursday: string; brunoTuesday: string; brunoFriday: string };
+  appointments: { annaMonday: string; annaThursday: string; brunoTuesday: string; brunoFriday: string; annaPool: string; brunoPool: string };
 };
 
 type Settings = { cancellationNoticeHours: number; minBookingNoticeHours: number; bookingHorizonDays: number; maxFutureAppointmentsPerUser: number | null };
@@ -153,6 +159,7 @@ export async function seedWeek(admin: string): Promise<World> {
 
   const visit = (await must('POST', '/calendar/types', admin, { name: VISIT }, 201)).typeId as string;
   const lesson = (await must('POST', '/calendar/types', admin, { name: LESSON }, 201)).typeId as string;
+  const pool = (await must('POST', '/calendar/types', admin, { name: POOL, capacity: POOL_CAPACITY }, 201)).typeId as string;
 
   const validUntil = addDays(today, PATTERN_WEEKS * 7);
   const patterns: Record<string, string> = {};
@@ -164,7 +171,10 @@ export async function seedWeek(admin: string): Promise<World> {
     patterns[key] = (await must('POST', '/calendar/patterns', admin, { ...pattern, validFrom: today, validUntil }, 201)).patternId as string;
   }
 
-  // The appointments first: Wednesday's own hours and Saturday's window do not touch them.
+  // The pool's window before its two appointments; the other appointments first: Wednesday's
+  // own hours and Saturday's window do not touch them.
+  const poolDay = days.weekAfter[2];
+  await must('POST', '/calendar/windows', admin, { date: poolDay, start: '15:00', end: '17:00', typeId: pool }, 201);
   const book = async (username: string, date: string, time: string, note?: string) =>
     (await must('POST', '/calendar/appointments', admin, { username, start: toInstant(date, time, zone), ...(note !== undefined && { note }) }, 201)).appointmentId as string;
   const appointments = {
@@ -172,13 +182,15 @@ export async function seedWeek(admin: string): Promise<World> {
     brunoTuesday: await book(BRUNO, tuesday, '09:00', ORDER_NOTE),
     annaThursday: await book(ANNA, thursday, '15:00'),
     brunoFriday: await book(BRUNO, friday, '11:00'),
+    annaPool: await book(ANNA, poolDay, '15:00'),
+    brunoPool: await book(BRUNO, poolDay, '15:00'),
   };
 
   await must('PUT', `/calendar/overrides/${wednesday}`, admin, { windows: [{ start: '10:00', end: '12:00', typeId: visit }] }, 200, 201);
   const extraWindow = (await must('POST', '/calendar/windows', admin, { date: saturday, start: '10:00', end: '12:00', typeId: lesson }, 201)).windowId as string;
 
   if (weekdayOf(monday) !== 1) throw new Error('the week of the evaluation does not start on a Monday');
-  return { zone, days, tokens, types: { visit, lesson }, patterns, extraWindow, appointments };
+  return { zone, days, tokens, types: { visit, lesson, pool }, patterns, extraWindow, appointments };
 }
 
 /**
@@ -190,9 +202,16 @@ export function paperWorld(today: string, zone: string): World {
     zone,
     days: daysFrom(today),
     tokens: { admin: '', anna: '', bruno: '' },
-    types: { visit: 'id-of-eval-visit', lesson: 'id-of-eval-lesson' },
+    types: { visit: 'id-of-eval-visit', lesson: 'id-of-eval-lesson', pool: 'id-of-eval-swimming-pool' },
     patterns: Object.fromEntries([...[1, 2, 3, 4, 5].map((n) => `visit-${n}`), 'lesson-2', 'lesson-4'].map((key) => [key, `id-of-${key}`])),
     extraWindow: 'id-of-the-extra-window',
-    appointments: { annaMonday: 'id-anna-monday', annaThursday: 'id-anna-thursday', brunoTuesday: 'id-bruno-tuesday', brunoFriday: 'id-bruno-friday' },
+    appointments: {
+      annaMonday: 'id-anna-monday',
+      annaThursday: 'id-anna-thursday',
+      brunoTuesday: 'id-bruno-tuesday',
+      brunoFriday: 'id-bruno-friday',
+      annaPool: 'id-anna-pool',
+      brunoPool: 'id-bruno-pool',
+    },
   };
 }

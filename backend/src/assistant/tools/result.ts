@@ -105,8 +105,11 @@ export function settingsForModel(settings: CalendarSettings): Record<string, unk
   };
 }
 
-/** An appointment type as Claude sees it: its id, which a later change will name, and its name. */
-export const typeForModel = (type: AvailabilityType): Record<string, unknown> => ({ id: type.typeId, name: type.name });
+/**
+ * An appointment type as Claude sees it: its id, which a later change will name, its name, and its
+ * capacity, how many people it holds at the same time (docs/SHARED_CALENDAR_SPEC.md R-TYPE-05).
+ */
+export const typeForModel = (type: AvailabilityType): Record<string, unknown> => ({ id: type.typeId, name: type.name, capacity: type.capacity });
 
 // The weekdays as Claude reads and writes them, Monday first: the calendar counts them from 1.
 export const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;

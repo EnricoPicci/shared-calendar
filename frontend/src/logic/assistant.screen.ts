@@ -1,4 +1,4 @@
-import type { AssistantLanguage, AssistantMessage, AssistantProposal, AssistantReply, AssistantStatus } from '@shared-calendar/shared';
+import type { AssistantLanguage, AssistantMessage, AssistantProposal, AssistantReply, AssistantStatus, Role } from '@shared-calendar/shared';
 import { BehaviorSubject, Subject, type Observable, type Subscription } from 'rxjs';
 import type { AssistantService } from '../services/assistant.service';
 import type { AssistantOutcome } from '../services/assistant.types';
@@ -109,7 +109,11 @@ export class AssistantScreen {
   private readonly changed = new Subject<void>();
   readonly changed$: Observable<void> = this.changed.asObservable();
 
-  constructor(private readonly assistant: AssistantCalls) {}
+  // `role` is the person's: the outcome of a refused change is said for it.
+  constructor(
+    private readonly assistant: AssistantCalls,
+    private readonly role: Role,
+  ) {}
 
   // Called once the view has subscribed (docs/FRONTEND_ARCHITECTURE.md section 5, rule 5):
   // from then on the panel can be opened and used, until the subscription returned ends.
@@ -371,7 +375,7 @@ export class AssistantScreen {
       open: this.opened,
       messages: this.rows,
       progress: this.away ? (this.activity ?? NO_ACTIVITY) : null,
-      proposal: proposalShown(this.proposal, this.status, this.away),
+      proposal: proposalShown(this.proposal, this.status, this.away, this.role),
       failure: this.failure ?? (this.left === 0 ? dayLimitText(this.language) : null),
       remaining: this.left === null ? '' : remainingText(this.left),
       canSend: this.canSend(),

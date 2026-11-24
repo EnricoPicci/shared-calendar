@@ -196,7 +196,16 @@ async function play(request: EvalRequest, world: World, log: string): Promise<Pl
 
   const entries = await storedEntries(token);
   const blocks = entries.filter((entry) => Array.isArray(entry.content)).flatMap((entry) => entry.content as { type: string; name?: string; input?: Record<string, unknown>; content?: string }[]);
-  seen.requests = blocks.filter((block) => block.type === 'tool_use').map((block) => ({ name: block.name!, input: block.input ?? {} }));
+  // Each request for a tool with the message of the person it answered: the person's messages are
+  // the stored entries of role "user" whose content is a text.
+  let message = -1;
+  seen.requests = entries.flatMap((entry) => {
+    if (entry.role === 'user' && typeof entry.content === 'string') message += 1;
+    if (!Array.isArray(entry.content)) return [];
+    return (entry.content as { type: string; name?: string; input?: Record<string, unknown> }[])
+      .filter((block) => block.type === 'tool_use')
+      .map((block) => ({ name: block.name!, input: block.input ?? {}, message }));
+  });
   const toolErrors = blocks
     .filter((block) => block.type === 'tool_result' && typeof block.content === 'string')
     .map((block) => {

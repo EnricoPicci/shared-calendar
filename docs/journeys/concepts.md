@@ -546,6 +546,8 @@ the tools" below). The texts the journeys send:
 | `fake: book me a slot when the money runs out` | first a request for `book_appointment`; then an error (a spending limit) the first time, and the second time the last result of a tool as its text |
 | `fake: add a note to my appointment of the note journey`, `fake: move my appointment of the moving journey`, `fake: cancel both my appointments of the cancelling journey` | first a request for `list_appointments`, for the day 22, 23 or 24 days after today; then a request for the change (`set_appointment_note`, `change_appointment`, or two `cancel_appointment` in one answer), with the id of the first appointment of that list, and of the second for the second cancellation; then the last result of a tool as its text |
 | `fake: set the booking horizon of the settings journey`, `fake: change a setting, which a User cannot` | first a request for the tool `update_settings`, for a booking horizon of 57 days; then, as its text, the last result of a tool word for word |
+| `fake: what is free on the day of the capacity journey?`, `fake: book the first User of the capacity journey twice`, `fake: book both Users of the capacity journey`, `fake: book the third User of the capacity journey`, `fake: book the third User of the capacity journey anyway`, `fake: book the first User of the capacity journey again` | a request for `get_calendar` for the day 20 days after today, or one or two requests for `book_appointment` on that day at 05:00 with the usernames `chat-cap-one`, `chat-cap-two` or `chat-cap-three` (`overbook: true` in the one that says "anyway"); then, as its text, the last result of a tool word for word: answers written by hand |
+| `fake: create the type of the capacity journey for four people`, `fake: let the type of the capacity journey hold two people` | a request for `create_type` with a capacity of 4; or a request for `list_types`, then one for `edit_type` with the id of the journey's type found by its name in that list and a capacity of 2; then the last result of a tool as its text: answers written by hand |
 | `fake: book the slot of the journey for its User` | first a request for the tool `book_appointment` with the username `chat-booked`, for the day 21 days after today at 05:00; then, as its text, the last result of a tool word for word |
 | `fake: block an hour of the day of the blocking journey`, `fake: block an hour that somebody booked` | first a request for `get_calendar`, for one Saturday (the first on or after the day 12, or 19, days after today); then a request for `list_types`, with the words "I need the type id."; then a request for `set_date_override` on that Saturday, with the hours 04:00–05:00 and 06:00–07:00 under the id of the journey's type, found by its name in that list; then the last result of a tool as its text |
 | `fake: what is free on the day of the blocking journey?` | first a request for `get_calendar`, for the Saturday of the blocking journey; then, as its text, the result of that tool word for word |
@@ -626,7 +628,7 @@ comes, the answer when the very same request comes again.
 Claude cannot change the calendar (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 5.5). When it
 asks for a tool that changes something (`book_appointment`, `cancel_appointment`,
 `change_appointment` and `set_appointment_note`, offered to everybody, and `update_settings`,
-`create_type`, `rename_type` and `delete_type`, offered to the Administrator only, like the
+`create_type`, `edit_type` and `delete_type`, offered to the Administrator only, like the
 seven tools of the opening hours, which have a section of their own below),
 the server changes nothing. It reads the facts itself, with the person's identity. For a
 booking, through the code of `GET /calendar`: the free slot at the time asked for, its end, the
@@ -680,7 +682,7 @@ answered, and the words that the person pressed the button), `declined` after a 
 A tool belongs to one role or to both (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 3). Eight
 are offered to everybody: the four reads and the four changes of an appointment. The
 Administrator is offered more: the reads `list_users` and `list_patterns`, the changes
-`update_settings`, `create_type`, `rename_type` and `delete_type`, and the seven changes of the
+`update_settings`, `create_type`, `edit_type` and `delete_type`, and the seven changes of the
 opening hours (see "The opening hours through the assistant" below). The server names to Claude
 only the tools of the person's role.
 
@@ -701,6 +703,26 @@ the code of `GET /calendar/settings`, shows in the proposal those that would cha
 is and as it would become, and at the confirmation sends all four to `PUT /calendar/settings`,
 the others as it read them (`docs/SHARED_CALENDAR_SPEC.md` R-SET-02). Asked for the values the
 settings already have, it proposes nothing.
+
+### Places through the assistant
+
+A type may hold several people at once ([places in a slot](#places-in-a-slot)). The assistant
+reads it and keeps to it (`docs/CONVERSATIONAL_ARCHITECTURE.md` sections 5.5 and 7.3):
+
+- `get_calendar` writes a free slot of a type above one place as "05:00 (2 of 3 places left)",
+  gives a window its type's `capacity` when above 1, and gives the Administrator the full times
+  of a day as `fullSlots`. A User never learns who holds the other places.
+- `book_appointment` and `change_appointment` refuse a full time with `no_free_slot` before any
+  proposal. The Administrator's input has one more field, `overbook`: with `true` the full time
+  is proposed all the same, the sentence says how many people it will hold, and the route is
+  called with `overbook: true` at the confirmation. For the Administrator, a User who already
+  holds an appointment at that time is refused at the proposal with `user_busy`, naming that
+  appointment.
+- Several changes of one answer into one slot are proposed while they fit its places left
+  (rule 4 of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 5.5): the first that does not fit,
+  and the same User twice, are refused with `same_thing_twice`, and then none is proposed. A
+  change marked `overbook` takes no place in that count.
+- `create_type` takes a `capacity`, and `edit_type` changes the name, the capacity or both.
 
 ### The opening hours through the assistant
 
@@ -759,7 +781,7 @@ that hold the type, the weekly patterns of the type and its extra windows, befor
 
 ### The Administrator's conversation in the journeys
 
-Six blocks of `backend/tests/integration/assistant.test.ts` talk to the assistant as the
+Eight blocks of `backend/tests/integration/assistant.test.ts` talk to the assistant as the
 seeded Administrator, `admin`. Unlike a throw-away User, that account keeps its `sub` from one
 run to the next, so it does not start clean by itself. Each of those blocks first deletes the
 Administrator's items of daily use (`forgetDailyUse()` of `backend/tests/integration/setup.ts`,

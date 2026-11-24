@@ -1,5 +1,5 @@
 import { weekdayOf } from '../calendar/time';
-import type { AppointmentSummary, AssistantSettingName, AssistantTexts, DayHours, HoursSummary, PatternSummary, SettingChange } from './texts';
+import type { AppointmentSummary, AssistantSettingName, AssistantTexts, DayHours, HoursSummary, OverCapacity, PatternSummary, SettingChange, TypeEditSummary } from './texts';
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -52,6 +52,18 @@ const dayThen = (day: DayHours) => `As it would become${day.from === 'own' ? '' 
 const extraWindows = (extras: HoursSummary[]) =>
   extras.length === 0 ? '' : extras.length === 1 ? ` The extra window ${hours(extras[0]!)} of this day is not changed.` : ` The extra windows ${extras.map(hours).join(', ')} of this day are not changed.`;
 
+// A booking or a move over the capacity of its type: " Over the capacity: it will hold 4 people,
+// its capacity is 3." Nothing when it stays within it.
+const overCapacity = (over: OverCapacity | null | undefined) => (over === null || over === undefined ? '' : ` Over the capacity: it will hold ${over.people} people, its capacity is ${over.capacity}.`);
+
+// An edited type: a new name alone keeps the words of a rename; a capacity says both numbers.
+const editedType = ({ name, newName, capacity, bookedAbove }: TypeEditSummary) => {
+  const kept = bookedAbove ? ' Nobody already booked is cancelled: where more people are booked than the new capacity, nobody else can book until some leave.' : '';
+  if (capacity === null) return `Rename the appointment type "${name}" to "${newName ?? name}".`;
+  const parts = [...(newName === null ? [] : [`name to "${newName}"`]), `capacity from ${capacity.from} to ${capacity.to}`];
+  return `Change the appointment type "${name}": ${parts.join(', ')}.${kept}`;
+};
+
 // The fixed texts in English. The three sentences of `cannotAnswer` are those of
 // docs/CONVERSATIONAL_ARCHITECTURE.md section 6.1, word for word.
 export const ASSISTANT_TEXTS_EN: AssistantTexts = {
@@ -73,21 +85,23 @@ export const ASSISTANT_TEXTS_EN: AssistantTexts = {
   confirmLabel: 'Confirm',
   declineLabel: "Don't",
   changes: {
-    bookAppointment: ({ date, start, end, type, note, secondTime, username }) =>
+    bookAppointment: ({ date, start, end, type, note, secondTime, username, over }) =>
       `Book an appointment${username === null ? '' : ` for ${username}`} on ${fullDate(date)}, from ${start} to ${end} (${type}).` +
       (secondTime ? ` This is the second ${start} of that night: the clocks go back.` : '') +
+      overCapacity(over) +
       (note === null ? '' : ` Note: "${note}"`),
     cancelAppointment: (appointment) => `Cancel ${theAppointment(appointment)}.`,
     changeAppointment: ({ appointment, to }) =>
       `Move ${theAppointment(appointment)}, to ${fullDate(to.date)}, from ${to.start} to ${to.end} (${to.type}).` +
-      (to.secondTime ? ` This is the second ${to.start} of that night: the clocks go back.` : ''),
+      (to.secondTime ? ` This is the second ${to.start} of that night: the clocks go back.` : '') +
+      overCapacity(to.over),
     setAppointmentNote: ({ appointment, note, previous }) =>
       note === null
         ? `Remove the note of ${theAppointment(appointment)}. The note is: "${previous ?? ''}"`
         : `Set the note of ${theAppointment(appointment)}, to: "${note}"` + (previous === null ? '' : ` It replaces the note: "${previous}"`),
     updateSettings: ({ changes }) => ['Change the settings.', ...changes.map(settingChange)].join(' '),
-    createType: ({ name }) => `Create the appointment type "${name}".`,
-    renameType: ({ from, to }) => `Rename the appointment type "${from}" to "${to}".`,
+    createType: ({ name, capacity }) => `Create the appointment type "${name}"${capacity > 1 ? `, for ${capacity} people at the same time` : ''}.`,
+    editType: editedType,
     deleteType: ({ name }) => `Delete the appointment type "${name}".`,
     createPattern: (pattern) => `Create a weekly pattern: ${thePattern(pattern)}.`,
     updatePattern: ({ from, to }) => `Change a weekly pattern. As it is now: ${thePattern(from)}. As it would become: ${thePattern(to)}.`,

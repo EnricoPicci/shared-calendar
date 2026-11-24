@@ -166,7 +166,7 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
   `xhigh`, `max`; `local:up` refuses another value. Without them the template's model and the
   effort `low` are used, and a `local:up` without them is the way back.
 - **`npm run assistant:eval -w backend`: the evaluation with the real model**
-  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3). It plays 51 requests in English and
+  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3). It plays 57 requests in English and
   Italian against the local API and checks what Claude did. **It costs money at Anthropic**:
   about 40 US cents and four minutes for the whole list on `claude-sonnet-5-5`, 3 cents on
   `claude-haiku-5-5`. It is no part of `verify`. Run it before a deployment that changes the
@@ -181,8 +181,8 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
     `--out` writes the run as JSON, `--hand` writes the answers a person must read; `--only`
     with ids, or `--kind` with a kind, plays part of the list; `--log` names another log file.
     `-- --list` prints the list and its checks, plays nothing, costs nothing and needs no stack.
-  - It makes the accounts `eval-anna` and `eval-bruno` and the types "eval Visit" and
-    "eval Lesson", and removes them at the end, also when stopped with Ctrl-C. The
+  - It makes the accounts `eval-anna` and `eval-bruno` and the types "eval Visit",
+    "eval Lesson" and "eval Swimming Pool" (capacity 3), and removes them at the end, also when stopped with Ctrl-C. The
     appointments it made stay in the table, cancelled. Never run it together with a gate or
     with the integration tests.
   - When a request fails, play it again alone before believing it: the model does not answer

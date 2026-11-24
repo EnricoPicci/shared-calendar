@@ -3,8 +3,9 @@
 // Claude asked of the tools and at what the server made of it, never at the wording of an answer.
 // Pure: a check is given what was seen and says what is wrong, or nothing.
 
-// One request of Claude for a tool, as the conversation stores it.
-export type ToolRequest = { name: string; input: Record<string, unknown> };
+// One request of Claude for a tool, as the conversation stores it, and which message of the
+// request it answered, counted from 0 (absent: not known).
+export type ToolRequest = { name: string; input: Record<string, unknown>; message?: number };
 
 // One change of a proposal as the server stored it: the tool, and the request its route would be
 // sent at the confirmation. That request, not the sentence shown, is what is checked.
@@ -119,6 +120,19 @@ export const readsDay = (tools: string | string[], date: string, longest = 7): C
     },
   };
 };
+
+/**
+ * No request of this tool before the message `message` (counted from 0) held the wanted input:
+ * what the person must ask for first, such as going over the capacity, was not done on Claude's
+ * own.
+ */
+export const notBefore = (message: number, tool: string, wanted: Wanted): Check => ({
+  what: `asks ${tool} with ${show(wanted)} only from message ${message + 1} on`,
+  failed: (seen) => {
+    const early = seen.requests.filter((request) => request.name === tool && (request.message ?? 0) < message && holds(request.input, wanted));
+    return early.length === 0 ? null : `asked it before: ${show(early.map((request) => request.input))}`;
+  },
+});
 
 /** No proposal waits at the end. */
 export const noProposal = (): Check => ({

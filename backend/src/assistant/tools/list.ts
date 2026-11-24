@@ -8,13 +8,13 @@ import { deleteDateOverride, deleteDateOverrideDefinition } from './deleteDateOv
 import { deleteOneOffWindow, deleteOneOffWindowDefinition } from './deleteOneOffWindow';
 import { deletePattern, deletePatternDefinition } from './deletePattern';
 import { deleteType, deleteTypeDefinition } from './deleteType';
+import { editType, editTypeDefinition } from './editType';
 import { getCalendar, getCalendarDefinition } from './getCalendar';
 import { getSettings, getSettingsDefinition } from './getSettings';
 import { listAppointments, listAppointmentsDefinition } from './listAppointments';
 import { listPatterns, listPatternsDefinition } from './listPatterns';
 import { listTypes, listTypesDefinition } from './listTypes';
 import { listUsers, listUsersDefinition } from './listUsers';
-import { renameType, renameTypeDefinition } from './renameType';
 import { setAppointmentNote, setAppointmentNoteDefinition } from './setAppointmentNote';
 import { setDateOverride, setDateOverrideDefinition } from './setDateOverride';
 import type { Tool, ToolDefinition } from './tool';
@@ -40,7 +40,7 @@ export const DEFINITIONS: readonly ToolDefinition[] = [
   listPatternsDefinition,
   updateSettingsDefinition,
   createTypeDefinition,
-  renameTypeDefinition,
+  editTypeDefinition,
   deleteTypeDefinition,
   createPatternDefinition,
   updatePatternDefinition,
@@ -66,7 +66,7 @@ export const TOOLS: readonly Tool[] = [
   listPatterns,
   updateSettings,
   createType,
-  renameType,
+  editType,
   deleteType,
   createPattern,
   updatePattern,

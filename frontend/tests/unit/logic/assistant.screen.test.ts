@@ -1,4 +1,4 @@
-import { ASSISTANT_TEXTS_EN, ASSISTANT_TEXTS_IT, type AssistantMessage, type AssistantProposal, type AssistantReply } from '@shared-calendar/shared';
+import { ASSISTANT_TEXTS_EN, ASSISTANT_TEXTS_IT, type ApiErrorCode, type AssistantMessage, type AssistantProposal, type AssistantReply } from '@shared-calendar/shared';
 import { ReplaySubject } from 'rxjs';
 import { COULD_NOT_FINISH } from '../../../src/logic/assistant.model';
 import { AssistantScreen, type AssistantCalls, type AssistantState } from '../../../src/logic/assistant.screen';
@@ -45,7 +45,7 @@ const NONE = reply({ conversationId: null, language: null, remainingToday: 10 })
 const working = (over: Partial<AssistantReply> = {}) => reply({ status: 'working', activity: 'Looking at the calendar…', ...over });
 const waiting = (over: Partial<AssistantReply> = {}) => reply({ status: 'awaiting_confirmation', proposal: proposal(null), ...over });
 
-function screenOf() {
+function screenOf(role: 'admin' | 'user' = 'user') {
   const outcome$ = new ReplaySubject<AssistantOutcome>(1);
   const service = {
     outcome$: outcome$.asObservable(),
@@ -56,7 +56,7 @@ function screenOf() {
     confirm: vi.fn<AssistantCalls['confirm']>(),
     decline: vi.fn<AssistantCalls['decline']>(),
   };
-  const screen = new AssistantScreen(service);
+  const screen = new AssistantScreen(service, role);
   const states: AssistantState[] = [];
   screen.assistant$.subscribe((s) => states.push(s)); // the view subscribes first
   let changes = 0;
@@ -810,5 +810,27 @@ describe('AssistantScreen', () => {
       answered('load', NONE);
       expect(last()).toEqual({ ...START, open: true, canSend: true, remaining: '10 messages left today' });
     });
+  });
+});
+
+describe('AssistantScreen: the outcome of a refused change, for the role', () => {
+  const refusedWith = (error: ApiErrorCode) => reply({ proposal: { ...proposal(null), actions: [{ summary: 'change 1', outcome: 'refused', error }] }, messages: [message(2, 'assistant', 'Not done.')] });
+
+  it("the Administrator's panel says user_busy and a full time in the Administrator's words", () => {
+    const { screen, opened, answered, last } = screenOf('admin');
+    opened(waiting());
+    screen.confirm();
+    answered('confirm', refusedWith('user_busy'));
+    expect(last().proposal!.actions[0]!.outcome).toBe('Not done. This User already has an appointment at this time.');
+    answered('confirm', refusedWith('slot_taken'));
+    expect(last().proposal!.actions[0]!.outcome).toBe('Not done. This time is full: there is no place left.');
+  });
+
+  it("a User's panel keeps the User's sentences", () => {
+    const { screen, opened, answered, last } = screenOf('user');
+    opened(waiting());
+    screen.confirm();
+    answered('confirm', refusedWith('slot_taken'));
+    expect(last().proposal!.actions[0]!.outcome).toBe('Not done. This time is full: there is no place left. The calendar has been refreshed: please choose another time.');
   });
 });

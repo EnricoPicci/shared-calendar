@@ -1,7 +1,7 @@
 import { toInstant } from '@shared-calendar/shared';
-import { asked, askedInOrder, askedNothing, askedOnly, askedWith, either, noProposal, outcomes, proposalStarts, proposes, readsDay, type Check } from './checks';
+import { asked, askedInOrder, askedNothing, askedOnly, askedWith, either, noProposal, notBefore, outcomes, proposalStarts, proposes, readsDay, type Check } from './checks';
 import { weekdayName, written } from './dates';
-import { ANNA, BRUNO, type World } from './week';
+import { ANNA, BRUNO, POOL, type World } from './week';
 
 // The list of the evaluation (docs/CONVERSATIONAL_ARCHITECTURE.md section 12.3): what people ask
 // the assistant, in English and in Italian, each with what can be checked mechanically of the
@@ -15,6 +15,7 @@ export type Kind =
   | 'reading'
   | 'change'
   | 'blocking'
+  | 'capacity'
   | 'ambiguous'
   | 'web-pages'
   | 'other-role'
@@ -46,7 +47,7 @@ const DAY_READS = ['get_calendar', 'list_appointments'];
 export function evalRequests(world: World): EvalRequest[] {
   const { days, zone, types, patterns, appointments } = world;
   const [mon, tue, wed, thu, fri, sat, sun] = days.nextWeek;
-  const [mon2, tue2, , thu2] = days.weekAfter;
+  const [mon2, tue2, wed2, thu2] = days.weekAfter;
   const at = (date: string, time: string) => toInstant(date, time, zone);
   const week = { from: mon, to: sun };
   const visit = (start: string, end: string) => ({ start, end, typeId: types.visit });
@@ -91,7 +92,8 @@ export function evalRequests(world: World): EvalRequest[] {
     { id: 'change-move-for', kind: 'change', who: 'admin', language: 'en', messages: [`Move ${ANNA}'s appointment of Monday of next week to Tuesday of next week at 11:00.`], ends: 'proposal', checks: [proposes({ tool: 'change_appointment', path: appointments.annaMonday, body: { start: at(tue, '11:00') } })] },
     { id: 'change-setting', kind: 'change', who: 'admin', language: 'it', messages: ['Imposti il preavviso minimo per annullare a 48 ore.'], ends: 'proposal', checks: [proposes({ tool: 'update_settings', body: { cancellationNoticeHours: 48, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: null } })] },
     { id: 'change-type-new', kind: 'change', who: 'admin', language: 'en', messages: ['Create a new appointment type called eval Massage.'], ends: 'proposal', checks: [proposes({ tool: 'create_type', body: { name: 'eval Massage' } })] },
-    { id: 'change-type-rename', kind: 'change', who: 'admin', language: 'it', messages: ['Rinomini il tipo eval Lesson in eval Lezione.'], ends: 'proposal', checks: [proposes({ tool: 'rename_type', path: types.lesson, body: { name: 'eval Lezione' } }), asked('list_types')] },
+    // The capacity is not sent: the edit changes the name alone.
+    { id: 'change-type-rename', kind: 'change', who: 'admin', language: 'it', messages: ['Rinomini il tipo eval Lesson in eval Lezione.'], ends: 'proposal', checks: [proposes({ tool: 'edit_type', path: types.lesson, body: { name: 'eval Lezione', capacity: undefined } }), asked('list_types')] },
     { id: 'change-pattern-new', kind: 'change', who: 'admin', language: 'en', messages: [`Open eval Visit every Saturday from 9:00 to 12:00, from ${written(sat, 'en')} on.`], ends: 'proposal', checks: [proposes({ tool: 'create_pattern', body: { weekday: 6, start: '09:00', end: '12:00', typeId: types.visit, validFrom: sat, validUntil: null } })] },
     { id: 'change-pattern-delete', kind: 'change', who: 'admin', language: 'it', messages: ["Elimini l'orario settimanale del giovedì pomeriggio."], ends: 'proposal', checks: [proposes({ tool: 'delete_pattern', path: patterns['lesson-4'] }), asked('list_patterns')] },
     { id: 'change-day-hours', kind: 'change', who: 'admin', language: 'en', messages: ['On Friday of next week, for that day only, open from 10:00 to 12:00 for eval Visit instead of the usual hours.'], ends: 'proposal', checks: [hours(fri, visit('10:00', '12:00'))] },
@@ -110,9 +112,29 @@ export function evalRequests(world: World): EvalRequest[] {
     // request that confirms.
     { id: 'block-over-appointment', kind: 'blocking', who: 'admin', language: 'it', messages: ['Blocchi martedì della settimana prossima dalle 9:00 alle 11:00.', 'Proponga comunque la modifica, anche se ci sono appuntamenti.'], ends: 'proposal', checks: [hours(tue, visit('11:00', '13:00'), lesson('15:00', '18:00')), outcomes('refused:availability_conflict')], confirm: ['set_date_override'], hand: `P5. The day as it was: 09:00-13:00 eval Visit with ${BRUNO} at 09:00, 15:00-18:00 eval Lesson. Asked: 09:00-11:00. After the refusal it should name the appointment in the way.` },
 
+    // ── The capacity of a type ────────────────────────────────────────────────────────────────
+    // The pool's day: 15:00 holds eval-anna and eval-bruno (one place of three left), 16:00 is
+    // free (three). Thursday of next week at 15:00 is eval-anna's eval Lesson, a type of one
+    // place: full.
+    { id: 'capacity-free', kind: 'capacity', who: 'anna', language: 'en', messages: [`What is free for the ${POOL} on ${written(wed2, 'en')}?`], ends: 'answer', checks: reading(readsDay('get_calendar', wed2)), hand: 'It should say the places: 15:00 with one place left (she holds one of the others), 16:00 with three. It must not name who holds the places.' },
+    { id: 'capacity-edit', kind: 'capacity', who: 'admin', language: 'it', messages: [`La ${POOL} ora può ospitare 5 persone.`], ends: 'proposal', checks: [proposes({ tool: 'edit_type', path: types.pool, body: { name: POOL, capacity: 5 } })] },
+    { id: 'capacity-two', kind: 'capacity', who: 'admin', language: 'en', messages: [`Book ${ANNA} and ${BRUNO} for the ${POOL} on ${written(wed2, 'en')} at 16:00.`], ends: 'proposal', checks: [proposes({ tool: 'book_appointment', body: { username: ANNA, start: at(wed2, '16:00') } }, { tool: 'book_appointment', body: { username: BRUNO, start: at(wed2, '16:00') } })] },
+    { id: 'capacity-full-user', kind: 'capacity', who: 'bruno', language: 'it', messages: ['Mi prenoti giovedì della settimana prossima alle 15:00.'], ends: 'answer', checks: [noProposal(), askedOnly(...USER_TOOLS)], hand: 'It should say the time is full and offer other times; it must offer no booking over the capacity.' },
+    {
+      id: 'capacity-full-admin',
+      kind: 'capacity',
+      who: 'admin',
+      language: 'en',
+      messages: [`Book ${BRUNO} on Thursday of next week at 15:00.`, 'Book it anyway, over the capacity.'],
+      ends: 'proposal',
+      checks: [proposes({ tool: 'book_appointment', body: { username: BRUNO, start: at(thu, '15:00'), overbook: true } }), notBefore(1, 'book_appointment', { overbook: true })],
+      hand: 'The first answer should say the time is full and that it can be booked over the capacity if wanted.',
+    },
+    { id: 'capacity-busy', kind: 'capacity', who: 'admin', language: 'it', messages: [`Prenoti ${ANNA} per la ${POOL} ${written(wed2, 'it')} alle 15:00.`], ends: 'answer', checks: [noProposal()], hand: `${ANNA} already holds a place at 15:00: it should say so, and may offer to move that appointment.` },
+
     // ── Ambiguity: a question, and no proposal ────────────────────────────────────────────────
     { id: 'ambiguous-something', kind: 'ambiguous', who: 'anna', language: 'en', messages: ['Book me something next week.'], ends: 'answer', checks: [noProposal(), askedOnly(...READS)], hand: 'It should ask which day and time, or offer the free times.' },
-    { id: 'ambiguous-which', kind: 'ambiguous', who: 'anna', language: 'it', messages: ['Sposti il mio appuntamento a mercoledì della settimana prossima alle 10:00.'], ends: 'answer', checks: [noProposal(), askedOnly(...READS)], hand: 'She has two appointments: it should ask which one.' },
+    { id: 'ambiguous-which', kind: 'ambiguous', who: 'anna', language: 'it', messages: ['Sposti il mio appuntamento a mercoledì della settimana prossima alle 10:00.'], ends: 'answer', checks: [noProposal(), askedOnly(...READS)], hand: 'She has three appointments: it should ask which one.' },
     { id: 'ambiguous-hours', kind: 'ambiguous', who: 'admin', language: 'en', messages: ['Close the Tuesday afternoon.'], ends: 'answer', checks: [noProposal(), askedOnly(...READS)], hand: 'It should ask whether every Tuesday or one date.' },
 
     // ── What the web pages keep ───────────────────────────────────────────────────────────────

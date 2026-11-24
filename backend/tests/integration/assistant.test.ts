@@ -106,6 +106,8 @@ const JOURNEY_TYPES = [
   'assistant blocked journey',
   'assistant pattern journey',
   'assistant filling journey',
+  'assistant places journey',
+  'assistant type capacity journey',
 ];
 
 // Removes what the journeys made in the calendar under one of their type names, when it is there:
@@ -1819,5 +1821,134 @@ describe('a conversation started under other instructions is over (4.3)', () => 
     expect(items.filter((item) => item.SK.startsWith(`MSG#${oldId}#`)).length).toBeGreaterThan(0);
     const read = (await conversation(token)).body;
     expect((read?.messages as unknown[]).length).toBe(2);
+  });
+});
+
+// The last text of Claude in a reply. The fake's closing answer of these journeys is the last
+// result of a tool, word for word: what Claude was given.
+const lastSaid = (body: Record<string, unknown> | undefined) => (body?.messages as { from: string; text: string }[]).filter((message) => message.from === 'assistant').at(-1)?.text ?? '';
+
+// Explained in simple words in docs/journeys/backend/assistant-places.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('the places of a type through the assistant (3, 5.5 rule 4, 7.3)', () => {
+  const TYPE = 'assistant places journey';
+  // The three Users the fake books, by the usernames its answer file holds.
+  const ONE = 'chat-cap-one';
+  const TWO = 'chat-cap-two';
+  const THREE = 'chat-cap-three';
+  // The day the fake asks for: {{date+20}} of its answer file, at 05:00, under a type of
+  // capacity 2. 05:00 to 06:00 of that day are hours no other journey opens.
+  let day: string;
+  const booking = (username: string, over: { people: number; capacity: number } | null = null) =>
+    assistantTexts('en').changes.bookAppointment({ date: day, start: '05:00', end: '06:00', type: TYPE, note: null, secondTime: false, username, over });
+  const bookedThere = async () => {
+    const res = await api('GET', `/calendar/appointments?from=${day}&to=${day}`, adminToken);
+    return (res.body?.appointments as Booked[]).filter((a) => a.typeName === TYPE && a.status === 'booked').map((a) => a.username).sort();
+  };
+  const settle = async (summaries: string[]) => {
+    const res = await say(adminToken, summaries.length === 2 ? 'fake: book both Users of the capacity journey' : 'fake: book the third User of the capacity journey anyway');
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'awaiting_confirmation', proposal: proposalOf(summaries) });
+    const confirmed = await confirm(adminToken, (res.body?.proposal as { proposalId: string }).proposalId);
+    expect(confirmed.status).toBe(200);
+    expect(confirmed.body).toMatchObject({ status: 'idle', proposal: proposalOf(summaries, summaries.map(() => ['done', null])) });
+  };
+
+  beforeAll(async () => {
+    day = await dayOfJourney(20);
+    for (const username of [ONE, TWO, THREE]) await newUser(username);
+    await removeFromCalendar(TYPE);
+    const type = await api('POST', '/calendar/types', adminToken, { name: TYPE, capacity: 2 });
+    expect(type.status).toBe(201);
+    expect((await api('POST', '/calendar/windows', adminToken, { date: day, start: '05:00', end: '06:00', typeId: type.body?.typeId })).status).toBe(201);
+    await forgetDailyUse(subOf(adminToken));
+    expect((await startAgain(adminToken)).status).toBe(204);
+  });
+
+  afterAll(async () => {
+    await startAgain(adminToken);
+    await removeFromCalendar(TYPE);
+    for (const username of [ONE, TWO, THREE]) await removeUserIfPresent(username);
+  });
+
+  it('get_calendar gives the places left of a free slot, and the capacity of its window', async () => {
+    const { body } = await sayAndRead(adminToken, 'fake: what is free on the day of the capacity journey?');
+    const given = JSON.parse(lastSaid(body)) as { days: { date: string; windows: object[]; freeSlots: string[] }[] };
+    const [ours] = given.days.filter((d) => d.date === day);
+    expect(ours?.windows).toContainEqual(expect.objectContaining({ start: '05:00', end: '06:00', type: TYPE, capacity: 2 }));
+    expect(ours?.freeSlots).toContain('05:00 (2 of 2 places left)');
+  });
+
+  it('the same User twice into one slot in one answer is refused, and nothing is proposed', async () => {
+    const { body } = await sayAndRead(adminToken, 'fake: book the first User of the capacity journey twice');
+    expect(body).toMatchObject({ status: 'idle', proposal: null });
+    expect(JSON.parse(lastSaid(body))).toMatchObject({ error: 'same_thing_twice', message: expect.stringContaining('a person holds one place at a time') });
+    expect(await bookedThere()).toEqual([]);
+  });
+
+  it('two Users into the slot of two places in one answer make one proposal, and confirm books both', async () => {
+    await settle([booking(ONE), booking(TWO)]);
+    expect(await bookedThere()).toEqual([ONE, TWO]);
+  });
+
+  it('a third User into the full time without "overbook" is refused before any proposal, with the words that the Administrator may go over the capacity', async () => {
+    const { body } = await sayAndRead(adminToken, 'fake: book the third User of the capacity journey');
+    expect(body).toMatchObject({ status: 'idle', proposal: null });
+    expect(JSON.parse(lastSaid(body))).toMatchObject({ error: 'no_free_slot', message: expect.stringContaining('It can be booked over the capacity if the person asks for it') });
+  });
+
+  it('the same booking with "overbook" is proposed with the people it will hold, and confirm books it over the capacity', async () => {
+    const over = booking(THREE, { people: 3, capacity: 2 });
+    expect(over).toContain('Over the capacity: it will hold 3 people, its capacity is 2.');
+    await settle([over]);
+    expect(await bookedThere()).toEqual([ONE, THREE, TWO].sort());
+    const requests = (await storedToolRequests(adminToken)).filter((request) => request.name === 'book_appointment');
+    expect(requests.map((request) => (request.input as { overbook?: boolean }).overbook)).toEqual([undefined, undefined, undefined, undefined, undefined, true]);
+  });
+
+  it("a User who already holds a place at that time is refused at the proposal: user_busy, naming that appointment's time and type", async () => {
+    const { body } = await sayAndRead(adminToken, 'fake: book the first User of the capacity journey again');
+    expect(body).toMatchObject({ status: 'idle', proposal: null });
+    expect(JSON.parse(lastSaid(body))).toMatchObject({ error: 'user_busy', message: expect.stringContaining(`${ONE} already has an appointment at this time: on ${day} from 05:00 to 06:00 (${TYPE})`) });
+    expect(await bookedThere()).toEqual([ONE, THREE, TWO].sort());
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/assistant-type-capacity.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('a type created with a capacity and edited through the assistant (3, 5.4)', () => {
+  const TYPE = 'assistant type capacity journey';
+  const typeNamed = async () => ((await api('GET', '/calendar/types', adminToken)).body?.types as { name: string; capacity: number }[]).find((t) => t.name === TYPE);
+  const proposeAndConfirm = async (text: string, summary: string) => {
+    const { body } = await sayAndRead(adminToken, text);
+    expect(body).toMatchObject({ status: 'awaiting_confirmation', proposal: proposalOf([summary]) });
+    const confirmed = await confirm(adminToken, (body?.proposal as { proposalId: string }).proposalId);
+    expect(confirmed.body).toMatchObject({ status: 'idle', proposal: proposalOf([summary], [['done', null]]) });
+  };
+
+  beforeAll(async () => {
+    await removeFromCalendar(TYPE);
+    await forgetDailyUse(subOf(adminToken));
+    expect((await startAgain(adminToken)).status).toBe(204);
+  });
+
+  afterAll(async () => {
+    await startAgain(adminToken);
+    await removeFromCalendar(TYPE);
+  });
+
+  it('create_type with a capacity: the proposal says how many people, and confirm creates it so', async () => {
+    const summary = assistantTexts('en').changes.createType({ name: TYPE, capacity: 4 });
+    expect(summary).toBe(`Create the appointment type "${TYPE}", for 4 people at the same time.`);
+    await proposeAndConfirm('fake: create the type of the capacity journey for four people', summary);
+    expect(await typeNamed()).toMatchObject({ name: TYPE, capacity: 4 });
+  });
+
+  it('edit_type with a capacity alone: the proposal says from and to, and confirm keeps the name', async () => {
+    const summary = assistantTexts('en').changes.editType({ name: TYPE, newName: null, capacity: { from: 4, to: 2 }, bookedAbove: false });
+    expect(summary).toBe(`Change the appointment type "${TYPE}": capacity from 4 to 2.`);
+    await proposeAndConfirm('fake: let the type of the capacity journey hold two people', summary);
+    expect(await typeNamed()).toMatchObject({ name: TYPE, capacity: 2 });
+    expect((await storedToolRequests(adminToken)).map((request) => request.name)).toEqual(['create_type', 'list_types', 'edit_type']);
   });
 });

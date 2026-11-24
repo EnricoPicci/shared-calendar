@@ -45,8 +45,8 @@ export type AssistantTexts = {
     changeAppointment: (move: MoveSummary) => string;
     setAppointmentNote: (change: NoteSummary) => string;
     updateSettings: (change: SettingsSummary) => string;
-    createType: (type: { name: string }) => string;
-    renameType: (rename: { from: string; to: string }) => string;
+    createType: (type: TypeSummary) => string;
+    editType: (edit: TypeEditSummary) => string;
     deleteType: (type: { name: string }) => string;
     createPattern: (pattern: PatternSummary) => string;
     updatePattern: (change: { from: PatternSummary; to: PatternSummary }) => string;
@@ -68,7 +68,14 @@ export type AssistantTexts = {
 // `secondTime` marks the second of the two times a clock shows the same hour on the night the
 // clocks go back. `username` is the User the appointment is for when the Administrator books it,
 // and null when a User books for themself: the sentence then names nobody.
-export type BookingSummary = { date: string; start: string; end: string; type: string; note: string | null; secondTime: boolean; username: string | null };
+// `over` is set when the Administrator books a time that is full, over the capacity of its type
+// (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13); null or absent otherwise.
+export type BookingSummary = { date: string; start: string; end: string; type: string; note: string | null; secondTime: boolean; username: string | null; over?: OverCapacity | null };
+
+// A booking or a move over the capacity, as its proposal says it: how many people the time will
+// hold with it, counted at their peak (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02), and the capacity
+// of the time's type.
+export type OverCapacity = { people: number; capacity: number };
 
 // An existing appointment as a proposal names it: its day as a local date, its two wall-clock
 // times and the name of its type. `username` is whose it is, given only when the person asked is
@@ -78,8 +85,19 @@ export type AppointmentSummary = { date: string; start: string; end: string; typ
 
 // What the proposal of a move shows: the appointment as it is, and the slot it would go to, with
 // the type of the hours that slot lies in, which may differ from the appointment's. `secondTime`
-// is as in a booking.
-export type MoveSummary = { appointment: AppointmentSummary; to: { date: string; start: string; end: string; type: string; secondTime: boolean } };
+// and `over` are as in a booking.
+export type MoveSummary = { appointment: AppointmentSummary; to: { date: string; start: string; end: string; type: string; secondTime: boolean; over?: OverCapacity | null } };
+
+// A new appointment type as its proposal names it: its name and how many people it holds at the
+// same time (docs/SHARED_CALENDAR_SPEC.md R-TYPE-05).
+export type TypeSummary = { name: string; capacity: number };
+
+// What the proposal of an edited type shows: the type by the name it has, and what changes, the
+// name, the capacity or both; what stays as it is is null. `bookedAbove` is true when the capacity
+// is lowered below the most people already booked at one time in the type's upcoming
+// appointments: nobody is cancelled (docs/SHARED_CALENDAR_SPEC.md R-TYPE-05), and the proposal
+// says so.
+export type TypeEditSummary = { name: string; newName: string | null; capacity: { from: number; to: number } | null; bookedAbove: boolean };
 
 // What the proposal of a note shows: the appointment, the note as it would become (null: no note)
 // and the note it has, which the new one replaces.

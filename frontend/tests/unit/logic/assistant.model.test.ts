@@ -1,4 +1,4 @@
-import { ASSISTANT_LIMITS, ASSISTANT_TEXTS_EN, ASSISTANT_TEXTS_IT, type AssistantMessage, type AssistantProposal, type AssistantReply } from '@shared-calendar/shared';
+import { ASSISTANT_LIMITS, ASSISTANT_TEXTS_EN, ASSISTANT_TEXTS_IT, type ApiErrorCode, type AssistantMessage, type AssistantProposal, type AssistantReply } from '@shared-calendar/shared';
 import {
   changeMade,
   confirmTrouble,
@@ -99,18 +99,18 @@ describe('the assistant\'s model', () => {
 
   describe('proposalShown', () => {
     it('no proposal: null', () => {
-      expect(proposalShown(null, 'idle', false)).toBeNull();
+      expect(proposalShown(null, 'idle', false, 'user')).toBeNull();
     });
 
     it('waiting: the server\'s words, no outcome, the buttons offered; out of use while a call is away', () => {
-      expect(proposalShown(PROPOSAL, 'awaiting_confirmation', false)).toEqual({
+      expect(proposalShown(PROPOSAL, 'awaiting_confirmation', false, 'user')).toEqual({
         question: 'Shall I make this change?',
         confirmLabel: 'Confirm',
         declineLabel: "Don't",
         actions: [{ summary: PROPOSAL.actions[0]!.summary, outcome: '' }],
         buttons: 'offered',
       });
-      expect(proposalShown(PROPOSAL, 'awaiting_confirmation', true)!.buttons).toBe('disabled');
+      expect(proposalShown(PROPOSAL, 'awaiting_confirmation', true, 'user')!.buttons).toBe('disabled');
     });
 
     it('settled: no button, and each change with what became of it', () => {
@@ -123,7 +123,7 @@ describe('the assistant\'s model', () => {
         ],
       };
       for (const status of ['idle', 'working'] as const) {
-        expect(proposalShown(settled, status, status === 'working')).toMatchObject({
+        expect(proposalShown(settled, status, status === 'working', 'user')).toMatchObject({
           buttons: 'none',
           actions: [
             { summary: 'one', outcome: 'Done' },
@@ -134,8 +134,19 @@ describe('the assistant\'s model', () => {
       }
     });
 
+    it("a refused change is said for the person's role: the Administrator reads the User booked for is busy, and a full time without the refresh the panel does not do", () => {
+      const refused = (error: ApiErrorCode): AssistantProposal => ({ ...PROPOSAL, actions: [{ summary: 'one', outcome: 'refused', error }] });
+      const words = (error: ApiErrorCode, role: 'admin' | 'user') => proposalShown(refused(error), 'idle', false, role)!.actions[0]!.outcome;
+      expect(words('user_busy', 'admin')).toBe('Not done. This User already has an appointment at this time.');
+      expect(words('slot_taken', 'admin')).toBe('Not done. This time is full: there is no place left.');
+      expect(words('user_busy', 'user')).toBe('Not done. You already have an appointment at this time. To move it, change that appointment instead.');
+      expect(words('slot_taken', 'user')).toBe('Not done. This time is full: there is no place left. The calendar has been refreshed: please choose another time.');
+      // Every other code reads the same for both roles.
+      expect(words('booking_in_past', 'admin')).toBe(words('booking_in_past', 'user'));
+    });
+
     it('a proposal a confirmation took, read while it is under way: no button and no outcome yet', () => {
-      expect(proposalShown(PROPOSAL, 'working', false)).toMatchObject({ buttons: 'none', actions: [{ outcome: '' }] });
+      expect(proposalShown(PROPOSAL, 'working', false, 'user')).toMatchObject({ buttons: 'none', actions: [{ outcome: '' }] });
     });
   });
 
