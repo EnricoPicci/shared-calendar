@@ -47,7 +47,7 @@ describe('calendarView: the 11.6 example', () => {
     expect(JSON.stringify(view())).toBe(specExample());
   });
 
-  it('gives the Administrator the same day with sources, hasOverride, no busy, every appointment with its username and no cancellableUntil', () => {
+  it('gives the Administrator the same day with sources, hasOverride, the full slots with no place left (D30), no busy, every appointment with its username and no cancellableUntil', () => {
     const v = admin();
     expect(v.days).toEqual([
       {
@@ -58,12 +58,14 @@ describe('calendarView: the 11.6 example', () => {
           { start: '2026-11-16T13:00:00.000Z', end: '2026-11-16T17:00:00.000Z', typeId: POOL, typeName: 'Swimming Pool', source: 'pattern', sourceId: P_POOL },
         ],
         slots: [
-          { start: '2026-11-16T07:00:00.000Z', end: '2026-11-16T08:00:00.000Z', typeId: STUDIO },
-          { start: '2026-11-16T09:00:00.000Z', end: '2026-11-16T10:00:00.000Z', typeId: STUDIO },
-          { start: '2026-11-16T13:00:00.000Z', end: '2026-11-16T14:00:00.000Z', typeId: POOL },
-          { start: '2026-11-16T14:00:00.000Z', end: '2026-11-16T15:00:00.000Z', typeId: POOL },
-          { start: '2026-11-16T15:00:00.000Z', end: '2026-11-16T16:00:00.000Z', typeId: POOL },
-          { start: '2026-11-16T16:00:00.000Z', end: '2026-11-16T17:00:00.000Z', typeId: POOL },
+          { start: '2026-11-16T07:00:00.000Z', end: '2026-11-16T08:00:00.000Z', typeId: STUDIO, capacity: 1, placesLeft: 1 },
+          { start: '2026-11-16T08:00:00.000Z', end: '2026-11-16T09:00:00.000Z', typeId: STUDIO, capacity: 1, placesLeft: 0 },
+          { start: '2026-11-16T09:00:00.000Z', end: '2026-11-16T10:00:00.000Z', typeId: STUDIO, capacity: 1, placesLeft: 1 },
+          { start: '2026-11-16T10:00:00.000Z', end: '2026-11-16T11:00:00.000Z', typeId: STUDIO, capacity: 1, placesLeft: 0 },
+          { start: '2026-11-16T13:00:00.000Z', end: '2026-11-16T14:00:00.000Z', typeId: POOL, capacity: 1, placesLeft: 1 },
+          { start: '2026-11-16T14:00:00.000Z', end: '2026-11-16T15:00:00.000Z', typeId: POOL, capacity: 1, placesLeft: 1 },
+          { start: '2026-11-16T15:00:00.000Z', end: '2026-11-16T16:00:00.000Z', typeId: POOL, capacity: 1, placesLeft: 1 },
+          { start: '2026-11-16T16:00:00.000Z', end: '2026-11-16T17:00:00.000Z', typeId: POOL, capacity: 1, placesLeft: 1 },
         ],
         busy: [],
         hasOverride: false,
@@ -173,10 +175,19 @@ describe('calendarView: which slots are offered', () => {
     expect(slotStarts(view(wed))).toEqual([]);
   });
 
-  it('takes away a slot partly occupied by the Administrator’s 10:00–10:30 booking, for both roles (R-SLOT-05)', () => {
+  it('takes away from a User a slot partly occupied by the Administrator’s 10:00–10:30 booking; the Administrator sees it with no place left (R-SLOT-05, D30)', () => {
     const half = appt('sub-bob', BOB_APPT, '2026-11-16T09:00:00.000Z', '2026-11-16T09:30:00.000Z');
     expect(localSlots(view({ appointments: [half] }))).toEqual(['08:00', '09:00', '11:00', '14:00', '15:00', '16:00', '17:00']);
-    expect(localSlots(admin({ appointments: [half] }))).toEqual(['08:00', '09:00', '11:00', '14:00', '15:00', '16:00', '17:00']);
+    expect(admin({ appointments: [half] }).days[0]!.slots.map((s) => [localTimeOf(s.start, ZONE), s.placesLeft])).toEqual([
+      ['08:00', 1],
+      ['09:00', 1],
+      ['10:00', 0],
+      ['11:00', 1],
+      ['14:00', 1],
+      ['15:00', 1],
+      ['16:00', 1],
+      ['17:00', 1],
+    ]);
     expect(view({ appointments: [half] }).days[0]!.busy).toEqual([{ start: '2026-11-16T09:00:00.000Z', end: '2026-11-16T09:30:00.000Z' }]);
   });
 
@@ -333,5 +344,122 @@ describe('calendarView: clock changes and the range', () => {
       ['2026-11-21', 6],
       ['2026-11-22', 7],
     ]);
+  });
+});
+
+// The capacity of a type in the view: the example's Monday, the Swimming Pool open 14:00–18:00
+// local (13:00Z–17:00Z). `inPool` books a User there, `capacity` is the Pool's.
+const withPool = (capacity: number) => [
+  { typeId: STUDIO, name: 'Studio', capacity: 1 },
+  { typeId: POOL, name: 'Swimming Pool', capacity },
+];
+const inPool = (who: string, n: number, start = '2026-11-16T13:00:00.000Z', end = '2026-11-16T14:00:00.000Z') =>
+  appt(`sub-${who}`, `01M70N00000000000000000P${String(n).padStart(2, '0')}`, start, end, { typeId: POOL, typeName: 'Swimming Pool', username: who });
+const poolSlots = (v: CalendarView) =>
+  v.days[0]!.slots.filter((s) => s.typeId === POOL).map((s) => [localTimeOf(s.start, ZONE), s.capacity, s.placesLeft]);
+const asUser = (who: string, more: Partial<CalendarViewInput>) => view({ callerSub: `sub-${who}`, ...more });
+
+// Test names: R-… rules, decisions D… and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md
+// (scenarios in its section 18.3).
+describe('calendarView: the capacity of a type (R-SLOT-02 to R-SLOT-06)', () => {
+  it('AC-37: alice and bob in a capacity of 3: carol gets the slot 13:00Z with capacity 3 and 1 place left, and nothing busy', () => {
+    const v = asUser('carol', { types: withPool(3), appointments: [inPool('alice', 1), inPool('bob', 2)] });
+    expect(poolSlots(v)).toEqual([
+      ['14:00', 3, 1],
+      ['15:00', 3, 3],
+      ['16:00', 3, 3],
+      ['17:00', 3, 3],
+    ]);
+    expect(v.days[0]!.busy).toEqual([]);
+    expect(JSON.stringify(v)).not.toContain('alice');
+  });
+
+  it('AC-38: three people: dan does not get 13:00Z and sees 13:00Z–14:00Z busy', () => {
+    const v = asUser('dan', { types: withPool(3), appointments: [inPool('alice', 1), inPool('bob', 2), inPool('carol', 3)] });
+    expect(poolSlots(v).map(([time]) => time)).toEqual(['15:00', '16:00', '17:00']);
+    expect(v.days[0]!.busy).toEqual([{ start: '2026-11-16T13:00:00.000Z', end: '2026-11-16T14:00:00.000Z' }]);
+  });
+
+  it('AC-39: four people, one forced: the Administrator gets 13:00Z with no place left, never a negative number (D30)', () => {
+    const four = [inPool('alice', 1), inPool('bob', 2), inPool('carol', 3), inPool('dan', 4)];
+    expect(poolSlots(admin({ types: withPool(3), appointments: four }))[0]).toEqual(['14:00', 3, 0]);
+  });
+
+  it('AC-43: the capacity lowered to 1 under three people: the Administrator’s 13:00Z has 0 places, 14:00Z has 1', () => {
+    const three = [inPool('alice', 1), inPool('bob', 2), inPool('carol', 3)];
+    expect(poolSlots(admin({ types: withPool(1), appointments: three })).slice(0, 2)).toEqual([
+      ['14:00', 1, 0],
+      ['15:00', 1, 1],
+    ]);
+  });
+
+  it('R-SLOT-03: a User never gets a slot that overlaps their own appointment, even with places left; others get it', () => {
+    const more = { types: withPool(3), appointments: [inPool('alice', 1)] };
+    expect(poolSlots(asUser('alice', more))[0]).toEqual(['15:00', 3, 3]);
+    expect(poolSlots(asUser('bob', more))[0]).toEqual(['14:00', 3, 2]);
+  });
+
+  it('D25: two halves that touch leave a place in a capacity of 2; two that overlap fill it', () => {
+    const touching = [inPool('alice', 1, '2026-11-16T13:00:00.000Z', '2026-11-16T13:30:00.000Z'), inPool('bob', 2, '2026-11-16T13:30:00.000Z', '2026-11-16T14:00:00.000Z')];
+    expect(poolSlots(asUser('carol', { types: withPool(2), appointments: touching }))[0]).toEqual(['14:00', 2, 1]);
+    expect(asUser('carol', { types: withPool(2), appointments: touching }).days[0]!.busy).toEqual([]);
+    const overlapping = [touching[0]!, inPool('bob', 2, '2026-11-16T13:15:00.000Z', '2026-11-16T14:00:00.000Z')];
+    expect(poolSlots(asUser('carol', { types: withPool(2), appointments: overlapping }))[0]).toEqual(['15:00', 2, 2]);
+    expect(poolSlots(admin({ types: withPool(2), appointments: overlapping }))[0]).toEqual(['14:00', 2, 0]);
+  });
+
+  describe('R-SLOT-06: busy is the time that is full', () => {
+    it('only the part at the capacity is busy: 13:30Z–14:00Z where two people meet in a capacity of 2', () => {
+      const more = { types: withPool(2), appointments: [inPool('bob', 1), inPool('carol', 2, '2026-11-16T13:30:00.000Z', '2026-11-16T14:30:00.000Z')] };
+      const v = asUser('dan', more);
+      expect(v.days[0]!.busy).toEqual([{ start: '2026-11-16T13:30:00.000Z', end: '2026-11-16T14:00:00.000Z' }]);
+      expect(poolSlots(v)[0]).toEqual(['15:00', 2, 1]);
+    });
+
+    it('with a capacity of 1, two other people’s appointments that touch make one interval', () => {
+      const carol = appt('sub-carol', '01M70N0000000000000000000C', '2026-11-16T09:00:00.000Z', '2026-11-16T10:00:00.000Z');
+      expect(view({ appointments: [BOB_09, carol] }).days[0]!.busy).toEqual([{ start: '2026-11-16T08:00:00.000Z', end: '2026-11-16T10:00:00.000Z' }]);
+    });
+
+    it('takes the User’s own times out, also from the middle of a full time', () => {
+      // bob and carol fill 13:00Z–15:00Z in a capacity of 2; alice was booked into it for 13:30Z–14:00Z.
+      const more = {
+        types: withPool(2),
+        appointments: [
+          inPool('bob', 1, '2026-11-16T13:00:00.000Z', '2026-11-16T15:00:00.000Z'),
+          inPool('carol', 2, '2026-11-16T13:00:00.000Z', '2026-11-16T15:00:00.000Z'),
+          appt('sub-alice', ALICE_APPT, '2026-11-16T13:30:00.000Z', '2026-11-16T14:00:00.000Z', { typeId: POOL }),
+        ],
+      };
+      expect(view(more).days[0]!.busy).toEqual([
+        { start: '2026-11-16T13:00:00.000Z', end: '2026-11-16T13:30:00.000Z' },
+        { start: '2026-11-16T14:00:00.000Z', end: '2026-11-16T15:00:00.000Z' },
+      ]);
+    });
+
+    it('counts the User’s own appointment among the people: alice and bob fill a capacity of 2, so carol sees busy and alice does not', () => {
+      const more = { types: withPool(2), appointments: [inPool('alice', 1), inPool('bob', 2)] };
+      expect(asUser('carol', more).days[0]!.busy).toEqual([{ start: '2026-11-16T13:00:00.000Z', end: '2026-11-16T14:00:00.000Z' }]);
+      expect(asUser('alice', more).days[0]!.busy).toEqual([]);
+      expect(asUser('bob', more).days[0]!.busy).toEqual([]);
+    });
+
+    it('applies a capacity of 1 where no window holds the time: an appointment left outside the availability is busy', () => {
+      // 12:00–13:00 local lies in no window of the example; one appointment there fills it.
+      const outside = appt('sub-bob', BOB_APPT, '2026-11-16T11:00:00.000Z', '2026-11-16T12:00:00.000Z');
+      expect(view({ types: withPool(3), appointments: [outside] }).days[0]!.busy).toEqual([{ start: '2026-11-16T11:00:00.000Z', end: '2026-11-16T12:00:00.000Z' }]);
+    });
+
+    it('applies a capacity of 1 under the window of a deleted type', () => {
+      // The Pool's pattern is still there, its type is not: its window is left out.
+      const more = { types: [{ typeId: STUDIO, name: 'Studio', capacity: 1 }], appointments: [inPool('bob', 1)] };
+      expect(view(more).days[0]!.windows.map((w) => w.typeId)).toEqual([STUDIO]);
+      expect(view(more).days[0]!.busy).toEqual([{ start: '2026-11-16T13:00:00.000Z', end: '2026-11-16T14:00:00.000Z' }]);
+    });
+
+    it('gives the Administrator no busy, whatever the capacity', () => {
+      const three = [inPool('alice', 1), inPool('bob', 2), inPool('carol', 3)];
+      expect(admin({ types: withPool(3), appointments: three }).days[0]!.busy).toEqual([]);
+    });
   });
 });

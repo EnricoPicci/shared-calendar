@@ -16,12 +16,14 @@ import { validate } from '../lib/validation';
 //   2. the body: JSON, BookBody with the note (docs/SHARED_CALENDAR_SPEC.md R-BOOK-11) and the
 //      exact instant form (400);
 //   3. docs/SHARED_CALENDAR_SPEC.md R-BOOK-01 from the body: a User naming someone else (403), the
-//      Administrator without a `username` (400);
+//      Administrator without a `username` (400); then docs/SHARED_CALENDAR_SPEC.md R-BOOK-13, a User
+//      sending `overbook: true` (403);
 //   4. docs/SHARED_CALENDAR_SPEC.md R-BOOK-02, the times for the role (400);
 //   5. the Administrator's target through Cognito, before the lock: unknown (404), not a plain User
 //      (409 target_not_user). A User books for themself, on the `sub` of their token;
 //   6. under the lock, on the data read inside the attempt: docs/SHARED_CALENDAR_SPEC.md
-//      R-BOOK-03..07 and 09 (409);
+//      R-BOOK-03 to R-BOOK-06, R-BOOK-12, R-BOOK-07 (which the Administrator's `overbook` lifts)
+//      and R-BOOK-09 (409);
 //   7. docs/SHARED_CALENDAR_SPEC.md R-BOOK-10 in the transaction: a deleted-user marker for the
 //      `sub` (404).
 // One log line with the appointmentId on success and the lock attempts. Never the note, the body,
@@ -71,6 +73,12 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   if (role === 'admin' && named === undefined) {
     return done('invalid_request', error(400, 'invalid_request', 'Invalid input: username'), caller);
   }
+  // Only the Administrator may go over a type's capacity (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13);
+  // `overbook: false` from a User is the same as leaving it out.
+  const overbook = body.value.overbook === true;
+  if (role === 'user' && overbook) {
+    return done('forbidden', error(403, 'forbidden', 'Only the Administrator can book over the capacity'), caller);
+  }
 
   // The times for the role (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02): needs only the body and
   // the zone.
@@ -112,7 +120,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   };
   try {
     const { result, attempts } = await bookAppointment(booking, today, now, (state, settings) =>
-      checkBooking({ start: times.start, end: times.end, role, userId: target.sub, settings, state, now, today, zone: timeZone }),
+      checkBooking({ start: times.start, end: times.end, role, userId: target.sub, overbook, settings, state, now, today, zone: timeZone }),
     );
     const fields = { ...caller, ...targetField, lockAttempts: attempts };
     if (!result.ok) {

@@ -14,6 +14,7 @@ Ideas used here, explained once for all journeys:
 [availability types](../concepts.md#availability-types),
 [where a window comes from](../concepts.md#where-a-window-comes-from),
 [windows and slots](../concepts.md#windows-and-slots),
+[places in a slot](../concepts.md#places-in-a-slot),
 [`busy` and `appointments`](../concepts.md#busy-and-appointments-in-the-calendar-view).
 
 ## What this block proves
@@ -123,9 +124,11 @@ test checks that:
 
 - the window is there, but **without** the Administrator-only details (no `source`, no `sourceId`,
   no `hasOverride`);
-- the **free slots** are 09:00 and 11:00 only. The User's own 08:00 appointment and the other
-  User's 10:00 appointment are not free;
-- **10:00–11:00 shows as `busy`**: just a start time and an end time, nothing else;
+- the **free slots** are 09:00 and 11:00 only, each with `capacity` 1 and `placesLeft` 1 (the
+  type was made without a capacity, so it holds one person). The User's own 08:00 appointment
+  and the other User's 10:00 appointment are not free;
+- **10:00–11:00 shows as `busy`**: the hour is full, and `busy` gives just a start time and an
+  end time, nothing else;
 - the only appointment listed is **its own** 08:00 one, with the deadline until which it may still
   cancel or change it. Its own appointment is not in `busy`: it is already in `appointments`;
 - nothing in the whole answer mentions `fe-calendar-b`: not its name, not its appointment's id, not

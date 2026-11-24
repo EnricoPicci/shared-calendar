@@ -16,7 +16,7 @@ function slotOf(date: string, window: [string, string], slot: [string, string], 
     {
       date,
       windows: [{ start: z(window[0]), end: z(window[1]), typeId: STUDIO, typeName: 'Studio' }],
-      slots: [{ start: z(slot[0]), end: z(slot[1]), typeId: STUDIO }],
+      slots: [{ start: z(slot[0]), end: z(slot[1]), typeId: STUDIO, capacity: 1, placesLeft: 1 }],
     },
   ]);
   return weekModel(week, 'admin').days.find((day) => day.date === date)!.slots[0]!;

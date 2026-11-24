@@ -1,6 +1,7 @@
 # Shared Calendar: several people in one slot, a capacity per type (implementation plan)
 
-**Version:** v4 (2026-11-24): step u2 done, the shared contract in `shared/`; the response
+**Version:** v5 (2026-11-24): step u3 done, the back end; AC-15 answers `user_busy` (the Product
+Owner's decision), its page in step u5. v4 (2026-11-24): step u2 done, the shared contract in `shared/`; the response
 fields moved from step u2 to step u3 (the Product Owner's decision). v3 (2026-11-24): step u1 done, the rules in the governing documents
 (`docs/SHARED_CALENDAR_SPEC.md` v17, `docs/ARCHITECTURE.md` v15 open). v2 (2026-11-24): the four proposals of planning (F4 to F7) decided by the Product
 Owner, F6 changed: side by side up to three people. v1 (2026-11-24): the plan, after the Product
@@ -293,6 +294,83 @@ simultaneous, the example pair of K3, the night clocks go back).
 
 **Check:** the root `verify` with the journeys. No deployment.
 
+**As done (2026-11-24).** Changes under `shared/`, `backend/` (not `backend/template.yaml`),
+`docs/` and the front end's test fixtures only; nothing deployed, no `aws` command run. Brief
+`prompts/e13-step-u3-implementation.md`.
+
+- *Three decisions of the Product Owner at the start.* The front end's test data follow the
+  contract (fixtures only, nothing under `frontend/src`); the assistant keeps its behaviour, two
+  files adapted; `docs/ARCHITECTURE.md` describes the back end as it runs, the spec keeps its "not
+  built yet" until step u7.
+- *`shared/`:* `AvailabilityType.capacity`, `Slot.capacity`, `Slot.placesLeft` required in
+  `shared/src/calendar/types.ts`; `slotsOf` in `shared/src/calendar/rules.ts` answers
+  `SlotTimes` (a slot without the two numbers, which the view adds).
+- *`backend/src/lib/calendarDb.ts`:* `capacity` read on the `TYPE` item, 1 when absent; written at
+  creation (1 when not given); at an edit, written when the body names it or the item already
+  holds one, so an old item edited by name only stays without the attribute.
+- *Handlers:* the two type handlers pass the body's `capacity`; `bookAppointment.ts` and
+  `changeAppointment.ts` answer a User's `overbook: true` with `403 forbidden` ("Only the
+  Administrator can book over the capacity"), after who books for whom and before the times, and
+  pass the Administrator's on; `changeAppointment.ts` maps `user_busy` to 409.
+- *`backend/src/lib/calendarRules.ts`:* `checkBooking` checks R-BOOK-12 (`user_busy`), then
+  R-BOOK-07 by `peopleIn` and the window's type's capacity (`slot_taken`, lifted by the
+  Administrator's `overbook`), after R-BOOK-06; `checkChange` passes `overbook` on. The message of
+  `slot_taken` is kept ("The time is already booked"): the spec sets none, and the tests and the
+  assistant quote it. `calendarView`: each slot gets `capacity` and `placesLeft`; a User's slots
+  are those with a place left that overlap none of the User's own; the Administrator's keep the
+  full ones; `busy` is the time that is full, per R-SLOT-06 (1 where no window of an existing
+  type holds it).
+- *The assistant (decision 2):* `backend/src/assistant/tools/getCalendar.ts` gives Claude only the
+  slots with `placesLeft > 0` as free; `backend/src/assistant/tools/facts.ts` finds a free slot
+  only among them. Nothing else under `backend/src/assistant` changed.
+- *Found: AC-15 of `docs/SHARED_CALENDAR_SPEC.md` contradicted R-BOOK-12.* The 09:15–10:00 that
+  alice's 09:00 overlaps is her own, so R-BOOK-12, checked first, answers `user_busy`, not
+  `slot_taken`. Decided by the Product Owner: AC-15 answers `user_busy` (the spec's row and its v17
+  change log); the page's answer to it goes into step u5 (above).
+- *Existing back-end tests changed, and why:* `calendarView.test.ts`, the Administrator's view of
+  the example and the R-SLOT-05 test now hold the full slots with `placesLeft: 0` (D30);
+  `calendarBooking.test.ts`, "applies to the Administrator too" uses another User's appointment
+  (the same User's is now `user_busy`), AC-15 as above, the R-BOOK-07 describe named for a
+  capacity of 1; `calendarDb.test.ts` and the type handlers' tests expect `capacity: 1`; the
+  fixtures of `calendarRules.test.ts`, `calendarChange.test.ts`, `calendarView.fixtures.ts`,
+  `listAvailabilityTypes.test.ts` and the assistant's tests (`tools.test.ts`,
+  `appointmentChanges.test.ts`, `bookAppointment.test.ts`, `proposals.test.ts`,
+  `recorded/routes.json`, whose Administrator's days now hold their full slots) gain the new
+  fields. The two tests of the 11.6 example pass, the example unchanged.
+- *New tests:* every rule id and AC-37 to AC-44 in the rules' and handlers' tests; in
+  `backend/tests/integration/calendar.test.ts` the journey "the capacity of a type (AC-37 to
+  AC-44)", on a Saturday of its own with four throw-away Users, which leaves the Saturday empty.
+- *Existing journeys changed:* the types' journey expects `capacity: 1` in the answer and the
+  item; AC-04 and AC-35 expect the slots' two fields; AC-20 expects dave's touching 09:00 and
+  10:00 as one busy interval 09:00–11:00 (R-SLOT-06); AC-15 as above, with erin refused
+  `slot_taken`.
+- *The front end's fixtures (decision 1), `capacity: 1` and `placesLeft: 1`:*
+  `frontend/tests/unit/logic/` `availability.model.test.ts`, `availability.screen.test.ts`,
+  `booking.test.ts`, `date.model.test.ts`, `date.screen.test.ts`, `fixtures.ts`,
+  `week.model.test.ts`; `frontend/tests/unit/services/availability-types.service.test.ts`;
+  `frontend/tests/unit/views/` `availability.view.test.ts`, `date.view.test.ts`, `shell.test.ts`.
+- *One front end journey, by the Product Owner's decision at the end:* in
+  `frontend/tests/integration/calendar.test.ts`, block "calendar view", the User's two slots are
+  compared whole and gain `capacity: 1, placesLeft: 1`; its page
+  `docs/journeys/frontend/calendar-view.md` says so. Nothing else of the front end's journeys changed.
+- *Checked:* `npm run typecheck`, `npm run lint`, `npm run test:unit` green (shared 516, back end
+  1 800, front end 2 581; 100 % lines); after `npm run build -w backend` and a restart of
+  `local:api`, the root `DYNAMODB_PORT=8002 npm run verify` **PASSED** (the back end's journeys
+  200); then apart `RUN_INTEGRATION=1 npm run test:integration -w frontend` passed (77), after the
+  change above.
+- *Documents:* `docs/ARCHITECTURE.md` section 4 (the rows of the type, booking, change and view
+  routes, `AvailabilityType`, `CalendarView`, "Booking", "The capacity of a type"), the `TYPE`
+  row of section 5.3, the booking diagram's refusals, the status line and the v15 row;
+  `docs/journeys/backend/calendar-capacity.md` (new), `calendar-booking.md` (AC-15),
+  `docs/journeys/concepts.md` (types, "Places in a slot", `busy`), the README's list;
+  `backend/CLAUDE.md`'s line on `checkBooking`.
+
+**Step u4 finds ready:** the API answers `capacity` on every type and takes it on create and
+edit (absent: 1, or kept); every slot of `GET /calendar` carries `capacity` and `placesLeft`, the
+Administrator's full ones included; `busy` is the time that is full; booking and change take
+`overbook` from the Administrator, refuse a User's with `403 forbidden`, and answer
+`409 user_busy` before `409 slot_taken`. The front end's types (from `shared/`) already require the fields.
+
 ### Step u4 — The front end's services
 
 - The types' service: `capacity` sent and received.
@@ -311,6 +389,12 @@ same time as the back end's).
   blocks of F6 (side by side up to three, then one block with the list).
 - The book dialog (`booking.ts`): on `slot_taken` for the Administrator, "Book anyway?" and the
   same request with `overbook: true`; the same for a change.
+- On `user_busy` (the person already holds an appointment that overlaps the time asked), the page
+  names that appointment and points to changing it, since a change leaves the old appointment out
+  of its own checks (`docs/SHARED_CALENDAR_SPEC.md` R-CHG-01): "You already have an appointment at
+  this time (09:15–10:00); open it to change it." Whether the page also offers the change in one
+  click ("Change it to 09:00–10:00?") is for the Product Owner to decide at this step (found at step
+  u3: AC-15).
 - `docs/FRONTEND_ARCHITECTURE.md` (new decisions), `docs/FRONTEND_WALK.md` (new checks: a
   capacity of 3 walked as alice, as a second User, as the Administrator forcing a fourth).
 

@@ -22,6 +22,7 @@ import {
   storedItem,
   ULID,
 } from './appointmentFixtures';
+import { typeItems } from './patternFixtures';
 
 type Handler = typeof import('../../../src/handlers/changeAppointment').handler;
 let handler: Handler;
@@ -349,5 +350,53 @@ describe('changeAppointment handler', () => {
     expect(response.statusCode).toBe(500);
     expect(bodyOf(response)).toEqual({ error: 'internal_error', message: 'Could not change the appointment' });
     expect(logLines()[0]).toMatchObject({ level: 'error', outcome: 'error', appointmentId: APPT_ID });
+  });
+});
+
+// The Studio of docs/SHARED_CALENDAR_SPEC.md AC-04 with a capacity of 2: alice holds 09:00 local,
+// bob and carol hold 10:00.
+const studioHolds = (capacity: number) => onPartition('TYPE', [{ ...typeItems[0]!, capacity }, typeItems[1]!]);
+const carolAt = (start: string, end: string) => ({ ...bobAt(start, end), SK: `${start}#01M70NR5E0Q7R2C9T5XH3KD8C0`, userId: 'sub-carol', username: 'carol' });
+
+// Test names: R-… rules and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in
+// its section 18.3).
+describe('changeAppointment handler: the capacity (R-CHG-01, R-BOOK-07, R-BOOK-12, R-BOOK-13)', () => {
+  it('into a slot with a place left: 201', async () => {
+    studioHolds(2);
+    onPartition('APPT', [storedItem(), bobAt(H1000, H1100)]);
+    expect((await post({ start: H1000 })).statusCode).toBe(201);
+  });
+
+  it('into a full slot: 409 slot_taken; the Administrator with overbook: true: 201', async () => {
+    studioHolds(2);
+    onPartition('APPT', [storedItem(), bobAt(H1000, H1100), carolAt(H1000, H1100)]);
+    const refused = await post({ start: H1000 });
+    expect(refused.statusCode).toBe(409);
+    expect(bodyOf(refused)).toEqual({ error: 'slot_taken', message: 'The time is already booked' });
+    expect(bodyOf(await post({ start: H1000 }, admin)).error).toBe('slot_taken');
+    expect(transactions()).toHaveLength(0);
+    expect((await post({ start: H1000, overbook: true }, admin)).statusCode).toBe(201);
+  });
+
+  it('onto another appointment of the same User: 409 user_busy, also forced', async () => {
+    studioHolds(2);
+    onPartition('APPT', [storedItem(), { ...bobAt(H1000, H1100), userId: 'sub-alice', username: 'alice' }]);
+    expect(bodyOf(await post({ start: H1000 }))).toEqual({ error: 'user_busy', message: 'The User already has an appointment at this time' });
+    const forced = await post({ start: H1000, overbook: true }, admin);
+    expect(forced.statusCode).toBe(409);
+    expect(bodyOf(forced).error).toBe('user_busy');
+    expect(logLines().map((line) => line.outcome)).toEqual(['conflict', 'conflict']);
+  });
+
+  it('AC-41 in a change: a User sending overbook: true is 403 forbidden, before the grid and with nothing touched', async () => {
+    const response = await post({ start: H1030, overbook: true });
+    expect(response.statusCode).toBe(403);
+    expect(bodyOf(response)).toEqual({ error: 'forbidden', message: 'Only the Administrator can book over the capacity' });
+    expect(ddb.calls()).toHaveLength(0);
+    expect(logLines()).toEqual([expect.objectContaining({ outcome: 'forbidden', status: 403, appointmentId: APPT_ID })]);
+  });
+
+  it('R-BOOK-13 after the body: a body with an unknown field and overbook: true is 400', async () => {
+    expect((await post({ start: H1000, overbook: true, extra: 1 })).statusCode).toBe(400);
   });
 });

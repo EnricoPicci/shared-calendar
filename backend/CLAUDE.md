@@ -82,8 +82,8 @@ Paths in this file are relative to `backend/`.
   Rule names are those of `docs/SHARED_CALENDAR_SPEC.md`.
   - `checkTypeName`, `checkTypeDelete`, `typeNameKey`, and `checkAvailabilityWrite` for every
     availability write: patterns, overrides, one-off windows.
-  - `checkBookingTimes`, R-BOOK-02 before the lock, and `checkBooking`, R-BOOK-03..07 and 09
-    under it.
+  - `checkBookingTimes`, R-BOOK-02 before the lock, and `checkBooking`, R-BOOK-03..06, 12, 07
+    (the places, `peopleIn`) and 09 under it.
   - `checkCancel` (R-CAN-01..03, R-PERM-01 by `sub`) and `checkNote` (R-NOTE-01, answers
     `unchanged`).
   - `checkChange` (its section 8.4: `checkCancel` on the old appointment, then `checkBooking`

@@ -25,7 +25,7 @@ const BOB = 'sub-bob';
 
 const ac04 = { patternId: P1, weekday: 1, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-11-01', validUntil: null };
 const state = (more: Partial<CalendarState> = {}): CalendarState => ({
-  types: [{ typeId: STUDIO }, { typeId: POOL }],
+  types: [{ typeId: STUDIO, capacity: 1 }, { typeId: POOL, capacity: 1 }],
   patterns: [ac04],
   overrides: [],
   oneOffs: [],
@@ -167,9 +167,12 @@ describe('checkBooking (R-BOOK-03..09)', () => {
       expect(book('2026-11-16T08:15:00.000Z', MON_1000, { role: 'admin' })).toEqual(studio('2026-11-16T07:00:00.000Z', MON_1200));
     });
 
-    it('AC-15: after AC-14, alice books 09:00 local: slot_taken (partial overlap)', () => {
+    it('AC-15: after AC-14, alice books 09:00 local: user_busy, the partial overlap is alice’s own', () => {
       const ac14 = appt('2026-11-16T08:15:00.000Z', MON_1000);
-      expect(book(MON_0900, MON_1000, { state: state({ appointments: [ac14] }) })).toEqual(refused('slot_taken'));
+      expect(book(MON_0900, MON_1000, { state: state({ appointments: [ac14] }) })).toEqual(refused('user_busy'));
+      // For another User, the 09:15–10:00 fills the hour in part: slot_taken
+      // (docs/SHARED_CALENDAR_SPEC.md R-SLOT-05).
+      expect(book(MON_0900, MON_1000, { userId: BOB, state: state({ appointments: [ac14] }) })).toEqual(refused('slot_taken'));
     });
 
     it('AC-16: alice books 12:00 local, outside the window: outside_availability', () => {
@@ -292,7 +295,7 @@ describe('checkBooking (R-BOOK-03..09)', () => {
     });
   });
 
-  describe('R-BOOK-07: no active appointment overlaps', () => {
+  describe('R-BOOK-07 with a capacity of 1: no active appointment of another User overlaps', () => {
     it('R-SLOT-05: the Administrator’s 10:00–10:30 makes the 10:00 slot not free for a User', () => {
       const half = state({ appointments: [appt(MON_1000, '2026-11-16T09:30:00.000Z', { userId: BOB })] });
       expect(book(MON_1000, MON_1100, { state: half })).toEqual(refused('slot_taken'));
@@ -309,7 +312,8 @@ describe('checkBooking (R-BOOK-03..09)', () => {
     });
 
     it('applies to the Administrator too', () => {
-      expect(book(MON_0900, MON_1000, { role: 'admin', state: state({ appointments: [appt(MON_0900, MON_1000)] }) })).toEqual(refused('slot_taken'));
+      const bobs = state({ appointments: [appt(MON_0900, MON_1000, { userId: BOB })] });
+      expect(book(MON_0900, MON_1000, { role: 'admin', state: bobs })).toEqual(refused('slot_taken'));
     });
   });
 
@@ -356,6 +360,121 @@ describe('checkBooking (R-BOOK-03..09)', () => {
     it('R-BOOK-07 before R-BOOK-09: taken and over the limit', () => {
       const s = state({ appointments: [appt(MON_0900, MON_1000, { userId: BOB }), appt(MON_1000, MON_1100)] });
       expect(book(MON_0900, MON_1000, { state: s, settings: { maxFutureAppointmentsPerUser: 1 } })).toEqual(refused('slot_taken'));
+    });
+  });
+});
+
+// The capacity of a type: Monday 2026-11-16, the Pool open 14:00–18:00 local (13:00Z–17:00Z) with
+// a capacity of 3, the Studio 08:00–12:00 local with the default capacity of 1.
+const POOL_MON = { patternId: '01JC00000000000000000000P2', weekday: 1, start: '14:00', end: '18:00', typeId: POOL, validFrom: '2026-11-01', validUntil: null };
+const MON_1400 = '2026-11-16T13:00:00.000Z';
+const MON_1430 = '2026-11-16T13:30:00.000Z';
+const MON_1500 = '2026-11-16T14:00:00.000Z';
+const MON_1600 = '2026-11-16T15:00:00.000Z';
+const CAROL = 'sub-carol';
+const DAN = 'sub-dan';
+const pool = (capacity: number, appointments: StateAppointment[] = []) =>
+  state({ types: [{ typeId: STUDIO, capacity: 1 }, { typeId: POOL, capacity }], patterns: [ac04, POOL_MON], appointments });
+const at14 = (id: string, userId: string, start = MON_1400, end = MON_1500) => appt(start, end, { appointmentId: id, userId, typeId: POOL });
+const poolWindow = { window: { start: MON_1400, end: '2026-11-16T17:00:00.000Z', typeId: POOL } };
+const three = [at14('A1', ALICE), at14('A2', BOB), at14('A3', CAROL)];
+
+// Test names: R-… rules, decisions D… and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md
+// (scenarios in its section 18.3).
+describe('checkBooking: the capacity of a type (R-BOOK-07, R-BOOK-12, R-BOOK-13)', () => {
+  it('AC-37: alice and bob book 14:00 into a capacity of 3, and carol after them', () => {
+    expect(book(MON_1400, MON_1500, { state: pool(3) })).toEqual(poolWindow);
+    expect(book(MON_1400, MON_1500, { userId: BOB, state: pool(3, [at14('A1', ALICE)]) })).toEqual(poolWindow);
+    expect(book(MON_1400, MON_1500, { userId: CAROL, state: pool(3, three.slice(0, 2)) })).toEqual(poolWindow);
+  });
+
+  it('AC-38: with three people in it, dan is refused slot_taken', () => {
+    expect(book(MON_1400, MON_1500, { userId: DAN, state: pool(3, three) })).toEqual({ error: 'slot_taken', message: 'The time is already booked' });
+  });
+
+  it('AC-39: the Administrator booking dan is refused without overbook, and booked with overbook: true', () => {
+    expect(book(MON_1400, MON_1500, { role: 'admin', userId: DAN, state: pool(3, three) })).toEqual(refused('slot_taken'));
+    expect(book(MON_1400, MON_1500, { role: 'admin', userId: DAN, overbook: false, state: pool(3, three) })).toEqual(refused('slot_taken'));
+    expect(book(MON_1400, MON_1500, { role: 'admin', userId: DAN, overbook: true, state: pool(3, three) })).toEqual(poolWindow);
+    // A fifth, forced again, over a slot already over its capacity.
+    const four = [...three, at14('A4', DAN)];
+    expect(book(MON_1400, MON_1500, { role: 'admin', userId: 'sub-erin', overbook: true, state: pool(3, four) })).toEqual(poolWindow);
+  });
+
+  it('AC-40: the Administrator booking alice at 14:00 again is user_busy, forced or not (R-BOOK-12 before R-BOOK-07)', () => {
+    for (const overbook of [false, true]) {
+      expect(book(MON_1400, MON_1500, { role: 'admin', overbook, state: pool(3, three) })).toEqual({
+        error: 'user_busy',
+        message: 'The User already has an appointment at this time',
+      });
+    }
+    // Also with a place left: the second place is not alice's to take.
+    expect(book(MON_1400, MON_1500, { state: pool(3, [at14('A1', ALICE)]) })).toEqual(refused('user_busy'));
+  });
+
+  it('AC-41 at the level of the rules: a User’s overbook lifts nothing (the handler answers 403 before)', () => {
+    expect(book(MON_1400, MON_1500, { userId: DAN, overbook: true, state: pool(3, three) })).toEqual(refused('slot_taken'));
+  });
+
+  it('AC-42: capacity 2, alice 14:00–14:30 and bob 14:30–15:00 are never there together: carol books 14:00, then dan is refused', () => {
+    const halves = [at14('A1', ALICE, MON_1400, MON_1430), at14('A2', BOB, MON_1430, MON_1500)];
+    expect(book(MON_1400, MON_1500, { userId: CAROL, state: pool(2, halves) })).toEqual(poolWindow);
+    expect(book(MON_1400, MON_1500, { userId: DAN, state: pool(2, [...halves, at14('A3', CAROL)]) })).toEqual(refused('slot_taken'));
+  });
+
+  it('D25: 10:00–10:30 and 10:15–11:00 at the peak fill a capacity of 2', () => {
+    const peak = [at14('A1', ALICE, MON_1400, MON_1430), at14('A2', BOB, '2026-11-16T13:15:00.000Z', MON_1500)];
+    expect(book(MON_1400, MON_1500, { userId: CAROL, state: pool(2, peak) })).toEqual(refused('slot_taken'));
+    // The Administrator's custom 14:45–15:00 meets only bob there: one place left.
+    expect(book('2026-11-16T13:45:00.000Z', MON_1500, { role: 'admin', userId: CAROL, state: pool(2, peak) })).toEqual(poolWindow);
+  });
+
+  it('AC-43: the capacity lowered to 1 under three people: 14:00 takes nobody, 15:00 one person (D28)', () => {
+    expect(book(MON_1400, MON_1500, { userId: DAN, state: pool(1, three) })).toEqual(refused('slot_taken'));
+    expect(book(MON_1500, MON_1600, { userId: DAN, state: pool(1, three) })).toEqual(poolWindow);
+  });
+
+  it('compares with the capacity of the window’s own type: the Studio holds 1 although the Pool holds 3', () => {
+    const studioTaken = pool(3, [appt(MON_0900, MON_1000, { userId: BOB })]);
+    expect(book(MON_0900, MON_1000, { state: studioTaken })).toEqual(refused('slot_taken'));
+  });
+
+  it('overbook: true on a time with a place left books as without it (8.2)', () => {
+    expect(book(MON_1400, MON_1500, { role: 'admin', userId: DAN, overbook: true, state: pool(3, three.slice(0, 1)) })).toEqual(poolWindow);
+  });
+
+  it('overbook lifts R-BOOK-07 only: outside the availability is still outside_availability', () => {
+    expect(book(MON_1200, MON_1300, { role: 'admin', overbook: true, state: pool(3) })).toEqual(refused('outside_availability'));
+  });
+
+  describe('R-BOOK-12: one place per person (D27)', () => {
+    it('refuses an overlap with the User’s own appointment, in part too', () => {
+      expect(book(MON_1400, MON_1500, { role: 'admin', state: pool(3, [at14('A1', ALICE, MON_1430, MON_1500)]) })).toEqual(refused('user_busy'));
+    });
+
+    it('a touching own appointment, a cancelled one and another User’s are not the User’s time', () => {
+      const s = pool(3, [at14('A1', ALICE, MON_1500, MON_1600), at14('A2', ALICE, MON_1400, MON_1500), at14('A3', BOB)]);
+      s.appointments[1]!.status = 'cancelled';
+      expect(book(MON_1400, MON_1500, { state: s })).toEqual(poolWindow);
+    });
+
+    it('is decided on the userId, not on the username', () => {
+      const formerAlice = at14('A1', 'sub-old-alice');
+      expect(book(MON_1400, MON_1500, { state: pool(3, [formerAlice]) })).toEqual(poolWindow);
+    });
+  });
+
+  describe('the order (8.2): R-BOOK-06, 12, 07, 09', () => {
+    it('R-BOOK-06 before R-BOOK-12: outside the availability and overlapping the User’s own appointment', () => {
+      expect(book(MON_1200, MON_1300, { state: pool(3, [appt(MON_1200, MON_1300)]) })).toEqual(refused('outside_availability'));
+    });
+
+    it('R-BOOK-12 before R-BOOK-07: the User’s own appointment in a full slot is user_busy', () => {
+      expect(book(MON_1400, MON_1500, { state: pool(3, three) })).toEqual(refused('user_busy'));
+    });
+
+    it('R-BOOK-12 before R-BOOK-09: own time and over the limit', () => {
+      expect(book(MON_1400, MON_1500, { state: pool(3, [at14('A1', ALICE)]), settings: { maxFutureAppointmentsPerUser: 1 } })).toEqual(refused('user_busy'));
     });
   });
 });

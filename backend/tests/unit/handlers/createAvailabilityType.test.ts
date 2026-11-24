@@ -81,13 +81,20 @@ describe('createAvailabilityType handler', () => {
     expect(response.statusCode).toBe(201);
     expect(response.headers).toEqual({ 'content-type': 'application/json' });
     const created = body(response);
-    expect(created).toEqual({ typeId: expect.stringMatching(ULID), name: 'Studio', createdAt: NOW, updatedAt: NOW });
+    expect(created).toEqual({ typeId: expect.stringMatching(ULID), name: 'Studio', capacity: 1, createdAt: NOW, updatedAt: NOW });
     expect(transactions()[0]!.TransactItems![1]).toEqual({
       Put: {
         TableName: 'calendar-test',
-        Item: { PK: 'TYPE', SK: created.typeId, name: 'Studio', nameKey: 'studio', createdAt: NOW, updatedAt: NOW },
+        Item: { PK: 'TYPE', SK: created.typeId, name: 'Studio', nameKey: 'studio', capacity: 1, createdAt: NOW, updatedAt: NOW },
       },
     });
+  });
+
+  it.each([1, 3, 100])('creates the type with the capacity of the body, %i (R-TYPE-05)', async (capacity) => {
+    const response = await handler(asAdmin(JSON.stringify({ name: 'Pool B', capacity })));
+    expect(response.statusCode).toBe(201);
+    expect(body(response).capacity).toBe(capacity);
+    expect(transactions()[0]!.TransactItems![1]!.Put!.Item).toMatchObject({ capacity });
   });
 
   it('accepts an admin who is also in user', async () => {
@@ -115,6 +122,9 @@ describe('createAvailabilityType handler', () => {
     { name: 'a name of 41 characters', raw: JSON.stringify({ name: 'x'.repeat(41) }), code: 'invalid_request', fields: 'name' },
     { name: 'a control character', raw: JSON.stringify({ name: 'Gym\tA' }), code: 'invalid_request', fields: 'name' },
     { name: 'a number', raw: JSON.stringify({ name: 7 }), code: 'invalid_request', fields: 'name' },
+    { name: 'a capacity of 0', raw: JSON.stringify({ name: 'Gym', capacity: 0 }), code: 'invalid_request', fields: 'capacity' },
+    { name: 'a capacity of 101', raw: JSON.stringify({ name: 'Gym', capacity: 101 }), code: 'invalid_request', fields: 'capacity' },
+    { name: 'a capacity of 2.5', raw: JSON.stringify({ name: 'Gym', capacity: 2.5 }), code: 'invalid_request', fields: 'capacity' },
   ])('answers 400 $code and touches nothing for $name', async ({ raw, code, fields }) => {
     const response = await handler(asCaller('admin', ['admin'], raw));
     expect(response.statusCode).toBe(400);

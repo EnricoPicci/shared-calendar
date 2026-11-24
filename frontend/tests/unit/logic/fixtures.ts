@@ -63,8 +63,8 @@ export function winterWeek(): CalendarView {
           { start: z('2026-11-16T13:00'), end: z('2026-11-16T17:00'), typeId: POOL, typeName: 'Swimming Pool' },
         ],
         slots: [
-          { start: z('2026-11-16T07:00'), end: z('2026-11-16T08:00'), typeId: STUDIO },
-          { start: z('2026-11-16T13:00'), end: z('2026-11-16T14:00'), typeId: POOL },
+          { start: z('2026-11-16T07:00'), end: z('2026-11-16T08:00'), typeId: STUDIO, capacity: 1, placesLeft: 1 },
+          { start: z('2026-11-16T13:00'), end: z('2026-11-16T14:00'), typeId: POOL, capacity: 1, placesLeft: 1 },
         ],
         busy: [{ start: z('2026-11-16T08:00'), end: z('2026-11-16T09:00') }],
       },

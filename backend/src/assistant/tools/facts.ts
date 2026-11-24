@@ -73,13 +73,14 @@ export function instantOf(date: string, time: string, occurrence: 'first' | 'sec
  * The free slot that starts at an instant, as GET /calendar answers the person for that day: its
  * end as a wall-clock time and the name of the type of the hours it lies in. The route gives a
  * person only the slots that person may book, so a time outside the open hours, taken, in the
- * past or, for a User, outside the period open to bookings has no slot.
+ * past or, for a User, outside the period open to bookings has no slot. The Administrator also gets
+ * the full slots (docs/SHARED_CALENDAR_SPEC.md decision D30), with no place left: they are not free.
  */
 export async function freeSlotAt(route: CallRoute, date: string, time: string, start: string, timeZone: string): Promise<{ ok: true; end: string; type: string } | NotPossible> {
   const answer = await route(getCalendar, { routeKey: 'GET /calendar', path: '/calendar', query: { from: date, to: date } });
   if (!succeeded(answer)) return { ok: false, ...refusalOf(answer, 'The calendar could not be read.') };
   const day = (answer.body as CalendarView).days.find((candidate) => candidate.date === date);
-  const slot = day?.slots.find((candidate) => candidate.start === start);
+  const slot = day?.slots.find((candidate) => candidate.start === start && candidate.placesLeft > 0);
   const window = day?.windows.find((candidate) => candidate.typeId === slot?.typeId);
   if (!slot || !window) {
     return {

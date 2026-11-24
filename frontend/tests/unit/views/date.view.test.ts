@@ -25,8 +25,8 @@ const W1 = '01M6W1ND0W0000000000000001';
 const W2 = '01M6W1ND0W0000000000000002';
 const STAMPS = { createdAt: '2026-11-01T10:00:00.000Z', updatedAt: '2026-11-01T10:00:00.000Z' };
 const TYPES: AvailabilityType[] = [
-  { typeId: POOL, name: 'Piscina', ...STAMPS },
-  { typeId: STUDIO, name: 'Studio', ...STAMPS },
+  { typeId: POOL, name: 'Piscina', capacity: 1, ...STAMPS },
+  { typeId: STUDIO, name: 'Studio', capacity: 1, ...STAMPS },
 ];
 const PATTERN = { patternId: '01M6PATTERN000000000000001', weekday: 1, start: '09:00', end: '13:00', typeId: STUDIO, validFrom: '2026-11-20', validUntil: null, ...STAMPS };
 const CONFLICTS: AppointmentConflict[] = [
@@ -253,7 +253,7 @@ describe('mountDate', () => {
       const { date$ } = mounted();
       set(ADD, { typeId: STUDIO });
       set(WINDOW, { typeId: POOL });
-      date$.next(state({ choices: typeChoices([TYPES[1]!, { typeId: '01M6NEW0000000000000000000', name: 'Sala', ...STAMPS }]) }));
+      date$.next(state({ choices: typeChoices([TYPES[1]!, { typeId: '01M6NEW0000000000000000000', name: 'Sala', capacity: 1, ...STAMPS }]) }));
       expect([field(ADD, 'typeId').value, field(WINDOW, 'typeId').value, options(ADD, 'typeId').length]).toEqual([STUDIO, '', 2]);
     });
   });
@@ -619,7 +619,7 @@ describe('mountDate', () => {
 
   describe('a text typed by one person and shown to another', () => {
     it('a type\'s name containing <script> is shown as text in every place it appears: the three lists of the day, the draft, the names of the buttons, the choices and the dialog', () => {
-      const types: AvailabilityType[] = [{ typeId: STUDIO, name: SCRIPT, ...STAMPS }];
+      const types: AvailabilityType[] = [{ typeId: STUDIO, name: SCRIPT, capacity: 1, ...STAMPS }];
       const day = dayOf([seen('10:00', '12:00', STUDIO, SCRIPT, 'override'), seen('18:00', '20:00', STUDIO, SCRIPT, 'one_off', W1)], true, types);
       mounted(showing(day, { draft: draftModel([{ start: '10:00', end: '12:00', typeId: STUDIO }], types), choices: typeChoices(types) }));
       expect([rows('given-rows'), rows('own-rows'), rows('extra-rows'), rows('draft-rows')]).toEqual([[`09:00 – 13:00 | ${SCRIPT}`], [`10:00 – 12:00 | ${SCRIPT}`], [`18:00 – 20:00 | ${SCRIPT}`], [`10:00 – 12:00 | ${SCRIPT}`]]);

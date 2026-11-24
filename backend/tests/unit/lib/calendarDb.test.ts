@@ -371,11 +371,14 @@ const POOL = '01JC0000000000000000000002';
 const NEW_ID = '01JC0000000000000000000009';
 const EARLIER = '2026-11-01T08:00:00.000Z';
 
-const typeItem = (typeId: string, name: string, at = EARLIER) => ({
+// A TYPE item without `capacity`, as written before the capacity existed: it reads as 1
+// (docs/SHARED_CALENDAR_SPEC.md section 13.2). `capacity` gives it one.
+const typeItem = (typeId: string, name: string, at = EARLIER, capacity?: number) => ({
   PK: 'TYPE',
   SK: typeId,
   name,
   nameKey: name.toLowerCase(),
+  ...(capacity !== undefined && { capacity }),
   createdAt: at,
   updatedAt: at,
 });
@@ -397,6 +400,8 @@ const rangeQuery = (pk: string, from: string) => ({
 const onTypes = (...items: object[]) =>
   ddb.on(QueryCommand, { ExpressionAttributeValues: { ':pk': 'TYPE' } }).resolves({ Items: items });
 
+// Test names: section numbers, R-… rules and decisions D… are those of
+// docs/SHARED_CALENDAR_SPEC.md.
 describe('listTypes', () => {
   it('reads the TYPE partition with one consistent query', async () => {
     await db.listTypes();
@@ -406,9 +411,17 @@ describe('listTypes', () => {
   it('answers the types sorted by nameKey, without PK, SK or nameKey', async () => {
     onTypes(typeItem(STUDIO, 'Studio'), typeItem(POOL, 'alpha'), typeItem(NEW_ID, 'Beta'));
     expect(await db.listTypes()).toEqual([
-      { typeId: POOL, name: 'alpha', createdAt: EARLIER, updatedAt: EARLIER },
-      { typeId: NEW_ID, name: 'Beta', createdAt: EARLIER, updatedAt: EARLIER },
-      { typeId: STUDIO, name: 'Studio', createdAt: EARLIER, updatedAt: EARLIER },
+      { typeId: POOL, name: 'alpha', capacity: 1, createdAt: EARLIER, updatedAt: EARLIER },
+      { typeId: NEW_ID, name: 'Beta', capacity: 1, createdAt: EARLIER, updatedAt: EARLIER },
+      { typeId: STUDIO, name: 'Studio', capacity: 1, createdAt: EARLIER, updatedAt: EARLIER },
+    ]);
+  });
+
+  it('answers the stored capacity, and 1 for an item written without one (13.2)', async () => {
+    onTypes(typeItem(POOL, 'Pool', EARLIER, 3), typeItem(STUDIO, 'Studio'));
+    expect((await db.listTypes()).map((t) => [t.name, t.capacity])).toEqual([
+      ['Pool', 3],
+      ['Studio', 1],
     ]);
   });
 
@@ -434,6 +447,8 @@ describe('listTypes', () => {
   });
 });
 
+// Test names: section numbers, R-… rules and decisions D… are those of
+// docs/SHARED_CALENDAR_SPEC.md.
 describe('createType', () => {
   const studio = { typeId: NEW_ID, name: 'Studio', nameKey: 'studio' };
 
@@ -441,7 +456,7 @@ describe('createType', () => {
     const check = vi.fn(() => null);
     const locked = await db.createType(studio, NOW, check);
     expect(locked).toEqual({
-      result: { ok: true, value: { typeId: NEW_ID, name: 'Studio', createdAt: NOW, updatedAt: NOW } },
+      result: { ok: true, value: { typeId: NEW_ID, name: 'Studio', capacity: 1, createdAt: NOW, updatedAt: NOW } },
       attempts: 1,
     });
     // Lock first, then the types (inside the attempt).
@@ -453,16 +468,22 @@ describe('createType', () => {
     expect(items[1]).toEqual({
       Put: {
         TableName: TABLE,
-        Item: { PK: 'TYPE', SK: NEW_ID, name: 'Studio', nameKey: 'studio', createdAt: NOW, updatedAt: NOW },
+        Item: { PK: 'TYPE', SK: NEW_ID, name: 'Studio', nameKey: 'studio', capacity: 1, createdAt: NOW, updatedAt: NOW },
       },
     });
+  });
+
+  it('writes and answers the capacity given (R-TYPE-05)', async () => {
+    const locked = await db.createType({ ...studio, capacity: 3 }, NOW, () => null);
+    expect(locked.result).toEqual({ ok: true, value: { typeId: NEW_ID, name: 'Studio', capacity: 3, createdAt: NOW, updatedAt: NOW } });
+    expect(transactions()[0]!.TransactItems![1]!.Put!.Item).toMatchObject({ capacity: 3 });
   });
 
   it('gives the check every type read inside the attempt, with its nameKey', async () => {
     onTypes(typeItem(POOL, 'Pool'));
     const check = vi.fn(() => null);
     await db.createType(studio, NOW, check);
-    expect(check).toHaveBeenCalledWith([{ typeId: POOL, name: 'Pool', nameKey: 'pool', createdAt: EARLIER, updatedAt: EARLIER }]);
+    expect(check).toHaveBeenCalledWith([{ typeId: POOL, name: 'Pool', nameKey: 'pool', capacity: 1, createdAt: EARLIER, updatedAt: EARLIER }]);
   });
 
   it('writes nothing when the check refuses', async () => {
@@ -502,6 +523,8 @@ describe('createType', () => {
   });
 });
 
+// Test names: section numbers, R-… rules and decisions D… are those of
+// docs/SHARED_CALENDAR_SPEC.md.
 describe('renameType', () => {
   const rename = { name: 'Gym', nameKey: 'gym' };
 
@@ -510,19 +533,46 @@ describe('renameType', () => {
     const check = vi.fn(() => null);
     const locked = await db.renameType(STUDIO, rename, NOW, check);
     expect(locked).toEqual({
-      result: { ok: true, value: { typeId: STUDIO, name: 'Gym', createdAt: EARLIER, updatedAt: NOW } },
+      result: { ok: true, value: { typeId: STUDIO, name: 'Gym', capacity: 1, createdAt: EARLIER, updatedAt: NOW } },
       attempts: 1,
     });
     expect(queries()).toEqual([partitionQuery('TYPE')]);
     expect(check).toHaveBeenCalledWith([
-      { typeId: STUDIO, name: 'Studio', nameKey: 'studio', createdAt: EARLIER, updatedAt: EARLIER },
-      { typeId: POOL, name: 'Pool', nameKey: 'pool', createdAt: EARLIER, updatedAt: EARLIER },
+      { typeId: STUDIO, name: 'Studio', nameKey: 'studio', capacity: 1, createdAt: EARLIER, updatedAt: EARLIER },
+      { typeId: POOL, name: 'Pool', nameKey: 'pool', capacity: 1, createdAt: EARLIER, updatedAt: EARLIER },
     ]);
+    // An item written without a capacity, edited without one, is written again without one.
     const items = transactions()[0]!.TransactItems!;
     expect(items).toHaveLength(2);
     expect(items[1]).toEqual({
       Put: { TableName: TABLE, Item: { PK: 'TYPE', SK: STUDIO, name: 'Gym', nameKey: 'gym', createdAt: EARLIER, updatedAt: NOW } },
     });
+  });
+
+  it('keeps the stored capacity when the edit has none (11.4)', async () => {
+    onTypes(typeItem(STUDIO, 'Studio', EARLIER, 3));
+    const locked = await db.renameType(STUDIO, rename, NOW, () => null);
+    expect(locked.result).toEqual({ ok: true, value: { typeId: STUDIO, name: 'Gym', capacity: 3, createdAt: EARLIER, updatedAt: NOW } });
+    expect(transactions()[0]!.TransactItems![1]!.Put!.Item).toEqual({
+      PK: 'TYPE',
+      SK: STUDIO,
+      name: 'Gym',
+      nameKey: 'gym',
+      capacity: 3,
+      createdAt: EARLIER,
+      updatedAt: NOW,
+    });
+  });
+
+  it('writes the capacity of the edit, also on an item that had none, and also lowered (R-TYPE-05, D28)', async () => {
+    onTypes(typeItem(STUDIO, 'Studio'), typeItem(POOL, 'Pool', EARLIER, 5));
+    const first = await db.renameType(STUDIO, { ...rename, capacity: 4 }, NOW, () => null);
+    expect(first.result).toMatchObject({ ok: true, value: { capacity: 4 } });
+    const second = await db.renameType(POOL, { name: 'Pool', nameKey: 'pool', capacity: 2 }, NOW, () => null);
+    expect(second.result).toMatchObject({ ok: true, value: { capacity: 2 } });
+    expect(transactions().map((t) => t.TransactItems![1]!.Put!.Item!.capacity)).toEqual([4, 2]);
+    // Only the TYPE item and the lock: no appointment is touched.
+    expect(transactions().every((t) => t.TransactItems!.length === 2)).toBe(true);
   });
 
   it('answers type_not_found, without calling the check or writing, when the type is not there', async () => {
@@ -618,7 +668,7 @@ describe('the state read inside a locked attempt', () => {
     const check = vi.fn(() => null);
     await db.deleteType(STUDIO, TODAY, LATE, check);
     expect(check).toHaveBeenCalledWith({
-      types: [{ typeId: STUDIO, name: 'Studio', nameKey: 'studio', createdAt: EARLIER, updatedAt: EARLIER }],
+      types: [{ typeId: STUDIO, name: 'Studio', nameKey: 'studio', capacity: 1, createdAt: EARLIER, updatedAt: EARLIER }],
       patterns: [
         { patternId: 'P1', weekday: 1, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-01-01', validUntil: '2026-02-01', createdAt: EARLIER, updatedAt: EARLIER },
         { patternId: 'P2', weekday: 2, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-01-01', validUntil: null, createdAt: EARLIER, updatedAt: EARLIER },
@@ -1183,7 +1233,7 @@ describe('readCalendarRange', () => {
         updatedAt: null,
         updatedBy: null,
       },
-      types: [{ typeId: STUDIO, name: 'Studio', createdAt: EARLIER, updatedAt: EARLIER }],
+      types: [{ typeId: STUDIO, name: 'Studio', capacity: 1, createdAt: EARLIER, updatedAt: EARLIER }],
       patterns: [{ patternId: 'P1', weekday: 1, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-11-01', validUntil: null, createdAt: EARLIER, updatedAt: EARLIER }],
       overrides: [{ date: '2026-11-17', windows: [] }],
       oneOffs: [{ windowId: 'W1', date: '2026-11-18', start: '12:00', end: '13:00', typeId: STUDIO }],

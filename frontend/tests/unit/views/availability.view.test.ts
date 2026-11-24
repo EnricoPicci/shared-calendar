@@ -20,7 +20,7 @@ const SCRIPT = '<script>window.hacked = true</script><b>bold</b>';
 const FAILURE = 'The server cannot be reached. Check the connection and try again.';
 const IN_USE = 'This type is in use, so it cannot be deleted. A type is in use while a weekly pattern, a date of today or later or an upcoming appointment uses it.';
 const STAMPS = { createdAt: '2026-11-01T10:00:00.000Z', updatedAt: '2026-11-01T10:00:00.000Z' };
-const type = (typeId: string, name: string): AvailabilityType => ({ typeId, name, ...STAMPS });
+const type = (typeId: string, name: string): AvailabilityType => ({ typeId, name, capacity: 1, ...STAMPS });
 const TYPES = [type(POOL, 'Piscina'), type(STUDIO, 'Studio')];
 const P1 = '01M6PATTERN000000000000001';
 const P2 = '01M6PATTERN000000000000002';

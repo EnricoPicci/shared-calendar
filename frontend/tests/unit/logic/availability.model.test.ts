@@ -24,7 +24,7 @@ import { POOL, STUDIO } from './fixtures';
 import { useFarBrowserZone } from './zone';
 
 const SCRIPT = '<script>alert(1)</script>';
-const type = (typeId: string, name: string): AvailabilityType => ({ typeId, name, createdAt: '2026-11-01T10:00:00.000Z', updatedAt: '2026-11-01T10:00:00.000Z' });
+const type = (typeId: string, name: string): AvailabilityType => ({ typeId, name, capacity: 1, createdAt: '2026-11-01T10:00:00.000Z', updatedAt: '2026-11-01T10:00:00.000Z' });
 const TYPES = [type(POOL, 'Piscina'), type(STUDIO, 'Studio')];
 let made = 0;
 const pattern = (over: Partial<WeeklyPattern> = {}): WeeklyPattern => ({

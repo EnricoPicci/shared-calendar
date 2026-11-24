@@ -21,7 +21,7 @@ const view = (date: string, windowStart: string, windowEnd: string, slotStarts: 
         date,
         weekday: 2,
         windows: [{ start: windowStart, end: windowEnd, typeId: TYPE, typeName: 'Visit' }],
-        slots: slotStarts.map((start) => ({ start, end: new Date(Date.parse(start) + 3_600_000).toISOString(), typeId: TYPE })),
+        slots: slotStarts.map((start) => ({ start, end: new Date(Date.parse(start) + 3_600_000).toISOString(), typeId: TYPE, capacity: 1, placesLeft: 1 })),
         busy: [],
       },
     ],
@@ -137,6 +137,14 @@ describe('book_appointment: the facts of the confirmation (5.5 rule 2)', () => {
     const result = await read({ date: '2026-11-24', time });
     expect(result).toMatchObject({ ok: false, error: 'no_free_slot' });
     expect(result.ok === false && result.message).toContain('get_calendar');
+  });
+
+  it('no proposal for a full slot the Administrator is given with no place left (D30 of docs/SHARED_CALENDAR_SPEC.md)', async () => {
+    const full = structuredClone(TUESDAY);
+    full.body.days[0]!.slots[1]!.placesLeft = 0;
+    route.mockResolvedValue(full);
+    expect(await read({ date: '2026-11-24', time: '11:00' })).toMatchObject({ ok: false, error: 'no_free_slot' });
+    expect(await read({ date: '2026-11-24', time: '10:00' })).toMatchObject({ ok: true });
   });
 
   it('no proposal for a day the calendar does not give, or a slot whose hours are not in the answer', async () => {

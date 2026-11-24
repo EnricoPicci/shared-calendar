@@ -19,6 +19,7 @@ const STATUS = {
   booking_notice_too_short: 409,
   booking_beyond_horizon: 409,
   outside_availability: 409,
+  user_busy: 409,
   slot_taken: 409,
   appointment_limit_reached: 409,
 } as const;
@@ -32,12 +33,13 @@ const OUTCOME = { 404: 'not_found', 409: 'conflict', 403: 'too_late' } as const;
 //   2. the path id, a ULID (400);
 //   3. the body: JSON, ChangeBody with the note (docs/SHARED_CALENDAR_SPEC.md R-BOOK-11) and the
 //      exact instant form (400);
-//   4. docs/SHARED_CALENDAR_SPEC.md R-BOOK-02, the new times for the role (400), before the lock;
-//   5. under the lock, on the data read inside the attempt (checkChange): the old appointment as a
+//   4. docs/SHARED_CALENDAR_SPEC.md R-BOOK-13, a User sending `overbook: true` (403);
+//   5. docs/SHARED_CALENDAR_SPEC.md R-BOOK-02, the new times for the role (400), before the lock;
+//   6. under the lock, on the data read inside the attempt (checkChange): the old appointment as a
 //      cancel (404, 409, 403 for a User), then the new one as a booking for the old one's User
-//      (409), the old appointment left out of the overlap and the limit
-//      (docs/SHARED_CALENDAR_SPEC.md R-CHG-01);
-//   6. docs/SHARED_CALENDAR_SPEC.md R-BOOK-10 in the transaction: a deleted-user marker for the old
+//      (409), the old appointment left out of the User's own times, the places and the limit
+//      (docs/SHARED_CALENDAR_SPEC.md R-CHG-01), the Administrator's `overbook` passed on;
+//   7. docs/SHARED_CALENDAR_SPEC.md R-BOOK-10 in the transaction: a deleted-user marker for the old
 //      appointment's `sub` (404).
 // No Cognito call: the User is the old appointment's (docs/SHARED_CALENDAR_SPEC.md section 8.4).
 // The note: absent keeps the old one, null clears it (docs/SHARED_CALENDAR_SPEC.md R-CHG-03). One
@@ -85,6 +87,13 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   const body = validate(ChangeBody, json.value);
   if (!body.ok) return done('invalid_request', body.response, fields);
 
+  // Only the Administrator may go over a type's capacity (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13);
+  // `overbook: false` from a User is the same as leaving it out.
+  const overbook = body.value.overbook === true;
+  if (role === 'user' && overbook) {
+    return done('forbidden', error(403, 'forbidden', 'Only the Administrator can book over the capacity'), fields);
+  }
+
   // The times for the role (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02): needs only the body and
   // the zone.
   const times = checkBookingTimes(body.value.start, body.value.end, role, timeZone);
@@ -103,7 +112,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   };
   try {
     const { result, attempts } = await changeAppointment(change, today, now, (appointment, state, settings) =>
-      checkChange({ appointment, caller: who, start: times.start, end: times.end, settings, state, now, today, zone: timeZone }),
+      checkChange({ appointment, caller: who, start: times.start, end: times.end, overbook, settings, state, now, today, zone: timeZone }),
     );
     const logged = { ...fields, lockAttempts: attempts };
     if (!result.ok) {

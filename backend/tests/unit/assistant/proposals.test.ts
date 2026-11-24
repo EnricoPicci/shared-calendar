@@ -1163,7 +1163,7 @@ describe('the log lines of a proposal (10.1)', () => {
     readRoutes.listAppointments.mockImplementation(() => routeAnswer({ appointments: [appointment(FIRST, 24), appointment(SECOND, 25), appointment(THIRD, 26)] }));
     readRoutes.getCalendar.mockImplementation(() =>
       routeAnswer({
-        days: [{ date: '2026-11-27', weekday: 5, windows: [{ start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T11:00:00.000Z', typeId: TYPE, typeName: 'Visit' }], slots: [{ start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T09:00:00.000Z', typeId: TYPE }], busy: [] }],
+        days: [{ date: '2026-11-27', weekday: 5, windows: [{ start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T11:00:00.000Z', typeId: TYPE, typeName: 'Visit' }], slots: [{ start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T09:00:00.000Z', typeId: TYPE, capacity: 1, placesLeft: 1 }], busy: [] }],
       }),
     );
     const mark = prompt.promptVersion(prompt.INSTRUCTIONS, prompt.contextBlock(ALICE, 'Europe/Rome'), toolsForClaude(DEFINITIONS, 'user'));
@@ -1238,7 +1238,7 @@ describe('the log lines of a proposal (10.1)', () => {
     readRoutes.listUsers.mockImplementation(() => routeAnswer({ users: [{ username: 'roberta', createdAt: AT }] }));
     readRoutes.getCalendar.mockImplementation(() =>
       routeAnswer({
-        days: [{ date: '2026-11-27', weekday: 5, windows: [{ start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T11:00:00.000Z', typeId: VISIT, typeName: 'Visit' }], slots: [{ start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T09:00:00.000Z', typeId: VISIT }], busy: [] }],
+        days: [{ date: '2026-11-27', weekday: 5, windows: [{ start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T11:00:00.000Z', typeId: VISIT, typeName: 'Visit' }], slots: [{ start: '2026-11-27T08:00:00.000Z', end: '2026-11-27T09:00:00.000Z', typeId: VISIT, capacity: 1, placesLeft: 1 }], busy: [] }],
       }),
     );
     const mark = prompt.promptVersion(prompt.INSTRUCTIONS, prompt.contextBlock(ADMIN, 'Europe/Rome'), toolsForClaude(DEFINITIONS, 'admin'));

@@ -28,8 +28,8 @@ import { useFarBrowserZone } from './zone';
 const ROME = 'Europe/Rome';
 const STAMPS = { createdAt: '2026-11-01T10:00:00.000Z', updatedAt: '2026-11-01T10:00:00.000Z' };
 const TYPES: AvailabilityType[] = [
-  { typeId: POOL, name: 'Piscina', ...STAMPS },
-  { typeId: STUDIO, name: 'Studio', ...STAMPS },
+  { typeId: POOL, name: 'Piscina', capacity: 1, ...STAMPS },
+  { typeId: STUDIO, name: 'Studio', capacity: 1, ...STAMPS },
 ];
 const pattern = (patternId: string, over: Partial<WeeklyPattern> = {}): WeeklyPattern => ({ patternId: `01M6PATTERN00000000000000${patternId}`, weekday: 1, start: '09:00', end: '13:00', typeId: STUDIO, validFrom: '2026-11-20', validUntil: null, ...STAMPS, ...over });
 const MONDAY = '2026-11-23';

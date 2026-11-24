@@ -122,11 +122,11 @@ describe('availability types (routes 3–6)', () => {
     expect(await listNames(adminToken)).toEqual([]);
   });
 
-  it('the Administrator creates two types (201), stored with their nameKey', async () => {
+  it('the Administrator creates two types (201), stored with their nameKey and the default capacity of 1', async () => {
     for (const name of ['Studio', 'pool']) {
       const res = await api('POST', '/calendar/types', adminToken, { name: `  ${name} ` });
       expect(res.status).toBe(201);
-      expect(res.body).toEqual({ typeId: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/), name, createdAt: expect.any(String), updatedAt: expect.any(String) });
+      expect(res.body).toEqual({ typeId: expect.stringMatching(/^[0-9A-HJKMNP-TV-Z]{26}$/), name, capacity: 1, createdAt: expect.any(String), updatedAt: expect.any(String) });
       expect(res.body?.createdAt).toBe(res.body?.updatedAt);
       ids[name] = res.body?.typeId as string;
     }
@@ -135,6 +135,7 @@ describe('availability types (routes 3–6)', () => {
       SK: ids.Studio,
       name: 'Studio',
       nameKey: 'studio',
+      capacity: 1,
       createdAt: expect.any(String),
       updatedAt: expect.any(String),
     });
@@ -383,12 +384,15 @@ describe('calendar view (route 15)', () => {
         { start: at(D, '07:00'), end: at(D, '08:00'), typeId: ids.pool, typeName: 'GYM' },
         { start: at(D, '08:00'), end: at(D, '12:00'), typeId: ids.viewStudio, typeName: 'Studio' },
       ],
+      // Each slot with its type's capacity, the default 1, and that one place left.
       slots: [
-        { start: at(D, '07:00'), end: at(D, '08:00'), typeId: ids.pool },
+        { start: at(D, '07:00'), end: at(D, '08:00'), typeId: ids.pool, capacity: 1, placesLeft: 1 },
         ...['08:00', '09:00', '10:00', '11:00'].map((t, i) => ({
           start: at(D, t),
           end: at(D, ['09:00', '10:00', '11:00', '12:00'][i]!),
           typeId: ids.viewStudio,
+          capacity: 1,
+          placesLeft: 1,
         })),
       ],
       busy: [],
@@ -449,8 +453,8 @@ describe('calendar view (route 15)', () => {
     ]);
     const slots = admin.slots as Slot[];
     expect(slots).toEqual([
-      { start: at(S, '01:00'), end: at(S, '03:00'), typeId: ids.viewStudio },
-      { start: at(S, '03:00'), end: at(S, '04:00'), typeId: ids.viewStudio },
+      { start: at(S, '01:00'), end: at(S, '03:00'), typeId: ids.viewStudio, capacity: 1, placesLeft: 1 },
+      { start: at(S, '03:00'), end: at(S, '04:00'), typeId: ids.viewStudio, capacity: 1, placesLeft: 1 },
     ]);
     for (const s of slots) expect(Date.parse(s.end) - Date.parse(s.start)).toBe(HOUR_MS);
 
@@ -851,10 +855,13 @@ describe('booking (route 17)', () => {
     expect((await getCalendarItem('APPT', `${at(W2(), '09:15')}#${res.body?.appointmentId}`))?.userId).toBe(subOf(daveToken));
   });
 
-  it('AC-15: dave then books W2 09:00: 409 slot_taken (partial overlap)', async () => {
+  it('AC-15: dave then books W2 09:00: 409 user_busy, the hour overlaps dave’s own 09:15 in part; erin is refused slot_taken', async () => {
     const res = await book(daveToken, { start: at(W2(), '09:00') });
     expect(res.status).toBe(409);
-    expect(res.body).toMatchObject({ error: 'slot_taken' });
+    expect(res.body).toEqual({ error: 'user_busy', message: 'The User already has an appointment at this time' });
+    const erin = await book(erinToken, { start: at(W2(), '09:00') });
+    expect(erin.status).toBe(409);
+    expect(erin.body).toMatchObject({ error: 'slot_taken' });
   });
 
   it('AC-16: dave books 12:00, outside the window: 409 outside_availability', async () => {
@@ -1084,10 +1091,12 @@ describe('listing, note and cancel (routes 16, 18, 19)', () => {
   it('AC-20: dave cancels T 09:00 with enough notice: 200, cancelled; the APPT item and one appointment.cancelled event; the slot is free again', async () => {
     const slotsOfT = async () => {
       const res = await api('GET', `/calendar?from=${T()}&to=${T()}`, erinToken);
-      const day = (res.body?.days as { slots: { start: string }[]; busy: { start: string }[] }[])[0]!;
-      return { slots: day.slots.map((s) => s.start), busy: day.busy.map((b) => b.start) };
+      const day = (res.body?.days as { slots: { start: string }[]; busy: { start: string; end: string }[] }[])[0]!;
+      return { slots: day.slots.map((s) => s.start), busy: day.busy.map((b) => [b.start, b.end]) };
     };
-    expect(await slotsOfT()).toEqual({ slots: [at(T(), '08:00')], busy: [at(T(), '09:00'), at(T(), '10:00')] });
+    // dave's 09:00 and 10:00 touch: erin sees them as one busy time, full from 09:00 to 11:00
+    // (docs/SHARED_CALENDAR_SPEC.md R-SLOT-06); her own 11:00 is not busy.
+    expect(await slotsOfT()).toEqual({ slots: [at(T(), '08:00')], busy: [[at(T(), '09:00'), at(T(), '11:00')]] });
 
     const res = await cancel(daveToken, ids.t9!);
     expect(res.status).toBe(200);
@@ -1111,7 +1120,7 @@ describe('listing, note and cancel (routes 16, 18, 19)', () => {
     const stored = Object.fromEntries(Object.entries(item!).filter(([key]) => key !== 'PK' && key !== 'SK'));
     expect(events[1]!.appointment).toEqual({ appointmentId: ids.t9, ...stored });
 
-    expect(await slotsOfT()).toEqual({ slots: [at(T(), '08:00'), at(T(), '09:00')], busy: [at(T(), '10:00')] });
+    expect(await slotsOfT()).toEqual({ slots: [at(T(), '08:00'), at(T(), '09:00')], busy: [[at(T(), '10:00'), at(T(), '11:00')]] });
     // Cancelling it again: no longer active.
     expect((await cancel(daveToken, ids.t9!)).body).toMatchObject({ error: 'appointment_not_active' });
   });
@@ -1653,6 +1662,234 @@ describe('users (route 21, deletion)', () => {
   });
 
   it('the settings are restored to what the earlier journeys left', async () => {
+    const { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser } = leftover;
+    const values = { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser };
+    const res = await api('PUT', '/calendar/settings', adminToken, values);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject(values);
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/calendar-capacity.md.
+// Test names: R-… rules, decisions D… and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md
+// (scenarios in its section 18.3).
+describe('the capacity of a type (AC-37 to AC-44)', () => {
+  // What the earlier journeys leave behind does not matter here: these journeys save their own
+  // settings first (restoring the leftover ones at the end), create four Users of their own and
+  // two types of their own, and book on a Saturday, where no earlier journey books. S is the next
+  // Saturday at least 8 days ahead; both patterns are valid on S alone. In the scenarios of
+  // docs/SHARED_CALENDAR_SPEC.md section 18.3, cap-alice, cap-bob, cap-carol and cap-dan play
+  // alice, bob, carol and dan. At the end every appointment of S is cancelled and the patterns and
+  // types deleted, so S is empty again: the assistant's journeys hold their own Saturdays empty.
+  const ZONE = 'Europe/Rome';
+  const today = () => localDateOf(new Date().toISOString(), ZONE);
+  const nextSaturday = (from: string) => {
+    let d = from;
+    while (weekdayOf(d) !== 6) d = addDays(d, 1);
+    return d;
+  };
+  const S = () => nextSaturday(addDays(today(), 8));
+  const at = (time: string) => toInstant(S(), time, ZONE);
+  const SETTINGS = { cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: null };
+  const PEOPLE = ['cap-alice', 'cap-bob', 'cap-carol', 'cap-dan'] as const;
+  type Person = (typeof PEOPLE)[number];
+  type ViewSlot = { start: string; end: string; typeId: string; capacity: number; placesLeft: number };
+  type ViewDay = { slots: ViewSlot[]; busy: { start: string; end: string }[]; windows: unknown[] };
+
+  const tokens = {} as Record<Person, string>;
+  const types: Record<string, string> = {};
+  const patterns: string[] = [];
+  const appts: Record<string, Record<string, unknown>> = {};
+  let leftover: Record<string, unknown>;
+
+  const book = (token: string, body: Record<string, unknown>) => api('POST', '/calendar/appointments', token, body);
+  const dayOf = async (token: string): Promise<ViewDay> => {
+    const res = await api('GET', `/calendar?from=${S()}&to=${S()}`, token);
+    expect(res.status).toBe(200);
+    return (res.body?.days as ViewDay[])[0]!;
+  };
+  const slotAt = (day: ViewDay, time: string) => day.slots.find((s) => s.start === at(time));
+  const bookedAt = async (time: string) =>
+    (await queryCalendarPartition('APPT')).filter((a) => a.start === at(time) && a.status === 'booked').map((a) => a.username).sort();
+
+  beforeAll(async () => {
+    for (const username of PEOPLE) {
+      await removeUserIfPresent(username);
+      const res = await api('POST', '/users', adminToken, { username });
+      expect(res.status).toBe(201);
+      tokens[username] = await signIn(username, res.body?.password as string);
+    }
+  });
+
+  afterAll(async () => {
+    for (const username of PEOPLE) await removeUserIfPresent(username);
+  });
+
+  it('prepares the settings, the Pool with a capacity of 3 (14:00–18:00) and the Pair with a capacity of 2 (09:00–12:00) on S', async () => {
+    leftover = (await api('GET', '/calendar/settings', adminToken)).body!;
+    expect((await api('PUT', '/calendar/settings', adminToken, SETTINGS)).status).toBe(200);
+    for (const [name, capacity, start, end] of [
+      ['Capacity pool', 3, '14:00', '18:00'],
+      ['Capacity pair', 2, '09:00', '12:00'],
+    ] as const) {
+      const type = await api('POST', '/calendar/types', adminToken, { name, capacity });
+      expect(type.status).toBe(201);
+      expect(type.body).toMatchObject({ name, capacity });
+      types[name] = type.body?.typeId as string;
+      expect(await getCalendarItem('TYPE', types[name]!)).toMatchObject({ name, capacity });
+      const pattern = await api('POST', '/calendar/patterns', adminToken, { weekday: 6, start, end, typeId: types[name], validFrom: S(), validUntil: S() });
+      expect(pattern.status).toBe(201);
+      patterns.push(pattern.body?.patternId as string);
+    }
+  });
+
+  it('AC-37: cap-alice and cap-bob book the Pool at 14:00: 201 both; cap-carol sees the slot with capacity 3 and 1 place left, nothing busy', async () => {
+    for (const who of ['cap-alice', 'cap-bob'] as const) {
+      const res = await book(tokens[who], { start: at('14:00') });
+      expect(res.status).toBe(201);
+      appts[`${who} 14:00`] = res.body!;
+    }
+    const carol = await dayOf(tokens['cap-carol']);
+    expect(slotAt(carol, '14:00')).toEqual({ start: at('14:00'), end: at('15:00'), typeId: types['Capacity pool'], capacity: 3, placesLeft: 1 });
+    expect(slotAt(carol, '15:00')).toMatchObject({ capacity: 3, placesLeft: 3 });
+    expect(carol.busy).toEqual([]);
+    // cap-alice does not get the slot they hold, even with a place left (docs/SHARED_CALENDAR_SPEC.md
+    // R-SLOT-03).
+    expect(slotAt(await dayOf(tokens['cap-alice']), '14:00')).toBeUndefined();
+  });
+
+  it('AC-38: cap-carol books 14:00 too; cap-dan is refused 409 slot_taken, and sees 14:00–15:00 busy with no slot there', async () => {
+    const carol = await book(tokens['cap-carol'], { start: at('14:00') });
+    expect(carol.status).toBe(201);
+    appts['cap-carol 14:00'] = carol.body!;
+    const dan = await book(tokens['cap-dan'], { start: at('14:00') });
+    expect(dan.status).toBe(409);
+    expect(dan.body).toEqual({ error: 'slot_taken', message: 'The time is already booked' });
+    const day = await dayOf(tokens['cap-dan']);
+    expect(slotAt(day, '14:00')).toBeUndefined();
+    expect(day.busy).toEqual([{ start: at('14:00'), end: at('15:00') }]);
+    expect(JSON.stringify(day)).not.toContain('cap-');
+  });
+
+  it('AC-39: the Administrator booking cap-dan is 409 slot_taken, then 201 with overbook: true; the Administrator sees the slot with no place left', async () => {
+    const plain = await book(adminToken, { username: 'cap-dan', start: at('14:00') });
+    expect(plain.status).toBe(409);
+    expect(plain.body).toMatchObject({ error: 'slot_taken' });
+    const forced = await book(adminToken, { username: 'cap-dan', start: at('14:00'), overbook: true });
+    expect(forced.status).toBe(201);
+    appts['cap-dan 14:00'] = forced.body!;
+    expect(await bookedAt('14:00')).toEqual(['cap-alice', 'cap-bob', 'cap-carol', 'cap-dan']);
+    expect(slotAt(await dayOf(adminToken), '14:00')).toMatchObject({ capacity: 3, placesLeft: 0 });
+    // Nothing about the force is stored, on the appointment or on its event
+    // (docs/SHARED_CALENDAR_SPEC.md decision D31).
+    const item = await getCalendarItem('APPT', `${forced.body?.start}#${forced.body?.appointmentId}`);
+    expect(item).toMatchObject({ username: 'cap-dan', createdBy: { username: 'admin', role: 'admin' } });
+    expect(item).not.toHaveProperty('overbook');
+    const events = (await queryCalendarPartition('EVENT')).filter((e) => (e.appointment as { appointmentId: string }).appointmentId === forced.body?.appointmentId);
+    expect(events.map((e) => e.type)).toEqual(['appointment.booked']);
+    expect(JSON.stringify(events)).not.toContain('overbook');
+  });
+
+  it('AC-40: the Administrator booking cap-alice at 14:00 again is 409 user_busy, forced or not', async () => {
+    for (const overbook of [false, true]) {
+      const res = await book(adminToken, { username: 'cap-alice', start: at('14:00'), overbook });
+      expect(res.status).toBe(409);
+      expect(res.body).toEqual({ error: 'user_busy', message: 'The User already has an appointment at this time' });
+    }
+    expect(await bookedAt('14:00')).toHaveLength(4);
+  });
+
+  it('AC-41: a User sending overbook: true is 403 forbidden, in a booking and in a change, and nothing is written', async () => {
+    const before = (await queryCalendarPartition('APPT')).length;
+    const booking = await book(tokens['cap-alice'], { start: at('15:00'), overbook: true });
+    expect(booking.status).toBe(403);
+    expect(booking.body).toEqual({ error: 'forbidden', message: 'Only the Administrator can book over the capacity' });
+    const id = appts['cap-alice 14:00']!.appointmentId as string;
+    const change = await api('POST', `/calendar/appointments/${id}/change`, tokens['cap-alice'], { start: at('15:00'), overbook: true });
+    expect(change.status).toBe(403);
+    expect(change.body).toMatchObject({ error: 'forbidden' });
+    expect((await queryCalendarPartition('APPT')).length).toBe(before);
+  });
+
+  it('AC-42: in the Pair (capacity 2), cap-alice 09:00–09:30 and cap-bob 09:30–10:00 are never there together: cap-carol books 09:00, then cap-dan is refused', async () => {
+    for (const [who, start, end] of [
+      ['cap-alice', '09:00', '09:30'],
+      ['cap-bob', '09:30', '10:00'],
+    ] as const) {
+      const res = await book(adminToken, { username: who, start: at(start), end: at(end) });
+      expect(res.status).toBe(201);
+      appts[`${who} ${start}`] = res.body!;
+    }
+    expect(slotAt(await dayOf(tokens['cap-carol']), '09:00')).toMatchObject({ capacity: 2, placesLeft: 1 });
+    const carol = await book(tokens['cap-carol'], { start: at('09:00') });
+    expect(carol.status).toBe(201);
+    appts['cap-carol 09:00'] = carol.body!;
+    const dan = await book(tokens['cap-dan'], { start: at('09:00') });
+    expect(dan.status).toBe(409);
+    expect(dan.body).toMatchObject({ error: 'slot_taken' });
+    expect(slotAt(await dayOf(adminToken), '09:00')).toMatchObject({ capacity: 2, placesLeft: 0 });
+  });
+
+  it('R-CHG-01: the Administrator moving cap-dan into the full Pair is 409 slot_taken, then 201 with overbook: true; moving cap-alice onto cap-alice’s own Pool hour is 409 user_busy, forced or not', async () => {
+    const dan = appts['cap-dan 14:00']!.appointmentId as string;
+    const plain = await api('POST', `/calendar/appointments/${dan}/change`, adminToken, { start: at('09:00') });
+    expect(plain.status).toBe(409);
+    expect(plain.body).toMatchObject({ error: 'slot_taken' });
+    const forced = await api('POST', `/calendar/appointments/${dan}/change`, adminToken, { start: at('09:00'), overbook: true });
+    expect(forced.status).toBe(201);
+    appts['cap-dan 09:00'] = (forced.body as Record<string, Record<string, unknown>>).booked!;
+    expect(appts['cap-dan 09:00']).toMatchObject({ username: 'cap-dan', typeId: types['Capacity pair'] });
+    expect(await bookedAt('14:00')).toEqual(['cap-alice', 'cap-bob', 'cap-carol']);
+
+    const alice = appts['cap-alice 09:00']!.appointmentId as string;
+    for (const overbook of [false, true]) {
+      const res = await api('POST', `/calendar/appointments/${alice}/change`, adminToken, { start: at('14:00'), overbook });
+      expect(res.status).toBe(409);
+      expect(res.body).toMatchObject({ error: 'user_busy' });
+    }
+  });
+
+  it('AC-43: the Administrator edits the Pool to a capacity of 1: 200; the three appointments stay booked; 14:00 has no place left, 15:00 has 1', async () => {
+    const res = await api('PUT', `/calendar/types/${types['Capacity pool']}`, adminToken, { name: 'Capacity pool', capacity: 1 });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ name: 'Capacity pool', capacity: 1 });
+    expect(await bookedAt('14:00')).toEqual(['cap-alice', 'cap-bob', 'cap-carol']);
+    const day = await dayOf(adminToken);
+    expect(slotAt(day, '14:00')).toMatchObject({ capacity: 1, placesLeft: 0 });
+    expect(slotAt(day, '15:00')).toMatchObject({ capacity: 1, placesLeft: 1 });
+    expect((await dayOf(tokens['cap-dan'])).busy).toContainEqual({ start: at('14:00'), end: at('15:00') });
+  });
+
+  it('AC-44: a type created without capacity has 1; a rename with the name only keeps it; after an edit to 3, a rename with the name only keeps 3', async () => {
+    const created = await api('POST', '/calendar/types', adminToken, { name: 'Capacity plain' });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ name: 'Capacity plain', capacity: 1 });
+    const id = created.body?.typeId as string;
+    expect(await getCalendarItem('TYPE', id)).toMatchObject({ capacity: 1 });
+    const steps: [Record<string, unknown>, string, number][] = [
+      [{ name: 'Capacity plain 2' }, 'Capacity plain 2', 1],
+      [{ name: 'Capacity plain 2', capacity: 3 }, 'Capacity plain 2', 3],
+      [{ name: 'Capacity plain 3' }, 'Capacity plain 3', 3],
+    ];
+    for (const [body, name, capacity] of steps) {
+      const res = await api('PUT', `/calendar/types/${id}`, adminToken, body);
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ typeId: id, name, capacity });
+    }
+    expect(await getCalendarItem('TYPE', id)).toMatchObject({ name: 'Capacity plain 3', capacity: 3 });
+    expect((await api('DELETE', `/calendar/types/${id}`, adminToken)).status).toBe(204);
+  });
+
+  it('leaves S empty: every appointment cancelled, the patterns and the types deleted, the settings restored', async () => {
+    const listed = await api('GET', `/calendar/appointments?from=${S()}&to=${S()}`, adminToken);
+    const booked = listed.body?.appointments as { appointmentId: string }[];
+    expect(booked).toHaveLength(7);
+    for (const a of booked) expect((await api('POST', `/calendar/appointments/${a.appointmentId}/cancel`, adminToken)).status).toBe(200);
+    for (const id of patterns) expect((await api('DELETE', `/calendar/patterns/${id}`, adminToken)).status).toBe(204);
+    for (const id of Object.values(types)) expect((await api('DELETE', `/calendar/types/${id}`, adminToken)).status).toBe(204);
+    const day = await dayOf(adminToken);
+    expect(day).toMatchObject({ windows: [], slots: [], busy: [] });
+
     const { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser } = leftover;
     const values = { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser };
     const res = await api('PUT', '/calendar/settings', adminToken, values);

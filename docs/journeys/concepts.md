@@ -219,16 +219,21 @@ appointment_limit_reached` (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-09).
 An availability type is a named kind of availability, usually a place. The specification's
 examples are "Studio" and "Swimming Pool" (`docs/SHARED_CALENDAR_SPEC.md` sections 2 and 6.1).
 
-- It is only a name. The Administrator keeps a catalogue of them: create, rename, delete.
+- It is a name and a **capacity**: how many people it holds at the same time, 1 to 100, 1 when
+  none is given (`docs/SHARED_CALENDAR_SPEC.md` decision D24). The Administrator keeps a catalogue
+  of them: create, edit (the name, the capacity), delete.
 - Every window of availability belongs to one type. "Monday 08:00–12:00, Studio" and "Monday
   14:00–18:00, Swimming Pool" are two windows of two types.
 - An appointment takes the type of the window it lies in. That is how a User knows what or where
   they booked. The calendar view shows the type's id and name on each window, so a week view can
   colour windows by type.
 
-Its rules (`docs/SHARED_CALENDAR_SPEC.md` R-TYPE-01 to R-TYPE-04):
+Its rules (`docs/SHARED_CALENDAR_SPEC.md` R-TYPE-01 to R-TYPE-05):
 
 - the name has 1 to 40 characters and is unique, ignoring upper and lower case;
+- an edit that leaves the capacity out keeps the stored one; a stored type written before the
+  capacity existed reads as 1; a capacity lowered under the people already booked cancels nobody:
+  that time simply has no place left;
 - at most 20 types exist at the same time;
 - a rename shows everywhere at once, also on existing appointments;
 - a type cannot be deleted while something still uses it (`409 type_in_use`): a weekly pattern, an
@@ -289,8 +294,25 @@ Adjacent windows of the same type are merged into one **effective window** befor
 counted (`docs/SHARED_CALENDAR_SPEC.md` section 6.6). `08:00–10:30 Studio` and `10:30–12:00 Studio`
 form `08:00–12:00 Studio`, which offers the slot 10:00–11:00 across the joint.
 
-A slot is **free** when no active appointment overlaps it (`docs/SHARED_CALENDAR_SPEC.md`
-R-SLOT-02). The calendar view lists only free slots, so a booked hour disappears from `slots`.
+### Places in a slot
+
+The **people in** a slot are the most booked appointments present at one instant of it: their
+peak, not their sum (`docs/SHARED_CALENDAR_SPEC.md` R-SLOT-02, decision D25). Two appointments
+that touch, 09:00–09:30 and 09:30–10:00, are never there together: they count one person. A slot's
+**places left** are its type's capacity minus the people in it, never below 0. Each slot of the
+calendar view carries both, `capacity` and `placesLeft`. With the default capacity of 1, a slot is
+free exactly when no booked appointment overlaps it.
+
+| Who asks | The slots they get (`docs/SHARED_CALENDAR_SPEC.md` R-SLOT-03, R-SLOT-04) |
+|---|---|
+| a User | those with a place left that overlap none of the User's own appointments, within the notice and the horizon: a full hour disappears from `slots` |
+| the Administrator | every future slot, the full ones included with `placesLeft: 0`, so that one can be booked over the capacity (decision D30) |
+
+A booking is refused with `409 user_busy` when the User already holds an appointment that overlaps
+it: one person is never in two places, whatever the type (R-BOOK-12). It is refused with
+`409 slot_taken` when no place is left (R-BOOK-07). `user_busy` is checked first. Only the
+Administrator may go over the capacity, by sending the request again with `overbook: true`
+(R-BOOK-13); that lifts `slot_taken` and nothing else, and a User who sends it gets `403 forbidden`.
 
 The Administrator is not bound to slots: it may book custom times inside a window, such as
 09:15–10:00 (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-08).
@@ -397,11 +419,17 @@ list for the whole range.
 | Field | For a User | For the Administrator |
 |---|---|---|
 | `appointments` | only the User's own appointments, in full (id, time, type, note, cancellation deadline) | **every** appointment, in full, with the User's name |
-| `busy` (per day) | other Users' appointments, as bare `{ start, end }`: no name, no id, no note | always empty |
+| `busy` (per day) | the times that are full, as bare `{ start, end }`: no name, no id, no note | always empty |
 
 - **Why the User needs `busy`.** A User may not see other people's appointments
-  (`docs/SHARED_CALENDAR_SPEC.md` section 17), but the calendar must still show that the time is
-  taken. So the server sends only the time span, and a view can draw a grey "busy" block there.
+  (`docs/SHARED_CALENDAR_SPEC.md` section 17), but the calendar must still show where a time is
+  full. So the server sends only the time span, and a view can draw a grey "busy" block there.
+- **What counts as full** (`docs/SHARED_CALENDAR_SPEC.md` R-SLOT-06). A time is busy where the
+  people present, the User's own appointments included, reach the capacity of the window there (1
+  where no window holds the time). The User's own appointments are then taken out, since the view
+  shows them apart. A time with places left is not busy: the slot's `placesLeft` tells how many
+  instead. With a capacity of 1 this is every other User's appointment, except that two of them
+  that touch make one interval: 09:00–10:00 and 10:00–11:00 are one busy time, 09:00–11:00.
 - **Why the Administrator's `busy` is empty.** The Administrator may see everything, so the full
   appointments are already in `appointments`, names included. A second, anonymous copy of the same
   appointments would add nothing.

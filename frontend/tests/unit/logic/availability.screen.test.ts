@@ -35,7 +35,7 @@ const START: AvailabilityState = {
   change: QUIET,
 };
 const STAMPS = { createdAt: '2026-11-01T10:00:00.000Z', updatedAt: '2026-11-01T10:00:00.000Z' };
-const type = (typeId: string, name: string): AvailabilityType => ({ typeId, name, ...STAMPS });
+const type = (typeId: string, name: string): AvailabilityType => ({ typeId, name, capacity: 1, ...STAMPS });
 const STUDIO_TYPE = type(STUDIO, 'Studio');
 const POOL_TYPE = type(POOL, 'Piscina');
 const P1 = '01M6PATTERN000000000000001';

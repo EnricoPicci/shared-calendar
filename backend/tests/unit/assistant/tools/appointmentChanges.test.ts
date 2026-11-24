@@ -46,7 +46,7 @@ const THURSDAY = {
         date: '2026-11-26',
         weekday: 4,
         windows: [{ start: '2026-11-26T08:00:00.000Z', end: '2026-11-26T11:00:00.000Z', typeId: CHECKUP, typeName: 'Checkup' }],
-        slots: ['08', '10'].map((hour) => ({ start: `2026-11-26T${hour}:00:00.000Z`, end: `2026-11-26T${String(Number(hour) + 1).padStart(2, '0')}:00:00.000Z`, typeId: CHECKUP })),
+        slots: ['08', '10'].map((hour) => ({ start: `2026-11-26T${hour}:00:00.000Z`, end: `2026-11-26T${String(Number(hour) + 1).padStart(2, '0')}:00:00.000Z`, typeId: CHECKUP, capacity: 1, placesLeft: 1 })),
         busy: [],
       },
     ],
@@ -248,7 +248,7 @@ describe('change_appointment: the facts, the words and the result (5.5 rule 2, 8
     const night = structuredClone(THURSDAY);
     night.body.days[0]!.date = '2026-10-25';
     night.body.days[0]!.windows[0] = { start: '2026-10-24T22:00:00.000Z', end: '2026-10-25T23:00:00.000Z', typeId: CHECKUP, typeName: 'Checkup' };
-    night.body.days[0]!.slots = [{ start: '2026-10-25T01:00:00.000Z', end: '2026-10-25T02:00:00.000Z', typeId: CHECKUP }];
+    night.body.days[0]!.slots = [{ start: '2026-10-25T01:00:00.000Z', end: '2026-10-25T02:00:00.000Z', typeId: CHECKUP, capacity: 1, placesLeft: 1 }];
     route.mockImplementation((_handler, call) => Promise.resolve(call.routeKey === 'GET /calendar' ? night : LIST));
     expect(await read({ appointmentId: TUESDAY, date: '2026-10-25', time: '02:00', occurrence: 'second' })).toMatchObject({
       call: { body: { start: '2026-10-25T01:00:00.000Z' } },

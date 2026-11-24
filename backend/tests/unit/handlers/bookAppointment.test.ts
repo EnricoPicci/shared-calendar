@@ -8,6 +8,7 @@ import {
 import { GetCommand, QueryCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import { mockClient } from 'aws-sdk-client-mock';
 import { admin, bodyOf, claimsOf, cleanUp, eventAt, harness, lockBusy, NOW, P1, patternItem, STUDIO, ULID } from './availabilityFixtures';
+import { typeItems } from './patternFixtures';
 
 type Handler = typeof import('../../../src/handlers/bookAppointment').handler;
 let handler: Handler;
@@ -437,5 +438,82 @@ describe('bookAppointment handler logging (AC-36)', () => {
       expect.objectContaining({ outcome: 'not_found', status: 404, target: 'ghost' }),
       expect.objectContaining({ outcome: 'conflict', status: 409, target: 'admin' }),
     ]);
+  });
+});
+
+// The Studio of docs/SHARED_CALENDAR_SPEC.md AC-04 with a capacity of 2; bob and carol hold
+// 09:00 local in it.
+const studioHolds = (capacity: number) => onPartition('TYPE', [{ ...typeItems[0]!, capacity }, typeItems[1]!]);
+const carolItem = (start: string, end: string) => apptItem(start, end, { SK: `${start}#01M70NR5E0Q7R2C9T5XH3KD8C0`, userId: 'sub-carol', username: 'carol' });
+
+// Test names: R-… rules and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in
+// its section 18.3).
+describe('bookAppointment handler: the capacity (R-BOOK-07, R-BOOK-12, R-BOOK-13)', () => {
+  it('AC-37: a User books a slot that holds another person, in a capacity of 2: 201', async () => {
+    studioHolds(2);
+    onPartition('APPT', [apptItem(START, END)]);
+    expect((await post({ start: START })).statusCode).toBe(201);
+  });
+
+  it('AC-38: the slot full: 409 slot_taken, nothing written', async () => {
+    studioHolds(2);
+    onPartition('APPT', [apptItem(START, END), carolItem(START, END)]);
+    const response = await post({ start: START });
+    expect(response.statusCode).toBe(409);
+    expect(bodyOf(response)).toEqual({ error: 'slot_taken', message: 'The time is already booked' });
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('AC-39: the Administrator: 409 slot_taken without overbook, 201 with overbook: true; nothing about the force is stored (D31)', async () => {
+    studioHolds(2);
+    onPartition('APPT', [apptItem(START, END), carolItem(START, END)]);
+    cognitoTarget(['user']);
+    expect(bodyOf(await post({ username: 'dave', start: START }, admin)).error).toBe('slot_taken');
+    expect(bodyOf(await post({ username: 'dave', start: START, overbook: false }, admin)).error).toBe('slot_taken');
+    const forced = await post({ username: 'dave', start: START, overbook: true }, admin);
+    expect(forced.statusCode).toBe(201);
+    expect(bodyOf(forced)).not.toHaveProperty('overbook');
+    const items = transactions()[0]!.TransactItems!;
+    expect(items[1]!.Put!.Item).not.toHaveProperty('overbook');
+    expect(items[3]!.Put!.Item!.type).toBe('appointment.booked');
+  });
+
+  it('AC-40: the Administrator booking a User at a time the User holds: 409 user_busy, also with overbook: true', async () => {
+    studioHolds(2);
+    onPartition('APPT', [apptItem(START, END, { userId: DAVE_SUB, username: 'dave' })]);
+    cognitoTarget(['user']);
+    for (const overbook of [undefined, true]) {
+      const response = await post({ username: 'dave', start: START, overbook }, admin);
+      expect(response.statusCode).toBe(409);
+      expect(bodyOf(response)).toEqual({ error: 'user_busy', message: 'The User already has an appointment at this time' });
+    }
+    expect(transactions()).toHaveLength(0);
+  });
+
+  it('R-BOOK-12: a User booking over their own appointment: 409 user_busy', async () => {
+    onPartition('APPT', [apptItem('2026-11-16T08:30:00.000Z', END, { userId: 'sub-alice', username: 'alice' })]);
+    expect(bodyOf(await post({ start: START }))).toEqual({ error: 'user_busy', message: 'The User already has an appointment at this time' });
+  });
+
+  it('AC-41: a User sending overbook: true is 403 forbidden, before the grid and with nothing touched', async () => {
+    const response = await post({ start: '2026-11-16T08:30:00.000Z', overbook: true });
+    expect(response.statusCode).toBe(403);
+    expect(bodyOf(response)).toEqual({ error: 'forbidden', message: 'Only the Administrator can book over the capacity' });
+    expect(ddb.calls()).toHaveLength(0);
+    expect(logLines()).toEqual([expect.objectContaining({ outcome: 'forbidden', status: 403, username: 'alice' })]);
+  });
+
+  it('R-BOOK-13 after R-BOOK-01: a User naming someone else with overbook: true gets the naming’s 403', async () => {
+    expect(bodyOf(await post({ start: START, username: 'bob', overbook: true }))).toEqual({ error: 'forbidden', message: 'A User can book only for themself' });
+  });
+
+  it('a User sending overbook: false books as without it', async () => {
+    expect((await post({ start: START, overbook: false })).statusCode).toBe(201);
+  });
+
+  it('400 for an overbook that is not a boolean', async () => {
+    const response = await post({ start: START, overbook: 'true' });
+    expect(response.statusCode).toBe(400);
+    expect(bodyOf(response).error).toBe('invalid_request');
   });
 });

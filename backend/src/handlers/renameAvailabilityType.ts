@@ -15,8 +15,10 @@ const REFUSALS = {
 } as const;
 
 // PUT /calendar/types/{typeId} (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 5): the
-// Administrator only. Renames a type under the calendar lock (docs/SHARED_CALENDAR_SPEC.md
-// R-TYPE-02). One log line with the typeId and the lock attempts, never the body or the name
+// Administrator only. Edits a type under the calendar lock (docs/SHARED_CALENDAR_SPEC.md
+// R-TYPE-02): the name, and the capacity when the body has one, else the stored one is kept
+// (docs/SHARED_CALENDAR_SPEC.md R-TYPE-05). A capacity lowered below the people already booked
+// cancels nothing (docs/SHARED_CALENDAR_SPEC.md decision D28). One log line with the typeId and the lock attempts, never the body or the name
 // (docs/SHARED_CALENDAR_SPEC.md section 14.5).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
@@ -53,10 +55,10 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   if (!json.ok) return done('invalid_request', json.response, { ...caller, typeId });
   const body = validate(TypeBody, json.value);
   if (!body.ok) return done('invalid_request', body.response, { ...caller, typeId });
-  const { name } = body.value;
+  const { name, capacity } = body.value;
 
   try {
-    const { result, attempts } = await renameType(typeId, { name, nameKey: typeNameKey(name) }, now, (types) =>
+    const { result, attempts } = await renameType(typeId, { name, nameKey: typeNameKey(name), capacity }, now, (types) =>
       checkTypeName(name, types, typeId),
     );
     const fields = { ...caller, typeId, lockAttempts: attempts };

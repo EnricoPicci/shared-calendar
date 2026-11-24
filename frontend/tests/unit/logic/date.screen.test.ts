@@ -47,8 +47,8 @@ const START: DateState = {
 };
 const STAMPS = { createdAt: '2026-11-01T10:00:00.000Z', updatedAt: '2026-11-01T10:00:00.000Z' };
 const TYPES: AvailabilityType[] = [
-  { typeId: POOL, name: 'Piscina', ...STAMPS },
-  { typeId: STUDIO, name: 'Studio', ...STAMPS },
+  { typeId: POOL, name: 'Piscina', capacity: 1, ...STAMPS },
+  { typeId: STUDIO, name: 'Studio', capacity: 1, ...STAMPS },
 ];
 const P1 = '01M6PATTERN000000000000001';
 const W1 = '01M6W1ND0W0000000000000001';

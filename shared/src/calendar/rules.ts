@@ -25,6 +25,11 @@ export type OneOffInput = Pick<OneOffWindow, 'windowId' | 'date' | 'start' | 'en
 export type SourcedWindow = { start: string; end: string; typeId: string; source: WindowSource; sourceId: string };
 /** An effective window (docs/SHARED_CALENDAR_SPEC.md section 6.6): instants, merged. */
 export type EffectiveWindow = { start: string; end: string; typeId: string };
+/**
+ * A slot's times and type, as slotsOf gives them. Its capacity and places left depend on the
+ * appointments, so the calendar view adds them (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02).
+ */
+export type SlotTimes = Pick<Slot, 'start' | 'end' | 'typeId'>;
 
 // Local times and instants both sort as strings. Array.prototype.sort is stable: windows with the
 // same start (only in data that breaks docs/SHARED_CALENDAR_SPEC.md R-AV-01) keep their order.
@@ -96,8 +101,8 @@ export function effectiveWindows(windows: readonly { start: string; end: string;
  * night clocks go forward the window 01:00–04:00 gives 01:00 (ending at local 03:00) and 03:00; on
  * the night they go back it gives four slots, two of them at local 02:00 (one per offset).
  */
-export function slotsOf(window: EffectiveWindow, zone: string): Slot[] {
-  const slots: Slot[] = [];
+export function slotsOf(window: EffectiveWindow, zone: string): SlotTimes[] {
+  const slots: SlotTimes[] = [];
   const end = Date.parse(window.end);
   let s = Date.parse(window.start);
   while (s + SLOT_MS <= end) {

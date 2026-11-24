@@ -117,7 +117,7 @@ describe('weekModel', () => {
       {
         date: '2027-07-05',
         windows: [{ start: z('2027-07-05T07:00'), end: z('2027-07-05T11:00'), typeId: STUDIO, typeName: 'Studio' }],
-        slots: [{ start: z('2027-07-05T07:00'), end: z('2027-07-05T08:00'), typeId: STUDIO }],
+        slots: [{ start: z('2027-07-05T07:00'), end: z('2027-07-05T08:00'), typeId: STUDIO, capacity: 1, placesLeft: 1 }],
       },
     ]);
     const day = weekModel(week, 'user').days[0]!;
@@ -132,7 +132,7 @@ describe('weekModel', () => {
       {
         date: '2026-11-16',
         windows: [{ start: z('2026-11-16T03:30'), end: z('2026-11-16T05:30'), typeId: STUDIO, typeName: 'Studio' }],
-        slots: [{ start: z('2026-11-16T03:30'), end: z('2026-11-16T04:30'), typeId: STUDIO }],
+        slots: [{ start: z('2026-11-16T03:30'), end: z('2026-11-16T04:30'), typeId: STUDIO, capacity: 1, placesLeft: 1 }],
       },
     ]);
     const model = weekModel(week, 'user');
@@ -186,7 +186,7 @@ describe('weekModel', () => {
 
   describe('the week of 2027-10-31, when the clocks go back in Europe/Rome (R-SLOT-01)', () => {
     // A window 01:00–04:00 local on Sunday holds four real hours and four slots.
-    const slot = (start: string, end: string) => ({ start: z(start), end: z(end), typeId: STUDIO });
+    const slot = (start: string, end: string) => ({ start: z(start), end: z(end), typeId: STUDIO, capacity: 1, placesLeft: 1 });
     const week: CalendarView = view('2027-10-25', { generatedAt: z('2027-10-20T09:00') }, [
       {
         date: '2027-10-30',
@@ -280,8 +280,8 @@ describe('weekModel', () => {
         date: '2027-03-28',
         windows: [{ start: z('2027-03-28T00:00'), end: z('2027-03-28T02:00'), typeId: STUDIO, typeName: 'Studio' }],
         slots: [
-          { start: z('2027-03-28T00:00'), end: z('2027-03-28T01:00'), typeId: STUDIO },
-          { start: z('2027-03-28T01:00'), end: z('2027-03-28T02:00'), typeId: STUDIO },
+          { start: z('2027-03-28T00:00'), end: z('2027-03-28T01:00'), typeId: STUDIO, capacity: 1, placesLeft: 1 },
+          { start: z('2027-03-28T01:00'), end: z('2027-03-28T02:00'), typeId: STUDIO, capacity: 1, placesLeft: 1 },
         ],
       },
     ]);
@@ -318,8 +318,8 @@ describe('weekModel', () => {
             { start: z('2026-11-16T11:00'), end: z('2026-11-16T13:00'), typeId: POOL, typeName: 'Swimming Pool' },
           ],
           slots: [
-            { start: z('2026-11-16T09:00'), end: z('2026-11-16T10:00'), typeId: STUDIO },
-            { start: z('2026-11-16T11:00'), end: z('2026-11-16T12:00'), typeId: POOL },
+            { start: z('2026-11-16T09:00'), end: z('2026-11-16T10:00'), typeId: STUDIO, capacity: 1, placesLeft: 1 },
+            { start: z('2026-11-16T11:00'), end: z('2026-11-16T12:00'), typeId: POOL, capacity: 1, placesLeft: 1 },
           ],
         },
       ]);
@@ -330,7 +330,7 @@ describe('weekModel', () => {
     });
 
     it('a slot that no window of the answer holds is its own window, and its type has no name', () => {
-      const week = view('2026-11-16', {}, [{ date: '2026-11-17', slots: [{ start: z('2026-11-17T08:00'), end: z('2026-11-17T09:00'), typeId: STUDIO }] }]);
+      const week = view('2026-11-16', {}, [{ date: '2026-11-17', slots: [{ start: z('2026-11-17T08:00'), end: z('2026-11-17T09:00'), typeId: STUDIO, capacity: 1, placesLeft: 1 }] }]);
       expect(weekModel(week, 'user').days[1]!.slots[0]).toMatchObject({
         day: 'Tue 17 Nov',
         typeName: '',
@@ -339,7 +339,7 @@ describe('weekModel', () => {
     });
 
     it('the two slots at 02:00 of 2027-10-31 carry their own instants, an hour apart, in one window', () => {
-      const slot = (start: string, end: string) => ({ start: z(start), end: z(end), typeId: STUDIO });
+      const slot = (start: string, end: string) => ({ start: z(start), end: z(end), typeId: STUDIO, capacity: 1, placesLeft: 1 });
       const week = view('2027-10-25', {}, [
         {
           date: '2027-10-31',

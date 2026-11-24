@@ -152,6 +152,14 @@ describe('get_calendar (3, 8.3)', () => {
     expect(list?.items[2]).toMatchObject({ freeSlots: ['09:00', '10:00'], appointments: [] });
   });
 
+  it('gives the Administrator the free slots only: the full ones the route also gives are left out', () => {
+    const { list } = getCalendar.toModel(recorded.admin.calendar, ADMIN);
+    // Tuesday 10:00 is alice's appointment: the route gives the Administrator that slot with no
+    // place left, and the model is not told it is free.
+    expect(recorded.admin.calendar.days[1]!.slots.map((slot) => slot.placesLeft)).toEqual([1, 0, 1]);
+    expect(list?.items[1]).toMatchObject({ date: '2026-11-24', freeSlots: ['09:00', '11:00'] });
+  });
+
   it("gives the Administrator everybody's appointments", () => {
     const { list } = getCalendar.toModel(recorded.admin.calendar, ADMIN);
     expect(list?.items[2]).toMatchObject({
@@ -241,7 +249,7 @@ describe('get_calendar (3, 8.3)', () => {
         date,
         weekday: weekday as 7,
         windows: [{ start, end, typeId: '01A', typeName: 'Visit' }],
-        slots: slots.map((slot) => ({ start: slot, end: slot, typeId: '01A' })),
+        slots: slots.map((slot) => ({ start: slot, end: slot, typeId: '01A', capacity: 1, placesLeft: 1 })),
         busy: [],
       },
     ],

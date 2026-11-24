@@ -6,7 +6,7 @@ import { CONFIG, describeMethod, type MethodSpec } from './suite';
 // docs/FRONTEND_SERVICES.md section 16.8: the per-method suite of suite.ts for the four methods.
 
 const TYPE_ID = '01JCAAAAAAAAAAAAAAAAAAAAAA';
-const STUDIO: AvailabilityType = { typeId: TYPE_ID, name: 'Studio', createdAt: '2026-11-15T09:00:00.000Z', updatedAt: '2026-11-15T09:00:00.000Z' };
+const STUDIO: AvailabilityType = { typeId: TYPE_ID, name: 'Studio', capacity: 1, createdAt: '2026-11-15T09:00:00.000Z', updatedAt: '2026-11-15T09:00:00.000Z' };
 const POOL: AvailabilityType = { ...STUDIO, typeId: '01JCBBBBBBBBBBBBBBBBBBBBBB', name: 'Swimming Pool' };
 const TOO_LONG = 'x'.repeat(41);
 

@@ -78,17 +78,36 @@ const logLines = () => output.map((line) => JSON.parse(line) as Record<string, u
 const body = (response: Awaited<ReturnType<Handler>>) => JSON.parse(response.body ?? '') as Record<string, unknown>;
 const transactions = () => ddb.commandCalls(TransactWriteCommand).map((call) => call.args[0].input);
 
+// Test names: R-… rules, AC-… scenarios and section numbers are those of
+// docs/SHARED_CALENDAR_SPEC.md (scenarios in its section 18.3).
 describe('renameAvailabilityType handler', () => {
   it('renames the type, keeps createdAt, sets updatedAt to "now", and answers 200', async () => {
     const response = await handler(asAdmin());
     expect(response.statusCode).toBe(200);
-    expect(body(response)).toEqual({ typeId: STUDIO, name: 'Gym', createdAt: EARLIER, updatedAt: NOW });
+    expect(body(response)).toEqual({ typeId: STUDIO, name: 'Gym', capacity: 1, createdAt: EARLIER, updatedAt: NOW });
     expect(transactions()[0]!.TransactItems![1]).toEqual({
       Put: {
         TableName: 'calendar-test',
         Item: { PK: 'TYPE', SK: STUDIO, name: 'Gym', nameKey: 'gym', createdAt: EARLIER, updatedAt: NOW },
       },
     });
+  });
+
+  it('edits the capacity, also lowered, and keeps the stored one when the body has none (R-TYPE-05, 11.4, AC-44)', async () => {
+    ddb.on(QueryCommand).resolves({ Items: [{ ...typeItem(STUDIO, 'Studio'), capacity: 3 }] });
+    const kept = await handler(asAdmin(STUDIO, JSON.stringify({ name: 'Studio' })));
+    expect(body(kept)).toMatchObject({ name: 'Studio', capacity: 3 });
+    const lowered = await handler(asAdmin(STUDIO, JSON.stringify({ name: 'Studio', capacity: 1 })));
+    expect(lowered.statusCode).toBe(200);
+    expect(body(lowered)).toMatchObject({ capacity: 1 });
+    expect(transactions().map((t) => t.TransactItems![1]!.Put!.Item!.capacity)).toEqual([3, 1]);
+  });
+
+  it('answers 400 for a capacity out of range, and touches nothing', async () => {
+    const response = await handler(asAdmin(STUDIO, JSON.stringify({ name: 'Gym', capacity: 0 })));
+    expect(response.statusCode).toBe(400);
+    expect(body(response)).toEqual({ error: 'invalid_request', message: 'Invalid input: capacity' });
+    expect(ddb.calls()).toHaveLength(0);
   });
 
   it.each(['Studio', 'STUDIO', 'studio'])('allows keeping its own name, also in another case (%s)', async (name) => {

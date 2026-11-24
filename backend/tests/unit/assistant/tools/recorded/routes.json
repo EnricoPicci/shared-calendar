@@ -14,6 +14,7 @@
         {
           "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
           "name": "Trial visit",
+          "capacity": 1,
           "createdAt": "2026-11-21T14:54:05.224Z",
           "updatedAt": "2026-11-21T14:54:05.224Z"
         }
@@ -40,17 +41,23 @@
             {
               "start": "2026-11-23T08:00:00.000Z",
               "end": "2026-11-23T09:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             },
             {
               "start": "2026-11-23T09:00:00.000Z",
               "end": "2026-11-23T10:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             },
             {
               "start": "2026-11-23T10:00:00.000Z",
               "end": "2026-11-23T11:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             }
           ],
           "busy": []
@@ -70,12 +77,16 @@
             {
               "start": "2026-11-24T08:00:00.000Z",
               "end": "2026-11-24T09:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             },
             {
               "start": "2026-11-24T10:00:00.000Z",
               "end": "2026-11-24T11:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             }
           ],
           "busy": []
@@ -95,12 +106,16 @@
             {
               "start": "2026-11-25T08:00:00.000Z",
               "end": "2026-11-25T09:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             },
             {
               "start": "2026-11-25T09:00:00.000Z",
               "end": "2026-11-25T10:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             }
           ],
           "busy": [
@@ -125,12 +140,16 @@
             {
               "start": "2026-11-26T09:00:00.000Z",
               "end": "2026-11-26T10:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             },
             {
               "start": "2026-11-26T10:00:00.000Z",
               "end": "2026-11-26T11:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             }
           ],
           "busy": []
@@ -150,17 +169,23 @@
             {
               "start": "2026-11-27T08:00:00.000Z",
               "end": "2026-11-27T09:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             },
             {
               "start": "2026-11-27T09:00:00.000Z",
               "end": "2026-11-27T10:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             },
             {
               "start": "2026-11-27T10:00:00.000Z",
               "end": "2026-11-27T11:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             }
           ],
           "busy": []
@@ -311,6 +336,7 @@
         {
           "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
           "name": "Trial visit",
+          "capacity": 1,
           "createdAt": "2026-11-21T14:54:05.224Z",
           "updatedAt": "2026-11-21T14:54:05.224Z"
         }
@@ -339,17 +365,23 @@
             {
               "start": "2026-11-23T08:00:00.000Z",
               "end": "2026-11-23T09:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             },
             {
               "start": "2026-11-23T09:00:00.000Z",
               "end": "2026-11-23T10:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             },
             {
               "start": "2026-11-23T10:00:00.000Z",
               "end": "2026-11-23T11:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             }
           ],
           "busy": [],
@@ -372,12 +404,23 @@
             {
               "start": "2026-11-24T08:00:00.000Z",
               "end": "2026-11-24T09:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
+            },
+            {
+              "start": "2026-11-24T09:00:00.000Z",
+              "end": "2026-11-24T10:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 0
             },
             {
               "start": "2026-11-24T10:00:00.000Z",
               "end": "2026-11-24T11:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             }
           ],
           "busy": [],
@@ -400,12 +443,23 @@
             {
               "start": "2026-11-25T08:00:00.000Z",
               "end": "2026-11-25T09:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             },
             {
               "start": "2026-11-25T09:00:00.000Z",
               "end": "2026-11-25T10:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
+            },
+            {
+              "start": "2026-11-25T10:00:00.000Z",
+              "end": "2026-11-25T11:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 0
             }
           ],
           "busy": [],
@@ -426,14 +480,25 @@
           ],
           "slots": [
             {
+              "start": "2026-11-26T08:00:00.000Z",
+              "end": "2026-11-26T09:00:00.000Z",
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 0
+            },
+            {
               "start": "2026-11-26T09:00:00.000Z",
               "end": "2026-11-26T10:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             },
             {
               "start": "2026-11-26T10:00:00.000Z",
               "end": "2026-11-26T11:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             }
           ],
           "busy": [],
@@ -456,17 +521,23 @@
             {
               "start": "2026-11-27T08:00:00.000Z",
               "end": "2026-11-27T09:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             },
             {
               "start": "2026-11-27T09:00:00.000Z",
               "end": "2026-11-27T10:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             },
             {
               "start": "2026-11-27T10:00:00.000Z",
               "end": "2026-11-27T11:00:00.000Z",
-              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ"
+              "typeId": "01M7Z9K9XKJTEANM7CDK1BEDZZ",
+              "capacity": 1,
+              "placesLeft": 1
             }
           ],
           "busy": [],

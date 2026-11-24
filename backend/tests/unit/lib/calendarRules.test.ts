@@ -149,7 +149,7 @@ describe('checkAvailabilityWrite', () => {
   // Pattern Mon 08:00–12:00 Studio from 2026-11-01, no end (docs/SHARED_CALENDAR_SPEC.md AC-04).
   const ac04 = { patternId: P1, weekday: 1, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-11-01', validUntil: null };
   const state = (more: Partial<CalendarState> = {}): CalendarState => ({
-    types: [{ typeId: STUDIO }, { typeId: POOL }],
+    types: [{ typeId: STUDIO, capacity: 1 }, { typeId: POOL, capacity: 1 }],
     patterns: [ac04],
     overrides: [],
     oneOffs: [],

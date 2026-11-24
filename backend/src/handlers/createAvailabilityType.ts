@@ -15,7 +15,8 @@ const REFUSALS = {
 
 // POST /calendar/types (docs/SHARED_CALENDAR_SPEC.md section 11.1, route 4): the Administrator
 // only. Creates a type under the calendar lock with a unique name, at most 20 types
-// (docs/SHARED_CALENDAR_SPEC.md R-TYPE-01). One log line with the new typeId and the lock attempts,
+// (docs/SHARED_CALENDAR_SPEC.md R-TYPE-01), and the capacity of the body, 1 when it has none
+// (docs/SHARED_CALENDAR_SPEC.md R-TYPE-05). One log line with the new typeId and the lock attempts,
 // never the body or the name (docs/SHARED_CALENDAR_SPEC.md section 14.5).
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
@@ -48,12 +49,12 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   if (!json.ok) return done('invalid_request', json.response, caller);
   const body = validate(TypeBody, json.value);
   if (!body.ok) return done('invalid_request', body.response, caller);
-  const { name } = body.value;
+  const { name, capacity } = body.value;
 
   // Generated once, outside the lock loop: a retry writes the same id.
   const typeId = ulid();
   try {
-    const { result, attempts } = await createType({ typeId, name, nameKey: typeNameKey(name) }, now, (types) =>
+    const { result, attempts } = await createType({ typeId, name, nameKey: typeNameKey(name), capacity }, now, (types) =>
       checkTypeName(name, types),
     );
     const fields = { ...caller, typeId, lockAttempts: attempts };

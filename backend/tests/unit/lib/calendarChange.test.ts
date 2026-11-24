@@ -40,7 +40,7 @@ const stateAppt = (id: string, start: string, end: string, more: Partial<StateAp
 });
 const OLD = stateAppt(OLD_ID, H0900, H1000);
 const state = (more: Partial<CalendarState> = {}): CalendarState => ({
-  types: [{ typeId: STUDIO }, { typeId: POOL }],
+  types: [{ typeId: STUDIO, capacity: 1 }, { typeId: POOL, capacity: 1 }],
   patterns: [ac04],
   overrides: [],
   oneOffs: [],
@@ -175,5 +175,46 @@ describe('checkChange (8.4, R-CHG-01)', () => {
     it('a cancelled old one outside availability: 409 appointment_not_active, not outside_availability', () => {
       expect(change(at('12:00'), at('13:00'), { appointment: { ...old, status: 'cancelled' } })).toEqual(refused('appointment_not_active'));
     });
+  });
+});
+
+// The capacity of a type in a change: the Studio of docs/SHARED_CALENDAR_SPEC.md AC-04 with a
+// capacity of 2.
+const studioOf = (capacity: number, appointments: StateAppointment[]) =>
+  state({ types: [{ typeId: STUDIO, capacity }, { typeId: POOL, capacity: 1 }], appointments });
+const bobAt = (id: string, start: string, end: string) => stateAppt(id, start, end, { userId: 'sub-bob', username: 'bob' });
+const carolAt = (id: string, start: string, end: string) => stateAppt(id, start, end, { userId: 'sub-carol', username: 'carol' });
+
+// Test names: R-… rules and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in
+// its section 18.3).
+describe('checkChange: the capacity (R-CHG-01, R-BOOK-07, R-BOOK-12, R-BOOK-13)', () => {
+  it('into a slot with a place left: allowed', () => {
+    expect(change(H1000, H1100, { state: studioOf(2, [OLD, bobAt(OTHER_ID, H1000, H1100)]) })).toEqual(studio);
+  });
+
+  it('into a full slot: slot_taken for a User and for the Administrator; the Administrator with overbook: true moves it', () => {
+    const full = studioOf(2, [OLD, bobAt(OTHER_ID, H1000, H1100), carolAt('01JC00000000000000000000C1', H1000, H1100)]);
+    expect(change(H1000, H1100, { state: full })).toEqual(refused('slot_taken'));
+    expect(change(H1000, H1100, { caller: ADMIN, state: full })).toEqual(refused('slot_taken'));
+    expect(change(H1000, H1100, { caller: ADMIN, overbook: true, state: full })).toEqual(studio);
+  });
+
+  it('extended into its own time in a full slot: the old appointment is left out of the places (R-CHG-01)', () => {
+    // 09:00–10:00 with bob there too fills a capacity of 2; alice's own old time is not a third person.
+    const full = studioOf(2, [OLD, bobAt(OTHER_ID, H0900, H1000)]);
+    expect(change(H0900, H1030, { caller: ADMIN, state: full })).toEqual(studio);
+  });
+
+  it('onto another appointment of the same User: user_busy, forced or not; the old one itself is left out (R-BOOK-12)', () => {
+    const second = stateAppt(OTHER_ID, H1000, H1100);
+    for (const overbook of [false, true]) {
+      expect(change(H1000, H1100, { caller: ADMIN, overbook, state: studioOf(2, [OLD, second]) })).toEqual(refused('user_busy'));
+    }
+    expect(change(H0900, H1030, { caller: ADMIN, state: studioOf(2, [OLD]) })).not.toHaveProperty('error');
+  });
+
+  it('the old appointment is checked before the new one: someone else’s is 404 even into a full slot', () => {
+    const full = studioOf(1, [OLD, bobAt(OTHER_ID, H1000, H1100)]);
+    expect(change(H1000, H1100, { caller: BOB, state: full })).toEqual(refused('appointment_not_found'));
   });
 });

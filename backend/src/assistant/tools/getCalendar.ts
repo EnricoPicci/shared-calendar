@@ -43,7 +43,8 @@ const parts: ReadTool<z.infer<typeof Input>> = {
   toHandler: { handler, request: ({ from, to }) => ({ routeKey: 'GET /calendar', path: '/calendar', query: { from, to } }) },
   // A day as its windows, its free slot starts and its appointments, in wall-clock times. The days
   // with nothing on them are left out, which keeps a month of mostly closed days small; the busy
-  // time of other people stays out. The id of a window's type, where the window comes from, the
+  // time of other people stays out, and so do the full slots the route gives the Administrator
+  // (docs/SHARED_CALENDAR_SPEC.md decision D30): a free slot has a place left. The id of a window's type, where the window comes from, the
   // id of an extra window and whether the date has hours of its own are given to the
   // Administrator only, who alone can change the hours; a day closed by hours of its own is then kept.
   toModel: (body, { timeZone, role }) => {
@@ -61,7 +62,7 @@ const parts: ReadTool<z.infer<typeof Input>> = {
           ...(admin && { typeId: window.typeId, source: window.source }),
           ...(admin && window.source === 'one_off' && { id: window.sourceId }),
         })),
-        freeSlots: day.slots.map((slot) => slotTime(slot.start, timeZone)),
+        freeSlots: day.slots.filter((slot) => slot.placesLeft > 0).map((slot) => slotTime(slot.start, timeZone)),
         appointments: view.appointments.filter((appointment) => appointment.date === day.date).map((appointment) => appointmentForModel(appointment, timeZone)),
       }))
       .filter((day) => day.windows.length > 0 || day.appointments.length > 0 || day.hasOverride === true);

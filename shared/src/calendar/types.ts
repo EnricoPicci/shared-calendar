@@ -25,7 +25,12 @@ export type CalendarSettings = {
   updatedBy: Actor | null;
 };
 
-export type AvailabilityType = { typeId: string; name: string; createdAt: string; updatedAt: string };
+/**
+ * A type (docs/SHARED_CALENDAR_SPEC.md section 11.5). `capacity` is how many people it holds at the
+ * same time, 1 to 100 (docs/SHARED_CALENDAR_SPEC.md decision D24); a type stored before the
+ * capacity existed answers 1 (docs/SHARED_CALENDAR_SPEC.md section 13.2).
+ */
+export type AvailabilityType = { typeId: string; name: string; capacity: number; createdAt: string; updatedAt: string };
 /** 200 of GET /calendar/types, sorted by name. */
 export type ListTypesResponse = { types: AvailabilityType[] };
 
@@ -87,7 +92,13 @@ export type CalendarWindow = {
   source?: WindowSource; // admin only
   sourceId?: string; // admin only
 };
-export type Slot = { start: string; end: string; typeId: string };
+/**
+ * A slot of the view (docs/SHARED_CALENDAR_SPEC.md section 11.6): its times, its type, the type's
+ * capacity, and its places left, the capacity minus the people in it, never below 0
+ * (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02). `placesLeft: 0` is a full slot, which only the
+ * Administrator gets (docs/SHARED_CALENDAR_SPEC.md decision D30).
+ */
+export type Slot = { start: string; end: string; typeId: string; capacity: number; placesLeft: number };
 export type Interval = { start: string; end: string };
 
 export type CalendarDay = {
@@ -95,9 +106,13 @@ export type CalendarDay = {
   weekday: number;
   // The defined windows (docs/SHARED_CALENDAR_SPEC.md section 6.5): sorted instants, not merged.
   windows: CalendarWindow[];
-  // Free slots bookable by the caller (docs/SHARED_CALENDAR_SPEC.md R-SLOT-03, R-SLOT-04).
+  // For a User, the slots with a place left that the User may book (docs/SHARED_CALENDAR_SPEC.md
+  // R-SLOT-03); for the Administrator, every future slot, the full ones included with
+  // `placesLeft: 0` (docs/SHARED_CALENDAR_SPEC.md R-SLOT-04).
   slots: Slot[];
-  busy: Interval[]; // users only: other people's active appointments, no names; [] for the Administrator
+  // For a User, the times that are full, no names, the User's own appointments taken out
+  // (docs/SHARED_CALENDAR_SPEC.md R-SLOT-06); [] for the Administrator.
+  busy: Interval[];
   hasOverride?: boolean; // admin only
 };
 

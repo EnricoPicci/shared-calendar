@@ -16,8 +16,8 @@ export const P_POOL = '01M6DN0000000000000000PP01';
 export const DEFAULTS = { cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 56 };
 
 export const TYPES = [
-  { typeId: STUDIO, name: 'Studio' },
-  { typeId: POOL, name: 'Swimming Pool' },
+  { typeId: STUDIO, name: 'Studio', capacity: 1 },
+  { typeId: POOL, name: 'Swimming Pool', capacity: 1 },
 ];
 export const PATTERNS = [
   { patternId: P_STUDIO, weekday: 1, start: '08:00', end: '12:00', typeId: STUDIO, validFrom: '2026-11-01', validUntil: null },

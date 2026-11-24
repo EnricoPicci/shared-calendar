@@ -1114,7 +1114,7 @@ describe('the navigation', () => {
         {
           date: '2026-12-07',
           windows: [{ start: '2026-12-07T07:00:00.000Z', end: '2026-12-07T11:00:00.000Z', typeId: STUDIO, typeName: 'Studio' }],
-          slots: [{ start: '2026-12-07T07:00:00.000Z', end: '2026-12-07T08:00:00.000Z', typeId: STUDIO }],
+          slots: [{ start: '2026-12-07T07:00:00.000Z', end: '2026-12-07T08:00:00.000Z', typeId: STUDIO, capacity: 1, placesLeft: 1 }],
         },
       ]);
 

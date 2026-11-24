@@ -8,6 +8,7 @@ import {
   isWholeLocalHour,
   localDateOf,
   overlaps,
+  peopleIn,
   slotsOf,
   toInstantWindows,
   weekdayOf,
@@ -20,6 +21,7 @@ import {
   type Interval,
   type Role,
   type Slot,
+  type SlotTimes,
   type AppointmentConflict,
   type AppointmentStatus,
   type OneOffInput,
@@ -61,13 +63,13 @@ export type StateAppointment = Pick<Appointment, 'appointmentId' | 'username' | 
 
 /**
  * The availability state calendarDb reads inside a locked attempt (the access patterns of
- * docs/SHARED_CALENDAR_SPEC.md section 13.2): every type and every pattern; the overrides and
+ * docs/SHARED_CALENDAR_SPEC.md section 13.2): every type with its capacity and every pattern; the overrides and
  * one-off windows dated today or later; the appointments that started at most 24 h ago. Nothing
  * earlier can still matter: an appointment lies inside one date, so one that has not ended is dated
  * today or later (docs/SHARED_CALENDAR_SPEC.md R-AV-02 for the rest).
  */
 export type CalendarState = {
-  types: readonly { typeId: string }[];
+  types: readonly { typeId: string; capacity: number }[];
   patterns: readonly PatternInput[];
   overrides: readonly OverrideInput[];
   oneOffs: readonly OneOffInput[];
@@ -354,7 +356,13 @@ export function checkBookingTimes(
 }
 
 export type BookingRefusal = Refusal<
-  'booking_in_past' | 'booking_notice_too_short' | 'booking_beyond_horizon' | 'outside_availability' | 'slot_taken' | 'appointment_limit_reached'
+  | 'booking_in_past'
+  | 'booking_notice_too_short'
+  | 'booking_beyond_horizon'
+  | 'outside_availability'
+  | 'user_busy'
+  | 'slot_taken'
+  | 'appointment_limit_reached'
 >;
 
 export type BookingInput = {
@@ -364,6 +372,11 @@ export type BookingInput = {
   role: Role;
   /** The Cognito `sub` of the User the appointment is for. */
   userId: string;
+  /**
+   * The Administrator's force (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13): absent is false. It lifts
+   * the capacity for the Administrator only; the handler has already refused a User sending it.
+   */
+  overbook?: boolean;
   settings: Pick<CalendarSettings, 'minBookingNoticeHours' | 'bookingHorizonDays' | 'maxFutureAppointmentsPerUser'>;
   state: CalendarState;
   now: string;
@@ -373,7 +386,7 @@ export type BookingInput = {
 
 /**
  * The booking rules that need the calendar (docs/SHARED_CALENDAR_SPEC.md section 8.2, step 5 of its
- * order), on the settings and the state read inside the locked attempt, in table order; the first
+ * order), on the settings and the state read inside the locked attempt, in that order; the first
  * that fails decides:
  * - docs/SHARED_CALENDAR_SPEC.md R-BOOK-03 `start > now`: `booking_in_past`;
  * - docs/SHARED_CALENDAR_SPEC.md R-BOOK-04 `start − now ≥ minBookingNoticeHours` (a User only):
@@ -383,8 +396,14 @@ export type BookingInput = {
  * - docs/SHARED_CALENDAR_SPEC.md R-BOOK-06 inside one effective window (docs/SHARED_CALENDAR_SPEC.md
  *   section 6.6: merged across sources) of the start's local date, a window whose type no longer
  *   exists left out as in the view: `outside_availability`;
- * - docs/SHARED_CALENDAR_SPEC.md R-BOOK-07 no booked appointment overlaps, compared as instants
- *   (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02): `slot_taken`;
+ * - docs/SHARED_CALENDAR_SPEC.md R-BOOK-12 no booked appointment of the target User (by `userId`)
+ *   overlaps, compared as instants: `user_busy`. Nothing lifts it, `overbook` included, and it
+ *   comes before the capacity, so the Administrator is never asked to force a booking the force
+ *   cannot make;
+ * - docs/SHARED_CALENDAR_SPEC.md R-BOOK-07 the people in `[start, end)`, the booked appointments
+ *   counted at their peak (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02), are fewer than the capacity of
+ *   the window's type: `slot_taken`. The Administrator's `overbook` lifts it; on a time with a
+ *   place left `overbook` changes nothing;
  * - docs/SHARED_CALENDAR_SPEC.md R-BOOK-09 (a User only) the User's booked appointments with
  *   `start > now`, by `userId`, are fewer than `maxFutureAppointmentsPerUser` when it is not null:
  *   `appointment_limit_reached`. One in progress or ended does not count.
@@ -408,7 +427,15 @@ export function checkBooking(input: BookingInput): { window: EffectiveWindow } |
   if (!window) return refuse('outside_availability', 'The time is not inside the availability');
 
   const booked = state.appointments.filter((a) => a.status === 'booked');
-  if (booked.some((a) => overlaps(a, { start, end }))) return refuse('slot_taken', 'The time is already booked');
+  if (booked.some((a) => a.userId === userId && overlaps(a, { start, end }))) {
+    return refuse('user_busy', 'The User already has an appointment at this time');
+  }
+  // The window's type exists: the check of docs/SHARED_CALENDAR_SPEC.md R-BOOK-06 above kept only
+  // the windows of existing types.
+  const capacity = state.types.find((t) => t.typeId === window.typeId)!.capacity;
+  if (!(admin && input.overbook === true) && peopleIn({ start, end }, booked) >= capacity) {
+    return refuse('slot_taken', 'The time is already booked');
+  }
 
   const limit = settings.maxFutureAppointmentsPerUser;
   if (!admin && limit !== null && booked.filter((a) => a.userId === userId && a.start > now).length >= limit) {
@@ -515,6 +542,8 @@ export type ChangeInput = {
   /** The new times docs/SHARED_CALENDAR_SPEC.md R-BOOK-02 accepted for the caller's role, `end` filled in. */
   start: string;
   end: string;
+  /** The Administrator's force, as in a booking (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13). */
+  overbook?: boolean;
   settings: Pick<CalendarSettings, 'cancellationNoticeHours' | 'minBookingNoticeHours' | 'bookingHorizonDays' | 'maxFutureAppointmentsPerUser'>;
   state: CalendarState;
   now: string;
@@ -530,20 +559,20 @@ export type ChangeInput = {
  *   for a User R-CAN-03 (`cancellation_notice_too_short`, with a change's wording);
  * - the new one, as a booking (checkBooking) for the old appointment's User
  *   (docs/SHARED_CALENDAR_SPEC.md R-BOOK-01: its `userId`), on the state with the old appointment
- *   left out by id: that is both adjustments of docs/SHARED_CALENDAR_SPEC.md R-CHG-01, R-BOOK-07
- *   ignores it and R-BOOK-09 does not count it.
+ *   left out by id: that is both adjustments of docs/SHARED_CALENDAR_SPEC.md R-CHG-01, R-BOOK-12
+ *   and R-BOOK-07 ignore it and R-BOOK-09 does not count it. `overbook` is passed on.
  * docs/SHARED_CALENDAR_SPEC.md R-BOOK-10 is not here: the marker is a condition of the transaction.
  * Answers the effective window that holds the new appointment: its type is the new appointment's.
  */
 export function checkChange(input: ChangeInput): { window: EffectiveWindow } | ChangeRefusal {
-  const { appointment, caller, start, end, settings, state, now, today, zone } = input;
+  const { appointment, caller, start, end, overbook, settings, state, now, today, zone } = input;
   const refusal = checkCancel(appointment, caller, settings, now);
   if (refusal) {
     return refusal.error === 'cancellation_notice_too_short' ? refuse(refusal.error, 'Too late to change this appointment') : refusal;
   }
   const old = appointment!;
   const others = { ...state, appointments: state.appointments.filter((a) => a.appointmentId !== old.appointmentId) };
-  return checkBooking({ start, end, role: caller.role, userId: old.userId, settings, state: others, now, today, zone });
+  return checkBooking({ start, end, role: caller.role, userId: old.userId, overbook, settings, state: others, now, today, zone });
 }
 
 // ── The calendar view (docs/SHARED_CALENDAR_SPEC.md sections 11.6, 7, 8.6 and 17) ───────────
@@ -565,7 +594,7 @@ export type CalendarViewInput = {
   /** The caller's Cognito `sub`: a User's own appointments are those with this `userId`. */
   callerSub: string;
   settings: Pick<CalendarSettings, 'cancellationNoticeHours' | 'minBookingNoticeHours' | 'bookingHorizonDays'>;
-  types: readonly { typeId: string; name: string }[];
+  types: readonly { typeId: string; name: string; capacity: number }[];
   patterns: readonly PatternInput[];
   /** The overrides dated in the range; one of another date is ignored. */
   overrides: readonly OverrideInput[];
@@ -609,6 +638,38 @@ function byInstant(a: string, b: string): number {
 }
 
 /**
+ * The busy times of one date for a User (docs/SHARED_CALENDAR_SPEC.md R-SLOT-06): the maximal
+ * intervals in which the booked appointments of the date, the User's own included, are at least
+ * the capacity that applies there, with the times of the User's own appointments (`own`) taken
+ * out. The capacity that applies at an instant is that of the effective window holding it, or 1
+ * where none does (an appointment left from availability changed since,
+ * docs/SHARED_CALENDAR_SPEC.md section 22, assumption A3). The date is cut at every start and end
+ * of an appointment and of a window; on each piece the count and the capacity are constant, and
+ * the full pieces outside the User's own appointments are joined where they touch.
+ */
+function busyOf(
+  appointments: readonly Interval[],
+  own: readonly Interval[],
+  windows: readonly (Interval & { capacity: number })[],
+): Interval[] {
+  const cuts = [...new Set([...appointments, ...windows].flatMap((i) => [i.start, i.end]))].sort(byInstant);
+  const busy: Interval[] = [];
+  for (let i = 0; i + 1 < cuts.length; i++) {
+    const piece = { start: cuts[i]!, end: cuts[i + 1]! };
+    const people = appointments.filter((a) => a.start <= piece.start && piece.end <= a.end).length;
+    const capacity = windows.find((w) => w.start <= piece.start && piece.end <= w.end)?.capacity ?? 1;
+    // The User's own appointments are among the appointments, so their ends are cuts too: a piece
+    // lies wholly inside one of them or outside all.
+    const mine = own.some((o) => o.start <= piece.start && piece.end <= o.end);
+    if (people < capacity || mine) continue;
+    const last = busy.at(-1);
+    if (last !== undefined && last.end === piece.start) last.end = piece.end;
+    else busy.push(piece);
+  }
+  return busy;
+}
+
+/**
  * The calendar view of `from`..`to` for one caller (docs/SHARED_CALENDAR_SPEC.md section 11.6), pure:
  * "now" and the zone passed in, "today" = localDateOf(now, zone) (docs/SHARED_CALENDAR_SPEC.md
  * R-TIME-04). Per date:
@@ -618,13 +679,17 @@ function byInstant(a: string, b: string): number {
  *   past: docs/SHARED_CALENDAR_SPEC.md R-TYPE-03 and R-VIEW-03), and so is one that holds no real
  *   time (it starts in the hour skipped when clocks go forward and ends at or just after it);
  * - `slots`: the slots (docs/SHARED_CALENDAR_SPEC.md R-SLOT-01) of the effective windows
- *   (docs/SHARED_CALENDAR_SPEC.md section 6.6), minus every slot that overlaps a booked appointment,
- *   the caller's own included (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02). A User gets those that pass
- *   docs/SHARED_CALENDAR_SPEC.md R-SLOT-03 (`start > now`, the minimum notice, the horizon); the
- *   Administrator those with `start > now` (docs/SHARED_CALENDAR_SPEC.md R-SLOT-04). A past date has
- *   windows and no slots (docs/SHARED_CALENDAR_SPEC.md R-VIEW-03);
- * - `busy`: for a User, the other Users' booked appointments of that date as bare intervals,
- *   sorted (docs/SHARED_CALENDAR_SPEC.md section 17); `[]` for the Administrator;
+ *   (docs/SHARED_CALENDAR_SPEC.md section 6.6), each with its type's capacity and its places left,
+ *   the capacity minus the booked appointments in it counted at their peak, never below 0
+ *   (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02). A User gets those with a place left that overlap none
+ *   of the User's own appointments and pass the timing of docs/SHARED_CALENDAR_SPEC.md R-SLOT-03
+ *   (`start > now`, the minimum notice, the horizon); the Administrator every slot with
+ *   `start > now`, the full ones included with `placesLeft: 0` (docs/SHARED_CALENDAR_SPEC.md
+ *   R-SLOT-04, decision D30). A past date has windows and no slots (docs/SHARED_CALENDAR_SPEC.md
+ *   R-VIEW-03);
+ * - `busy`: for a User, the times of that date that are full, as bare intervals, sorted, with the
+ *   User's own appointments taken out (busyOf, docs/SHARED_CALENDAR_SPEC.md R-SLOT-06 and section
+ *   17); `[]` for the Administrator;
  * - `hasOverride`: for the Administrator only, also for an override with no windows.
  * A field that is "admin only" is absent for a User. `appointments`: the booked ones (active, an
  * ended one included) starting in the range, by start: all for the Administrator with
@@ -643,13 +708,23 @@ export function calendarView(input: CalendarViewInput): CalendarView {
     .filter((a) => a.appointment.status === 'booked' && from <= a.appointment.date && a.appointment.date <= to)
     .sort(byStartThenId);
 
-  // docs/SHARED_CALENDAR_SPEC.md R-SLOT-03 for a User, R-SLOT-04 for the Administrator, and R-SLOT-02
-  // for both.
+  const capacities = new Map(input.types.map((t) => [t.typeId, t.capacity]));
+  const bookedTimes = booked.map((a) => a.appointment);
+  const own = booked.filter((a) => a.userId === callerSub).map((a) => a.appointment);
+
+  // A slot with its capacity and places left (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02). Its window's
+  // type exists: the windows of a deleted type were left out.
+  const placed = (slot: SlotTimes): Slot => {
+    const capacity = capacities.get(slot.typeId)!;
+    return { ...slot, capacity, placesLeft: Math.max(0, capacity - peopleIn(slot, bookedTimes)) };
+  };
+  // docs/SHARED_CALENDAR_SPEC.md R-SLOT-03 for a User, R-SLOT-04 for the Administrator.
   const offered = (slot: Slot): boolean => {
     const ahead = Date.parse(slot.start) - nowMs;
     if (ahead <= 0) return false;
-    if (!admin && (ahead < settings.minBookingNoticeHours * HOUR_MS || localDateOf(slot.start, zone) > lastBookable)) return false;
-    return !booked.some((a) => overlaps(slot, a.appointment));
+    if (admin) return true;
+    if (ahead < settings.minBookingNoticeHours * HOUR_MS || localDateOf(slot.start, zone) > lastBookable) return false;
+    return slot.placesLeft > 0 && !own.some((a) => overlaps(slot, a));
   };
 
   const days: CalendarDay[] = [];
@@ -666,12 +741,15 @@ export function calendarView(input: CalendarViewInput): CalendarView {
         ...(admin && { source: w.source, sourceId: w.sourceId }),
       }),
     );
-    const slots = effectiveWindows(instants).flatMap((w) => slotsOf(w, zone)).filter(offered);
+    const effective = effectiveWindows(instants);
+    const slots = effective.flatMap((w) => slotsOf(w, zone)).map(placed).filter(offered);
     const busy: Interval[] = admin
       ? []
-      : booked
-          .filter((a) => a.userId !== callerSub && a.appointment.date === date)
-          .map((a) => ({ start: a.appointment.start, end: a.appointment.end }));
+      : busyOf(
+          booked.filter((a) => a.appointment.date === date).map((a) => a.appointment),
+          own,
+          effective.map((w) => ({ ...w, capacity: capacities.get(w.typeId)! })),
+        );
     days.push({ date, weekday: weekdayOf(date), windows, slots, busy, ...(admin && { hasOverride: override !== null }) });
   }
 

@@ -4,13 +4,14 @@
 |---|---|
 | Test file | `backend/tests/integration/calendar.test.ts` |
 | `describe` | `booking (route 17)` |
-| Tests | 1. "prepares the settings, two types and the Wednesday pattern 08:00–12:00 from a past Wednesday"<br>2. "AC-10: dave books W 09:00: 201, end + 60 min, the type, cancellableUntil; APPT, APPTID and EVENT items written"<br>3. "AC-11: erin books the same slot: 409 slot_taken"<br>4. "AC-12: erin’s view of W has the busy interval and no slot at 09:00, and nothing of dave’s"<br>5. "AC-13: dave books 09:30: 400 invalid_request"<br>6. "AC-14: the Administrator books dave W2 09:15–10:00: 201, cancellableUntil null"<br>7. "AC-15: dave then books W2 09:00: 409 slot_taken (partial overlap)"<br>8. "AC-16: dave books 12:00, outside the window: 409 outside_availability"<br>9. "AC-17: horizon 7, W 11:00 (8 or more days ahead): dave 409 booking_beyond_horizon; the Administrator books it for dave: 201"<br>10. "AC-18: notice 720 h: dave books W 10:00: 409 booking_notice_too_short"<br>11. "AC-19: limit 1 while dave holds future appointments: dave 409 appointment_limit_reached; the Administrator books for dave: 201"<br>12. "a User naming someone else is 403; the Administrator booking without a username is 400, for admin 409 target_not_user, for an unknown username 404"<br>13. "AC-25: an empty override on W is 409 availability_conflict listing dave’s appointments; a User gets 403 and no conflicts"<br>14. "AC-26: changing the pattern’s type is 409 availability_conflict; AC-27: extending it to 07:00–12:00 is 200"<br>15. "AC-34: two bookings of the same slot at the same moment: exactly one 201, the other 409 slot_taken"<br>16. "R-BOOK-10: a deleted-user marker for dave’s sub makes his booking 404 user_not_found and writes nothing"<br>17. "every booking wrote exactly one event; the settings are restored to what the earlier journeys left" |
+| Tests | 1. "prepares the settings, two types and the Wednesday pattern 08:00–12:00 from a past Wednesday"<br>2. "AC-10: dave books W 09:00: 201, end + 60 min, the type, cancellableUntil; APPT, APPTID and EVENT items written"<br>3. "AC-11: erin books the same slot: 409 slot_taken"<br>4. "AC-12: erin’s view of W has the busy interval and no slot at 09:00, and nothing of dave’s"<br>5. "AC-13: dave books 09:30: 400 invalid_request"<br>6. "AC-14: the Administrator books dave W2 09:15–10:00: 201, cancellableUntil null"<br>7. "AC-15: dave then books W2 09:00: 409 user_busy, the hour overlaps dave’s own 09:15 in part; erin is refused slot_taken"<br>8. "AC-16: dave books 12:00, outside the window: 409 outside_availability"<br>9. "AC-17: horizon 7, W 11:00 (8 or more days ahead): dave 409 booking_beyond_horizon; the Administrator books it for dave: 201"<br>10. "AC-18: notice 720 h: dave books W 10:00: 409 booking_notice_too_short"<br>11. "AC-19: limit 1 while dave holds future appointments: dave 409 appointment_limit_reached; the Administrator books for dave: 201"<br>12. "a User naming someone else is 403; the Administrator booking without a username is 400, for admin 409 target_not_user, for an unknown username 404"<br>13. "AC-25: an empty override on W is 409 availability_conflict listing dave’s appointments; a User gets 403 and no conflicts"<br>14. "AC-26: changing the pattern’s type is 409 availability_conflict; AC-27: extending it to 07:00–12:00 is 200"<br>15. "AC-34: two bookings of the same slot at the same moment: exactly one 201, the other 409 slot_taken"<br>16. "R-BOOK-10: a deleted-user marker for dave’s sub makes his booking 404 user_not_found and writes nothing"<br>17. "every booking wrote exactly one event; the settings are restored to what the earlier journeys left" |
 | Runs against | the local stack: the API on port 3000 (`sam local`), cognito-local on port 9229, DynamoDB Local on `DYNAMODB_PORT` (`RUN_INTEGRATION=1`) |
 
 Ideas used here, explained once for all journeys: [the settings](../concepts.md#the-settings),
 [availability types](../concepts.md#availability-types),
 [where a window comes from](../concepts.md#where-a-window-comes-from),
 [windows and slots](../concepts.md#windows-and-slots),
+[places in a slot](../concepts.md#places-in-a-slot),
 [booked appointments keep their window](../concepts.md#booked-appointments-keep-their-window),
 [`busy` and `appointments`](../concepts.md#busy-and-appointments-in-the-calendar-view),
 [the `calendar` table and its items](../concepts.md#the-calendar-table-and-its-items),
@@ -19,8 +20,8 @@ Ideas used here, explained once for all journeys: [the settings](../concepts.md#
 
 ## What this block proves
 
-- Booking (`POST /calendar/appointments`) applies the rules R-BOOK-01, 02, 04 to 07, 09 and 10 of
-  `docs/SHARED_CALENDAR_SPEC.md` section 8.2, for a User and for the Administrator, with the error
+- Booking (`POST /calendar/appointments`) applies the rules R-BOOK-01, 02, 04 to 07, 09, 10 and 12
+  of `docs/SHARED_CALENDAR_SPEC.md` section 8.2, for a User and for the Administrator, with the error
   code of each (scenarios AC-10 to AC-19 of `docs/SHARED_CALENDAR_SPEC.md` section 18.3).
 - A successful booking stores three items, in the same transaction as the lock update and the
   marker check: the appointment, its pointer and one `appointment.booked` event
@@ -178,11 +179,18 @@ In the table, the test checks that:
 - the `APPT` item's `userId` is **`dave`'s `sub`**. The Administrator named `dave` by username; the
   handler looked up `dave`'s `sub` in Cognito before the lock, so the appointment belongs to `dave`.
 
-## Test 7 (AC-15): `dave` books `W2` 09:00
+## Test 7 (AC-15): `dave` books `W2` 09:00, then `erin`
 
-`W2` 09:00–10:00 overlaps the 09:15–10:00 of test 6 for three quarters of an hour. The test checks
-`409 slot_taken`: a partial overlap is still an overlap. The slot 09:00 is no longer free for any
-User, although part of the hour is (`docs/SHARED_CALENDAR_SPEC.md` R-SLOT-05).
+`W2` 09:00–10:00 overlaps the 09:15–10:00 of test 6 for three quarters of an hour. That 09:15 is
+`dave`'s own appointment, so the test checks `409` with exactly `{ error: 'user_busy', message: 'The
+User already has an appointment at this time' }`: one person is never in two places
+(`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-12). The server checks this before the places, so the answer
+is `user_busy`, not `slot_taken`. To move the 09:15 to 09:00, `dave` would change that appointment
+instead (`docs/SHARED_CALENDAR_SPEC.md` section 8.4).
+
+Then `erin` books the same `W2` 09:00. The test checks `409 slot_taken`: the type holds one person,
+and the 09:15–10:00 fills the hour although part of it is free (`docs/SHARED_CALENDAR_SPEC.md`
+R-BOOK-07, R-SLOT-05). The server refuses both under the lock and writes nothing.
 
 ## Test 8 (AC-16): `dave` books 12:00
 
@@ -408,14 +416,15 @@ them. The first that fails decides the answer.
 | Order | Rule | Error | Test |
 |---|---|---|---|
 | 1 | the body's shape, the note (R-BOOK-11) | `400 invalid_request` | 2 (the note is trimmed) |
-| 2 | R-BOOK-01 from the body: a User naming someone else; the Administrator naming nobody | `403 forbidden`, `400 invalid_request` | 12 |
+| 2 | R-BOOK-01 from the body: a User naming someone else; the Administrator naming nobody; then R-BOOK-13, a User sending `overbook: true` | `403 forbidden`, `400 invalid_request` | 12; R-BOOK-13 in [the capacity journey](calendar-capacity.md) |
 | 3 | R-BOOK-02 times | `400 invalid_request` | 5; 6 (the Administrator's custom times, R-BOOK-08) |
 | 4 | R-BOOK-01 in Cognito: unknown, not a plain User | `404 user_not_found`, `409 target_not_user` | 12 |
 | 5 | under the lock: R-BOOK-03 in the future | `409 booking_in_past` | not in this block |
 | | R-BOOK-04 notice (User only) | `409 booking_notice_too_short` | 10 |
 | | R-BOOK-05 horizon (User only) | `409 booking_beyond_horizon` | 9 |
 | | R-BOOK-06 inside one window | `409 outside_availability` | 8 |
-| | R-BOOK-07 no overlap | `409 slot_taken` | 3, 7, 15 |
+| | R-BOOK-12 no appointment of the same User overlapping | `409 user_busy` | 7 |
+| | R-BOOK-07 a place left (the types here hold one person) | `409 slot_taken` | 3, 7, 15 |
 | | R-BOOK-09 limit (User only) | `409 appointment_limit_reached` | 11 |
 | 6 | R-BOOK-10 no deleted-user marker, in the transaction | `404 user_not_found` | 16 |
 

@@ -506,8 +506,8 @@ describe('calendar view', () => {
     expect(day.windows).toEqual([window]); // no source, no sourceId
     expect(day).not.toHaveProperty('hasOverride');
     expect(day.slots).toEqual([
-      { start: at('09:00'), end: at('10:00'), typeId: type.typeId },
-      { start: at('11:00'), end: at('12:00'), typeId: type.typeId },
+      { start: at('09:00'), end: at('10:00'), typeId: type.typeId, capacity: 1, placesLeft: 1 },
+      { start: at('11:00'), end: at('12:00'), typeId: type.typeId, capacity: 1, placesLeft: 1 },
     ]);
     expect(day.busy).toEqual([{ start: at('10:00'), end: at('11:00') }]); // start and end only
     expect(userView.appointments.map((a) => a.appointmentId)).toEqual([mine.appointmentId]);

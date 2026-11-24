@@ -61,9 +61,9 @@ describe('listAvailabilityTypes handler', () => {
     expect(response.headers).toEqual({ 'content-type': 'application/json' });
     expect(body(response)).toEqual({
       types: [
-        { typeId: '01JC0000000000000000000002', name: 'alpha', createdAt: AT, updatedAt: AT },
-        { typeId: '01JC0000000000000000000003', name: 'Beta', createdAt: AT, updatedAt: AT },
-        { typeId: '01JC0000000000000000000001', name: 'Studio', createdAt: AT, updatedAt: AT },
+        { typeId: '01JC0000000000000000000002', name: 'alpha', capacity: 1, createdAt: AT, updatedAt: AT },
+        { typeId: '01JC0000000000000000000003', name: 'Beta', capacity: 1, createdAt: AT, updatedAt: AT },
+        { typeId: '01JC0000000000000000000001', name: 'Studio', capacity: 1, createdAt: AT, updatedAt: AT },
       ],
     });
   });
