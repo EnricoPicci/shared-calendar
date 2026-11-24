@@ -1,6 +1,6 @@
 # Shared Calendar: several people in one slot, a capacity per type (implementation plan)
 
-**Version:** v8 (2026-11-24): step u6 done, the assistant; F8 decided. v7 (2026-11-24): step u5 done, the front end's screens; a slot under appointments drawn as a tab beside them (found in the walk, the Product Owner's choice). v6 (2026-11-24): step u4 done, the front end's services; the Administrator's
+**Version:** v9 (2026-11-24): step u7 part A done, the smoke test's capacity journey, run locally; the API and the page not deployed yet. v8 (2026-11-24): step u6 done, the assistant; F8 decided. v7 (2026-11-24): step u5 done, the front end's screens; a slot under appointments drawn as a tab beside them (found in the walk, the Product Owner's choice). v6 (2026-11-24): step u4 done, the front end's services; the Administrator's
 sentence of `user_busy` moved to step u5 (the Product Owner's decision). v5 (2026-11-24): step u3 done, the back end; AC-15 answers `user_busy` (the Product
 Owner's decision), its page in step u5. v4 (2026-11-24): step u2 done, the shared contract in `shared/`; the response
 fields moved from step u2 to step u3 (the Product Owner's decision). v3 (2026-11-24): step u1 done, the rules in the governing documents
@@ -667,6 +667,49 @@ checks at the deployed address. The deployment of the API ends every conversatio
 - The record in `docs/RUNBOOK.md`; the documents' versions closed; this plan finished.
 
 **Check:** the smoke test PASS in the cloud, the walk's checks all yes.
+
+**As done, part A, local (2026-11-24).** Changes under `backend/scripts/smoke.sh` and the
+documents only; nothing under `backend/src`, `frontend/src`, `shared/src` or in either
+`template.yaml`; nothing deployed, no `aws` command run against the cloud. Brief
+`prompts/e17-step-u7-implementation.md`, with the Product Owner's decisions for this step:
+nothing pushed; three throw-away users; the calendar journey's date and hour, after it; a User's
+`overbook: true` checked too; when to deploy is the operator's choice; **at the deployed page
+only a quick look by the operator** (a type of capacity 2, a User, a window, a slot saying its
+places, all deleted), not the walk's checks, which changes this step's check as written above.
+
+- *The journey* (`docs/RUNBOOK.md` section 2.3, `docs/ARCHITECTURE.md` section 9.3), 16 lines
+  starting `capacity:`, right after the calendar journey and only when it ended: the users
+  `smoke-<epoch>-b` and `-c` through `POST /users` (only `-c` signs in); the type
+  `smoke-cap-<epoch>` of capacity 2 and its one-off window at 03:00–04:00 of the calendar
+  journey's date; `-c`'s own booking with `overbook: true` `403 forbidden`, its list of
+  appointments then empty; the Administrator books `smoke-<epoch>` and `-b` (201 both); the
+  Administrator's view: the slot with `capacity` 2, `placesLeft` 0 and two appointments; `-c`'s
+  view: the slot not offered and its hour `busy`; `-c` refused `409 slot_taken`, then booked with
+  `overbook: true`; `smoke-<epoch>` again, forced, `409 user_busy`; the three appointments
+  cancelled, the window and the type deleted, the two users removed through
+  `DELETE /users/{username}`. The Administrator books every appointment, as in the calendar
+  journey, so the settings' notice, horizon (56 days by default, the date is about 50 ahead) and
+  limit do not bear on it. The User's `overbook` is checked first, while the slot has both places
+  left, so that "nothing written" proves the refusal and not a full slot. Clean-up on every exit
+  (`capacity_cleanup`): a write whose answer was lost is looked up, appointments cancelled, then
+  the window, the type and the two users (straight in Cognito when the API fails).
+- *What stays by design* in `calendar`, per run, besides the calendar journey's: three cancelled
+  appointments of type name `smoke-cap-<epoch>` with their pointers and two events each, and the
+  deleted-user markers of `-b` and `-c`. The lock's version goes up by 12 for the journey, 19 per
+  smoke run.
+- *Lines:* 49 (33 + 16). Locally: 47 PASS and the 2 SKIP of `GlobalSignOut`, `PASSED (2 check(s)
+  skipped on the local stack)`. A stop halfway (`TERM` after the second booking) cancelled both
+  appointments, deleted the window and the type and removed `-b` and `-c` through the API; no
+  `smoke-` user was left in cognito-local.
+- *Checks:* `npm run lint` green; the root `DYNAMODB_PORT=8002 npm run verify` PASSED (back end
+  1 831 unit tests and 208 journey tests, shared 518, front end 2 705, 100 % lines); then, apart,
+  the front end's journeys passed (79). The lock's 19 per run measured on the local stack.
+- *Found:* the `local:api` left running in a terminal had stalled while starting (port 3000 never
+  opened after 16 minutes); stopped and started again, it was up in about 20 seconds.
+- *Documents:* `docs/RUNBOOK.md` (section 2, step 5 and the counts of sections 3 and 3.2: 49;
+  section 2.1, the lock's count; section 2.3 new), `docs/ARCHITECTURE.md` (section 9.3, the v15
+  row's sentence of step u7, still open), `docs/COMMANDS.md` (`smoke`), `README.md` (the smoke
+  test's row; the capacity in the screens' table).
 
 ## 6. Out of this plan
 

@@ -435,14 +435,19 @@ Every command of this section that names a stack acts on a real AWS account. `CL
   last, the calendar journey of `docs/SHARED_CALENDAR_SPEC.md` section 18.4 (a type
   `smoke-<epoch>` and a one-off window on the first free 03:00–04:00 from 50 days ahead, booked
   for the user, listed and cancelled by it, then window and type deleted; settings never
-  changed), then one exchange with the assistant as the user (its conversation ended, the
+  changed), then on that date and hour the capacity journey (`docs/RUNBOOK.md` section 2.3: two
+  more throw-away users `smoke-<epoch>-b` and `-c`, a type `smoke-cap-<epoch>` of capacity 2 and
+  its window; a User's own `overbook: true` refused `403` with nothing written; two people booked
+  into the slot, full in the Administrator's view and busy in the third's; the third refused
+  `409 slot_taken`, then booked with `overbook: true`; the first booked again `409 user_busy`;
+  all cancelled and deleted, the two users removed), then one exchange with the assistant as the user (its conversation ended, the
   message "What are the calendar's settings right now?", `continue` while `working`, at most
   eight steps, the conversation ended again; statuses and counts only, never a text), then the
   change of the user's own password at Cognito through `backend/scripts/cognito.mjs` (a wrong
   current password refused, the error named; the change; the refresh token from before it still
   valid after `ChangePassword` alone; `GlobalSignOut`, after which that refresh token is refused;
-  the old password refused, the new one signing in; `docs/RUNBOOK.md` section 2.2); 33 checks,
-  PASS/FAIL each, 7 of them the assistant's and 7 the password's. Locally the two checks of
+  the old password refused, the new one signing in; `docs/RUNBOOK.md` section 2.2); 49 checks,
+  PASS/FAIL each, 16 of them the capacity's, 7 the assistant's and 7 the password's. Locally the two checks of
   `GlobalSignOut` print `SKIP` (cognito-local has none) and the last line counts them; only a run
   against a stack proves which error a wrong current password gets and the revocation. The new
   passwords come from `backend/src/lib/password.ts`, checked against `shared/src/password.ts`,
@@ -450,10 +455,10 @@ Every command of this section that names a stack acts on a real AWS account. `CL
   (`assistant-key` below) and costs about a US cent at Anthropic; without the key the message
   answers `503 assistant_unavailable`, one FAIL, and the other checks run. Locally it answers
   through the fake Claude, whose `answers.json` scripts the sentence as a read of the settings
-  and a text. On every exit it ends the conversation, removes the type, window and booking and
-  deletes the user. Prompts for the admin password (stdin). Leaves its message rows and, in
-  `calendar`, the cancelled appointment, its events and the user's deleted-user marker
-  (history). Its date arithmetic imports `shared/src/calendar/time.ts` in node (Node ≥ 22.18,
+  and a text. On every exit it ends the conversation, removes the types, windows and bookings and
+  deletes the three users. Prompts for the admin password (stdin). Leaves its message rows and, in
+  `calendar`, the four cancelled appointments, their events and the three users' deleted-user
+  markers (history). Its date arithmetic imports `shared/src/calendar/time.ts` in node (Node ≥ 22.18,
   type stripping).
   `backend/scripts/cognito.mjs`, its helper for the Cognito calls that carry a secret, reads every
   password and token on stdin: `sign-in`, `tokens` (access and refresh token, one per line),

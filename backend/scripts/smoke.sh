@@ -2,7 +2,7 @@
 # Post-deploy smoke test (docs/ARCHITECTURE.md section 9.3): docs/IMPLEMENTATION_PLAN.md step 9,
 # journeys 3, 4, 6 and 11, with a throw-away user smoke-<timestamp>, and between journeys 3 and 11
 # the calendar journey of docs/SHARED_CALENDAR_SPEC.md section 18.4. Prints PASS, FAIL or SKIP per
-# check (33 checks; locally 2 of them SKIP); exits 1 if any check failed.
+# check (49 checks; locally 2 of them SKIP); exits 1 if any check failed.
 #
 #   npm run smoke <stack-name>   the deployed stack, your AWS login (run after every deploy)
 #   npm run smoke local          the local stack (local:up + local:api; pass DYNAMODB_PORT)
@@ -20,6 +20,23 @@
 # smoke-<timestamp> and a one-off window there, books it for the throw-away user with a note, lists
 # it as that user (upcoming) and cancels it as that user, then deletes the window and the type.
 # Only the API is used; no calendar answer body is ever printed (status and error code only).
+#
+# Right after it, the capacity journey (docs/SHARED_CALENDAR_SPEC.md decisions D24 to D31), 16
+# checks, each line starting "capacity:", on the same date and in the same hour, which the calendar
+# journey found free of any window and active appointment and left so (its cancelled appointment
+# blocks nothing), so its window overlaps no real one. It creates two more throw-away users,
+# smoke-<timestamp>-b and smoke-<timestamp>-c, through POST /users, and the type
+# smoke-cap-<timestamp> of capacity 2 with a one-off window 03:00-04:00. smoke-<timestamp>-c sending
+# its own booking with overbook: true gets 403 forbidden and nothing is written
+# (docs/SHARED_CALENDAR_SPEC.md AC-41). The Administrator books smoke-<timestamp> and
+# smoke-<timestamp>-b (201 both); the Administrator's view shows the slot with capacity 2 and
+# placesLeft 0, smoke-<timestamp>-c's view does not offer it and shows the hour busy
+# (docs/SHARED_CALENDAR_SPEC.md R-SLOT-03 and R-SLOT-06). The Administrator booking
+# smoke-<timestamp>-c is refused 409 slot_taken, then made with overbook: true (201); booking
+# smoke-<timestamp> again, forced, is 409 user_busy (docs/SHARED_CALENDAR_SPEC.md R-BOOK-12). The
+# Administrator cancels the three appointments, deletes the window and the type, and removes the
+# two users through DELETE /users/{username}. The Administrator books, as in the calendar journey,
+# so the minimum notice, the horizon and the limit of the settings do not bear on the date.
 #
 # After the calendar journey and before the user's deletion, one exchange with the assistant as the
 # throw-away user (docs/ARCHITECTURE.md section 9.3): its conversation ended first, the sentence
@@ -52,11 +69,14 @@
 # Tokens and passwords stay in shell variables and travel through pipes only: never printed,
 # never command-line arguments, never written to disk. On every exit, also after a failed check
 # or Ctrl-C, the assistant's conversation is ended once its message was sent, the calendar
-# journey's appointment is cancelled and its window and type deleted, and the throw-away user is
-# deleted. What stays, by design, as history: the user's message row, and
-# in the calendar table the cancelled appointment (username and type name smoke-<timestamp>), its
-# pointer, its booked and cancelled events, and the deleted-user marker that the user's deletion
-# (docs/IMPLEMENTATION_PLAN.md step 9, journey 11) writes.
+# journey's appointment is cancelled and its window and type deleted, the capacity journey's
+# appointments are cancelled, its window and type deleted and its two users removed through the
+# API (straight in Cognito if the API fails), and the throw-away user is deleted. What stays, by
+# design, as history: the user's message row, and in the calendar table the calendar journey's
+# cancelled appointment (username and type name smoke-<timestamp>), the capacity journey's three
+# cancelled appointments (type name smoke-cap-<timestamp>), the pointer and the booked and
+# cancelled events of each, and the deleted-user markers of the three users, which the deletion
+# through DELETE /users/{username} (docs/IMPLEMENTATION_PLAN.md step 9, journey 11) writes.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/target.sh
@@ -98,6 +118,24 @@ cal_pending=""
 cal_date=""
 cal_start=""
 cal_cleanup_failed=false
+cal_done=false # the calendar journey ended with its window and type deleted
+# The capacity journey's names, and what it created and has not removed yet: the type and window
+# ids, the booked appointments' ids (space-separated), the write sent whose answer has not been
+# read yet (cap_pending: type, window or appointment, with the User of an appointment), and its
+# two extra Users, created and removed like the throw-away user.
+CAP_TYPE="smoke-cap-${SMOKE_USER#smoke-}"
+CAP_USER_B="$SMOKE_USER-b"
+CAP_USER_C="$SMOKE_USER-c"
+cap_type_id=""
+cap_window_id=""
+cap_appts=""
+cap_pending=""
+cap_pending_user=""
+cap_token=""
+cap_b_created=false
+cap_b_deleted=false
+cap_c_created=false
+cap_c_deleted=false
 # The assistant's message was sent and its conversation not ended yet: clean-up ends it.
 asst_open=false
 
@@ -108,6 +146,7 @@ cleanup() {
   local status=$? err
   assistant_cleanup
   calendar_cleanup
+  capacity_cleanup
   [[ "$cal_cleanup_failed" == true ]] && status=1
   if [[ "$created" == true && "$deleted" == false ]]; then
     if err=$(idp admin-delete-user --user-pool-id "$POOL_ID" --username "$SMOKE_USER" 2>&1); then
@@ -412,8 +451,322 @@ calendar_journey() {
   if [[ "$STATUS" == 204 ]]; then
     pass "calendar: DELETE /calendar/types/$cal_type_id -> 204"
     cal_type_id=""
+    cal_done=true
   else
     cal_fail "DELETE /calendar/types/$cal_type_id -> $STATUS $(error_code)"
+  fi
+}
+
+# cap_user_delete <username> <created flag name> <deleted flag name>: removes one of the capacity
+# journey's Users through DELETE /users/{username}, as the Administrator, if it was created and not
+# removed yet; straight in Cognito when the API fails. Quiet unless something is left behind.
+cap_user_delete() {
+  local name=$1 err
+  [[ "${!2}" == true && "${!3}" == false ]] || return 0
+  if [[ -n "${admin_token:-}" ]]; then
+    api DELETE "/users/$name" "$admin_token"
+    if [[ "$STATUS" == 204 ]]; then
+      echo "cleanup: $name deleted"
+      printf -v "$3" '%s' true
+      return 0
+    elif [[ "$STATUS" == 404 ]]; then
+      printf -v "$3" '%s' true
+      return 0
+    fi
+  fi
+  if err=$(idp admin-delete-user --user-pool-id "$POOL_ID" --username "$name" 2>&1) ||
+    [[ "$err" == *UserNotFoundException* ]]; then
+    echo "cleanup: $name deleted directly in Cognito"
+    printf -v "$3" '%s' true
+  else
+    echo "CLEANUP FAILED: $name may still exist in pool $POOL_ID; delete it in the Cognito console." >&2
+    cal_cleanup_failed=true
+  fi
+}
+
+# Finds what a capacity write may have created when its answer was never read (timeout, Ctrl-C):
+# the type by its name, the window by its type and start, an appointment by its User and start.
+capacity_resolve_pending() {
+  local id=""
+  case "$cap_pending" in
+    type)
+      api GET /calendar/types "$admin_token"
+      [[ "$STATUS" == 200 ]] &&
+        id=$(cal get 'const x = (b.types || []).find((y) => y.name === a[0]); return x ? x.typeId : "";' "$CAP_TYPE") || id=""
+      [[ -n "$id" ]] && cap_type_id=$id
+      ;;
+    window)
+      api GET "/calendar?from=$cal_date&to=$cal_date" "$admin_token"
+      [[ "$STATUS" == 200 ]] &&
+        id=$(cal get 'const w = (b.days || []).flatMap((d) => d.windows || []).find((y) => y.source === "one_off" && y.typeId === a[0] && y.start === a[1]); return w ? w.sourceId : "";' "$cap_type_id" "$cal_start") || id=""
+      [[ -n "$id" ]] && cap_window_id=$id
+      ;;
+    appointment)
+      api GET "/calendar/appointments?upcoming=true&username=$cap_pending_user" "$admin_token"
+      [[ "$STATUS" == 200 ]] &&
+        id=$(cal get 'const x = (b.appointments || []).find((y) => y.start === a[0]); return x ? x.appointmentId : "";' "$cal_start") || id=""
+      [[ -n "$id" ]] && cap_appts="$cap_appts $id"
+      ;;
+  esac
+  if [[ "$STATUS" != 200 ]]; then
+    cleanup_failed "a $cap_pending of the capacity journey may exist (no answer to its creation; lookup failed)"
+  fi
+  cap_pending=""
+}
+
+# Removes what the capacity journey created, as the Administrator: cancels its appointments, then
+# deletes the window, then the type (the order docs/SHARED_CALENDAR_SPEC.md R-TYPE-03 and R-AV-03
+# require), then removes the two extra Users. Safe to run twice.
+capacity_cleanup() {
+  local id
+  if [[ -n "${admin_token:-}" ]]; then
+    [[ -z "$cap_pending" ]] || capacity_resolve_pending
+    for id in $cap_appts; do
+      api POST "/calendar/appointments/$id/cancel" "$admin_token"
+      if [[ "$STATUS" == 200 ]]; then
+        echo "cleanup: appointment $id cancelled"
+      else
+        cleanup_failed "appointment $id of the capacity journey, still booked"
+      fi
+    done
+    cap_appts=""
+    if [[ -n "$cap_window_id" ]]; then
+      api DELETE "/calendar/windows/$cap_window_id" "$admin_token"
+      if [[ "$STATUS" == 204 ]]; then
+        echo "cleanup: one-off window $cap_window_id deleted"
+      else
+        cleanup_failed "one-off window $cap_window_id ($cal_date 03:00-04:00, type $CAP_TYPE)"
+      fi
+      cap_window_id=""
+    fi
+    if [[ -n "$cap_type_id" ]]; then
+      api DELETE "/calendar/types/$cap_type_id" "$admin_token"
+      if [[ "$STATUS" == 204 ]]; then
+        echo "cleanup: type $cap_type_id ($CAP_TYPE) deleted"
+      else
+        cleanup_failed "type $cap_type_id ($CAP_TYPE)"
+      fi
+      cap_type_id=""
+    fi
+  fi
+  cap_user_delete "$CAP_USER_B" cap_b_created cap_b_deleted
+  cap_user_delete "$CAP_USER_C" cap_c_created cap_c_deleted
+}
+
+# cap_fail <check>: a failed capacity check; what was created so far is removed at once.
+cap_fail() {
+  fail "capacity: $*"
+  capacity_cleanup
+}
+
+# cap_book <username> <token> <overbook true|false> [self]: POST /calendar/appointments for
+# <username> at the journey's hour; with "self" the request is the User's own (no username in the
+# body). Sets STATUS and BODY; an appointment the answer says was made is remembered for clean-up,
+# whatever the check expected.
+cap_book() {
+  local body id
+  if [[ "${4:-}" == self ]]; then
+    body="{\"start\": \"$cal_start\""
+  else
+    body="{\"username\": \"$1\", \"start\": \"$cal_start\""
+  fi
+  [[ "$3" == true ]] && body="$body, \"overbook\": true"
+  body="$body}"
+  cap_pending="appointment"
+  cap_pending_user=$1
+  api POST /calendar/appointments "$2" "$body"
+  [[ "$STATUS" == 000 ]] || cap_pending=""
+  if [[ "$STATUS" == 201 ]]; then
+    id=$(field appointmentId)
+    [[ -n "$id" ]] && cap_appts="$cap_appts $id"
+  fi
+}
+
+# cap_booked <username>: the answer in BODY is the appointment of <username>, booked, at the
+# journey's hour, 60 minutes, of the capacity journey's type.
+cap_booked() {
+  cal test 'return b.status === "booked" && b.username === a[0] && b.start === a[1] && b.end === a[2] && b.typeId === a[3];' \
+    "$1" "$cal_start" "$cal_end" "$cap_type_id"
+}
+
+# The capacity journey (docs/SHARED_CALENDAR_SPEC.md decisions D24 to D31), after the calendar
+# journey, on its date and in its hour, which that journey found free and has emptied again: a
+# throw-away type of capacity 2 and its window; a User's own overbook refused with nothing written
+# (docs/SHARED_CALENDAR_SPEC.md AC-41); two Users booked into the slot by the Administrator; the
+# slot full in the Administrator's view and absent, its hour busy, in a third User's view
+# (docs/SHARED_CALENDAR_SPEC.md R-SLOT-03, R-SLOT-04, R-SLOT-06); the third refused slot_taken,
+# then booked with overbook (docs/SHARED_CALENDAR_SPEC.md R-BOOK-07 and R-BOOK-13); the first
+# booked again, forced, refused user_busy (docs/SHARED_CALENDAR_SPEC.md R-BOOK-12). Then everything
+# is removed. Stops at the first failed check.
+capacity_journey() {
+  local password id status
+  cap_b_created=true
+  api POST /users "$admin_token" "{\"username\": \"$CAP_USER_B\"}"
+  password=""
+  if [[ "$STATUS" == 201 && "$(field username)" == "$CAP_USER_B" ]]; then password=$(field password); fi
+  BODY=""
+  if [[ -n "$password" ]]; then
+    pass "capacity: POST /users $CAP_USER_B -> 201 with a password"
+  else
+    cap_fail "POST /users $CAP_USER_B -> $STATUS"
+    return 0
+  fi
+  password=""
+
+  cap_c_created=true
+  api POST /users "$admin_token" "{\"username\": \"$CAP_USER_C\"}"
+  password=""
+  if [[ "$STATUS" == 201 && "$(field username)" == "$CAP_USER_C" ]]; then password=$(field password); fi
+  status=$STATUS
+  BODY=""
+  if [[ -n "$password" ]] && cap_token=$(printf '%s' "$password" | sign_in "$CAP_USER_C"); then
+    pass "capacity: POST /users $CAP_USER_C -> 201, signed in as it"
+  else
+    cap_token=""
+    cap_fail "POST /users $CAP_USER_C -> $status, or its sign-in failed"
+    return 0
+  fi
+  password=""
+
+  cap_pending="type"
+  api POST /calendar/types "$admin_token" "{\"name\": \"$CAP_TYPE\", \"capacity\": 2}"
+  [[ "$STATUS" == 000 ]] || cap_pending=""
+  [[ "$STATUS" == 201 ]] && cap_type_id=$(field typeId)
+  if [[ -n "$cap_type_id" ]] && cal test 'return b.name === a[0] && b.capacity === 2;' "$CAP_TYPE"; then
+    pass "capacity: POST /calendar/types $CAP_TYPE capacity 2 -> 201, capacity 2"
+  else
+    cap_fail "POST /calendar/types $CAP_TYPE capacity 2 -> $STATUS $(error_code)"
+    return 0
+  fi
+
+  cap_pending="window"
+  api POST /calendar/windows "$admin_token" \
+    "{\"date\": \"$cal_date\", \"start\": \"03:00\", \"end\": \"04:00\", \"typeId\": \"$cap_type_id\"}"
+  [[ "$STATUS" == 000 ]] || cap_pending=""
+  [[ "$STATUS" == 201 ]] && cap_window_id=$(field windowId)
+  if [[ -n "$cap_window_id" ]]; then
+    pass "capacity: POST /calendar/windows $cal_date 03:00-04:00 of $CAP_TYPE -> 201"
+  else
+    cap_fail "POST /calendar/windows $cal_date 03:00-04:00 of $CAP_TYPE -> $STATUS $(error_code)"
+    return 0
+  fi
+
+  # A User's own overbook, on a slot with both places left: refused before any check of the
+  # calendar, and nothing is written (the Administrator's list of that User's appointments is empty).
+  cap_book "$CAP_USER_C" "$cap_token" true self
+  status=$STATUS
+  id=$(error_code)
+  api GET "/calendar/appointments?upcoming=true&username=$CAP_USER_C" "$admin_token"
+  if [[ "$status" == 403 && "$id" == forbidden && "$STATUS" == 200 ]] &&
+    cal test 'return (b.appointments || []).length === 0;'; then
+    pass "capacity: overbook: true as $CAP_USER_C -> 403 forbidden, nothing written"
+  else
+    cap_fail "overbook: true as $CAP_USER_C -> $status $id (its appointments: $STATUS)"
+    return 0
+  fi
+
+  cap_book "$SMOKE_USER" "$admin_token" false
+  if [[ "$STATUS" == 201 ]] && cap_booked "$SMOKE_USER"; then
+    pass "capacity: book $cal_date 03:00 for $SMOKE_USER -> 201 (1 of 2)"
+  else
+    cap_fail "book $cal_date 03:00 for $SMOKE_USER -> $STATUS $(error_code)"
+    return 0
+  fi
+  cap_book "$CAP_USER_B" "$admin_token" false
+  if [[ "$STATUS" == 201 ]] && cap_booked "$CAP_USER_B"; then
+    pass "capacity: book $cal_date 03:00 for $CAP_USER_B -> 201 (2 of 2)"
+  else
+    cap_fail "book $cal_date 03:00 for $CAP_USER_B -> $STATUS $(error_code)"
+    return 0
+  fi
+
+  api GET "/calendar?from=$cal_date&to=$cal_date" "$admin_token"
+  if [[ "$STATUS" == 200 ]] &&
+    cal test 'const s = (b.days || []).flatMap((d) => d.slots || []).filter((x) => x.start === a[0] && x.typeId === a[1]); const n = (b.appointments || []).filter((x) => x.start === a[0] && x.typeId === a[1]).length; return s.length === 1 && s[0].capacity === 2 && s[0].placesLeft === 0 && n === 2;' \
+      "$cal_start" "$cap_type_id"; then
+    pass "capacity: the Administrator's view: the slot 03:00 with capacity 2, placesLeft 0, 2 appointments"
+  else
+    cap_fail "the Administrator's view of $cal_date -> $STATUS $(error_code), or the slot 03:00 not full"
+    return 0
+  fi
+
+  api GET "/calendar?from=$cal_date&to=$cal_date" "$cap_token"
+  if [[ "$STATUS" == 200 ]] &&
+    cal test 'const d = (b.days || [])[0] || {}, s = Date.parse(a[0]), e = Date.parse(a[1]); return !(d.slots || []).some((x) => x.start === a[0]) && (d.busy || []).some((x) => Date.parse(x.start) <= s && e <= Date.parse(x.end));' \
+      "$cal_start" "$cal_end"; then
+    pass "capacity: $CAP_USER_C's view: the slot 03:00 not offered, 03:00-04:00 busy"
+  else
+    cap_fail "$CAP_USER_C's view of $cal_date -> $STATUS $(error_code), or the slot 03:00 still offered"
+    return 0
+  fi
+
+  cap_book "$CAP_USER_C" "$admin_token" false
+  if [[ "$STATUS" == 409 && "$(error_code)" == slot_taken ]]; then
+    pass "capacity: book $cal_date 03:00 for $CAP_USER_C -> 409 slot_taken"
+  else
+    cap_fail "book $cal_date 03:00 for $CAP_USER_C -> $STATUS $(error_code), expected 409 slot_taken"
+    return 0
+  fi
+  cap_book "$CAP_USER_C" "$admin_token" true
+  if [[ "$STATUS" == 201 ]] && cap_booked "$CAP_USER_C"; then
+    pass "capacity: book $cal_date 03:00 for $CAP_USER_C with overbook: true -> 201 (3 of 2)"
+  else
+    cap_fail "book $cal_date 03:00 for $CAP_USER_C with overbook: true -> $STATUS $(error_code)"
+    return 0
+  fi
+  cap_book "$SMOKE_USER" "$admin_token" true
+  if [[ "$STATUS" == 409 && "$(error_code)" == user_busy ]]; then
+    pass "capacity: book $cal_date 03:00 for $SMOKE_USER again with overbook: true -> 409 user_busy"
+  else
+    cap_fail "book $cal_date 03:00 for $SMOKE_USER again with overbook: true -> $STATUS $(error_code), expected 409 user_busy"
+    return 0
+  fi
+
+  status=""
+  for id in $cap_appts; do
+    api POST "/calendar/appointments/$id/cancel" "$admin_token"
+    if [[ "$STATUS" == 200 ]] && cal test 'return b.status === "cancelled";'; then
+      cap_appts=${cap_appts/ $id/}
+    else
+      status="$id -> $STATUS $(error_code)"
+      break
+    fi
+  done
+  if [[ -z "$status" && -z "${cap_appts// /}" ]]; then
+    cap_appts=""
+    pass "capacity: the 3 appointments cancelled by the Administrator -> 200 each"
+  else
+    cap_fail "cancel $status"
+    return 0
+  fi
+
+  api DELETE "/calendar/windows/$cap_window_id" "$admin_token"
+  if [[ "$STATUS" == 204 ]]; then
+    pass "capacity: DELETE /calendar/windows/$cap_window_id -> 204"
+    cap_window_id=""
+  else
+    cap_fail "DELETE /calendar/windows/$cap_window_id -> $STATUS $(error_code)"
+    return 0
+  fi
+  api DELETE "/calendar/types/$cap_type_id" "$admin_token"
+  if [[ "$STATUS" == 204 ]]; then
+    pass "capacity: DELETE /calendar/types/$cap_type_id -> 204"
+    cap_type_id=""
+  else
+    cap_fail "DELETE /calendar/types/$cap_type_id -> $STATUS $(error_code)"
+    return 0
+  fi
+
+  cap_token=""
+  api DELETE "/users/$CAP_USER_B" "$admin_token"
+  [[ "$STATUS" == 204 ]] && cap_b_deleted=true
+  status=$STATUS
+  api DELETE "/users/$CAP_USER_C" "$admin_token"
+  [[ "$STATUS" == 204 ]] && cap_c_deleted=true
+  if [[ "$cap_b_deleted" == true && "$cap_c_deleted" == true ]]; then
+    pass "capacity: DELETE /users/$CAP_USER_B and /users/$CAP_USER_C -> 204"
+  else
+    cap_fail "DELETE /users/$CAP_USER_B -> $status, /users/$CAP_USER_C -> $STATUS"
   fi
 }
 
@@ -683,6 +1036,13 @@ fi
 
 # The calendar journey (docs/SHARED_CALENDAR_SPEC.md section 18.4), before the user is deleted.
 if [[ -n "$user_token" ]]; then calendar_journey; fi
+
+# The capacity journey, on the calendar journey's date and hour, only once that journey has ended.
+if [[ "$cal_done" == true ]]; then
+  capacity_journey
+elif [[ -n "$user_token" ]]; then
+  fail "capacity: not run, the calendar journey did not end (it gives the date and the hour)"
+fi
 
 # The assistant's exchange (docs/ARCHITECTURE.md section 9.3), before the user is deleted.
 if [[ -n "$user_token" ]]; then assistant_exchange; fi

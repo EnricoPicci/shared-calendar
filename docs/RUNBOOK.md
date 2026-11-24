@@ -89,9 +89,9 @@ both fit into its 30 minutes; otherwise run it again before the second.
    Never `> out.txt` inside the repository: the new file makes the tree dirty and the deploy
    refuses, and the change set and its prompt would go to the file instead of the screen.
 5. `npm run smoke -w backend -- shared-calendar-api` (asks for the admin password; `-w backend` is
-   needed, the root has no `smoke` script): all 33 lines must say PASS (10 Hello World checks,
-   9 calendar checks: section 2.1; 7 of the assistant: section 3.2; 7 of the change of
-   password: section 2.2). Once the assistant is
+   needed, the root has no `smoke` script): all 49 lines must say PASS (10 Hello World checks,
+   9 calendar checks: section 2.1; 16 of the capacity of a type: section 2.3; 7 of the
+   assistant: section 3.2; 7 of the change of password: section 2.2). Once the assistant is
    deployed the smoke test needs its key (section 3.2), and its exchange costs about a US cent
    at Anthropic. `script -q -c "…" /tmp/smoke.txt` works here too; the
    password prompt does not echo, so the password does not reach the file.
@@ -169,8 +169,8 @@ starting with `calendar:`:
 `appointment.cancelled` events, and the `DELETEDUSER` marker that journey 11 writes for the user.
 No type and no window stay. A cancelled appointment blocks nothing. Besides these, the table holds
 one `LOCK` item from the first calendar write on (the calendar lock, one item for the whole
-table); its `version` goes up by one per locked write, 7 per smoke run on an otherwise unused
-calendar. No `SETTINGS` item appears: the smoke test only reads the settings, and until an
+table); its `version` goes up by one per locked write, 7 for this journey and 12 for the
+capacity journey (section 2.3), so 19 per smoke run on an otherwise unused calendar. No `SETTINGS` item appears: the smoke test only reads the settings, and until an
 Administrator saves them the API answers the defaults.
 
 **When the calendar journey fails:**
@@ -228,6 +228,62 @@ Against the local stack the two lines of `GlobalSignOut` print `SKIP`: cognito-l
 stack)`; a run against a stack never skips them. Two wrong passwords in a run (the wrong current
 one, the old one at the sign-in) stay far below Cognito's lockout.
 
+### 2.3 The smoke test's capacity journey
+
+Right after the calendar journey (section 2.1), on its date and in its hour, 03:00–04:00 local:
+that journey found the hour free of any window and active appointment and left it so (its
+cancelled appointment blocks nothing), so the new window overlaps no real one
+(`docs/SHARED_CALENDAR_SPEC.md` R-AV-01) and there is no second search. It runs only when the
+calendar journey ended; otherwise one line `capacity: not run, …` says so (a FAIL). Two more
+throw-away users, `smoke-<epoch>-b` and `smoke-<epoch>-c`, are made like the first, through
+`POST /users`. The Administrator books, so the settings' notice, horizon and limit do not bear on
+the date; nothing of the settings, no real type and no real person's appointment is touched, and
+no booking is forced on a real slot. Its lines, all starting with `capacity:`:
+
+| Line | Checks |
+|---|---|
+| `POST /users smoke-<epoch>-b -> 201 with a password` | the second user |
+| `POST /users smoke-<epoch>-c -> 201, signed in as it` | the third user, who also signs in |
+| `POST /calendar/types smoke-cap-<epoch> capacity 2 -> 201, capacity 2` | a type of its own that holds two people |
+| `POST /calendar/windows <date> 03:00-04:00 of smoke-cap-<epoch> -> 201` | its one-off window |
+| `overbook: true as smoke-<epoch>-c -> 403 forbidden, nothing written` | a User's own booking with `overbook` is refused, and that User has no appointment (`docs/SHARED_CALENDAR_SPEC.md` AC-41) |
+| `book <date> 03:00 for smoke-<epoch> -> 201 (1 of 2)`, `… for smoke-<epoch>-b -> 201 (2 of 2)` | two people in one slot |
+| `the Administrator's view: the slot 03:00 with capacity 2, placesLeft 0, 2 appointments` | the full slot is still offered to the Administrator (R-SLOT-04) |
+| `smoke-<epoch>-c's view: the slot 03:00 not offered, 03:00-04:00 busy` | a User does not get a full slot and sees its hour busy, without names (R-SLOT-03, R-SLOT-06) |
+| `book <date> 03:00 for smoke-<epoch>-c -> 409 slot_taken` | no place left (R-BOOK-07) |
+| `book … for smoke-<epoch>-c with overbook: true -> 201 (3 of 2)` | the Administrator goes over the capacity, saying so (R-BOOK-13) |
+| `book … for smoke-<epoch> again with overbook: true -> 409 user_busy` | one place per person, which `overbook` does not lift (R-BOOK-12) |
+| `the 3 appointments cancelled by the Administrator -> 200 each` | |
+| `DELETE /calendar/windows/<id> -> 204`, `DELETE /calendar/types/<id> -> 204` | its window and type are removed |
+| `DELETE /users/smoke-<epoch>-b and /users/smoke-<epoch>-c -> 204` | the two extra users are removed through the API |
+
+The R-… rules are those of `docs/SHARED_CALENDAR_SPEC.md`. No answer body is printed (status and
+error code only); the passwords of the two users stay in the script's variables, and only the
+third one's is used, to sign in.
+
+**What stays in the `calendar` table, by design**, besides what section 2.1 lists: per run,
+three cancelled appointments at 03:00 on the calendar journey's date, of the users
+`smoke-<epoch>`, `smoke-<epoch>-b` and `smoke-<epoch>-c`, with type name `smoke-cap-<epoch>`
+(`cancelReason` `cancelled`, `cancelledBy` the Administrator), their pointers, their
+`appointment.booked` and `appointment.cancelled` events, and the `DELETEDUSER` markers of the two
+extra users. The refused bookings write nothing. No type, no window and no user stay.
+
+**When the capacity journey fails:**
+
+- `POST /users … -> 409`: a user of that name exists; a rerun takes a new epoch.
+- `POST /calendar/types … -> 409 limit_reached`: 20 types exist; only the users were created,
+  and they are removed.
+- a `409` on the window (`availability_overlap`): someone wrote at 03:00 on that date after the
+  calendar journey. Rerun.
+- `overbook: true as … -> 201`, `… -> 409 slot_taken` expected but `201`, or the views not as
+  said: the capacity is not deployed as built. The appointment made is cancelled by the
+  clean-up; stop and investigate before releasing the page.
+- any other failure: the `cleanup:` lines say what was removed, appointments first, then the
+  window, the type and the two users (through `DELETE /users/<name>`, or straight in Cognito when
+  the API fails). A `CLEANUP FAILED:` line names what is left: cancel the appointment as the
+  Administrator, delete the window, then the type, then the user, in this order, as in
+  section 2.1.
+
 ---
 
 ## 3. Deploying from scratch (new stack, new account or after deleting it)
@@ -253,7 +309,7 @@ Plan step 11 has the full list; in short:
    status is `FORCE_CHANGE_PASSWORD` and the smoke test cannot sign in.
 4. The assistant's key, `npm run assistant-key -w backend -- shared-calendar-api`, after
    Anthropic's side is ready (section 3.2). Then `npm run smoke -w backend -- shared-calendar-api`:
-   33 PASS (sections 2.1, 2.2 and 3.2); without the key, 32 and the assistant's one FAIL. On a new
+   49 PASS (sections 2.1, 2.2, 2.3 and 3.2); without the key, 48 and the assistant's one FAIL. On a new
    stack the calendar is empty, so the first date searched is free.
 5. `npm run budget -w backend -- shared-calendar-api --dry-run`, then
    `npm run budget -w backend -- shared-calendar-api`. The
@@ -378,7 +434,7 @@ account's owner):
    refuses `local`, `hello-world-api`, a stack it cannot read (no login) and a stack without
    the assistant (deploy first); a key that does not start with `sk-ant-` or holds a space is
    refused before anything is stored. `docs/COMMANDS.md` section 6 has its messages.
-5. The smoke test again: **33 PASS**. Its exchange costs about a US cent at Anthropic (up to 4
+5. The smoke test again: **49 PASS**. Its exchange costs about a US cent at Anthropic (up to 4
    when the assistant has been silent for a few minutes). When the FAIL of step 3 is still
    there, read the function's log line (below): `key_missing` is P2.
 6. **The page released again**, section 2, step 6, from the same commit and inside the same 30
@@ -435,7 +491,7 @@ other route.
 3. Wait ten minutes: each function keeps the key it read for ten minutes, so the old key may
    still serve until then.
 4. Delete the old key in the Console.
-5. The smoke test: 33 PASS.
+5. The smoke test: 49 PASS.
 
 A key that leaked is deleted in the Console at once, without waiting: the assistant then
 answers `503` (`key_refused`) until step 2 is done and ten minutes have passed.
