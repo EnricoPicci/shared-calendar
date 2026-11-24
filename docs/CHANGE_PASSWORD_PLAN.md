@@ -1,7 +1,8 @@
 # Shared Calendar: a person changes their own password (implementation plan)
 
-**Version:** v7 (2026-11-23): step p4's part A done (the smoke test's journey, run against the
-local stack, and the operator's documents); its runs in the cloud left. v6: steps p1, p2 and p3
+**Version:** v8 (2026-11-24): step p4's part B done, F1 and F2 proved against the real Cognito;
+part C (the page released and walked) left. v7 (2026-11-23): step p4's part A done (the smoke
+test's journey, run against the local stack, and the operator's documents). v6: steps p1, p2 and p3
 done. v5: steps p1 and p2
 merged into `main` (`docs/MERGE_CHANGE_PASSWORD.md`), where the page is deployed and has a
 sign-out; steps p3 and p4 amended for both. The design is in `docs/ARCHITECTURE.md` (v14,
@@ -439,6 +440,30 @@ deployed, no `aws` command run.
 - **Left, each only when asked:** part B, the smoke test against `shared-calendar-api` (the proof
   of F1 and F2) and the log search of `docs/RUNBOOK.md` section 2; part C, the page released and
   walked, the record in `docs/RUNBOOK.md` section 5, v14 closed.
+
+**As done (2026-11-24), part B.** Asked in the session. No deployment before it, no change to the
+stack; the commit run was `dac4b02`.
+
+- *The smoke test*, `npm run smoke -w backend -- shared-calendar-api`, run by the operator inside
+  `script -q`, the admin password typed at the hidden prompt: **33 PASS**, throw-away user
+  `smoke-1795501431`, the 7 lines of the change among them. A first attempt stopped before any
+  check at the stack's read (`error: INVALID_REQUEST`, the AWS login of that terminal); with the
+  login fixed it ran whole.
+- **F1 proved:** a wrong current password is refused by the real Cognito with
+  `NotAuthorizedException` (`docs/ARCHITECTURE.md` section 6.9, row 2, holds); the old password
+  at the sign-in after the change: `NotAuthorizedException` too.
+- **F2 proved:** the refresh token from before the change still worked after `ChangePassword`
+  alone; `GlobalSignOut` with the access token from before the change succeeded, and that refresh
+  token was then refused with `NotAuthorizedException` (row 3 holds). The new password signed in;
+  the deletion's check, with the new password, passed.
+- *The log search* of `docs/RUNBOOK.md` section 2, Logs Insights over the 32 log groups of the
+  stack (31 functions and the API's access log), the last three hours, 114 records: 0 rows for
+  the booking's note, 0 for `eyJ` (a token), 0 for `ChangePassword`, `GlobalSignOut` or
+  `REFRESH_TOKEN`. The same search for the throw-away user's name matched 13 lines in 11 groups
+  (the routes it called), so the search reads the run; none of them is the change's: the change
+  makes no Lambda log.
+- *Cost*: one exchange with the assistant, about a US cent at Anthropic; nothing at AWS beyond
+  the free allowances.
 
 ## 5. Risks
 
