@@ -1,7 +1,8 @@
 # Shared Calendar: a person changes their own password (implementation plan)
 
-**Version:** v8 (2026-11-24): step p4's part B done, F1 and F2 proved against the real Cognito;
-part C (the page released and walked) left. v7 (2026-11-23): step p4's part A done (the smoke
+**Version:** v9 (2026-11-24): step p4 done, the plan finished: the page released with the screen
+and walked at its deployed address; `docs/ARCHITECTURE.md` v14 closed. v8: step p4's part B
+done, F1 and F2 proved against the real Cognito. v7 (2026-11-23): step p4's part A done (the smoke
 test's journey, run against the local stack, and the operator's documents). v6: steps p1, p2 and p3
 done. v5: steps p1 and p2
 merged into `main` (`docs/MERGE_CHANGE_PASSWORD.md`), where the page is deployed and has a
@@ -464,6 +465,21 @@ stack; the commit run was `dac4b02`.
   makes no Lambda log.
 - *Cost*: one exchange with the assistant, about a US cent at Anthropic; nothing at AWS beyond
   the free allowances.
+
+**As done (2026-11-24), part C.** Asked in the session. The record is `docs/RUNBOOK.md` section
+5.7.
+
+- *The gate*: root `verify` PASSED on the clean tree at `bfbea46`. *The release*:
+  `npm run deploy -w frontend`, no change to the hosting's stack, the three files' sizes and the
+  invalidation in the record, the four checks PASS; the served bundle does not skip the sign-out.
+- *The walk*, by the operator from the checklist of decision 5 (W1 to W11), every one yes:
+  checks 123 (both roles), 126, 127 (`GlobalSignOut` answered 200), 128, 129 and 133 of
+  `docs/FRONTEND_WALK.md` section 9 as a throw-away User, created and deleted on the page. The
+  second tab signed in at 09:50 was signed out at its refresh at 10:05. No check proved inexact,
+  so `docs/FRONTEND_WALK.md` is unchanged: its section 9 already says the sign-out everywhere is
+  walked at the deployed page.
+- *Documents*: `docs/ARCHITECTURE.md` (the status line, v14 closed with step p4's sentence,
+  section 6.9's title, section 8's note on the answers seen); `docs/RUNBOOK.md` section 5.7.
 
 ## 5. Risks
 

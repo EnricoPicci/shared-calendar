@@ -830,6 +830,48 @@ without credentials, saw no password, no token and never the key.
 - **Not done:** the rotation of the key (section 3.2); the spending limit provoked (decided
   against, `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1); nobody but the operator invited.
 
+### 5.7 The change of one's own password (`docs/CHANGE_PASSWORD_PLAN.md` step p4, 2026-11-24)
+
+No deployment of the API: the stack `shared-calendar-api` stayed as section 5.6 left it. The
+smoke test ran against it with its new journey (section 2.2), then the page was released from
+`main` with the screen "Password" and walked. Who did what: the operator ran the smoke test,
+typing the admin password at its prompt, and walked the page by hand from a checklist; the session
+with Claude Code ran the gate, the page's release, read-only `aws` commands and curl without
+credentials, and saw no password and no token. The commits were not pushed before either run.
+
+- **The smoke test**, `npm run smoke -w backend -- shared-calendar-api` at commit `dac4b02`,
+  inside `script -q`: **33 PASS**, throw-away user `smoke-1795501431`. A first attempt stopped at
+  the stack's read (`error: INVALID_REQUEST`, the AWS login of that terminal), before any check.
+- **Finding F1 of `docs/CHANGE_PASSWORD_PLAN.md` proved:** a wrong current password refused with
+  `NotAuthorizedException`, as `docs/ARCHITECTURE.md` section 6.9, row 2, says; the old password
+  at the sign-in after the change too.
+- **Finding F2 of the same plan proved:** the refresh token from before the change still valid
+  after `ChangePassword` alone, `GlobalSignOut` answered, and that refresh token then refused with
+  `NotAuthorizedException`.
+- **The log search** of section 2.1, over the stack's 32 log groups, the last three hours, 114
+  records: 0 rows for the note, for `eyJ` (a token), for `ChangePassword`, `GlobalSignOut` and
+  `REFRESH_TOKEN`; a control search for the user's name matched 13 lines in 11 groups. The change
+  makes no Lambda log.
+- **The gate:** root `DYNAMODB_PORT=8002 npm run verify` PASSED on the clean tree at `bfbea46`.
+- **The release**, `npm run deploy -w frontend` at `bfbea46`: SAM `No changes to deploy` for
+  `shared-calendar-web`; the build `index.html` 35 268 bytes (6 407 gzipped), `style.css` 21 463
+  (6 127), `app.js` 608 106 (137 090); the four uploads, `index.html` last; the invalidation of
+  `/*` on `E2V5GRRPLMET12` waited for; the four checks PASS. Read back with curl: the page holds
+  the screen's element, and the bundle hands the shell `skipGlobalSignOut` false.
+- **The walk at the deployed page** (operator, by hand), two tabs with the Network panel: as the
+  Administrator, "Password" last, after "Availability", the form empty with its hints (check 123
+  of `docs/FRONTEND_WALK.md`), the password not changed; a throw-away User created on "Users".
+  As that User: the screen (check 123); a wrong current password, `ChangePassword` 400, the
+  sentence, the fields emptied, still signed in (check 126); the change, `ChangePassword` 200
+  then `GlobalSignOut` 200, the login saying "Password changed." (check 127, with the sign-out
+  the local stack skips); the old password refused (check 128); the new one signing in on
+  `#/password` (check 129); the consoles with no password and no token (check 133). The second
+  tab, signed in as the same User at 09:50 local, before the change: its refresh answered 400
+  and the login appeared at 10:05, 15 minutes after its sign-in. The User deleted from the page
+  at the end. Every check yes.
+- **Cost:** one exchange of the smoke test with the assistant, about a US cent at Anthropic;
+  nothing at AWS beyond the free allowances.
+
 ---
 
 ## 6. A person's password: what to tell them
