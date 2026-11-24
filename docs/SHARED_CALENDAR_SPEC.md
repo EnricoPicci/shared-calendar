@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v16 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; not implemented (plan steps 41–59) |
-| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10, v11, v12 and v13 2026-11-14; v14 and v15 2026-11-15; v16 2026-11-16 |
+| Status | v16 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; implemented (plan steps 41–59). v17 — the capacity of a type (decisions D24 to D31): several people in one slot; specified, **not built yet** (`docs/CAPACITY_PLAN.md`) |
+| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10, v11, v12 and v13 2026-11-14; v14 and v15 2026-11-15; v16 2026-11-16; v17 2026-11-24 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
@@ -28,6 +28,7 @@
 | v14 | 2026-11-15 | Brief 54 review (plan step 53). Route 9's errors written out instead of "as #8": `limit_reached` removed, since an update replaces a pattern and never adds one (R-PAT-04); architecture section 4 and the handler never had it (11.1). |
 | v15 | 2026-11-15 | Error codes of the timing rules renamed after the rule they break and its setting (user's decision, before plan step 54): `booking_too_soon` split into `booking_in_past` (R-BOOK-03) and `booking_notice_too_short` (R-BOOK-04, `minBookingNoticeHours`); `booking_too_far` → `booking_beyond_horizon` (R-BOOK-05, `bookingHorizonDays`); `cancellation_too_late` → `cancellation_notice_too_short` (R-CAN-03, `cancellationNoticeHours`). Statuses, order of the checks and messages unchanged (8.2, 8.3, 8.4, 11.1, 11.3, 18.3). |
 | v16 | 2026-11-16 | Brief 71 (`docs/RENAME_PLAN.md`, plan step 56): the table's physical name in the cloud follows the stack, `<stack>-calendar`; locally it stays `calendar` (13.1). The plan's calendar steps run 41–59. |
+| v17 | 2026-11-24 | Brief `prompts/e11-step-u1-implementation.md` (`docs/CAPACITY_PLAN.md` step u1), decided by the Product Owner on 2026-11-24. **The capacity of a type**: a type holds 1 to 100 people at the same time, default 1 (D24 to D31, 6.1, R-TYPE-05). The people in an interval are counted at their peak; a slot is free while they are fewer than the capacity, and says its places left (glossary, R-SLOT-02 to R-SLOT-05, 11.6). A User never holds two appointments at the same time, `409 user_busy` (R-BOOK-12). The Administrator goes over the capacity only with `overbook: true` (R-BOOK-07, R-BOOK-13, R-CHG-01, the order of the checks in 8.2 and 8.4). `busy` is the time that is full (R-SLOT-06); the Administrator's slots include the full ones (11.6, R-VIEW-01). `capacity` optional in the type's bodies (11.1, 11.4); `capacity` on the `TYPE` item, absent = 1 (13.2). Group appointments no longer out of scope as several Users each with their own appointment (1.3). The views' needs (16.8), privacy (17), unit tests (18.1), AC-37 to AC-44 (18.3). The 11.6 example gains `capacity` and `placesLeft` on each slot and keeps every other value. Not built yet. |
 
 ---
 
@@ -37,7 +38,9 @@
 
 The application has one Administrator and up to about ten Users (architecture N6). This
 document specifies a **shared calendar**: the Administrator publishes when and where they are
-available, and Users book one-to-one appointments with the Administrator inside that availability.
+available, and Users book appointments with the Administrator inside that availability. A place
+may take several Users at the same time, each with an appointment of their own, up to the
+capacity of its type (D24).
 The Administrator can also book, move and cancel appointments on a User's behalf.
 
 The document defines **what** the feature does (sections 4 to 10: rules with stable ids such as
@@ -73,7 +76,7 @@ specification into them.
 | Date-range closures (e.g. "holidays 1–20 August") as a single operation | v1: one empty override per date (the front end can loop). Follow-up in section 21. |
 | Recurrences other than weekly (fortnightly, monthly, …) | Follow-up in section 21. |
 | Several Administrators / several calendars | One Administrator, one calendar (decision D20). |
-| Group appointments (one slot, several Users) | An appointment is between one User and the Administrator. |
+| Group appointments (one appointment for several Users) | An appointment is between one User and the Administrator. Several Users may each hold their own appointment at the same time, up to the type's capacity (D24). |
 | Waiting lists, payment, external calendar sync (iCal, Google) | — |
 | Changing the calendar's time zone after data exists | It is a deployment parameter. Changing it would move every stored pattern, so it is an operation that needs its own design. |
 
@@ -90,13 +93,16 @@ specification into them.
 | **Local time** | A wall-clock time in the calendar time zone, `HH:mm`, in 15-minute steps. |
 | **Instant** | An absolute point in time, ISO-8601 UTC with milliseconds and `Z`, e.g. `2026-11-16T07:00:00.000Z`. |
 | **Availability type** | A named kind of availability, usually a place: "Studio", "Swimming Pool". |
+| **Capacity** | How many people a type holds at the same time: 1 to 100, default 1 (D24). |
+| **People in an interval** | The most active appointments that overlap at one instant of the interval: their peak, not their sum (D25, R-SLOT-02). |
+| **Places left** | A slot's capacity minus the people in it, never below 0. |
 | **Window** | An interval of one local date, `[start, end)` in local time, with a type: "Monday 16 Nov 2026, 08:00–12:00, Studio". |
 | **Weekly pattern** | A rule that yields one window on a given weekday, every week, within a validity period. |
 | **Date override** | For one local date, an explicit list of windows that **replaces** that date's pattern windows (an empty list means "not available that day"). |
 | **One-off window** | A window defined for one specific date, **in addition to** the pattern or override windows. |
 | **Effective windows** | A date's windows once patterns, override and one-offs have been combined, with adjacent windows of the same type merged (section 6.6). |
 | **Slot** | A whole local hour `[hh:00, hh:00 + 60 min)` lying inside one effective window. |
-| **Free slot** | A slot that overlaps no booked appointment. |
+| **Free slot** | A slot with a place left: the people in it are fewer than its type's capacity (R-SLOT-02). |
 | **Appointment** | A booking between one User and the Administrator: a start, an end, a type, an optional note, and a status (`booked` or `cancelled`). |
 | **Active appointment** | An appointment with status `booked`. |
 | **Ended appointment** | An appointment whose end is not after now (`end ≤ now`). |
@@ -115,13 +121,13 @@ notifications will be added as a future feature, so no decision may make them ha
 |---|---|---|
 | D1 | Time zone | One IANA time zone for the whole calendar, set as a deployment parameter. Instants are stored in UTC. Patterns are in local wall-clock time, so they stay right across daylight-saving changes. |
 | D2 | Granularity | Windows and the Administrator's custom appointment times use 15-minute steps. Users only book whole hours. |
-| D3 | Availability types | A catalogue the Administrator manages (create, rename, delete). Each type has only a name. A type that is still in use cannot be deleted. |
+| D3 | Availability types | A catalogue the Administrator manages (create, rename, delete). Each type has a name and a capacity (D24). A type that is still in use cannot be deleted. |
 | D4 | Patterns | Weekly only: weekday, start, end, type, "valid from" and optional "valid until". |
 | D5 | Overrides | Per date: an explicit list of windows that replaces the pattern windows of that date; an empty list = not available. The pattern itself is unchanged. Date-range closure: not in v1. |
 | D6 | Overlaps | No two windows of the same date may overlap, whatever their source or type. |
 | D7 | Editing availability with existing appointments | Rejected with the list of affected appointments. The Administrator cancels or moves them first. |
-| D8 | Slots | A whole hour fully inside one window, overlapping no active appointment. No break between appointments. |
-| D9 | Visibility | A User sees free slots (with type) and their own appointments; others' appointments are "not free", without names. The Administrator sees everything. |
+| D8 | Slots | A whole hour fully inside one window, with a place left: with the default capacity of 1, overlapping no active appointment (D24, D25). No break between appointments. |
+| D9 | Visibility | A User sees free slots (with type) and their own appointments; others' appointments are "not free" where they fill a time (D29), without names. The Administrator sees everything. |
 | D10 | Booking window | Settings: minimum booking notice (default 0 h) and booking horizon (default 8 weeks). The Administrator is exempt. |
 | D11 | Limit per User | Setting "max future appointments per User", default unlimited. The Administrator is exempt. |
 | D12 | Administrator's custom times | Inside one window, no overlap, 15-minute steps, at least 15 minutes. |
@@ -137,6 +143,21 @@ notifications will be added as a future feature, so no decision may make them ha
 | D22 | Scope | Rules, API contract, data model, back end and front-end services. UI out of scope except its functional needs. A week view fetches a date range of up to 31 days. |
 | D23 | Settings | Changed by the Administrator through the API (`GET`/`PUT /calendar/settings`). |
 
+Decisions D24 to D31, the capacity of a type, were taken by the Product Owner on 2026-11-24
+(`docs/CAPACITY_PLAN.md` sections 2 and 3). They are designed and not built yet: `docs/CAPACITY_PLAN.md`
+builds them.
+
+| # | Topic | Decision |
+|---|---|---|
+| D24 | Capacity | Each type holds 1 to 100 people at the same time, default 1, which is the calendar of D8. Set when the type is created, changed when it is edited. |
+| D25 | Counting | The people in an interval are their peak: the most appointments present at one instant. With a capacity of 2, 10:00–10:30 and 10:30–11:00 leave one place in the slot 10:00–11:00; 10:00–10:30 and 10:15–11:00 fill it. |
+| D26 | Going over the capacity | Only the Administrator, and only by saying so: a booking into a full slot is refused with `409 slot_taken` for the Administrator too, who sends it again with `overbook: true`. Nobody overbooks by mistake. |
+| D27 | One place per person | A User never holds two active appointments at the same time, whatever the type; `overbook` does not lift it. |
+| D28 | Capacity lowered | Allowed at any time; nothing is cancelled (as R-SET-03). A slot with more people than its new capacity takes no booking until people leave. |
+| D29 | What a User sees | The places left of a slot, never who holds the others (D9 stands). A time is `busy` only when it is full. |
+| D30 | The Administrator's full slots | Shown to the Administrator with no place left, so that a full slot can be booked over its capacity. A User never gets a full slot. |
+| D31 | A forced booking is not marked | Nothing is stored about a booking over the capacity: `createdBy` already says the Administrator made it, and "over the capacity" is a fact of one moment, since the capacity can change afterwards (D28). The event of section 15.2 is unchanged. |
+
 ---
 
 ## 4. Actors and permissions
@@ -149,11 +170,11 @@ neither group gets `403 forbidden` on every calendar route.
 | Read settings | yes | yes (needed to explain the rules to the User) |
 | Change settings | yes | no |
 | List availability types | yes | yes |
-| Create / rename / delete availability types | yes | no |
+| Create / edit (name, capacity) / delete availability types | yes | no |
 | Manage weekly patterns, date overrides, one-off windows | yes | no |
 | See the calendar (windows, free slots) for a date range | yes, with the source of every window | yes, without sources |
-| See appointments | all, with the User's name | own only; others' appear as anonymous "busy" intervals |
-| Book | for any User; any free slot or custom times inside one window; no notice, horizon or limit | for themself only; whole-hour free slots; notice, horizon and limit apply |
+| See appointments | all, with the User's name | own only; others' count in a slot's places left, and a full time appears as an anonymous "busy" interval |
+| Book | for any User; any free slot or custom times inside one window; no notice, horizon or limit; over the capacity with `overbook` (R-BOOK-13) | for themself only; whole-hour free slots; notice, horizon and limit apply; never over the capacity |
 | Cancel | any active appointment not yet ended | own active appointment, only with enough notice |
 | Change | any active appointment not yet ended | own, with notice on the old one and booking rules on the new one |
 | Edit the note | any active appointment not yet ended | own active appointment not yet ended |
@@ -220,11 +241,15 @@ fall-back day, and a zone with a non-whole-hour offset.
 |---|---|
 | `typeId` | ULID, generated by the server |
 | `name` | 1–40 characters (counted as in 11.4) after trimming leading and trailing spaces; no control characters; unique among types, compared case-insensitively |
+| `capacity` | an integer 1–100, default 1: how many people the type holds at the same time (D24) |
 | `createdAt`, `updatedAt` | instants |
+
+Not built yet: the capacity of a type is designed (decisions D24 to D31) and built by `docs/CAPACITY_PLAN.md`.
 
 - **R-TYPE-01** Create: the name must be valid and unique (otherwise `409 type_name_exists`).
   At most 20 types exist at the same time (`409 limit_reached`).
-- **R-TYPE-02** Rename: the same rules. Renaming takes effect everywhere at once, also in the
+- **R-TYPE-02** Edit: the name with the same rules, the capacity with R-TYPE-05; a capacity left
+  out of the body keeps the stored one (11.4). Renaming takes effect everywhere at once, also in the
   display of existing appointments (an appointment shows the type's current name, section 8.1).
 - **R-TYPE-03** Delete: refused with `409 type_in_use` while the type is referenced by any weekly
   pattern (whatever its validity), by an override or one-off window dated today or later, or by an
@@ -232,6 +257,12 @@ fall-back day, and a zone with a non-whole-hour offset.
   snapshot of the type name taken at booking, which is shown once the type no longer exists.
 - **R-TYPE-04** Every window and appointment refers to an existing type. A body that names an
   unknown `typeId` gets `409 type_not_found`.
+- **R-TYPE-05** Capacity: an integer from 1 to 100 (`400 invalid_request` otherwise); absent at
+  creation, it is 1. It can be changed at any time, also below the people already booked in a
+  future slot: no appointment is touched (D28), and that slot simply has no place left. Since the
+  windows of a date never overlap (R-AV-01), two appointments that overlap lie in one effective
+  window and share its type: the capacity that applies to a time is the capacity of the type of
+  the window there.
 
 ### 6.2 Weekly patterns
 
@@ -377,20 +408,46 @@ real hours and gives four slots: 01:00 (+02:00), 02:00 (+02:00), 02:00 (+01:00) 
 Each lasts 60 real minutes, and all of them are free and bookable like any other slot. An instant
 names each slot without ambiguity.
 
-**R-SLOT-02 — Free.** A slot is free when it overlaps no active appointment. Overlap is computed
-on real instants (`[a, b)` and `[c, d)` overlap when `a < d` and `c < b`). There is no break
-between appointments (D8).
+Not built yet: the capacity of a type is designed (decisions D24 to D31) and built by `docs/CAPACITY_PLAN.md`.
+
+**R-SLOT-02 — Free.** The *people in* an interval are the most active appointments that overlap
+at one instant of it: their peak, not their sum (D25). Overlap is computed on real instants (`[a, b)`
+and `[c, d)` overlap when `a < d` and `c < b`), so two appointments that touch are never present at
+the same instant. A slot is free when the people in it are fewer than the capacity of its type
+(R-TYPE-05); its **places left** are `capacity − people`, never below 0. There is no break between
+appointments (D8). With a capacity of 1 a slot is free exactly when it overlaps no active
+appointment.
 
 **R-SLOT-03 — Bookable by a User.** A free slot can be booked by a User when, in addition:
+- it overlaps none of the User's own active appointments (R-BOOK-12);
 - `start > now` and `start − now ≥ minBookingNoticeHours` (R-BOOK-04);
 - `localDateOf(start) ≤ today + bookingHorizonDays` (R-BOOK-05).
 
-**R-SLOT-04 — Offered to the Administrator.** The free slots shown to the Administrator need only
-`start > now`. The Administrator can also book custom times that are not slots (R-BOOK-08).
+**R-SLOT-04 — Offered to the Administrator.** The slots shown to the Administrator need only
+`start > now`, and include the full ones, with no place left (D30): the Administrator may book one
+over its capacity (R-BOOK-13). The Administrator can also book custom times that are not slots
+(R-BOOK-08).
 
-**R-SLOT-05 — Partial occupation.** If the Administrator books 10:00–10:30, the slot 10:00–11:00
-is no longer free for Users. The remaining half hour can only be booked by the Administrator with
-custom times.
+**R-SLOT-05 — Partial occupation.** If the Administrator books 10:00–10:30, that half hour counts
+one person in the slot 10:00–11:00. With a capacity of 1 the slot is no longer free for Users, and
+the remaining half hour can only be booked by the Administrator with custom times. With a capacity
+of 2 the slot still has one place left.
+
+**R-SLOT-06 — Busy.** What a User sees of the others' appointments, without names (D29): the
+maximal intervals of the date in which the people present at every instant (all active
+appointments, the User's own included) are at least the capacity that applies there, with the
+times of the User's own appointments taken out, since the view shows those apart. The capacity
+that applies at an instant is that of the type of the effective window holding it, or 1 where no
+window of an existing type holds it (a past appointment under availability changed since, A3).
+With a capacity of 1 this is the others' appointments, except that two of them that touch make
+one interval. The Administrator gets no `busy`: they see the appointments themselves.
+
+Example: the Swimming Pool has a capacity of 3 and a window 14:00–16:00. alice and bob book 14:00.
+carol sees the slot 14:00 with 1 place left and the slot 15:00 with 3, and nothing `busy`. carol books
+14:00: the slot is full. dan no longer gets the slot 14:00, and sees 14:00–15:00 as `busy`. The
+Administrator still sees it, with no place left, and may book dan into it with `overbook: true`: four
+people, one over the capacity. alice cannot book 14:00 a second time, nor may the Administrator book
+her there again, forced or not (R-BOOK-12).
 
 ---
 
@@ -436,7 +493,7 @@ stateDiagram-v2
 
 ### 8.2 Booking
 
-Request: `{ start, end?, username?, note? }` (section 11.7).
+Request: `{ start, end?, username?, note?, overbook? }` (section 11.7).
 
 | Rule | User | Administrator | Error if broken |
 |---|---|---|---|
@@ -446,11 +503,15 @@ Request: `{ start, end?, username?, note? }` (section 11.7).
 | **R-BOOK-04** Minimum notice | `start − now ≥ minBookingNoticeHours` | exempt | `409 booking_notice_too_short` |
 | **R-BOOK-05** Horizon | `localDateOf(start) ≤ today + bookingHorizonDays` | exempt | `409 booking_beyond_horizon` |
 | **R-BOOK-06** Inside availability | inside one effective window; the appointment takes that window's type | same | `409 outside_availability` |
-| **R-BOOK-07** No overlap | no active appointment overlaps | same | `409 slot_taken` |
-| **R-BOOK-08** Custom times | — (forbidden by R-BOOK-02) | allowed, subject to R-BOOK-06/07 (D12) | — |
+| **R-BOOK-07** Places | the people in `[start, end)` (R-SLOT-02) are fewer than the capacity of the window's type (R-BOOK-06) | same, unless `overbook` is `true` (R-BOOK-13) | `409 slot_taken` |
+| **R-BOOK-08** Custom times | — (forbidden by R-BOOK-02) | allowed, subject to R-BOOK-06/07/12 (D12) | — |
 | **R-BOOK-09** Limit | the User's active appointments with `start > now`, **before** this booking, are fewer than `maxFutureAppointmentsPerUser` (when not `null`) | exempt | `409 appointment_limit_reached` |
 | **R-BOOK-10** Account still alive | the target User has not been deleted (section 10.2) | same | `404 user_not_found` |
 | **R-BOOK-11** Note | optional; trimmed; empty → `null`; at most 500 characters (counted as in 11.4); no control characters except line feed | same | `400 invalid_request` |
+| **R-BOOK-12** One place per person | no active appointment of the target User overlaps `[start, end)` (D27) | same; `overbook` does not lift it | `409 user_busy` |
+| **R-BOOK-13** Going over the capacity | `overbook` absent or `false` | `overbook: true` lifts R-BOOK-07, and nothing else (D26) | `403 forbidden` (a User sending `true`) |
+
+Not built yet: the capacity of a type is designed (decisions D24 to D31) and built by `docs/CAPACITY_PLAN.md`.
 
 The checks run in this order, and the first that fails decides the answer, so the same request
 always gets the same error:
@@ -458,14 +519,19 @@ always gets the same error:
 1. the body's shape, including the note of R-BOOK-11 and the instant form of 11.4 (`400
    invalid_json` / `invalid_request`);
 2. the parts of R-BOOK-01 that need only the body and the caller: a User naming someone else (`403
-   forbidden`), the Administrator's `username` absent (`400`);
+   forbidden`), the Administrator's `username` absent (`400`); then R-BOOK-13, a User sending
+   `overbook: true` (`403 forbidden`);
 3. R-BOOK-02 (`400`);
 4. the Administrator's target through Cognito (R-BOOK-01: `404 user_not_found`, `409
    target_not_user`), before the calendar lock: its answer does not depend on the calendar, so a
    lock retry does not repeat it;
-5. inside the locked attempt, on the data read in it: R-BOOK-03, 04, 05, 06, 07, 09;
+5. inside the locked attempt, on the data read in it: R-BOOK-03, 04, 05, 06, 12, 07, 09;
 6. R-BOOK-10, as a condition of the booking transaction itself (13.4): a cancellation on that item
    answers `404 user_not_found` without a retry.
+
+R-BOOK-12 comes before R-BOOK-07, so that the Administrator is never offered to go over the
+capacity for a refusal that `overbook` cannot lift. `overbook: true` on a slot that has a place
+left is not an error: the booking is made as without it.
 
 R-BOOK-08 is a permission, not a check: R-BOOK-02 applies it. A User books on the `sub` of their
 token, which is also the `sub` the marker is checked on.
@@ -507,14 +573,15 @@ does, and a retry must re-check it. The cancel writes, with the lock update and 
 
 ### 8.4 Changing (D16)
 
-Request: `POST /calendar/appointments/{id}/change` with `{ start, end?, note? }`. The User of the
+Request: `POST /calendar/appointments/{id}/change` with `{ start, end?, note?, overbook? }`. The User of the
 new appointment is always the User of the old one. To move an appointment to another User, the
 Administrator cancels it and books a new one.
 
 **R-CHG-01** A change must pass **all** of R-CAN-01 to R-CAN-03 for the old appointment and
 **all** of R-BOOK-02 to R-BOOK-11 for the new one, with two adjustments:
-- the overlap check (R-BOOK-07) ignores the old appointment, so an appointment can be moved by
-  half an hour or extended into its own time;
+- the checks of places and of one place per person (R-BOOK-07, R-BOOK-12) ignore the old
+  appointment, so an appointment can be moved by half an hour or extended into its own time, also
+  in a full slot;
 - the limit (R-BOOK-09) does not count the old appointment.
 
 Both adjustments are one: the new appointment is checked against the state with the old one left
@@ -532,6 +599,8 @@ What the booking rules mean in a change (v11):
 - R-BOOK-10: checked on the old appointment's `userId`. A change by the Administrator of an
   appointment whose User has been deleted (still `booked` only if the deletion stopped before its
   cancellations, R-DEL-01) answers `404 user_not_found`.
+- R-BOOK-13: `overbook` as in a booking; the Administrator may move an appointment into a full
+  slot with `overbook: true`.
 - A change to exactly the old times (and note) is allowed and written like any other: a new
   appointment and an event.
 - The Administrator may change an appointment in progress (R-CAN-03 exempts them), but the new one
@@ -543,12 +612,13 @@ The checks run in this order, and the first that fails decides (v11):
 1. the path id is a ULID (`400 invalid_request`);
 2. the body: JSON, then `ChangeBody` with the note of R-BOOK-11 and the instant form of 11.4 (`400
    invalid_json` / `invalid_request`);
-3. R-BOOK-02 for the caller's role (`400`);
-4. inside the locked attempt, on the data read in it, the old appointment as in 8.3: R-CAN-01 /
+3. R-BOOK-13, a User sending `overbook: true` (`403 forbidden`);
+4. R-BOOK-02 for the caller's role (`400`);
+5. inside the locked attempt, on the data read in it, the old appointment as in 8.3: R-CAN-01 /
    R-PERM-01 (`404 appointment_not_found`), R-CAN-02 (`409 appointment_not_active`), for a User
    R-CAN-03 (`403 cancellation_notice_too_short`, "Too late to change this appointment");
-5. then the new one: R-BOOK-03, 04, 05, 06, 07, 09, with the adjustments of R-CHG-01;
-6. R-BOOK-10, as a condition of the change transaction on the old appointment's `userId` (`404
+6. then the new one: R-BOOK-03, 04, 05, 06, 12, 07, 09, with the adjustments of R-CHG-01;
+7. R-BOOK-10, as a condition of the change transaction on the old appointment's `userId` (`404
    user_not_found`, without a retry).
 
 The old appointment comes first: the 404 of R-PERM-01 must come before anything that depends on the
@@ -589,8 +659,8 @@ event is therefore a real change.
 ### 8.6 Listing and viewing
 
 - **R-VIEW-01** A User sees their own appointments in every status and every time range: their
-  history. They see others' active appointments only as anonymous `busy` intervals in the calendar
-  view. "Ended" is not a status: a booked appointment that has ended is listed as `booked` (v10).
+  history. Of others' active appointments they see only the places left of a slot and, where a
+  time is full, anonymous `busy` intervals in the calendar view (D29). "Ended" is not a status: a booked appointment that has ended is listed as `booked` (v10).
   A history longer than 92 days is read through several ranges.
 - **R-VIEW-02** The Administrator sees every appointment, in every status.
 - **R-VIEW-03** Past dates can be viewed. Their windows are shown as the *current* rules define
@@ -713,8 +783,8 @@ are validated the same way.
 | 1 | `GET /calendar/settings` | admin, user | — | `200` `CalendarSettings` | — |
 | 2 | `PUT /calendar/settings` | admin | `UpdateSettingsBody` | `200` `CalendarSettings` | 400 `invalid_json`/`invalid_request` · 409 `concurrent_update` |
 | 3 | `GET /calendar/types` | admin, user | — | `200` `{ types: AvailabilityType[] }` (by name) | — |
-| 4 | `POST /calendar/types` | admin | `{ name }` | `201` `AvailabilityType` | 400 · 409 `type_name_exists`, `limit_reached`, `concurrent_update` |
-| 5 | `PUT /calendar/types/{typeId}` | admin | `{ name }` | `200` `AvailabilityType` | 400 · 404 `type_not_found` · 409 `type_name_exists`, `concurrent_update` |
+| 4 | `POST /calendar/types` | admin | `{ name, capacity? }` | `201` `AvailabilityType` | 400 · 409 `type_name_exists`, `limit_reached`, `concurrent_update` |
+| 5 | `PUT /calendar/types/{typeId}` | admin | `{ name, capacity? }` | `200` `AvailabilityType` | 400 · 404 `type_not_found` · 409 `type_name_exists`, `concurrent_update` |
 | 6 | `DELETE /calendar/types/{typeId}` | admin | — | `204` | 400 · 404 `type_not_found` · 409 `type_in_use`, `concurrent_update` |
 | 7 | `GET /calendar/patterns` | admin | — | `200` `{ patterns: WeeklyPattern[] }` (by weekday, start) | — |
 | 8 | `POST /calendar/patterns` | admin | `PatternBody` | `201` `WeeklyPattern` | 400 · 409 `type_not_found`, `availability_overlap`, `availability_conflict`, `limit_reached`, `concurrent_update` |
@@ -726,10 +796,10 @@ are validated the same way.
 | 14 | `DELETE /calendar/windows/{windowId}` | admin | — | `204` | 400 · 404 `window_not_found` · 409 `date_in_past`, `availability_conflict`, `concurrent_update` |
 | 15 | `GET /calendar` | admin, user | `?from=YYYY-MM-DD&to=YYYY-MM-DD` (inclusive, `from ≤ to`, at most 31 days) | `200` `CalendarView` | 400 `invalid_request` |
 | 16 | `GET /calendar/appointments` | admin, user | `?from&to` (at most 92 days) **or** `?upcoming=true`; optional `username` (admin only), `status` = `booked` (default) \| `cancelled` \| `all` | `200` `{ appointments: Appointment[] }` (by start) | 400 · 403 `forbidden` (a User passing another `username`) |
-| 17 | `POST /calendar/appointments` | admin, user | `BookBody` | `201` `Appointment` | 400 · 403 `forbidden` · 404 `user_not_found` · 409 `target_not_user`, `booking_in_past`, `booking_notice_too_short`, `booking_beyond_horizon`, `outside_availability`, `slot_taken`, `appointment_limit_reached`, `concurrent_update` |
+| 17 | `POST /calendar/appointments` | admin, user | `BookBody` | `201` `Appointment` | 400 · 403 `forbidden` · 404 `user_not_found` · 409 `target_not_user`, `booking_in_past`, `booking_notice_too_short`, `booking_beyond_horizon`, `outside_availability`, `user_busy`, `slot_taken`, `appointment_limit_reached`, `concurrent_update` |
 | 18 | `PATCH /calendar/appointments/{appointmentId}` | admin, owner | `{ note }` | `200` `Appointment` | 400 · 404 `appointment_not_found` · 409 `appointment_not_active`, `concurrent_update` |
 | 19 | `POST /calendar/appointments/{appointmentId}/cancel` | admin, owner | — | `200` `Appointment` | 400 · 403 `cancellation_notice_too_short` · 404 `appointment_not_found` · 409 `appointment_not_active`, `concurrent_update` |
-| 20 | `POST /calendar/appointments/{appointmentId}/change` | admin, owner | `ChangeBody` | `201` `{ cancelled, booked }` | 400 · 403 `cancellation_notice_too_short` · 404 `appointment_not_found`, `user_not_found` · 409 `appointment_not_active`, `booking_in_past`, `booking_notice_too_short`, `booking_beyond_horizon`, `outside_availability`, `slot_taken`, `appointment_limit_reached`, `concurrent_update` (v11; in the order of 8.4) |
+| 20 | `POST /calendar/appointments/{appointmentId}/change` | admin, owner | `ChangeBody` | `201` `{ cancelled, booked }` | 400 · 403 `cancellation_notice_too_short` · 404 `appointment_not_found`, `user_not_found` · 409 `appointment_not_active`, `booking_in_past`, `booking_notice_too_short`, `booking_beyond_horizon`, `outside_availability`, `user_busy`, `slot_taken`, `appointment_limit_reached`, `concurrent_update` (v11; in the order of 8.4) |
 | 21 | `GET /users` | admin | — | `200` `{ users: UserSummary[] }` | — |
 
 ¹ Deleting a pattern cannot create an overlap. The code is listed only because the shared
@@ -786,7 +856,8 @@ Notes on the route design:
 | `booking_notice_too_short` | 409 | R-BOOK-04: less than `minBookingNoticeHours` ahead |
 | `booking_beyond_horizon` | 409 | R-BOOK-05: after today + `bookingHorizonDays` |
 | `outside_availability` | 409 | R-BOOK-06 |
-| `slot_taken` | 409 | R-BOOK-07 |
+| `slot_taken` | 409 | R-BOOK-07: no place left in the time asked |
+| `user_busy` | 409 | R-BOOK-12: the User already holds an appointment at that time |
 | `appointment_limit_reached` | 409 | R-BOOK-09 |
 | `appointment_not_active` | 409 | R-CAN-02, R-NOTE-01 |
 | `cancellation_notice_too_short` | 403 | R-CAN-03: less than `cancellationNoticeHours` before the start |
@@ -815,15 +886,18 @@ type UpdateSettingsBody = {
   bookingHorizonDays: number;                 // int 1..365
   maxFutureAppointmentsPerUser: number | null; // int 1..100 or null
 };
-type TypeBody = { name: string };
+type TypeBody = { name: string; capacity?: number }; // int 1..100; absent: 1 at creation, the stored value at an edit
 type WindowBody = { start: LocalTime; end: LocalTime; typeId: string };
 type PatternBody = WindowBody & { weekday: 1 | 2 | 3 | 4 | 5 | 6 | 7; validFrom: LocalDate; validUntil: LocalDate | null };
 type OverrideBody = { windows: WindowBody[] }; // 0..10
 type OneOffWindowBody = WindowBody & { date: LocalDate };
-type BookBody = { start: string; end?: string; username?: string; note?: string | null }; // instants
-type ChangeBody = { start: string; end?: string; note?: string | null };
+type BookBody = { start: string; end?: string; username?: string; note?: string | null; overbook?: boolean }; // instants
+type ChangeBody = { start: string; end?: string; note?: string | null; overbook?: boolean };
 type NoteBody = { note: string | null };
 ```
+
+`capacity` is optional at an edit too, so that a client that sends only the name keeps the
+capacity. `overbook` absent is `false`; only the Administrator may send `true` (R-BOOK-13).
 
 Instants in requests must be in the exact form `YYYY-MM-DDTHH:mm:ss.sssZ` (what
 `Date.prototype.toISOString` produces) with seconds and milliseconds zero. Any other form is `400`.
@@ -847,7 +921,7 @@ type CalendarSettings = {
   updatedBy: Actor | null;
 };
 
-type AvailabilityType = { typeId: string; name: string; createdAt: string; updatedAt: string };
+type AvailabilityType = { typeId: string; name: string; capacity: number; createdAt: string; updatedAt: string };
 
 type WeeklyPattern = PatternBody & { patternId: string; createdAt: string; updatedAt: string };
 type DateOverride = { date: LocalDate; windows: WindowBody[]; updatedAt: string };
@@ -886,8 +960,8 @@ type CalendarDay = {
   date: LocalDate;
   weekday: number;
   windows: CalendarWindow[];     // the defined windows (6.5), as instants, sorted; NOT merged
-  slots: Slot[];                 // free slots bookable by the caller (R-SLOT-03 / R-SLOT-04)
-  busy: Interval[];              // users only: other people's active appointments, no names; [] for admin
+  slots: Slot[];                 // slots bookable by the caller (R-SLOT-03), or offered to admin with the full ones (R-SLOT-04)
+  busy: Interval[];              // users only: the times that are full (R-SLOT-06), no names; [] for admin
   hasOverride?: boolean;         // admin only
 };
 
@@ -897,7 +971,7 @@ type CalendarWindow = {
   source?: 'pattern' | 'override' | 'one_off'; // admin only
   sourceId?: string;             // admin only: patternId, the override's date, or windowId
 };
-type Slot = { start: string; end: string; typeId: string };
+type Slot = { start: string; end: string; typeId: string; capacity: number; placesLeft: number }; // placesLeft 0: full (admin only)
 type Interval = { start: string; end: string };
 ```
 
@@ -916,12 +990,12 @@ this JSON once compacted):
       { "start": "2026-11-16T13:00:00.000Z", "end": "2026-11-16T17:00:00.000Z", "typeId": "01M6DMMJZ04FZ6M1H8QJ0C3BNA", "typeName": "Swimming Pool" }
     ],
     "slots": [
-      { "start": "2026-11-16T07:00:00.000Z", "end": "2026-11-16T08:00:00.000Z", "typeId": "01M6DMBE008N3QKX5R2D7W9VT4" },
-      { "start": "2026-11-16T09:00:00.000Z", "end": "2026-11-16T10:00:00.000Z", "typeId": "01M6DMBE008N3QKX5R2D7W9VT4" },
-      { "start": "2026-11-16T13:00:00.000Z", "end": "2026-11-16T14:00:00.000Z", "typeId": "01M6DMMJZ04FZ6M1H8QJ0C3BNA" },
-      { "start": "2026-11-16T14:00:00.000Z", "end": "2026-11-16T15:00:00.000Z", "typeId": "01M6DMMJZ04FZ6M1H8QJ0C3BNA" },
-      { "start": "2026-11-16T15:00:00.000Z", "end": "2026-11-16T16:00:00.000Z", "typeId": "01M6DMMJZ04FZ6M1H8QJ0C3BNA" },
-      { "start": "2026-11-16T16:00:00.000Z", "end": "2026-11-16T17:00:00.000Z", "typeId": "01M6DMMJZ04FZ6M1H8QJ0C3BNA" }
+      { "start": "2026-11-16T07:00:00.000Z", "end": "2026-11-16T08:00:00.000Z", "typeId": "01M6DMBE008N3QKX5R2D7W9VT4", "capacity": 1, "placesLeft": 1 },
+      { "start": "2026-11-16T09:00:00.000Z", "end": "2026-11-16T10:00:00.000Z", "typeId": "01M6DMBE008N3QKX5R2D7W9VT4", "capacity": 1, "placesLeft": 1 },
+      { "start": "2026-11-16T13:00:00.000Z", "end": "2026-11-16T14:00:00.000Z", "typeId": "01M6DMMJZ04FZ6M1H8QJ0C3BNA", "capacity": 1, "placesLeft": 1 },
+      { "start": "2026-11-16T14:00:00.000Z", "end": "2026-11-16T15:00:00.000Z", "typeId": "01M6DMMJZ04FZ6M1H8QJ0C3BNA", "capacity": 1, "placesLeft": 1 },
+      { "start": "2026-11-16T15:00:00.000Z", "end": "2026-11-16T16:00:00.000Z", "typeId": "01M6DMMJZ04FZ6M1H8QJ0C3BNA", "capacity": 1, "placesLeft": 1 },
+      { "start": "2026-11-16T16:00:00.000Z", "end": "2026-11-16T17:00:00.000Z", "typeId": "01M6DMMJZ04FZ6M1H8QJ0C3BNA", "capacity": 1, "placesLeft": 1 }
     ],
     "busy": [ { "start": "2026-11-16T08:00:00.000Z", "end": "2026-11-16T09:00:00.000Z" } ]
   }],
@@ -943,6 +1017,8 @@ Local times are UTC + 1 in November: the Studio window is 08:00–12:00 local, 0
 someone else's appointment (busy), 11:00–12:00 local is alice's own, so the free slots are 08:00 and
 10:00 local at the Studio and 14:00, 15:00, 16:00 and 17:00 local at the Swimming Pool. alice may
 cancel or change her appointment until 2026-11-15 11:00 local (`cancellableUntil`, 24 h of notice).
+Both types have a capacity of 1, so each free slot has one place left; the hour 09:00–10:00 is full
+and is therefore `busy`, and alice's own hour is left out of `busy` (D29).
 
 ### 11.7 Examples
 
@@ -1021,7 +1097,7 @@ kinds of item (single-table design). This is the reason `hello-messages`, with i
 |---|---|---|---|
 | Calendar lock | `LOCK` | `LOCK` | `version` (N) |
 | Settings | `SETTINGS` | `SETTINGS` | the four editable settings, `updatedAt`, `updatedBy` |
-| Availability type | `TYPE` | `<typeId>` | `name`, `nameKey` (lower-case, for uniqueness), `createdAt`, `updatedAt` |
+| Availability type | `TYPE` | `<typeId>` | `name`, `nameKey` (lower-case, for uniqueness), `capacity` (N, 1–100; an item without it, written before the capacity existed, reads as 1, so nothing is migrated), `createdAt`, `updatedAt` |
 | Weekly pattern | `PATTERN` | `<patternId>` | `weekday`, `start`, `end`, `typeId`, `validFrom`, `validUntil`, `createdAt`, `updatedAt` |
 | Date override | `OVERRIDE` | `<date>` | `windows` (list of maps), `updatedAt`, `updatedBy` |
 | One-off window | `WINDOW` | `<date>#<windowId>` | `date`, `start`, `end`, `typeId`, `createdAt`, `createdBy` |
@@ -1379,11 +1455,11 @@ A new journeys file, `frontend/tests/integration/calendar.test.ts`, against the 
 
 | View | Who | Needs |
 |---|---|---|
-| Week calendar | both | Seven days from `GET /calendar`: windows coloured by type, free slots clickable, own appointments (User) or all appointments with names (Administrator), busy blocks (User). Navigation by week. Times shown in the calendar time zone, labelled with it, whatever the browser's zone. On the night clocks go back, two slots or appointments can show the same local time an hour apart: the view must tell them apart, for example by showing the UTC offset ("02:00 +02:00", "02:00 +01:00"). |
-| Book dialog | both | Slot or (Administrator) custom start/end on a 15-minute grid, User picker (`GET /users`, Administrator), note. |
+| Week calendar | both | Seven days from `GET /calendar`: windows coloured by type, free slots clickable, own appointments (User) or all appointments with names (Administrator), busy blocks (User). A slot whose type has a capacity above 1 says its places left ("2 of 3 places left"); the Administrator's full slots are drawn apart and can be clicked to book over the capacity (D30). In the Administrator's week, appointments that overlap are drawn side by side, one block each, up to three; four or more are one block ("4 people · Swimming Pool") that opens the list of them, each one opening its detail. Navigation by week. Times shown in the calendar time zone, labelled with it, whatever the browser's zone. On the night clocks go back, two slots or appointments can show the same local time an hour apart: the view must tell them apart, for example by showing the UTC offset ("02:00 +02:00", "02:00 +01:00"). |
+| Book dialog | both | Slot or (Administrator) custom start/end on a 15-minute grid, User picker (`GET /users`, Administrator), note. For the Administrator, a `slot_taken` answer asks "Book anyway?" and sends the same request with `overbook: true`; the same in a change (R-BOOK-13). `user_busy` is said in plain words, with no such offer. |
 | Appointment detail | both | Fields of 11.5; actions cancel, change, edit note, enabled according to the rules (`cancellableUntil`, status, end); the reason of a failure in plain words. |
 | My appointments | User | `GET /calendar/appointments?upcoming=true`; history with `status=all` and a range. |
-| Availability management | Administrator | Types list; patterns list grouped by weekday; per-date override editor ("this day only…", "not available"); one-off windows; the conflicts list when a change is refused. |
+| Availability management | Administrator | Types list with each type's capacity, set at creation and edit; patterns list grouped by weekday; per-date override editor ("this day only…", "not available"); one-off windows; the conflicts list when a change is refused. |
 | Settings | Administrator | The four settings, with their defaults and ranges. |
 
 The **CORS gap** (`FRONTEND_SERVICES.md` 10.3) applied to the new routes too. The front-end
@@ -1398,7 +1474,7 @@ route through its own address (`docs/FRONTEND_ARCHITECTURE.md` section 13.3).
 |---|---|
 | Authentication | unchanged: every route behind the Lambda authorizer |
 | Authorization | role check in every handler; ownership check on appointment routes (R-PERM-01: 404 for others' appointments) |
-| Privacy between Users | a User never receives another User's username, note or appointment id; only anonymous `busy` intervals |
+| Privacy between Users | a User never receives another User's username, note or appointment id; only the places left of a slot and anonymous `busy` intervals where a time is full (D29) |
 | Deleted User still holding a valid token | the deleted-user marker blocks bookings at once (10.2). Other calendar reads by such a token for up to 20 minutes are accepted, as for Hello World (architecture 7.3). |
 | Privilege boundary | unchanged: no calendar route touches Cognito groups or passwords; `GET /users` is read-only |
 | Input validation | `zod` `.strict()` schemas from `shared/` on body, path and query; size limits on every list and string |
@@ -1415,7 +1491,9 @@ route through its own address (`docs/FRONTEND_ARCHITECTURE.md` section 13.3).
 
 - `shared/`: time helpers (DST forward/back, non-whole-hour offset, `24:00`), schemas (every
   bound), `definedWindows` (pattern validity edges, override replaces, one-off adds), merging,
-  `slotsOf` (08:30 start, 08:45 window, DST day), overlap edges (touching is not overlapping).
+  `slotsOf` (08:30 start, 08:45 window, DST day), overlap edges (touching is not overlapping), the
+  people in an interval (D25: touching appointments are not present together, the peak of
+  overlapping custom times, the night clocks go back).
 - `backend/src/lib`: `calendarRules` for every rule id of sections 6–10, with a fixed "now";
   `calendarDb` with `aws-sdk-client-mock`, including the lock retry (cancelled twice, then success;
   three times → `concurrent_update`) and transaction shapes; `cognito.ts` additions.
@@ -1485,6 +1563,14 @@ into DynamoDB Local, as the existing journeys already read the table directly.
 | AC-34 | Two bookings of the same slot sent at the same moment (unit test with a mocked transaction conflict; integration with `Promise.all`) | — | exactly one 201; the other 409 `slot_taken`. The retry on the lock is proven by the unit test: `sam local` may serve the two requests one after the other, and then no retry happens |
 | AC-35 | Pattern Sun 01:00–04:00 local valid on 2027-03-28 (clocks go forward) | admin views 2027-03-28 | slots 01:00 and 03:00 local, each 60 real minutes |
 | AC-36 | Any write above | inspect CloudWatch/local logs | no note text, no request body |
+| AC-37 | Type Pool, capacity 3, pattern Mon 14:00–18:00 Pool | alice and bob book 2026-11-16 14:00 local | 201 both; carol's view: slot 13:00Z with `capacity` 3, `placesLeft` 1, nothing `busy` at that hour |
+| AC-38 | AC-37, carol books 14:00 too | dan books 14:00 | 409 `slot_taken`; dan's view: 13:00Z not in `slots`, one `busy` interval 13:00Z–14:00Z |
+| AC-39 | AC-38 | admin books dan 14:00 without `overbook`, then with `overbook: true` | 409 `slot_taken`, then 201; the admin's view: slot 13:00Z with `placesLeft` 0 |
+| AC-40 | AC-37 | admin books alice 14:00 again with `overbook: true` | 409 `user_busy` (R-BOOK-12 comes before R-BOOK-07 and is not lifted) |
+| AC-41 | AC-04 | alice books 2026-11-16 09:00 with `overbook: true` | 403 `forbidden` |
+| AC-42 | Pool with capacity 2; admin books alice 14:00–14:30 and bob 14:30–15:00 local | carol books 14:00 | 201 (never two people at one instant); then dan books 14:00: 409 `slot_taken` |
+| AC-43 | AC-38 | admin edits Pool to capacity 1 | 200; the three appointments stay `booked`; the admin's slot 13:00Z has `placesLeft` 0, 14:00Z has 1 |
+| AC-44 | — | admin creates a type without `capacity`, then renames it sending only `name` | 201 with `capacity` 1, then 200 with `capacity` 1; after an edit to capacity 3, a rename with `name` only keeps 3 |
 
 ### 18.4 Smoke test (local and cloud)
 

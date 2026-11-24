@@ -1,7 +1,9 @@
 # Shared Calendar: several people in one slot, a capacity per type (implementation plan)
 
-**Version:** v1 (2026-11-24): the plan, after the Product Owner's answers to eight questions
-(section 2). No step done.
+**Version:** v3 (2026-11-24): step u1 done, the rules in the governing documents
+(`docs/SHARED_CALENDAR_SPEC.md` v17, `docs/ARCHITECTURE.md` v15 open). v2 (2026-11-24): the four proposals of planning (F4 to F7) decided by the Product
+Owner, F6 changed: side by side up to three people. v1 (2026-11-24): the plan, after the Product
+Owner's answers to eight questions (section 2). No step done.
 **Brief:** `prompts/e10-plan-concurrent-users-per-type.md`.
 **Governed by:** `docs/SHARED_CALENDAR_SPEC.md`, `docs/ARCHITECTURE.md`,
 `docs/FRONTEND_SERVICES.md`, `docs/FRONTEND_ARCHITECTURE.md`,
@@ -71,29 +73,29 @@ Decided by the Product Owner on 2026-11-24.
   sentence in the page.
 - **F4. `busy` changes its meaning for a capacity above 1.** Today it is every other User's
   appointment. With K6 it is the times where the people booked reach the capacity, so a User
-  learns no more than "full". Proposed rule: the maximal intervals of the date where the active
+  learns no more than "full". **Decided** (the Product Owner, 2026-11-24): the maximal intervals of the date where the active
   appointments, the caller's own included, are at least the capacity, minus the times of the
   caller's own appointments (which the view shows apart). With a capacity of 1 this gives
   today's intervals, except that two other people's appointments that touch are one interval
-  instead of two (one block drawn instead of two touching ones): accepted unless the Product
-  Owner objects at step u1.
+  instead of two (one block drawn instead of two touching ones), which is accepted.
 - **F5. The Administrator's full slots.** Today the Administrator books from a free slot of the
   week (`frontend/src/logic/booking.ts`). A full slot is not in `slots`, so the page would have
-  no place to offer "Book anyway". Proposed: for the Administrator, `slots` also holds the full
+  no place to offer "Book anyway". **Decided** (the Product Owner, 2026-11-24): for the Administrator, `slots` also holds the full
   ones, with `placesLeft: 0` (the field says it); for a User nothing changes, a full slot is
   absent. A slot over its capacity (K5, or forced) also answers `placesLeft: 0`, never a
   negative number.
 - **F6. The week draws at most two blocks side by side.** `frontend/src/logic/week.model.ts`
   gives a block `lanes: 1 | 2`, made for the hour repeated on the night clocks go back. Three
   to a hundred people in one hour of the Administrator's week cannot be drawn as lanes.
-  Proposed: one block per group of appointments that overlap, "3 people · Swimming Pool",
-  which opens the list of them (each one then opens its detail as today); a single appointment
-  is drawn as today. The date screen (`frontend/src/logic/date.model.ts`) is checked for the
+  **Decided** (the Product Owner, 2026-11-24, changing the plan's proposal): a group of
+  appointments that overlap is drawn **side by side, one block each, up to three**; a group of
+  four or more is **one block**, "4 people · Swimming Pool", which opens the list of them (each
+  one then opens its detail as today). A single appointment is drawn as today. The date screen (`frontend/src/logic/date.model.ts`) is checked for the
   same assumption in step u5.
 - **F7. The type's bodies are a full replacement today** (`TypeBody` = `{ name }` for
-  `POST` and `PUT /calendar/types/{typeId}`). The API is deployed before the page (section 6):
+  `POST` and `PUT /calendar/types/{typeId}`). The API is deployed before the page (step u7):
   a `capacity` required by `PUT` would break the deployed page's rename until the page follows.
-  Proposed: `capacity` optional in both; absent at creation is 1, absent at an edit keeps the
+  **Decided** (the Product Owner, 2026-11-24): `capacity` optional in both; absent at creation is 1, absent at an edit keeps the
   stored value. The route's name in the documents becomes "edit a type".
 - **F8. The assistant's rule "two changes into the same slot are not proposed"**
   (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 5.5, rule 4) was right with one place per
@@ -126,6 +128,9 @@ D31 after D23):
   (F5).
 - **R-SLOT-05** (partial occupation) restated with people: a half hour booked by the
   Administrator counts one person in the slot.
+- **R-SLOT-06 — Busy.** F4 as a rule: the maximal intervals where the people present are at
+  least the capacity that applies there (1 where no window of an existing type holds the time),
+  minus the User's own appointments.
 - **R-BOOK-07 — Places.** The people in `[start, end)` are fewer than the capacity of the
   window's type: `409 slot_taken`. The Administrator with `overbook: true` is exempt.
 - **R-BOOK-12 — One place per person.** No active appointment of the target User overlaps
@@ -153,8 +158,9 @@ page under `docs/journeys/` in the same commit (the project skill `explain-journ
 
 ### Step u1 — The rules in the documents (documents only)
 
-- Confirm with the Product Owner the four proposals of planning: F4 (`busy`), F5 (the
-  Administrator's full slots), F6 (the group block), F7 (`capacity` optional).
+- The four proposals of planning, F4 (`busy`), F5 (the Administrator's full slots), F6 (side
+  by side up to three, then one block) and F7 (`capacity` optional), are decided (section 3):
+  nothing to ask.
 - `docs/SHARED_CALENDAR_SPEC.md`: section 4 above, decisions D24–D31 (K1–K7, F9), the change
   log. `docs/ARCHITECTURE.md`: the API contract of section 4 (the two bodies, the new code), the
   `TYPE` item of section 5.3, a v15 row and the status line.
@@ -163,6 +169,44 @@ page under `docs/journeys/` in the same commit (the project skill `explain-journ
   `docs/CAPACITY_PLAN.md`", so that no document says something false meanwhile.
 
 **Check:** `npm run lint` (the references in the documents), and the review.
+
+**As done (2026-11-24).** Documents only; nothing under `backend/`, `frontend/` or `shared/`
+changed, nothing deployed, no `aws` command run. Brief `prompts/e11-step-u1-implementation.md`.
+
+- *The findings against the code.* F1 holds: `checkBooking` and `calendarView` in
+  `backend/src/lib/calendarRules.ts` are the only places that compare appointments with one
+  another. F3 holds: the view drops a slot that overlaps any booked appointment, the caller's own
+  included, by the same test. F5 holds: `slots` holds free slots only, and the book dialog opens
+  from one. F6 holds for the week only: `week.model.ts` gives `lanes: 1 | 2`;
+  `frontend/src/logic/date.model.ts` is the availability's date screen and draws no appointment,
+  so step u5 changes the week alone. F7 holds: one `TypeBody`, `{ name }` `.strict()`, serves both
+  type routes.
+- *`docs/SHARED_CALENDAR_SPEC.md` v17.* Decisions D24 to D31 in a table of their own after D23
+  (D24 capacity, D25 counting, D26 the force, D27 one place per person, D28 lowered capacity, D29
+  what a User sees, D30 the Administrator's full slots, D31 a forced booking not marked); D3, D8 and
+  D9 amended to point at them. The glossary gains "Capacity", "People in an interval", "Places
+  left"; "Free slot" restated. Section 1.1 and the row "Group appointments" of 1.3; section 4's
+  rows. 6.1: the field, R-TYPE-02 "Edit", R-TYPE-05. Section 7: R-SLOT-02 to R-SLOT-05 restated,
+  **a new R-SLOT-06 for `busy`** (F4 needed a rule of its own: the plan had it only as a meaning
+  of a field), the worked example of the Swimming Pool. 8.2: R-BOOK-07 "Places", R-BOOK-12,
+  R-BOOK-13, the order of the checks. 8.4: the request, R-CHG-01's adjustments, R-BOOK-13 as a new
+  step 3 of the order (the steps after it renumbered 4 to 7). R-VIEW-01. 11.1 routes 4, 5, 17 and
+  20; 11.3 `user_busy`; 11.4; 11.5; 11.6, the example's six slots gain `"capacity": 1,
+  "placesLeft": 1` at the end of each and nothing else changes, with a sentence under it. 13.2,
+  16.8 (F6 as decided), 17, 18.1, AC-37 to AC-44 in 18.3. A sentence "not built yet" heads the
+  changed parts of 3, 6.1, 7 and 8.2; the status line says v17 is specified and not built. The
+  status line also no longer calls v16 "not implemented": it is.
+- *`docs/ARCHITECTURE.md`.* The status line and the date; a v15 row, open; section 4 a new
+  paragraph "The capacity of a type", after the paragraph on booking, which says what changes and
+  leaves the rows as the calendar runs today; section 5.3 the `TYPE` row.
+- *The three other documents.* `docs/FRONTEND_SERVICES.md`, `docs/FRONTEND_ARCHITECTURE.md` and
+  `docs/CONVERSATIONAL_ARCHITECTURE.md`: one sentence at the end of the status line each.
+- *Checked:* `npm run lint` green. No diagram changed.
+
+**Step u2 finds ready:** the contract to write in `shared/` is `docs/SHARED_CALENDAR_SPEC.md`
+sections 11.3 to 11.6 (`TypeBody.capacity`, `BookBody.overbook`, `ChangeBody.overbook`,
+`AvailabilityType.capacity`, `Slot.capacity` and `Slot.placesLeft`, the code `user_busy`); the
+counting for `peopleIn` is R-SLOT-02 and D25, its unit tests 18.1.
 
 ### Step u2 — The shared contract (`shared/`)
 
@@ -210,7 +254,7 @@ same time as the back end's).
 - The availability screen: the capacity beside a type's name, at creation and edit.
 - `week.model.ts` and `date.model.ts`: "2 of 3 places left" on a slot whose capacity is above 1
   (a capacity of 1 says nothing new); the full slot of the Administrator drawn apart; the group
-  block of F6.
+  blocks of F6 (side by side up to three, then one block with the list).
 - The book dialog (`booking.ts`): on `slot_taken` for the Administrator, "Book anyway?" and the
   same request with `overbook: true`; the same for a change.
 - `docs/FRONTEND_ARCHITECTURE.md` (new decisions), `docs/FRONTEND_WALK.md` (new checks: a

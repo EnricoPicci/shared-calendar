@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v19, deployed: steps c00 to c15 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` section 5.6); step c16, the hand-over, to come |
+| Status | v19, deployed: steps c00 to c15 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` section 5.6); step c16, the hand-over, to come **Not yet in line with the capacity of a type** (`docs/SHARED_CALENDAR_SPEC.md` v17, decisions D24 to D31): this document changes for it in step u6 of `docs/CAPACITY_PLAN.md`, and until then says nothing of a type's capacity, of `overbook` or of a slot's places left. |
 | Date | 2026-11-23 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
