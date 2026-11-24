@@ -2,8 +2,9 @@
 
 What to do, in order, to work on the two deployed stacks, the API's and the page's: the daily
 start, updating the API's stack, releasing the page, deploying from scratch, the assistant's
-key and alarm, and the one-time
-setup done during plan step 11 that is easy to forget. The tools a machine needs, with their
+key and alarm, the one-time
+setup done during plan step 11 that is easy to forget, and what to tell a person about their
+password (section 6). The tools a machine needs, with their
 versions, are in `README.md`, "Prerequisites". The why behind each rule is in `docs/ARCHITECTURE.md` and `CLAUDE.md`. Which AWS
 identity to sign in with (Identity Center user, root, Builder ID) is in `docs/AWS_ACCOUNTS.md`.
 
@@ -88,8 +89,9 @@ both fit into its 30 minutes; otherwise run it again before the second.
    Never `> out.txt` inside the repository: the new file makes the tree dirty and the deploy
    refuses, and the change set and its prompt would go to the file instead of the screen.
 5. `npm run smoke -w backend -- shared-calendar-api` (asks for the admin password; `-w backend` is
-   needed, the root has no `smoke` script): all 26 lines must say PASS (10 Hello World checks,
-   9 calendar checks: section 2.1; 7 of the assistant: section 3.2). Once the assistant is
+   needed, the root has no `smoke` script): all 33 lines must say PASS (10 Hello World checks,
+   9 calendar checks: section 2.1; 7 of the assistant: section 3.2; 7 of the change of
+   password: section 2.2). Once the assistant is
    deployed the smoke test needs its key (section 3.2), and its exchange costs about a US cent
    at Anthropic. `script -q -c "…" /tmp/smoke.txt` works here too; the
    password prompt does not echo, so the password does not reach the file.
@@ -202,6 +204,30 @@ have indexed the new events yet and scans 0 records, so 0 rows proves nothing. W
 and rerun until it scans the run's events: 4 or 5 per function call (START, the one log line, END,
 REPORT, and INIT_START on a cold start), so 15 over the three log groups above.
 
+### 2.2 The smoke test's change of password
+
+After the assistant's exchange and before the user's deletion, the throw-away user changes its
+own password straight at Cognito, as the page's screen "Password" does (`docs/ARCHITECTURE.md`
+section 6.9). No Lambda runs and nothing reaches a log of the stack. Both passwords, the access
+token and the refresh token stay in the script's variables and pipes; the two new passwords come
+from the generator of `POST /users`, checked against the page's rule. Its lines, all starting
+with `password:`:
+
+| Line | Checks |
+|---|---|
+| `ChangePassword with a wrong current password is refused (<error>)` | a wrong current password changes nothing; the line names Cognito's error: `NotAuthorizedException` is expected of the real Cognito, `InvalidPasswordException` is cognito-local's. The page reads both as "the current password is not correct" |
+| `ChangePassword as smoke-<epoch> succeeds` | the change with the right current password |
+| `the refresh token from before the change still works after ChangePassword alone` | `ChangePassword` revokes nothing: why the page signs out everywhere after it |
+| `GlobalSignOut with the access token from before the change succeeds` | the sign-out everywhere the page sends after a change, with the same token |
+| `the refresh token from before the change is refused after GlobalSignOut (NotAuthorizedException)` | every other device is signed out at its next refresh |
+| `the old password no longer signs in (<error>)` | |
+| `the new password signs in` | journey 11 then proves the deletion with the new password |
+
+Against the local stack the two lines of `GlobalSignOut` print `SKIP`: cognito-local has none
+(`docs/ARCHITECTURE.md` section 8). The local run ends `PASSED (2 check(s) skipped on the local
+stack)`; a run against a stack never skips them. Two wrong passwords in a run (the wrong current
+one, the old one at the sign-in) stay far below Cognito's lockout.
+
 ---
 
 ## 3. Deploying from scratch (new stack, new account or after deleting it)
@@ -227,7 +253,7 @@ Plan step 11 has the full list; in short:
    status is `FORCE_CHANGE_PASSWORD` and the smoke test cannot sign in.
 4. The assistant's key, `npm run assistant-key -w backend -- shared-calendar-api`, after
    Anthropic's side is ready (section 3.2). Then `npm run smoke -w backend -- shared-calendar-api`:
-   26 PASS (sections 2.1 and 3.2); without the key, 25 and the assistant's one FAIL. On a new
+   33 PASS (sections 2.1, 2.2 and 3.2); without the key, 32 and the assistant's one FAIL. On a new
    stack the calendar is empty, so the first date searched is free.
 5. `npm run budget -w backend -- shared-calendar-api --dry-run`, then
    `npm run budget -w backend -- shared-calendar-api`. The
@@ -352,7 +378,7 @@ account's owner):
    refuses `local`, `hello-world-api`, a stack it cannot read (no login) and a stack without
    the assistant (deploy first); a key that does not start with `sk-ant-` or holds a space is
    refused before anything is stored. `docs/COMMANDS.md` section 6 has its messages.
-5. The smoke test again: **26 PASS**. Its exchange costs about a US cent at Anthropic (up to 4
+5. The smoke test again: **33 PASS**. Its exchange costs about a US cent at Anthropic (up to 4
    when the assistant has been silent for a few minutes). When the FAIL of step 3 is still
    there, read the function's log line (below): `key_missing` is P2.
 6. **The page released again**, section 2, step 6, from the same commit and inside the same 30
@@ -409,7 +435,7 @@ other route.
 3. Wait ten minutes: each function keeps the key it read for ten minutes, so the old key may
    still serve until then.
 4. Delete the old key in the Console.
-5. The smoke test: 26 PASS.
+5. The smoke test: 33 PASS.
 
 A key that leaked is deleted in the Console at once, without waiting: the assistant then
 answers `503` (`key_refused`) until step 2 is done and ten minutes have passed.
@@ -803,3 +829,35 @@ without credentials, saw no password, no token and never the key.
   month** on the workspace (operator, in the Console), its limit 10 USD.
 - **Not done:** the rotation of the key (section 3.2); the spending limit provoked (decided
   against, `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1); nobody but the operator invited.
+
+---
+
+## 6. A person's password: what to tell them
+
+Nobody can change another person's password: not the Administrator, not the API, not the
+operator through the page (`docs/ARCHITECTURE.md` section 6.9). There is no e-mail, so there is no
+"forgot my password" either.
+
+**A person who knows their password** and wants another one, a User or the Administrator:
+
+- Sign in at the page, open "Password", the last link, and type the current password, then the
+  new one twice. The hints under the fields say what the new one still misses (12 characters or
+  more, an upper-case letter, a lower-case one, a digit, one of the symbols listed there; no
+  space).
+- After the change the page shows the login with "Password changed.": sign in with the new one.
+- The change signs the person out everywhere. Another computer or phone where they were signed
+  in asks them to sign in again at its next renewal of the session, within 15 minutes or so; a
+  call it makes before then still works.
+- If the page says the current password is not correct, nothing has changed. After several wrong
+  attempts Cognito refuses for a while ("too many attempts"): wait, then try again.
+
+**A person who lost their password:**
+
+- **A User:** the Administrator deletes the account in the page's "Users" and creates it again
+  with the same username. The page shows the new password once; hand it over out of band (in
+  person, by phone), never by e-mail or chat. Deleting the account cancels the User's future
+  appointments (`docs/SHARED_CALENDAR_SPEC.md` section 10.2): book them again for the new account
+  if needed. The User can then change the handed-over password in "Password".
+- **The Administrator:** the operator runs `npm run bootstrap-admin -w backend --
+  shared-calendar-api` in a terminal set up as in section 1, item 3, and types the new password
+  twice. It sets the password only; the Administrator's appointments and data stay.

@@ -1,6 +1,8 @@
 # Shared Calendar: a person changes their own password (implementation plan)
 
-**Version:** v6 (2026-11-23): steps p1, p2 and p3 done; step p4 left. v5: steps p1 and p2
+**Version:** v7 (2026-11-23): step p4's part A done (the smoke test's journey, run against the
+local stack, and the operator's documents); its runs in the cloud left. v6: steps p1, p2 and p3
+done. v5: steps p1 and p2
 merged into `main` (`docs/MERGE_CHANGE_PASSWORD.md`), where the page is deployed and has a
 sign-out; steps p3 and p4 amended for both. The design is in `docs/ARCHITECTURE.md` (v14,
 section 6.9); the shared rule and `ChangePasswordService` are built (`docs/FRONTEND_SERVICES.md`
@@ -380,6 +382,63 @@ local accounts have their documented passwords again.
 
 **Check:** the gate; the local smoke test green; the cloud one green, or reported as not run;
 the walk at the deployed page done, or reported as not run.
+
+**As done (2026-11-23), part A.** Brief `prompts/e06-step-p4-implementation.md`. Nothing under
+`backend/src`, `frontend/src` or `shared/src` and neither `template.yaml` changed; nothing
+deployed, no `aws` command run.
+
+- *The five decisions taken before the code* (by the Product Owner, on the recommendations):
+  1. **`cognito.mjs` gains four small actions**, every secret on stdin: `tokens` (the access and
+     the refresh token, one per line, split by the shell with parameter expansion), `refresh`
+     (prints nothing; exit 0 when Cognito still accepts the token), `change-password` (three
+     lines: the access token, the current password, the new one; any other count refused; a
+     line break can be neither in a password nor in a token) and `sign-out` (`GlobalSignOut`).
+     **`ChangePassword` and `GlobalSignOut` are two calls**, so that the script checks the
+     refresh token between them: the proof of both halves of F2. Errors print
+     `<name> <message>` with every secret read from stdin blanked out of the message.
+  2. **A third kind of line, `SKIP`**, for the two checks of `GlobalSignOut`, only when the
+     target is `local`; the local run ends "PASSED (2 check(s) skipped on the local stack)".
+     A run against a stack never skips, and a failed sign-out there is a `FAIL`.
+  3. **The journey after the assistant's exchange, before the deletion**, with a sign-in of its
+     own for both tokens (a `FAIL` line only if it fails); seven checks, 26 lines become 33.
+     `user_password` follows the password the user has, so the deletion's check signs in with
+     the new one (with the old, a failed sign-in after the deletion would prove nothing). A
+     change whose answer is lost is settled by a silent sign-in with the new password. The
+     cleanup deletes the user as before; it needs no password.
+  4. **The new password and the wrong current one come from `generatePassword`** of
+     `backend/src/lib/password.ts`, run in node with its types stripped, each checked against
+     `passwordProblems` of `shared/src/password.ts`. The wrong attempt proposes a new password
+     that passes the rule, so a refusal can only be about the current password (F1).
+  5. **The walk at the deployed page is the operator's, by hand**, from a checklist; Claude
+     drives no browser there, since every step shows or types a password. The second browser is
+     a second tab (the session lives in the page's memory), signed in first; its scheduled
+     refresh, about 14 minutes after its sign-in, must be answered 400 and bring the login.
+     Repeated of `docs/FRONTEND_WALK.md` section 9: checks 123, 126, 127 (a `GlobalSignOut`
+     answered 200 instead of none), 128, 129 and 133 as the User; 123 only as the
+     Administrator, whose password is never changed.
+- *The script*: `backend/scripts/smoke.sh` gains `skip`, `new_password` and `password_journey`,
+  its header and the closing line; `backend/scripts/target.sh`'s comment on `cognito` follows.
+  `shellcheck` clean.
+- *The local run*, `npm run smoke -w backend -- local`: 31 PASS and 2 SKIP, 33 lines. A wrong
+  current password: `InvalidPasswordException`, as `docs/ARCHITECTURE.md` section 8 says; the
+  refresh token from before the change still works after `ChangePassword`; the old password
+  refused with `InvalidPasswordException`, the new one signing in; the deletion's check with the
+  new password. Probed by hand: `change-password` with two lines is refused without echoing them;
+  with a garbage token cognito-local answers `InvalidParameterException`.
+- *Documents*: `docs/ARCHITECTURE.md` (section 9.3's new paragraph and count, section 8's note,
+  the status line, the row of section 1.2 and the residual risk of section 7.3 no longer "not
+  built yet", the v14 row's sentence of step p4); `docs/RUNBOOK.md` (section 2, step 5, 33 lines;
+  the new section 2.2, the journey's lines; the counts of sections 3 and 3.2; the new section 6,
+  what to tell a person who knows their password and one who lost it); `docs/COMMANDS.md`
+  section 6 (`smoke`, `cognito.mjs`); `README.md` (the smoke test's row, the screen "Password",
+  the passwords' paragraphs).
+- *Check*: `npm run lint` green; the root `DYNAMODB_PORT=8002 npm run verify` PASSED (back end
+  1 737 unit tests and 189 journeys; `shared` 489; front end 2 581 in 51 files; 100 % lines on
+  `backend/src/lib` and `src/assistant`, `shared/src` and `frontend/src`). `git status`: the three
+  scripts under `backend/scripts`, `README.md` and the documents only.
+- **Left, each only when asked:** part B, the smoke test against `shared-calendar-api` (the proof
+  of F1 and F2) and the log search of `docs/RUNBOOK.md` section 2; part C, the page released and
+  walked, the record in `docs/RUNBOOK.md` section 5, v14 closed.
 
 ## 5. Risks
 

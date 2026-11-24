@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
 # Post-deploy smoke test (docs/ARCHITECTURE.md section 9.3): docs/IMPLEMENTATION_PLAN.md step 9,
 # journeys 3, 4, 6 and 11, with a throw-away user smoke-<timestamp>, and between journeys 3 and 11
-# the calendar journey of docs/SHARED_CALENDAR_SPEC.md section 18.4. Prints PASS or FAIL per check;
-# exits 1 if any check failed.
+# the calendar journey of docs/SHARED_CALENDAR_SPEC.md section 18.4. Prints PASS, FAIL or SKIP per
+# check (33 checks; locally 2 of them SKIP); exits 1 if any check failed.
 #
 #   npm run smoke <stack-name>   the deployed stack, your AWS login (run after every deploy)
 #   npm run smoke local          the local stack (local:up + local:api; pass DYNAMODB_PORT)
 #
 # Locally the global sign-out on delete is skipped (SKIP_GLOBAL_SIGN_OUT), so only the cloud run
 # exercises refresh-token revocation; both prove that the deleted user can no longer sign in.
+#
+# Locally the throw-away user's own GlobalSignOut is skipped too, for the same reason (cognito-local
+# has none, docs/ARCHITECTURE.md section 8): its two checks print SKIP, never PASS. The cloud run
+# never skips them.
 #
 # The calendar journey works whatever the real calendar holds, and never changes the settings
 # or anything it did not create: it reads the settings and the calendar view, picks the first
@@ -30,6 +34,21 @@
 # test needs the key (npm run assistant-key): without it the message answers
 # 503 assistant_unavailable, one FAIL line, and every other check runs as usual.
 #
+# After the assistant's exchange and before the user's deletion, the throw-away user changes its
+# own password at Cognito, as the page's screen "Password" does (docs/ARCHITECTURE.md section 6.9):
+# a fresh sign-in keeps its access and refresh tokens; ChangePassword with a wrong current password
+# is refused, and the line names Cognito's error (NotAuthorizedException is expected of the real
+# Cognito, InvalidPasswordException of cognito-local); ChangePassword with the right one succeeds;
+# the refresh token from before the change still works, since ChangePassword alone revokes nothing;
+# GlobalSignOut with the access token from before the change succeeds, and that refresh token is
+# then refused (both skipped locally); the old password no longer signs in, the new one does. The
+# new password and the wrong current one come from the generator of POST /users
+# (src/lib/password.ts), each checked against shared/src/password.ts. Only the cloud run proves
+# which error a wrong current password gets and that GlobalSignOut revokes the refresh token.
+# From the change on, the deletion's check (docs/IMPLEMENTATION_PLAN.md step 9, journey 11) signs
+# in with the new password. Nothing of the change is
+# undone: the user is deleted anyway.
+#
 # Tokens and passwords stay in shell variables and travel through pipes only: never printed,
 # never command-line arguments, never written to disk. On every exit, also after a failed check
 # or Ctrl-C, the assistant's conversation is ended once its message was sent, the calendar
@@ -44,6 +63,7 @@ source scripts/target.sh
 
 [[ $# -eq 1 ]] || die "usage: npm run smoke <stack-name|local>"
 load_target "$1"
+TARGET=$1
 
 SMOKE_USER="smoke-$(date +%s)"
 # The booking's note: the log search of docs/SHARED_CALENDAR_SPEC.md AC-36 looks for "must never
@@ -53,10 +73,16 @@ SMOKE_NOTE="smoke-test note ${SMOKE_USER#smoke-}, must never reach a log"
 # local log search looks for it too. Never printed.
 SMOKE_SENTENCE="What are the calendar's settings right now?"
 failures=0
+skipped=0
 created=false # POST /users was sent: the user may exist
 deleted=false # DELETE /users/{username} answered 204: nothing left to clean up
 
 pass() { echo "PASS  $*"; }
+# skip <check>: a check the local stack cannot run; never used against a stack.
+skip() {
+  echo "SKIP  $*"
+  skipped=$((skipped + 1))
+}
 fail() {
   echo "FAIL  $*"
   failures=$((failures + 1))
@@ -391,6 +417,97 @@ calendar_journey() {
   fi
 }
 
+# new_password: a password from the generator of POST /users (src/lib/password.ts), on stdout for
+# the caller's variable only; fails unless it passes the page's rule, shared/src/password.ts. Both
+# files are TypeScript, which Node 22 runs, stripping the types, as cal does.
+new_password() {
+  node --disable-warning=ExperimentalWarning -e '
+const path = require("path"), { pathToFileURL } = require("url");
+const load = (file) => import(pathToFileURL(path.resolve(file)).href);
+Promise.all([load("src/lib/password.ts"), load("../shared/src/password.ts")]).then(([g, s]) => {
+  const p = g.generatePassword();
+  if (s.passwordProblems(p).length > 0) process.exit(1);
+  process.stdout.write(p);
+}).catch(() => process.exit(1));'
+}
+
+# The change of the throw-away user's own password (the header says what and why). Stops at the
+# first failed check that leaves nothing to test; user_password follows the password the user has.
+password_journey() {
+  local tokens access refresh old new wrong err
+  if ! tokens=$(printf '%s' "$user_password" | cognito tokens "$CLIENT_ID" "$SMOKE_USER"); then
+    fail "password: sign-in as $SMOKE_USER for its access and refresh tokens"
+    return 0
+  fi
+  access=${tokens%%$'\n'*}
+  refresh=${tokens#*$'\n'}
+  refresh=${refresh%$'\n'}
+  tokens=""
+  old=$user_password
+  if ! new=$(new_password) || ! wrong=$(new_password) || [[ "$new" == "$old" || "$wrong" == "$old" ]]; then
+    fail "password: no new password from src/lib/password.ts that passes shared/src/password.ts"
+    return 0
+  fi
+
+  if err=$(printf '%s\n%s\n%s\n' "$access" "$wrong" "$new" | cognito change-password 2>&1); then
+    user_password=$new
+    fail "password: ChangePassword with a wrong current password succeeded"
+    return 0
+  elif [[ "$err" == NotAuthorizedException* || "$err" == InvalidPasswordException* ]]; then
+    pass "password: ChangePassword with a wrong current password is refused (${err%% *})"
+  else
+    fail "password: ChangePassword with a wrong current password is refused for an unexpected reason: $err"
+    return 0
+  fi
+
+  if err=$(printf '%s\n%s\n%s\n' "$access" "$old" "$new" | cognito change-password 2>&1); then
+    user_password=$new
+    pass "password: ChangePassword as $SMOKE_USER succeeds"
+  else
+    # The answer may have been lost after the change was made: the password the user has decides.
+    if printf '%s' "$new" | sign_in "$SMOKE_USER" >/dev/null 2>&1; then user_password=$new; fi
+    fail "password: ChangePassword as $SMOKE_USER -> $err"
+    return 0
+  fi
+
+  if err=$(printf '%s\n' "$refresh" | cognito refresh "$CLIENT_ID" 2>&1); then
+    pass "password: the refresh token from before the change still works after ChangePassword alone"
+  else
+    fail "password: the refresh token from before the change is refused after ChangePassword alone: $err"
+  fi
+
+  if [[ "$TARGET" == local ]]; then
+    skip "password: GlobalSignOut (cognito-local has none, docs/ARCHITECTURE.md section 8)"
+    skip "password: the refresh token from before the change refused after GlobalSignOut"
+  elif err=$(printf '%s\n' "$access" | cognito sign-out 2>&1); then
+    pass "password: GlobalSignOut with the access token from before the change succeeds"
+    if err=$(printf '%s\n' "$refresh" | cognito refresh "$CLIENT_ID" 2>&1); then
+      fail "password: the refresh token from before the change still works after GlobalSignOut"
+    elif [[ "$err" == NotAuthorizedException* ]]; then
+      pass "password: the refresh token from before the change is refused after GlobalSignOut (NotAuthorizedException)"
+    else
+      fail "password: the refresh token from before the change is refused for an unexpected reason: $err"
+    fi
+  else
+    fail "password: GlobalSignOut with the access token from before the change -> $err"
+  fi
+  access=""
+  refresh=""
+
+  if err=$(printf '%s' "$old" | sign_in "$SMOKE_USER" 2>&1 >/dev/null); then
+    fail "password: the old password still signs in"
+  elif [[ "$err" == NotAuthorizedException* || "$err" == InvalidPasswordException* ]]; then
+    pass "password: the old password no longer signs in (${err%% *})"
+  else
+    fail "password: the old password fails to sign in for an unexpected reason: $err"
+  fi
+  if printf '%s' "$new" | sign_in "$SMOKE_USER" >/dev/null; then
+    pass "password: the new password signs in"
+  else
+    fail "password: the new password does not sign in"
+  fi
+}
+
 # reply <code>: what the JavaScript body <code> returns for the assistant's answer in BODY, as text
 # (a status, a count; never a text of the conversation). Through cal get, which reads stdin.
 reply() { cal get "return String($1);"; }
@@ -570,8 +687,11 @@ if [[ -n "$user_token" ]]; then calendar_journey; fi
 # The assistant's exchange (docs/ARCHITECTURE.md section 9.3), before the user is deleted.
 if [[ -n "$user_token" ]]; then assistant_exchange; fi
 
+# The change of its own password (docs/ARCHITECTURE.md section 6.9), before the user is deleted.
+if [[ -n "$user_token" ]]; then password_journey; fi
+
 # docs/IMPLEMENTATION_PLAN.md step 9, journey 11: delete the throw-away user; it can no longer
-# sign in; its message row stays.
+# sign in, with the password it has at the end (the new one after a change); its message row stays.
 api DELETE "/users/$SMOKE_USER" "$admin_token"
 if [[ "$STATUS" == 204 ]]; then
   deleted=true
@@ -603,4 +723,8 @@ if (( failures > 0 )); then
   echo "Smoke test FAILED: $failures check(s)."
   exit 1
 fi
-echo "Smoke test PASSED."
+if (( skipped > 0 )); then
+  echo "Smoke test PASSED ($skipped check(s) skipped on the local stack)."
+else
+  echo "Smoke test PASSED."
+fi

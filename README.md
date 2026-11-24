@@ -119,7 +119,7 @@ in `backend/` (from inside `backend/`, drop `-w backend` and the `--` before arg
 | `npm run local:api -w backend` | Builds the functions and serves the API on `http://127.0.0.1:3000` (foreground; wait for `Running on http://127.0.0.1:3000`) |
 | `DYNAMODB_PORT=8002 npm run verify -w backend` | The deploy gate: typecheck, lint, audit, template lint, unit tests (of `backend` and `shared`), integration tests against the running local stack. On success writes `backend/.verify-ok` |
 | `npm run deploy -w backend` | Refuses unless `backend/.verify-ok` is younger than 30 minutes, names the current commit and says `clean`, and the tree is still clean. Then `sam build` and `sam deploy` (asks to confirm the change set). Uses your real AWS login |
-| `npm run smoke -w backend -- shared-calendar-api` | After every deploy of the API: creates a throw-away user, runs the journeys against the real API, deletes the user. Prompts for the admin password. `npm run smoke -w backend -- local` runs the same against the local stack |
+| `npm run smoke -w backend -- shared-calendar-api` | After every deploy of the API: creates a throw-away user, runs the journeys against the real API, changes that user's own password at Cognito, deletes the user; 33 checks. Prompts for the admin password. `npm run smoke -w backend -- local` runs the same against the local stack, where the two checks of the sign-out everywhere say `SKIP` |
 | `npm run deploy -w frontend` | Releases the page: behind the same gate as the back end's deploy, it runs the front end's own checks, reads the API's address and the app client from the stack `shared-calendar-api`, deploys the hosting's stack `shared-calendar-web` (asks to confirm a change set only when a resource of the hosting changes), builds, uploads the four files and ends with four checks against the page's address, PASS or FAIL each. Uses your real AWS login. `npm run deploy -w frontend -- --dry-run` goes as far as the build, says what it would do and changes nothing. The procedure, and the order of the two deployments: `docs/RUNBOOK.md` section 2, step 6 |
 | `npm run local:down -w backend` | Stops the Docker stack. The table is in memory and is lost; Cognito data survives in `backend/.cognito/` |
 
@@ -156,6 +156,7 @@ each of them finds:
 | Settings (`#/settings`) | Administrator | The cancellation notice, the booking notice, the booking horizon and the maximum of upcoming appointments |
 | Users (`#/users`) | Administrator | The list, a form that creates a user and shows the generated password once, a "Delete" per row that asks first |
 | Availability (`#/availability`) | Administrator | The availability types, the weekly patterns, and a single date: its own windows ("This day only…"), "Not available on this day", extra windows. A change that would leave a booked appointment outside the hours open for booking is refused and lists the appointments in the way |
+| Password (`#/password`) | both, last link | The change of one's own password: the current one, the new one twice, with what the new one still misses said under it while typing. After a change the person is signed out everywhere and the login says "Password changed." |
 
 Good to know: the week is loaded again after every write and every time the browser's tab
 becomes visible again; a reload of the page signs out, since the session is kept in memory
@@ -250,9 +251,11 @@ Two answers come from API Gateway itself, with its own body `{"message":"…"}`:
 
 The administrator creates a user with `POST /users` and hands the returned password to the
 person **out of band** (it is shown only in that response and is never logged). The password is
-permanent: the user signs in with it right away, no first-login change. There is no password
-reset in v1; a user who loses the password is deleted and recreated (`docs/ARCHITECTURE.md`
-section 7.4 shows the designed-in ways to add change and reset later). Deleting a user signs
+permanent: the user signs in with it right away, no first-login change. Each person, User or
+Administrator, may change their own password on the page's "Password" screen, knowing the
+current one; nobody can change someone else's. There is no reset of a lost password: a user who
+loses it is deleted and recreated (`docs/ARCHITECTURE.md` section 7.4; what to tell a person:
+`docs/RUNBOOK.md` section 6). Deleting a user signs
 them out everywhere and removes the account; their messages stay in the table as history.
 The API can never create an administrator, delete one, or set its password.
 
@@ -270,7 +273,8 @@ The API can never create an administrator, delete one, or set its password.
 
 `npm run bootstrap-admin -w backend -- shared-calendar-api` sets or rotates the admin password of the deployed
 stack (typed twice, hidden; checked against the pool policy: 12+ characters with upper, lower,
-digit and symbol). It is the only way to set it: the API never touches admin accounts.
+digit and symbol). It is the way back from a lost admin password; the Administrator can also
+change a known one on the page's "Password" screen. The API never touches admin accounts.
 `npm run bootstrap-admin -w backend -- local` does the same against the emulator; after that,
 run `DYNAMODB_PORT=8002 npm run local:up -w backend` again to restore `Admin-Local-Pass-1!`, or the
 integration tests fail.

@@ -63,7 +63,7 @@ load_target() {
 idp() { aws cognito-idp ${COGNITO_URL:+--endpoint-url "$COGNITO_URL"} "$@"; }
 ddb() { aws dynamodb ${DYNAMODB_URL:+--endpoint-url "$DYNAMODB_URL"} "$@"; }
 
-# cognito <sign-in|set-password> <clientId|poolId> <username>: password on stdin. See cognito.mjs.
+# cognito <action> [args]: the calls of cognito.mjs that carry a password or a token, on stdin.
 cognito() { COGNITO_URL="$COGNITO_URL" node scripts/cognito.mjs "$@"; }
 
 # json_field <name>: the string field <name> of the JSON object on stdin, or nothing (also for

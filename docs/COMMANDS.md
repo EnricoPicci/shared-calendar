@@ -437,8 +437,16 @@ Every command of this section that names a stack acts on a real AWS account. `CL
   for the user, listed and cancelled by it, then window and type deleted; settings never
   changed), then one exchange with the assistant as the user (its conversation ended, the
   message "What are the calendar's settings right now?", `continue` while `working`, at most
-  eight steps, the conversation ended again; statuses and counts only, never a text); 26 checks,
-  PASS/FAIL each, 7 of them the assistant's. Against a stack the exchange needs the key
+  eight steps, the conversation ended again; statuses and counts only, never a text), then the
+  change of the user's own password at Cognito through `backend/scripts/cognito.mjs` (a wrong
+  current password refused, the error named; the change; the refresh token from before it still
+  valid after `ChangePassword` alone; `GlobalSignOut`, after which that refresh token is refused;
+  the old password refused, the new one signing in; `docs/RUNBOOK.md` section 2.2); 33 checks,
+  PASS/FAIL each, 7 of them the assistant's and 7 the password's. Locally the two checks of
+  `GlobalSignOut` print `SKIP` (cognito-local has none) and the last line counts them; only a run
+  against a stack proves which error a wrong current password gets and the revocation. The new
+  passwords come from `backend/src/lib/password.ts`, checked against `shared/src/password.ts`,
+  both run in node like the time helpers. Against a stack the exchange needs the key
   (`assistant-key` below) and costs about a US cent at Anthropic; without the key the message
   answers `503 assistant_unavailable`, one FAIL, and the other checks run. Locally it answers
   through the fake Claude, whose `answers.json` scripts the sentence as a read of the settings
@@ -447,6 +455,10 @@ Every command of this section that names a stack acts on a real AWS account. `CL
   `calendar`, the cancelled appointment, its events and the user's deleted-user marker
   (history). Its date arithmetic imports `shared/src/calendar/time.ts` in node (Node ≥ 22.18,
   type stripping).
+  `backend/scripts/cognito.mjs`, its helper for the Cognito calls that carry a secret, reads every
+  password and token on stdin: `sign-in`, `tokens` (access and refresh token, one per line),
+  `refresh`, `change-password` (three lines: access token, current, new), `sign-out`
+  (`GlobalSignOut`), `set-password`; errors print `<name> <message>` with any secret blanked.
 - `npm run assistant-key -w backend -- <stack>` (`backend/scripts/assistant-key.sh`): stores the
   Anthropic API key as the SecureString `/<stack>/anthropic-api-key`, encrypted with the
   account's default key for Parameter Store, or replaces it (a rotation); the procedure is
