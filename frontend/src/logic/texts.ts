@@ -107,9 +107,13 @@ const PLAIN_WORDS = new Map<string, string>([
   // Booking, cancelling, changing and the note (docs/FRONTEND_SERVICES.md section 19.1) and the
   // list of users (docs/FRONTEND_SERVICES.md section 13.1). After a refused booking or change
   // the week is loaded again (docs/FRONTEND_ARCHITECTURE.md section 5.1), which is what the
-  // sentence of `slot_taken` says.
+  // sentence of `slot_taken` says: a time is full when its places are taken, one place or more
+  // (docs/SHARED_CALENDAR_SPEC.md R-BOOK-07). `user_busy` is a person's own appointment in the way
+  // (docs/SHARED_CALENDAR_SPEC.md R-BOOK-12); a change leaves the old appointment out of that
+  // check (docs/SHARED_CALENDAR_SPEC.md R-CHG-01), which is why the sentence points to changing it.
   ['invalid_json', 'The server could not read the request. Please try again.'],
-  ['slot_taken', 'This time has just been taken. The calendar has been refreshed: please choose another time.'],
+  ['slot_taken', 'This time is full: there is no place left. The calendar has been refreshed: please choose another time.'],
+  ['user_busy', 'You already have an appointment at this time. To move it, change that appointment instead.'],
   ['booking_in_past', 'This time has already passed. Please choose a later one.'],
   ['booking_notice_too_short', 'This time is too soon to be booked. Please choose a later one.'],
   ['booking_beyond_horizon', 'This time is too far ahead to be booked yet. Please choose an earlier one.'],

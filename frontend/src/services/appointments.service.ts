@@ -39,6 +39,7 @@ const BOOKING_RULE_CODES = [
   'booking_notice_too_short',
   'booking_beyond_horizon',
   'outside_availability',
+  'user_busy',
   'slot_taken',
   'appointment_limit_reached',
 ] as const satisfies readonly ApiErrorCode[];
@@ -149,6 +150,8 @@ export class AppointmentsService {
       .subscribe((result) => this.appointmentsResultSubject.next(result));
   }
 
+  // `overbook` goes out as the caller gives it, absent staying absent; whether the caller may send
+  // `true` is the API's to answer (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13).
   book(booking: BookBody): void {
     this.pendingBook?.unsubscribe(); // cancels a pending book only
     this.bookStateSubject.next({ status: 'pending', booking });
@@ -186,6 +189,7 @@ export class AppointmentsService {
       .subscribe((result) => this.cancelResultSubject.next(result));
   }
 
+  // `overbook` as in `book`.
   change(appointmentId: string, change: ChangeBody): void {
     this.pendingChange?.unsubscribe(); // cancels a pending change only
     this.changeStateSubject.next({ status: 'pending', appointmentId, change });

@@ -1,9 +1,12 @@
 import type { AvailabilityType } from '@shared-calendar/shared';
+import type { Observable } from 'rxjs';
 import { AvailabilityTypesService } from '../../../src/services/availability-types.service';
-import { json } from './fixtures';
+import { SessionStore } from '../../../src/services/session.store';
+import { call, json, session } from './fixtures';
 import { CONFIG, describeMethod, type MethodSpec } from './suite';
 
-// docs/FRONTEND_SERVICES.md section 16.8: the per-method suite of suite.ts for the four methods.
+// docs/FRONTEND_SERVICES.md section 16.8: the per-method suite of suite.ts for the four methods,
+// then the capacity: sent when given, left out when not, refused before sending when out of range.
 
 const TYPE_ID = '01JCAAAAAAAAAAAAAAAAAAAAAA';
 const STUDIO: AvailabilityType = { typeId: TYPE_ID, name: 'Studio', capacity: 1, createdAt: '2026-11-15T09:00:00.000Z', updatedAt: '2026-11-15T09:00:00.000Z' };
@@ -51,6 +54,9 @@ const create: MethodSpec<S> = {
     ['empty after trimming', (s) => s.create('   '), 'name: 1 to 40 characters'],
     ['41 characters', (s) => s.create(TOO_LONG), 'name: 1 to 40 characters'],
     ['a control character', (s) => s.create('Stu\u0007dio'), 'name: no control characters'],
+    ['a capacity of 0', (s) => s.create('Studio', 0), 'capacity: Too small: expected number to be >=1'],
+    ['a capacity of 101', (s) => s.create('Studio', 101), 'capacity: Too big: expected number to be <=100'],
+    ['a capacity of 2.5', (s) => s.create('Studio', 2.5), 'capacity: Invalid input: expected int, received number'],
   ],
 };
 
@@ -73,6 +79,9 @@ const rename: MethodSpec<S> = {
     ['typeId not a ULID', (s) => s.rename('../types', 'Studio'), 'typeId: expected a ULID'],
     ['both wrong: the path first', (s) => s.rename('x', ''), 'typeId: expected a ULID'],
     ['an empty name', (s) => s.rename(TYPE_ID, ''), 'name: 1 to 40 characters'],
+    ['a capacity of 0', (s) => s.rename(TYPE_ID, 'Studio', 0), 'capacity: Too small: expected number to be >=1'],
+    ['a capacity of 101', (s) => s.rename(TYPE_ID, 'Studio', 101), 'capacity: Too big: expected number to be <=100'],
+    ['a capacity of 2.5', (s) => s.rename(TYPE_ID, 'Studio', 2.5), 'capacity: Invalid input: expected int, received number'],
   ],
 };
 
@@ -99,4 +108,77 @@ describe('AvailabilityTypesService', () => {
   describeMethod(make, create, rename);
   describeMethod(make, rename, remove);
   describeMethod(make, remove, load);
+
+  describe('the capacity', () => {
+    let fetchMock: ReturnType<typeof vi.fn>;
+    let store: SessionStore;
+    let service: S;
+    beforeEach(() => {
+      fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      store = new SessionStore();
+      store.set(session({ username: 'admin', role: 'admin' }));
+      service = make(store);
+    });
+    afterEach(() => {
+      store.clear();
+      vi.unstubAllGlobals();
+    });
+
+    // Runs one call against a stubbed answer: the body sent, the pending state and the result.
+    async function run(result$: Observable<unknown>, state$: Observable<unknown>, trigger: () => void, answer: Response) {
+      fetchMock.mockResolvedValueOnce(answer);
+      const results: unknown[] = [];
+      const states: unknown[] = [];
+      result$.subscribe((r) => results.push(r));
+      state$.subscribe((s) => states.push(s));
+      trigger();
+      await vi.waitFor(() => expect(results).toHaveLength(1));
+      const [, init] = call(fetchMock);
+      return { body: JSON.parse(init.body as string) as unknown, pending: states[1], result: results[0] };
+    }
+
+    const POOL_3: AvailabilityType = { ...POOL, capacity: 3 };
+
+    it('create with a capacity sends it, pending carries it, the answer passes it through', async () => {
+      const { body, pending, result } = await run(service.createResult$, service.createState$, () => service.create(' Swimming Pool ', 3), json(201, POOL_3));
+      expect(body).toEqual({ name: 'Swimming Pool', capacity: 3 });
+      expect(pending).toEqual({ status: 'pending', name: ' Swimming Pool ', capacity: 3 });
+      expect(result).toEqual({ status: 'success', type: POOL_3 });
+    });
+
+    it('create without a capacity sends none, and pending has no key capacity: the server gives 1', async () => {
+      const { body, pending } = await run(service.createResult$, service.createState$, () => service.create('Studio'), json(201, STUDIO));
+      expect(body).toEqual({ name: 'Studio' });
+      expect(pending).not.toHaveProperty('capacity');
+    });
+
+    it('the bounds 1 and 100 are sent', async () => {
+      expect((await run(service.createResult$, service.createState$, () => service.create('Studio', 1), json(201, STUDIO))).body).toEqual({ name: 'Studio', capacity: 1 });
+      fetchMock.mockClear();
+      expect((await run(service.createResult$, service.createState$, () => service.create('Studio', 100), json(201, STUDIO))).body).toEqual({ name: 'Studio', capacity: 100 });
+    });
+
+    it('rename with a capacity sends it, pending carries it, the answer passes it through', async () => {
+      const { body, pending, result } = await run(service.renameResult$, service.renameState$, () => service.rename(POOL.typeId, 'Swimming Pool', 3), json(200, POOL_3));
+      expect(body).toEqual({ name: 'Swimming Pool', capacity: 3 });
+      expect(pending).toEqual({ status: 'pending', typeId: POOL.typeId, name: 'Swimming Pool', capacity: 3 });
+      expect(result).toEqual({ status: 'success', type: POOL_3 });
+    });
+
+    it('rename without a capacity sends none: the type keeps its own, which the answer carries', async () => {
+      const { body, pending, result } = await run(service.renameResult$, service.renameState$, () => service.rename(POOL.typeId, 'Pool'), json(200, { ...POOL_3, name: 'Pool' }));
+      expect(body).toEqual({ name: 'Pool' });
+      expect(pending).toEqual({ status: 'pending', typeId: POOL.typeId, name: 'Pool' });
+      expect(result).toEqual({ status: 'success', type: { ...POOL_3, name: 'Pool' } });
+    });
+
+    it('a capacity out of range: pending carries it as given, then invalid_request, no request', async () => {
+      const states: unknown[] = [];
+      service.createState$.subscribe((s) => states.push(s));
+      service.create('Studio', 0);
+      expect(states[1]).toEqual({ status: 'pending', name: 'Studio', capacity: 0 });
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -302,6 +302,20 @@ describe('types', () => {
   it('an empty name: invalid_request, no request sent', async () => {
     expect(await noRequest(() => createType(admin, '   '))).toMatchObject({ reason: 'invalid_request', message: 'name: 1 to 40 characters' });
   });
+
+  // A capacity left out of an edit keeps the stored one (docs/SHARED_CALENDAR_SPEC.md R-TYPE-02).
+  it('create with a capacity of 2, edit the name only: the capacity stays 2', async () => {
+    const s = types(admin);
+    const created = ok(await outcome(s.createResult$, () => s.create(`${PREFIX}Pool`, 2)), 'create with a capacity').type;
+    expect(created).toMatchObject({ name: `${PREFIX}Pool`, capacity: 2 });
+
+    const renamed = ok(await outcome(s.renameResult$, () => s.rename(created.typeId, `${PREFIX}Pool B`)), 'edit the name only').type;
+    expect(renamed).toMatchObject({ typeId: created.typeId, name: `${PREFIX}Pool B`, capacity: 2 });
+    const listed = ok(await loadTypes(user), 'load as user').types;
+    expect(listed.find((t) => t.typeId === created.typeId)?.capacity).toBe(2);
+
+    ok(await removeType(admin, created.typeId), 'remove');
+  });
 });
 
 // ── Weekly patterns (docs/SHARED_CALENDAR_SPEC.md section 11.1, routes 7–10) ─────────────────
@@ -603,6 +617,31 @@ describe('appointments', () => {
     ok(await cancel(admin, forUser.appointmentId), 'cancel as the Administrator');
     expect(ok(await list(user, { upcoming: 'true' }), 'upcoming').appointments.filter((x) => x.date === date)).toEqual([]);
 
+    await release(bookable);
+  });
+
+  // One place per person, and the force over the capacity (docs/SHARED_CALENDAR_SPEC.md R-BOOK-12
+  // and R-BOOK-13), in a type of capacity 1.
+  it(`${USER} over its own appointment: user_busy; its overbook: forbidden; the Administrator's overbook: booked`, async () => {
+    const bookable = await bookableDate('Places');
+    const { date, at } = bookable;
+    const mine = ok(await book(user, { start: at('08:00') }), 'book').appointment;
+
+    // The same User at the same time: refused before the places are counted.
+    expect(await book(user, { start: at('08:00') })).toMatchObject({ status: 'failure', reason: 'user_busy' });
+
+    // A User may not force: 403 forbidden, and nothing is written.
+    expect(await book(user, { start: at('09:00'), overbook: true })).toMatchObject({ status: 'failure', reason: 'forbidden' });
+    const onDate = ok(await list(user, { from: date, to: date }), 'the date').appointments;
+    expect(onDate.map((x) => x.appointmentId)).toEqual([mine.appointmentId]);
+
+    // The Administrator is refused the full slot, then books it over the capacity.
+    expect(await book(admin, { start: at('08:00'), username: USER_B })).toMatchObject({ status: 'failure', reason: 'slot_taken' });
+    const forced = ok(await book(admin, { start: at('08:00'), username: USER_B, overbook: true }), 'book over the capacity').appointment;
+    expect(forced).toMatchObject({ username: USER_B, start: at('08:00'), end: at('09:00'), status: 'booked' });
+
+    ok(await cancel(admin, forced.appointmentId), 'cancel the forced one');
+    ok(await cancel(user, mine.appointmentId), 'cancel');
     await release(bookable);
   });
 

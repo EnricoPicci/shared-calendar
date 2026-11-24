@@ -94,13 +94,14 @@ export class AvailabilityTypesService {
       .subscribe((result) => this.typesResultSubject.next(result));
   }
 
-  create(name: string): void {
+  // A capacity left out is not sent: the type then gets 1 (docs/SHARED_CALENDAR_SPEC.md R-TYPE-05).
+  create(name: string, capacity?: number): void {
     this.pendingCreate?.unsubscribe(); // cancels a pending create only
-    this.createStateSubject.next({ status: 'pending', name });
+    this.createStateSubject.next({ status: 'pending', name, ...withCapacity(capacity) });
 
-    // Checked with the shared schema, and its parsed output (the trimmed name) is what is sent
-    // (docs/FRONTEND_SERVICES.md section 16.4).
-    const body = TypeBody.safeParse({ name });
+    // Checked with the shared schema, and its parsed output (the trimmed name, the capacity when
+    // given) is what is sent (docs/FRONTEND_SERVICES.md section 16.4).
+    const body = TypeBody.safeParse({ name, ...withCapacity(capacity) });
     const call: Observable<CreateTypeResult> = body.success
       ? apiCall(this.config, this.store, { method: 'POST', path: '/calendar/types', body: body.data, codes: CREATE_CODES }).pipe(
           map((answer): CreateTypeResult => (answer.status === 'ok' ? toTypeResult(answer, 201) : answer)),
@@ -114,13 +115,15 @@ export class AvailabilityTypesService {
       .subscribe((result) => this.createResultSubject.next(result));
   }
 
-  rename(typeId: string, name: string): void {
+  // The edit of a type: its name, and its capacity when given. A capacity left out is not sent, so
+  // the type keeps its own (docs/SHARED_CALENDAR_SPEC.md R-TYPE-02).
+  rename(typeId: string, name: string, capacity?: number): void {
     this.pendingRename?.unsubscribe(); // cancels a pending rename only
-    this.renameStateSubject.next({ status: 'pending', typeId, name });
+    this.renameStateSubject.next({ status: 'pending', typeId, name, ...withCapacity(capacity) });
 
     // The path first, then the body: the handler's order.
     const path = TypeIdParam.safeParse({ typeId });
-    const body = TypeBody.safeParse({ name });
+    const body = TypeBody.safeParse({ name, ...withCapacity(capacity) });
     const call: Observable<RenameTypeResult> = !path.success
       ? of(invalidRequest(path.error)) // no request sent
       : !body.success
@@ -162,6 +165,12 @@ export class AvailabilityTypesService {
       // (docs/FRONTEND_SERVICES.md section 3.2).
       .subscribe((result) => this.removeResultSubject.next(result));
   }
+}
+
+// The key `capacity` only when one is given, so that an absent capacity is absent from the body
+// and from the pending state alike.
+function withCapacity(capacity: number | undefined): { capacity?: number } {
+  return capacity === undefined ? {} : { capacity };
 }
 
 // A success is checked for its status, the array under `types` and each element's `typeId`

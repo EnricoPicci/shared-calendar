@@ -1405,7 +1405,7 @@ validation with the shared schemas before any request, and failure reasons typed
 | `CalendarService` (`calendar.service.ts`) | `load(from, to)`, `reload()` | `calendarResult$`, `calendarState$` (pending carries `{ from, to }`) | 15 |
 | `AppointmentsService` (`appointments.service.ts`) | `list(query)`, `book(input)`, `cancel(id)`, `change(id, input)`, `updateNote(id, note)` | one pair per method: `listResult$`/`listState$`, `bookResult$`/`bookState$`, `cancelResult$`/`cancelState$`, `changeResult$`/`changeState$`, `noteResult$`/`noteState$` | 16–20 |
 | `CalendarSettingsService` (`calendar-settings.service.ts`) | `load()`, `update(settings)` | `settingsResult$`/`settingsState$`, `updateResult$`/`updateState$` | 1, 2 |
-| `AvailabilityTypesService` (`availability-types.service.ts`) | `load()`, `create(name)`, `rename(id, name)`, `remove(id)` | one pair per method | 3–6 |
+| `AvailabilityTypesService` (`availability-types.service.ts`) | `load()`, `create(name, capacity?)`, `rename(id, name, capacity?)`, `remove(id)`; a `capacity` left out is not sent (R-TYPE-02, R-TYPE-05) | one pair per method | 3–6 |
 | `AvailabilityRulesService` (`availability-rules.service.ts`, Administrator) | `loadPatterns()`, `createPattern(p)`, `updatePattern(id, p)`, `deletePattern(id)`, `setOverride(date, windows)`, `deleteOverride(date)`, `createWindow(w)`, `deleteWindow(id)` | one pair per method | 7–14 |
 | `UsersService` (existing, extended) | `listUsers()` | `listUsersResult$`/`listUsersState$` | 21 |
 

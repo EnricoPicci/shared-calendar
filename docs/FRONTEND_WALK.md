@@ -158,7 +158,7 @@ Sign in as `alice`.
 12. `[2]` Leave the week as it is. In the second window, as `admin`, book the free slot of
     Tuesday 11:00–12:00 for `alice` (note `walk-<tag> elsewhere`). Back in the first window,
     press that slot, still shown as free, and "Book". → The booking is refused in plain words
-    ("This time has just been taken. The calendar has been refreshed…"), the dialog stays open, and behind it the week is read again: the
+    ("This time is full: there is no place left. The calendar has been refreshed…"), the dialog stays open, and behind it the week is read again: the
     slot is gone and the appointment is there. Close the dialog. In the second window, cancel
     that appointment.
 

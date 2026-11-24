@@ -4,7 +4,7 @@
 |---|---|
 | Test file | `frontend/tests/integration/calendar.test.ts` |
 | `describe` | `appointments` |
-| Tests | 1. "book, slot taken, book for fe-calendar, note, change, upcoming, cancel"<br>2. "fe-calendar starts off the whole hour: the API answers invalid_request (the service sends it)"<br>3. "fe-calendar lists fe-calendar-b's appointments: forbidden"<br>4. "cancel an unknown appointment: appointment_not_found"<br>5. "a note of 501 characters: invalid_request with the field, no request sent" |
+| Tests | 1. "book, slot taken, book for fe-calendar, note, change, upcoming, cancel"<br>2. "fe-calendar over its own appointment: user_busy; its overbook: forbidden; the Administrator's overbook: booked"<br>3. "fe-calendar starts off the whole hour: the API answers invalid_request (the service sends it)"<br>4. "fe-calendar lists fe-calendar-b's appointments: forbidden"<br>5. "cancel an unknown appointment: appointment_not_found"<br>6. "a note of 501 characters: invalid_request with the field, no request sent" |
 | Runs against | the local stack: the API on port 3000, cognito-local on port 9229 (`RUN_INTEGRATION=1`) |
 
 Ideas used here, explained once for all journeys:
@@ -13,6 +13,7 @@ Ideas used here, explained once for all journeys:
 [one local calendar, shared](../concepts.md#one-local-calendar-shared),
 [the settings](../concepts.md#the-settings),
 [windows and slots](../concepts.md#windows-and-slots),
+[places in a slot](../concepts.md#places-in-a-slot),
 [the life of an appointment](../concepts.md#the-life-of-an-appointment),
 [a change cancels one appointment and books another](../concepts.md#a-change-cancels-one-appointment-and-books-another),
 [booked appointments keep their window](../concepts.md#booked-appointments-keep-their-window),
@@ -27,6 +28,10 @@ Ideas used here, explained once for all journeys:
 - A change cancels the old appointment and books a new one that keeps the note
   (`docs/SHARED_CALENDAR_SPEC.md` R-CHG-02 and R-CHG-03); a cancelled appointment can be neither
   changed nor cancelled again (`docs/SHARED_CALENDAR_SPEC.md` R-CAN-02).
+- One person never holds two appointments at the same time (`409 user_busy`,
+  `docs/SHARED_CALENDAR_SPEC.md` R-BOOK-12); only the Administrator may book a full slot, by
+  sending `overbook: true`, and a User who sends it gets `403 forbidden` with nothing written
+  (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-13). The service passes `overbook` on as it is given.
 - The service refuses a note of more than 500 characters itself, without a request, but sends a
   User's booking off the whole hour and lets the API refuse it (`docs/FRONTEND_SERVICES.md`
   section 8, decision 42).
@@ -37,11 +42,13 @@ Ideas used here, explained once for all journeys:
   changes, lists and cancels. In test 1 its bookings, note, changes and cancels go through one
   `AppointmentsService`; its lists go through the helper `list()`.
 - **The Administrator** (`admin`): tries to book a taken slot, books for `fe-calendar` with a
-  custom end, lists `fe-calendar`'s appointments and cancels one. It also prepares and removes the
+  custom end, lists `fe-calendar`'s appointments and cancels one; in test 2 it books a full slot
+  for `fe-calendar-b` over the capacity, then cancels that booking. It also prepares and removes the
   day (`bookableDate()`, `release()`).
 - **`fe-calendar-b`**: a second plain User created by the test file. It never signs in. Here it is
-  only a name: the User of the booking the Administrator is refused in test 1, and the User whose
-  appointments `fe-calendar` may not list in test 3.
+  only a name: the User of the booking the Administrator is refused in test 1, the User of the
+  booking the Administrator forces in test 2, and the User whose appointments `fe-calendar` may
+  not list in test 4.
 
 ## Before the block starts
 
@@ -63,10 +70,13 @@ Ideas used here, explained once for all journeys:
 ## Test 1: book, note, change, list, cancel
 
 ```mermaid
+%%{init: {'theme': 'default'}}%%
 sequenceDiagram
+    box rgb(250, 250, 247)
     participant U as fe-calendar
     participant A as admin
     participant API as API (local)
+    end
     A->>API: type "fe-calendar Appointments", pattern 08:00–12:00 on date D only
     U->>API: book D 08:00
     API-->>U: 201, cancellableUntil set
@@ -79,11 +89,11 @@ sequenceDiagram
     API-->>U: 201 { cancelled: 08:00, booked: 09:00 }
     U->>API: change the 08:00 again
     API-->>U: 409 appointment_not_active
-    U->>API: list upcoming; list D, every status
+    U->>API: list upcoming, then D with every status
     A->>API: list upcoming for fe-calendar
     U->>API: cancel the 09:00, then again
-    API-->>U: 200; then 409 appointment_not_active
-    A->>API: cancel the 10:00–10:30; delete pattern and type
+    API-->>U: 200, then 409 appointment_not_active
+    A->>API: cancel the 10:00–10:30, delete pattern and type
 ```
 
 ### 1. Prepare a bookable day
@@ -120,8 +130,10 @@ The test keeps it as `booked`.
 ### 3. The Administrator tries 08:00 for `fe-calendar-b`
 
 `book(admin, { start: at('08:00'), username: 'fe-calendar-b' })`. The test checks the failure
-`slot_taken`. The Administrator is exempt from the notice, the horizon and the limit, but not from
-the overlap rule (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-07). Nothing is written.
+`slot_taken`. The type has the default capacity of 1, and `fe-calendar` holds that one place
+([places in a slot](../concepts.md#places-in-a-slot)). The Administrator is exempt from the
+notice, the horizon and the limit, but not from the places (`docs/SHARED_CALENDAR_SPEC.md`
+R-BOOK-07) unless it asks to go over them, which it does not do here. Nothing is written.
 
 ### 4. The Administrator books 10:00–10:30 for `fe-calendar`
 
@@ -228,7 +240,78 @@ can tell apart:
 5. The helper `release()` deletes the pattern, then the type. Both work now: no booked appointment
    is left in the window.
 
-## Test 2: a booking off the whole hour
+## Test 2: one place per person, and the force over the capacity
+
+```mermaid
+%%{init: {'theme': 'default'}}%%
+sequenceDiagram
+    box rgb(250, 250, 247)
+    participant U as fe-calendar
+    participant A as admin
+    participant API as API (local)
+    end
+    A->>API: type "fe-calendar Places" (capacity 1), pattern 08:00–12:00 on date E only
+    U->>API: book E 08:00
+    API-->>U: 201
+    U->>API: book E 08:00 again
+    API-->>U: 409 user_busy
+    U->>API: book E 09:00 with overbook true
+    API-->>U: 403 forbidden
+    U->>API: list E (booked)
+    A->>API: book E 08:00 for fe-calendar-b
+    API-->>A: 409 slot_taken
+    A->>API: the same with overbook true
+    API-->>A: 201
+    A->>API: cancel the forced one
+    U->>API: cancel its own
+    A->>API: delete pattern and type
+```
+
+### 1. Prepare a bookable day
+
+`bookableDate('Places')` as in test 1: the type `fe-calendar Places`, created without a capacity,
+so it holds one person; a window 08:00–12:00 on the first free date of the band. Call it `E`. Test
+1 deleted its pattern, so `E` is often the same date as `D`; test 1 left only cancelled
+appointments there, which take no place.
+
+### 2. `fe-calendar` books 08:00
+
+`book(user, { start: at('08:00') })` through the helper. It must succeed (the helper `ok()`); the
+test keeps it as `mine`.
+
+### 3. `fe-calendar` books 08:00 again
+
+The same call once more. The test checks the failure `user_busy`: `fe-calendar` already holds an
+appointment that overlaps the time asked, and one person is never in two places
+(`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-12). The server checks this before it counts the places,
+so the answer is not `slot_taken`, although the slot is full too. Nothing is written.
+
+### 4. `fe-calendar` asks to go over the capacity
+
+`book(user, { start: at('09:00'), overbook: true })`. 09:00 is free, so only the flag is wrong.
+The service's schema accepts `overbook` as a boolean and sends it as given; the API refuses it:
+only the Administrator may book over the capacity (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-13). The
+test checks the failure `forbidden`.
+
+Then `fe-calendar` lists `{ from: E, to: E }` (status `booked` by default). The test checks that
+the list holds `mine` only: the refused booking wrote nothing. The count can be trusted: the
+server lists only this run's `fe-calendar` account, and of its appointments on `E` only `mine` is
+booked, since test 1 cancelled all of its own.
+
+### 5. The Administrator books the full slot, then forces it
+
+`book(admin, { start: at('08:00'), username: 'fe-calendar-b' })`. The test checks the failure
+`slot_taken`: the one place of 08:00 is `fe-calendar`'s. The Administrator then sends the same
+booking with `overbook: true`. The test checks that it succeeds, as an appointment of
+`fe-calendar-b`, 08:00–09:00, `booked`. 08:00 now holds two people in a type of capacity 1; the
+calendar allows it because the Administrator said so.
+
+### 6. Tidy up
+
+The Administrator cancels the forced appointment, `fe-calendar` cancels `mine` (the helper
+`cancel()`, which must succeed each time), and `release()` deletes the pattern and the type.
+
+## Test 3: a booking off the whole hour
 
 `fe-calendar` books 08:15 on the first date of the band. The service's schema accepts 08:15 (an
 instant with zero seconds), so the service sends it, and the API refuses it: a User books whole
@@ -239,20 +322,20 @@ copy of a role rule in the front end could drift from the server's (`docs/FRONTE
 section 8, decision 42). The server checks the times before it reads the calendar, so the date
 needs no window.
 
-## Test 3: listing someone else's appointments
+## Test 4: listing someone else's appointments
 
 `fe-calendar` lists `{ upcoming: 'true', username: 'fe-calendar-b' }`. The test checks the failure
 `forbidden`. A User may pass `username` only with its own name (`docs/SHARED_CALENDAR_SPEC.md`
 section 11.2). The server decides from the token and the query alone, before it reads anything.
 
-## Test 4: cancelling an unknown appointment
+## Test 5: cancelling an unknown appointment
 
 `fe-calendar` cancels `UNKNOWN_ID`, a well-formed ULID whose time part lies in 2024, so no server
 generates it now. The id passes the service's schema, so the request is sent. The test checks the
 failure `appointment_not_found`. A User gets the same answer for someone else's appointment, so it
 learns nothing from an id (`docs/SHARED_CALENDAR_SPEC.md` R-PERM-01).
 
-## Test 5: a note of 501 characters
+## Test 6: a note of 501 characters
 
 `fe-calendar` sets a note of 501 `x` on `UNKNOWN_ID`. The service checks the id first (a ULID: it
 passes), then the note: at most 500 characters (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-11). The test
@@ -261,8 +344,8 @@ request leaves (the helper `noRequest()`). So the unknown id never reaches the s
 
 ## What the block leaves
 
-Nothing booked, no type and no pattern: test 1 cancels everything and `release()` removes the
-pattern and the type. The block's `afterAll` writes the settings back to the values it read and
+Nothing booked, no type and no pattern: tests 1 and 2 cancel everything and `release()` removes
+the pattern and the type of each. The block's `afterAll` writes the settings back to the values it read and
 removes `fe-calendar-settings.local.json`. On `D` this block's three cancelled appointments stay
 as history, all of them `fe-calendar`'s (next to whatever the "calendar view" block and earlier
 runs left there):
@@ -273,8 +356,16 @@ runs left there):
 | 09:00–10:00 | `fe-calendar`, by the change (`replaces` the 08:00) | `cancelled` | `fe-calendar` |
 | 10:00–10:30 | the Administrator | `cancelled` | the Administrator |
 
-With them stay their events, as the server writes them: two `appointment.booked`, one
-`appointment.note_updated`, one `appointment.changed` and two `appointment.cancelled`
+On `E` (often the same date) test 2's two cancelled appointments stay too:
+
+| Time | User | Booked by | `cancelReason` | Cancelled by |
+|---|---|---|---|---|
+| 08:00–09:00 | `fe-calendar` | `fe-calendar` | `cancelled` | `fe-calendar` |
+| 08:00–09:00 | `fe-calendar-b` | the Administrator, over the capacity | `cancelled` | the Administrator |
+
+With them stay their events, as the server writes them: for test 1 two `appointment.booked`, one
+`appointment.note_updated`, one `appointment.changed` and two `appointment.cancelled`; for test 2
+two `appointment.booked` and two `appointment.cancelled`
 ([the event log](../concepts.md#the-event-log)). The refused requests wrote nothing.
 
 The next block, "availability conflict", needs no more than that: it makes its own type and
@@ -283,11 +374,13 @@ appointment could block.
 
 ## If the block fails halfway
 
-- **The later tests still run.** vitest does not stop a block at its first failure. Tests 2 to 5
-  need nothing from test 1.
-- **A failed check in test 1 skips the rest of it**, the cancels and `release()` included. The
-  booked appointments, the type and the pattern then stay until the end of the file. The next
-  block still works: its own date is another one, since `D` still has a window.
+- **The later tests still run.** vitest does not stop a block at its first failure. Tests 2 to 6
+  need nothing from test 1, and tests 3 to 6 nothing from test 2.
+- **A failed check in test 1 or test 2 skips the rest of it**, the cancels and `release()`
+  included. The booked appointments, the type and the pattern then stay until the end of the file.
+  The tests and the block after it still work: each takes another free date, since that one still
+  has a window. A booked appointment of `fe-calendar` left by test 1 does not reach test 2's
+  checks either: they look only at `E`.
 - **The settings are written back** by the block's `afterAll` whatever happened.
 - **The file's `afterAll`** (and the next run's `beforeAll`) removes the two Users through
   `DELETE /users/{username}`, which cancels their booked appointments with `cancelReason`
@@ -304,7 +397,7 @@ the cancelled appointments, their events and the markers.
 |---|---|
 | The service | `AppointmentsService` (`frontend/src/services/appointments.service.ts`), types in `appointments.types.ts` |
 | Methods, streams, routes | `book` → `bookResult$`, `POST /calendar/appointments` (route 17); `updateNote` → `updateNoteResult$`, `PATCH /calendar/appointments/{appointmentId}` (route 18); `cancel` → `cancelResult$`, `POST …/cancel` (route 19); `change` → `changeResult$`, `POST …/change` (route 20); `list` → `appointmentsResult$`, `GET /calendar/appointments` (route 16). `docs/SHARED_CALENDAR_SPEC.md` section 16.2 names two of them `noteResult$` and `listResult$`; the names in the code are those of `docs/FRONTEND_SERVICES.md` section 8, decision 40 |
-| Checks before sending | the shared schemas `BookBody`, `ChangeBody`, `AppointmentIdParam`, `NoteBody`, `AppointmentsQuery` (`shared/src/calendar/schemas.ts`); the message built by `invalidRequest()` in `frontend/src/services/api.ts` |
+| Checks before sending | the shared schemas `BookBody` (with `overbook`, a boolean), `ChangeBody`, `AppointmentIdParam`, `NoteBody`, `AppointmentsQuery` (`shared/src/calendar/schemas.ts`); the message built by `invalidRequest()` in `frontend/src/services/api.ts` |
 | An answer becoming a result | `apiCall()` in `frontend/src/services/api.ts`: the `error` code becomes the `reason`, if the route lists it |
 | Test helpers | in the test file: `bookingSettings()`, `bookableDate()`, `release()`, `book()`, `cancel()`, `list()`, `appointments()`, `ok()`, `noRequest()`; in `frontend/tests/integration/local.ts`: `outcome()` |
 | Constants | `USER` (`fe-calendar`), `USER_B` (`fe-calendar-b`), `BAND_OFFSET` (330 days), `UNKNOWN_ID` |

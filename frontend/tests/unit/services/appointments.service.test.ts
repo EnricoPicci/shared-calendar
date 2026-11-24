@@ -5,7 +5,8 @@ import { call, json, session } from './fixtures';
 import { CONFIG, describeMethod, type MethodSpec } from './suite';
 
 // docs/FRONTEND_SERVICES.md section 19.8: the per-method suite of suite.ts for the five methods,
-// then what the suite cannot say: the query's default, the trimmed note, what is left to the API.
+// then what the suite cannot say: the query's default, the trimmed note, `overbook` as given, what
+// is left to the API.
 
 const ID = '01JCAAAAAAAAAAAAAAAAAAAAAA';
 const NEW_ID = '01JCBBBBBBBBBBBBBBBBBBBBBB';
@@ -61,7 +62,7 @@ const list: MethodSpec<S> = {
     ['201 instead of 200', () => json(201, { appointments: [] })],
   ],
   codes: ['forbidden', 'invalid_request', 'internal_error'],
-  notCodes: ['invalid_json', 'appointment_not_found'],
+  notCodes: ['invalid_json', 'appointment_not_found', 'user_busy'],
   invalid: [
     ['neither selection', (s) => s.list({}), 'upcoming: expected either from and to, or upcoming=true'],
     ['both selections', (s) => s.list({ ...QUERY, upcoming: 'true' }), 'upcoming: expected either from and to, or upcoming=true'],
@@ -96,6 +97,7 @@ const book: MethodSpec<S> = {
     'booking_notice_too_short',
     'booking_beyond_horizon',
     'outside_availability',
+    'user_busy',
     'slot_taken',
     'appointment_limit_reached',
     'concurrent_update',
@@ -108,6 +110,7 @@ const book: MethodSpec<S> = {
     ['a note of 501 characters', (s) => s.book({ start: START, note: 'x'.repeat(501) }), 'note: at most 500 characters'],
     ['a control character in the note', (s) => s.book({ start: START, note: 'a\tb' }), 'note: no control characters except line feed'],
     ['an unknown field', (s) => s.book({ start: START, typeId: TYPE_ID } as never), 'Unrecognized key: "typeId"'],
+    ['overbook not a boolean', (s) => s.book({ start: START, overbook: 'true' } as never), 'overbook: Invalid input: expected boolean, received string'],
   ],
 };
 
@@ -134,7 +137,7 @@ const cancel: MethodSpec<S> = {
     'internal_error',
   ],
   // The route reads no body, and a cancel has no target User.
-  notCodes: ['invalid_json', 'user_not_found', 'slot_taken'],
+  notCodes: ['invalid_json', 'user_not_found', 'slot_taken', 'user_busy'],
   invalid: [[NOT_A_ULID[0], (s) => s.cancel(NOT_A_ULID[1]), NOT_A_ULID[2]]],
 };
 
@@ -166,6 +169,7 @@ const change: MethodSpec<S> = {
     'booking_notice_too_short',
     'booking_beyond_horizon',
     'outside_availability',
+    'user_busy',
     'slot_taken',
     'appointment_limit_reached',
     'concurrent_update',
@@ -177,6 +181,7 @@ const change: MethodSpec<S> = {
     [`${NOT_A_ULID[0]} (with a bad body: the path's message)`, (s) => s.change(NOT_A_ULID[1], { start: 'x' }), NOT_A_ULID[2]],
     ['a username in the body', (s) => s.change(ID, { ...CHANGE, username: 'bob' } as never), 'Unrecognized key: "username"'],
     ['start missing', (s) => s.change(ID, {} as never), 'start: Invalid input: expected string, received undefined'],
+    ['overbook not a boolean', (s) => s.change(ID, { ...CHANGE, overbook: 1 } as never), 'overbook: Invalid input: expected boolean, received number'],
   ],
 };
 
@@ -195,7 +200,7 @@ const note: MethodSpec<S> = {
   ],
   codes: ['forbidden', 'invalid_json', 'invalid_request', 'appointment_not_found', 'appointment_not_active', 'concurrent_update', 'internal_error'],
   // A note has no notice (docs/SHARED_CALENDAR_SPEC.md R-NOTE-01).
-  notCodes: ['cancellation_notice_too_short', 'slot_taken'],
+  notCodes: ['cancellation_notice_too_short', 'slot_taken', 'user_busy'],
   invalid: [
     [NOT_A_ULID[0], (s) => s.updateNote(NOT_A_ULID[1], 'x'), NOT_A_ULID[2]],
     ['a note of 501 characters', (s) => s.updateNote(ID, 'x'.repeat(501)), 'note: at most 500 characters'],
@@ -268,6 +273,43 @@ describe('AppointmentsService', () => {
       const [url, init] = await sent(service.bookResult$, () => service.book(booking), json(201, APPOINTMENT));
       expect(url).toBe(`${CONFIG.apiUrl}/calendar/appointments`);
       expect(JSON.parse(init.body as string)).toEqual(booking);
+    });
+
+    // The Administrator's force over the capacity goes out as given; a User's `true` is the API's
+    // to refuse with forbidden (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13).
+    it.each([
+      ['true', { overbook: true }],
+      ['false', { overbook: false }],
+      ['absent', {}],
+    ])('book: overbook %s is sent as given; pending keeps the booking as given', async (_name, extra) => {
+      const booking = { start: START, username: 'alice', ...extra };
+      const states: unknown[] = [];
+      service.bookState$.subscribe((s) => states.push(s));
+      const [, init] = await sent(service.bookResult$, () => service.book(booking), json(201, APPOINTMENT));
+      expect(JSON.parse(init.body as string)).toStrictEqual(booking);
+      expect(states[1]).toEqual({ status: 'pending', booking });
+    });
+
+    it.each([
+      ['true', { overbook: true }],
+      ['false', { overbook: false }],
+      ['absent', {}],
+    ])('change: overbook %s is sent as given; pending keeps the change as given', async (_name, extra) => {
+      const change = { start: START, ...extra };
+      const states: unknown[] = [];
+      service.changeState$.subscribe((s) => states.push(s));
+      const [, init] = await sent(service.changeResult$, () => service.change(ID, change), json(201, { cancelled: REPLACED, booked: BOOKED }));
+      expect(JSON.parse(init.body as string)).toStrictEqual(change);
+      expect(states[1]).toEqual({ status: 'pending', appointmentId: ID, change });
+    });
+
+    it('a User sending overbook: true gets the 403 forbidden of the API as the reason forbidden', async () => {
+      const [, , result] = await sent(
+        service.bookResult$,
+        () => service.book({ start: START, overbook: true }),
+        json(403, { error: 'forbidden', message: 'Only the Administrator can book over the capacity' }),
+      );
+      expect(result).toEqual({ status: 'failure', reason: 'forbidden', message: 'Only the Administrator can book over the capacity' });
     });
 
     it('the id goes into the path encoded (a valid ULID is unchanged)', async () => {

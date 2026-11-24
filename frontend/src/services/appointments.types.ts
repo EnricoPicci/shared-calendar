@@ -8,12 +8,14 @@ import type { ApiFailure, TransportFailureReason } from './api';
 
 type Common = 'forbidden' | 'internal_error';
 // The timing and availability refusals a booking and a change share (docs/SHARED_CALENDAR_SPEC.md
-// section 8.2, R-BOOK-03 to R-BOOK-09).
+// section 8.2, R-BOOK-03 to R-BOOK-09, and R-BOOK-12: the target User already holds an appointment at
+// that time).
 type BookingRule =
   | 'booking_in_past'
   | 'booking_notice_too_short'
   | 'booking_beyond_horizon'
   | 'outside_availability'
+  | 'user_busy'
   | 'slot_taken'
   | 'appointment_limit_reached';
 

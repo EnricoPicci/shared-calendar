@@ -19,7 +19,7 @@ type CreateCode = Extract<
 >;
 export type CreateTypeFailureReason = CreateCode | TransportFailureReason;
 export type CreateTypeResult = { status: 'success'; type: AvailabilityType } | ApiFailure<CreateCode>;
-export type CreateTypeState = { status: 'idle' } | { status: 'pending'; name: string } | CreateTypeResult;
+export type CreateTypeState = { status: 'idle' } | { status: 'pending'; name: string; capacity?: number } | CreateTypeResult;
 
 // PUT /calendar/types/{typeId}, admin only.
 type RenameCode = Extract<
@@ -28,7 +28,7 @@ type RenameCode = Extract<
 >;
 export type RenameTypeFailureReason = RenameCode | TransportFailureReason;
 export type RenameTypeResult = { status: 'success'; type: AvailabilityType } | ApiFailure<RenameCode>;
-export type RenameTypeState = { status: 'idle' } | { status: 'pending'; typeId: string; name: string } | RenameTypeResult;
+export type RenameTypeState = { status: 'idle' } | { status: 'pending'; typeId: string; name: string; capacity?: number } | RenameTypeResult;
 
 // DELETE /calendar/types/{typeId}, admin only. The 204 has no body: the success carries the id of the call.
 type RemoveCode = Extract<ApiErrorCode, 'forbidden' | 'invalid_request' | 'type_not_found' | 'type_in_use' | 'concurrent_update' | 'internal_error'>;

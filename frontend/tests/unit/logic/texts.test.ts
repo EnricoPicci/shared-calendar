@@ -140,6 +140,7 @@ describe('texts', () => {
       // Booking, cancelling and the list of users.
       'invalid_json',
       'slot_taken',
+      'user_busy',
       'booking_in_past',
       'booking_notice_too_short',
       'booking_beyond_horizon',
@@ -184,8 +185,12 @@ describe('texts', () => {
       expect(failureText('unexpected')).toBe(general);
     });
 
-    it('slot_taken says that the calendar has been refreshed', () => {
-      expect(failureText('slot_taken')).toBe('This time has just been taken. The calendar has been refreshed: please choose another time.');
+    it('slot_taken says that the time is full, for any capacity, and that the calendar has been refreshed', () => {
+      expect(failureText('slot_taken')).toBe('This time is full: there is no place left. The calendar has been refreshed: please choose another time.');
+    });
+
+    it('user_busy says that the person already has an appointment then, and points to changing it', () => {
+      expect(failureText('user_busy')).toBe('You already have an appointment at this time. To move it, change that appointment instead.');
     });
 
     it('a username that exists says so and what to do; an Administrator that cannot be deleted says so', () => {
@@ -234,7 +239,7 @@ describe('texts', () => {
     it('every other reason has the same sentence after a change, an unknown one the general sentence', () => {
       const others = [
         'network', 'server', 'unexpected', 'not_signed_in', 'session_rejected', 'forbidden', 'invalid_request', 'internal_error', 'invalid_json',
-        'slot_taken', 'booking_in_past', 'booking_notice_too_short', 'booking_beyond_horizon', 'outside_availability',
+        'slot_taken', 'user_busy', 'booking_in_past', 'booking_notice_too_short', 'booking_beyond_horizon', 'outside_availability',
         'user_not_found', 'concurrent_update', 'appointment_not_found', 'appointment_not_active', 'user_exists', 'cannot_delete_admin',
         'type_in_use', '', 'constructor',
       ];

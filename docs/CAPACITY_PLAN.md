@@ -1,6 +1,7 @@
 # Shared Calendar: several people in one slot, a capacity per type (implementation plan)
 
-**Version:** v5 (2026-11-24): step u3 done, the back end; AC-15 answers `user_busy` (the Product
+**Version:** v6 (2026-11-24): step u4 done, the front end's services; the Administrator's
+sentence of `user_busy` moved to step u5 (the Product Owner's decision). v5 (2026-11-24): step u3 done, the back end; AC-15 answers `user_busy` (the Product
 Owner's decision), its page in step u5. v4 (2026-11-24): step u2 done, the shared contract in `shared/`; the response
 fields moved from step u2 to step u3 (the Product Owner's decision). v3 (2026-11-24): step u1 done, the rules in the governing documents
 (`docs/SHARED_CALENDAR_SPEC.md` v17, `docs/ARCHITECTURE.md` v15 open). v2 (2026-11-24): the four proposals of planning (F4 to F7) decided by the Product
@@ -381,6 +382,72 @@ Administrator's full ones included; `busy` is the time that is full; booking and
 **Check:** the root `verify`; `RUN_INTEGRATION=1 npm run test:integration -w frontend` (not at the
 same time as the back end's).
 
+**As done (2026-11-24).** Changes under `frontend/src/services`, `frontend/src/logic/texts.ts`,
+`frontend/tests` and `docs/` only; no caller under `frontend/src/logic` or `frontend/src/views`
+changed (the typecheck asked for none); nothing deployed, no `aws` command run. Brief
+`prompts/e14-step-u4-implementation.md`.
+
+- *Decision 1, the type calls:* `create(name, capacity?)` and `rename(typeId, name, capacity?)` in
+  `frontend/src/services/availability-types.service.ts`. A `capacity` left out is absent from the
+  body and from `pending` (the helper `withCapacity`); one given is checked with `TypeBody`, so 0,
+  101 and 2.5 are `invalid_request` with no request. The answer's `capacity` passes through with
+  the type. `pending` of both methods gains `capacity?` in `availability-types.types.ts`.
+  `docs/FRONTEND_SERVICES.md` section 8, decision 70. The comments cite
+  `docs/SHARED_CALENDAR_SPEC.md` R-TYPE-05 (absent at creation is 1) and R-TYPE-02 (absent at an
+  edit keeps the stored one): the brief's D28 is the lowered capacity, not the absent one.
+- *`AppointmentsService`:* `BookBody` and `ChangeBody` already held `overbook` (step u2), so `book`
+  and `change` passed it through unchanged in code: a comment says so. `user_busy` joins the
+  booking codes of both routes (`appointments.service.ts`, `appointments.types.ts`), between
+  `outside_availability` and `slot_taken`, the server's order.
+- *Decision 2, the sentence of `user_busy`:* "You already have an appointment at this time. To
+  move it, change that appointment instead." `failureText` cannot tell who attempted: its second
+  value says what was attempted, and no caller passes the role. Decided by the Product Owner: the
+  Administrator's sentence ("This User already has an appointment at this time.") waits for step
+  u5, which passes the role in from the week view. Until then the Administrator, booking for a
+  User in the week or through the assistant's panel, reads the User's sentence, on the local
+  stack only.
+- *Decision 3, the sentence of `slot_taken`:* "This time is full: there is no place left. The
+  calendar has been refreshed: please choose another time." The tests that quote it changed with
+  it: `frontend/tests/unit/views/week.view.test.ts`, `shell.test.ts`, `assistant.view.test.ts` (an
+  outcome's text written in the test), and check 12 of `docs/FRONTEND_WALK.md`.
+- *Unit tests:* `availability-types.service.test.ts`: the capacity 0, 101 and 2.5 refused before
+  sending in `create` and `rename`; a describe "the capacity": sent with `pending` and the answer
+  (3, the bounds 1 and 100), left out of the body and of `pending`, and an edit by name only.
+  `appointments.service.test.ts`: `user_busy` a route code of `book` and `change`, `unexpected`
+  for `list`, `cancel` and `updateNote`; an `overbook` that is not a boolean refused in both;
+  `overbook` `true`, `false` and absent sent as given by both; a User's `403` answered as
+  `forbidden`. `texts.test.ts`: the two sentences, `user_busy` among the reasons with a sentence of
+  their own and the same after a change. 100 % line coverage on `frontend/src` kept.
+- *Journeys (`frontend/tests/integration/calendar.test.ts`):* block "types", a new test: a type
+  created with a capacity of 2, edited by name only, keeps 2, also in the User's list; the block
+  has no page under `docs/journeys/`, and gets none. Block "appointments", a new test 2 on a type
+  of capacity 1 and a free date of its own: `fe-calendar` over its own appointment gets
+  `user_busy`; its `overbook: true` gets `forbidden` and the date holds only its first appointment;
+  the Administrator is refused the full slot (`slot_taken`) and books it with `overbook: true`;
+  everything cancelled, the pattern and the type removed. Its page
+  `docs/journeys/frontend/calendar-appointments.md` refreshed with the skill `explain-journey`:
+  the tests renumbered, the places in "What this block proves" and test 1's step 3, a new "Test 2"
+  with its diagram, what the block leaves and what a failure skips; its two diagrams now follow
+  `.claude/rules/diagrams.md` (the old one had `;` in its labels and did not render).
+  `docs/journeys/concepts.md` already said what the page needs (step u3).
+- *Documents:* `docs/FRONTEND_SERVICES.md` v12 (status line, change log, decision 70, sections
+  14.4, 16 and 19; the sentence "Not yet in line with the capacity of a type" removed);
+  `docs/FRONTEND_ARCHITECTURE.md`, the paragraph "Failures in plain words" (the two sentences); the
+  v15 row of `docs/ARCHITECTURE.md`. after the commit, by the Product Owner's decision,
+  `docs/SHARED_CALENDAR_SPEC.md` section 16.2 lists `create(name, capacity?)` and
+  `rename(id, name, capacity?)`.
+- *Checked:* `npm run typecheck`, `npm run lint`, `npm run test:unit` green (shared 516, back end
+  1 800, front end 2 609; 100 % lines); with `local:up` and `local:api` running, the root
+  `DYNAMODB_PORT=8002 npm run verify` **PASSED** (the back end's journeys 200); then apart
+  `RUN_INTEGRATION=1 npm run test:integration -w frontend` passed (79, two new).
+
+**Step u5 finds ready:** `AvailabilityTypesService.create(name, capacity?)` and
+`rename(typeId, name, capacity?)` for the capacity field; `AppointmentsService.book` and `change`
+send `overbook` as given, for "Book anyway?" after `slot_taken`; `user_busy` is a reason of both,
+with the User's sentence in `failureText`; the Administrator's sentence is step u5's, with the role
+passed in from the week view; every slot carries `capacity` and `placesLeft`, the Administrator's
+full ones with `placesLeft: 0`.
+
 ### Step u5 — The front end's screens
 
 - The availability screen: the capacity beside a type's name, at creation and edit.
@@ -389,6 +456,8 @@ same time as the back end's).
   blocks of F6 (side by side up to three, then one block with the list).
 - The book dialog (`booking.ts`): on `slot_taken` for the Administrator, "Book anyway?" and the
   same request with `overbook: true`; the same for a change.
+- On `user_busy` for the Administrator booking for a User, the sentence "This User already has an
+  appointment at this time." (decided at step u4: `failureText` gets told who attempted).
 - On `user_busy` (the person already holds an appointment that overlaps the time asked), the page
   names that appointment and points to changing it, since a change leaves the old appointment out
   of its own checks (`docs/SHARED_CALENDAR_SPEC.md` R-CHG-01): "You already have an appointment at

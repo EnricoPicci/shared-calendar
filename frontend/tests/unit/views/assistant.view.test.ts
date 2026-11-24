@@ -272,10 +272,10 @@ describe('mountAssistant', () => {
       const block = one('.proposal');
       assistant$.next(opened({ proposal: proposal({ buttons: 'disabled' }) }));
       expect([one('.proposal .actions').hidden, one<HTMLButtonElement>('.confirm').disabled, one<HTMLButtonElement>('.decline').disabled]).toEqual([false, true, true]);
-      assistant$.next(opened({ proposal: proposal({ buttons: 'none', actions: [{ summary: 'first', outcome: 'Done' }, { summary: 'second', outcome: 'Not done. This time has just been taken.' }] }) }));
+      assistant$.next(opened({ proposal: proposal({ buttons: 'none', actions: [{ summary: 'first', outcome: 'Done' }, { summary: 'second', outcome: 'Not done. This time is full: there is no place left.' }] }) }));
       expect(one('.proposal')).toBe(block);
       expect([block.hidden, one('.proposal .actions').hidden]).toEqual([false, true]);
-      expect(changes().map((row) => [row.querySelector('.summary')!.textContent, row.querySelector('.outcome')!.textContent])).toEqual([['first', 'Done'], ['second', 'Not done. This time has just been taken.']]);
+      expect(changes().map((row) => [row.querySelector('.summary')!.textContent, row.querySelector('.outcome')!.textContent])).toEqual([['first', 'Done'], ['second', 'Not done. This time is full: there is no place left.']]);
     });
 
     it('no proposal any more: the block is hidden and empty, its buttons ready for the next one', () => {

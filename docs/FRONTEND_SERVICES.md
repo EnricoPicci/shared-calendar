@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| Status | v11 — implemented (2026-11-23, brief `prompts/e05-step-p3-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p3): `ChangePasswordService` says its success before it clears the store (section 22.4, decision 69), so that the shell reacts while the person is still signed in. v10 — implemented (2026-11-22, brief `prompts/e03-step-p2-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p2): `ChangePasswordService` (section 22), a person's change of their own password straight at Cognito, with `cognito.ts` making one request for any target of Cognito (section 10.1). v9 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 21), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v8 — implemented (2026-11-21, brief `prompts/95-step-71-implementation.md`, `docs/FRONTEND_DEPLOY_PLAN.md` step 71; the design reviewed before the code): `LogoutService` (section 20), `revokeToken` and `toRevokeOutcome` in `cognito.ts` (section 10.1), `reset()` on `LoginService` and `RefreshService`; proven against cognito-local, and at the deployed page as far as the revocation answered 200 (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; section 20.9 says what was seen and what was not). v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). **Not yet in line with the capacity of a type** (`docs/SHARED_CALENDAR_SPEC.md` v17, decisions D24 to D31): this document changes for it in step u4 of `docs/CAPACITY_PLAN.md`, and until then says nothing of a type's capacity, of `overbook` or of a slot's places left. |
-| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-21; v9 and v10 2026-11-22; v11 2026-11-23 |
-| Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows); since v7 the calendar view and the appointments; since v8 the sign-out; since v9 the conversation with the assistant; since v10 the change of one's own password |
+| Status | v12 — implemented (2026-11-24, brief `prompts/e14-step-u4-implementation.md`, `docs/CAPACITY_PLAN.md` step u4): the capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` v17, decisions D24 to D31) in the services: `AvailabilityTypesService.create` and `rename` take an optional `capacity` (section 16, decision 70); `AppointmentsService.book` and `change` pass `overbook` through and answer `user_busy` (section 19). v11 — implemented (2026-11-23, brief `prompts/e05-step-p3-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p3): `ChangePasswordService` says its success before it clears the store (section 22.4, decision 69), so that the shell reacts while the person is still signed in. v10 — implemented (2026-11-22, brief `prompts/e03-step-p2-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p2): `ChangePasswordService` (section 22), a person's change of their own password straight at Cognito, with `cognito.ts` making one request for any target of Cognito (section 10.1). v9 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 21), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v8 — implemented (2026-11-21, brief `prompts/95-step-71-implementation.md`, `docs/FRONTEND_DEPLOY_PLAN.md` step 71; the design reviewed before the code): `LogoutService` (section 20), `revokeToken` and `toRevokeOutcome` in `cognito.ts` (section 10.1), `reset()` on `LoginService` and `RefreshService`; proven against cognito-local, and at the deployed page as far as the revocation answered 200 (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; section 20.9 says what was seen and what was not). v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). |
+| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-21; v9 and v10 2026-11-22; v11 2026-11-23; v12 2026-11-24 |
+| Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows); since v7 the calendar view and the appointments; since v8 the sign-out; since v9 the conversation with the assistant; since v10 the change of one's own password; since v12 the capacity of a type |
 | Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), since v6 v12 (sections 3 and 4: the calendar routes as implemented); `docs/SHARED_CALENDAR_SPEC.md` v15 section 16 (v13 when v6 was written), and for v7 sections 8, 11.1 (routes 15–20), 11.2, 11.5, 11.6; for v8 `docs/FRONTEND_ARCHITECTURE.md` section 13.7 and section 11, decision 152 (the direction for logout as v14 had it; its v15 follows this design), and `docs/ARCHITECTURE.md` section 7.3; `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/`; for v9 `docs/CONVERSATIONAL_ARCHITECTURE.md` v14 (sections 4.4, 5.1 to 5.5, 6, 6.1 and 13) and `docs/ARCHITECTURE.md` section 4, "The assistant's routes"; for v10 `docs/ARCHITECTURE.md` v14 (sections 5.1, 6.9, 7.3 and 8) and `docs/CHANGE_PASSWORD_PLAN.md` |
 
 ### Change log
@@ -25,6 +25,7 @@
 | v9, note | 2026-11-23 | The branch `deploy-frontend` merged into `main`, where `AssistantService` had been written at the same time. The assistant's version, first numbered v8, is v9, after the sign-out's v8; its section, first 20, is section 21, after the sign-out's 20; its decisions, first 46 to 49, are 59 to 62, after the sign-out's 46 to 58; every reference to them was changed with them. No other text changed. |
 | v10 | 2026-11-22 | Implemented (brief `prompts/e03-step-p2-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p2). New section 22, `ChangePasswordService`: `changePassword(current, next)` with `changePasswordResult$` and `changePasswordState$`, straight at Cognito (`ChangePassword`, then `GlobalSignOut`, then the store cleared), no route of the API. The new password checked before any request with the pool's rule of `shared/src/password.ts`, its problems named in `new_password_refused` (decision 63), the current password given again among them (decision 64); one success whatever the sign-out did (decision 65); the sign-out skipped by a value of the configuration, locally only (decision 67); the store cleared unguarded (decision 68). `cognito.ts` makes one request for any target of Cognito (section 10.1, decision 53), with no change to `LoginService` or `RefreshService` and none to their tests. The journey `frontend/tests/integration/change-password.test.ts` under the account `fe-password` (section 14.9). Acceptance in section 14.10. Written on the branch `change-password` at the same time as the sign-out and the assistant on `main`, and first numbered v9, section 21, decisions 50 to 55; on the merge into `main` (`docs/MERGE_CHANGE_PASSWORD.md`) they became v10, section 22, decisions 63 to 68, every reference changed with them. With the merge `cognitoRequest` also serves `RevokeToken` and takes the sign-out's `init` (decision 58). |
 | v11 | 2026-11-23 | `docs/CHANGE_PASSWORD_PLAN.md` step p3 (brief `prompts/e05-step-p3-implementation.md`), decided by the Product Owner at the start of the step. **The order at the end of a change is reversed**: `ChangePasswordService` gives the success on both streams first and clears the store after it (section 22.4, step 6; section 22.6; decision 68 amended; new decision 69). The password screen and the shell hear the success while the person is still signed in: the screen empties its fields, the shell puts the `LoginService` and the `RefreshService` back to their first state, as at a sign-out (decision 53), and words the login's "Password changed"; then the store's `null` brings the login. The service takes no page-wide service: the shell calls the two `reset()`s. The configuration's `skipGlobalSignOut` comes from the bundle's constant `SKIP_GLOBAL_SIGN_OUT` (section 22.2). One test of the service changed with it, its name and two assertions (section 22.8). |
+| v12 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u4 (brief `prompts/e14-step-u4-implementation.md`), from `docs/SHARED_CALENDAR_SPEC.md` v17 (decisions D24 to D31) and the back end as `docs/ARCHITECTURE.md` section 4 describes it. **`AvailabilityTypesService`**: `create(name, capacity?)` and `rename(typeId, name, capacity?)`, the methods keeping their names as the route keeps its path; a `capacity` left out is not sent, so a new type gets 1 and an edited one keeps its own, and today's callers work unchanged; `TypeBody` checks it before sending (0, 101 and 2.5 are `invalid_request`, no request); each `pending` carries the `capacity` given (sections 16.1, 16.3, 16.4, decision 70, decided by the Product Owner). The answer's `capacity` is passed through, not checked (section 16.5). **`AppointmentsService`**: `overbook` in `book` and `change` goes out as the caller gives it, absent staying absent; a User's `true` is the API's `403 forbidden`, already a reason; `user_busy` is a reason of both routes, between `outside_availability` and `slot_taken`, the server's order (sections 19.1, 19.3, 19.4). Unit tests (sections 16.8 and 19.8) and two journeys (section 14.4, blocks "types" and "appointments"). The status line's sentence that this document was not yet in line with the capacity is removed. |
 
 ---
 
@@ -668,6 +669,7 @@ unexpected`).
 | 67 | **The sign-out everywhere is skipped by the configuration**: `ChangePasswordConfig = { cognitoUrl, skipGlobalSignOut }`, injected through the constructor (rule 3), `true` only against the local stack, whose emulator does not implement `GlobalSignOut` (`docs/ARCHITECTURE.md` section 8). No client id: neither call needs one | `docs/CHANGE_PASSWORD_PLAN.md` finding F2, as `SKIP_GLOBAL_SIGN_OUT` does for the back end's `deleteUser`. A value of the configuration rather than a guess from the URL, so that a unit test runs both ways |
 | 68 | **The store is cleared unguarded** (`clear()`, not `clear(session)`), after the sign-out and, since v11, after the success is emitted (decision 69). A call made again abandons the first, as in every service (decision 6): when the first change was already made, its sign-out and its clear are abandoned too, and the screen keeps the button disabled while the state is `pending` so that this cannot happen from the page | A refresh during the change replaces the session object (section 9.2), and a guarded clear would then leave the person signed in after their password changed. The login says "Password changed", the shell's sentence (decision 69) |
 | 69 | **The success comes before the store is cleared.** At the end of a change both streams say `success`, the state first, and only then is the store cleared. The service takes no page-wide service: whoever reacts to the success does it while the person is still signed in. The shell puts the `LoginService` and the `RefreshService` back to their first state then, as `LogoutService` does before it clears the store (decision 53), and words the login's "Password changed" (`docs/FRONTEND_ARCHITECTURE.md` section 6) | Decided by the Product Owner, 2026-11-23, at the start of `docs/CHANGE_PASSWORD_PLAN.md` step p3, which reversed the first order of decision 68. With the store cleared first, the person's teardown had ended every subscription of the session before the success arrived: no view and no shell code of the session could hear it, and the `reset()`s would have come after the login was mounted. Without them nothing on screen goes wrong (the login view reads only `loginState$`, whose last value is the person's own success, which shows no text, and a refresh in flight cannot write the store back, `replace` being guarded), but the person's name stays in the two services' last outcome, as decision 53 means to prevent. A change of the service rather than a subscription the shell keeps past the session's end |
+| 70 | **The capacity is an optional extra value of the type calls**: `create(name, capacity?)`, `rename(typeId, name, capacity?)`. A `capacity` left out is not sent, and absent from `pending` too; one given goes out as `TypeBody` parses it | Decided by the Product Owner, 2026-11-24, at `docs/CAPACITY_PLAN.md` step u4. The route keeps its path and the body its optional field (`docs/SHARED_CALENDAR_SPEC.md` R-TYPE-02, R-TYPE-05), so the methods keep their names; the screens that rename a type keep working unchanged until they offer the capacity, and an edit by name only never resets a capacity to 1 |
 
 ---
 
@@ -2089,6 +2091,7 @@ it did not create (decision 35):
 | | rename an unknown ULID | `type_not_found` (404) |
 | | `fe-calendar` creates a type | `forbidden` |
 | | create `   ` | `invalid_request`, `name: 1 to 40 characters`; no request sent |
+| | create `fe-calendar Pool` with a capacity of 2; edit its name only; load as `fe-calendar`; remove (v12) | `success` with `capacity: 2`; `success`, the new name and still `capacity: 2` (`docs/SHARED_CALENDAR_SPEC.md` R-TYPE-02); the User's list has the capacity 2; `success` |
 | patterns | create on a free date, load, create an overlapping one, update, remove the type, delete, delete again | `success`; listed; `availability_overlap`; `success`; `type_in_use`; `success` with the `patternId`; `pattern_not_found` |
 | | create with an unknown `typeId` | `type_not_found` (409) |
 | | `fe-calendar` loads the patterns | `forbidden` |
@@ -2102,6 +2105,7 @@ it did not create (decision 35):
 | calendar view (v7) | admin books 08:00 for `fe-calendar` and 10:00 for `fe-calendar-b` (with a note); admin loads the week; `fe-calendar` loads it; admin cancels `fe-calendar-b`'s; `fe-calendar` reloads | admin: 7 days, the window with `source` `pattern` and its `patternId`, `hasOverride: false`, `busy: []`, both appointments with their usernames and `cancellableUntil: null`. User: the window without `source`/`sourceId`, no `hasOverride`, slots 09:00 and 11:00, `busy` one bare `{ start, end }` at 10:00, only its own appointment (with `cancellableUntil`), and nowhere `fe-calendar-b`, its appointment id or its note. After the reload: `busy: []`, slots 09:00, 10:00, 11:00 |
 | | load 32 days; `reload()` on a new service | `invalid_request`, `to: the range spans more than 31 days`; `invalid_request`, `nothing loaded yet`; no request sent |
 | appointments (v7) | `fe-calendar` books 08:00; admin books 08:00 for `fe-calendar-b`; admin books 10:00–10:30 for `fe-calendar`; `fe-calendar` sets the note `  Bring shoes  `, changes to 09:00, changes the old one again; `upcoming` as the User and as admin with `username=fe-calendar`; the date with `status=all`; `fe-calendar` cancels, cancels again; admin cancels the other | `success` (`createdBy` the User, `cancellableUntil` set); `slot_taken`; `success` (custom end, `createdBy` admin); `success`, note trimmed; `success`, `cancelled` with `cancelReason: changed` and `replacedBy`, `booked` with `replaces` and the note kept; `appointment_not_active`; both lists the two booked ones (the User's with `cancellableUntil`, the admin's with `null`); old cancelled, two booked; `success` `cancelled` by the User; `appointment_not_active`; `upcoming` empty on that date |
+| | on a type of capacity 1 (v12): `fe-calendar` books 08:00, books 08:00 again, books 09:00 with `overbook: true`, lists the date; admin books 08:00 for `fe-calendar-b`, then the same with `overbook: true`; both cancelled, the pattern and the type removed | `success`; `user_busy` (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-12); `forbidden` (R-BOOK-13); only the first appointment booked on the date; `slot_taken`; `success`, `fe-calendar-b`'s 08:00–09:00 `booked` |
 | | `fe-calendar` books at 08:15 | `invalid_request` from the API: one request sent (decision 42) |
 | | `fe-calendar` lists with `username=fe-calendar-b`; cancels an unknown ULID; sets a 501-character note | `forbidden`; `appointment_not_found`; `invalid_request`, `note: at most 500 characters`, no request sent |
 | availability conflict (v7) | `fe-calendar` books 08:00; admin sets an override with only 10:00–12:00; admin deletes the pattern; then `fe-calendar` cancels and the pattern and type are removed | `availability_conflict` with `conflicts: [{ appointmentId, username: 'fe-calendar', start, end }]`, twice; the date still has no override; the removals succeed (a cancelled appointment blocks nothing) |
@@ -2416,13 +2420,16 @@ Section 14.4, block "settings".
 | Call | Request | Success | Errors (architecture section 4) |
 |---|---|---|---|
 | `load()` | `GET /calendar/types`; **both roles** | `200` `{ types: AvailabilityType[] }`, by name | 403 `forbidden`, 500 `internal_error` |
-| `create(name)` | `POST /calendar/types`, `{ name }`; admin | `201` `AvailabilityType` | 400 `invalid_json` / `invalid_request`, 403 `forbidden`, 409 `type_name_exists`, `limit_reached`, `concurrent_update`, 500 |
-| `rename(typeId, name)` | `PUT /calendar/types/{typeId}`, `{ name }`; admin | `200` `AvailabilityType` | 400 `invalid_json` / `invalid_request`, 403 `forbidden`, 404 `type_not_found`, 409 `type_name_exists`, `concurrent_update`, 500 |
+| `create(name, capacity?)` | `POST /calendar/types`, `{ name, capacity? }`; admin | `201` `AvailabilityType` | 400 `invalid_json` / `invalid_request`, 403 `forbidden`, 409 `type_name_exists`, `limit_reached`, `concurrent_update`, 500 |
+| `rename(typeId, name, capacity?)` | `PUT /calendar/types/{typeId}`, `{ name, capacity? }`; admin | `200` `AvailabilityType` | 400 `invalid_json` / `invalid_request`, 403 `forbidden`, 404 `type_not_found`, 409 `type_name_exists`, `concurrent_update`, 500 |
 | `remove(typeId)` | `DELETE /calendar/types/{typeId}`, no body; admin | `204` | 400 `invalid_request`, 403 `forbidden`, 404 `type_not_found`, 409 `type_in_use`, `concurrent_update`, 500 |
 
 A User reads the types through this service too (route 3 is both roles'; decision 36): the view
 needs their names for the calendar's legend. The three writes are the Administrator's; a User gets
-`forbidden`.
+`forbidden`. `rename` is the edit of a type: its name, and its capacity when one is given. A
+`capacity` left out is not sent: at creation the server gives 1, at an edit it keeps the stored
+one (`docs/SHARED_CALENDAR_SPEC.md` R-TYPE-02 and R-TYPE-05; decision 70). Every
+`AvailabilityType` answered carries its `capacity`.
 
 ### 16.2 Configuration
 
@@ -2432,8 +2439,8 @@ As section 15.2.
 
 One `…FailureReason`, `…Result` and `…State` per method, as in section 15.3: `TypesResult`
 (`{ status: 'success', types }`), `CreateTypeResult` and `RenameTypeResult` (`{ …, type }`),
-`RemoveTypeResult` (`{ …, typeId }`, the id of the call). `pending`: nothing, `{ name }`,
-`{ typeId, name }`, `{ typeId }`. `type_not_found` is one reason for its 404 (a path id) and its
+`RemoveTypeResult` (`{ …, typeId }`, the id of the call). `pending`: nothing, `{ name, capacity? }`,
+`{ typeId, name, capacity? }`, `{ typeId }`, the `capacity` only when one was given. `type_not_found` is one reason for its 404 (a path id) and its
 409 (a body id, route 8 and later): the view says "this type no longer exists" in both cases
 (decision 32).
 
@@ -2441,13 +2448,16 @@ One `…FailureReason`, `…Result` and `…State` per method, as in section 15.
 
 Four pairs, `typesResult$` / `typesState$`, `createResult$` / `createState$`, `renameResult$` /
 `renameState$`, `removeResult$` / `removeState$`, each cancelling only its own pending call.
-Validation before sending (decision 33): `create` parses `{ name }` with `TypeBody` and sends the
-parsed output, so `'  Studio  '` goes out as `'Studio'` while `pending` keeps the argument as
-given; `rename` parses `TypeIdParam` first, then `TypeBody` (the handler's order: path, then
-body); `remove` parses `TypeIdParam`. A failure answers `invalid_request` (`name: 1 to 40
+Validation before sending (decision 33): `create` parses `{ name }`, with `capacity` when given,
+with `TypeBody` and sends the parsed output, so `'  Studio  '` goes out as `'Studio'` while
+`pending` keeps the argument as given; a capacity that is not an integer from 1 to 100 is
+`invalid_request` (`capacity: Too small: expected number to be >=1`, `… Too big …`, `… expected
+int …`); `rename` parses `TypeIdParam` first, then `TypeBody` with the same capacity (the handler's
+order: path, then body); `remove` parses `TypeIdParam`. A failure answers `invalid_request` (`name: 1 to 40
 characters`, `typeId: expected a ULID`), with no request sent. The id goes into the path through
 `encodeURIComponent`. The service does not check the name's uniqueness or the limit of 20: only the
-server knows the stored types.
+server knows the stored types. The answer's `capacity` is passed through as the rest of the type
+(section 16.5).
 
 ### 16.5 Mapping the answer
 
@@ -2481,7 +2491,10 @@ The per-method suite of section 14.1 for the four methods, each with its route's
 `unexpected`, codes of the neighbouring routes (`type_not_found` and `type_in_use` for `create`,
 `limit_reached` for `rename`, `invalid_json` for `remove`). Invalid inputs: an empty name after
 trimming, 41 characters, a control character; a `typeId` that is not a ULID (`../types`, lower
-case), and for `rename` with both wrong the path's message. Wrong answers: a missing or
+case), and for `rename` with both wrong the path's message; a capacity of 0, 101 and 2.5 for both
+`create` and `rename`. The capacity apart: sent when given (3, and the bounds 1 and 100), with
+`pending` carrying it and the answer's `capacity` passed through; left out of the body and of
+`pending` when not given, for both methods. Wrong answers: a missing or
 non-array `types`, an element without `typeId` or `null`, a 200 where a 201 is due and back, a 200
 for a delete.
 
@@ -2714,13 +2727,18 @@ architecture section 4, which agrees with spec 11.1 on these routes (decision 44
 | Call | Request | Success | Errors besides 403 `forbidden`, 500 `internal_error` |
 |---|---|---|---|
 | `list(query)` | `GET /calendar/appointments?…`, `AppointmentsQuery` | `200` `{ appointments: Appointment[] }` by start | 400 `invalid_request` · 403 `forbidden` also for a User naming another `username` |
-| `book(booking)` | `POST /calendar/appointments`, `BookBody` | `201` `Appointment` | 400 `invalid_json` / `invalid_request` · 404 `user_not_found` · 409 `target_not_user`, `booking_in_past`, `booking_notice_too_short`, `booking_beyond_horizon`, `outside_availability`, `slot_taken`, `appointment_limit_reached`, `concurrent_update` |
+| `book(booking)` | `POST /calendar/appointments`, `BookBody` | `201` `Appointment` | 400 `invalid_json` / `invalid_request` · 403 `forbidden` also for a User's `overbook: true` · 404 `user_not_found` · 409 `target_not_user`, `booking_in_past`, `booking_notice_too_short`, `booking_beyond_horizon`, `outside_availability`, `user_busy`, `slot_taken`, `appointment_limit_reached`, `concurrent_update` |
 | `cancel(appointmentId)` | `POST /calendar/appointments/{appointmentId}/cancel`, no body | `200` `Appointment` (cancelled) | 400 `invalid_request` · 403 `cancellation_notice_too_short` · 404 `appointment_not_found` · 409 `appointment_not_active`, `concurrent_update` |
-| `change(appointmentId, change)` | `POST /calendar/appointments/{appointmentId}/change`, `ChangeBody` | `201` `{ cancelled, booked }` | 400 `invalid_json` / `invalid_request` · 403 `cancellation_notice_too_short` · 404 `appointment_not_found`, `user_not_found` · 409 `appointment_not_active`, the six booking codes of `book`, `concurrent_update` |
+| `change(appointmentId, change)` | `POST /calendar/appointments/{appointmentId}/change`, `ChangeBody` | `201` `{ cancelled, booked }` | 400 `invalid_json` / `invalid_request` · 403 `cancellation_notice_too_short` · 404 `appointment_not_found`, `user_not_found` · 409 `appointment_not_active`, the seven booking codes of `book`, `concurrent_update` · 403 `forbidden` also for a User's `overbook: true` |
 | `updateNote(appointmentId, note)` | `PATCH /calendar/appointments/{appointmentId}`, `{ note }` | `200` `Appointment` | 400 `invalid_json` / `invalid_request` · 404 `appointment_not_found` · 409 `appointment_not_active`, `concurrent_update` |
 
 `user_not_found` is one reason for both of its 404s: an unknown target of the Administrator's
-booking, and a User deleted meanwhile (R-BOOK-10, on `book` and `change`). `concurrent_update` is a
+booking, and a User deleted meanwhile (R-BOOK-10, on `book` and `change`). `user_busy` is the
+target User already holding an appointment that overlaps the time asked, checked before the places
+(`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-12); `slot_taken` is no place left
+(`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-07). `overbook: true` in `BookBody` or `ChangeBody` is the
+Administrator's force over the capacity, which lifts `slot_taken` and nothing else
+(`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-13). `concurrent_update` is a
 normal reason: the view may offer "try again" (spec 16.3).
 
 ### 19.2 Configuration
@@ -2745,16 +2763,16 @@ before sending (decision 42), path first, then body:
 | Method | Schemas | Sent |
 |---|---|---|
 | `list` | `AppointmentsQuery` | the parsed query without absent keys, in the schema's order: `status=booked` when the caller left it out |
-| `book` | `BookBody` | the parsed body (the note trimmed, a blank one `null`) |
+| `book` | `BookBody` | the parsed body (the note trimmed, a blank one `null`; `overbook` as given, absent staying absent) |
 | `cancel` | `AppointmentIdParam` | no body |
-| `change` | `AppointmentIdParam`, then `ChangeBody` | the parsed body; no `note` key keeps the old note, `null` clears it (R-CHG-03) |
+| `change` | `AppointmentIdParam`, then `ChangeBody` | the parsed body; no `note` key keeps the old note, `null` clears it (R-CHG-03); `overbook` as in `book` |
 | `updateNote` | `AppointmentIdParam`, then `NoteBody` | `{ note }` parsed |
 
 The messages name the field: `upcoming: expected either from and to, or upcoming=true`, `to: the
 range spans more than 92 days`, `end: end must be after start`, `note: at most 500 characters`,
 `appointmentId: expected a ULID`. What depends on the role (a User's whole hours and fixed `end`,
-the Administrator's required `username`) is sent and answered by the API (`invalid_request`, a
-route code); what only the server knows (notice, horizon, availability, taken slots, limits,
+the Administrator's required `username`, a User's `overbook: true`) is sent and answered by the
+API (`invalid_request`, `forbidden`, a route code); what only the server knows (notice, horizon, availability, taken slots, limits,
 ownership, a start in the past) likewise.
 
 ### 19.5 Mapping the answer
@@ -2799,15 +2817,18 @@ token rules are those of section 10.2.
 The per-method suite of section 14.1 for the five methods, each paired with the next one for the
 cancel test. Per route its codes, and as `unexpected` codes of neighbouring routes (`invalid_json`
 and `appointment_not_found` for `list`; the cancel and conflict codes for `book`; `invalid_json`,
-`user_not_found`, `slot_taken` for `cancel`; `target_not_user` for `change`;
-`cancellation_notice_too_short`, `slot_taken` for `updateNote`). Invalid inputs: neither or both
+`user_not_found`, `slot_taken`, `user_busy` for `cancel`; `target_not_user` for `change`;
+`cancellation_notice_too_short`, `slot_taken`, `user_busy` for `updateNote`; `user_busy` for
+`list` too). `user_busy` is a route code of `book` and `change`. Invalid inputs: neither or both
 selections, `from` alone, 93 days, an unknown status, a bad username; an instant with seconds, end
 before start, a 501-character note, a tab in the note, an unknown field; ids that are not ULIDs (for
 `change` with a bad body too: the path's message), a `username` in a change, `start` or `note`
-missing. Plus what is sent: `status=booked` added while `pending` keeps the query as given, an empty
+missing, an `overbook` that is not a boolean (in `book` and in `change`). Plus what is sent: `status=booked` added while `pending` keeps the query as given, an empty
 list as a success, a blank note sent as `null`, a change without `note` sending none, and four
 bookings sent rather than refused (a User's 08:15, no `username`, a custom `end`, a start in the
-past), and a cancel with no body.
+past), and a cancel with no body; `overbook` `true`, `false` and absent each sent as given by
+`book` and by `change`, `pending` keeping the argument as given; a User's `overbook: true`
+answered `403 forbidden` as the reason `forbidden`.
 
 ### 19.9 Integration checks
 

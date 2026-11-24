@@ -364,7 +364,7 @@ describe('mountWeek', () => {
       { username: 'bob', createdAt: '2026-11-02T10:00:00.000Z' },
     ],
   };
-  const TAKEN = 'This time has just been taken. The calendar has been refreshed: please choose another time.';
+  const TAKEN = 'This time is full: there is no place left. The calendar has been refreshed: please choose another time.';
   const booked = (): BookState => ({ status: 'success', appointment: {} as never });
 
   describe('the book dialog, for a User', () => {

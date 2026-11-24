@@ -1592,8 +1592,12 @@ sentence, and neither did the save of the settings. The users (`docs/FRONTEND_SE
 section 13.1) brought two: `user_exists`, "A user with this username exists already. Choose
 another username.", and `cannot_delete_admin`, "An Administrator cannot be deleted."
 `user_not_found`, met after a booking, is the same sentence after a delete: "This user no
-longer exists." The sentence of `slot_taken` says that
-the calendar has been refreshed, which the reload above makes true. `invalid_request` has one
+longer exists." The sentence of `slot_taken`, "This time is full: there is no place left. The
+calendar has been refreshed: please choose another time.", holds for a capacity of one place or
+more, and says that the calendar has been refreshed, which the reload above makes true.
+`user_busy` (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-12) is "You already have an appointment at
+this time. To move it, change that appointment instead.", the same for both roles until the
+screens tell the Administrator's attempt apart (`docs/CAPACITY_PLAN.md` step u5). `invalid_request` has one
 sentence for every case and every screen, "The request was not accepted. Check what you entered
 and try again.": an end not after the start has no sentence of its own, and the logic layer
 does not check the two times. **A second, optional argument says what was attempted**

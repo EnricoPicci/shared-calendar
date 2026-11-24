@@ -638,7 +638,7 @@ describe('the navigation', () => {
       find('#week .slot').click();
       submit(find<HTMLFormElement>('#week dialog.book form'));
 
-      await vi.waitFor(() => expect(find('#week dialog.book .error').textContent).toBe('This time has just been taken. The calendar has been refreshed: please choose another time.'));
+      await vi.waitFor(() => expect(find('#week dialog.book .error').textContent).toBe('This time is full: there is no place left. The calendar has been refreshed: please choose another time.'));
       expect(book().open).toBe(true);
       await vi.waitFor(() => expect(document.querySelectorAll('#week .slot')).toHaveLength(0));
       expect(apiCalls()[2]).toEqual([WEEK_URL, 'Bearer access-token-alice']);
