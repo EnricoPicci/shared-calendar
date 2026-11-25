@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v22: hours on 5-minute steps, built and not deployed, its evaluation still to run (`docs/SLOT_STEP_PLAN.md` step s3). v21, implemented, merged and deployed: steps c00 to c16 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` sections 5.6 and 5.8). Where this document is merged into `docs/ARCHITECTURE.md` (its change log, v13), `docs/FRONTEND_SERVICES.md` or `docs/FRONTEND_ARCHITECTURE.md`, those documents win. This one stays as the assistant's design and the home of what only it holds: the instructions, the tools' four parts, the evaluation, the alternatives, a second channel (section 16) |
+| Status | v22: hours on 5-minute steps, built and not deployed (`docs/SLOT_STEP_PLAN.md` step s3); its evaluation run in step s6, 59 of 59 (section 12.3). v21, implemented, merged and deployed: steps c00 to c16 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` sections 5.6 and 5.8). Where this document is merged into `docs/ARCHITECTURE.md` (its change log, v13), `docs/FRONTEND_SERVICES.md` or `docs/FRONTEND_ARCHITECTURE.md`, those documents win. This one stays as the assistant's design and the home of what only it holds: the instructions, the tools' four parts, the evaluation, the alternatives, a second channel (section 16) |
 | Date | 2026-11-24 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
@@ -32,7 +32,7 @@
 | v19 | 2026-11-23 | **Deployed**, in `docs/CONVERSATIONAL_PLAN.md` step c15 (`docs/RUNBOOK.md` section 5.6). **Open point P2 closed**: the key is read with `ssm:GetParameter` alone, no `kms:Decrypt` statement is needed (sections 10.1 and 18.2). P7 seen at the deployed page. Nothing else changed |
 | v20 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u6: **the capacity of a type**. `get_calendar` says a slot's places left, a window's capacity and the Administrator's full times (section 8.3); `book_appointment` and `change_appointment` take the Administrator's `overbook`, the proposal says when a time goes over the capacity, and the Administrator's booking or move of a User already busy then is refused at the proposal with `user_busy` (sections 3 and 8.2); rule 4 counts the places of a slot (section 5.5); `create_type` takes a capacity and **`rename_type` became `edit_type`**, for the name, the capacity or both (sections 3, 8.2, 8.3); the instructions gain a paragraph on places (section 7.3); the panel says a refused change for the person's role (section 13); the evaluation gains a type of capacity 3 and six requests (section 12.3); decisions 14 to 20 (section 18.1), decided by the Product Owner. The mark of the instructions changes, which ends the conversations in progress |
 | v21 | 2026-11-24 | `docs/CONVERSATIONAL_PLAN.md` step c16, the hand-over: **implemented, merged and deployed**. The status line and section 1 say which document wins: where this one is merged, `docs/ARCHITECTURE.md` and the front end's two documents. Sections 10.3 and 19 say they are done and where the result lives; P7 blocks nothing (section 18.2). No design changed |
-| v22 | 2026-11-25 | `docs/SLOT_STEP_PLAN.md` step s3: **hours on 5-minute steps** (`docs/SHARED_CALENDAR_SPEC.md` decision D32). The instructions say "Hours are on 5-minute steps: 10:05, 10:10 and so on" where they said the quarter hour (section 7.3); the tools of the opening hours describe a start and an end on a 5-minute step, and the pattern Claude is given for a time allows every fifth minute (section 8.2). `book_appointment` and `change_appointment` are unchanged in words and in what they do: a time such as 10:10 is no free slot. The evaluation gains two requests, 59 in all (section 12.3); **its paid run is not made in this step**: it is made once on the code merged with the mail work, before the deployment. The mark of the instructions changes, which ends the conversations in progress at the deployment. Built, not deployed |
+| v22 | 2026-11-25 | `docs/SLOT_STEP_PLAN.md` step s3: **hours on 5-minute steps** (`docs/SHARED_CALENDAR_SPEC.md` decision D32). The instructions say "Hours are on 5-minute steps: 10:05, 10:10 and so on" where they said the quarter hour (section 7.3); the tools of the opening hours describe a start and an end on a 5-minute step, and the pattern Claude is given for a time allows every fifth minute (section 8.2). `book_appointment` and `change_appointment` are unchanged in words and in what they do: a time such as 10:10 is no free slot. The evaluation gains two requests, 59 in all (section 12.3); **its paid run is not made in this step**: it is made once on the code merged with the mail work, before the deployment. The mark of the instructions changes, which ends the conversations in progress at the deployment. Built, not deployed. The release went before the merge (`docs/SLOT_STEP_PLAN.md` step s6), so the paid run was made there, on this branch alone: 59 of 59 (section 12.3) |
 
 ---
 
@@ -1477,12 +1477,15 @@ other people's busy time; nothing over the capacity was offered. Nothing in the 
 the tools was changed after the run. The post-deploy smoke
 test gains one real exchange (a read), which proves the key, the permissions and the route.
 
-**No run yet for the 5-minute step** (`docs/SLOT_STEP_PLAN.md` step s3, 2026-11-25). The
-instructions' sentence, the two descriptions of the opening hours and the two requests are in
-place; the list prints 59 requests. The Product Owner decided to make the paid run once, on the
-code merged with the mail work, which adds a tool of its own: a run before the merge would
-judge an assistant that is never deployed. Until that run, nothing says whether the real model
-keeps a time such as 10:10 to the minute.
+**The run for the 5-minute step** (2026-11-25, `docs/SLOT_STEP_PLAN.md` step s6, ceiling
+US$4, `claude-sonnet-5-5` at effort `low`), made on the branch of the 5-minute step alone,
+released before the merge with the mail work: 59 of 59 passed, 117 steps, 46.59 US cents. Read
+by hand: asked for eval Lesson every Sunday from 14:05 to 16:35 from 6 December, the model
+proposed a weekly pattern from 14:05 to 16:35 valid from 2026-12-06; asked in Italian to block
+Tuesday 8 December from 10:10 to 10:35, it proposed that day's hours as 09:00–10:10 and
+10:35–13:00 (eval Visit) with 15:00–18:00 (eval Lesson) kept. Both times kept to the minute.
+Nothing in the instructions or the tools was changed after the run. The merge with the mail
+work, which adds a tool, makes its own run.
 
 ---
 

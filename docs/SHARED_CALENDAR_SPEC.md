@@ -30,7 +30,7 @@
 | v16 | 2026-11-16 | Brief 71 (`docs/RENAME_PLAN.md`, plan step 56): the table's physical name in the cloud follows the stack, `<stack>-calendar`; locally it stays `calendar` (13.1). The plan's calendar steps run 41–59. |
 | v17 | 2026-11-24 | Brief `prompts/e11-step-u1-implementation.md` (`docs/CAPACITY_PLAN.md` step u1), decided by the Product Owner on 2026-11-24. **The capacity of a type**: a type holds 1 to 100 people at the same time, default 1 (D24 to D31, 6.1, R-TYPE-05). The people in an interval are counted at their peak; a slot is free while they are fewer than the capacity, and says its places left (glossary, R-SLOT-02 to R-SLOT-05, 11.6). A User never holds two appointments at the same time, `409 user_busy` (R-BOOK-12). The Administrator goes over the capacity only with `overbook: true` (R-BOOK-07, R-BOOK-13, R-CHG-01, the order of the checks in 8.2 and 8.4). `busy` is the time that is full (R-SLOT-06); the Administrator's slots include the full ones (11.6, R-VIEW-01). `capacity` optional in the type's bodies (11.1, 11.4); `capacity` on the `TYPE` item, absent = 1 (13.2). Group appointments no longer out of scope as several Users each with their own appointment (1.3). The views' needs (16.8), privacy (17), unit tests (18.1), AC-37 to AC-44 (18.3). The 11.6 example gains `capacity` and `placesLeft` on each slot and keeps every other value. AC-15 answers `user_busy`, since the 09:15 it overlaps is alice's own (found at `docs/CAPACITY_PLAN.md` step u3). Not built yet. |
 | v18 | 2026-11-24 | Brief `prompts/e17-step-u7-implementation.md` (`docs/CAPACITY_PLAN.md` step u7). Status only: the capacity of a type (decisions D24 to D31) is built and deployed to `shared-calendar-api` and `shared-calendar-web`, and proven there by the smoke test's capacity journey (`docs/RUNBOOK.md` sections 2.3 and 5.8); the marks "not built yet" of section 3, the `TYPE` item, the slots and the booking checks removed. No rule changes. |
-| v19 | 2026-11-25 | Brief `prompts/slot-s02-pair-s1-s2-implementation.md` (`docs/SLOT_STEP_PLAN.md` steps s1 and s2), decided by the Product Owner on 2026-11-25. **Times on 5-minute steps**: the Administrator's windows and custom appointment times start and end on 5-minute steps instead of 15, and a custom appointment lasts at least 5 minutes (D32; D2, D12, the glossary, section 5, 6.2, R-BOOK-02, 11.4). The slot does not change: a whole local hour, 60 real minutes; R-SLOT-01 gains the example of a window that opens at 08:05. No route, field or error code changes, and nothing stored is migrated. The book dialog's row of 16.8 says how the page will offer a time. Section 12 (`isOnTimeStep`, `TIME_STEP_MINUTES`), 18.1, AC-45 to AC-48 in 18.3. |
+| v19 | 2026-11-25 | Brief `prompts/slot-s02-pair-s1-s2-implementation.md` (`docs/SLOT_STEP_PLAN.md` steps s1 and s2), decided by the Product Owner on 2026-11-25. **Times on 5-minute steps**: the Administrator's windows and custom appointment times start and end on 5-minute steps instead of 15, and a custom appointment lasts at least 5 minutes (D32; D2, D12, the glossary, section 5, 6.2, R-BOOK-02, 11.4). The slot does not change: a whole local hour, 60 real minutes; R-SLOT-01 gains the example of a window that opens at 08:05. No route, field or error code changes, and nothing stored is migrated. The book dialog's row of 16.8 says how the page will offer a time. Section 12 (`isOnTimeStep`, `TIME_STEP_MINUTES`), 18.1, AC-45 to AC-48 in 18.3. In step s6 (brief `prompts/slot-s05-step-s6-release.md`) the smoke test of 18.4 gains three lines: 03:10–03:35 booked and cancelled by the Administrator, 03:07 refused. |
 
 ---
 
@@ -1608,21 +1608,25 @@ status and the error code only, since an answer may hold a note).
    naming the range (or, when every date was too soon, the setting and the earliest start) and no
    calendar journey. Something created between the read and the writes answers 409: FAIL with
    its code, clean-up, no retry.
-3. **The journey, one check line each** (19 checks with Hello World's 10; the assistant's exchange of `docs/ARCHITECTURE.md` section 9.3 adds 7): the settings read; the
+3. **The journey, one check line each** (22 checks with Hello World's 10; the assistant's exchange of `docs/ARCHITECTURE.md` section 9.3 adds 7): the settings read; the
    free hour found; as the admin, create the type `smoke-<epoch>` (the User's epoch), create the
    one-off window 03:00–04:00 on the date, book it for the User (`username`, `start`, no `end`,
    and the note `smoke-test note <epoch>, must never reach a log`; the answer is `booked`, 60
    minutes, that type, that note); as the User, `upcoming` holds exactly that appointment (id,
    start, end, type, `booked`, note, a `cancellableUntil`), then cancel it (`cancelled`,
-   `cancelReason` `cancelled`); as the admin, delete the window, then the type (R-TYPE-03: the
-   cancelled appointment does not block it). The script never prints the note.
+   `cancelReason` `cancelled`); as the admin, in the same window, book the custom times
+   03:10–03:35 for the User (`username`, `start`, `end`; the answer `booked` with exactly those
+   two instants, D32 and R-BOOK-02), cancel it, and send 03:07–03:35, whose start is off the
+   step: `400 invalid_request`, and the User's appointments (`status=all`) hold none at 03:07;
+   then delete the window, then the type (R-TYPE-03: the cancelled appointments do not block
+   it). The script never prints the note. With these three, the journey has 12 lines.
 4. **Clean-up.** After a failed calendar check, and on every exit (Ctrl-C included), the script
    cancels the appointment if still booked, then deletes the window and the type, through the API
    as the admin, before the User is deleted; a write whose answer was not read is looked up first.
    It does not rely on the User's deletion (10.2), which the exit path does directly in Cognito.
    A clean-up call that fails prints the ids to remove by hand, never a body, and the exit is 1.
-5. **History.** The appointment (cancelled, by the User or by the admin's clean-up), its pointer,
-   its two events and, after the User's deletion through the API, the deleted-user marker stay, as
+5. **History.** The two appointments, 03:00–04:00 and 03:10–03:35 (cancelled, by the User, by
+   the admin or by the admin's clean-up), their pointers, their two events each and, after the User's deletion through the API, the deleted-user marker stay, as
    the smoke test's messages do. They carry the username and type name `smoke-<epoch>`.
 
 AC-36 is checked on top of it: locally by searching `local:api`'s output for every journey's note

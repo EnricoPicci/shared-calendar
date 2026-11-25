@@ -252,7 +252,9 @@ dialog .question { overflow-wrap: anywhere; }
 .draft { padding: 0.75rem; border: 1px solid #1d5fd1; border-radius: 6px; background: #e8f0fd; }
 .add-draft, .add-window { display: grid; gap: 0.5rem; }
 .add-draft .failure:empty, .add-window .failure:empty { display: none; }
-.window-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: 0.75rem; align-items: start; }
+/* Start, End and Type of a date's window: a field never narrower than a time's two lists need to
+   show their values, so on a phone the type goes to a row of its own */
+.window-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem; align-items: start; }
 
 /* The dialogs: as wide as a phone allows, scrolling inside when taller than the screen */
 dialog { width: min(24rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); box-sizing: border-box; overflow-y: auto; border: 0; border-radius: 10px; padding: 1.25rem; box-shadow: 0 8px 30px #0004; color: inherit; }

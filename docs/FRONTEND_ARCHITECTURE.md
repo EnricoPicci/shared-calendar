@@ -2184,7 +2184,10 @@ of `rxjs` they use. Open point O9 (section 10) is about the 454.
 measured again in the tables above: two new files, `src/logic/times.ts` (71 lines) and
 `src/views/time.parts.ts` (73 lines); `booking.ts` is 153 lines, `week.model.ts` 288 and
 `availability.model.ts` 224. `frontend/index.html` is 770 lines with 52 fields, twenty of them
-the lists of the ten times, two each; `frontend/style.css` is 353 lines.
+the lists of the ten times, two each; `frontend/style.css` is 355 lines. In step s6 the walk at
+390 pixels found the four lists of "This day only" too narrow to show their values: the fields
+of a date's window (`.window-fields`) are now never narrower than 9rem, so on a phone the type
+takes a row of its own.
 
 ### 7.2 The verdict on the fallback
 

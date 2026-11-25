@@ -89,8 +89,8 @@ both fit into its 30 minutes; otherwise run it again before the second.
    Never `> out.txt` inside the repository: the new file makes the tree dirty and the deploy
    refuses, and the change set and its prompt would go to the file instead of the screen.
 5. `npm run smoke -w backend -- shared-calendar-api` (asks for the admin password; `-w backend` is
-   needed, the root has no `smoke` script): all 49 lines must say PASS (10 Hello World checks,
-   9 calendar checks: section 2.1; 16 of the capacity of a type: section 2.3; 7 of the
+   needed, the root has no `smoke` script): all 52 lines must say PASS (10 Hello World checks,
+   12 calendar checks: section 2.1; 16 of the capacity of a type: section 2.3; 7 of the
    assistant: section 3.2; 7 of the change of password: section 2.2). Once the assistant is
    deployed the smoke test needs its key (section 3.2), and its exchange costs about a US cent
    at Anthropic. `script -q -c "…" /tmp/smoke.txt` works here too; the
@@ -161,16 +161,19 @@ starting with `calendar:`:
 | `book <date> 03:00 for smoke-<epoch> -> 201, booked, 60 min, type …` | the Administrator books for the user, with a note |
 | `upcoming as smoke-<epoch> -> the appointment` | the user sees exactly it, with its note and `cancellableUntil` |
 | `cancel as smoke-<epoch> -> 200, cancelled (cancelReason cancelled)` | the user cancels |
+| `book <date> 03:10-03:35 for smoke-<epoch> -> 201, the times on the 5-minute step read back` | the Administrator books custom times on the 5-minute step in the same window (`docs/SHARED_CALENDAR_SPEC.md` decision D32, R-BOOK-02); the answer holds exactly those two instants |
+| `cancel 03:10-03:35 as the Administrator -> 200, cancelled` | the Administrator cancels it |
+| `book <date> 03:07-03:35 for smoke-<epoch> -> 400 invalid_request, nothing written` | a start off the step is refused, and the user's appointments, cancelled ones included, hold none at 03:07 |
 | `DELETE /calendar/windows/<id> -> 204`, `DELETE /calendar/types/<id> -> 204` | its window and type are removed |
 
 **What stays in the `calendar` table, by design** (history, like the smoke rows in
-`hello-messages`): per run, one cancelled appointment with username and type name
-`smoke-<epoch>` at 03:00 local about 50 days ahead, its pointer, its `appointment.booked` and
-`appointment.cancelled` events, and the `DELETEDUSER` marker that journey 11 writes for the user.
+`hello-messages`): per run, two cancelled appointments with username and type name
+`smoke-<epoch>` about 50 days ahead, 03:00–04:00 and 03:10–03:35 local, their pointers, their
+`appointment.booked` and `appointment.cancelled` events, and the `DELETEDUSER` marker that journey 11 writes for the user.
 No type and no window stay. A cancelled appointment blocks nothing. Besides these, the table holds
 one `LOCK` item from the first calendar write on (the calendar lock, one item for the whole
-table); its `version` goes up by one per locked write, 7 for this journey and 12 for the
-capacity journey (section 2.3), so 19 per smoke run on an otherwise unused calendar. No `SETTINGS` item appears: the smoke test only reads the settings, and until an
+table); its `version` goes up by one per locked write, 9 for this journey and 12 for the
+capacity journey (section 2.3), so 21 per smoke run on an otherwise unused calendar. No `SETTINGS` item appears: the smoke test only reads the settings, and until an
 Administrator saves them the API answers the defaults.
 
 **When the calendar journey fails:**
@@ -184,6 +187,9 @@ Administrator saves them the API answers the defaults.
 - `POST /calendar/types … -> 409 limit_reached`: 20 types exist; nothing was created.
 - a `409` on the window or the booking (`availability_overlap`, `slot_taken`, …): someone wrote at
   03:00 on that date between the read and the write. Rerun.
+- `book … 03:10-03:35 … -> 400 invalid_request`, or `… 03:07-03:35 … -> 201`: the API deployed
+  is not on the 5-minute step of `docs/SHARED_CALENDAR_SPEC.md` decision D32. A booking made is
+  cancelled by the clean-up; stop before releasing the page (`docs/SLOT_STEP_PLAN.md` F9).
 - any other failure: the `cleanup:` lines that follow say what was removed. A `CLEANUP FAILED:`
   line names the appointment, window or type id left behind: cancel the appointment as the
   Administrator (`POST /calendar/appointments/<id>/cancel`), then delete the window

@@ -1,6 +1,6 @@
 # Shared Calendar: times on 5-minute steps, and "from" drives "to" (implementation plan)
 
-**Version:** v7 (2026-11-25): the pair s4 with s5 done, the page's times as an hour and a minute, a start that sets the end, and a short appointment drawn 15 minutes tall; looked at in a browser on the local stack. v6 (2026-11-25): the two points left to the pair s4 with s5 decided by the
+**Version:** v8 (2026-11-25): open point O1 decided by the Product Owner: this plan is released alone, from its branch, as `v2.4.0`, before the mail work; the merge into `main` follows the release. Step s6 part B and section 6 rewritten; brief `prompts/slot-s05-step-s6-release.md`. v7 (2026-11-25): the pair s4 with s5 done, the page's times as an hour and a minute, a start that sets the end, and a short appointment drawn 15 minutes tall; looked at in a browser on the local stack. v6 (2026-11-25): the two points left to the pair s4 with s5 decided by the
 Product Owner before it starts, under F7 (more than three columns are one block, whatever the
 reason) and F8 (the two lists of a time in a group named "Start" or "End"). v5 (2026-11-25): step s3 done, the assistant's words and two requests more in
 its evaluation; **the paid run of the evaluation moved to step s6, part B**, on the code
@@ -535,11 +535,12 @@ Nothing here is run without an explicit instruction in the request of the step (
 - **A.** `backend/scripts/smoke.sh`: in the calendar's journey, the Administrator books a
   5-minute time and a time off the step is refused. Run locally
   (`npm run smoke -w backend -- local`).
-- **B.** The branch brought in line with `main` (section 6). The full regression: the root
-  `DYNAMODB_PORT=8002 npm run verify`, every journey, `docs/FRONTEND_WALK.md`, the smoke test.
-  **Then the paid evaluation, once**, on the merged code and only on the Product Owner's word,
-  the cost said first (about 50 US cents): `npm run assistant:eval -w backend` on a stack
-  started afresh with the real key by the Product Owner. The two requests of step s3 are read
+- **B.** On the branch `slot-5min` as it is, not merged with `main` (section 6). The full
+  regression: the root `DYNAMODB_PORT=8002 npm run verify`, every journey,
+  `docs/FRONTEND_WALK.md`, the smoke test. **Then the paid evaluation, once**, on this branch
+  and only on the Product Owner's word, the cost said first (about 50 US cents):
+  `npm run assistant:eval -w backend` on a stack started afresh with the real key by the
+  Product Owner. The two requests of step s3 are read
   by hand whatever their result; the run is recorded in
   `docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3. A failure that comes from the sentence
   or the descriptions of step s3 is fixed before part C.
@@ -549,21 +550,68 @@ Nothing here is run without an explicit instruction in the request of the step (
 
 **Check:** B green before C; the smoke test green in the cloud; the operator's look.
 
+**As done (2026-11-25).** Brief `prompts/slot-s05-step-s6-release.md`, with the Product
+Owner's decisions for this step: nothing pushed; the smoke test's new lines in the calendar
+journey; the walk at a real phone width; the deploy when the operator chooses; a quick look by
+hand at the deployed page, everything made there deleted; the tag made locally.
+
+- *Part A, the smoke test.* `backend/scripts/smoke.sh`: in the calendar journey, after the
+  user's own cancellation and before the window is deleted, three lines in the same window:
+  the Administrator books 03:10–03:35 for the throw-away user (`201`, both instants read back
+  exactly), cancels it (`200`), and 03:07–03:35 is refused `400 invalid_request`, the user's
+  appointments with `status=all` holding none at 03:07. The times are the hour's start plus
+  10, 35 and 7 real minutes, which the journey's date search keeps to an hour of 60 real
+  minutes. The clean-up looks an unanswered booking up by the start it sent, so a stop halfway
+  cancels the new appointment as it does the first. **52 lines** (12 of the calendar journey);
+  the calendar lock's `version` goes up by 9 for that journey, 21 per run; one more cancelled
+  appointment per run stays as history. Documents: `docs/RUNBOOK.md` sections 2 and 2.1 (the
+  lines, a failure that means the API is not on the step), `docs/ARCHITECTURE.md` section 9.3,
+  `docs/SHARED_CALENDAR_SPEC.md` section 18.4 (its items 3 and 5, and the v19 row; the brief
+  did not name it, but it specifies the journey's lines), `docs/COMMANDS.md`, `README.md`.
+  *Checked:* `npm run smoke -w backend -- local`: 52 lines, 50 PASS and the 2 SKIP of
+  `GlobalSignOut`.
+- *Part B, the full regression.* On `slot-5min` as it is (`ffce069` with the changes of part
+  A). `DYNAMODB_PORT=8002 npm run verify` at the root green: `shared/` 544 tests, the back end
+  1 843 unit tests and its 215 journeys, the front end 2 775 unit tests, 100 % line coverage
+  kept; then, apart, `RUN_INTEGRATION=1 npm run test:integration -w frontend`: 6 files, 79
+  tests passed.
+- *Part B, the walk.* `docs/FRONTEND_WALK.md` walked whole at 1280 × 800 and at a real
+  390 × 844 viewport, in headless Chromium driven by a script outside the repository, on the
+  stack restarted by the Product Owner and seeded: every check yes at both widths (the record
+  and its exceptions in the walk's v7 row). **One defect found and fixed** with the Product
+  Owner's agreement: at the phone width the four time lists of "This day only" were 47 pixels
+  wide and cut their values; `frontend/style.css` gives the fields of a date's window at least
+  9rem (`docs/FRONTEND_ARCHITECTURE.md` section 7.1). Not under `frontend/src`. After the fix,
+  sections 4 and 11 walked again at both widths and `npm run verify -w frontend` green.
+  Checks 102 and 169 of the walk corrected. Screenshots in the session's scratchpad.
+- *Part B, the paid evaluation.* On the Product Owner's word, the stack restarted by them with
+  the real key: `npm run assistant:eval -w backend -- --ceiling 4`, 59 of 59 passed, 117
+  steps, 46.59 US cents, `claude-sonnet-5-5` at effort `low`. Read by hand: `step-pattern-new`
+  proposed a Sunday pattern 14:05–16:35 from 2026-12-06, `step-block` that day's hours as
+  09:00–10:10 and 10:35–13:00 with the afternoon kept; every minute kept.
+  `docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3 and its status line record the run.
+
 ## 6. Beside the mail work
 
-`main` carries the mail work (`docs/EMAIL_PLAN.md`), whose release is v3.0.0.
+`main` carries the mail work (`docs/EMAIL_PLAN.md`), whose release is v3.0.0. Its steps m1 to
+m4 are on `main`, built for the local stack only: a new table, the mailer and changes to
+`backend/template.yaml` that must not reach the cloud before its step m9.
 
-- **Files both touch.** `docs/ARCHITECTURE.md` (each adds a version row and edits section 4),
-  `shared/src/api.ts` (the mail adds codes; this plan adds none, so no conflict is expected
-  there), `backend/template.yaml` (this plan does not touch it), `README.md` section
-  "Versions", `docs/RUNBOOK.md` section 5, `docs/FRONTEND_WALK.md`, `frontend/index.html`.
-  The version row and the number of the RUNBOOK's record are given at the merge, not before.
-- **The assistant.** The mail's step m6 adds a tool to the assistant and runs the paid
-  evaluation for it. This plan's change of the assistant (step s3) is built without its run:
-  the evaluation is run once on the merged code, in step s6, part B, and judges both changes
-  as they will be deployed. The lists of requests of the two branches are joined at the
-  merge (`backend/tests/eval/requests.ts`), and the counts in
-  `docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3 and `docs/COMMANDS.md` follow.
-- **Open point O1, for step s6: the order and the tag.** Released before the mail's first
-  deploy, this is `v2.4.0`. Released after it, it is `v3.1.0`. The Product Owner decides at
-  step s6, when the state of the mail work is known.
+- **The order, decided (open point O1, the Product Owner, 2026-11-25).** This plan is released
+  first and alone, from the branch `slot-5min`, whose base (`b3c3425`) holds no code of the
+  mail: the deployment changes the functions' code and nothing else. Its tag is `v2.4.0`.
+  Merging `main` in before the release would deploy the mail's half-built resources, and the
+  one evaluation over both changes of the assistant, the reason for merging first, cannot be
+  had yet: the mail's tool comes in its step m6.
+- **The merge follows the release**, in a session of its own, when the mail work's checkout of
+  `main` has nothing uncommitted: `slot-5min` into `main`. **Files both touch.**
+  `docs/ARCHITECTURE.md` (each adds a version row and edits section 4; this plan's row, v16,
+  is closed by then and keeps its number, the mail's takes the next), `shared/src/api.ts`
+  (the mail adds codes; this plan adds none), `README.md` section "Versions", `docs/RUNBOOK.md`
+  section 5 (this plan's record comes first), `docs/FRONTEND_WALK.md` (this plan's section 11
+  and checks 157 to 170 come first), `frontend/index.html`, `backend/scripts/smoke.sh`.
+- **The assistant.** This plan's change of the assistant (step s3) is judged by its own paid
+  run in step s6, part B. At the merge the lists of requests of the two branches are joined
+  (`backend/tests/eval/requests.ts`), with the counts in
+  `docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3 and `docs/COMMANDS.md`; the mail's step
+  m6 then runs the evaluation on code that holds both changes.
