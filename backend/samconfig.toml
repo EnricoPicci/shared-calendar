@@ -34,6 +34,10 @@ lint = true
 # - AssistantDailyMessageLimit: 30 messages to the assistant per person and day, which with the
 #   other limits bounds what one person can cost at Anthropic
 #   (docs/CONVERSATIONAL_ARCHITECTURE.md section 4.4).
+# - E-mail (docs/EMAIL_ARCHITECTURE.md section 13.1): MailStage, off, on, or domain in between
+#   (its section 13.2); MailDomain, the domain mail is sent from; MailFromLocalPart and
+#   MailFromName, the sender; PageAddress, the page an invitation points at. MailReplyTo is left
+#   empty, so replies go to AlertEmail: a real address is never written here.
 # The assistant's effort is not a parameter: the template leaves ASSISTANT_EFFORT empty in the
 # cloud, which means the effort low.
 #
@@ -47,7 +51,7 @@ capabilities = "CAPABILITY_IAM"
 resolve_s3 = true
 confirm_changeset = true
 s3_prefix = "shared-calendar-api"
-parameter_overrides = "AdminUsername=\"admin\" FunctionArchitecture=\"arm64\" AssistantModel=\"claude-sonnet-5-5\" AssistantDailyMessageLimit=\"30\""
+parameter_overrides = "AdminUsername=\"admin\" FunctionArchitecture=\"arm64\" AssistantModel=\"claude-sonnet-5-5\" AssistantDailyMessageLimit=\"30\" MailStage=\"off\" MailDomain=\"enricopiccinin.com\" MailFromLocalPart=\"noreply\" MailFromName=\"Shared calendar\" PageAddress=\"https://calendar.enricopiccinin.com\""
 image_repositories = []
 
 # Laptop: sam local start-api against the Docker emulators (docs/IMPLEMENTATION_PLAN.md step 3).
@@ -57,8 +61,10 @@ parallel = true
 build_in_source = true
 
 [local.local_start_api.parameters]
-# AlertEmail has no default; only the alarms use it, and they do not run locally.
-parameter_overrides = "AlertEmail=local@example.invalid"
+# AlertEmail has no default; only the alarms use it, and they do not run locally. MailStage on: the
+# local stack runs e-mail as a stack at stage on does, against the fake mail
+# (docs/EMAIL_ARCHITECTURE.md section 14.2), so the mailer is part of it.
+parameter_overrides = "AlertEmail=local@example.invalid MailStage=on"
 env_vars = "env.local.json"
 docker_network = "shared-calendar-local"
 # Each function's container starts on its first request and stays warm after. Starting them all
@@ -72,7 +78,7 @@ skip_pull_image = true
 # (scripts/local-lambda.sh, docs/EMAIL_PLAN.md finding F3). The same environment and network as the
 # API. No warm containers: each run of the mailer starts its own container, which sam removes after.
 [local.local_start_lambda.parameters]
-parameter_overrides = "AlertEmail=local@example.invalid"
+parameter_overrides = "AlertEmail=local@example.invalid MailStage=on"
 env_vars = "env.local.json"
 docker_network = "shared-calendar-local"
 skip_pull_image = true

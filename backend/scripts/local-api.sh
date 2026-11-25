@@ -30,7 +30,8 @@ export SAM_CLI_BETA_NODEJS_MONOREPO=1
 
 # The functions run on the machine's own CPU type: on an x86 machine Docker would have to emulate
 # arm64, and cold starts then exceed the 10 s timeout. The code is plain JavaScript, so it behaves
-# the same on both. --parameter-overrides replaces the one in samconfig.toml, hence AlertEmail again.
+# the same on both. --parameter-overrides replaces the one in samconfig.toml, hence AlertEmail and
+# MailStage again: the local stack runs e-mail at stage on, its mailer included.
 arch=arm64
 [[ "$(uname -m)" == x86_64 ]] && arch=x86_64
 
@@ -91,4 +92,4 @@ trap remove_lambda_containers EXIT
 
 sam build --config-env local
 sam local start-api --config-env local \
-  --parameter-overrides "AlertEmail=local@example.invalid FunctionArchitecture=$arch"
+  --parameter-overrides "AlertEmail=local@example.invalid MailStage=on FunctionArchitecture=$arch"

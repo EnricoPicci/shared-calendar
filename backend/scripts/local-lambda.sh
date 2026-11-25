@@ -31,4 +31,4 @@ arch=arm64
 [[ "$(uname -m)" == x86_64 ]] && arch=x86_64
 
 sam local start-lambda --config-env local \
-  --parameter-overrides "AlertEmail=local@example.invalid FunctionArchitecture=$arch"
+  --parameter-overrides "AlertEmail=local@example.invalid MailStage=on FunctionArchitecture=$arch"

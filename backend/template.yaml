@@ -7,8 +7,9 @@ Description: >
   (docs/SHARED_CALENDAR_SPEC.md, being built in plan steps 41-59): its table, its shared
   permission sets, one function per calendar route, and GET /users; and the assistant
   (docs/CONVERSATIONAL_ARCHITECTURE.md, being built): its table and the functions of a conversation;
-  and e-mail (docs/EMAIL_ARCHITECTURE.md, being built): the mail table, the mailer, its routes and
-  its hourly timer.
+  and e-mail (docs/EMAIL_ARCHITECTURE.md): the mail table and its routes always; by the stage
+  MailStage, the SES domain, its configuration set and the bounces' topic, then the user pool's
+  invitations through SES, the mailer and its hourly timer.
 
 # Values given at deploy time: samconfig.toml holds all but AlertEmail, which the first deploy
 # passes on the command line (public repository) and CloudFormation then keeps.
@@ -92,10 +93,23 @@ Parameters:
     Description: >
       Where replies to a mail go. Empty: AlertEmail, the address that already receives the alarms
       (docs/EMAIL_ARCHITECTURE.md section 8.2).
+  PageAddress:
+    Type: String
+    Default: https://example.com
+    AllowedPattern: '^https://[a-z0-9.-]+(/[^\s]*)?$'
+    Description: >
+      The page's address, written in the invitation so that a new User knows where to sign in
+      (docs/EMAIL_ARCHITECTURE.md sections 6.6 and 13.1). Used only at MailStage 'on'.
 
-# A value chosen at deploy time: the Reply-To is MailReplyTo when one is given, AlertEmail otherwise.
+# Values chosen at deploy time. The Reply-To is MailReplyTo when one is given, AlertEmail otherwise.
+# The stages of e-mail (docs/EMAIL_ARCHITECTURE.md section 13.2): at 'domain' and 'on' the stack
+# holds what proves the domain to SES and reports bounces (MailDomainStage); only at 'on' the user
+# pool sends its invitations through SES, and the mailer and its timer exist (MailOn). At 'off'
+# none of them exists.
 Conditions:
   HasMailReplyTo: !Not [!Equals [!Ref MailReplyTo, '']]
+  MailDomainStage: !Or [!Equals [!Ref MailStage, 'domain'], !Equals [!Ref MailStage, 'on']]
+  MailOn: !Equals [!Ref MailStage, 'on']
 
 # Settings shared by every function below, so each function only lists what differs.
 Globals:
@@ -125,8 +139,31 @@ Resources:
       UserPoolTier: ESSENTIALS
       DeletionProtection: ACTIVE
       # No self sign-up: only AdminCreateUser (our createUser Lambda, or this template) creates accounts.
+      # At MailStage 'on' the invitation Cognito e-mails to a new User is ours
+      # (docs/EMAIL_ARCHITECTURE.md section 6.6): its subject and its HTML body, in which Cognito
+      # puts the username for {username} and the temporary password for {####}; the page's address
+      # tells where to sign in. AWS's CloudFormation reference for InviteMessageTemplate
+      # (aws-properties-cognito-userpool-invitemessagetemplate.html): the body 6 to 20 000
+      # characters and the subject 1 to 140, allowed only with EmailSendingAccount DEVELOPER, hence
+      # only at 'on', with EmailConfiguration below. At the other stages no invitation is sent:
+      # POST /users answers 503 before it reaches Cognito.
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
+        InviteMessageTemplate: !If
+          - MailOn
+          - EmailSubject: Your account on the shared calendar
+            EmailMessage: !Sub >-
+              <p>Hello, an account was created for you.</p>
+              <p>Username: {username}<br>Temporary password: {####}</p>
+              <p>Sign in at <a href="${PageAddress}">${PageAddress}</a>: you will be asked to choose
+              your own password. The temporary password works once and expires in 7 days.</p>
+              <p>If you did not expect this e-mail, ignore it.</p>
+              <p>This is an automatic e-mail. Replies reach the calendar's Administrator.</p>
+          - !Ref AWS::NoValue
+      # A temporary password (an invitation's) is refused after 7 days; set at MailStage 'on' only,
+      # where invitations are sent (docs/EMAIL_ARCHITECTURE.md section 5.1). AWS's CloudFormation
+      # reference for PasswordPolicy (aws-properties-cognito-userpool-passwordpolicy.html):
+      # TemporaryPasswordValidityDays 0 to 365, "Update requires: No interruption".
       Policies:
         PasswordPolicy:
           MinimumLength: 12
@@ -134,15 +171,34 @@ Resources:
           RequireLowercase: true
           RequireNumbers: true
           RequireSymbols: true
+          TemporaryPasswordValidityDays: !If [MailOn, 7, !Ref AWS::NoValue]
+      # At MailStage 'on' Cognito sends its mail through our SES (docs/EMAIL_ARCHITECTURE.md
+      # sections 8.2 and 13.2): from the stack's sender at the proven domain, with the same Reply-To
+      # as the mailer's, and through the stack's configuration set, so that a bounced invitation is
+      # reported too. AWS's CloudFormation reference for EmailConfiguration
+      # (aws-properties-cognito-userpool-emailconfiguration.html): DEVELOPER makes Cognito create a
+      # service-linked role to call SES; SourceArn may be an address of a verified domain when set
+      # through the API, which CloudFormation is; every property "Update requires: No
+      # interruption", so the pool is changed in place, not replaced. At the other stages the
+      # property is left out and nothing is mailed.
+      EmailConfiguration: !If
+        - MailOn
+        - EmailSendingAccount: DEVELOPER
+          SourceArn: !Sub arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/${MailDomain}
+          From: !Sub '"${MailFromName}" <${MailFromLocalPart}@${MailDomain}>'
+          ReplyToEmailAddress: !If [HasMailReplyTo, !Ref MailReplyTo, !Ref AlertEmail]
+          ConfigurationSet: !Ref MailConfigurationSet
+        - !Ref AWS::NoValue
       # v1 has no forgot-password flow (docs/ARCHITECTURE.md section 7.4): only an administrator can
       # recover an account.
       AccountRecoverySetting:
         RecoveryMechanisms:
           - Name: admin_only
             Priority: 1
-      # The e-mail attribute, optional and mutable. A person's other facts (given_name, family_name,
-      # address, docs/EMAIL_ARCHITECTURE.md section 4.1) are standard attributes that need no line
-      # here. This list is never changed: changing a pool's schema can replace the pool.
+      # The e-mail attribute, optional and mutable: the address an invitation goes to, and the
+      # calendar's mails. A person's other facts (given_name, family_name, address,
+      # docs/EMAIL_ARCHITECTURE.md section 4.1) are standard attributes that need no line here. This
+      # list is never changed: changing a pool's schema can replace the pool.
       Schema:
         - Name: email
           AttributeDataType: String
@@ -419,6 +475,89 @@ Resources:
         AttributeName: expiresAt
         Enabled: true
       DeletionProtectionEnabled: true
+
+  # ---------------------------------------------------------------------------
+  # E-mail: the domain proven to SES, the configuration set, the bounces' topic. They exist at
+  # MailStage 'domain' and 'on' (docs/EMAIL_ARCHITECTURE.md sections 8 and 13.2), so that the DNS
+  # records can be added and the domain verified before anything is mailed.
+  # ---------------------------------------------------------------------------
+
+  # The domain mail is sent from, proven to SES with Easy DKIM (docs/EMAIL_ARCHITECTURE.md section
+  # 8.1): SES makes three DNS records (CNAME), which the outputs below list and the operator adds at
+  # the domain's DNS provider; once SES sees them the domain is verified and every mail is signed
+  # for it. AWS's CloudFormation reference for AWS::SES::EmailIdentity
+  # (aws-resource-ses-emailidentity.html): a domain without DkimSigningAttributes uses Easy DKIM and
+  # gives the records as DkimDNSTokenName1..3 and DkimDNSTokenValue1..3; changing EmailIdentity
+  # replaces the identity, as changing the domain should (docs/EMAIL_ARCHITECTURE.md section 8.3).
+  MailIdentity:
+    Type: AWS::SES::EmailIdentity
+    Condition: MailDomainStage
+    Properties:
+      EmailIdentity: !Ref MailDomain
+      DkimAttributes:
+        SigningEnabled: true
+
+  # The rules SES applies to every mail of the stack, the mailer's and Cognito's invitations: here
+  # only that bounces and complaints are reported to the topic below. Named after the stack, the name
+  # the mailer and the pool give SES (MAIL_CONFIGURATION_SET). AWS's CloudFormation reference for
+  # AWS::SES::ConfigurationSet (aws-resource-ses-configurationset.html): a name of letters, digits,
+  # "_" and "-", at most 64; Ref gives the name.
+  MailConfigurationSet:
+    Type: AWS::SES::ConfigurationSet
+    Condition: MailDomainStage
+    Properties:
+      Name: !Sub ${AWS::StackName}-mail
+
+  # Where the configuration set reports: a hard bounce (the address does not exist) and a complaint
+  # (the person marked the mail as spam) go to the bounces' topic (docs/EMAIL_ARCHITECTURE.md section
+  # 8.4). AWS's CloudFormation reference for the event destination
+  # (aws-properties-ses-configurationseteventdestination-eventdestination.html): MatchingEventTypes
+  # BOUNCE and COMPLAINT; an SnsDestination names the topic's ARN, a standard topic.
+  MailBounceDestination:
+    Type: AWS::SES::ConfigurationSetEventDestination
+    Condition: MailDomainStage
+    Properties:
+      ConfigurationSetName: !Ref MailConfigurationSet
+      EventDestination:
+        Name: bounces-and-complaints
+        Enabled: true
+        MatchingEventTypes:
+          - BOUNCE
+          - COMPLAINT
+        SnsDestination:
+          TopicARN: !Ref MailBounceTopic
+
+  # The bounces' topic: it e-mails each report to the Reply-To address, the one the Administrator
+  # reads (docs/EMAIL_ARCHITECTURE.md section 8.4). As for the alarms, AWS first sends a
+  # confirmation e-mail, and nothing arrives until it is confirmed (docs/RUNBOOK.md section 3).
+  MailBounceTopic:
+    Type: AWS::SNS::Topic
+    Condition: MailDomainStage
+    Properties:
+      Subscription:
+        - Protocol: email
+          Endpoint: !If [HasMailReplyTo, !Ref MailReplyTo, !Ref AlertEmail]
+
+  # Lets SES publish to the bounces' topic, and only for this AWS account: Amazon SES's developer
+  # guide, "Configuring Amazon SNS notifications for Amazon SES" (configure-sns-notifications.html),
+  # gives SES the action sns:Publish on the topic with the account as a condition.
+  MailBounceTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Condition: MailDomainStage
+    Properties:
+      Topics:
+        - !Ref MailBounceTopic
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ses.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref MailBounceTopic
+            Condition:
+              StringEquals:
+                AWS:SourceAccount: !Ref AWS::AccountId
 
   # ---------------------------------------------------------------------------
   # API: the public HTTPS entry point
@@ -2818,7 +2957,9 @@ Resources:
   #   adding one to the person's count of the day in the mail table (UpdateItem, on that table
   #   only) and starting the mailer in the background (lambda:InvokeFunction, on the mailer only).
   #   It sends no mail itself: the mailer does. MAIL_STAGE, MAIL_TABLE and MAILER_FUNCTION are what
-  #   that route reads; LAMBDA_ENDPOINT is empty in the cloud, only the local stack fills it.
+  #   that route reads; LAMBDA_ENDPOINT is empty in the cloud, only the local stack fills it. The
+  #   mailer exists at MailStage 'on' only: at the other stages MAILER_FUNCTION is empty and the role
+  #   cannot start anything, and the route answers 503 before it would.
   ConfirmProposalFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -2844,7 +2985,7 @@ Resources:
           COGNITO_ENDPOINT: ''
           MAIL_STAGE: !Ref MailStage
           MAIL_TABLE: !Ref MailTable
-          MAILER_FUNCTION: !Ref MailerFunction
+          MAILER_FUNCTION: !If [MailOn, !Ref MailerFunction, '']
           LAMBDA_ENDPOINT: ''
       Events:
         ConfirmProposal:
@@ -2933,14 +3074,17 @@ Resources:
                 Action:
                   - dynamodb:UpdateItem
                 Resource: !GetAtt MailTable.Arn
-        - PolicyName: start-mailer
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - lambda:InvokeFunction
-                Resource: !GetAtt MailerFunction.Arn
+        - !If
+          - MailOn
+          - PolicyName: start-mailer
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - lambda:InvokeFunction
+                  Resource: !GetAtt MailerFunction.Arn
+          - !Ref AWS::NoValue
 
   # POST /assistant/proposals/{proposalId}/decline (Administrator and Users): the person pressed
   # the button to decline. Nothing is changed and Claude is not asked: the function reads the
@@ -3018,7 +3162,9 @@ Resources:
   # route that starts it. Each has its own log group and its own role, like every function.
   # ---------------------------------------------------------------------------
 
-  # The mailer (docs/EMAIL_ARCHITECTURE.md section 6.1): no route of its own. A mail route starts it
+  # The mailer (docs/EMAIL_ARCHITECTURE.md section 6.1): no route of its own, and only at MailStage
+  # 'on' (docs/EMAIL_ARCHITECTURE.md section 13.2), with its log group, its role, its timer and its
+  # alarm. At the other stages the routes that would start it answer 503 first. A mail route starts it
   # in the background, Lambda keeps the request and runs it, and tries a failed run twice more. It
   # reads the person's address and names in Cognito, the appointments in the calendar table, makes
   # the Excel file and hands the mail to SES. It is the only function that carries the Excel
@@ -3034,6 +3180,7 @@ Resources:
   # fills them, with the emulators' addresses.
   MailerFunction:
     Type: AWS::Serverless::Function
+    Condition: MailOn
     Properties:
       Handler: mailer.handler
       Role: !GetAtt MailerRole.Arn
@@ -3078,6 +3225,7 @@ Resources:
 
   MailerLogGroup:
     Type: AWS::Logs::LogGroup
+    Condition: MailOn
     Properties:
       LogGroupName: !Sub /aws/lambda/${AWS::StackName}-mailer
       RetentionInDays: 14
@@ -3092,6 +3240,7 @@ Resources:
   # names. It cannot write the calendar, delete an item of the mail table or change an account.
   MailerRole:
     Type: AWS::IAM::Role
+    Condition: MailOn
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -3146,7 +3295,7 @@ Resources:
   # for a mail of the calendar between two dates, sent to the asker's own address. It checks the
   # request, counts it in the mail table and starts the mailer in the background; it sends nothing
   # itself. MAIL_STAGE is the stack's stage: anything but 'on' answers 503. MAILER_FUNCTION names the
-  # function to start. LAMBDA_ENDPOINT, COGNITO_ENDPOINT and DYNAMODB_ENDPOINT are empty in the
+  # function to start, empty at the stages without a mailer. LAMBDA_ENDPOINT, COGNITO_ENDPOINT and DYNAMODB_ENDPOINT are empty in the
   # cloud: only the local stack fills them.
   SendCalendarMailFunction:
     Type: AWS::Serverless::Function
@@ -3163,7 +3312,7 @@ Resources:
           DYNAMODB_ENDPOINT: ''
           USER_POOL_ID: !Ref UserPool
           COGNITO_ENDPOINT: ''
-          MAILER_FUNCTION: !Ref MailerFunction
+          MAILER_FUNCTION: !If [MailOn, !Ref MailerFunction, '']
           LAMBDA_ENDPOINT: ''
       Events:
         SendCalendarMail:
@@ -3195,8 +3344,8 @@ Resources:
 
   # What the route may do: read one account (AdminGetUser: has the asker an address?) on this user
   # pool; add one to a person's count of the day (UpdateItem, which also creates the count) in the
-  # mail table only; and start the mailer, that one function only. It cannot send mail itself, read
-  # the calendar or delete a count.
+  # mail table only; and start the mailer, that one function only, at MailStage 'on' where it exists.
+  # It cannot send mail itself, read the calendar or delete a count.
   SendCalendarMailRole:
     Type: AWS::IAM::Role
     Properties:
@@ -3233,14 +3382,17 @@ Resources:
                 Action:
                   - dynamodb:UpdateItem
                 Resource: !GetAtt MailTable.Arn
-        - PolicyName: start-mailer
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - lambda:InvokeFunction
-                Resource: !GetAtt MailerFunction.Arn
+        - !If
+          - MailOn
+          - PolicyName: start-mailer
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - lambda:InvokeFunction
+                  Resource: !GetAtt MailerFunction.Arn
+          - !Ref AWS::NoValue
 
   # GET /mail/settings (docs/EMAIL_ARCHITECTURE.md section 9.1, the Administrator only): the daily
   # mail's settings, or the defaults until the first save. MAIL_STAGE is the stack's stage:
@@ -3399,6 +3551,7 @@ Resources:
   # moment of the hour.
   DailyMailSchedule:
     Type: AWS::Scheduler::Schedule
+    Condition: MailOn
     Properties:
       Description: Starts the mailer every hour; it sends the daily mail at the hour the Administrator chose.
       ScheduleExpression: cron(0 * * * ? *)
@@ -3416,6 +3569,7 @@ Resources:
   # function.
   DailyMailScheduleRole:
     Type: AWS::IAM::Role
+    Condition: MailOn
     Properties:
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
@@ -3478,6 +3632,7 @@ Resources:
   # address, not the hour, switched off) is no failure and fires nothing.
   MailerErrorsAlarm:
     Type: AWS::CloudWatch::Alarm
+    Condition: MailOn
     Properties:
       AlarmDescription: The mailer failed at least once in an hour.
       Namespace: AWS/Lambda
@@ -3533,3 +3688,20 @@ Outputs:
   CalendarTableName:
     Description: DynamoDB table holding the shared calendar
     Value: !Ref CalendarTable
+  # The three DNS records (CNAME) that prove the mail domain to SES with Easy DKIM, at MailStage
+  # 'domain' and 'on' (docs/EMAIL_ARCHITECTURE.md section 8.1): the operator adds each, its name and
+  # its value, at the domain's DNS provider. AWS's CloudFormation reference
+  # for AWS::SES::EmailIdentity (aws-resource-ses-emailidentity.html) gives them as
+  # DkimDNSTokenName1..3 and DkimDNSTokenValue1..3.
+  MailDkimRecord1:
+    Condition: MailDomainStage
+    Description: DNS record 1 of 3 that proves the mail domain to SES, type CNAME, "name value"
+    Value: !Join [' ', [!GetAtt MailIdentity.DkimDNSTokenName1, !GetAtt MailIdentity.DkimDNSTokenValue1]]
+  MailDkimRecord2:
+    Condition: MailDomainStage
+    Description: DNS record 2 of 3 that proves the mail domain to SES, type CNAME, "name value"
+    Value: !Join [' ', [!GetAtt MailIdentity.DkimDNSTokenName2, !GetAtt MailIdentity.DkimDNSTokenValue2]]
+  MailDkimRecord3:
+    Condition: MailDomainStage
+    Description: DNS record 3 of 3 that proves the mail domain to SES, type CNAME, "name value"
+    Value: !Join [' ', [!GetAtt MailIdentity.DkimDNSTokenName3, !GetAtt MailIdentity.DkimDNSTokenValue3]]
