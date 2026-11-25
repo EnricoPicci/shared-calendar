@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v21, implemented, merged and deployed: steps c00 to c16 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` sections 5.6 and 5.8). Where this document is merged into `docs/ARCHITECTURE.md` (its change log, v13), `docs/FRONTEND_SERVICES.md` or `docs/FRONTEND_ARCHITECTURE.md`, those documents win. This one stays as the assistant's design and the home of what only it holds: the instructions, the tools' four parts, the evaluation, the alternatives, a second channel (section 16) **The time step becomes 5 minutes** (`docs/SHARED_CALENDAR_SPEC.md` decision D32): what the assistant is told about the quarter hour is changed in step s3 of `docs/SLOT_STEP_PLAN.md`; until then its instructions and tools are as this document says. |
+| Status | v22: hours on 5-minute steps, built and not deployed, its evaluation still to run (`docs/SLOT_STEP_PLAN.md` step s3). v21, implemented, merged and deployed: steps c00 to c16 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` sections 5.6 and 5.8). Where this document is merged into `docs/ARCHITECTURE.md` (its change log, v13), `docs/FRONTEND_SERVICES.md` or `docs/FRONTEND_ARCHITECTURE.md`, those documents win. This one stays as the assistant's design and the home of what only it holds: the instructions, the tools' four parts, the evaluation, the alternatives, a second channel (section 16) |
 | Date | 2026-11-24 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
@@ -32,6 +32,7 @@
 | v19 | 2026-11-23 | **Deployed**, in `docs/CONVERSATIONAL_PLAN.md` step c15 (`docs/RUNBOOK.md` section 5.6). **Open point P2 closed**: the key is read with `ssm:GetParameter` alone, no `kms:Decrypt` statement is needed (sections 10.1 and 18.2). P7 seen at the deployed page. Nothing else changed |
 | v20 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u6: **the capacity of a type**. `get_calendar` says a slot's places left, a window's capacity and the Administrator's full times (section 8.3); `book_appointment` and `change_appointment` take the Administrator's `overbook`, the proposal says when a time goes over the capacity, and the Administrator's booking or move of a User already busy then is refused at the proposal with `user_busy` (sections 3 and 8.2); rule 4 counts the places of a slot (section 5.5); `create_type` takes a capacity and **`rename_type` became `edit_type`**, for the name, the capacity or both (sections 3, 8.2, 8.3); the instructions gain a paragraph on places (section 7.3); the panel says a refused change for the person's role (section 13); the evaluation gains a type of capacity 3 and six requests (section 12.3); decisions 14 to 20 (section 18.1), decided by the Product Owner. The mark of the instructions changes, which ends the conversations in progress |
 | v21 | 2026-11-24 | `docs/CONVERSATIONAL_PLAN.md` step c16, the hand-over: **implemented, merged and deployed**. The status line and section 1 say which document wins: where this one is merged, `docs/ARCHITECTURE.md` and the front end's two documents. Sections 10.3 and 19 say they are done and where the result lives; P7 blocks nothing (section 18.2). No design changed |
+| v22 | 2026-11-25 | `docs/SLOT_STEP_PLAN.md` step s3: **hours on 5-minute steps** (`docs/SHARED_CALENDAR_SPEC.md` decision D32). The instructions say "Hours are on 5-minute steps: 10:05, 10:10 and so on" where they said the quarter hour (section 7.3); the tools of the opening hours describe a start and an end on a 5-minute step, and the pattern Claude is given for a time allows every fifth minute (section 8.2). `book_appointment` and `change_appointment` are unchanged in words and in what they do: a time such as 10:10 is no free slot. The evaluation gains two requests, 59 in all (section 12.3); **its paid run is not made in this step**: it is made once on the code merged with the mail work, before the deployment. The mark of the instructions changes, which ends the conversations in progress at the deployment. Built, not deployed |
 
 ---
 
@@ -890,7 +891,8 @@ conversation's language) say, in prose:
 - how to block time (section 3): read the day, take the blocked time out of the windows of
   the patterns or of the day's own hours, keep each piece with the type of the window it was
   cut from, give `set_date_override` everything that is left, untouched windows included, and
-  treat an extra window in the blocked time with its own two tools; how to open a day again;
+  treat an extra window in the blocked time with its own two tools; that hours are on 5-minute
+  steps (`docs/SHARED_CALENDAR_SPEC.md` decision D32); how to open a day again;
 - places at the same time: a type's capacity is one unless `list_types` or `get_calendar` say
   more, a slot with places left takes several people, one call each; a full time is said to be
   full, and only to the Administrator offered over the capacity, with `overbook` given only
@@ -1043,7 +1045,7 @@ out one proposed change, `changeHandlers.ts` names the handler of each change to
   the types to turn each pattern's type id into a name, and `get_calendar` asks for them to give
   each window its type's capacity.
 - **`create_pattern`** and **`update_pattern`**, for the Administrator: a weekday as an English
-  word (`Monday` to `Sunday`, never a number), a start and an end on the quarter hour, the end
+  word (`Monday` to `Sunday`, never a number), a start and an end on a 5-minute step, the end
   after the start and `24:00` allowed, a type's id, the first valid day and the last, or `null`
   for a pattern with no end. The creation may leave the last day out; the change names the
   pattern by its id and must give every field. **`delete_pattern`**: the id.
@@ -1410,11 +1412,12 @@ A separate command, **outside** `verify` because it costs money and is not deter
 DYNAMODB_PORT=8002 npm run assistant:eval -w backend -- --ceiling 4 --out run.json --hand answers.txt
 ```
 
-**What it plays.** A list of 57 requests, 62 messages, 31 in English and 26 in Italian
+**What it plays.** A list of 59 requests, 64 messages, 32 in English and 27 in Italian
 (`backend/tests/eval/requests.ts`): the first brief's examples; relative dates ("dopodomani",
 "next Friday", the last day of the month); readings; each kind of change, by a User and by
 the Administrator for a User, with a setting, a type, a weekly pattern and a day's hours; nine
-wordings of blocking time; ambiguity that must produce a question; what the web pages keep; a
+wordings of blocking time; two on the 5-minute step, a weekly pattern from 14:05 to 16:35 and a
+block from 10:10 to 10:35, which must come out to the minute; ambiguity that must produce a question; what the web pages keep; a
 tool of the Administrator asked for by a User; a note that tries to give orders; a message in
 the other language later in a conversation; and six on the capacity of a type: what is free
 (the places said), a type's capacity changed, two Users into one slot, a User asking for a full
@@ -1473,6 +1476,13 @@ answer is weaker than it could be, and left as it is: a User asking for a full t
 other people's busy time; nothing over the capacity was offered. Nothing in the instructions or
 the tools was changed after the run. The post-deploy smoke
 test gains one real exchange (a read), which proves the key, the permissions and the route.
+
+**No run yet for the 5-minute step** (`docs/SLOT_STEP_PLAN.md` step s3, 2026-11-25). The
+instructions' sentence, the two descriptions of the opening hours and the two requests are in
+place; the list prints 59 requests. The Product Owner decided to make the paid run once, on the
+code merged with the mail work, which adds a tool of its own: a run before the merge would
+judge an assistant that is never deployed. Until that run, nothing says whether the real model
+keeps a time such as 10:10 to the minute.
 
 ---
 

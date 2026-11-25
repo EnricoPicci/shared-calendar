@@ -5,6 +5,7 @@ import {
   LocalTime,
   localDateOf,
   localTimeOf,
+  TIME_STEP_MINUTES,
   toInstant,
   Ulid,
   type Appointment,
@@ -249,11 +250,16 @@ export const nameTaken = (name: string): NotPossible => ({
 });
 
 // The hours of a window as the tools that change the opening hours take them from Claude: two
-// wall-clock times on the quarter hour and the id of an appointment type
-// (docs/SHARED_CALENDAR_SPEC.md section 11.4).
+// wall-clock times on the step of TIME_STEP_MINUTES and the id of an appointment type
+// (docs/SHARED_CALENDAR_SPEC.md section 11.4, decision D32). The words give Claude the step with
+// its first and last minute; the pattern of LocalTime holds every minute allowed.
+// "minutes 00, 05, 10 and so on up to 55": the first three minutes of the step and the last.
+const minuteSaid = (step: number) => String(step * TIME_STEP_MINUTES).padStart(2, '0');
+const STEP_MINUTES_SAID = `minutes ${[0, 1, 2].map(minuteSaid).join(', ')} and so on up to ${minuteSaid(60 / TIME_STEP_MINUTES - 1)}`;
+
 export const hoursInput = {
-  start: LocalTime.describe('When the hours start: a wall-clock time as HH:mm, on the quarter hour (minutes 00, 15, 30 or 45).'),
-  end: LocalEndTime.describe('When the hours end, after "start": HH:mm on the quarter hour, or "24:00" for the midnight that closes the day.'),
+  start: LocalTime.describe(`When the hours start: a wall-clock time as HH:mm, on a ${TIME_STEP_MINUTES}-minute step (${STEP_MINUTES_SAID}).`),
+  end: LocalEndTime.describe(`When the hours end, after "start": HH:mm on a ${TIME_STEP_MINUTES}-minute step, or "24:00" for the midnight that closes the day.`),
   typeId: Ulid.describe('The id of the appointment type of these hours, as list_types gave it. Never its name, and never a guess.'),
 };
 

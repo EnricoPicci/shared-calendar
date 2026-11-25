@@ -1,6 +1,8 @@
 # Shared Calendar: times on 5-minute steps, and "from" drives "to" (implementation plan)
 
-**Version:** v4 (2026-11-25): steps s1 and s2 done, the first pair: the rule in the
+**Version:** v5 (2026-11-25): step s3 done, the assistant's words and two requests more in
+its evaluation; **the paid run of the evaluation moved to step s6, part B**, on the code
+merged with the mail work (the Product Owner's decision). v4 (2026-11-25): steps s1 and s2 done, the first pair: the rule in the
 governing documents (`docs/SHARED_CALENDAR_SPEC.md` v19, `docs/ARCHITECTURE.md` v16 open) and
 the step in `shared/` and the back end, the back end's journeys green. v3 (2026-11-25): the three proposals of planning, F1, F7 and F8, decided by the
 Product Owner; F7 changed: a short block and the one that follows it stand side by side. v2
@@ -339,14 +341,65 @@ check with accept 5-minute times, and the server books them.
 - `backend/tests/eval/requests.ts` and `checks.ts`: S8's two requests, for example "open
   Tuesdays from 09:05 to 12:00" in English and a block of 10:10 to 10:35 in Italian, each
   checked on the times of the request stored in its proposal.
-- **The paid evaluation**, only on the Product Owner's word in the request of this step, the
-  cost said first: `npm run assistant:eval -w backend` on the local stack wired to the real
-  model. Its result is written into `docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3.
+- **The paid evaluation is not run in this step** (decided by the Product Owner, 2026-11-25):
+  it is run once in step s6, part B, on the code merged with the mail work, which adds a tool
+  of its own to the assistant. A run here would judge an assistant that is never deployed, and
+  would be paid again after the merge.
 - `docs/CONVERSATIONAL_ARCHITECTURE.md`: the instructions of section 7.3, the tools of
   section 8, the evaluation's count of requests, a new version row.
 
-**Check:** the short check; the assistant's journeys on the fake Claude; the evaluation's
-result, read by hand for the two new requests.
+**Check:** the short check; the back end's journeys, the assistant's among them, on the fake
+Claude; the evaluation's list printed with the two new requests (`-- --list`, which costs
+nothing).
+
+**As done (2026-11-25).** Changes under `backend/src/assistant`, `backend/tests` and `docs/`
+only; nothing deployed, no `aws` command run, nothing paid. Brief
+`prompts/slot-s03-step-s3-implementation.md`, changed before the step started to leave the
+paid run out.
+
+- *`backend/src/assistant/prompt.ts`:* in the paragraph on blocking time, "Hours are on the
+  quarter hour." is "Hours are on 5-minute steps: 10:05, 10:10 and so on." Nothing else of the
+  instructions changed.
+- *`backend/src/assistant/tools/facts.ts`:* the two descriptions of `hoursInput`, built on
+  `TIME_STEP_MINUTES`: `start` "on a 5-minute step (minutes 00, 05, 10 and so on up to 55)",
+  `end` "on a 5-minute step, or 24:00". They serve `create_pattern`, `update_pattern`,
+  `set_date_override` and `create_one_off_window`. The descriptions of `time` in
+  `book_appointment` and `change_appointment` are as they were.
+- *Unit tests:* what Claude is given for `start` and `end` (the two sentences, the pattern
+  with every fifth minute, no "quarter"); 09:05 to 11:55 and 19:05 to 20:10 accepted, 09:07
+  and an end at 11:58 refused; **`book_appointment` asked for 10:10** by a User and by the
+  Administrator for a User, and **`change_appointment` asked for 09:10**: the schema lets the
+  time through and the tool answers `no_free_slot`, having only read (F6 holds); the
+  instructions name the 5-minute step and no longer the quarter hour.
+- *The journeys:* none names a quarter hour as a limit, in
+  `backend/tests/integration/assistant.test.ts` or in the fake Claude's answers; none changed.
+- *The evaluation:* two requests in `backend/tests/eval/requests.ts`, `step-pattern-new`
+  (English: "Open eval Lesson every Sunday from 14:05 to 16:35", checked on the body of
+  `create_pattern`) and `step-block` (Italian: a block from 10:10 to 10:35 on the Tuesday of
+  the week after, checked on the three pieces `set_date_override` is given). `checks.ts`
+  needed nothing. The list prints 59 requests, 64 messages. **Not run with the real model.**
+- *Documents:* `docs/CONVERSATIONAL_ARCHITECTURE.md` v22 (the row, the status line, sections
+  7.3, 8.2 and 12.3, which says that no run was made and why); `docs/COMMANDS.md` (59
+  requests); the open row of `docs/ARCHITECTURE.md`; the status line of
+  `docs/SHARED_CALENDAR_SPEC.md`; this plan's steps s3 and s6 and section 6.
+- *Open until step s6:* nothing yet says whether the real model keeps a time such as 10:10
+  to the minute, or reads the new sentence as meant.
+- *Checked:* `npm run typecheck`, `npm run lint` and `npm run test:unit` green at the root
+  (544 tests in `shared/`, 1 843 in `backend/`, 2 705 in `frontend/`, 100 % line coverage
+  kept). `DYNAMODB_PORT=8002 RUN_INTEGRATION=1 npm run test:integration -w backend`, on the
+  fake Claude, with the stack started from this worktree on the new build: 3 files, 215 tests
+  passed. `npm run assistant:eval -w backend -- --list`: 59 requests, 64 messages.
+- *Found on the way: one local stack, two checkouts.* The emulators belong to the folder
+  that started them: `local:up` from the checkout of `main` gives Cognito another user pool
+  than the one this worktree's `backend/env.local.json` names, and every journey then fails
+  at its first call ("User Pool … not found", all tests skipped). Before the journeys here:
+  `local:down`, `local:up` and `local:api` from this worktree, while the mail work is not
+  using the stack. `local:down` from here leaves the mail work's fake mail container running
+  and says the network is still in use, which is harmless.
+
+**The pair s4 with s5 finds ready:** nothing of this step; the page does not depend on it.
+**Step s6 finds ready:** the two requests in the list, to be joined with the mail work's at
+the merge; the paid run to make, with what to read by hand (part B).
 
 ### Step s4 — The page: hours and minutes, and "from" drives "to" (a pair with s5)
 
@@ -397,6 +450,12 @@ Nothing here is run without an explicit instruction in the request of the step (
   (`npm run smoke -w backend -- local`).
 - **B.** The branch brought in line with `main` (section 6). The full regression: the root
   `DYNAMODB_PORT=8002 npm run verify`, every journey, `docs/FRONTEND_WALK.md`, the smoke test.
+  **Then the paid evaluation, once**, on the merged code and only on the Product Owner's word,
+  the cost said first (about 50 US cents): `npm run assistant:eval -w backend` on a stack
+  started afresh with the real key by the Product Owner. The two requests of step s3 are read
+  by hand whatever their result; the run is recorded in
+  `docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3. A failure that comes from the sentence
+  or the descriptions of step s3 is fixed before part C.
 - **C.** The API deployed, the smoke test there; then the page; a look by the operator.
 - **D.** The documents closed: the status lines, `docs/RUNBOOK.md` section 5 (a new record,
   with F10), `README.md` section "Versions", the tag.
@@ -412,9 +471,12 @@ Nothing here is run without an explicit instruction in the request of the step (
   there), `backend/template.yaml` (this plan does not touch it), `README.md` section
   "Versions", `docs/RUNBOOK.md` section 5, `docs/FRONTEND_WALK.md`, `frontend/index.html`.
   The version row and the number of the RUNBOOK's record are given at the merge, not before.
-- **The assistant.** The mail's step m6 also changes the instructions and runs the paid
-  evaluation. Whichever of the two is merged second runs the evaluation again on the merged
-  instructions; released together, one run serves both.
+- **The assistant.** The mail's step m6 adds a tool to the assistant and runs the paid
+  evaluation for it. This plan's change of the assistant (step s3) is built without its run:
+  the evaluation is run once on the merged code, in step s6, part B, and judges both changes
+  as they will be deployed. The lists of requests of the two branches are joined at the
+  merge (`backend/tests/eval/requests.ts`), and the counts in
+  `docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3 and `docs/COMMANDS.md` follow.
 - **Open point O1, for step s6: the order and the tag.** Released before the mail's first
   deploy, this is `v2.4.0`. Released after it, it is `v3.1.0`. The Product Owner decides at
   step s6, when the state of the mail work is known.

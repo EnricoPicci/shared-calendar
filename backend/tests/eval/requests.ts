@@ -132,6 +132,13 @@ export function evalRequests(world: World): EvalRequest[] {
     },
     { id: 'capacity-busy', kind: 'capacity', who: 'admin', language: 'it', messages: [`Prenoti ${ANNA} per la ${POOL} ${written(wed2, 'it')} alle 15:00.`], ends: 'answer', checks: [noProposal()], hand: `${ANNA} already holds a place at 15:00: it should say so, and may offer to move that appointment.` },
 
+    // ── Hours on 5-minute steps ───────────────────────────────────────────────────────────────
+    // The opening hours lie on 5-minute steps (docs/SHARED_CALENDAR_SPEC.md decision D32): a time
+    // such as 14:05 or 10:35 must come out as asked, not moved to a quarter hour. The Sunday has
+    // no hours and the Tuesday of the week after no appointment, so nothing stands in the way.
+    { id: 'step-pattern-new', kind: 'change', who: 'admin', language: 'en', messages: [`Open eval Lesson every Sunday from 14:05 to 16:35, from ${written(sun, 'en')} on.`], ends: 'proposal', checks: [proposes({ tool: 'create_pattern', body: { weekday: 7, start: '14:05', end: '16:35', typeId: types.lesson, validFrom: sun, validUntil: null } })] },
+    { id: 'step-block', kind: 'blocking', who: 'admin', language: 'it', messages: [`Blocchi ${written(tue2, 'it')} dalle 10:10 alle 10:35.`], ends: 'proposal', checks: [hours(tue2, visit('09:00', '10:10'), visit('10:35', '13:00'), lesson('15:00', '18:00')), asked('get_calendar')], hand: 'The day as it was: 09:00-13:00 eval Visit, 15:00-18:00 eval Lesson. Asked: 10:10-10:35, to the minute.' },
+
     // ── Ambiguity: a question, and no proposal ────────────────────────────────────────────────
     { id: 'ambiguous-something', kind: 'ambiguous', who: 'anna', language: 'en', messages: ['Book me something next week.'], ends: 'answer', checks: [noProposal(), askedOnly(...READS)], hand: 'It should ask which day and time, or offer the free times.' },
     { id: 'ambiguous-which', kind: 'ambiguous', who: 'anna', language: 'it', messages: ['Sposti il mio appuntamento a mercoledì della settimana prossima alle 10:00.'], ends: 'answer', checks: [noProposal(), askedOnly(...READS)], hand: 'She has three appointments: it should ask which one.' },

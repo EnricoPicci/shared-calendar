@@ -31,8 +31,13 @@ describe('the fixed instructions (7.3)', () => {
     ['only what there is a tool for is offered', 'Offer only what you have a tool for'],
     ['a type in use cannot be deleted', 'an appointment type cannot be deleted while opening hours or appointments still use it'],
     ['open hours of one date cannot overlap', 'two stretches of open hours on the same date cannot overlap'],
+    ['the hours lie on 5-minute steps', 'Hours are on 5-minute steps: 10:05, 10:10 and so on.'],
   ])('say that %s', (_what, words) => {
     expect(INSTRUCTIONS).toContain(words);
+  });
+
+  it('no longer speak of the quarter hour (D32 of docs/SHARED_CALENDAR_SPEC.md)', () => {
+    expect(INSTRUCTIONS).not.toMatch(/quarter/i);
   });
 
   it('hold no stopgap paragraph: nothing is done from the web pages "for the time being" or "not yet"', () => {

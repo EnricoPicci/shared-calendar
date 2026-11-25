@@ -1,4 +1,4 @@
-import { ASSISTANT_TEXTS_EN, ASSISTANT_TEXTS_IT, toInstant, type DayChangeSummary, type PatternSummary, type WindowSummary } from '@shared-calendar/shared';
+import { ASSISTANT_TEXTS_EN, ASSISTANT_TEXTS_IT, TIME_STEP_MINUTES, toInstant, type DayChangeSummary, type PatternSummary, type WindowSummary } from '@shared-calendar/shared';
 import { createOneOffWindow, createOneOffWindowDefinition } from '../../../../src/assistant/tools/createOneOffWindow';
 import { createPattern, createPatternDefinition } from '../../../../src/assistant/tools/createPattern';
 import { deleteDateOverride, deleteDateOverrideDefinition } from '../../../../src/assistant/tools/deleteDateOverride';
@@ -144,7 +144,7 @@ describe('create_pattern (3, 5.5 rule 2, 8.2)', () => {
   const input = createPatternDefinition.input('admin');
   const ASKED = { weekday: 'Tuesday', start: '09:00', end: '12:00', typeId: VISIT, validFrom: '2026-12-01' };
 
-  it('takes a weekday as a word, hours on the quarter hour that may end at 24:00, the id of a type and the dates; the last date may be left out', () => {
+  it('takes a weekday as a word, hours on the 5-minute step that may end at 24:00, the id of a type and the dates; the last date may be left out', () => {
     const schema = forClaude(createPatternDefinition, 'admin').input_schema;
     expect(Object.keys(schema.properties as object)).toEqual(['weekday', 'start', 'end', 'typeId', 'validFrom', 'validUntil']);
     expect(schema.required).toEqual(['weekday', 'start', 'end', 'typeId', 'validFrom']);
@@ -153,12 +153,22 @@ describe('create_pattern (3, 5.5 rule 2, 8.2)', () => {
     expect(input.safeParse(ASKED).success).toBe(true);
     expect(input.safeParse({ ...ASKED, end: '24:00', validUntil: '2026-12-01' }).success).toBe(true);
     expect(input.safeParse({ ...ASKED, validUntil: null }).success).toBe(true);
+    expect(input.safeParse({ ...ASKED, start: '09:05', end: '11:55' }).success).toBe(true);
+  });
+
+  it('Claude is told the step of the hours in words, with the pattern of every minute allowed (D32 of docs/SHARED_CALENDAR_SPEC.md)', () => {
+    const properties = forClaude(createPatternDefinition, 'admin').input_schema.properties as Record<string, { description: string; pattern?: string; anyOf?: { pattern?: string }[] }>;
+    expect(properties.start!.description).toBe(`When the hours start: a wall-clock time as HH:mm, on a ${TIME_STEP_MINUTES}-minute step (minutes 00, 05, 10 and so on up to 55).`);
+    expect(properties.end!.description).toBe(`When the hours end, after "start": HH:mm on a ${TIME_STEP_MINUTES}-minute step, or "24:00" for the midnight that closes the day.`);
+    expect(properties.start!.pattern).toContain('00|05|10|15|20|25|30|35|40|45|50|55');
+    expect(JSON.stringify(properties)).not.toContain('quarter');
   });
 
   it.each([
     ['a weekday as a number', { weekday: 2 }],
     ['a weekday in Italian', { weekday: 'martedì' }],
-    ['a start off the quarter hour', { start: '09:07' }],
+    ['a start off the 5-minute step', { start: '09:07' }],
+    ['an end off the 5-minute step', { end: '11:58' }],
     ['a start at 24:00', { start: '24:00' }],
     ['an end that is not after the start', { end: '09:00' }],
     ['the name of a type', { typeId: 'Visit' }],
@@ -533,6 +543,7 @@ describe('create_one_off_window (3, 5.5 rule 2)', () => {
     expect(input.safeParse({ ...ASKED, end: '24:00' }).success).toBe(true);
     expect(input.safeParse({ ...ASKED, end: '19:00' }).success).toBe(false);
     expect(input.safeParse({ ...ASKED, start: '19:07' }).success).toBe(false);
+    expect(input.safeParse({ ...ASKED, start: '19:05', end: '20:10' }).success).toBe(true);
     expect(input.safeParse({ ...ASKED, weekday: 'Tuesday' }).success).toBe(false);
   });
 

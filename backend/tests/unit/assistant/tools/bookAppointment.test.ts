@@ -148,10 +148,14 @@ describe('book_appointment: the facts of the confirmation (5.5 rule 2)', () => {
   it.each([
     ['a time outside the open hours', '14:00'],
     ['a slot that is not free', '09:00'],
+    ['a time on the 5-minute step that is no whole hour, inside the open hours', '10:10'],
   ])('no proposal for %s: Claude is told there is no free slot', async (_what, time) => {
+    expect(bookAppointmentDefinition.input('user').safeParse({ date: '2026-11-24', time }).success).toBe(true);
     const result = await read({ date: '2026-11-24', time });
     expect(result).toMatchObject({ ok: false, error: 'no_free_slot' });
     expect(result.ok === false && result.message).toContain('get_calendar');
+    // Only the day was read: nothing that changes the calendar was called.
+    expect(route.mock.calls.map(([, call]) => (call as { routeKey: string }).routeKey)).toEqual(['GET /calendar']);
   });
 
   it('no proposal for a full slot the Administrator is given with no place left (D30 of docs/SHARED_CALENDAR_SPEC.md)', async () => {
@@ -189,6 +193,13 @@ describe('book_appointment for a User, by the Administrator (5.4, 5.5 rule 2)', 
   const asAdmin = (input: Record<string, unknown>) => tool.confirmation.read(input, ADMIN, route);
   // The users' list for GET /users, the day for GET /calendar.
   const routes = (users: RouteAnswer = USERS) => route.mockImplementation((_handler, call) => Promise.resolve((call as { routeKey: string }).routeKey === 'GET /users' ? users : TUESDAY));
+
+  it('the Administrator asking for 10:10, on the 5-minute step but no whole hour, gets no proposal: a custom time stays in the web pages', async () => {
+    routes();
+    expect(bookAppointmentDefinition.input('admin').safeParse({ username: 'alice', date: '2026-11-24', time: '10:10' }).success).toBe(true);
+    expect(await asAdmin({ username: 'alice', date: '2026-11-24', time: '10:10' })).toMatchObject({ ok: false, error: 'no_free_slot' });
+    expect(route.mock.calls.map(([, call]) => (call as { routeKey: string }).routeKey)).toEqual(['GET /users', 'GET /calendar']);
+  });
 
   it('reads the users through the handler of GET /users, then the day, and sends the route the username', async () => {
     routes();
