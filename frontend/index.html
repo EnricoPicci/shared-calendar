@@ -44,6 +44,7 @@
             <button type="button" class="previous" aria-label="Previous week">‹</button>
             <button type="button" class="today">Today</button>
             <button type="button" class="next" aria-label="Next week">›</button>
+            <button type="button" class="mail-open">E-mail…</button>
             <h2 class="week-label"></h2>
             <span class="loading" role="status" hidden>Loading…</span>
           </div>
@@ -94,6 +95,27 @@
               <div class="actions">
                 <button type="button" class="close">Close</button>
                 <button class="primary submit"><span class="in-booking">Book</span><span class="in-change" hidden>Change</span></button>
+              </div>
+            </form>
+          </dialog>
+
+          <!-- The mail of two dates, for both roles: what it holds is the role's, and it goes to
+               the person's own address, which the page says once the mail is asked for. The
+               script proposes the dates of the week on show. Outside the region the script
+               redraws. -->
+          <dialog class="mail" aria-labelledby="mail-title">
+            <form>
+              <h3 id="mail-title">E-mail the appointments</h3>
+              <p class="mail-what"></p>
+              <div class="dates">
+                <label>From <input type="date" name="from"></label>
+                <label>To <input type="date" name="to"></label>
+              </div>
+              <p class="mail-sent" role="status"></p>
+              <p class="error" role="alert"></p>
+              <div class="actions">
+                <button type="button" class="close">Close</button>
+                <button class="primary submit">Send</button>
               </div>
             </form>
           </dialog>

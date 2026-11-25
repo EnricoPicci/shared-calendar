@@ -180,6 +180,13 @@ describe('WeekScreen', () => {
       expect(last().label).toBe('23 Nov – 29 Nov 2026');
     });
 
+    it('range gives the dates of the week on screen, Monday to Sunday, before start() too', () => {
+      const { screen } = screenAt();
+      expect(screen.range()).toEqual({ from: '2026-11-16', to: '2026-11-22' });
+      screen.next();
+      expect(screen.range()).toEqual({ from: '2026-11-23', to: '2026-11-29' });
+    });
+
     it('today on the week of today loads it again', () => {
       const { screen, load } = screenAt();
       screen.start();

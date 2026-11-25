@@ -137,6 +137,11 @@ export class WeekScreen {
     this.load();
   }
 
+  // The dates of the week on screen, Monday to Sunday: what the "E-mail…" dialog proposes.
+  range(): { from: string; to: string } {
+    return { from: this.monday, to: addDays(this.monday, 6) };
+  }
+
   // Ends the move and leaves the appointment as it is.
   keep(): void {
     const shown = this.state.getValue();

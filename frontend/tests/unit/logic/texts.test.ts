@@ -1,5 +1,5 @@
 import { CALENDAR_LIMITS, PASSWORD_PROBLEMS, PASSWORD_SYMBOLS } from '@shared-calendar/shared';
-import { dateText, dateTimeText, failureText, longDateText, offsetChangesOn, offsetText, PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS, rangeText, timeText, weekLabel } from '../../../src/logic/texts';
+import { dateText, dateTimeText, failureText, longDateText, MAIL_TEXTS, offsetChangesOn, offsetText, PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS, rangeText, timeText, weekLabel } from '../../../src/logic/texts';
 import { useFarBrowserZone } from './zone';
 
 describe('texts', () => {
@@ -185,6 +185,12 @@ describe('texts', () => {
       expect(failureText('unexpected')).toBe(general);
     });
 
+    it('a mail refused before the request names the two dates and the most days; the other reasons of a mail keep their sentence', () => {
+      expect(failureText('invalid_request', 'mail')).toBe('Choose two dates, the first not after the second, at most 366 days in all.');
+      expect(failureText('mail_unavailable', 'mail')).toBe('E-mail is not available yet.');
+      expect(failureText('mail_limit_reached', 'mail')).toBe(failureText('mail_limit_reached'));
+    });
+
     it('slot_taken says that the time is full, for any capacity, and that the calendar has been refreshed', () => {
       expect(failureText('slot_taken')).toBe('This time is full: there is no place left. The calendar has been refreshed: please choose another time.');
     });
@@ -368,6 +374,15 @@ describe('texts', () => {
         differ: 'The two new passwords are not the same.',
         changed: 'Password changed.',
       });
+    });
+  });
+
+  describe('MAIL_TEXTS', () => {
+    it('says what the mail holds for each role, and where it goes: the address masked, or in general words', () => {
+      expect(MAIL_TEXTS.what.admin).toMatch(/^The whole calendar /);
+      expect(MAIL_TEXTS.what.user).toMatch(/^Your appointments /);
+      expect(MAIL_TEXTS.sent('alice@example.com')).toBe('On its way to a•••@example.com');
+      expect(MAIL_TEXTS.sent(null)).toBe('On its way to your e-mail address');
     });
   });
 });

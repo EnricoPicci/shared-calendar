@@ -1,6 +1,7 @@
 # Shared Calendar: e-mail (implementation plan)
 
-**Version:** v4 (2026-11-25): steps m1 and m2 done, their "As done" notes written; no step's
+**Version:** v5 (2026-11-25): steps m3 and m4 done, their "As done" notes written; no step's
+content changed. v4 (2026-11-25): steps m1 and m2 done, their "As done" notes written; no step's
 content changed. v3 (2026-11-25): steps m1 and m2, and steps m3 and m4, built and reviewed as pairs,
 one brief, one check and one stop each (the Product Owner's decision); no step's content changes.
 v2 (2026-11-25): the deletion of the existing Users moved from a step m0 at the start
@@ -448,6 +449,46 @@ Documents: section 4's row m3, with the root `CLAUDE.md`'s hard rule on e-mail.
 **Check**, run with step m4's at the end of the pair: section 5.1 (the new file alone). No screen
 of its own.
 
+**As done (2026-11-25, with step m4).** Changes under `shared/`, `backend/`, `frontend/`, the
+documents, the `CLAUDE.md` files, `eslint.config.js` and `package-lock.json`; nothing deployed, no
+`aws` command against the cloud. The pair's check is under step m4.
+
+- **Built as planned**: `mailDb.ts` (the day's count only: the settings and the daily mark come
+  with step m5), `excel.ts` with its lint rule, `ses.ts`, `lambdaInvoke.ts`, `mailerEvent.ts`
+  (the event checked strictly, `kindFor`), `mailer.ts`, `cognito.namesBySub()`; in
+  `template.yaml` the table `mail`, `MailerFunction` and its role, the parameters `MailStage`,
+  `MailDomain`, `MailFromLocalPart`, `MailFromName`, `MailReplyTo`; the fake mail, the table in
+  `local-seed.sh`, `local:lambda`, `mail:send`, `verify.sh`'s note. New dependencies:
+  `@aws-sdk/client-sesv2`, `@aws-sdk/client-lambda`, `write-excel-file`; for the tests
+  `read-excel-file`. `npm audit` reported 9 moderate findings, all there before the pair; noted
+  and not changed (the Product Owner's choice).
+- **Not built**: `MAIL_ALLOW_NOW`, which only the daily mail reads, moves to step m5.
+- **F3, tried first**: on macOS with Docker Desktop, the route's container reached
+  `sam local start-lambda` at `http://host.docker.internal:3001`; the `Event` invoke was answered
+  `202` at once and the mailer ran and sent. Not tried on Linux or in a Codespace, where
+  `host.docker.internal` needs a mapping (`docs/COMMANDS.md` section 3.5).
+- **The mailer's measure** (in AWS's Lambda image on the local stack, memory and CPU limited by
+  Docker): a mail of a whole year, 3 000 appointments, took 5.2 s to 5.8 s at 512 MB, its memory
+  at most 139 MB; at 256 MB, with half the CPU, 18.9 s. Hence 512 MB and a timeout of 30 s. The
+  3 000 items were removed afterwards.
+- **Tests changed, and why.** Back end: `cognito.test.ts` (`namesBySub`). New: `mailDb.test.ts`,
+  `excel.test.ts`, `ses.test.ts`, `lambdaInvoke.test.ts`, `mailerEvent.test.ts`,
+  `mailer.test.ts`. The integration set-up (`setup.ts`) now stops every file's run when the
+  table `mail`, the fake mail or `local:lambda` is missing, and gains the mail helpers; no
+  journey's story changed.
+- **Journeys**: `backend/tests/integration/mail.test.ts`, block "the mailer run by hand" (three
+  tests), page `docs/journeys/backend/mail-mailer.md`; with step m4's block, the file is green
+  alone, twice. It never empties the `calendar` table (the Product Owner's choice): its own day,
+  45 days ahead, its own type and window, three appointments marked with the run, removed
+  first and last; a file's rows are compared with the rows of that mark only.
+- **The CLAUDE.md files.** Root (199 lines, shown to the Product Owner before the change): the
+  hard rule now says mail goes only by the mailer, through SES; Cloud safety's local stack has
+  the fake mail and `start-lambda`; the command `local:lambda`; `verify` needs it; the
+  foreground bullet keeps only how to stop a background `dev`. `backend/CLAUDE.md` (199 lines):
+  the e-mail modules, the fake mail, the two scripts, `mail.test.ts`; to make room, the list of
+  the Administrator's calendar handlers became one sentence (their names are the folder's), and
+  the line on the calendar journeys emptying the table went (the root says it).
+
 ### Step m4 — `POST /mail/calendar`, and the week page's button (built with step m3)
 
 Builds:
@@ -469,6 +510,46 @@ of the day refused; a range of 367 days refused; `no_email_address` for an accou
 
 **Check**, the pair's: step m3's and this one, once: section 5.1 (`mail.test.ts` and the front
 end's mail service, each alone); the screen: the week's "E-mail…" dialog, for each role.
+
+**As done (2026-11-25, with step m3).** Root `typecheck`, `lint` and `test:unit` green, 100 %
+lines (shared 576 tests, back end 1 927, front end 2 881).
+
+- **Built as planned**: `sendCalendarMail.ts` with its function and role; the page's
+  `MailService` (`mail.service.ts`, `mail.types.ts`), `MailScreen` (`mail.screen.ts`), the
+  week's "E-mail…" and `dialog.mail`, `MAIL_TEXTS` and the sentence of a refused range in
+  `texts.ts`, `WeekScreen.range()`; `MailCalendarResponse` in `shared/src/mail/schemas.ts`. The
+  address shown after "Send" is read with `GET /me` and masked by `maskAddress`; the route
+  stays `202 { status: "queued" }` (the Product Owner's choice).
+- **Beyond the plan**: the route answers `404 user_not_found` when the account was deleted after
+  its token was issued, as `GET /me` does. A request counted whose invoke then fails stays
+  counted (`docs/ARCHITECTURE.md` section 4, "The mail of a range of dates").
+- **Tests changed, and why.** Front end: `texts.test.ts` (the mail's sentences),
+  `week.screen.test.ts` (`range`), `week.view.test.ts` (the dialog; its fake's text is neutral,
+  since "You" was found in it by an older check), `detail.view.test.ts` (the week's fakes gain
+  `range` and `mail`), `page.test.ts` (56 fields, 69 places of a failure, eleven dialogs, the
+  status `mail-sent`). New: `mail.service.test.ts`, `mail.screen.test.ts`. Back end new:
+  `sendCalendarMail.test.ts`.
+- **Journeys**, each file alone, green: the back end's `mail.test.ts` block "POST /mail/calendar"
+  (five tests: both roles, 367 days, the sixth of the day, no address), page
+  `docs/journeys/backend/mail-route.md`; the front end's `mail.test.ts` (three tests, the
+  throw-away User `fe-mail`), page `docs/journeys/frontend/mail.md`; the section "Mail in the
+  journeys" of `docs/journeys/concepts.md`.
+- **Browser look** (local stack): the dialog for `alice` and for `admin`, the address masked, a
+  reversed range refused; the mails at http://localhost:8025 and the `.xlsx` opened (sheet
+  "Appointments", its headings and rows). Section 11's six checks left by step m2 (159, 162,
+  164, 167, 168, 170) walked and passed; the phone width at 606 px only, the narrowest the
+  browser allowed: the rows wrap, an e-mail breaks, nothing scrolls sideways. The new checks are
+  `docs/FRONTEND_WALK.md` section 12; the walk as a whole was not run.
+- **Documents**: `docs/ARCHITECTURE.md` (v16: sections 4, 5.5, 7.1, 8, 9.2, 10, 11),
+  `docs/FRONTEND_SERVICES.md` v14 (section 24), `docs/FRONTEND_ARCHITECTURE.md` v25,
+  `docs/FRONTEND_WALK.md` v7, `docs/COMMANDS.md` (section 3.5), `docs/FOLDER_STRUCTURE.md`,
+  `docs/EMAIL_ARCHITECTURE.md` (the counter's key as built); `frontend/CLAUDE.md`.
+
+**What step m5 finds ready**: the table `mail` and `mailDb.ts`, to which the settings and the
+daily mark are added; `excel.ts`, `ses.ts` and the mailer, whose kinds `calendar` and `mine` a
+kind `daily` joins; `local:lambda`, `mail:send` and the fake mail, to run the daily mail by hand;
+the parameters of the sender and `MailStage`. Still to make: `MAIL_ALLOW_NOW`, the hourly timer
+and its own role.
 
 ### Step m5 — The daily mail
 

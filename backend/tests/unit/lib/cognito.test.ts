@@ -26,6 +26,7 @@ import {
   isPlainUser,
   listGroups,
   listPlainUsers,
+  namesBySub,
   setPermanentPassword,
   updateProfile,
   UserExistsError,
@@ -436,5 +437,29 @@ describe('client endpoint', () => {
     vi.resetModules();
     const { cognitoClient } = await import('../../../src/lib/cognito');
     expect(cognitoClient.config.endpoint).toBeUndefined();
+  });
+});
+
+describe('namesBySub', () => {
+  const member = (sub: string | null, givenName: string | null, familyName: string | null) => ({
+    Username: `u-${String(sub)}`,
+    Attributes: [
+      ...(sub === null ? [] : [{ Name: 'sub', Value: sub }]),
+      ...(givenName === null ? [] : [{ Name: 'given_name', Value: givenName }]),
+      ...(familyName === null ? [] : [{ Name: 'family_name', Value: familyName }]),
+    ],
+  });
+
+  it("maps every member of group user to their names by sub, following NextToken; a gap is empty, a member without a sub left out", async () => {
+    cognito.on(ListUsersInGroupCommand, { UserPoolId: POOL, GroupName: 'user', NextToken: undefined }).resolves({ Users: [member('s1', 'Anna', 'Rossi')], NextToken: 'n2' });
+    cognito.on(ListUsersInGroupCommand, { UserPoolId: POOL, GroupName: 'user', NextToken: 'n2' }).resolves({ Users: [member('s2', null, 'Verdi'), member(null, 'Nobody', 'Here')] });
+
+    const names = await namesBySub();
+
+    expect([...names]).toEqual([
+      ['s1', { givenName: 'Anna', familyName: 'Rossi' }],
+      ['s2', { givenName: '', familyName: 'Verdi' }],
+    ]);
+    expect(cognito.commandCalls(ListUsersInGroupCommand).map((c) => c.args[0].input.GroupName)).toEqual(['user', 'user']);
   });
 });

@@ -5,6 +5,7 @@ import type { ListState } from '../../../src/logic/appointments.screen';
 import type { WeekModel } from '../../../src/logic/week.model';
 import type { WeekState } from '../../../src/logic/week.screen';
 import type { BookState, CancelState, ChangeState, UpdateNoteState } from '../../../src/services/appointments.types';
+import type { MailState } from '../../../src/logic/mail.screen';
 import type { ListUsersState } from '../../../src/services/users.types';
 import { mountAppointments, type AppointmentsDeps } from '../../../src/views/appointments.view';
 import { mountDetail, type DetailDeps, type DetailView } from '../../../src/views/detail.view';
@@ -121,6 +122,7 @@ const BY_THE_WEEK: Host = {
         move,
         keep: vi.fn(),
         refusal: vi.fn(),
+        range: vi.fn(),
       },
       appointments: {
         ...appointments,
@@ -130,6 +132,7 @@ const BY_THE_WEEK: Host = {
         change: vi.fn(),
       },
       users: { listUsersState$: new BehaviorSubject<ListUsersState>({ status: 'idle' }).asObservable(), listUsers: vi.fn() },
+      mail: { mail$: new BehaviorSubject<MailState>({ what: '', sending: false, sent: null, failure: null }).asObservable(), send: vi.fn(), reset: vi.fn() },
       role: 'user',
     });
     return { screen: { detail }, appointments, cancelState$, updateNoteState$, changed: () => move.mock.calls.map(([id]) => id), subscription };

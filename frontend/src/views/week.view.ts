@@ -1,6 +1,7 @@
 import type { Role } from '@shared-calendar/shared';
 import type { Subscription } from 'rxjs';
 import type { Moving } from '../logic/appointment.detail';
+import type { MailScreen } from '../logic/mail.screen';
 import { bookingFor, bookingText, changeFor, timeChoice, userChoice, type Asked } from '../logic/booking';
 import type { AppointmentBlock, BusyBlock, DayModel, GroupBlock, Placed, SlotBlock, WeekModel, WindowBlock } from '../logic/week.model';
 import type { WeekScreen } from '../logic/week.screen';
@@ -12,15 +13,17 @@ import { mountDetail } from './detail.view';
 // of an appointment, the start and the end of an appointment's move to another time, and what
 // the book dialog says about a refusal; of the
 // AppointmentsService the four writes, each with its state; of the UsersService the list of
-// Users, which only the Administrator's book dialog asks for; and the role, for which parts of
-// the book dialog to show.
+// Users, which only the Administrator's book dialog asks for; the mail's screen, for the
+// "E-mail…" dialog, with the week's dates it proposes; and the role, for which parts of the book
+// dialog to show.
 export type WeekDeps = {
-  screen: Pick<WeekScreen, 'week$' | 'previous' | 'next' | 'today' | 'detail' | 'move' | 'keep' | 'refusal'>;
+  screen: Pick<WeekScreen, 'week$' | 'previous' | 'next' | 'today' | 'detail' | 'move' | 'keep' | 'refusal' | 'range'>;
   appointments: Pick<
     AppointmentsService,
     'book' | 'bookState$' | 'cancel' | 'cancelState$' | 'change' | 'changeState$' | 'updateNote' | 'updateNoteState$'
   >;
   users: Pick<UsersService, 'listUsers' | 'listUsersState$'>;
+  mail: Pick<MailScreen, 'mail$' | 'send' | 'reset'>;
   role: Role;
 };
 
@@ -32,8 +35,8 @@ export type WeekDeps = {
 // to another time, and the Administrator's block of four or more appointments the list of them,
 // the week's own too, whose rows open their detail. While an appointment is being moved a
 // banner says so, and a slot opens the book dialog in its second mode, as the confirmation of
-// the change.
-export function mountWeek(root: HTMLElement, { screen, appointments, users, role }: WeekDeps): Subscription {
+// the change. "E-mail…" opens the mail's dialog, for both roles.
+export function mountWeek(root: HTMLElement, { screen, appointments, users, mail, role }: WeekDeps): Subscription {
   // 1. Find the elements, once.
   const find = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
   const all = <T extends HTMLElement = HTMLElement>(selector: string) => [...root.querySelectorAll<T>(selector)];
@@ -74,6 +77,15 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
   const groupWhat = find('dialog.group .what');
   const groupWhen = find('dialog.group .when');
   const groupPeople = find('dialog.group .people');
+
+  const mailDialog = find<HTMLDialogElement>('dialog.mail');
+  const mailForm = find<HTMLFormElement>('dialog.mail form');
+  const mailWhat = find('dialog.mail .mail-what');
+  const mailFrom = find<HTMLInputElement>('dialog.mail [name="from"]');
+  const mailTo = find<HTMLInputElement>('dialog.mail [name="to"]');
+  const mailSent = find('dialog.mail .mail-sent');
+  const mailError = find('dialog.mail .error');
+  const mailSubmit = find<HTMLButtonElement>('dialog.mail .submit');
 
   // The appointment detail is the frame's dialog, outside this view's element: mounted here for
   // as long as the week is on show. It asks the week screen for an appointment's detail, and
@@ -295,6 +307,22 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
     anyway.hidden = true;
   };
   find('.keep').onclick = () => screen.keep();
+  // The mail's dialog opens with nothing of the time before, here or in the mail's screen, and
+  // proposes the dates of the week on show; "Send" hands the two dates to the mail's screen,
+  // which checks them through the service.
+  find('.mail-open').onclick = () => {
+    mailForm.reset();
+    mail.reset();
+    const { from, to } = screen.range();
+    mailFrom.value = from;
+    mailTo.value = to;
+    mailDialog.showModal();
+  };
+  find('dialog.mail .close').onclick = () => mailDialog.close();
+  mailForm.onsubmit = (event) => {
+    event.preventDefault();
+    mail.send(mailFrom.value, mailTo.value);
+  };
 
   // 6. The streams' notifications fill the elements.
   const subscription = screen.week$.subscribe((state) => {
@@ -352,6 +380,16 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
       enableBook();
     }),
   );
+  // The mail's dialog: what the mail holds, where it went or why not; "Send" disabled while one
+  // is under way. The mail's screen forgets at every opening, so what is shown is this opening's.
+  subscription.add(
+    mail.mail$.subscribe((state) => {
+      mailWhat.textContent = state.what;
+      mailSent.textContent = state.sent ?? '';
+      mailError.textContent = state.failure ?? '';
+      mailSubmit.disabled = state.sending;
+    }),
+  );
   // The parts of the book dialog that are the Administrator's.
   bookChoices.hidden = role !== 'admin';
 
@@ -363,6 +401,7 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
   subscription.add(() => {
     book.close();
     group.close();
+    mailDialog.close();
     draw(null);
     label.textContent = '';
     loading.hidden = true;
@@ -376,9 +415,10 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
     bookMode(false);
     anyway.hidden = true;
     for (const list of [bookUser, bookStart, bookEnd, groupPeople]) list.replaceChildren();
-    for (const text of [bannerWhat, bookWhat, bookOld, bookUsersMessage, bookError, groupWhat, groupWhen]) text.textContent = '';
+    for (const text of [bannerWhat, bookWhat, bookOld, bookUsersMessage, bookError, groupWhat, groupWhen, mailWhat, mailSent, mailError]) text.textContent = '';
     bookChoices.hidden = true;
-    bookSubmit.disabled = force.disabled = false;
+    mailForm.reset();
+    bookSubmit.disabled = force.disabled = mailSubmit.disabled = false;
   });
   return subscription;
 }

@@ -65,3 +65,14 @@ warm_containers = "EAGER"
 # No registry lookup per container (they ran in parallel without a timeout and could hang the
 # start-up); scripts/local-api.sh pulls the Lambda base image once before starting instead.
 skip_pull_image = true
+
+# Laptop: sam local start-lambda, the functions' own invoke for the mailer's start
+# (scripts/local-lambda.sh, docs/EMAIL_PLAN.md finding F3). The same environment and network as the
+# API. No warm containers: each run of the mailer starts its own container, which sam removes after.
+[local.local_start_lambda.parameters]
+parameter_overrides = "AlertEmail=local@example.invalid"
+env_vars = "env.local.json"
+docker_network = "shared-calendar-local"
+skip_pull_image = true
+host = "127.0.0.1"
+port = 3001

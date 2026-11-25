@@ -2,15 +2,15 @@
 # Prepares the local emulators started by docker-compose.yml. Safe to run any number of times:
 # every step first checks whether its object already exists.
 #
-#   1. tables hello-messages, calendar and assistant on DynamoDB Local (same key schemas as
-#      template.yaml; assistant with its time to live)
+#   1. tables hello-messages, calendar, assistant and mail on DynamoDB Local (same key schemas as
+#      template.yaml; assistant and mail with their time to live)
 #   2. user pool local_pool and app client local_client on cognito-local
 #   3. groups admin and user
 #   4. user admin (group admin) and user alice (group user), permanent passwords, each with the
 #      four facts of a person (invented, at example.com)
-#   5. env.local.json with the generated pool and client ids, for sam local, and with which Claude
+#   5. env.local.json with the generated pool and client ids, for sam local, with which Claude
 #      the assistant talks to: the fake of the Docker stack, or the real one when ANTHROPIC_API_KEY
-#      is set in the shell that runs this script
+#      is set in the shell that runs this script, and with e-mail switched on against the fake mail
 #
 # Runs on the host, so it reaches the emulators on localhost. The Lambda containers reach them
 # by service name (dynamodb, cognito) instead, which is what env.local.json contains.
@@ -20,6 +20,7 @@ cd "$(dirname "$0")/.."
 DYNAMODB_URL="http://localhost:${DYNAMODB_PORT:-8000}"
 COGNITO_URL="http://localhost:9229"
 FAKE_CLAUDE_URL="http://localhost:9230"
+FAKE_MAIL_URL="http://localhost:8025"
 # What env.local.json holds when the fake Claude is wired: its address as the Lambda containers
 # reach it, and a key that is plainly not one (the fake checks none). The journeys' set-up
 # (tests/integration/setup.ts) looks for exactly these two values.
@@ -30,6 +31,7 @@ LOCAL_DAILY_MESSAGE_LIMIT=10
 TABLE_NAME="hello-messages"
 CALENDAR_TABLE="calendar"
 ASSISTANT_TABLE="assistant"
+MAIL_TABLE="mail"
 POOL_NAME="local_pool"
 CLIENT_NAME="local_client"
 ADMIN_PASSWORD="Admin-Local-Pass-1!"
@@ -82,12 +84,14 @@ check_service() {
 check_service dynamodb 8000 "${DYNAMODB_PORT:-8000}"
 check_service cognito 9229 9229
 check_service fake-claude 9230 9230
+check_service fake-mail 8025 8025
 
 wait_for "DynamoDB Local ($DYNAMODB_URL)" ddb list-tables
 wait_for "cognito-local ($COGNITO_URL)" idp list-user-pools --max-results 1
 # Any message gets an answer from the fake Claude; an empty one gets its "not scripted" answer.
 wait_for "the fake Claude ($FAKE_CLAUDE_URL)" curl -sf -o /dev/null -X POST "$FAKE_CLAUDE_URL/v1/messages" \
   -H 'content-type: application/json' -d '{}'
+wait_for "the fake mail ($FAKE_MAIL_URL)" curl -sf -o /dev/null "$FAKE_MAIL_URL/mails"
 
 # 1. Tables. The calendar table starts empty: until the Administrator saves settings, the
 # defaults apply (docs/SHARED_CALENDAR_SPEC.md R-SET-01). The calendar journeys empty it at their
@@ -135,6 +139,30 @@ else
   ddb update-time-to-live --table-name "$ASSISTANT_TABLE" \
     --time-to-live-specification Enabled=true,AttributeName=expiresAt >/dev/null
   echo "table $ASSISTANT_TABLE: time to live switched on"
+fi
+
+# The table of e-mail (docs/EMAIL_ARCHITECTURE.md section 10.1): the counts of the mails on demand,
+# which delete themselves (time to live, as in template.yaml). As for the assistant's table,
+# DynamoDB Local may never delete an expired item, and nothing depends on it: a count is read by
+# its date.
+if ddb describe-table --table-name "$MAIL_TABLE" >/dev/null 2>&1; then
+  echo "table $MAIL_TABLE: exists"
+else
+  ddb create-table \
+    --table-name "$MAIL_TABLE" \
+    --attribute-definitions AttributeName=PK,AttributeType=S AttributeName=SK,AttributeType=S \
+    --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE \
+    --provisioned-throughput ReadCapacityUnits=2,WriteCapacityUnits=2 >/dev/null
+  echo "table $MAIL_TABLE: created"
+fi
+TTL_STATUS=$(ddb describe-time-to-live --table-name "$MAIL_TABLE" \
+  --query TimeToLiveDescription.TimeToLiveStatus --output text)
+if [[ "$TTL_STATUS" == "ENABLED" ]]; then
+  echo "table $MAIL_TABLE: time to live on"
+else
+  ddb update-time-to-live --table-name "$MAIL_TABLE" \
+    --time-to-live-specification Enabled=true,AttributeName=expiresAt >/dev/null
+  echo "table $MAIL_TABLE: time to live switched on"
 fi
 
 # 2. User pool and app client
@@ -228,6 +256,15 @@ ensure_user alice "$ALICE_PASSWORD" user "$(facts_of Alice Liddell alice@example
 # ASSISTANT_DAILY_MESSAGE_LIMIT in this shell (for a long session by hand). And a spending limit,
 # once Anthropic answered it, is not remembered: the journeys make the fake Claude answer one, and
 # the next request must be asked about again at once.
+#
+# E-mail (docs/EMAIL_ARCHITECTURE.md section 14.2), for the functions that declare these variables:
+# the stage is on, so the mail routes work; the table of the counts; the mailer's SES client talks
+# to the fake mail of the Docker stack; and a mail route starts the mailer through
+# `npm run local:lambda`, which serves the functions' invoke on the host's port 3001, reached from
+# a Lambda container at host.docker.internal (docs/EMAIL_PLAN.md finding F3), under the function's
+# name in template.yaml. The mailer and the mail route read Cognito too, each with a section of its
+# own below.
+#
 # The key is written by printf, a builtin of bash, and never through a here-document or a
 # command's argument: bash 3.2 keeps a here-document in a temporary file, and an argument shows in
 # ps. It is checked first, since a quote or a backslash in it would break the JSON.
@@ -269,6 +306,11 @@ rm -f env.local.json
     "ASSISTANT_TABLE": "$ASSISTANT_TABLE",
     "ASSISTANT_DAILY_MESSAGE_LIMIT": "$DAILY_MESSAGE_LIMIT",
     "ASSISTANT_BUDGET_MEMORY_SECONDS": "0",
+    "MAIL_STAGE": "on",
+    "MAIL_TABLE": "$MAIL_TABLE",
+    "SES_ENDPOINT": "http://fake-mail:8025",
+    "LAMBDA_ENDPOINT": "http://host.docker.internal:3001",
+    "MAILER_FUNCTION": "MailerFunction",
 EOF
   if [[ -n "$REAL_CLAUDE_KEY" ]]; then
     printf '    "ANTHROPIC_API_KEY": "%s",\n' "$REAL_CLAUDE_KEY"
@@ -349,6 +391,18 @@ EOF
     "COGNITO_ENDPOINT": "http://cognito:9229",
     "AWS_ACCESS_KEY_ID": "local",
     "AWS_SECRET_ACCESS_KEY": "local"
+  },
+  "MailerFunction": {
+    "USER_POOL_ID": "$POOL_ID",
+    "COGNITO_ENDPOINT": "http://cognito:9229",
+    "AWS_ACCESS_KEY_ID": "local",
+    "AWS_SECRET_ACCESS_KEY": "local"
+  },
+  "SendCalendarMailFunction": {
+    "USER_POOL_ID": "$POOL_ID",
+    "COGNITO_ENDPOINT": "http://cognito:9229",
+    "AWS_ACCESS_KEY_ID": "local",
+    "AWS_SECRET_ACCESS_KEY": "local"
   }
 }
 EOF
@@ -366,4 +420,4 @@ SHOWN_MODEL="${LOCAL_MODEL:-the default of the template}"
 SHOWN_EFFORT="${LOCAL_EFFORT:-the default of the functions}"
 echo "Assistant: $DAILY_MESSAGE_LIMIT messages a person a day; model $SHOWN_MODEL, effort $SHOWN_EFFORT."
 echo
-echo "Local stack ready. DB browser: http://localhost:8001"
+echo "Local stack ready. DB browser: http://localhost:8001, mails: $FAKE_MAIL_URL"

@@ -30,7 +30,8 @@ when those files are touched (`.claude/rules/frontend-views.md`).
 - `src/services/`: `session.store.ts`; `cognito.ts`, `api.ts` and `jwt.ts`, the building
   blocks; then one `<name>.service.ts` + `<name>.types.ts` per service: `login`, `refresh`,
   `logout`, `hello`, `users`, `calendar-settings`, `availability-types`, `availability-rules`,
-  `calendar`, `appointments`, `assistant`, `change-password` (straight at Cognito, no route), `me`.
+  `calendar`, `appointments`, `assistant`, `change-password` (straight at Cognito, no route), `me`,
+  `mail`.
   One result/state pair per method, except `assistant`: one stream, `outcome$`, for its six
   calls. Input checked with the shared schemas before sending. Tokens live only in the
   `SessionStore`: no result, state or service field holds one.
@@ -57,7 +58,8 @@ when those files are touched (`.claude/rules/frontend-views.md`).
   `password.model.ts`, `profile.model.ts`, `me.model.ts`) and one class
   per screen, and one for the panel, with one stream and `start()` (`week.screen.ts`,
   `appointments.screen.ts`, `settings.screen.ts`, `users.screen.ts`, `availability.screen.ts`,
-  `date.screen.ts`, `assistant.screen.ts`, `password.screen.ts`, `me.screen.ts`).
+  `date.screen.ts`, `assistant.screen.ts`, `password.screen.ts`, `me.screen.ts`; `mail.screen.ts`,
+  the week's "E-mail…" dialog).
 - `scripts/` (Node, outside the browser's lint rules): `bundle.mjs`, `build.mjs`, `dev.mjs`,
   `seed-local.mjs`; and `deploy.sh`, the release of the page (`npm run deploy -w frontend`).
 - `tests/unit/services/`, `tests/unit/logic/` (project `unit`, in node; `zone.ts`,
@@ -65,7 +67,7 @@ when those files are touched (`.claude/rules/frontend-views.md`).
   `page.test.ts`, `shell.test.ts`) mirror `src/`; `tests/unit/scripts/bundle.test.ts` (project
   `unit`) holds the bundle's constants; `tests/integration/` (`local.ts`,
   `login.service.test.ts`, `journeys.test.ts`, `logout.service.test.ts`, `calendar.test.ts`,
-  `change-password.test.ts`, `profiles.test.ts`; `assistant.test.ts`, against the fake Claude only: `claude.ts`,
+  `change-password.test.ts`, `profiles.test.ts`, `mail.test.ts` (with `local:lambda`); `assistant.test.ts`, against the fake Claude only: `claude.ts`,
   tested in `tests/unit/integration/`) runs the services against the local stack.
 - Generated, git-ignored: `coverage/`, `dist/`.
 

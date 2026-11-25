@@ -16,27 +16,33 @@
     "local:up": "mkdir -p .cognito && cp docker/cognito-local-config.json .cognito/config.json && docker compose up -d && bash scripts/local-seed.sh",
     "local:down": "docker compose down",
     "local:api": "bash scripts/local-api.sh",
+    "local:lambda": "bash scripts/local-lambda.sh",
     "verify": "bash scripts/verify.sh",
     "deploy": "bash scripts/deploy.sh",
     "bootstrap-admin": "bash scripts/bootstrap-admin.sh",
     "smoke": "bash scripts/smoke.sh",
     "assistant-key": "bash scripts/assistant-key.sh",
     "assistant:eval": "bash scripts/assistant-eval.sh",
-    "budget": "bash scripts/budget.sh"
+    "budget": "bash scripts/budget.sh",
+    "mail:send": "bash scripts/mail-send.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.1158.0",
     "@aws-sdk/client-dynamodb": "^3.1158.0",
+    "@aws-sdk/client-lambda": "^3.1177.0",
+    "@aws-sdk/client-sesv2": "^3.1177.0",
     "@aws-sdk/client-ssm": "^3.1175.0",
     "@aws-sdk/lib-dynamodb": "^3.1158.0",
     "@shared-calendar/shared": "*",
     "aws-jwt-verify": "^5.2.1",
     "ulid": "^3.0.2",
+    "write-excel-file": "^4.1.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.164",
-    "aws-sdk-client-mock": "^4.1.0"
+    "aws-sdk-client-mock": "^4.1.0",
+    "read-excel-file": "^9.3.20"
   }
 }

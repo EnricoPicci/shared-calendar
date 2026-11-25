@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v6 (2026-11-25, `docs/EMAIL_PLAN.md` step m2): the four facts of a person and "My details" are section 11, checks 157 to 170; checks 3, 40, 53 and section 1 in line. v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
+| Status | v7 (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): the week's "E-mail…" dialog is section 12, checks 171 to 180; section 1 says what it needs. v6 (2026-11-25, `docs/EMAIL_PLAN.md` step m2): the four facts of a person and "My details" are section 11, checks 157 to 170; checks 3, 40, 53 and section 1 in line. v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
 | What it is | One list of checks that walks every screen of the front end and the assistant's panel in a browser, as a User and as the Administrator, against the local stack. **The check to repeat after a later change to the view layer** |
 | What it is not | A source of truth, and not an automated test. On any conflict `docs/FRONTEND_ARCHITECTURE.md` and the tests win, and this page is fixed. No end-to-end test tool is in the repository (`docs/FRONTEND_VIEW_PLAN.md` section 8, decision 6): a person follows the list by hand, or drives a browser with a script kept outside the repository |
 | Made from | The browser checks of `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 68, of `docs/CONVERSATIONAL_PLAN.md` step c12 and of `docs/CAPACITY_PLAN.md` step u5, in the order a person would follow, and `docs/SHARED_CALENDAR_SPEC.md` section 16.8 |
@@ -19,6 +19,7 @@
 | v3, note | 2026-11-23 | The branch `deploy-frontend` merged into `main`: the panel's version, first numbered v2, is v3, after the sign-out's v2. Walked on the merged page that day by a script in headless Chromium, at a desktop and a phone width, against the local stack with the fake Claude, as `alice`: checks 3, 4 (one `RevokeToken`, answered 200) and 103 to 105, then "Sign out" while the panel waited for an answer (the login at once, the panel gone, no `continue` sent after it, the conversation read again at the next sign-in); all yes. The console held `zod`'s `eval` probe only. The rest of the walk was not run again. |
 | v5 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u5: **the capacity of a type**, section 10, checks 134 to 156, with what they need and leave in its opening; the row of step u5 in section 8. Check 12: the Administrator's booking for `alice` makes `alice`'s attempt a `user_busy`, whose sentence it quotes. Check 41: the tab "Full" beside an appointment. Checks 66 and 70: "Edit" in the place of "Rename", and the capacity. Walked that day by a script in headless Chromium (Playwright 1.62), at 1280 × 800 and at 390 × 844, on a fresh, seeded local stack, as `admin`, `alice` and three Users of the run: every check of section 10 answered yes at both widths, and check 12 as written; at check 140 the tab "1 left" was seen on top and within reach, not pressed, and check 150 was seen on the screenshots, its tabs not pressed. The console held the known report of `zod` and the browser's own line for each answer 409 of checks 144, 145, 146 and 152. The rest of the walk was not run again. 156 checks. |
 | v6 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m2: **the four facts of a person**, section 11, checks 157 to 170: the users screen's form and its refusals, a row's name and e-mail, the Edit dialog, "My details" for both roles; the facts every user of the walk is given (section 1); checks 3 and 40 (the navigation's "My details") and 53 (a row) in line; the row of step m2 in section 8. Walked on the local stack that day at a desktop width: 157, 158, 160, 161, 163, 165, 166 as `admin` and 169 as `alice`; 159, 162, 164, 167, 168 and 170 not yet. |
+| v7 | 2026-11-25 | `docs/EMAIL_PLAN.md` steps m3 and m4: **the mail of two dates**, section 12, checks 171 to 180: the week's "E-mail…" dialog for both roles, a refused range, the address masked, the mail and its file at the fake mail, the limit of five a day, the phone width; section 1 gains `local:lambda` and the fake mail; the row of m4 in section 8. Section 11's checks 159, 162, 164, 167, 168 and 170 walked that day (168 at 606 px, the narrowest the browser of the walk allowed). |
 
 ---
 
@@ -50,6 +51,11 @@
   when no `ANTHROPIC_API_KEY` is given (`docs/COMMANDS.md` section 3.4), and the local limit of
   10 messages a person a day. Section 6 is never walked with the real Claude wired: its
   sentences mean something to the fake only. What is done with the real one is in section 7.
+- **For the mail (section 12): `npm run local:lambda -w backend`**, a third terminal beside
+  `local:api` and `dev`, which runs the mailer, and the fake mail of `local:up` at
+  http://localhost:8025, which keeps what it sends (`docs/COMMANDS.md` section 3.5). A program
+  that opens an `.xlsx` file. Each account may ask for five mails a local day; a fresh stack
+  starts them again.
 - **Two dates.** *The walk's date*: the first Wednesday that is at least 35 days after today
   (the seed gives it Studio 09:00 to 13:00, and a booking so far ahead is still allowed). *Next
   week*: the week after the one of today, where the seed leaves free slots on every weekday.
@@ -645,6 +651,7 @@ section 6 and the journeys run on the fake only.
 
 | u5 | A type's capacity: created, refused, edited; the places left; a time full for Users, busy for a fourth, refused to a page read before; the Administrator's full slot as a tab, refused, "Book anyway", the offer hidden by a change; two and three side by side, four as one block and its list; `user_busy` named for the Administrator; the User's own time not offered | 134 to 156, 12, 41, 66, 70 |
 | m2 | The create form's facts and their live refusals; a row's name and e-mail; Edit, saved and cancelled; "My details" for the Administrator, with Edit, and for a User, without | 157 to 170 |
+| m4 | The week's "E-mail…" for `alice` and `admin`: the dates of the week on show, a range refused, the address masked, the mail and its file at the fake mail, the sixth of the day refused, the phone | 171 to 180 |
 | p3 | The hints while typing, the two new ones differing, a wrong current password, a change that succeeds, "Password changed" at the login, the old password refused, the new one accepted; as `alice` and as `admin`, at the two widths | 123 to 133 |
 
 Steps 60 to 68 are those of `docs/FRONTEND_VIEW_PLAN.md`; step c12 is of
@@ -817,3 +824,38 @@ back as found.
      facts; no "Edit"; the sentence "To change your details, ask the Administrator."
 170. `[=]` The address `#/users`, typed by hand as `alice`. → The week.
 
+## 12. The mail of two dates
+
+Walked as `alice`, then `admin`, after section 11, with `local:lambda` running (section 1;
+`docs/EMAIL_ARCHITECTURE.md` sections 6.5 and 9.1). It leaves the mails in the fake mail, until
+`local:down`, and the day's counts of the two accounts in the table `mail`: `alice` has none left
+today, `admin` four.
+
+171. `[K]` As `alice`, on the week. → After "Next", the button "E-mail…". Press it. → The dialog
+     "E-mail the appointments", "Your appointments between the two dates, as an Excel file, to
+     your own e-mail address.", "From" and "To" side by side with the Monday and the Sunday of
+     the week on show, then "Close" and "Send"; the keyboard in the dialog.
+172. `[K]` "Close", "Next", "E-mail…". → The dates of the next week.
+173. `[K]` `[N]` Put "From" after "To", "Send". → "Choose two dates, the first not after the
+     second, at most 366 days in all."; no request.
+174. `[K]` `[N]` Put the week's dates back, "Send". → One `POST /mail/calendar` answered `202`,
+     then one `GET /me`; "Send" disabled until then; the dialog stays open and says "On its way
+     to a•••@example.com".
+175. Open http://localhost:8025. → On top, a mail "Your appointments, …" to `alice@example.com`,
+     with the file `my-appointments-<from>-to-<to>.xlsx`. Download it and open it. → One sheet,
+     "Appointments": the headings `Date`, `Start`, `End`, `Type`, `Username`, `Status`,
+     `Cancelled because`, `Note`, `Booked at`, no names; one row per appointment of `alice` in
+     the week, cancelled ones too, and nobody else's.
+176. `[K]` Back in the page: "Close", "E-mail…". → Nothing of before: the sentence of what the
+     mail holds, the dates of the week, no "On its way", no failure.
+177. `[K]` "Send" four times more, each after its answer. → "On its way…" each time. A sixth. →
+     "You have asked for as many e-mails as a day allows. Please try again tomorrow."; the fake
+     mail has five mails for `alice`, not six.
+178. `[K]` Sign out, sign in as `admin`, "E-mail…". → "The whole calendar between the two dates,
+     as an Excel file, to your own e-mail address." "Send". → "On its way to a•••@example.com".
+179. At http://localhost:8025, the newest mail. → "Calendar, …" to `admin@example.com`, the
+     file `calendar-<from>-to-<to>.xlsx`; opened, its headings have `First name` and `Last name`
+     after `Username`, and its rows are every person's appointments of the week, with their
+     names.
+180. → At 390 × 844 the dialog fits the screen, the two dates side by side, "On its way to …"
+     breaks inside the line rather than running off, and the page does not scroll sideways.

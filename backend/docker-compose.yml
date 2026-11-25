@@ -65,6 +65,25 @@ services:
     networks:
       - shared-calendar-local
 
+  # The fake mail: a stand-in for Amazon SES (docs/EMAIL_ARCHITECTURE.md section 14.2), so that the
+  # mailer runs and is tested without an AWS account and no mail leaves the laptop. One small script
+  # of plain Node (docker/fake-mail.mjs) on the official Node image, which answers SESv2's
+  # SendEmail and keeps each mail, its files included, in memory until the container stops. The
+  # folder is mounted read-only. A change to the script needs `docker compose restart fake-mail`.
+  # A person reads the mails at http://localhost:8025, the journeys at http://localhost:8025/mails.
+  # From the Lambda containers: http://fake-mail:8025.
+  fake-mail:
+    image: node:22.23.4-alpine3.23
+    command: node /fake/fake-mail.mjs
+    user: node
+    read_only: true
+    volumes:
+      - ./docker:/fake:ro
+    ports:
+      - 127.0.0.1:8025:8025
+    networks:
+      - shared-calendar-local
+
 # Fixed name (not prefixed by the project) so `sam local start-api --docker-network shared-calendar-local`
 # can attach the Lambda containers to it and reach the services above by name.
 networks:

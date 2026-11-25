@@ -1,4 +1,4 @@
-import { ASSISTANT_LIMITS, CALENDAR_LIMITS, localDateOf, localTimeOf, PASSWORD_POLICY, PASSWORD_SYMBOLS, toInstant, type Role } from '@shared-calendar/shared';
+import { ASSISTANT_LIMITS, CALENDAR_LIMITS, localDateOf, localTimeOf, MAIL_LIMITS, maskAddress, PASSWORD_POLICY, PASSWORD_SYMBOLS, toInstant, type Role } from '@shared-calendar/shared';
 import type { NewPasswordProblem } from '../services/change-password.types';
 
 // The texts that depend on data (docs/FRONTEND_ARCHITECTURE.md section 5 and section 12.4): a
@@ -175,7 +175,7 @@ const PLAIN_WORDS = new Map<string, string>([
 ]);
 
 // What was being attempted when a call failed, where the same reason needs other words for it.
-export type Attempt = 'change' | 'type' | 'pattern' | 'window' | 'patterns-back' | 'message';
+export type Attempt = 'change' | 'type' | 'pattern' | 'window' | 'patterns-back' | 'message' | 'mail';
 const AFTER: Record<Attempt, Map<string, string>> = {
   // A change is refused with the cancellation's reason when its appointment is too close to be
   // moved by a User (docs/SHARED_CALENDAR_SPEC.md section 8.4): nothing was being cancelled. And
@@ -201,6 +201,9 @@ const AFTER: Record<Attempt, Map<string, string>> = {
   // can be wrong with it is its length (docs/CONVERSATIONAL_ARCHITECTURE.md section 4.4), with
   // the number of shared/.
   message: new Map([['invalid_request', `A message can be ${ASSISTANT_LIMITS.messageLength} characters long at most, and cannot be empty.`]]),
+  // A mail of the calendar that the check before the request refused: the two dates are what can
+  // be wrong (docs/EMAIL_ARCHITECTURE.md section 6.5), with the number of shared/.
+  mail: new Map([['invalid_request', `Choose two dates, the first not after the second, at most ${MAIL_LIMITS.rangeDays} days in all.`]]),
 };
 
 // Who attempted, where the same reason needs other words for the Administrator. `user_busy`
@@ -238,3 +241,15 @@ export const PASSWORD_TEXTS = {
   differ: 'The two new passwords are not the same.',
   changed: 'Password changed.',
 } as const;
+
+// The words of the week's "E-mail…" dialog (docs/FRONTEND_ARCHITECTURE.md section 5.1): what the
+// mail holds, which is the role's (docs/EMAIL_ARCHITECTURE.md section 9.1), and where it goes once
+// asked for, the person's own address masked (docs/EMAIL_ARCHITECTURE.md section 12.4), or in
+// general words when it could not be read.
+export const MAIL_TEXTS = {
+  what: {
+    admin: 'The whole calendar between the two dates, as an Excel file, to your own e-mail address.',
+    user: 'Your appointments between the two dates, as an Excel file, to your own e-mail address.',
+  },
+  sent: (address: string | null) => `On its way to ${address === null ? 'your e-mail address' : maskAddress(address)}`,
+} as const satisfies { what: Record<Role, string>; sent: (address: string | null) => string };

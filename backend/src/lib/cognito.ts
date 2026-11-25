@@ -230,6 +230,24 @@ export async function listPlainUsers(): Promise<UserSummary[]> {
     .sort((a, b) => (a.username < b.username ? -1 : a.username > b.username ? 1 : 0));
 }
 
+/**
+ * The first and last name of every member of group `user`, by the `sub` the calendar stores as an
+ * appointment's `userId`, for the name columns of the Administrator's Excel file
+ * (docs/EMAIL_ARCHITECTURE.md section 6.3). Only Users have appointments
+ * (docs/SHARED_CALENDAR_SPEC.md R-BOOK-01). A member without a `sub` is left out, and a missing name
+ * is empty: a mail is not refused for one gap in the directory.
+ */
+export async function namesBySub(): Promise<Map<string, { givenName: string; familyName: string }>> {
+  const names = new Map<string, { givenName: string; familyName: string }>();
+  for (const member of await membersOf('user')) {
+    const sub = member.Attributes?.find((attribute) => attribute.Name === 'sub')?.Value;
+    if (!sub) continue;
+    const facts = storedFacts(member.Attributes);
+    names.set(sub, { givenName: facts.givenName ?? '', familyName: facts.familyName ?? '' });
+  }
+  return names;
+}
+
 // Revokes the user's refresh tokens.
 //
 // SKIP_GLOBAL_SIGN_OUT exists only because the local Cognito emulator (cognito-local 5.3.0)

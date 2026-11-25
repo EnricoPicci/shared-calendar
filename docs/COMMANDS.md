@@ -47,7 +47,8 @@ the scripts themselves win, and this document is fixed.
 ## 3. The local stack
 
 - `npm run local:up -w backend`: starts DynamoDB Local, dynamodb-admin (http://localhost:8001),
-  cognito-local and the fake Claude, then seeds them (tables `hello-messages`, `calendar` and `assistant`, the last two empty;
+  cognito-local, the fake Claude and the fake mail (http://localhost:8025, section 3.5), then
+  seeds them (tables `hello-messages`, `calendar`, `assistant` and `mail`, the last three empty;
   pool, client, groups, users `admin` / `Admin-Local-Pass-1!` and `alice` /
   `Alice-Local-Pass-1!`) and writes `env.local.json`. Idempotent; rerun it after a change to
   `local-seed.sh`. Its last line but one says which Claude it wired: the fake, or the real one
@@ -60,11 +61,14 @@ the scripts themselves win, and this document is fixed.
   The file starts again at every start, and holds the handlers' log lines among SAM's own.
   The tokens of the assistant's steps are in those lines and nowhere else: a session with the
   real Claude whose messages, proposals and cost are to be counted afterwards needs this file.
+- `npm run local:lambda -w backend`: serves the functions' invoke on http://127.0.0.1:3001
+  (foreground), from the build `local:api` made, which it needs and does not make; the mailer
+  runs there (section 3.5). Restart it after every build, as `local:api`.
 - `npm run local:down -w backend`: stops the stack. The table is in memory and is lost; Cognito
   data survives in `backend/.cognito/`.
   So does an account made by hand before the four facts of a person existed: it has none, and
   `GET /users` answers `500` until it is deleted (`docs/ARCHITECTURE.md` section 4).
-  Stop `local:api` first. When it answers "Network shared-calendar-local … Resource is still in
+  Stop `local:api` and `local:lambda` first; the fake mail's mails are lost. When it answers "Network shared-calendar-local … Resource is still in
   use", the emulators are stopped all the same and Lambda containers of `sam local` are still
   on the network: remove them with
   `docker rm -f $(docker ps -q --filter network=shared-calendar-local)` and run it again.
@@ -86,7 +90,7 @@ the scripts themselves win, and this document is fixed.
 - cognito-local does not implement `AdminUserGlobalSignOut`. `env.local.json` sets
   `SKIP_GLOBAL_SIGN_OUT=true` for `DeleteUserFunction` so local deletes work; the cloud never
   sets it (`docs/ARCHITECTURE.md` section 8, note on Cognito emulation).
-- The tables are plain `calendar`, `hello-messages` and `assistant`; in the cloud they carry the
+- The tables are plain `calendar`, `hello-messages`, `assistant` and `mail`; in the cloud they carry the
   stack's name (`shared-calendar-api-calendar`, `shared-calendar-api-hello-messages`; the
   assistant's table is in the template and not deployed yet).
 - The `assistant` table has its time to live on `expiresAt`, as in the cloud, but DynamoDB Local
@@ -120,6 +124,12 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
   per day and is never reset: when `alice` has used hers, wait for tomorrow or raise the limit.
 - `ASSISTANT_BUDGET_MEMORY_SECONDS`: 0, so that a spending limit answered by the fake Claude is
   not remembered for ten minutes by the function.
+
+`env.local.json` sets, in `Parameters`, what e-mail's functions declare: `MAIL_STAGE` `on` (the
+template's default is `off`, which makes `POST /mail/calendar` answer `503 mail_unavailable`),
+`MAIL_TABLE`, `SES_ENDPOINT` (the fake mail), `LAMBDA_ENDPOINT` and `MAILER_FUNCTION` (the
+mailer as `local:lambda` names it); and sections of their own for `MailerFunction` and
+`SendCalendarMailFunction`, which call Cognito.
 
 ### 3.3 When the local stack misbehaves
 
@@ -238,6 +248,35 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
   (in `backend/`). After a change to the script `backend/docker/fake-claude.mjs`:
   `docker compose restart fake-claude`.
 
+### 3.5 Mail: the fake mail and `local:lambda`
+
+- **The fake mail**, the service `fake-mail` of the Docker stack (`docs/ARCHITECTURE.md`
+  section 8), answers SES's `SendEmail` and keeps each mail in memory until the container stops
+  (at most 200). A person reads them at http://localhost:8025, newest first, each with its HTML
+  body and its files to download; `GET /mails?to=<address>` gives them as JSON and
+  `DELETE /mails?to=<address>` forgets them. Nothing leaves the laptop. Its log, one line per
+  request without an address: `docker compose logs fake-mail` (in `backend/`). After a change
+  to `backend/docker/fake-mail.mjs`: `docker compose restart fake-mail`. Port 8025 is the one
+  Mailpit uses by default: when another project's Mailpit holds it, `local:up` stops on it;
+  stop that container first.
+- **`npm run local:lambda -w backend`** runs `sam local start-lambda` on 127.0.0.1:3001, from
+  the same build as `local:api` and with the same `env.local.json`. `POST /mail/calendar`
+  reaches it from its container at `http://host.docker.internal:3001` and gets `202` at once;
+  the mailer then runs there, and its log line is in this process's output. Tried on macOS with
+  Docker Desktop. **On Linux, a Codespace among them, it is not tried**: `host.docker.internal`
+  needs the mapping `--add-host host.docker.internal:host-gateway` and the process a bind other
+  than `127.0.0.1`, neither of which the scripts set.
+- **The mailer by hand**: `npm run mail:send -w backend -- <kind> <username> <from> <to>`, the
+  kind `calendar` for an administrator, `mine` for a User, the dates `YYYY-MM-DD`. It reads the
+  account's `sub` and groups in cognito-local, refuses a kind that is not the role's, invokes
+  the mailer through `local:lambda` and waits, prints its result (`{"outcome": "sent",
+  "appointmentCount": N}` or why not) and the fake mail's page. It counts nothing: the five
+  a day are the route's.
+- **The five a day.** `POST /mail/calendar` counts per account (`sub`) and local day in the
+  table `mail`. `admin` and `alice` keep their `sub` across `local:up`, so after five requests
+  of a day by hand, wait for tomorrow or run `local:down` and `local:up` (the table is in
+  memory).
+
 ## 4. The integration tests and the deploy gate
 
 - `RUN_INTEGRATION=1 npm run test:integration -w backend`: the journeys of
@@ -257,6 +296,13 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
   the `calendar` table, cancelled; what it leaves in the `assistant` table stays there, under accounts that no longer exist) against the running `local:up` +
   `local:api` stack. Pass the same
   `DYNAMODB_PORT` as `local:up`. Without `RUN_INTEGRATION=1` it runs nothing and exits 0.
+  `mail.test.ts` (e-mail) needs `local:lambda` too, and the set-up of every file stops when
+  port 3001 or 8025 does not answer. It never empties the `calendar` table: it opens 20:00–23:00
+  of its own type `mail journey` on the 45th day from today, books three appointments there
+  with a note marking the run, and removes the window and the type first and last (the
+  appointments stay, cancelled); its accounts `mail-bob`, `mail-boss` and `mail-nobody` are new
+  each run, so the five a day never run out; it reads and forgets only the mails of the
+  addresses it made, `admin`'s and `alice`'s among them.
   Removes a leftover `carol` before starting, so it can be rerun after a failed run. **The
   journeys refuse to start when `env.local.json` wires the real Claude** (section 3.4), every
   one of them, the calendar's too: run `local:up` without `ANTHROPIC_API_KEY`, then restart
@@ -267,10 +313,11 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
   when they run.
 - `RUN_INTEGRATION=1 npm run test:integration -w frontend`: runs `frontend/tests/integration`
   (`login.service.test.ts`, `journeys.test.ts`, `logout.service.test.ts`, `calendar.test.ts`,
-  `change-password.test.ts` and `assistant.test.ts`: the services against cognito-local on 9229
+  `change-password.test.ts`, `profiles.test.ts`, `mail.test.ts` and `assistant.test.ts`: the services against cognito-local on 9229
   and the API on 3000, `docs/FRONTEND_SERVICES.md` section 14; the sign-out's is its section
-  20.9: `alice` only, no table touched, every session it opens signed out at its end). Needs
-  `local:up` + `local:api` running and, in a Codespace, the iptables rule of section 3.3.
+  20.9: `alice` only, no table touched, every session it opens signed out at its end; the mail's needs
+  `local:lambda` too, and its throw-away user `fe-mail` asks for all of its five mails of the
+  day, removed first and last). Needs `local:up` + `local:api` running and, in a Codespace, the iptables rule of section 3.3.
   Without `RUN_INTEGRATION=1` it runs nothing and exits 0, like the back end's. Creates and
   removes the throw-away users `fe-journey`, `fe-calendar` and `fe-calendar-b` (removed first
   too, so it can be rerun after a failed run). `change-password.test.ts` changes the password of

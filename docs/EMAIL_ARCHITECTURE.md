@@ -447,8 +447,8 @@ calendar's read-only permission set. It never writes the calendar.
 
 ### 6.5 Limits
 
-- At most 5 on-demand mails per person and local day (a counter `QUOTA#<sub>#<date>` in the
-  table `mail`, incremented by the route under a condition): beyond it `429 mail_limit_reached`.
+- At most 5 on-demand mails per person and local day (a counter, key `QUOTA#<sub>` and the
+  local date, in the table `mail`, incremented by the route under a condition): beyond it `429 mail_limit_reached`.
   The daily mail does not count.
 - A range of at most 366 days, `from` ≤ `to`: else `400 invalid_request`.
 - A person without an e-mail: `409 no_email_address`, before anything is counted.

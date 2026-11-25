@@ -27,3 +27,6 @@ export const MailCalendarBody = z
     when: (p) => p.issues.length === 0,
   });
 export type MailCalendarBody = z.infer<typeof MailCalendarBody>;
+
+/** 202 of POST /mail/calendar: the mailer has been started; SES delivers later. */
+export type MailCalendarResponse = { status: 'queued' };

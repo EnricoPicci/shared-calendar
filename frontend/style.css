@@ -267,7 +267,9 @@ dialog h3 { font-size: 1.05rem; }
 dialog p { margin: 0; }
 dialog p:empty { display: none; }
 dialog .what { font-weight: 600; overflow-wrap: anywhere; }
-dialog .times { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+dialog .times, dialog .dates { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+/* The mail's dialog: where the mail goes, once asked for */
+dialog .mail-sent { color: #1b6e3c; overflow-wrap: anywhere; }
 dialog .users-message, dialog .booked, dialog .hint { font-size: 0.85rem; color: #52606d; }
 dialog textarea { resize: vertical; }
 dialog dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.3rem 1rem; margin: 0; }

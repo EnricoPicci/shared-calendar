@@ -6,7 +6,8 @@ Description: >
   the chain API - authorizer - Lambda - DynamoDB works, with its table; and the shared calendar
   (docs/SHARED_CALENDAR_SPEC.md, being built in plan steps 41-59): its table, its shared
   permission sets, one function per calendar route, and GET /users; and the assistant
-  (docs/CONVERSATIONAL_ARCHITECTURE.md, being built): its table and the functions of a conversation.
+  (docs/CONVERSATIONAL_ARCHITECTURE.md, being built): its table and the functions of a conversation;
+  and e-mail (docs/EMAIL_ARCHITECTURE.md, being built): the mail table, the mailer and its route.
 
 # Values given at deploy time: samconfig.toml holds all but AlertEmail, which the first deploy
 # passes on the command line (public repository) and CloudFormation then keeps.
@@ -55,6 +56,45 @@ Parameters:
       How many messages one person may send to the assistant in one day of the calendar's time
       zone (docs/CONVERSATIONAL_ARCHITECTURE.md section 4.4). With the other limits it bounds what
       one person can cost at Anthropic. Passed as ASSISTANT_DAILY_MESSAGE_LIMIT.
+  # E-mail (docs/EMAIL_ARCHITECTURE.md section 13.1). No parameter holds a personal address: the
+  # Reply-To is AlertEmail unless MailReplyTo is given, and a given one is passed on the command
+  # line like AlertEmail, never written in samconfig.toml (public repository).
+  MailStage:
+    Type: String
+    Default: 'off'
+    AllowedValues: ['off', 'domain', 'on']
+    Description: >
+      Whether e-mail works in this stack (docs/EMAIL_ARCHITECTURE.md section 13.2). Only 'on' lets
+      the mail routes start the mailer; any other stage answers 503 mail_unavailable. Passed to the
+      mail routes as MAIL_STAGE.
+  MailDomain:
+    Type: String
+    Default: example.com
+    AllowedPattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$'
+    Description: >
+      The domain mail is sent from, proven to SES (docs/EMAIL_ARCHITECTURE.md section 8.1). The
+      default, example.com, can never be proven, so no mail leaves a stack that keeps it.
+  MailFromLocalPart:
+    Type: String
+    Default: noreply
+    AllowedPattern: '^[a-z0-9][a-z0-9._-]{0,63}$'
+    Description: The part before the @ of the sender's address (docs/EMAIL_ARCHITECTURE.md section 8.2).
+  MailFromName:
+    Type: String
+    Default: Shared calendar
+    AllowedPattern: '^[A-Za-z0-9 ._-]{1,64}$'
+    Description: The sender's name as a mailbox shows it (docs/EMAIL_ARCHITECTURE.md section 8.2).
+  MailReplyTo:
+    Type: String
+    Default: ''
+    AllowedPattern: '^$|^[^@\s]+@[^@\s]+\.[^@\s]+$'
+    Description: >
+      Where replies to a mail go. Empty: AlertEmail, the address that already receives the alarms
+      (docs/EMAIL_ARCHITECTURE.md section 8.2).
+
+# A value chosen at deploy time: the Reply-To is MailReplyTo when one is given, AlertEmail otherwise.
+Conditions:
+  HasMailReplyTo: !Not [!Equals [!Ref MailReplyTo, '']]
 
 # Settings shared by every function below, so each function only lists what differs.
 Globals:
@@ -348,6 +388,36 @@ Resources:
               - dynamodb:PutItem
               - dynamodb:UpdateItem
             Resource: !GetAtt AssistantTable.Arn
+
+  # The table of e-mail (docs/EMAIL_ARCHITECTURE.md section 10.1): how many mails on demand each
+  # person asked for on each day, kept apart from the calendar so that the calendar's table, lock and
+  # permissions stay as they are. It holds no personal data: no address, no name, only a person's
+  # `sub`. The same generic two-part key as the other tables. Fixed capacity of 2 reads and 2 writes
+  # per second: with the three other tables 21 reads and 19 writes, inside the always-free 25 and 25.
+  # Time to live on `expiresAt`: a day's count deletes itself two days later. Deletion protection on,
+  # as for the calendar. Named after the stack (shared-calendar-api-mail; locally plain mail).
+  MailTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${AWS::StackName}-mail
+      BillingMode: PROVISIONED
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 2
+        WriteCapacityUnits: 2
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      DeletionProtectionEnabled: true
 
   # ---------------------------------------------------------------------------
   # API: the public HTTPS entry point
@@ -2810,6 +2880,212 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${DeclineProposalLogGroup}:log-stream:*
+
+  # ---------------------------------------------------------------------------
+  # E-mail (docs/EMAIL_ARCHITECTURE.md): the mailer, the one function that sends mail, and the
+  # route that starts it. Each has its own log group and its own role, like every function.
+  # ---------------------------------------------------------------------------
+
+  # The mailer (docs/EMAIL_ARCHITECTURE.md section 6.1): no route of its own. A mail route starts it
+  # in the background, Lambda keeps the request and runs it, and tries a failed run twice more. It
+  # reads the person's address and names in Cognito, the appointments in the calendar table, makes
+  # the Excel file and hands the mail to SES. It is the only function that carries the Excel
+  # library and the only one allowed to send mail.
+  # Its memory and time, measured in AWS's Lambda image for Node 22 on the local stack, with the
+  # CPU share Lambda gives each size: a mail of a whole year, 3 000 appointments, took 5.2 s to 5.8 s
+  # at 512 MB, peak 139 MB; at 256 MB it took 18.9 s. Hence 512 MB, and 30 s, five times the run.
+  # MAIL_FROM is the sender as a mailbox shows it, "Shared calendar" <noreply@the domain>;
+  # MAIL_REPLY_TO the address replies go to; MAIL_CONFIGURATION_SET the SES configuration set that
+  # reports bounces, named after the stack. SES_ENDPOINT, COGNITO_ENDPOINT and DYNAMODB_ENDPOINT are
+  # empty in the cloud: only the local stack fills them, with the emulators' addresses.
+  MailerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: mailer.handler
+      Role: !GetAtt MailerRole.Arn
+      MemorySize: 512
+      Timeout: 30
+      LoggingConfig:
+        LogGroup: !Ref MailerLogGroup
+      Environment:
+        Variables:
+          CALENDAR_TABLE: !Ref CalendarTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+          USER_POOL_ID: !Ref UserPool
+          COGNITO_ENDPOINT: ''
+          MAIL_FROM: !Sub '"${MailFromName}" <${MailFromLocalPart}@${MailDomain}>'
+          MAIL_REPLY_TO: !If [HasMailReplyTo, !Ref MailReplyTo, !Ref AlertEmail]
+          MAIL_CONFIGURATION_SET: !Sub ${AWS::StackName}-mail
+          SES_ENDPOINT: ''
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/mailer.ts
+
+  MailerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-mailer
+      RetentionInDays: 14
+
+  # What the mailer may do, and nothing more: read the calendar (the calendar's read-only set); read
+  # one account (AdminGetUser: the asker's address) and the members of a group (ListUsersInGroup:
+  # the Users' names for the Administrator's file), on this user pool only; and send mail through
+  # SES, only as the stack's domain and only through the stack's configuration set: SES checks the
+  # sending identity and the configuration set against these two names. It cannot write the
+  # calendar or change an account.
+  MailerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref CalendarReadPolicy
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${MailerLogGroup}:log-stream:*
+        - PolicyName: read-people
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:ListUsersInGroup
+                Resource: !GetAtt UserPool.Arn
+        - PolicyName: send-mail
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                Resource:
+                  - !Sub arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/${MailDomain}
+                  - !Sub arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/${AWS::StackName}-mail
+
+  # POST /mail/calendar (docs/EMAIL_ARCHITECTURE.md section 9.1; the Administrator and Users): asks
+  # for a mail of the calendar between two dates, sent to the asker's own address. It checks the
+  # request, counts it in the mail table and starts the mailer in the background; it sends nothing
+  # itself. MAIL_STAGE is the stack's stage: anything but 'on' answers 503. MAILER_FUNCTION names the
+  # function to start. LAMBDA_ENDPOINT, COGNITO_ENDPOINT and DYNAMODB_ENDPOINT are empty in the
+  # cloud: only the local stack fills them.
+  SendCalendarMailFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: sendCalendarMail.handler
+      Role: !GetAtt SendCalendarMailRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref SendCalendarMailLogGroup
+      Environment:
+        Variables:
+          MAIL_STAGE: !Ref MailStage
+          MAIL_TABLE: !Ref MailTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+          USER_POOL_ID: !Ref UserPool
+          COGNITO_ENDPOINT: ''
+          MAILER_FUNCTION: !Ref MailerFunction
+          LAMBDA_ENDPOINT: ''
+      Events:
+        SendCalendarMail:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /mail/calendar
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/sendCalendarMail.ts
+
+  SendCalendarMailLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-sendCalendarMail
+      RetentionInDays: 14
+
+  # What the route may do: read one account (AdminGetUser: has the asker an address?) on this user
+  # pool; add one to a person's count of the day (UpdateItem, which also creates the count) in the
+  # mail table only; and start the mailer, that one function only. It cannot send mail itself, read
+  # the calendar or delete a count.
+  SendCalendarMailRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${SendCalendarMailLogGroup}:log-stream:*
+        - PolicyName: read-own-address
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminGetUser
+                Resource: !GetAtt UserPool.Arn
+        - PolicyName: count-mail
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt MailTable.Arn
+        - PolicyName: start-mailer
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt MailerFunction.Arn
 
   # ---------------------------------------------------------------------------
   # Error alarms (docs/ARCHITECTURE.md section 11)

@@ -2,6 +2,7 @@ import type { Role } from '@shared-calendar/shared';
 import { BehaviorSubject } from 'rxjs';
 import type { AppointmentDetail, Moving } from '../../../src/logic/appointment.detail';
 import { refusalOf } from '../../../src/logic/booking';
+import type { MailState } from '../../../src/logic/mail.screen';
 import type { DayModel, GroupBlock, Placed, SlotBlock, WeekModel } from '../../../src/logic/week.model';
 import type { WeekState } from '../../../src/logic/week.screen';
 import type { BookState, CancelState, ChangeState, UpdateNoteState } from '../../../src/services/appointments.types';
@@ -16,6 +17,8 @@ import { find, submit, useRealPage } from './page';
 // layer's tests.
 
 const SCRIPT = '<script>window.hacked = true</script><b>bold</b>';
+// The mail's dialog before anything is asked, with words of the fake's own for what the mail holds.
+const NO_MAIL: MailState = { what: 'The mail of the two dates.', sending: false, sent: null, failure: null };
 const FAILURE = 'The server cannot be reached. Check the connection and try again.';
 
 const at = (top: string, height: string, time: string, lane = 0, lanes = 1): Placed => ({ top, height, time, lane, lanes });
@@ -120,6 +123,7 @@ function mounted(first: WeekState = state(), role: Role = 'user', details: Appoi
     // The words of a refusal as the logic layer chooses them, with no appointment of the week to
     // name: a test that needs one answers it itself.
     refusal: vi.fn<WeekDeps['screen']['refusal']>((reason, asked) => refusalOf(reason, asked, role, [])),
+    range: vi.fn<WeekDeps['screen']['range']>(() => ({ from: '2026-11-16', to: '2026-11-22' })),
   };
   const appointments = {
     bookState$: bookState$.asObservable(),
@@ -132,9 +136,11 @@ function mounted(first: WeekState = state(), role: Role = 'user', details: Appoi
     updateNote: vi.fn<WeekDeps['appointments']['updateNote']>(),
   };
   const users = { listUsersState$: listUsersState$.asObservable(), listUsers: vi.fn<WeekDeps['users']['listUsers']>() };
+  const mail$ = new BehaviorSubject<MailState>(NO_MAIL);
+  const mail = { mail$: mail$.asObservable(), send: vi.fn<WeekDeps['mail']['send']>(), reset: vi.fn<WeekDeps['mail']['reset']>() };
   const root = find('#week');
-  const subscription = mountWeek(root, { screen, appointments, users, role });
-  return { week$, bookState$, cancelState$, changeState$, updateNoteState$, listUsersState$, screen, appointments, users, root, subscription };
+  const subscription = mountWeek(root, { screen, appointments, users, mail, role });
+  return { week$, bookState$, cancelState$, changeState$, updateNoteState$, listUsersState$, mail$, screen, appointments, users, mail, root, subscription };
 }
 
 const all = (selector: string) => [...document.querySelectorAll<HTMLElement>(`#week ${selector}`)];
@@ -1689,6 +1695,83 @@ describe('mountWeek', () => {
         expect([group().open, all('dialog.group li').length, find('#week dialog.group .what').textContent, anyway().hidden]).toEqual([false, 0, '', true]);
         expect(html()).toBe(before);
       });
+    });
+  });
+
+  describe('the "E-mail…" dialog (docs/EMAIL_ARCHITECTURE.md 9.1)', () => {
+    const dialog = () => find<HTMLDialogElement>('#week dialog.mail');
+    const field = (name: string) => find<HTMLInputElement>(`#week dialog.mail [name="${name}"]`);
+    const sendButton = () => find<HTMLButtonElement>('#week dialog.mail .submit');
+    const text = (selector: string) => find(`#week dialog.mail ${selector}`).textContent;
+
+    it('"E-mail…" opens it with nothing of before, the dates of the week on show and what the mail holds', () => {
+      const { mail, screen } = mounted(state({ week: WEEK }));
+      expect(dialog().open).toBe(false);
+      find<HTMLButtonElement>('#week .mail-open').click();
+      expect(dialog().open).toBe(true);
+      expect(mail.reset).toHaveBeenCalledTimes(1);
+      expect(screen.range).toHaveBeenCalledTimes(1);
+      expect([field('from').value, field('to').value]).toEqual(['2026-11-16', '2026-11-22']);
+      expect(text('.mail-what')).toBe(NO_MAIL.what);
+      expect([text('.mail-sent'), text('.error')]).toEqual(['', '']);
+    });
+
+    it('for both roles: the Administrator is told the whole calendar', () => {
+      const { mail$ } = mounted(state(), 'admin');
+      mail$.next({ ...NO_MAIL, what: 'The whole calendar between the two dates, as an Excel file, to your own e-mail address.' });
+      find<HTMLButtonElement>('#week .mail-open').click();
+      expect(text('.mail-what')).toMatch(/^The whole calendar /);
+    });
+
+    it('"Send" hands the two dates, as changed, to the mail\'s screen, and the form is not sent by the browser', () => {
+      const { mail } = mounted();
+      find<HTMLButtonElement>('#week .mail-open').click();
+      field('from').value = '2026-12-01';
+      field('to').value = '2026-12-31';
+      expect(submit(find<HTMLFormElement>('#week dialog.mail form')).prevented).toBe(true);
+      expect(mail.send).toHaveBeenCalledWith('2026-12-01', '2026-12-31');
+    });
+
+    it('the states of mail$: "Send" disabled while sending; where the mail went; why it did not; the dialog stays open', () => {
+      const { mail$ } = mounted();
+      find<HTMLButtonElement>('#week .mail-open').click();
+      mail$.next({ ...NO_MAIL, sending: true });
+      expect(sendButton().disabled).toBe(true);
+      mail$.next({ ...NO_MAIL, sent: 'On its way to a•••@example.com' });
+      expect(sendButton().disabled).toBe(false);
+      expect([text('.mail-sent'), text('.error')]).toEqual(['On its way to a•••@example.com', '']);
+      mail$.next({ ...NO_MAIL, failure: 'E-mail is not available yet.' });
+      expect([text('.mail-sent'), text('.error')]).toEqual(['', 'E-mail is not available yet.']);
+      expect(dialog().open).toBe(true);
+    });
+
+    it('a text containing <script> is shown as text', () => {
+      const { mail$ } = mounted();
+      mail$.next({ what: SCRIPT, sending: false, sent: SCRIPT, failure: SCRIPT });
+      expect([text('.mail-what'), text('.mail-sent'), text('.error')]).toEqual([SCRIPT, SCRIPT, SCRIPT]);
+      expect(find('#week dialog.mail').querySelector('script, b')).toBeNull();
+    });
+
+    it('"Close" closes it', () => {
+      mounted();
+      find<HTMLButtonElement>('#week .mail-open').click();
+      find<HTMLButtonElement>('#week dialog.mail .close').click();
+      expect(dialog().open).toBe(false);
+    });
+
+    it('after unsubscribing, with the dialog open, filled and answered: closed, emptied, and the page as index.html has it', () => {
+      const before = html();
+      const { mail$, subscription } = mounted(state({ week: WEEK }));
+      find<HTMLButtonElement>('#week .mail-open').click();
+      field('from').value = '2026-12-01';
+      mail$.next({ ...NO_MAIL, sending: true });
+      mail$.next({ ...NO_MAIL, sent: 'On its way to a•••@example.com', failure: 'A failure' });
+      subscription.unsubscribe();
+      expect(dialog().open).toBe(false);
+      expect([field('from').value, field('to').value]).toEqual(['', '']);
+      expect([text('.mail-what'), text('.mail-sent'), text('.error')]).toEqual(['', '', '']);
+      expect(sendButton().disabled).toBe(false);
+      expect(html()).toBe(before);
     });
   });
 });

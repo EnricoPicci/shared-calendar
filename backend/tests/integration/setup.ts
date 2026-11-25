@@ -3,6 +3,7 @@ import {
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
   AdminSetUserPasswordCommand,
+  AdminUpdateUserAttributesCommand,
   CognitoIdentityProviderClient,
   InitiateAuthCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
@@ -22,8 +23,8 @@ import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { connect } from 'node:net';
 
 // Helpers for the integration journeys (docs/IMPLEMENTATION_PLAN.md step 9). They talk to the local
-// stack of docs/ARCHITECTURE.md section 8: `npm run local:up` (emulators) and `npm run local:api`
-// (sam local). Unlike the handlers, tests may use the AWS SDK directly.
+// stack of docs/ARCHITECTURE.md section 8: `npm run local:up` (emulators), `npm run local:api`
+// (sam local) and `npm run local:lambda` (the functions' invoke, for the mailer). Unlike the handlers, tests may use the AWS SDK directly.
 
 export const API_URL = 'http://127.0.0.1:3000';
 const COGNITO_URL = 'http://localhost:9229';
@@ -32,6 +33,11 @@ const DYNAMODB_URL = `http://localhost:${DYNAMODB_PORT}`;
 const TABLE_NAME = 'hello-messages';
 const CALENDAR_TABLE = 'calendar';
 const ASSISTANT_TABLE = 'assistant';
+const MAIL_TABLE = 'mail';
+// Where `npm run local:lambda` serves the functions' invoke, and where the fake mail listens
+// (docs/EMAIL_ARCHITECTURE.md section 14.2).
+const LAMBDA_PORT = 3001;
+const FAKE_MAIL_URL = 'http://localhost:8025';
 const ENV_FILE = 'env.local.json';
 // What `npm run local:up` writes into env.local.json when it wires the fake Claude of the Docker
 // stack (scripts/local-seed.sh), and the port the fake listens on.
@@ -122,10 +128,14 @@ export async function setup(): Promise<void> {
     missing.push(`no table ${CALENDAR_TABLE} on port ${DYNAMODB_PORT}: run npm run local:up again`);
   } else if (!(await tableExists(ASSISTANT_TABLE))) {
     missing.push(`no table ${ASSISTANT_TABLE} on port ${DYNAMODB_PORT}: run npm run local:up again`);
+  } else if (!(await tableExists(MAIL_TABLE))) {
+    missing.push(`no table ${MAIL_TABLE} on port ${DYNAMODB_PORT}: run npm run local:up again`);
   }
   if (!(await portOpen(9229))) missing.push('cognito-local is not listening on port 9229 (npm run local:up)');
   if (!(await portOpen(FAKE_CLAUDE_PORT))) missing.push(`the fake Claude is not listening on port ${FAKE_CLAUDE_PORT} (npm run local:up)`);
+  if (!(await portOpen(8025))) missing.push('the fake mail is not listening on port 8025 (npm run local:up)');
   if (!(await portOpen(3000))) missing.push('the API is not listening on port 3000 (npm run local:api)');
+  if (!(await portOpen(LAMBDA_PORT))) missing.push(`the functions' invoke is not listening on port ${LAMBDA_PORT} (npm run local:lambda)`);
   if (missing.length > 0) {
     // Printed as well as thrown: vitest 5 crashes while formatting an error thrown from a
     // globalSetup (TypeError: code.charCodeAt is not a function) and the message is lost.
@@ -490,4 +500,76 @@ export async function createUserInNoGroup(username: string, password: string): P
   const UserPoolId = localPool().userPoolId;
   await cognito.send(new AdminCreateUserCommand({ UserPoolId, Username: username, MessageAction: 'SUPPRESS' }));
   await cognito.send(new AdminSetUserPasswordCommand({ UserPoolId, Username: username, Password: password, Permanent: true }));
+}
+
+// Sets the four facts of an account straight in cognito-local, as the seed does: for an account the
+// API cannot give facts to, such as a second administrator made by createSecondAdmin.
+export async function setFactsOf(username: string, facts: ReturnType<typeof factsOf>): Promise<void> {
+  await cognito.send(
+    new AdminUpdateUserAttributesCommand({
+      UserPoolId: localPool().userPoolId,
+      Username: username,
+      UserAttributes: [
+        { Name: 'given_name', Value: facts.givenName },
+        { Name: 'family_name', Value: facts.familyName },
+        { Name: 'email', Value: facts.email },
+        { Name: 'email_verified', Value: 'true' },
+        { Name: 'address', Value: facts.address },
+      ],
+    }),
+  );
+}
+
+// ── E-mail (docs/EMAIL_ARCHITECTURE.md section 14.2) ───────────────────────────────────────────
+
+/** A mail as the fake mail keeps it: the headers, the two bodies, each file in base64. */
+export type FakeMail = {
+  id: string;
+  from: string | null;
+  to: string[];
+  replyTo: string[];
+  subject: string;
+  text: string;
+  html: string;
+  attachments: { fileName: string; contentType: string; size: number; content: string }[];
+};
+
+// The mails the fake mail holds for one address, oldest first.
+export async function mailsTo(address: string): Promise<FakeMail[]> {
+  const res = await fetch(`${FAKE_MAIL_URL}/mails?to=${encodeURIComponent(address)}`);
+  if (!res.ok) throw new Error(`The fake mail answered ${res.status}`);
+  return ((await res.json()) as { mails: FakeMail[] }).mails;
+}
+
+// Makes the fake mail forget the mails of one address, and only those: a journey starts from none.
+export async function forgetMailsTo(address: string): Promise<void> {
+  const res = await fetch(`${FAKE_MAIL_URL}/mails?to=${encodeURIComponent(address)}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error(`The fake mail answered ${res.status}`);
+}
+
+// Waits until the fake mail holds `count` mails for an address, and gives them: a mail route starts
+// the mailer in the background, so its mail comes a little after the route's answer.
+export async function waitForMails(address: string, count: number, timeoutMs = 45_000): Promise<FakeMail[]> {
+  const until = Date.now() + timeoutMs;
+  for (;;) {
+    const mails = await mailsTo(address);
+    if (mails.length >= count || Date.now() > until) return mails;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+}
+
+/** The mailer's event (backend/src/lib/mailerEvent.ts): never an address. */
+export type MailerEventInput = { kind: 'calendar' | 'mine'; sub: string; username: string; role: 'admin' | 'user'; from: string; to: string; requestId: string };
+
+// Runs the mailer once through `npm run local:lambda`, synchronously, as `npm run mail:send` does,
+// and gives its result: the mail is in the fake when this returns.
+export async function runMailer(event: MailerEventInput | Record<string, unknown>): Promise<Record<string, unknown>> {
+  const res = await fetch(`http://127.0.0.1:${LAMBDA_PORT}/2015-03-31/functions/MailerFunction/invocations`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(event),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`The mailer's run answered ${res.status}: ${text}`);
+  return JSON.parse(text) as Record<string, unknown>;
 }

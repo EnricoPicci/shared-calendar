@@ -71,7 +71,7 @@ one that is fixed:
   what its route needs, scoped to the user pool and/or table it uses. The calendar's DynamoDB
   permissions are shared managed policies on the `calendar` table, attached per role
   (`docs/ARCHITECTURE.md` section 7.1).
-- Every password is set as permanent. There is no forced password change and no e-mail sending.
+- Every password is set as permanent, no forced change. Mail goes only by the mailer, via SES.
 - The API can never create an administrator, delete one, or set its password.
 - A password is changed only by its owner, at Cognito; the API has no route that changes one.
 - Role resolution: `admin` wins over `user`; a token in neither group gets 403.
@@ -87,7 +87,7 @@ one that is fixed:
   `eu-north-1`, profile `shared-calendar-admin` (`aws sso login --profile shared-calendar-admin
   --use-device-code` when the session expires).
 - Local development uses the Docker stack (DynamoDB Local, dynamodb-admin, cognito-local, a
-  fake Claude) and `sam local start-api`, and needs no AWS account.
+  fake Claude, a fake mail), `sam local start-api` and `start-lambda`: no AWS account.
 
 ## Comments
 
@@ -133,6 +133,7 @@ npm run verify -w frontend                          # the three above, then lint
 
 DYNAMODB_PORT=8002 npm run local:up -w backend      # the emulators, seeded; idempotent
 npm run local:api -w backend                        # the API on http://127.0.0.1:3000, foreground
+npm run local:lambda -w backend                     # the mailer's invoke on http://127.0.0.1:3001, foreground
 npm run local:down -w backend                       # stops the emulators; the tables are lost
 DYNAMODB_PORT=8002 npm run verify                   # back end's gate with its journeys, then front end's
 
@@ -145,9 +146,9 @@ npm run seed:local -w frontend                      # a week to look at, in the 
 
 - One package: add `-w backend`, `-w frontend` or `-w @shared-calendar/shared`. A script's own
   arguments go after `--` (`npm run smoke -w backend -- local`).
-- The back end's `verify` (so the root one too) and the integration tests need `local:up` and
-  `local:api` running and never start them. Without `RUN_INTEGRATION=1` the integration tests
-  run nothing and exit 0.
+- The back end's `verify` (so the root one too) and the integration tests need `local:up`,
+  `local:api` and `local:lambda` running and never start them. Without `RUN_INTEGRATION=1` the
+  integration tests run nothing and exit 0.
 - `DYNAMODB_PORT=8002` on this machine (port 8000 is taken): the same value for every command.
 - The local accounts: `admin` / `Admin-Local-Pass-1!` and `alice` / `Alice-Local-Pass-1!`.
 - The shell is zsh: `set -- $var` does not word-split. Pass arguments explicitly.
@@ -164,8 +165,7 @@ What goes wrong most often:
   `sam build`.
 - In a Codespace, after each start and before `local:api` (or the authorizer times out):
   `sudo iptables-legacy -I FORWARD -i br-+ -o br-+ -j ACCEPT`.
-- `local:api` and `dev` run in the foreground. Stop a background `dev` with
-  `pkill -f 'node scripts/dev[.]mjs'`, in a command that holds no other text matching it.
+- Stop a background `dev` with `pkill -f 'node scripts/dev[.]mjs'`, alone in its command.
 
 ## Folder map
 

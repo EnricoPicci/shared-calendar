@@ -5,6 +5,7 @@ import { AppointmentsScreen } from '../logic/appointments.screen';
 import { AssistantScreen } from '../logic/assistant.screen';
 import { AvailabilityScreen } from '../logic/availability.screen';
 import { DateScreen } from '../logic/date.screen';
+import { MailScreen } from '../logic/mail.screen';
 import { MeScreen } from '../logic/me.screen';
 import { PasswordScreen } from '../logic/password.screen';
 import { SettingsScreen } from '../logic/settings.screen';
@@ -22,6 +23,7 @@ import { ChangePasswordService } from '../services/change-password.service';
 import type { CognitoConfig } from '../services/cognito';
 import { LoginService } from '../services/login.service';
 import { LogoutService, type Resettable } from '../services/logout.service';
+import { MailService } from '../services/mail.service';
 import { RefreshService } from '../services/refresh.service';
 import { SessionStore } from '../services/session.store';
 import { MeService } from '../services/me.service';
@@ -88,7 +90,8 @@ const ROLE_IN_WORDS: Record<Role, string> = { admin: 'Administrator', user: 'Use
 // service the week's book dialog and the users screen share; `types` and `rules` are the two
 // services of the availability, whose view calls their deletes. `assistant` is the logic object
 // of the assistant's panel, which is no screen: it is mounted once for the session, beside
-// whichever screen is on show. `me` is the logic object of "My details". `password` is the
+// whichever screen is on show. `mail` is the logic object of the week's "E-mail…" dialog. `me`
+// is the logic object of "My details". `password` is the
 // logic object of the password screen, and `changes` the service it uses, whose success the
 // shell also hears.
 export type SessionObjects = {
@@ -104,6 +107,7 @@ export type SessionObjects = {
   types: AvailabilityTypesService;
   rules: AvailabilityRulesService;
   assistant: AssistantScreen;
+  mail: MailScreen;
   me: MeScreen;
   password: PasswordScreen;
   changes: ChangePasswordService;
@@ -144,11 +148,14 @@ function sessionObjects(config: ShellConfig, store: SessionStore, person: Person
   // The person's own facts: read through GET /me, the Administrator's saved through the users
   // service, the one the users screen uses (docs/EMAIL_ARCHITECTURE.md section 9.1).
   const me = new MeScreen(new MeService(config, store), users, person.role, again$);
+  // The week's "E-mail…" dialog, with a MeService of its own: it reads the person's address once
+  // a mail is asked for, and "My details" must not hear that read as its own.
+  const mail = new MailScreen(new MailService(config, store), new MeService(config, store), person.role);
   // The change of the person's own password, straight at Cognito (docs/FRONTEND_SERVICES.md
   // section 22).
   const changes = new ChangePasswordService({ cognitoUrl: config.cognitoUrl, skipGlobalSignOut: config.skipGlobalSignOut === true }, store);
   const password = new PasswordScreen(changes);
-  return { role: person.role, week, list, settings, accounts, availability, date, appointments, users, types, rules, assistant, me, password, changes };
+  return { role: person.role, week, list, settings, accounts, availability, date, appointments, users, types, rules, assistant, mail, me, password, changes };
 }
 
 // A screen of the application: its address (the URL's hash), its name in the navigation, the
@@ -173,9 +180,10 @@ export const SCREENS: readonly Screen[] = [
     label: 'Week',
     roles: ['admin', 'user'],
     element: '#week',
-    show: (root, { week, appointments, users, role }) => {
-      const subscription = mountWeek(root, { screen: week, appointments, users, role });
+    show: (root, { week, appointments, users, mail, role }) => {
+      const subscription = mountWeek(root, { screen: week, appointments, users, mail, role });
       subscription.add(week.start());
+      subscription.add(mail.start());
       return subscription;
     },
   },

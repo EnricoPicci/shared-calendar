@@ -79,7 +79,7 @@ describe('index.html', () => {
 
     it('every field has its label: a <label> around it, with words of its own', () => {
       const fields = everywhere('input, select, textarea');
-      expect(fields).toHaveLength(54);
+      expect(fields).toHaveLength(56);
       for (const field of fields) {
         const label = field.closest('label');
         expect(label, field.getAttribute('name')!).not.toBeNull();
@@ -117,15 +117,15 @@ describe('index.html', () => {
       const place = (element: Element) => [...element.classList].join('.');
       const alerts = everywhere('[role="alert"]');
       const failures = everywhere('.error');
-      expect(failures).toHaveLength(68);
+      expect(failures).toHaveLength(69);
       expect(alerts).toEqual(failures);
       for (const alert of alerts) expect(['P', alert.textContent], place(alert)).toEqual(['P', '']);
       const loading = everywhere('.loading');
       expect(loading.map((element) => [element.getAttribute('role'), element.textContent, element.hidden])).toEqual(Array.from({ length: 7 }, () => ['status', 'Loading…', true]));
       // What else is news: "Password changed" at the login, the appointment being moved, the
-      // list of Users being read for the book dialog, "Settings saved.", and what the assistant
-      // answers.
-      expect(everywhere('[role="status"]:not(.loading)').map((element) => place(element) || place(element.parentElement!))).toEqual(['notice', 'moving', 'users-message', 'saved', 'news']);
+      // list of Users being read for the book dialog, where a mail asked for goes,
+      // "Settings saved.", and what the assistant answers.
+      expect(everywhere('[role="status"]:not(.loading)').map((element) => place(element) || place(element.parentElement!))).toEqual(['notice', 'moving', 'users-message', 'mail-sent', 'saved', 'news']);
     });
   });
 
@@ -149,16 +149,16 @@ describe('index.html', () => {
     for (const template of templates) expect(template.content.querySelectorAll('input, select, textarea'), template.id).toHaveLength(0);
   });
 
-  it('the page has ten dialogs, closed, each named by its heading: the book dialog and the list of a group are the week\'s, three are the users\', three the availability\'s and one is "My details", outside the regions that are redrawn; the detail belongs to no screen', () => {
+  it('the page has eleven dialogs, closed, each named by its heading: the book dialog, the mail\'s and the list of a group are the week\'s, three are the users\', three the availability\'s and one is "My details", outside the regions that are redrawn; the detail belongs to no screen', () => {
     loadPage();
     const dialogs = [...document.querySelectorAll<HTMLDialogElement>('dialog')];
-    expect(dialogs.map((dialog) => dialog.className)).toEqual(['book', 'group', 'edit', 'created', 'delete', 'rename', 'change', 'delete', 'edit', 'detail']);
+    expect(dialogs.map((dialog) => dialog.className)).toEqual(['book', 'mail', 'group', 'edit', 'created', 'delete', 'rename', 'change', 'delete', 'edit', 'detail']);
     for (const dialog of dialogs) {
       expect(dialog.open, dialog.className).toBe(false);
       expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)!.tagName, dialog.className).toBe('H3');
     }
-    const [book, group, edit, created, remove, rename, change, removeAvailability, editMe, detail] = dialogs as HTMLDialogElement[] as [HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement];
-    for (const dialog of [book, group]) {
+    const [book, mail, group, edit, created, remove, rename, change, removeAvailability, editMe, detail] = dialogs as HTMLDialogElement[] as [HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement];
+    for (const dialog of [book, group, mail]) {
       expect(dialog.parentElement!.id, dialog.className).toBe('week');
       expect(dialog.closest('.week'), dialog.className).toBeNull();
     }

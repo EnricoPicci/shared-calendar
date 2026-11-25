@@ -38,6 +38,22 @@ export default tseslint.config(
     },
   },
   {
+    // The Excel library is imported by one module only, backend/src/lib/excel.ts, so that it is
+    // bundled into the mailer alone (docs/EMAIL_ARCHITECTURE.md section 6.3), and by that module's
+    // unit test. It is typescript-eslint's twin of the rule above: the blocks below set the core
+    // rule for some folders, which would replace this list there; a rule of its own is never replaced.
+    files: ['**/*.ts', '**/*.js', '**/*.mjs'],
+    ignores: ['backend/src/lib/excel.ts', 'backend/tests/unit/lib/excel.test.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': ['error', {
+        patterns: [{
+          regex: '^write-excel-file(/.*)?$',
+          message: 'The Excel library is imported only by backend/src/lib/excel.ts: make a file through that module.',
+        }],
+      }],
+    },
+  },
+  {
     // The assistant's core reaches the calendar through a route's handler only, so that every
     // rule of the calendar stays in one place (docs/CONVERSATIONAL_ARCHITECTURE.md section 8.1):
     // it imports neither the module that knows the calendar table nor the two that hold the

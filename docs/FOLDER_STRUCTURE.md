@@ -59,9 +59,11 @@ stays at the root.
 │   ├── package.json             # name "backend"; runtime deps; scripts build/verify/deploy/local:*
 │   ├── template.yaml            # all back-end infrastructure (SAM)
 │   ├── samconfig.toml           # SAM settings per environment (default = cloud, local = laptop)
-│   ├── docker-compose.yml       # DynamoDB Local, dynamodb-admin, cognito-local, the fake Claude
+│   ├── docker-compose.yml       # DynamoDB Local, dynamodb-admin, cognito-local, the fake Claude,
+│   │                            # the fake mail
 │   ├── docker/                  # files the local stack needs (cognito-local-config.json;
-│   │                            # fake-claude.mjs: the script of the fake Claude, plain Node)
+│   │                            # fake-claude.mjs: the script of the fake Claude, plain Node;
+│   │                            # fake-mail.mjs: the fake mail, a stand-in for SES, plain Node)
 │   ├── tsconfig.json            # extends ../tsconfig.base.json; lib ES2022, node types
 │   ├── vitest.config.ts         # projects unit + integration; 100 % line coverage on src/lib
 │   │                            # and src/assistant
@@ -83,7 +85,11 @@ stays at the root.
 │   │                            # the calendar's checks, pure, no AWS; assistantDb.ts: the
 │   │                            # assistant table's item layout, its reads and conditional writes;
 │   │                            # anthropic.ts: the one door to Claude, the only file that imports
-│   │                            # the Anthropic SDK; parameters.ts: one read of Parameter Store)
+│   │                            # the Anthropic SDK; parameters.ts: one read of Parameter Store;
+│   │                            # mailDb.ts: the mail table's item layout; excel.ts: the only
+│   │                            # file that imports write-excel-file; ses.ts: one mail through
+│   │                            # SES; lambdaInvoke.ts: a function started in the background;
+│   │                            # mailerEvent.ts: the mailer's event, checked)
 │   ├── tests/
 │   │   ├── unit/                # mirrors src/; unit/eval/ tests the pure parts of tests/eval/
 │   │   ├── eval/                # the evaluation with the real model (npm run assistant:eval):
@@ -115,7 +121,8 @@ stays at the root.
 │   │   │                        # login, refresh, logout, hello, users, the calendar's, the
 │   │   │                        # assistant's (assistant.service.ts, assistant.types.ts), the
 │   │   │                        # change of one's own password (change-password.service.ts,
-│   │   │                        # .types.ts); cognito.ts (one request for any target of Cognito)
+│   │   │                        # .types.ts), me and mail (each .service.ts, .types.ts);
+│   │   │                        # cognito.ts (one request for any target of Cognito)
 │   │   │                        # and api.ts
 │   │   ├── logic/               # between the services and the views, no DOM: texts.ts (dates, times,
 │   │   │                        # failures in plain words), week.model.ts, week.screen.ts,
@@ -124,7 +131,8 @@ stays at the root.
 │   │   │                        # users.model.ts, users.screen.ts, availability.model.ts,
 │   │   │                        # conflicts.ts, availability.screen.ts, date.model.ts,
 │   │   │                        # date.screen.ts, assistant.model.ts, assistant.screen.ts,
-│   │   │                        # password.model.ts, password.screen.ts
+│   │   │                        # password.model.ts, password.screen.ts, profile.model.ts,
+│   │   │                        # me.model.ts, me.screen.ts, mail.screen.ts
 │   │   └── views/               # shell.ts (with the table of screens) and one <name>.view.ts per
 │   │                            # view: login.view.ts, week.view.ts, appointments.view.ts,
 │   │                            # settings.view.ts, users.view.ts, availability.view.ts and
@@ -198,6 +206,8 @@ Two rules carried over from the architecture, unchanged by the move:
 - Handlers never import the AWS SDK; only `backend/src/lib` does.
 - The Anthropic SDK is imported only by `backend/src/lib/anthropic.ts` and its unit test
   (`docs/ARCHITECTURE.md` section 12; `npm run lint` refuses it anywhere else).
+- `write-excel-file` is imported only by `backend/src/lib/excel.ts` and its unit test, in the
+  same way (`npm run lint` refuses it anywhere else).
 - `shared/` imports **no** AWS SDK, no Node-only module (`node:crypto`, `node:fs`…), no DOM
   API and no UI framework. Allowed: TypeScript, `zod`. Anything else is a design discussion,
   because it would be bundled into both the Lambda functions and the browser.

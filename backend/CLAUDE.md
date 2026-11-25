@@ -19,14 +19,15 @@ Paths in this file are relative to `backend/`.
   when `env.local.json` does not wire the fake Claude (`claudeWiringProblem()`): `setup.ts` (helpers,
   including `resetCalendarTable()`, `putCalendarItem()`, `getCalendarItem()`,
   `deleteCalendarItem()`, `queryCalendarPartition()`), `journeys.test.ts` (the journeys of
-  `docs/IMPLEMENTATION_PLAN.md` step 9), `calendar.test.ts` (the calendar's journeys).
+  `docs/IMPLEMENTATION_PLAN.md` step 9), `calendar.test.ts` (the calendar's journeys),
+  `mail.test.ts` (the mail's, which also need `local:lambda` and the fake mail).
 - `scripts/`: shell scripts behind the npm scripts (`local-seed.sh`, `local-api.sh`,
-  `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`, `assistant-key.sh`,
-  `assistant-eval.sh`, `budget.sh`, `check-sam.sh`; `target.sh`, `cognito.mjs` and
-  `parameters.mjs` are helpers of those).
+  `local-lambda.sh`, `mail-send.sh`, `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`,
+  `assistant-key.sh`, `assistant-eval.sh`, `budget.sh`, `check-sam.sh`; `target.sh`,
+  `cognito.mjs` and `parameters.mjs` are helpers of those).
 - `docker/`: files for the local stack (`cognito-local-config.json`; `fake-claude.mjs`, the
   fake Claude, whose answers are `tests/integration/fake-claude/answers.json`:
-  `docs/ARCHITECTURE.md` section 8).
+  `docs/ARCHITECTURE.md` section 8; `fake-mail.mjs`, the fake mail, a stand-in for SES).
 - Generated, git-ignored: `env.local.json`, `.cognito/`, `.aws-sam/`, `.verify-ok`, `coverage/`.
 
 ## `src/lib/`
@@ -94,6 +95,12 @@ Paths in this file are relative to `backend/`.
 - `cognito.ts` also has `getUserSub`, `isPlainUser`, `listPlainUsers` (both groups, every page,
   sorted by code units, each with its state and four facts) and the facts: `createUser` takes
   them, `updateProfile` (`email_verified` true), `getProfile`, `asUserSummary`, `asMe`.
+- E-mail (`docs/ARCHITECTURE.md` sections 4 and 5.5): `mailDb.ts`, the only module that knows
+  the `mail` table (the day's count under a condition); `excel.ts`, the only file that imports
+  `write-excel-file` (`npm run lint`); `ses.ts`, one mail through SESv2; `lambdaInvoke.ts`, the
+  mailer started with an `Event` invoke; `mailerEvent.ts`, the mailer's event (never an address)
+  and the role's kind. Their handlers: `sendCalendarMail.ts` (`POST /mail/calendar`) and
+  `mailer.ts` (no route; the error's name only in its log, an SES message can quote an address).
 - `http.ts`: `parseJsonBody` for bodies, `parseQuery` for query strings (the object a
   `.strict()` query schema checks).
 
@@ -134,13 +141,8 @@ handlers copy: claims → configuration check → role → path → body → `ca
 `calendarRules` check → one log line. Section numbers below are those of
 `docs/SHARED_CALENDAR_SPEC.md`.
 
-- Admin only; `date_in_past` from the path or body before the lock, except the window delete:
-  - availability types: `listAvailabilityTypes.ts`, `createAvailabilityType.ts`,
-    `renameAvailabilityType.ts`, `deleteAvailabilityType.ts`;
-  - weekly patterns: `listPatterns.ts`, `createPattern.ts`, `updatePattern.ts`,
-    `deletePattern.ts`;
-  - date overrides: `setOverride.ts`, `deleteOverride.ts`;
-  - one-off windows: `createOneOffWindow.ts`, `deleteOneOffWindow.ts`.
+- Admin only, `date_in_past` from the path or body before the lock (not the window delete):
+  the handlers of the types, weekly patterns, date overrides and one-off windows.
 - The view: `getCalendar.ts` (`GET /calendar`, both roles).
 - Booking: `bookAppointment.ts` (`POST /calendar/appointments`, both roles; the checks in the
   order of its section 8.2, the Administrator's target through Cognito before the lock).
@@ -186,14 +188,12 @@ a role of its own (root `CLAUDE.md`, "Hard rules from the design"). It needs no 
 - Unit tests mock AWS with `aws-sdk-client-mock`, never real endpoints. `test:unit` fails below
   100 % line coverage on `src/lib` and `src/assistant`.
 - The assistant's journeys (`assistant.test.ts`) run against the fake Claude: a sentence gets
-  the answers `tests/integration/fake-claude/answers.json` scripts for its exact text, one per
-  step. Each block plays its own throw-away User, or `admin`. **They never empty the `calendar`
-  table**: each creates what it needs through the API on a day of its own, and removes it after.
+  the answers `fake-claude/answers.json` scripts for its exact text, one per step. Each block
+  plays its own throw-away User, or `admin`. **They never empty the `calendar` table**, nor do
+  the mail's: each creates what it needs through the API on a day of its own, and removes it.
 - Tests of the contract itself (what a schema accepts, `resolveRole`) live in `shared/`; the
   back end tests what it does with it (the 400 answer, the handlers).
-- The calendar journeys empty the local `calendar` table first (`resetCalendarTable()`, which
-  refuses any endpoint but `localhost`/`127.0.0.1`); integration files run one at a time and in
-  no fixed order, so every file prepares its own state.
+- Integration files run one at a time and in no fixed order: every file prepares its own state.
 - When a journey changes, its page under `docs/journeys/` changes in the same commit, written
   and checked with the project skill `explain-journey` (format, pointer comment and list of
   pages: `docs/journeys/README.md`).

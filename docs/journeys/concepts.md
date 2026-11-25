@@ -18,12 +18,15 @@ Each section explains one idea in simple words and names the document that defin
 | `fe-assistant-read`, `fe-assistant-book`, `fe-assistant-decline` | throw-away Users of the front end's assistant journeys, one per block | `frontend/tests/integration/assistant.test.ts` |
 | `profile-user`, `profile-admin` | a throw-away User of the back end's profiles journey, and a second administrator made straight in cognito-local, with no fact | `backend/tests/integration/journeys.test.ts` |
 | `fe-profile` | a throw-away User of the front end's profiles journey | `frontend/tests/integration/profiles.test.ts` |
+| `fe-mail` | a throw-away User of the front end's mail journey, who asks for every mail of it | `frontend/tests/integration/mail.test.ts` |
 | `fe-password` | a throw-away User of the front end's change of password journey, the only account whose password a journey changes | `frontend/tests/integration/change-password.test.ts` |
 | `chat-text`, `chat-lingua`, `chat-read`, `chat-book`, `chat-decline`, `chat-trouble`, `chat-note`, `chat-move`, `chat-cancel`, `chat-limit`, `chat-down`, `chat-notadmin`, `chat-full`, `chat-mark` | throw-away Users of the assistant's journeys, one per block | `backend/tests/integration/assistant.test.ts` |
 | `chat-rival` | a second throw-away User of one assistant journey, who books through the calendar's own route | `backend/tests/integration/assistant.test.ts` |
 | `chat-booked` | the throw-away User the Administrator books for through the assistant; it only reads its own list | `backend/tests/integration/assistant.test.ts` |
 | `chat-in-the-way` | the throw-away User whose appointment lies in the hour the Administrator asks the assistant to block; it books through the calendar's own route | `backend/tests/integration/assistant.test.ts` |
 | `chat-nobody` | a throw-away account in neither group, made straight in cognito-local | `backend/tests/integration/assistant.test.ts` |
+| `mail-bob` | a throw-away User of the mail journeys: books one of their appointments, then, made again with a new `sub`, asks for mails through the route | `backend/tests/integration/mail.test.ts` |
+| `mail-boss`, `mail-nobody` | second administrators of the mail journeys, made straight in cognito-local: `mail-boss` is given the four facts, `mail-nobody` none | `backend/tests/integration/mail.test.ts` |
 | `smoke-<epoch>` | the smoke test's throw-away User | `backend/scripts/smoke.sh` |
 
 Every test file removes its own throw-away Users before it starts and after it ends, so it can be
@@ -457,6 +460,38 @@ list for the whole range.
   appointments would add nothing.
 
 A range covers at most 31 days.
+
+## Mail in the journeys
+
+The local stack sends no real mail. Two pieces stand in for the cloud
+(`docs/EMAIL_ARCHITECTURE.md` section 14.2):
+
+- **The fake mail** (`backend/docker/fake-mail.mjs`, port 8025) answers the one call of Amazon
+  SES the mailer makes, `SendEmail`, and keeps each mail in memory: its sender, recipients,
+  Reply-To, subject, plain text, HTML and files (in base64). A person reads them at
+  `http://localhost:8025`; the journeys read them as JSON with `mailsTo()` and
+  `waitForMails()`, and forget them with `forgetMailsTo()`, always for one address, so that they
+  never touch the mails someone else is looking at. The mails go when the container stops.
+- **`npm run local:lambda -w backend`** (`sam local start-lambda`, port 3001) runs the functions
+  when they are invoked as Lambda functions, not as routes. The mailer (`MailerFunction`) is one:
+  `runMailer()` invokes it and waits for its result, as `npm run mail:send` does; the route
+  `POST /mail/calendar` invokes it in the background (an `Event` invocation) and answers at once,
+  which is why a journey waits for the mail with `waitForMails()`.
+
+The mailer's event never holds an address (`docs/EMAIL_ARCHITECTURE.md` section 6.1): the
+mailer reads the asker's e-mail in Cognito, one of [the four facts](#the-four-facts-of-a-person),
+and sends only there. It answers `{ outcome, appointmentCount }`: `sent`, or the reason it sent
+nothing (`invalid_event`, `user_not_found`, `no_email_address`).
+
+The file of a mail is an Excel workbook, one sheet `Appointments`, a heading row then one row per
+appointment in the range, of every status, by start (`docs/EMAIL_ARCHITECTURE.md` section 6.3).
+The Administrator's file (kind `calendar`) has every appointment and the columns `First name`
+and `Last name`; a User's (kind `mine`) has only their own, and no names. The journeys open it
+again with `read-excel-file`.
+
+The on-demand mails are counted per person (`sub`) and local day, five at most, in the table
+`mail` (`docs/EMAIL_ARCHITECTURE.md` section 6.5). The count outlives a run, so a journey that
+asks through the route uses accounts made for the run, whose `sub` is new.
 
 ## The front end's services in the journeys
 

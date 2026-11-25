@@ -7,8 +7,9 @@
 # The shared package (../shared, @shared-calendar/shared) is bundled into every function, so its
 # typecheck, lint and unit tests (100 % line coverage) are part of the gate too.
 #
-# The integration tests need the local stack (npm run local:up, npm run local:api); pass the same
-# DYNAMODB_PORT as local:up. This script never starts the stack.
+# The integration tests need the local stack (npm run local:up, npm run local:api and npm run
+# local:lambda); pass the same DYNAMODB_PORT as local:up. This script never starts the stack: the
+# journeys' set-up (tests/integration/setup.ts) stops the run at once, naming what is not running.
 #
 # On full success it writes .verify-ok, which scripts/deploy.sh requires:
 #
