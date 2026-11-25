@@ -981,6 +981,67 @@ nobody was told beforehand. The commits were not pushed before, during or after 
   the deleted user's `DELETEDUSER` marker. No type, window or user made for the release is left.
 - **Cost:** AWS within the free tier; at Anthropic the smoke test's one exchange, about a US cent.
 
+### 5.9 Times on 5-minute steps (`docs/SLOT_STEP_PLAN.md` step s6, 2026-11-25)
+
+The API deployed to `shared-calendar-api` and the page released to `shared-calendar-web`, from
+the branch `slot-5min`, not from `main`: its base holds no code of the mail work, which is on
+`main` and must not reach the cloud before its own release (`docs/SLOT_STEP_PLAN.md` section 6).
+Times on 5-minute steps (`docs/SHARED_CALENDAR_SPEC.md` decision D32). Who did what, as in 5.8:
+the operator ran the API's deployment and the smoke test in a terminal inside `script -q`, typed
+`y` and the admin password, and looked at the deployed page by hand from a short list; the
+session ran the gates, the page's release, read-only `aws` commands and curl without
+credentials, and saw no password and no token. Nothing was pushed.
+
+- **The smoke test locally first**, with its three new lines (section 2.1): 50 PASS and the 2
+  SKIP of `GlobalSignOut`, 52 lines.
+- **The gate:** root `DYNAMODB_PORT=8002 npm run verify` PASSED on the clean tree at `259e0d6`.
+- **Deployment of the API**, `npm run deploy -w backend` at `259e0d6`. A first attempt stopped
+  before reaching AWS with `CreateOAuth2Token … authorization grant is invalid`: the terminal
+  had no `AWS_PROFILE`, so SAM took the machine's default profile, whose sign-in had expired.
+  Run again as `AWS_PROFILE=shared-calendar-admin script -q /tmp/deploy.txt npm run deploy -w
+  backend` (section 1, item 3). **Change set: 31 Modify, all with replacement `False`, no Add,
+  no Remove, no Replace**, read back with `describe-change-set` before the operator's `y`: 30
+  functions with `Code` their only change, and `HttpApi`, its `Body` "Dynamic", as in 5.8.
+  `UPDATE_COMPLETE` at 14:24 UTC. The mark of the assistant's instructions changed with this
+  code, so every conversation in progress ended.
+- **The smoke test**, `npm run smoke -w backend -- shared-calendar-api` at `259e0d6`, inside
+  `script -q`: **52 PASS**, throw-away user `smoke-1795616753`, the calendar journey on
+  2027-01-14 (Europe/Rome), with 03:10–03:35 booked and cancelled by the Administrator and
+  03:07 refused, nothing written.
+- **The log search** of section 2.1, over the stack's 32 log groups from ten minutes before the
+  run, read as raw events with `aws logs filter-log-events` (Logs Insights had not indexed the
+  run yet and scanned 0 records), 237 events in 18 groups: 0 for the note, for `eyJ`, for
+  `ChangePassword`, `GlobalSignOut` and `REFRESH_TOKEN`, for `"password"` and for the
+  assistant's sentence; the control search for the user's name matched 29 events in 12 groups.
+- **The gate again** on the same clean tree at `259e0d6`, then **the release**,
+  `npm run deploy -w frontend`: SAM `No changes to deploy` for `shared-calendar-web`; the build
+  `index.html` 40 835 bytes (6 991 gzipped), `style.css` 24 998 (7 089), `app.js` 615 263
+  (139 593); the four uploads, `index.html` last; the invalidation of `/*` on `E2V5GRRPLMET12`
+  waited for; the four checks PASS. Read back with curl: the served `app.js` is byte for byte
+  the build.
+- **The quick look at the deployed page** (operator, by hand, as the Administrator and as a
+  User), seven yes: the type `look-step` and the user `look-user` created; a window 09:05–11:00
+  of `look-step` saved under "This day only" on 2026-12-03, each time list showing its whole
+  value; that day offering the User one slot, 10:00; the book dialog, Start 10:10 setting End
+  11:10 and End changed to 10:15 leaving Start alone, booked for `look-user`; the 10:10–10:15
+  block short and readable; the appointment cancelled; the window, the user and the type
+  deleted. A first try with the windows 09:05–10:05 and 11:10–12:00 offered the User no slot,
+  as `docs/SHARED_CALENDAR_SPEC.md` R-SLOT-01 says (no whole local hour fits in either); the
+  Product Owner then asked for a new rule, a User's hour starting on any 5-minute step, which
+  is planned apart and not part of this release.
+- **No way back without care.** Once a window at 09:05 or an appointment at 10:10 is stored, the
+  API of `v2.3.0` still reads it, but its page cannot show that time in its lists. Before any
+  roll-back to `v2.3.0`, look for times off the quarter hour first: patterns, date overrides
+  and one-off windows whose `start` or `end` is not on 00, 15, 30 or 45, and booked
+  appointments whose start or end is not; while there are none, the roll-back is safe. The
+  smoke test's own 03:10–03:35 is cancelled and needs no care.
+- **What stays**, by design: the smoke test's history (sections 2.1 and 2.3, two cancelled
+  appointments of its calendar journey); of the quick look, the deleted user's `DELETEDUSER`
+  marker and the cancelled 10:10–10:15.
+- **Cost:** AWS within the free tier; at Anthropic the smoke test's one exchange, about a US
+  cent, and the paid evaluation before the deployment, 46.59 US cents (`docs/SLOT_STEP_PLAN.md`
+  step s6).
+
 ## 6. A person's password: what to tell them
 
 Nobody can change another person's password: not the Administrator, not the API, not the

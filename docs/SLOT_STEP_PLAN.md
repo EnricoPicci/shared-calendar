@@ -1,6 +1,6 @@
 # Shared Calendar: times on 5-minute steps, and "from" drives "to" (implementation plan)
 
-**Version:** v8 (2026-11-25): open point O1 decided by the Product Owner: this plan is released alone, from its branch, as `v2.4.0`, before the mail work; the merge into `main` follows the release. Step s6 part B and section 6 rewritten; brief `prompts/slot-s05-step-s6-release.md`. v7 (2026-11-25): the pair s4 with s5 done, the page's times as an hour and a minute, a start that sets the end, and a short appointment drawn 15 minutes tall; looked at in a browser on the local stack. v6 (2026-11-25): the two points left to the pair s4 with s5 decided by the
+**Version:** v9 (2026-11-25): **the plan is finished**: step s6 done, the API and the page deployed from `slot-5min`, tag `v2.4.0` (`docs/RUNBOOK.md` section 5.9); the merge into `main` meets what section 6 lists. A new rule decided by the Product Owner at the release (a User's hour starting on any 5-minute step) is planned apart. v8 (2026-11-25): open point O1 decided by the Product Owner: this plan is released alone, from its branch, as `v2.4.0`, before the mail work; the merge into `main` follows the release. Step s6 part B and section 6 rewritten; brief `prompts/slot-s05-step-s6-release.md`. v7 (2026-11-25): the pair s4 with s5 done, the page's times as an hour and a minute, a start that sets the end, and a short appointment drawn 15 minutes tall; looked at in a browser on the local stack. v6 (2026-11-25): the two points left to the pair s4 with s5 decided by the
 Product Owner before it starts, under F7 (more than three columns are one block, whatever the
 reason) and F8 (the two lists of a time in a group named "Start" or "End"). v5 (2026-11-25): step s3 done, the assistant's words and two requests more in
 its evaluation; **the paid run of the evaluation moved to step s6, part B**, on the code
@@ -590,6 +590,23 @@ hand at the deployed page, everything made there deleted; the tag made locally.
   proposed a Sunday pattern 14:05–16:35 from 2026-12-06, `step-block` that day's hours as
   09:00–10:10 and 10:35–13:00 with the afternoon kept; every minute kept.
   `docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3 and its status line record the run.
+- *Part C, the API.* On the Product Owner's word: the gate again at `259e0d6`, the deployment
+  with a change set of 31 Modify, code only (the first attempt stopped before AWS for want of
+  `AWS_PROFILE` in the operator's terminal), the smoke test against `shared-calendar-api` 52
+  PASS, the log search clean. The record: `docs/RUNBOOK.md` section 5.9.
+- *Part D, the page.* The gate again, `npm run deploy -w frontend` with no change to the
+  hosting and its four checks PASS; the quick look by the Product Owner, seven yes. A first
+  try with windows of 09:05–10:05 and 11:10–12:00 offered a User no slot, as R-SLOT-01 says;
+  **the Product Owner then decided a new rule**, to be planned apart as the next release: a
+  User books one hour that may start on any 5-minute step, the week shows each free stretch as
+  one block with a start list in the book dialog, a window is never shorter than 60 minutes,
+  and the windows already shorter are listed in the cloud before that release and removed by
+  hand. Documents closed: `docs/RUNBOOK.md` section 5.9 (with F10, what to look for before a
+  roll-back), `docs/ARCHITECTURE.md` v16, the status lines of `docs/SHARED_CALENDAR_SPEC.md`,
+  `docs/CONVERSATIONAL_ARCHITECTURE.md`, `docs/FRONTEND_SERVICES.md` and
+  `docs/FRONTEND_ARCHITECTURE.md`, `README.md` section "Versions". Tag `v2.4.0` on the commit
+  of this record, made locally; nothing pushed. Nothing changed under `shared/`, `frontend/src`
+  or either `template.yaml` in this step.
 
 ## 6. Beside the mail work
 
