@@ -1209,7 +1209,7 @@ describe('who may talk to the assistant (6)', () => {
 describe("a User is not offered the Administrator's tools (3, 7.4)", () => {
   // The fake answers this sentence with a request for update_settings, whoever sends it.
   const ASK = 'fake: change a setting, which a User cannot';
-  const FOR_A_USER = 'get_settings, list_types, get_calendar, list_appointments, book_appointment, cancel_appointment, change_appointment, set_appointment_note';
+  const FOR_A_USER = 'get_settings, list_types, get_calendar, list_appointments, book_appointment, cancel_appointment, change_appointment, set_appointment_note, send_calendar_mail';
   let token: string;
   let before: Record<string, unknown> | undefined;
 

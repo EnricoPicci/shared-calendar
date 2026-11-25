@@ -91,10 +91,10 @@ The test checks:
   { error: "unknown_tool",
     message: "There is no tool with this name. The tools are: get_settings, list_types,
               get_calendar, list_appointments, book_appointment, cancel_appointment,
-              change_appointment, set_appointment_note." }
+              change_appointment, set_appointment_note, send_calendar_mail." }
   ```
 
-  The eight names are the tools of a User, in the order Claude is given them (the test's
+  The nine names are the tools of a User, in the order Claude is given them (the test's
   `FOR_A_USER`). None of the Administrator's is among them, and neither is `update_settings`,
   the name Claude used.
 
