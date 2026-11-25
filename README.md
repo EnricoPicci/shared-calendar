@@ -35,7 +35,7 @@ Where the full story is:
 | `docs/FRONTEND_SERVICES.md` | The front end's services layer: the `SessionStore` and one service per remote call (login, refresh, logout, Hello World, users, the calendar), in `frontend/src/services/` |
 | `docs/FRONTEND_ARCHITECTURE.md` | The front end's pages: how a view is written, the logic between the services and the views, the shell; and how the page is hosted and deployed (its section 13) |
 | `docs/FRONTEND_DEPLOY_PLAN.md` | In which order the hosting was built and deployed (steps 70 to 73; done, with a few checks at the deployed page still owed, listed in `docs/RUNBOOK.md` section 5.5) |
-| `docs/FRONTEND_WALK.md` | The walk through every screen in a browser, by hand: the check to repeat after a change to the pages |
+| `docs/FRONTEND_WALK.md` | The walk through every screen in a browser, by hand: part of the full regression, run before a release |
 | `docs/journeys/` | The integration journeys explained in simple words, one page per `describe` block (index in `docs/journeys/README.md`) |
 | `docs/COMMANDS.md` | The complete list of commands, with the notes that go with each, and the local stack's quirks |
 | `CLAUDE.md` | Working rules for Claude Code (one more per package: `backend/CLAUDE.md`, `frontend/CLAUDE.md`, `shared/CLAUDE.md`; path-scoped rules in `.claude/rules/`) |

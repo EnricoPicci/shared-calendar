@@ -40,8 +40,7 @@ one that is fixed:
 
 - `README.md` (the newcomer's entry point), `docs/COMMANDS.md` (every command with its notes,
   the local stack's quirks), `docs/RUNBOOK.md` and `docs/CUSTOM_DOMAIN.md` (the operator's steps).
-- `docs/FRONTEND_WALK.md`: every screen walked by hand in a browser; the check to repeat after
-  a change to the view layer.
+- `docs/FRONTEND_WALK.md`: every screen walked by hand in a browser (the full regression).
 - `docs/journeys/`: the integration journeys in simple words, one page per `describe` block,
   written and checked with the project skill `explain-journey`. When a journey changes, its
   page changes in the same commit.
@@ -50,8 +49,10 @@ one that is fixed:
 
 ## Working rhythm
 
-- Implement one plan step at a time. Run the step's acceptance check, report the result
-  honestly (including failures), then stop for review before the next step. Commit only when asked.
+- One plan step at a time. Its acceptance check: `typecheck`, `lint`, `test:unit`, the journeys
+  the step adds or changes, a look at the screens it changes; the full regression (`verify`,
+  every journey, `docs/FRONTEND_WALK.md`, `smoke`) only before a deploy and after the last step.
+  Report honestly (failures too), stop for review before the next step. Commit only when asked.
 - End every task with one or two simple sentences on what was done, then say plainly what the
   user must decide or do. No tables or long reports in that message unless the user asks.
 - When the implementation proves the architecture wrong, say so and propose the document change.

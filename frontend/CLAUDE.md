@@ -14,9 +14,10 @@ per file); the sizes in its section 7.1. The layout: `docs/FOLDER_STRUCTURE.md` 
 commands in full (`dev`, `seed:local`, `build`, the integration tests, `deploy`):
 `docs/COMMANDS.md` sections 4, 5 and 6.
 
-After a change to the view layer, the check to repeat is the walk, `docs/FRONTEND_WALK.md`, by
-hand in a browser; when a screen changes what one of its checks says, the check changes in the
-same commit. The rules for the views' tests, the page and the style sheet load on their own
+After a change to the view layer, walk the screens it changes (`docs/FRONTEND_WALK.md`, by
+hand in a browser); the whole walk belongs to the full regression (root `CLAUDE.md`, "Working
+rhythm"). When a screen changes what one of its checks says, the check changes in the same
+commit. The rules for the views' tests, the page and the style sheet load on their own
 when those files are touched (`.claude/rules/frontend-views.md`).
 
 ## Folder map
