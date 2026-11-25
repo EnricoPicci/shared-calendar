@@ -61,7 +61,9 @@ build_in_source = true
 parameter_overrides = "AlertEmail=local@example.invalid"
 env_vars = "env.local.json"
 docker_network = "shared-calendar-local"
-warm_containers = "EAGER"
+# Each function's container starts on its first request and stays warm after. Starting them all
+# at once (EAGER) could stall sam's start-up with this many functions, with nothing in the log.
+warm_containers = "LAZY"
 # No registry lookup per container (they ran in parallel without a timeout and could hang the
 # start-up); scripts/local-api.sh pulls the Lambda base image once before starting instead.
 skip_pull_image = true

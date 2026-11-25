@@ -74,7 +74,7 @@ else
 fi
 
 # On exit (Ctrl-C included), remove the Lambda containers sam local leaves running. It cleans up
-# its EAGER containers but not the extra ones it starts on a first request; they pile up with every
+# its warm containers but not every extra one it starts on a request; they pile up with every
 # restart (once seen: 14 of 18 still running after Ctrl-C). Only containers SAM labels as Lambda
 # containers on this project's network: the emulators and other projects' containers are untouched.
 remove_lambda_containers() {

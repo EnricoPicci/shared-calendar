@@ -141,7 +141,11 @@ mailer as `local:lambda` names it); and sections of their own for `MailerFunctio
   `DOCKER_HOST=unix://$HOME/.docker/run/docker.sock` and dummy `AWS_ACCESS_KEY_ID` /
   `AWS_SECRET_ACCESS_KEY` (otherwise SAM tries the real, possibly expired, AWS login).
   `scripts/local-api.sh` does both.
-- **Leftover Lambda containers.** `sam local` (`warm_containers = "EAGER"`) starts extra Lambda
+- **Warm containers on demand.** `local:api` runs with `warm_containers = "LAZY"`: a function's
+  container starts on its first request (a second or two) and stays warm after. With every
+  function started at once (`EAGER`), sam's start-up stalled now and then at about 37 functions,
+  with nothing in its log.
+- **Leftover Lambda containers.** `sam local` (warm containers) starts extra Lambda
   containers besides its warm ones and leaves them running when it stops. `local-api.sh` removes
   every container labelled `sam.cli.container.type=lambda` on the `shared-calendar-local`
   network when it exits (Ctrl-C included); the emulators are untouched. After a `kill -9` or a
