@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { Username } from '../username';
 import { CALENDAR_LIMITS, SETTINGS_RANGES, TIME_STEP_MINUTES, TYPE_CAPACITY } from './defaults';
+import { lastsWholeHours } from './rules';
 import { addDays } from './time';
 
 // The primitive schemas of the calendar contract (docs/SHARED_CALENDAR_SPEC.md R-TIME-02,
@@ -94,10 +95,13 @@ export type TypeName = z.infer<typeof TypeName>;
 //
 // The schemas of docs/SHARED_CALENDAR_SPEC.md sections 11.2 and 11.4. Every object is .strict(): an
 // unknown field is a 400 (docs/SHARED_CALENDAR_SPEC.md section 11). A schema decides only what is
-// malformed by itself. It knows no time zone, no "now", no settings and no stored data, so these
-// are not here: the Administrator's step and the whole-hour grid of an instant and which one
-// applies (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02, checked per role in the handler with
-// isOnTimeStep / isWholeLocalHour from rules.ts); overlap among an override's windows (409 availability_overlap);
+// malformed by itself. A window of a pattern, of an override or a one-off window must last a whole
+// number of hours, `end` with the same minutes as `start` (docs/SHARED_CALENDAR_SPEC.md decision
+// D33, lastsWholeHours from rules.ts), which needs nothing but the body. A schema knows no time
+// zone, no "now", no settings and no stored data, so these are not here: the 5-minute step of an
+// instant and the custom times per role (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02, checked in the
+// handler with isOnTimeStep from rules.ts); whether a User's start is a slot, decided under the lock
+// (docs/SHARED_CALENDAR_SPEC.md R-BOOK-06); overlap among an override's windows (409 availability_overlap);
 // date_in_past; an unknown typeId; count limits.
 //
 // The cross-field rules run only on an object whose fields are valid (`when`): a malformed field
@@ -111,6 +115,11 @@ function onField(field: string, message: string) {
 // instants in the toISOString form Instant enforces.
 const endAfterStart = (w: { start: string; end?: string }) => w.end === undefined || w.start < w.end;
 const END_AFTER_START = 'end must be after start';
+// A window's end is a whole number of hours after its start (docs/SHARED_CALENDAR_SPEC.md decision
+// D33). It runs after endAfterStart and only when that passed (`when`), so an end not after the
+// start is said once.
+const wholeHours = (w: { start: string; end: string }) => lastsWholeHours(w.start, w.end);
+const WHOLE_HOURS = 'end must be a whole number of hours after start';
 
 // An integer setting in its range (docs/SHARED_CALENDAR_SPEC.md section 9).
 function setting(range: { min: number; max: number }) {
@@ -144,8 +153,15 @@ export type TypeBody = z.infer<typeof TypeBody>;
 
 const windowFields = { start: LocalTime, end: LocalEndTime, typeId: Ulid };
 
-/** One window of a date: local times, `start < end`, `end` may be `24:00`. */
-export const WindowBody = z.object(windowFields).strict().refine(endAfterStart, onField('end', END_AFTER_START));
+/**
+ * One window of a date: local times, `start < end`, `end` may be `24:00`, a whole number of hours
+ * after `start` (docs/SHARED_CALENDAR_SPEC.md decision D33).
+ */
+export const WindowBody = z
+  .object(windowFields)
+  .strict()
+  .refine(endAfterStart, onField('end', END_AFTER_START))
+  .refine(wholeHours, onField('end', WHOLE_HOURS));
 export type WindowBody = z.infer<typeof WindowBody>;
 
 /**
@@ -156,6 +172,7 @@ export const PatternBody = z
   .object({ ...windowFields, weekday: Weekday, validFrom: LocalDate, validUntil: LocalDate.nullable() })
   .strict()
   .refine(endAfterStart, onField('end', END_AFTER_START))
+  .refine(wholeHours, onField('end', WHOLE_HOURS))
   .refine((p) => p.validUntil === null || p.validFrom <= p.validUntil, onField('validUntil', 'validUntil must not be before validFrom'));
 export type PatternBody = z.infer<typeof PatternBody>;
 
@@ -168,11 +185,12 @@ export const OverrideBody = z
   .strict();
 export type OverrideBody = z.infer<typeof OverrideBody>;
 
-/** POST /calendar/windows: a one-off window on a date. */
+/** POST /calendar/windows: a one-off window on a date, of whole hours as WindowBody. */
 export const OneOffWindowBody = z
   .object({ ...windowFields, date: LocalDate })
   .strict()
-  .refine(endAfterStart, onField('end', END_AFTER_START));
+  .refine(endAfterStart, onField('end', END_AFTER_START))
+  .refine(wholeHours, onField('end', WHOLE_HOURS));
 export type OneOffWindowBody = z.infer<typeof OneOffWindowBody>;
 
 // Instants; `end` absent means start + 60 minutes. `note` absent and `note: null` differ in a

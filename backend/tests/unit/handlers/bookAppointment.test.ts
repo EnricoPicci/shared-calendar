@@ -138,11 +138,18 @@ describe('bookAppointment handler', () => {
       expect(cognito.calls()).toHaveLength(0);
     });
 
-    it('AC-13: 400 for 09:30 local, with nothing touched', async () => {
-      const response = await post({ start: '2026-11-16T08:30:00.000Z' });
+    it('400 for 09:07 local, off the 5-minute step, with nothing touched', async () => {
+      const response = await post({ start: '2026-11-16T08:07:00.000Z' });
       expect(response.statusCode).toBe(400);
-      expect(bodyOf(response)).toEqual({ error: 'invalid_request', message: 'Invalid input: start must be a whole hour' });
+      expect(bodyOf(response)).toEqual({ error: 'invalid_request', message: 'Invalid input: start must be on a 5-minute step' });
       expect(ddb.calls()).toHaveLength(0);
+    });
+
+    it('AC-13: 409 outside_availability for 09:30 local, on the step but not a slot, with nothing written', async () => {
+      const response = await post({ start: '2026-11-16T08:30:00.000Z' });
+      expect(response.statusCode).toBe(409);
+      expect(bodyOf(response)).toEqual({ error: 'outside_availability', message: 'The time is not inside the availability' });
+      expect(transactions()).toHaveLength(0);
     });
 
     it('400 for an end other than start + 60 min', async () => {

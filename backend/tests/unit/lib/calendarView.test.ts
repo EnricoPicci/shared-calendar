@@ -221,10 +221,11 @@ describe('calendarView: windows', () => {
     expect(localSlots(v)).toEqual(['08:00', '09:00', '10:00', '11:00', '12:00']);
   });
 
-  it('keeps touching windows of different types apart: no slot across them', () => {
-    const v = admin({ patterns: [pattern('A', 1, '08:00', '08:30'), pattern('B', 1, '08:30', '10:00', POOL)], appointments: [] });
+  it('keeps touching windows of different types apart: each slot lies in one window and has its type', () => {
+    const v = admin({ patterns: [pattern('A', 1, '08:00', '09:00'), pattern('B', 1, '09:00', '11:00', POOL)], appointments: [] });
     expect(v.days[0]!.windows).toHaveLength(2);
-    expect(localSlots(v)).toEqual(['09:00']);
+    expect(localSlots(v)).toEqual(['08:00', '09:00', '10:00']);
+    expect(v.days[0]!.slots.map((s) => s.typeId)).toEqual([STUDIO, POOL, POOL]);
   });
 
   it('shows an override with no windows as hasOverride true and no windows; a User sees only the empty day', () => {

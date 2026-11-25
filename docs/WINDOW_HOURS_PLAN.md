@@ -1,8 +1,10 @@
 # Shared Calendar: windows of whole hours, slots counted from the window's start (implementation plan)
 
-**Version:** v2 (2026-11-25): the proposals of F6, F7 and F10 decided by the Product Owner,
-Q5 to Q8 (section 2). v1 (2026-11-25): the plan, after the Product Owner's eight decisions of
-the brief and the answers to four questions of planning (section 2). No step done.
+**Version:** v3 (2026-11-25): steps w1 and w2 done (their "As done" notes), with brief
+`prompts/slot-s07-pair-w1-w2-implementation.md`; decision 5 restated (the server's 400 names the
+field), F5 and F9 corrected. v2 (2026-11-25): the proposals of F6, F7 and F10 decided by the
+Product Owner, Q5 to Q8 (section 2). v1 (2026-11-25): the plan, after the Product Owner's eight
+decisions of the brief and the answers to four questions of planning (section 2).
 **Brief:** `prompts/slot-s06-plan-window-whole-hours.md`.
 **Governed by:** `docs/SHARED_CALENDAR_SPEC.md`, `docs/ARCHITECTURE.md`,
 `docs/FRONTEND_SERVICES.md`, `docs/FRONTEND_ARCHITECTURE.md`,
@@ -50,7 +52,7 @@ The rest follows:
 | 2 | A User's slots are the whole hours counted from the window's start, 60 real minutes each, inside one effective window of one type. |
 | 3 | Windows of the same type that touch are joined, as today (`docs/SHARED_CALENDAR_SPEC.md` section 6.6); the slots are counted from the start of the joined window. |
 | 4 | The nights the clocks change: the window is checked as whole hours on the local clock; its slots are 60 real minutes each from its start, as many as fit. |
-| 5 | A window not whole hours is refused by the page's form before it is sent, and by the server with `400 invalid_request` and a sentence of its own. |
+| 5 | A window not whole hours is refused by the page's form before it is sent, and by the server with `400 invalid_request`. The sentence ("end must be a whole number of hours after start") is the shared schema's, read by the page and the assistant's tools; the server's answer names the field only, "Invalid input: end", as for every refusal of a schema (the Product Owner, 2026-11-25, at step w2: `backend/src/lib/validation.ts` never sends a schema's message). |
 | 6 | In the window forms the end is chosen as an hour only; its minute follows the start's. A start chosen still sets the end one hour later. |
 | 7 | Windows already stored that are not whole hours are not changed by code: a read-only check lists them in the cloud before the release. |
 | 8 | Built on `slot-5min`, released alone before the mail work, as the next minor version. |
@@ -116,7 +118,9 @@ The rest follows:
   AC-48's "alice books 10:10" was `400 invalid_request` and is `409 outside_availability`;
   the front end's journey "starts off the whole hour" (08:15, `invalid_request`) keeps its
   `invalid_request` on a time off the step (08:17) and gains the case 08:15,
-  `outside_availability`. A start inside a window but not a slot, and a start outside every
+  `outside_availability`. Found at step w2: AC-13 changes too (alice's 09:30 is
+  `outside_availability`), and so do the handlers' unit tests of booking and change that sent a
+  User's 09:30 expecting `invalid_request`. A start inside a window but not a slot, and a start outside every
   window, get the same code: the page and the assistant need no new sentence.
 - **F6. A User's appointment on the hour in a window changed later.** An appointment is never
   re-checked against slots, only against windows (`docs/SHARED_CALENDAR_SPEC.md` R-AV-03). If
@@ -199,6 +203,15 @@ The rest follows:
     past week (F7), so they stay true. Changed only if a test fails.
   - The seeds: `frontend/scripts/seed-local.mjs` and `backend/scripts/local-seed.sh` hold
     whole-hour windows only (09:00–13:00, 15:00–18:00, 10:00–12:00). Nothing to change.
+  - Found at step w2: `backend/tests/unit/handlers/setOverride.test.ts` and `updatePattern.test.ts`
+    (windows 14:30–16:00, 11:00–12:30, 09:30–12:00, ten of 30 minutes, an end 13:30),
+    `bookAppointment.test.ts` and `changeAppointment.test.ts` (a User's 09:30),
+    `backend/tests/unit/lib/calendarView.test.ts` (08:00–08:30 beside 08:30–10:00); AC-09 of
+    `docs/SHARED_CALENDAR_SPEC.md` and its journey (11:00–12:30). The two tests of the assistant
+    named above did not fail: their windows reach no shared schema until step w3. Four front-end
+    unit tests failed on the shared schema and were changed in their examples only, on the
+    Product Owner's word: `times.test.ts` and `availability.model.test.ts` (every pair of the lists,
+    and a pattern 23:45–24:00), `shell.test.ts` (a pattern's end 09:30); step w4 rewrites them.
 - **F10. The smoke test.** `backend/scripts/smoke.sh`, calendar journey: its one-off window
   03:00–04:00 and the User's slot 03:00 become 03:05–04:05 and 03:05 (the date search looks
   for that span free), which proves a slot counted from a 5-minute start in the cloud; the
@@ -307,6 +320,50 @@ step s3, "one local stack, two checkouts"), after the Product Owner's go-ahead.
 
 Between w2 and w4 the page can still send a window not whole hours and gets the server's
 `invalid_request` in its own words. Nothing is deployed in between.
+
+**As done (step w1, 2026-11-25).** `docs/SHARED_CALENDAR_SPEC.md` v20: decision D33 after D32,
+whose sentence on the slot now points at it; the glossary ("Window", "Slot"), D2, D8 and the table
+of section 4; R-TIME-02's local time corrected to the 5-minute step (left from D32) and R-TIME-03's
+example (01:05–04:05); 6.2 (whole hours, no start after 23:00); R-AV-01's example of the night the
+clocks go forward made whole hours (02:00–03:00); 6.6 with both examples; R-SLOT-01 restated, with
+08:05–11:05, a leftover 08:30–12:00 and the two nights; R-BOOK-02, R-BOOK-06 and the orders of 8.2
+and 8.4; 11.4 and 11.7; 12; 16.8 ("not built yet"); 18.1; AC-09 (11:00–13:00, found by the search),
+AC-13, AC-45, AC-48, AC-49 to AC-52; the change log and the status line. 11.6 needed nothing.
+`docs/ARCHITECTURE.md`: the v17 row, open, the status line, the three window bodies and the
+paragraph on booking of section 4, and the User's row of the roles' table. **The v17 number is
+provisional**: the mail work adds its own row on `main`, and the merge may renumber it. The three
+other documents have their sentence. No diagram changed.
+
+**As done (step w2, 2026-11-25).** `shared/src/calendar/rules.ts`: `lastsWholeHours(start, end)`;
+`slotsOf(window)` counts one slot every 60 real minutes from the window's start and no longer takes
+a zone (its one caller, `calendarView`, changed with it); `isWholeLocalHour` removed;
+`isOnTimeStep` keeps its tests. `schemas.ts`: a refinement on `end` of `WindowBody`, `PatternBody`
+and `OneOffWindowBody`, after the order check and only when it passed, so an end not after the
+start is said once. `schemas.ts` imports `lastsWholeHours` from `rules.ts`; `rules.ts` reaches
+`schemas.ts` only through type imports of `types.ts`, so there is no cycle at run time and the
+function stays in `rules.ts`. `backend/src/lib/calendarRules.ts`: `checkBookingTimes` holds both
+roles' start to the step; `checkBooking` refuses a User's start that is no slot of the window found
+with `outside_availability`; `checkChange` follows through it. No handler named the whole hour.
+**Decision 5 corrected:** the 400 says "Invalid input: end" (section 2). Tests: the cases of the
+rule in `shared/` and `backend/tests/unit/lib/` (`calendarBooking`, `calendarChange`,
+`calendarView`), the handlers' tests of F9; four front-end unit tests in their examples only (F9),
+nothing under `frontend/src`. The journey "times on 5-minute steps and windows of whole hours
+(AC-45 to AC-52)" rewritten: the pattern 08:05–12:05 and its four slots, the refusals of AC-49
+with nothing stored, a one-off window 12:05–13:05 joined to the pattern and one 14:05–15:05 apart,
+`step-alice` booking 09:05 and refused 09:10 and 10:10; AC-13, AC-09 and the weekly patterns'
+overlap (11:00–14:00) moved. The whole `tests/integration/calendar.test.ts` run once on the new
+build (the AC fixtures of "booking (route 17)" come from earlier blocks): 97 passed. Pages
+`docs/journeys/backend/calendar-time-step.md` and `calendar-booking.md`, the README's title and
+the section "Windows and slots" of `docs/journeys/concepts.md`. Checked: typecheck, lint, test:unit
+green at the root, 100 % line coverage kept. **The known gap, accepted:** until step w4 the page can
+still send a window not whole hours and gets the server's `invalid_request` in its own words;
+until step w3 the assistant is not told the rule, and its tools would propose such a window that
+the confirmation then refuses. Nothing is deployed in between. **What steps w3 and w4 find ready:**
+`lastsWholeHours` exported from `@shared-calendar/shared`; the three schemas refuse on `end` with
+the message "end must be a whole number of hours after start"; the server answers a User's start
+that is not a slot with `outside_availability`, which the page and the assistant already explain.
+Step w4 also finds `frontend/src/services/appointments.service.ts`, whose comment still names a
+User's "whole hours", and the front-end page `docs/journeys/frontend/calendar-appointments.md`.
 
 **Check, for the pair, then the stop:** the short check; the changed journeys run alone, after
 `npm run build -w backend` and a restart of `local:api`.

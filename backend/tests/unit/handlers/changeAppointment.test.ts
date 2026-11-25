@@ -235,6 +235,8 @@ describe('changeAppointment handler', () => {
       const response = await post({ start: '2026-11-16T11:00:00.000Z' });
       expect(response.statusCode).toBe(409);
       expect(bodyOf(response)).toMatchObject({ error: 'outside_availability' });
+      // A User's start on the step inside the window, but not one of its slots (docs/SHARED_CALENDAR_SPEC.md R-BOOK-06).
+      expect(bodyOf(await post({ start: '2026-11-16T09:30:00.000Z' }))).toMatchObject({ error: 'outside_availability' });
     });
 
     it('the limit does not count the old one: at limit 1 alice moves her only future appointment', async () => {
@@ -296,9 +298,9 @@ describe('changeAppointment handler', () => {
       expect(output.join('')).not.toContain('xxxx');
     });
 
-    it('R-BOOK-02 per role: a User’s start not a whole hour, or a custom end; the Administrator off the 5-minute grid', async () => {
+    it('R-BOOK-02 per role: a User’s start off the 5-minute grid, or a custom end; the Administrator off the grid', async () => {
       for (const [body, claims] of [
-        [{ start: '2026-11-16T09:30:00.000Z' }, alice],
+        [{ start: '2026-11-16T09:07:00.000Z' }, alice],
         [{ start: H1000, end: H1030 }, alice],
         [{ start: '2026-11-16T09:07:00.000Z' }, admin],
         [{ start: H1000, end: '2026-11-16T09:03:00.000Z' }, admin],
@@ -311,7 +313,7 @@ describe('changeAppointment handler', () => {
     });
 
     it('R-BOOK-02 comes before the lookup: an invalid time for someone else’s id is 400, not 404', async () => {
-      expect((await post({ start: '2026-11-16T09:30:00.000Z' }, bob)).statusCode).toBe(400);
+      expect((await post({ start: '2026-11-16T09:07:00.000Z' }, bob)).statusCode).toBe(400);
     });
 
     it('403 forbidden for a token in neither group; 401 without claims; nothing touched', async () => {

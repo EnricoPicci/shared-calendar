@@ -1,4 +1,4 @@
-import { CALENDAR_LIMITS, PatternBody, TYPE_CAPACITY, TypeBody, type AvailabilityType, type WeeklyPattern } from '@shared-calendar/shared';
+import { CALENDAR_LIMITS, lastsWholeHours, PatternBody, TYPE_CAPACITY, TypeBody, type AvailabilityType, type WeeklyPattern } from '@shared-calendar/shared';
 import {
   deletePatternQuestion,
   deleteTypeQuestion,
@@ -166,20 +166,21 @@ describe('availability.model', () => {
       expect(WEEKDAY_CHOICES.map(({ value, label }) => `${value} ${label}`)).toEqual(['1 Monday', '2 Tuesday', '3 Wednesday', '4 Thursday', '5 Friday', '6 Saturday', '7 Sunday']);
     });
 
-    it('every pair of times the form\'s lists can hold is accepted, or refused for the order of the two times alone, never for the step', () => {
+    it('every pair of times the form\'s lists can hold is accepted, or refused for the order of the two times or for not lasting whole hours, never for the step', () => {
       const all = (hours: readonly string[]) => hours.flatMap((hour) => minutesOf(hour).map((minute) => timeOf(hour, minute)));
       const starts = all(WINDOW_HOURS.starts);
       const ends = all(WINDOW_HOURS.ends);
       expect([starts.length, starts[0], starts.at(-1), ends.length, ends[0], ends.at(-1)]).toEqual([288, '00:00', '23:55', 289, '00:00', '24:00']);
       const fields = (start: string, end: string): PatternFields => ({ weekday: '1', start, end, typeId: STUDIO, validFrom: TODAY, validUntil: '' });
       // What the model and the shared schema say of a pair: the model's refusal of the end, or
-      // the schema's verdict on the body.
+      // the schema's verdict on the body, which also refuses a window that is not a whole number
+      // of hours (docs/SHARED_CALENDAR_SPEC.md decision D33).
       const verdict = (start: string, end: string) => {
         const checked = patternFor(fields(start, end));
         return 'refusals' in checked ? Object.keys(checked.refusals) : PatternBody.safeParse(checked.pattern).success;
       };
       const pairs = [...starts.flatMap((start) => ['00:00', start, ends[ends.indexOf(start) + 1]!, '24:00'].map((end) => [start, end] as const)), ...ends.flatMap((end) => ['00:00', '23:55'].map((start) => [start, end] as const))];
-      for (const [start, end] of pairs) expect(verdict(start, end), `${start}–${end}`).toEqual(end > start ? true : ['end']);
+      for (const [start, end] of pairs) expect(verdict(start, end), `${start}–${end}`).toEqual(end > start ? lastsWholeHours(start, end) : ['end']);
       // And the schema refuses exactly those the model refuses, for the order alone.
       expect(PatternBody.safeParse({ weekday: 1, start: '10:05', end: '10:05', typeId: STUDIO, validFrom: TODAY, validUntil: null }).error!.issues.map((issue) => issue.path.join('.'))).toEqual(['end']);
     });
@@ -243,7 +244,7 @@ describe('availability.model', () => {
     it('with an end of validity; the same day as the start of validity is allowed; an end at 24:00; a start in the past', () => {
       expect(accepted({ ...FIELDS, validUntil: '2027-01-19' }).validUntil).toBe('2027-01-19');
       expect(accepted({ ...FIELDS, validUntil: '2026-11-20' }).validUntil).toBe('2026-11-20');
-      expect(accepted({ ...FIELDS, start: '23:45', end: '24:00' }).end).toBe('24:00');
+      expect(accepted({ ...FIELDS, start: '23:00', end: '24:00' }).end).toBe('24:00');
       // "Today" is not a rule here (docs/SHARED_CALENDAR_SPEC.md R-PAT-03).
       expect(accepted({ ...FIELDS, validFrom: '2019-01-01', validUntil: '2019-12-31' }).validFrom).toBe('2019-01-01');
     });

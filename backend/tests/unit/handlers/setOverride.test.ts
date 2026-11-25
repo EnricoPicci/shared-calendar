@@ -79,7 +79,7 @@ describe('setOverride handler', () => {
 
   it('replaces an override the date already has (R-OVR-02)', async () => {
     onPartition('OVERRIDE', [{ PK: 'OVERRIDE', SK: MONDAY, windows: [w('14:00', '15:00', POOL)], updatedAt: '2026-11-01T08:00:00.000Z' }]);
-    expect((await put(MONDAY, { windows: [w('14:30', '16:00')] })).statusCode).toBe(200);
+    expect((await put(MONDAY, { windows: [w('14:30', '16:30')] })).statusCode).toBe(200);
   });
 
   describe('date_in_past (R-AV-02), before the lock', () => {
@@ -106,7 +106,7 @@ describe('setOverride handler', () => {
   });
 
   describe('limits', () => {
-    const ten = Array.from({ length: 10 }, (_, i) => w(`${String(i + 8).padStart(2, '0')}:00`, `${String(i + 8).padStart(2, '0')}:30`));
+    const ten = Array.from({ length: 10 }, (_, i) => w(`${String(i + 8).padStart(2, '0')}:00`, `${String(i + 9).padStart(2, '0')}:00`));
 
     it('accepts 10 windows', async () => {
       expect((await put(MONDAY, { windows: ten })).statusCode).toBe(200);
@@ -133,11 +133,11 @@ describe('setOverride handler', () => {
 
     it('refuses a window that overlaps a one-off window of the date', async () => {
       onPartition('WINDOW', [windowItem(W1, MONDAY, '12:00', '13:00', STUDIO)]);
-      const response = await put(MONDAY, { windows: [w('11:00', '12:30')] });
+      const response = await put(MONDAY, { windows: [w('11:00', '13:00')] });
       expect(response.statusCode).toBe(409);
       expect(bodyOf(response)).toEqual({
         error: 'availability_overlap',
-        message: 'On 2026-11-16 the window 11:00–12:30 would overlap the window 12:00–13:00',
+        message: 'On 2026-11-16 the window 11:00–13:00 would overlap the window 12:00–13:00',
       });
     });
 
@@ -168,7 +168,7 @@ describe('setOverride handler', () => {
     });
 
     it.each([
-      ['shrinks the window under it', [w('09:30', '12:00')]],
+      ['shrinks the window under it', [w('09:30', '11:30')]],
       ['changes the type under it', [w('08:00', '12:00', POOL)]],
     ])('a window that %s is a conflict', async (_, windows) => {
       expect(bodyOf(await put(MONDAY, { windows })).error).toBe('availability_conflict');

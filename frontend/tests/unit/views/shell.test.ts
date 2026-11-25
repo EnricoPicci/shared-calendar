@@ -2315,7 +2315,7 @@ describe('the navigation', () => {
       await onAvailability();
       one('.patterns .groups section:nth-child(1) .ask-change').click();
       fetchMock.mockResolvedValueOnce(json(409, conflict)).mockResolvedValueOnce(patternsOf());
-      set('dialog.change', { end: '09:30' });
+      set('dialog.change', { start: '10:00' });
       submit(one<HTMLFormElement>('dialog.change form'));
       await vi.waitFor(() => expect(one('dialog.change .failure').textContent).toBe('This would leave booked appointments outside the hours open for booking. Cancel or move them in the week first.'));
       expect(one('dialog.change .conflicts').hidden).toBe(false);
@@ -2323,7 +2323,7 @@ describe('the navigation', () => {
       expect(all('dialog.change .conflicts-list li').map((row) => [...row.children].map((part) => part.textContent))).toEqual([['Mon 23 Nov', '09:00–10:00', 'alice']]);
       await vi.waitFor(() => expect(sent()).toEqual([...READS, `PUT /calendar/patterns/${P1}`, 'GET /calendar/patterns']));
       await quiet();
-      expect([dialog('change').open, value('dialog.change', 'end'), anywhere('01M6APPT'), anywhere('would fall outside')]).toEqual([true, '09:30', false, false]);
+      expect([dialog('change').open, value('dialog.change', 'start'), anywhere('01M6APPT'), anywhere('would fall outside')]).toEqual([true, '10:00', false, false]);
       // Nothing of it in the form that creates.
       expect([one('form.create-pattern .failure').textContent, one('form.create-pattern .conflicts').hidden]).toEqual(['', true]);
     });

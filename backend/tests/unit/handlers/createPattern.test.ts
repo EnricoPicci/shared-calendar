@@ -113,10 +113,10 @@ describe('createPattern handler', () => {
     expect((await handler(asAdmin(JSON.stringify({ ...AC04, weekday: 2 })))).statusCode).toBe(201);
   });
 
-  it('AC-45: accepts a pattern that opens at 08:05 and closes at 11:55, on the 5-minute grid', async () => {
-    const response = await handler(asAdmin(JSON.stringify({ ...AC04, start: '08:05', end: '11:55' })));
+  it('AC-45: accepts a pattern 08:05–12:05, whole hours from a 5-minute start', async () => {
+    const response = await handler(asAdmin(JSON.stringify({ ...AC04, start: '08:05', end: '12:05' })));
     expect(response.statusCode).toBe(201);
-    expect(JSON.parse(response.body!)).toMatchObject({ start: '08:05', end: '11:55' });
+    expect(JSON.parse(response.body!)).toMatchObject({ start: '08:05', end: '12:05' });
   });
 
   it.each([
@@ -133,6 +133,7 @@ describe('createPattern handler', () => {
       fields: 'validUntil',
     },
     { name: 'a time off the 5-minute grid', raw: JSON.stringify({ ...AC04, start: '08:07' }), code: 'invalid_request', fields: 'start' },
+    { name: 'a window not whole hours (AC-49)', raw: JSON.stringify({ ...AC04, start: '09:05', end: '10:30' }), code: 'invalid_request', fields: 'end' },
     { name: 'weekday 8', raw: JSON.stringify({ ...AC04, weekday: 8 }), code: 'invalid_request', fields: 'weekday' },
     { name: 'a typeId that is not a ULID', raw: JSON.stringify({ ...AC04, typeId: 'studio' }), code: 'invalid_request', fields: 'typeId' },
   ])('answers 400 $code and touches nothing for $name', async ({ raw, code, fields }) => {

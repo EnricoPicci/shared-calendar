@@ -19,7 +19,8 @@ adds to the root `CLAUDE.md`, whose rules all apply here. Paths are relative to 
 - `src/calendar/`: the shared calendar. `time.ts`, the time-zone helpers; `schemas.ts`, the zod
   schemas: primitives, request bodies, path and query parameters; `types.ts`, the response and
   event types; `rules.ts`, the pure rules: defined and effective windows, slots, overlap,
-  the people in an interval (`peopleIn`), grids, `cancellableUntil`; `defaults.ts`, default
+  the people in an interval (`peopleIn`), the 5-minute step (`isOnTimeStep`), windows of whole
+  hours (`lastsWholeHours`), `cancellableUntil`; `defaults.ts`, default
   settings, limits, settings ranges and the type's capacity range.
 - `src/assistant/`: the assistant's contract. `types.ts`, `AssistantReply` and its parts;
   `schemas.ts`, the body of a message; `limits.ts`; `languages.ts`, the list `en`, `it`;

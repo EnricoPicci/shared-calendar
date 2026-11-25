@@ -1,4 +1,4 @@
-import { LocalEndTime, LocalTime, TIME_STEP_MINUTES, WindowBody } from '@shared-calendar/shared';
+import { lastsWholeHours, LocalEndTime, LocalTime, TIME_STEP_MINUTES, WindowBody } from '@shared-calendar/shared';
 import { clockOf, endFor, LAST_TIME, minuteOfClock, MINUTES, minutesOf, partsOf, timeOf, WINDOW_HOURS, windowHours } from '../../../src/logic/times';
 import { STUDIO } from './fixtures';
 import { useFarBrowserZone } from './zone';
@@ -59,13 +59,15 @@ describe('times', () => {
       for (const end of every(WINDOW_HOURS.ends)) expect(LocalEndTime.safeParse(end).success, end).toBe(true);
     });
 
-    it('every pair is a window the shared schema accepts, or refuses for the order of the two times alone', () => {
+    // The shared schema also refuses a window that is not a whole number of hours
+    // (docs/SHARED_CALENDAR_SPEC.md decision D33), always on its end.
+    it('every pair is a window the shared schema accepts, or refuses on its end for the order or for not lasting whole hours', () => {
       const starts = every(WINDOW_HOURS.starts);
       const ends = every(WINDOW_HOURS.ends);
       for (const start of starts) {
         for (const end of ends) {
           const parsed = WindowBody.safeParse({ start, end, typeId: STUDIO });
-          if (parsed.success !== end > start) throw new Error(`${start}–${end}: ${String(parsed.success)}`);
+          if (parsed.success !== (end > start && lastsWholeHours(start, end))) throw new Error(`${start}–${end}: ${String(parsed.success)}`);
           if (!parsed.success) expect(parsed.error.issues.map((issue) => issue.path.join('.'))).toEqual(['end']);
         }
       }

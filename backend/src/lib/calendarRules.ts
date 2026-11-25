@@ -6,7 +6,6 @@ import {
   definedWindows,
   effectiveWindows,
   isOnTimeStep,
-  isWholeLocalHour,
   localDateOf,
   overlaps,
   peopleIn,
@@ -332,9 +331,11 @@ const STEP_MS = TIME_STEP_MINUTES * MINUTE_MS;
 /**
  * docs/SHARED_CALENDAR_SPEC.md R-BOOK-02, the times for the caller's role, from the body alone (the
  * zone is the only other input): `400 invalid_request` before Cognito and the lock
- * (docs/SHARED_CALENDAR_SPEC.md section 8.2, step 3 of its order). A User's `start` is a
- * whole local hour and `end` absent or `start + 60 min`; the Administrator's `start` and `end` lie
- * on the local step of TIME_STEP_MINUTES, `end` defaults to `start + 60 min`, and lasts at least one step.
+ * (docs/SHARED_CALENDAR_SPEC.md section 8.2, step 3 of its order). Both roles' `start` lies on the
+ * local step of TIME_STEP_MINUTES. A User's `end` is absent or `start + 60 min`; whether the start
+ * is one of the window's slots needs the calendar, so checkBooking decides it under the lock. The
+ * Administrator's `end` lies on the step too, defaults to `start + 60 min`, and lasts at least one
+ * step.
  * The schema has already checked the exact instant form and `end > start`. Answers the times to
  * book, `end` filled in.
  */
@@ -345,12 +346,11 @@ export function checkBookingTimes(
   zone: string,
 ): { start: string; end: string } | Refusal<'invalid_request'> {
   const hourLater = new Date(Date.parse(start) + SLOT_MS).toISOString();
+  if (!isOnTimeStep(start, zone)) return refuse('invalid_request', `Invalid input: start must be on a ${TIME_STEP_MINUTES}-minute step`);
   if (role === 'user') {
-    if (!isWholeLocalHour(start, zone)) return refuse('invalid_request', 'Invalid input: start must be a whole hour');
     if (end !== undefined && end !== hourLater) return refuse('invalid_request', 'Invalid input: end must be one hour after start');
     return { start, end: hourLater };
   }
-  if (!isOnTimeStep(start, zone)) return refuse('invalid_request', `Invalid input: start must be on a ${TIME_STEP_MINUTES}-minute step`);
   const until = end ?? hourLater;
   if (!isOnTimeStep(until, zone)) return refuse('invalid_request', `Invalid input: end must be on a ${TIME_STEP_MINUTES}-minute step`);
   if (Date.parse(until) - Date.parse(start) < STEP_MS) return refuse('invalid_request', `Invalid input: an appointment lasts at least ${TIME_STEP_MINUTES} minutes`);
@@ -397,7 +397,10 @@ export type BookingInput = {
  *   only): `booking_beyond_horizon`;
  * - docs/SHARED_CALENDAR_SPEC.md R-BOOK-06 inside one effective window (docs/SHARED_CALENDAR_SPEC.md
  *   section 6.6: merged across sources) of the start's local date, a window whose type no longer
- *   exists left out as in the view: `outside_availability`;
+ *   exists left out as in the view, and for a User `start` the start of one of that window's slots
+ *   (docs/SHARED_CALENDAR_SPEC.md R-SLOT-01, decision D33: the hours counted from the window's
+ *   start): `outside_availability`, the same answer for a start on the step that is not a slot as
+ *   for a time outside every window;
  * - docs/SHARED_CALENDAR_SPEC.md R-BOOK-12 no booked appointment of the target User (by `userId`)
  *   overlaps, compared as instants: `user_busy`. Nothing lifts it, `overbook` included, and it
  *   comes before the capacity, so the Administrator is never asked to force a booking the force
@@ -426,7 +429,7 @@ export function checkBooking(input: BookingInput): { window: EffectiveWindow } |
   const override = state.overrides.find((o) => o.date === date) ?? null;
   const defined = definedWindows(date, state.patterns, override, state.oneOffs).filter((w) => typeIds.has(w.typeId));
   const window = effectiveWindows(toInstantWindows(date, defined, zone)).find((w) => w.start <= start && end <= w.end);
-  if (!window) return refuse('outside_availability', 'The time is not inside the availability');
+  if (!window || (!admin && !slotsOf(window).some((s) => s.start === start))) return refuse('outside_availability', 'The time is not inside the availability');
 
   const booked = state.appointments.filter((a) => a.status === 'booked');
   if (booked.some((a) => a.userId === userId && overlaps(a, { start, end }))) {
@@ -744,7 +747,7 @@ export function calendarView(input: CalendarViewInput): CalendarView {
       }),
     );
     const effective = effectiveWindows(instants);
-    const slots = effective.flatMap((w) => slotsOf(w, zone)).map(placed).filter(offered);
+    const slots = effective.flatMap((w) => slotsOf(w)).map(placed).filter(offered);
     const busy: Interval[] = admin
       ? []
       : busyOf(

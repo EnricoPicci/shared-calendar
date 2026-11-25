@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v22: hours on 5-minute steps (`docs/SLOT_STEP_PLAN.md` step s3), evaluated in step s6, 59 of 59 (section 12.3), and deployed (`docs/RUNBOOK.md` section 5.9). v21, implemented, merged and deployed: steps c00 to c16 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` sections 5.6 and 5.8). Where this document is merged into `docs/ARCHITECTURE.md` (its change log, v13), `docs/FRONTEND_SERVICES.md` or `docs/FRONTEND_ARCHITECTURE.md`, those documents win. This one stays as the assistant's design and the home of what only it holds: the instructions, the tools' four parts, the evaluation, the alternatives, a second channel (section 16) |
+| Status | v22: hours on 5-minute steps (`docs/SLOT_STEP_PLAN.md` step s3), evaluated in step s6, 59 of 59 (section 12.3), and deployed (`docs/RUNBOOK.md` section 5.9). v21, implemented, merged and deployed: steps c00 to c16 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` sections 5.6 and 5.8). Where this document is merged into `docs/ARCHITECTURE.md` (its change log, v13), `docs/FRONTEND_SERVICES.md` or `docs/FRONTEND_ARCHITECTURE.md`, those documents win. This one stays as the assistant's design and the home of what only it holds: the instructions, the tools' four parts, the evaluation, the alternatives, a second channel (section 16). Windows of whole hours (`docs/SHARED_CALENDAR_SPEC.md` decision D33) reach the assistant in step w3 of `docs/WINDOW_HOURS_PLAN.md`. |
 | Date | 2026-11-24 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |

@@ -4,7 +4,7 @@
 |---|---|
 | Test file | `backend/tests/integration/calendar.test.ts` |
 | `describe` | `booking (route 17)` |
-| Tests | 1. "prepares the settings, two types and the Wednesday pattern 08:00–12:00 from a past Wednesday"<br>2. "AC-10: dave books W 09:00: 201, end + 60 min, the type, cancellableUntil; APPT, APPTID and EVENT items written"<br>3. "AC-11: erin books the same slot: 409 slot_taken"<br>4. "AC-12: erin’s view of W has the busy interval and no slot at 09:00, and nothing of dave’s"<br>5. "AC-13: dave books 09:30: 400 invalid_request"<br>6. "AC-14: the Administrator books dave W2 09:15–10:00: 201, cancellableUntil null"<br>7. "AC-15: dave then books W2 09:00: 409 user_busy, the hour overlaps dave’s own 09:15 in part; erin is refused slot_taken"<br>8. "AC-16: dave books 12:00, outside the window: 409 outside_availability"<br>9. "AC-17: horizon 7, W 11:00 (8 or more days ahead): dave 409 booking_beyond_horizon; the Administrator books it for dave: 201"<br>10. "AC-18: notice 720 h: dave books W 10:00: 409 booking_notice_too_short"<br>11. "AC-19: limit 1 while dave holds future appointments: dave 409 appointment_limit_reached; the Administrator books for dave: 201"<br>12. "a User naming someone else is 403; the Administrator booking without a username is 400, for admin 409 target_not_user, for an unknown username 404"<br>13. "AC-25: an empty override on W is 409 availability_conflict listing dave’s appointments; a User gets 403 and no conflicts"<br>14. "AC-26: changing the pattern’s type is 409 availability_conflict; AC-27: extending it to 07:00–12:00 is 200"<br>15. "AC-34: two bookings of the same slot at the same moment: exactly one 201, the other 409 slot_taken"<br>16. "R-BOOK-10: a deleted-user marker for dave’s sub makes his booking 404 user_not_found and writes nothing"<br>17. "every booking wrote exactly one event; the settings are restored to what the earlier journeys left" |
+| Tests | 1. "prepares the settings, two types and the Wednesday pattern 08:00–12:00 from a past Wednesday"<br>2. "AC-10: dave books W 09:00: 201, end + 60 min, the type, cancellableUntil; APPT, APPTID and EVENT items written"<br>3. "AC-11: erin books the same slot: 409 slot_taken"<br>4. "AC-12: erin’s view of W has the busy interval and no slot at 09:00, and nothing of dave’s"<br>5. "AC-13: dave books 09:30, on the step but not a slot: 409 outside_availability"<br>6. "AC-14: the Administrator books dave W2 09:15–10:00: 201, cancellableUntil null"<br>7. "AC-15: dave then books W2 09:00: 409 user_busy, the hour overlaps dave’s own 09:15 in part; erin is refused slot_taken"<br>8. "AC-16: dave books 12:00, outside the window: 409 outside_availability"<br>9. "AC-17: horizon 7, W 11:00 (8 or more days ahead): dave 409 booking_beyond_horizon; the Administrator books it for dave: 201"<br>10. "AC-18: notice 720 h: dave books W 10:00: 409 booking_notice_too_short"<br>11. "AC-19: limit 1 while dave holds future appointments: dave 409 appointment_limit_reached; the Administrator books for dave: 201"<br>12. "a User naming someone else is 403; the Administrator booking without a username is 400, for admin 409 target_not_user, for an unknown username 404"<br>13. "AC-25: an empty override on W is 409 availability_conflict listing dave’s appointments; a User gets 403 and no conflicts"<br>14. "AC-26: changing the pattern’s type is 409 availability_conflict; AC-27: extending it to 07:00–12:00 is 200"<br>15. "AC-34: two bookings of the same slot at the same moment: exactly one 201, the other 409 slot_taken"<br>16. "R-BOOK-10: a deleted-user marker for dave’s sub makes his booking 404 user_not_found and writes nothing"<br>17. "every booking wrote exactly one event; the settings are restored to what the earlier journeys left" |
 | Runs against | the local stack: the API on port 3000 (`sam local`), cognito-local on port 9229, DynamoDB Local on `DYNAMODB_PORT` (`RUN_INTEGRATION=1`) |
 
 Ideas used here, explained once for all journeys: [the settings](../concepts.md#the-settings),
@@ -160,9 +160,13 @@ the answer of test 2, `cancellableUntil` included. This is the privacy rule of
 
 ## Test 5 (AC-13): `dave` books 09:30
 
-The test checks `400` with exactly `{ error: 'invalid_request', message: 'Invalid input: start must
-be a whole hour' }`. A User books whole local hours only (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-02).
-This check needs only the body, so it runs before the lock and reads nothing from the table.
+The test checks `409` with exactly `{ error: 'outside_availability', message: 'The time is not
+inside the availability' }`. 09:30 is on the 5-minute step, so it passes the check of the body
+(`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-02). Under the lock the server finds the window 08:00–12:00,
+whose slots are 08:00, 09:00, 10:00 and 11:00; a User's start must be one of them, and 09:30 is
+not (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-06, R-SLOT-01). The hour would also overlap `dave`'s own
+09:00 of test 2, but `docs/SHARED_CALENDAR_SPEC.md` section 8.2 checks R-BOOK-06 before R-BOOK-12,
+so `outside_availability` answers.
 
 ## Test 6 (AC-14): the Administrator books `dave` a custom time on `W2`
 
@@ -399,8 +403,8 @@ Thursdays.
 | What | Where |
 |---|---|
 | The route | `POST /calendar/appointments`: `backend/src/handlers/bookAppointment.ts`. The checks in the order of `docs/SHARED_CALENDAR_SPEC.md` section 8.2: the body, who books for whom, the times, the Administrator's target in Cognito, then under the lock the calendar rules, and last the marker |
-| Times, before the lock | `checkBookingTimes()` in `backend/src/lib/calendarRules.ts` (tests 5, 6) |
-| Rules under the lock | `checkBooking()` in `backend/src/lib/calendarRules.ts` (tests 3, 7–11, 15) |
+| Times, before the lock | `checkBookingTimes()` in `backend/src/lib/calendarRules.ts` (tests 5, 6: both pass it) |
+| Rules under the lock | `checkBooking()` in `backend/src/lib/calendarRules.ts` (tests 3, 5, 7–11, 15) |
 | `cancellableUntil` | `cancellableUntilFor()` in `backend/src/lib/calendarRules.ts` (tests 2, 6) |
 | The transaction | `bookAppointment()` and `withCalendarLock()` in `backend/src/lib/calendarDb.ts`; the event item from `appointmentEvent()` in `backend/src/lib/calendarEvents.ts` |
 | The Administrator's target | `getUserSub()` and `isPlainUser()` in `backend/src/lib/cognito.ts` (tests 6, 12) |
@@ -417,12 +421,12 @@ them. The first that fails decides the answer.
 |---|---|---|---|
 | 1 | the body's shape, the note (R-BOOK-11) | `400 invalid_request` | 2 (the note is trimmed) |
 | 2 | R-BOOK-01 from the body: a User naming someone else; the Administrator naming nobody; then R-BOOK-13, a User sending `overbook: true` | `403 forbidden`, `400 invalid_request` | 12; R-BOOK-13 in [the capacity journey](calendar-capacity.md) |
-| 3 | R-BOOK-02 times | `400 invalid_request` | 5; 6 (the Administrator's custom times, R-BOOK-08) |
+| 3 | R-BOOK-02 times | `400 invalid_request` | 6 (the Administrator's custom times, R-BOOK-08); a time off the step in [the time-step journey](calendar-time-step.md) |
 | 4 | R-BOOK-01 in Cognito: unknown, not a plain User | `404 user_not_found`, `409 target_not_user` | 12 |
 | 5 | under the lock: R-BOOK-03 in the future | `409 booking_in_past` | not in this block |
 | | R-BOOK-04 notice (User only) | `409 booking_notice_too_short` | 10 |
 | | R-BOOK-05 horizon (User only) | `409 booking_beyond_horizon` | 9 |
-| | R-BOOK-06 inside one window | `409 outside_availability` | 8 |
+| | R-BOOK-06 inside one window, and for a User a slot's start | `409 outside_availability` | 8; 5 (on the step, not a slot) |
 | | R-BOOK-12 no appointment of the same User overlapping | `409 user_busy` | 7 |
 | | R-BOOK-07 a place left (the types here hold one person) | `409 slot_taken` | 3, 7, 15 |
 | | R-BOOK-09 limit (User only) | `409 appointment_limit_reached` | 11 |

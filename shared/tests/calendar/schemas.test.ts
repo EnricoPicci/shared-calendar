@@ -28,7 +28,7 @@ import type { z } from 'zod';
 
 // Every bound of the primitive schemas, then of the request bodies and the path and query
 // parameters built on them (docs/SHARED_CALENDAR_SPEC.md R-TIME-02, section 6.1, R-BOOK-11,
-// sections 11.2 and 11.4).
+// sections 11.2 and 11.4, and the windows of whole hours of its decision D33).
 
 describe('LocalDate', () => {
   it.each(['2026-11-12', '2028-02-29', '2000-02-29', '2026-12-31', '2027-01-01', '2026-04-30'])('accepts %s', (date) => {
@@ -275,11 +275,55 @@ describe('TypeBody', () => {
   });
 });
 
+// The three window bodies hold a window to whole hours (docs/SHARED_CALENDAR_SPEC.md decision D33):
+// the same cases for each, and the refusal on `end` with its own message.
+const WHOLE_HOURS = 'end must be a whole number of hours after start';
+const wholeHourCases = [
+  ['09:05', '11:05', true],
+  ['08:00', '24:00', true],
+  ['23:00', '24:00', true],
+  ['09:05', '10:30', false],
+  ['23:05', '24:00', false],
+] as const;
+// The messages of a rejection, by path.
+function messagesOf(schema: z.ZodType, value: unknown): Record<string, string[]> {
+  const result = schema.safeParse(value);
+  const messages: Record<string, string[]> = {};
+  for (const issue of result.error?.issues ?? []) (messages[issue.path.join('.') || '(root)'] ??= []).push(issue.message);
+  return messages;
+}
+
+// Test names: D… decisions are those of docs/SHARED_CALENDAR_SPEC.md.
+describe('the window bodies: whole hours (D33)', () => {
+  const bodies = [
+    ['WindowBody', WindowBody, (start: string, end: string) => ({ start, end, typeId: STUDIO })],
+    ['PatternBody', PatternBody, (start: string, end: string) => ({ weekday: 1, start, end, typeId: STUDIO, validFrom: '2026-11-01', validUntil: null })],
+    ['OneOffWindowBody', OneOffWindowBody, (start: string, end: string) => ({ date: '2026-11-09', start, end, typeId: STUDIO })],
+  ] as const;
+
+  describe.each(bodies)('%s', (_name, schema, body) => {
+    it.each(wholeHourCases)('%s–%s: accepted %s', (start, end, accepted) => {
+      if (accepted) expect(schema.safeParse(body(start, end))).toEqual({ success: true, data: body(start, end) });
+      else expect(messagesOf(schema, body(start, end))).toEqual({ end: [WHOLE_HOURS] });
+    });
+
+    it('an end not after the start is said once, by the order check', () => {
+      expect(messagesOf(schema, body('10:05', '09:05'))).toEqual({ end: ['end must be after start'] });
+    });
+  });
+
+  it('OverrideBody: a window not whole hours is refused on its own end', () => {
+    expect(messagesOf(OverrideBody, { windows: [{ start: '09:00', end: '10:00', typeId: STUDIO }, { start: '11:05', end: '12:30', typeId: STUDIO }] })).toEqual({
+      'windows.1.end': [WHOLE_HOURS],
+    });
+  });
+});
+
 describe('WindowBody', () => {
   it.each([
     ['08:00', '12:00'],
-    ['00:00', '00:15'],
-    ['23:45', '24:00'],
+    ['00:00', '01:00'],
+    ['23:00', '24:00'],
     ['00:00', '24:00'],
   ])('accepts %s–%s', (start, end) => {
     const body = { start, end, typeId: STUDIO };
@@ -330,7 +374,7 @@ describe('PatternBody', () => {
 
 // Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('OverrideBody', () => {
-  const window = (hour: number) => ({ start: `${String(hour).padStart(2, '0')}:00`, end: `${String(hour).padStart(2, '0')}:30`, typeId: STUDIO });
+  const window = (hour: number) => ({ start: `${String(hour).padStart(2, '0')}:00`, end: `${String(hour + 1).padStart(2, '0')}:00`, typeId: STUDIO });
   const windows = (count: number) => Array.from({ length: count }, (_, i) => window(i + 8));
 
   it.each([0, 1, 10])('accepts %i windows', (count) => {

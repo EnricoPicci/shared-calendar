@@ -78,12 +78,12 @@ describe('createOneOffWindow handler', () => {
   });
 
   describe('overlap (6.5, "create a one-off window")', () => {
-    it('AC-09: refuses 11:00–12:30 on a Monday with the pattern, naming the date and both windows', async () => {
-      const response = await post({ ...AC08, start: '11:00', end: '12:30' });
+    it('AC-09: refuses 11:00–13:00 on a Monday with the pattern, naming the date and both windows', async () => {
+      const response = await post({ ...AC08, start: '11:00', end: '13:00' });
       expect(response.statusCode).toBe(409);
       expect(bodyOf(response)).toEqual({
         error: 'availability_overlap',
-        message: 'On 2026-11-16 the window 08:00–12:00 would overlap the window 11:00–12:30',
+        message: 'On 2026-11-16 the window 08:00–12:00 would overlap the window 11:00–13:00',
       });
       expect(transactions()).toHaveLength(0);
     });
@@ -106,7 +106,7 @@ describe('createOneOffWindow handler', () => {
     it('compares with the override’s windows on a date with an override', async () => {
       onPartition('OVERRIDE', [overrideItem(MONDAY, [{ start: '14:00', end: '15:00', typeId: STUDIO }])]);
       expect((await post({ ...AC08, start: '09:00', end: '10:00' })).statusCode).toBe(201);
-      expect(bodyOf(await post({ ...AC08, start: '14:30', end: '16:00' })).error).toBe('availability_overlap');
+      expect(bodyOf(await post({ ...AC08, start: '14:30', end: '16:30' })).error).toBe('availability_overlap');
     });
   });
 
@@ -229,7 +229,7 @@ describe('createOneOffWindow handler logging (AC-36)', () => {
   });
 
   it('logs a refusal as a conflict, without its message', async () => {
-    await post({ ...AC08, start: '11:00', end: '12:30' });
+    await post({ ...AC08, start: '11:00', end: '13:00' });
     expect(logLines()).toEqual([expect.objectContaining({ outcome: 'conflict', status: 409, windowId: expect.stringMatching(ULID), date: MONDAY })]);
     expect(output.join('')).not.toContain('overlap');
   });
