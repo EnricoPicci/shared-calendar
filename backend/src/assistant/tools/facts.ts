@@ -1,4 +1,5 @@
 import {
+  lastsWholeHours,
   LocalEndTime,
   overlaps,
   peopleIn,
@@ -252,20 +253,35 @@ export const nameTaken = (name: string): NotPossible => ({
 // The hours of a window as the tools that change the opening hours take them from Claude: two
 // wall-clock times on the step of TIME_STEP_MINUTES and the id of an appointment type
 // (docs/SHARED_CALENDAR_SPEC.md section 11.4, decision D32). The words give Claude the step with
-// its first and last minute; the pattern of LocalTime holds every minute allowed.
+// its first and last minute; the pattern of LocalTime holds every minute allowed. That the hours
+// last a whole number of hours (docs/SHARED_CALENDAR_SPEC.md decision D33) is no pattern of one
+// field: the description of `end` says it in words, and `WHOLE_HOURS` below refuses the rest.
 // "minutes 00, 05, 10 and so on up to 55": the first three minutes of the step and the last.
 const minuteSaid = (step: number) => String(step * TIME_STEP_MINUTES).padStart(2, '0');
 const STEP_MINUTES_SAID = `minutes ${[0, 1, 2].map(minuteSaid).join(', ')} and so on up to ${minuteSaid(60 / TIME_STEP_MINUTES - 1)}`;
 
 export const hoursInput = {
   start: LocalTime.describe(`When the hours start: a wall-clock time as HH:mm, on a ${TIME_STEP_MINUTES}-minute step (${STEP_MINUTES_SAID}).`),
-  end: LocalEndTime.describe(`When the hours end, after "start": HH:mm on a ${TIME_STEP_MINUTES}-minute step, or "24:00" for the midnight that closes the day.`),
+  end: LocalEndTime.describe(
+    'When the hours end, as HH:mm: a whole number of hours after "start", so with the same minutes as "start" (09:05 to 11:05), or "24:00" for the midnight that closes the day when "start" is on the hour.',
+  ),
   typeId: Ulid.describe('The id of the appointment type of these hours, as list_types gave it. Never its name, and never a guess.'),
 };
 
 // The hours must end after they start. Times written HH:mm compare as text, and "24:00" comes last.
 export const endsAfterStart = (hours: { start: string; end: string }): boolean => hours.start < hours.end;
 export const END_AFTER_START = { message: 'end must be after start', path: ['end'] };
+
+// The hours last a whole number of hours on the local clock (docs/SHARED_CALENDAR_SPEC.md decision
+// D33), with the sentence of the shared window schemas, so that Claude reads it at the proposal and
+// not at the person's confirmation. It runs only when nothing before it failed (`when`), so an end
+// not after the start is said once, by the order check.
+export const lastsWholeHoursOf = (hours: { start: string; end: string }): boolean => lastsWholeHours(hours.start, hours.end);
+export const WHOLE_HOURS = {
+  message: 'end must be a whole number of hours after start',
+  path: ['end'],
+  when: (payload: { issues: readonly unknown[] }) => payload.issues.length === 0,
+};
 
 /** The weekly patterns, as GET /calendar/patterns answers the Administrator. */
 export async function presentPatterns(route: CallRoute): Promise<{ ok: true; patterns: WeeklyPattern[] } | NotPossible> {

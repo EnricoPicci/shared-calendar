@@ -1,6 +1,8 @@
 # Shared Calendar: windows of whole hours, slots counted from the window's start (implementation plan)
 
-**Version:** v3 (2026-11-25): steps w1 and w2 done (their "As done" notes), with brief
+**Version:** v4 (2026-11-25): step w3 done (its "As done" note), with brief
+`prompts/slot-s08-step-w3-implementation.md`; two decisions of the Product Owner added beside Q1
+and Q4 (section 2). v3 (2026-11-25): steps w1 and w2 done (their "As done" notes), with brief
 `prompts/slot-s07-pair-w1-w2-implementation.md`; decision 5 restated (the server's 400 names the
 field), F5 and F9 corrected. v2 (2026-11-25): the proposals of F6, F7 and F10 decided by the
 Product Owner, Q5 to Q8 (section 2). v1 (2026-11-25): the plan, after the Product Owner's eight
@@ -68,6 +70,8 @@ The rest follows:
 | Q5 | Weekly patterns already ended that are not whole hours: deleted too? | **Deleted too.** The check lists every pattern whatever its validity; past weeks then no longer show those hours, and past appointments keep their own times (F7). |
 | Q6 | Should the check also list windows of whole hours that do not start on the hour, whose slots move at the release? | **No.** It lists only the windows that must go; the slots that move are accepted (F6). |
 | Q7 | The check: commands in the runbook or a script? | **Commands in `docs/RUNBOOK.md`**, read-only, run once; no script kept for a one-time job (F7). |
+| Q1a | A block that already leaves whole hours (10:00–11:00 inside 09:00–13:00): does the assistant ask too? | **No.** It says the times and asks only when the block had to grow; a block that leaves whole hours is proposed at once, as before (the Product Owner, 2026-11-25, step w3). |
+| Q4a | The assistant asked for a window that starts after 23:00 (23:05–24:00), which no whole hours fit. | **Say so and suggest.** A window ends on its own date, so none starts after 23:00: the assistant suggests the start moved to 23:00 (23:00–24:00), or the hour before with the same minutes (22:05–23:05). One sentence of the instructions, no request of the evaluation (the Product Owner, 2026-11-25, step w3). |
 | Q8 | Should the smoke test prove the new rule in the cloud? | **Yes**, the small change of F10: its window 03:05–04:05, the slot 03:05, a window 03:05–03:50 refused; 53 lines. |
 
 ## 3. What planning found
@@ -383,6 +387,33 @@ User's "whole hours", and the front-end page `docs/journeys/frontend/calendar-ap
 
 **Check:** the short check; `npm run assistant:eval -w backend -- --list` (61 requests, costs
 nothing). No journey changes, so none is run. Then the stop.
+
+**As done (step w3, 2026-11-25).** `backend/src/assistant/tools/facts.ts`: the description of
+`end` in `hoursInput` says in words "a whole number of hours after "start", so with the same
+minutes as "start" (09:05 to 11:05), or "24:00" for the midnight that closes the day when
+"start" is on the hour"; `lastsWholeHoursOf` with `WHOLE_HOURS` (the shared sentence on `end`,
+run only when nothing before it failed) beside `endsAfterStart`, used by the four tools, so a
+refusal says one sentence and comes before anything is read. `backend/src/assistant/prompt.ts`:
+in "The opening hours", whole hours from any 5-minute start, Q4 and Q4a; in "Blocking time", Q1
+with Q1a. The fake Claude's answers and the assistant's journeys hold whole hours only (04:00–05:00,
+06:00–07:00, 04:00–06:00, 05:00–07:00, 04:00–07:00): none changed. Unit tests: the new sentences of
+the instructions and the description of `end`; each of the four tools accepts 09:05–11:05 and
+08:00–24:00 and refuses 09:05–10:30 and 23:05–24:00 at the proposal with the sentence on `end`,
+reading nothing; an end not after the start said once. `availabilityTools.test.ts` (09:05–12:05,
+19:05–20:05) and `proposals.test.ts` (an extra window 14:00–16:00 of which 14:00–15:00 is kept)
+moved to whole hours. The evaluation: `step-pattern-new` 14:05–17:05; `step-block` with a second
+message, "Va bene, proceda.", checked with `notBefore` of `checks.ts` (no `set_date_override`
+before it), which needed no change; `hours-not-whole` and `hours-not-whole-it` (an extra window on
+Sunday of next week, a day with no hours). **61 requests, 67 messages: 33 requests in English, 28
+in Italian.** `docs/CONVERSATIONAL_ARCHITECTURE.md` v23 (status line, sections 7.3, 8.2, 12.3),
+`docs/COMMANDS.md`, the v17 row of `docs/ARCHITECTURE.md`, the status line of
+`docs/SHARED_CALENDAR_SPEC.md`. Checked: typecheck, lint, test:unit green at the root (back end
+1 873 tests), 100 % line coverage kept; `--list` shows 61 requests. **The mark of the
+instructions changed: every conversation in progress ends at the deploy.** **What steps w4 and w5
+find ready:** the assistant complete and not evaluated; step w4 touches nothing of it. Step w5
+part D runs the evaluation once on the deployed code, about 50 US cents (the last run, of
+`v2.4.0`, cost 46.59 for 59), the cost said again before it is run, and reads the four requests by
+hand.
 
 ### Step w4 — The page: the end chosen as an hour
 

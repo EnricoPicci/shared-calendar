@@ -166,7 +166,7 @@ settings only the local stack makes (`docs/ARCHITECTURE.md` section 8):
   `xhigh`, `max`; `local:up` refuses another value. Without them the template's model and the
   effort `low` are used, and a `local:up` without them is the way back.
 - **`npm run assistant:eval -w backend`: the evaluation with the real model**
-  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3). It plays 59 requests in English and
+  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3). It plays 61 requests in English and
   Italian against the local API and checks what Claude did. **It costs money at Anthropic**:
   about 40 US cents and four minutes for the whole list on `claude-sonnet-5-5`, 3 cents on
   `claude-haiku-5-5`. It is no part of `verify`. Run it before a deployment that changes the

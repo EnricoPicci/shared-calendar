@@ -153,13 +153,15 @@ describe('create_pattern (3, 5.5 rule 2, 8.2)', () => {
     expect(input.safeParse(ASKED).success).toBe(true);
     expect(input.safeParse({ ...ASKED, end: '24:00', validUntil: '2026-12-01' }).success).toBe(true);
     expect(input.safeParse({ ...ASKED, validUntil: null }).success).toBe(true);
-    expect(input.safeParse({ ...ASKED, start: '09:05', end: '11:55' }).success).toBe(true);
+    expect(input.safeParse({ ...ASKED, start: '09:05', end: '12:05' }).success).toBe(true);
   });
 
   it('Claude is told the step of the hours in words, with the pattern of every minute allowed (D32 of docs/SHARED_CALENDAR_SPEC.md)', () => {
     const properties = forClaude(createPatternDefinition, 'admin').input_schema.properties as Record<string, { description: string; pattern?: string; anyOf?: { pattern?: string }[] }>;
     expect(properties.start!.description).toBe(`When the hours start: a wall-clock time as HH:mm, on a ${TIME_STEP_MINUTES}-minute step (minutes 00, 05, 10 and so on up to 55).`);
-    expect(properties.end!.description).toBe(`When the hours end, after "start": HH:mm on a ${TIME_STEP_MINUTES}-minute step, or "24:00" for the midnight that closes the day.`);
+    expect(properties.end!.description).toBe(
+      'When the hours end, as HH:mm: a whole number of hours after "start", so with the same minutes as "start" (09:05 to 11:05), or "24:00" for the midnight that closes the day when "start" is on the hour.',
+    );
     expect(properties.start!.pattern).toContain('00|05|10|15|20|25|30|35|40|45|50|55');
     expect(JSON.stringify(properties)).not.toContain('quarter');
   });
@@ -543,7 +545,7 @@ describe('create_one_off_window (3, 5.5 rule 2)', () => {
     expect(input.safeParse({ ...ASKED, end: '24:00' }).success).toBe(true);
     expect(input.safeParse({ ...ASKED, end: '19:00' }).success).toBe(false);
     expect(input.safeParse({ ...ASKED, start: '19:07' }).success).toBe(false);
-    expect(input.safeParse({ ...ASKED, start: '19:05', end: '20:10' }).success).toBe(true);
+    expect(input.safeParse({ ...ASKED, start: '19:05', end: '20:05' }).success).toBe(true);
     expect(input.safeParse({ ...ASKED, weekday: 'Tuesday' }).success).toBe(false);
   });
 
@@ -606,5 +608,52 @@ describe('delete_one_off_window (3, 5.5 rule 2)', () => {
     expect(change.confirmation.summary(ASSISTANT_TEXTS_EN, { date: DAY, ...CALL_EVENING })).toBe('Delete the extra window of Tuesday 24 November 2026, from 19:00 to 20:00 (Phone call).');
     expect(change.confirmation.summary(ASSISTANT_TEXTS_IT, { date: DAY, ...CALL_EVENING })).toBe('Eliminare la finestra aggiuntiva di martedì 24 novembre 2026, dalle 19:00 alle 20:00 (Phone call).');
     expect(change.toModel(null, ADMIN)).toEqual({ fields: { deleted: true } });
+  });
+});
+
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md, D33 is a decision of
+// docs/SHARED_CALENDAR_SPEC.md.
+describe('the four tools that open hours take only whole hours (8.2, D33)', () => {
+  const ADMIN_CALLER = { sub: 'sub-admin', username: 'admin', role: 'admin' as const, requestId: 'req-1' };
+  // Each tool's input with the hours given, as Claude would ask for them.
+  const FOUR: [string, (hours: { start: string; end: string }) => Record<string, unknown>][] = [
+    ['create_pattern', (hours) => ({ weekday: 'Tuesday', ...hours, typeId: VISIT, validFrom: '2026-12-01' })],
+    ['update_pattern', (hours) => ({ patternId: MORNING, weekday: 'Tuesday', ...hours, typeId: VISIT, validFrom: '2026-11-02', validUntil: null })],
+    ['set_date_override', (hours) => ({ date: DAY, windows: [{ ...hours, typeId: VISIT }] })],
+    ['create_one_off_window', (hours) => ({ date: DAY, ...hours, typeId: VISIT })],
+  ];
+  const tool = (name: string) => TOOLS.find((candidate) => candidate.definition.name === name) as ChangeTool;
+  // What the proposal tells Claude when the input is refused, with nothing read.
+  const refusedWith = async (name: string, input: Record<string, unknown>) => {
+    const read = vi.spyOn(tool(name).confirmation, 'read');
+    const proposed = await proposeChange({ id: 'toolu_1', name, input }, TOOLS, ADMIN_CALLER, ADMIN, ASSISTANT_TEXTS_EN, NOW);
+    expect(proposed).toMatchObject({ ok: false, outcome: { log: { name, notRun: 'invalid_input' }, result: { is_error: true } } });
+    expect(read).not.toHaveBeenCalled();
+    read.mockRestore();
+    // The problems found, without the JSON Schema that follows them.
+    const { message } = JSON.parse((proposed as { outcome: { result: { content: string } } }).outcome.result.content) as { message: string };
+    return message.split(' It must match this JSON Schema')[0]!;
+  };
+
+  it.each(FOUR)('%s takes 09:05-11:05, a whole number of hours from a 5-minute start', (name, input) => {
+    expect(tool(name).definition.input('admin').safeParse(input({ start: '09:05', end: '11:05' })).success).toBe(true);
+    expect(tool(name).definition.input('admin').safeParse(input({ start: '08:00', end: '24:00' })).success).toBe(true);
+  });
+
+  it.each(FOUR)('%s refuses 09:05-10:30 at the proposal with the shared sentence on end, having read nothing', async (name, input) => {
+    const message = await refusedWith(name, input({ start: '09:05', end: '10:30' }));
+    // One problem only, the shared sentence on the field end.
+    expect(message).toMatch(/ \((windows\.0\.)?end: end must be a whole number of hours after start\)\.$/);
+    expect(route).not.toHaveBeenCalled();
+  });
+
+  it.each(FOUR)('%s refuses 23:05-24:00: no window starts after 23:00', async (name, input) => {
+    expect(await refusedWith(name, input({ start: '23:05', end: '24:00' }))).toContain('end must be a whole number of hours after start');
+  });
+
+  it.each(FOUR)('%s says an end not after the start once, by the order check', async (name, input) => {
+    const message = await refusedWith(name, input({ start: '10:30', end: '09:05' }));
+    expect(message).toContain('end must be after start');
+    expect(message).not.toContain('whole number of hours');
   });
 });

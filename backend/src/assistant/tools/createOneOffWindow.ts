@@ -1,6 +1,6 @@
 import { LocalDate, type OneOffWindow, type WindowSummary } from '@shared-calendar/shared';
 import { z } from 'zod';
-import { END_AFTER_START, endsAfterStart, hoursInput, hoursOf, newWindowSubject, presentDay, presentTypes } from './facts';
+import { END_AFTER_START, endsAfterStart, lastsWholeHoursOf, WHOLE_HOURS, hoursInput, hoursOf, newWindowSubject, presentDay, presentTypes } from './facts';
 import { windowForModel } from './result';
 import type { ChangeTool, Tool, ToolDefinition } from './tool';
 
@@ -18,7 +18,8 @@ import type { ChangeTool, Tool, ToolDefinition } from './tool';
 const Input = z
   .object({ date: LocalDate.describe("The date of the window, a date of the calendar's time zone as YYYY-MM-DD, today or later."), ...hoursInput })
   .strict()
-  .refine(endsAfterStart, END_AFTER_START);
+  .refine(endsAfterStart, END_AFTER_START)
+  .refine(lastsWholeHoursOf, WHOLE_HOURS);
 type Input = z.infer<typeof Input>;
 
 export const createOneOffWindowDefinition: ToolDefinition = {

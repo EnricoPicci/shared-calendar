@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v22: hours on 5-minute steps (`docs/SLOT_STEP_PLAN.md` step s3), evaluated in step s6, 59 of 59 (section 12.3), and deployed (`docs/RUNBOOK.md` section 5.9). v21, implemented, merged and deployed: steps c00 to c16 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` sections 5.6 and 5.8). Where this document is merged into `docs/ARCHITECTURE.md` (its change log, v13), `docs/FRONTEND_SERVICES.md` or `docs/FRONTEND_ARCHITECTURE.md`, those documents win. This one stays as the assistant's design and the home of what only it holds: the instructions, the tools' four parts, the evaluation, the alternatives, a second channel (section 16). Windows of whole hours (`docs/SHARED_CALENDAR_SPEC.md` decision D33) reach the assistant in step w3 of `docs/WINDOW_HOURS_PLAN.md`. |
-| Date | 2026-11-24 |
+| Status | v23: windows of whole hours (`docs/SHARED_CALENDAR_SPEC.md` decision D33), built in step w3 of `docs/WINDOW_HOURS_PLAN.md`, evaluated in its step w5, not deployed (sections 7.3, 8.2, 12.3). v22: hours on 5-minute steps (`docs/SLOT_STEP_PLAN.md` step s3), evaluated in step s6, 59 of 59 (section 12.3), and deployed (`docs/RUNBOOK.md` section 5.9). v21, implemented, merged and deployed: steps c00 to c16 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` sections 5.6 and 5.8). Where this document is merged into `docs/ARCHITECTURE.md` (its change log, v13), `docs/FRONTEND_SERVICES.md` or `docs/FRONTEND_ARCHITECTURE.md`, those documents win. This one stays as the assistant's design and the home of what only it holds: the instructions, the tools' four parts, the evaluation, the alternatives, a second channel (section 16). |
+| Date | 2026-11-25 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
 
@@ -33,6 +33,7 @@
 | v20 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u6: **the capacity of a type**. `get_calendar` says a slot's places left, a window's capacity and the Administrator's full times (section 8.3); `book_appointment` and `change_appointment` take the Administrator's `overbook`, the proposal says when a time goes over the capacity, and the Administrator's booking or move of a User already busy then is refused at the proposal with `user_busy` (sections 3 and 8.2); rule 4 counts the places of a slot (section 5.5); `create_type` takes a capacity and **`rename_type` became `edit_type`**, for the name, the capacity or both (sections 3, 8.2, 8.3); the instructions gain a paragraph on places (section 7.3); the panel says a refused change for the person's role (section 13); the evaluation gains a type of capacity 3 and six requests (section 12.3); decisions 14 to 20 (section 18.1), decided by the Product Owner. The mark of the instructions changes, which ends the conversations in progress |
 | v21 | 2026-11-24 | `docs/CONVERSATIONAL_PLAN.md` step c16, the hand-over: **implemented, merged and deployed**. The status line and section 1 say which document wins: where this one is merged, `docs/ARCHITECTURE.md` and the front end's two documents. Sections 10.3 and 19 say they are done and where the result lives; P7 blocks nothing (section 18.2). No design changed |
 | v22 | 2026-11-25 | `docs/SLOT_STEP_PLAN.md` step s3: **hours on 5-minute steps** (`docs/SHARED_CALENDAR_SPEC.md` decision D32). The instructions say "Hours are on 5-minute steps: 10:05, 10:10 and so on" where they said the quarter hour (section 7.3); the tools of the opening hours describe a start and an end on a 5-minute step, and the pattern Claude is given for a time allows every fifth minute (section 8.2). `book_appointment` and `change_appointment` are unchanged in words and in what they do: a time such as 10:10 is no free slot. The evaluation gains two requests, 59 in all (section 12.3); **its paid run is not made in this step**: it is made once on the code merged with the mail work, before the deployment. The mark of the instructions changes, which ends the conversations in progress at the deployment. Built, not deployed. The release went before the merge (`docs/SLOT_STEP_PLAN.md` step s6), so the paid run was made there, on this branch alone: 59 of 59 (section 12.3) |
+| v23 | 2026-11-25 | `docs/WINDOW_HOURS_PLAN.md` step w3: **windows of whole hours** (`docs/SHARED_CALENDAR_SPEC.md` decision D33). The instructions say that a window lasts a whole number of hours from any 5-minute start; that hours asked that are not whole are explained, the nearest whole hours inside and around them suggested, and the tool called only after the person has chosen; that no window starts after 23:00; and that a block is widened until every piece left is whole hours, the person told the times and asked first only when it had to be widened (section 7.3). The description of `end` in the four tools that open hours says it in words, and their input refuses a window not whole hours at the proposal with the shared sentence, before anything is read (section 8.2). The evaluation has 61 requests: one rewritten, one given a second message, two added (section 12.3); **its paid run is not made in this step**, but once in step w5. The mark of the instructions changes, which ends the conversations in progress at the deployment. Built, not deployed |
 
 ---
 
@@ -887,12 +888,22 @@ conversation's language) say, in prose:
   was made before a tool result says so;
 - where the hours of a day come from (a weekly pattern, the day's own hours, an extra
   window), which words to use for the three with the person, and to ask when it is not clear
-  whether a request holds every week or for one date;
+  whether a request holds every week or for one date; that every window lasts a whole number
+  of hours from its start, which may be on any 5-minute step (`docs/SHARED_CALENDAR_SPEC.md`
+  decision D33); that hours asked that are not whole are explained, the nearest whole hours
+  inside the times asked and those that cover them suggested (09:05 to 12:00: 09:05 to 11:05
+  or 09:05 to 12:05), and the tool called only after the person has chosen; that no window
+  starts after 23:00, since it ends on its own date, so a start after 23:00 is answered with
+  23:00 to 24:00, or the hour before with the same minutes (22:05 to 23:05);
 - how to block time (section 3): read the day, take the blocked time out of the windows of
   the patterns or of the day's own hours, keep each piece with the type of the window it was
   cut from, give `set_date_override` everything that is left, untouched windows included, and
   treat an extra window in the blocked time with its own two tools; that hours are on 5-minute
-  steps (`docs/SHARED_CALENDAR_SPEC.md` decision D32); how to open a day again;
+  steps (`docs/SHARED_CALENDAR_SPEC.md` decision D32); that each piece left must last whole
+  hours, keeping its window's own start or end, so the blocked time is widened until it does
+  (10:10 to 10:35 inside 09:00 to 13:00 blocks 10:00 to 11:00, leaving 09:00 to 10:00 and
+  11:00 to 13:00); when it had to be widened, the person is told the times and asked before the
+  tool is called, and when it did not, the tool is called at once; how to open a day again;
 - places at the same time: a type's capacity is one unless `list_types` or `get_calendar` say
   more, a slot with places left takes several people, one call each; a full time is said to be
   full, and only to the Administrator offered over the capacity, with `overbook` given only
@@ -1045,14 +1056,23 @@ out one proposed change, `changeHandlers.ts` names the handler of each change to
   the types to turn each pattern's type id into a name, and `get_calendar` asks for them to give
   each window its type's capacity.
 - **`create_pattern`** and **`update_pattern`**, for the Administrator: a weekday as an English
-  word (`Monday` to `Sunday`, never a number), a start and an end on a 5-minute step, the end
-  after the start and `24:00` allowed, a type's id, the first valid day and the last, or `null`
+  word (`Monday` to `Sunday`, never a number), a start on a 5-minute step and an end a whole
+  number of hours after it, `24:00` allowed, a type's id, the first valid day and the last, or `null`
   for a pattern with no end. The creation may leave the last day out; the change names the
   pattern by its id and must give every field. **`delete_pattern`**: the id.
 - **`set_date_override`**: a date and a list of none to ten stretches of hours, each a start,
   an end and a type's id; an empty list closes the day. **`delete_date_override`**: the date.
 - **`create_one_off_window`**: a date, a start, an end and a type's id.
   **`delete_one_off_window`**: the date and the window's id.
+- **The hours of the four tools that open them** (`create_pattern`, `update_pattern`,
+  `set_date_override`, `create_one_off_window`) last a whole number of hours
+  (`docs/SHARED_CALENDAR_SPEC.md` decision D33). No pattern of one field can say it, so the
+  description of `end` says it in words: "a whole number of hours after "start", so with the
+  same minutes as "start" (09:05 to 11:05), or "24:00" for the midnight that closes the day
+  when "start" is on the hour". The input refuses the rest with `lastsWholeHours` of `shared/`
+  and the shared schemas' sentence, "end must be a whole number of hours after start", on the
+  field `end`: at the proposal, before anything is read, so Claude reads it before the person
+  sees anything. It runs only when the end is after the start, so a refusal says one sentence.
 
 - **The JSON Schema Claude is given is made from the `zod` schema**, by `zod`'s own
   `z.toJSONSchema`, without its `$schema` line. One schema therefore does both jobs: it tells
@@ -1412,12 +1432,17 @@ A separate command, **outside** `verify` because it costs money and is not deter
 DYNAMODB_PORT=8002 npm run assistant:eval -w backend -- --ceiling 4 --out run.json --hand answers.txt
 ```
 
-**What it plays.** A list of 59 requests, 64 messages, 32 in English and 27 in Italian
+**What it plays.** A list of 61 requests, 67 messages, 33 requests in English and 28 in Italian
 (`backend/tests/eval/requests.ts`): the first brief's examples; relative dates ("dopodomani",
 "next Friday", the last day of the month); readings; each kind of change, by a User and by
 the Administrator for a User, with a setting, a type, a weekly pattern and a day's hours; nine
-wordings of blocking time; two on the 5-minute step, a weekly pattern from 14:05 to 16:35 and a
-block from 10:10 to 10:35, which must come out to the minute; ambiguity that must produce a question; what the web pages keep; a
+wordings of blocking time; four on the 5-minute step and windows of whole hours: a weekly
+pattern from 14:05 to 17:05, which must come out to the minute; a block from 10:10 to 10:35,
+whose first answer must propose nothing and say the widened times, and whose second message
+("Va bene, proceda.") must get 09:00–10:00 and 11:00–13:00 with the afternoon kept; and two
+requests for hours not whole, a weekly pattern from 09:05 to 12:00 in English and an extra
+window from 10:10 to 11:40 in Italian, which must propose nothing, the suggestion of whole
+hours read by hand; ambiguity that must produce a question; what the web pages keep; a
 tool of the Administrator asked for by a User; a note that tries to give orders; a message in
 the other language later in a conversation; and six on the capacity of a type: what is free
 (the places said), a type's capacity changed, two Users into one slot, a User asking for a full
@@ -1486,6 +1511,12 @@ Tuesday 8 December from 10:10 to 10:35, it proposed that day's hours as 09:00–
 10:35–13:00 (eval Visit) with 15:00–18:00 (eval Lesson) kept. Both times kept to the minute.
 Nothing in the instructions or the tools was changed after the run. The merge with the mail
 work, which adds a tool, makes its own run.
+
+**Windows of whole hours** (`docs/WINDOW_HOURS_PLAN.md` step w3): the list holds 61 requests;
+**no run has been made on it yet**. The last run is still the one above, of `v2.4.0`. It is
+run once, in step w5 of that plan, on the code that is deployed, about 50 US cents; the four
+requests of the change (`step-pattern-new`, `step-block`, `hours-not-whole`,
+`hours-not-whole-it`) are then read by hand whatever their result.
 
 ---
 
