@@ -111,6 +111,23 @@ The screens are those of the table under "The page, locally". A reload of the pa
 What has been seen at the deployed page and what has not yet been looked at there is in
 `docs/RUNBOOK.md` section 5.5 (the record of the first deployment, with its open items).
 
+## Versions
+
+Each git tag marks a state that was deployed: the last commit of its plan, whose code is the
+code the stacks ran once that plan was released. A new feature that keeps every client working
+takes the next minor version; the major version changes when a client would break.
+
+| Tag | Commit | What it is | Deployment record |
+|---|---|---|---|
+| `v1.0.0` | `bb31a63` | The Hello World API: sign-in, roles, users created and deleted, on the old stack `hello-world-api`, deleted since | `docs/RUNBOOK.md` section 5.1 |
+| `v2.0.0` | `31bed45` | The shared calendar and its page, the page first deployed as `shared-calendar-web` | `docs/RUNBOOK.md` section 5.5 |
+| `v2.1.0` | `f29e732` | The assistant, a conversation about the calendar in English or Italian (`docs/CONVERSATIONAL_PLAN.md`) | `docs/RUNBOOK.md` section 5.6 |
+| `v2.2.0` | `72215ae` | The change of one's own password (`docs/CHANGE_PASSWORD_PLAN.md`) | `docs/RUNBOOK.md` section 5.7 |
+| `v2.3.0` | `a8b3a2b` | The capacity of a type, several people in one slot (`docs/CAPACITY_PLAN.md`) | `docs/RUNBOOK.md` section 5.8 |
+
+`git checkout v2.3.0` gives the code as it was released; `git tag -n1` lists the tags with
+their one-line message.
+
 ## Commands
 
 Once, after cloning, at the repository root: `nvm use && npm ci` (installs all packages, one
