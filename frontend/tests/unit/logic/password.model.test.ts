@@ -1,10 +1,21 @@
 import { PASSWORD_PROBLEMS } from '@shared-calendar/shared';
-import { EMPTY_HINTS, failurePlace, hintStands, newProblems, passwordHints, problemTexts } from '../../../src/logic/password.model';
+import {
+  againHint,
+  EMPTY_HINTS,
+  EMPTY_NEW_HINTS,
+  failurePlace,
+  hintStands,
+  newHintStands,
+  newPasswordHints,
+  newProblems,
+  passwordHints,
+  problemTexts,
+} from '../../../src/logic/password.model';
 import { PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS } from '../../../src/logic/texts';
 import { useFarBrowserZone } from './zone';
 
 // The pure part of the password screen: the hints of the three fields, and where a failure is
-// said. No network, no DOM, and no password of a real account: made-up texts only.
+// said; and the hints of the two fields of "Choose your password", which are the same. No network, no DOM, and no password of a real account: made-up texts only.
 
 const GOOD = 'Next-Password-2?';
 const CURRENT = 'Current-Pass-1!';
@@ -88,6 +99,44 @@ describe('password.model', () => {
     it('no hint holds a password typed', () => {
       const hints = passwordHints({ current: CURRENT, next: 'Next-Pass', again: 'Something' });
       for (const secret of [CURRENT, 'Next-Pass', 'Something']) expect(JSON.stringify(hints)).not.toContain(secret);
+    });
+  });
+
+  describe('againHint', () => {
+    it('empty, different, then the same: two sentences, then none', () => {
+      expect(againHint(GOOD, '')).toBe(PASSWORD_TEXTS.againEmpty);
+      expect(againHint(GOOD, 'Next')).toBe(PASSWORD_TEXTS.differ);
+      expect(againHint(GOOD, GOOD)).toBeNull();
+    });
+  });
+
+  describe('newPasswordHints, for "Choose your password"', () => {
+    it('two empty fields: every condition of the rule, and type it once more', () => {
+      expect(EMPTY_NEW_HINTS).toEqual({ next: text('too_short', 'no_uppercase', 'no_lowercase', 'no_digit', 'no_symbol'), again: PASSWORD_TEXTS.againEmpty });
+      expect(newHintStands(EMPTY_NEW_HINTS)).toBe(true);
+    });
+
+    it('the same sentences as the password screen for the same two fields, and nothing about a current password', () => {
+      for (const fields of [
+        { next: 'Next', again: '' },
+        { next: 'next password', again: 'next' },
+        { next: GOOD, again: GOOD },
+      ]) {
+        const full = passwordHints({ current: '', ...fields });
+        expect(newPasswordHints(fields)).toEqual({ next: full.next, again: full.again });
+      }
+    });
+
+    it('both right: no hint stands; any one hint stands on its own', () => {
+      expect(newPasswordHints({ next: GOOD, again: GOOD })).toEqual({ next: [], again: null });
+      expect(newHintStands({ next: [], again: null })).toBe(false);
+      expect(newHintStands({ next: ['x'], again: null })).toBe(true);
+      expect(newHintStands({ next: [], again: 'x' })).toBe(true);
+    });
+
+    it('no hint holds a password typed', () => {
+      const hints = newPasswordHints({ next: 'Next-Pass', again: 'Something' });
+      for (const secret of ['Next-Pass', 'Something']) expect(JSON.stringify(hints)).not.toContain(secret);
     });
   });
 

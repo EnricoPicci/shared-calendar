@@ -22,7 +22,7 @@ Paths in this file are relative to `backend/`.
   `docs/IMPLEMENTATION_PLAN.md` step 9), `calendar.test.ts` (the calendar's journeys),
   `mail.test.ts` (the mail's, which also need `local:lambda` and the fake mail).
 - `scripts/`: shell scripts behind the npm scripts (`local-seed.sh`, `local-api.sh`,
-  `local-lambda.sh`, `mail-send.sh`, `mail-daily.sh`, `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`,
+  `local-lambda.sh`, `mail-send.sh`, `mail-daily.sh`, `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `test-user.sh`, `smoke.sh`,
   `assistant-key.sh`, `assistant-eval.sh`, `budget.sh`, `check-sam.sh`; `target.sh`,
   `cognito.mjs` and `parameters.mjs` are helpers of those).
 - `docker/`: files for the local stack (`cognito-local-config.json`; `fake-claude.mjs`, the
@@ -167,7 +167,7 @@ handlers copy: claims → configuration check → role → path → body → `ca
 ## Writing the scripts
 
 - Passwords and tokens in these scripts never go into a command-line argument (visible in
-  `ps`) or a file: the two Cognito calls carrying a password go through `scripts/cognito.mjs`
+  `ps`) or a file: the Cognito calls carrying a password go through `scripts/cognito.mjs`
   (AWS SDK, password on stdin), the Anthropic key goes the same way through
   `scripts/parameters.mjs`, API calls pass the token to curl with `-H @-`, and JSON answers
   are parsed by `json_field` (node, stdin). The AWS CLI cannot read a request from a pipe, and

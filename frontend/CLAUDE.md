@@ -49,7 +49,7 @@ when those files are touched (`.claude/rules/frontend-views.md`).
   never the week's; the assistant's panel, mounted once per session and in no row of
   `SCREENS`); one `<name>.view.ts` per view, `mount<Name>(root, deps): Subscription`: `login`,
   `week`, `appointments`, `settings`, `users`, `availability` and `date` (two views of one
-  screen), `assistant`, `me`, `password`; `detail.view.ts`, the dialog two views mount; `availability.parts.ts`, the
+  screen), `assistant`, `me`, `password`, `choose-password` (beside the login, on `#login`); `detail.view.ts`, the dialog two views mount; `availability.parts.ts`, the
   helpers the availability's two views share, with `mountConfirm`; `profile.parts.ts`, the four
   facts' fields and the Edit dialog, shared by the users view and `me`.
 - `src/logic/`: pure models (`texts.ts`, `week.model.ts`, `booking.ts`,
@@ -58,7 +58,8 @@ when those files are touched (`.claude/rules/frontend-views.md`).
   `password.model.ts`, `profile.model.ts`, `me.model.ts`, `daily-mail.model.ts`) and one class
   per screen, and one for the panel, with one stream and `start()` (`week.screen.ts`,
   `appointments.screen.ts`, `settings.screen.ts`, `users.screen.ts`, `availability.screen.ts`,
-  `date.screen.ts`, `assistant.screen.ts`, `password.screen.ts`, `me.screen.ts`; `mail.screen.ts`,
+  `date.screen.ts`, `assistant.screen.ts`, `password.screen.ts`, `me.screen.ts`;
+  `choose-password.screen.ts`, the first sign-in's new password, page-wide; `mail.screen.ts`,
   the week's "E-mail…" dialog; `daily-mail.screen.ts`, the settings' "Daily e-mail").
 - `scripts/` (Node, outside the browser's lint rules): `bundle.mjs`, `build.mjs`, `dev.mjs`,
   `seed-local.mjs`; and `deploy.sh`, the release of the page (`npm run deploy -w frontend`).

@@ -28,15 +28,8 @@ echo >&2
 unset again
 
 # The pool policy (template.yaml), checked here for a clear message. Cognito has the last word.
-problems=""
-(( ${#password} >= 12 )) || problems+=" at least 12 characters;"
-[[ "$password" =~ [[:upper:]] ]] || problems+=" an upper-case letter;"
-[[ "$password" =~ [[:lower:]] ]] || problems+=" a lower-case letter;"
-[[ "$password" =~ [[:digit:]] ]] || problems+=" a digit;"
-[[ "$password" =~ [^[:alnum:]] ]] || problems+=" a symbol;"
-[[ ! "$password" =~ [[:cntrl:]] ]] || problems+=" no control characters;"
-[[ "$password" != " "* && "$password" != *" " ]] || problems+=" no space at the start or end;"
-[[ -z "$problems" ]] || die "the password does not meet the pool policy. It needs:${problems%;}. Nothing was changed."
+problems=$(printf '%s\n' "$password" | password_problems)
+[[ -z "$problems" ]] || die "the password does not meet the pool policy. It needs:${problems}. Nothing was changed."
 
 echo "Your details, as the daily e-mail and \"My details\" use them. Leave the first name empty to keep them."
 IFS= read -r -p "First name: " given_name || given_name=""

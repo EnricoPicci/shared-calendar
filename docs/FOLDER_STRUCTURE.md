@@ -132,7 +132,8 @@ stays at the root.
 │   │   │                        # conflicts.ts, availability.screen.ts, date.model.ts,
 │   │   │                        # date.screen.ts, assistant.model.ts, assistant.screen.ts,
 │   │   │                        # password.model.ts, password.screen.ts, profile.model.ts,
-│   │   │                        # me.model.ts, me.screen.ts, mail.screen.ts
+│   │   │                        # me.model.ts, me.screen.ts, mail.screen.ts,
+│   │   │                        # choose-password.screen.ts
 │   │   └── views/               # shell.ts (with the table of screens) and one <name>.view.ts per
 │   │                            # view: login.view.ts, week.view.ts, appointments.view.ts,
 │   │                            # settings.view.ts, users.view.ts, availability.view.ts and
@@ -140,7 +141,8 @@ stays at the root.
 │   │                            # in availability.parts.ts); detail.view.ts, the appointment's
 │   │                            # dialog that two views mount; assistant.view.ts, the
 │   │                            # assistant's panel, at the bottom of every screen;
-│   │                            # password.view.ts, the change of one's own password
+│   │                            # password.view.ts, the change of one's own password;
+│   │                            # choose-password.view.ts, the first sign-in's new password
 │   ├── tests/
 │   │   ├── unit/                # mirrors src/ (plus services/fixtures.ts, logic/zone.ts and
 │   │   │                        # logic/fixtures.ts, views/page.ts); integration/claude.test.ts,
@@ -532,6 +534,12 @@ headless browser is not in the repository, and no end-to-end test tool is.
   (its element `#password` in `index.html`), the sixth entry of the table of screens in
   `src/views/shell.ts`, the bundle's fourth constant (`scripts/bundle.mjs`, `scripts/dev.mjs`,
   `src/main.ts`) and its test, `tests/unit/scripts/bundle.test.ts`. No new script and no new
+  dependency.
+- **"Choose your password", since 2026-11-25** (`docs/EMAIL_PLAN.md` step m7): the first sign-in
+  with a temporary password. `src/logic/choose-password.screen.ts` and
+  `src/views/choose-password.view.ts` (its element `section.first-password` inside `#login`);
+  `cognito.ts` gains `RespondToAuthChallenge`, `login.service.ts` the challenge. In the back end,
+  `backend/scripts/test-user.sh` (`npm run test-user -w backend -- local <username>`). No new
   dependency.
 
 **The hosting is deployed** (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; the record is

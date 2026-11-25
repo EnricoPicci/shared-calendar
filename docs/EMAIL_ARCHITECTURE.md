@@ -813,8 +813,13 @@ On the local stack (`cognito-local` 5.3.0), with a throw-away user, deleted afte
 | Sign-in with the temporary password | `NEW_PASSWORD_REQUIRED` challenge, no token, the attributes in the challenge |
 | `RespondToAuthChallenge` with a new password | Tokens; the account becomes `CONFIRMED` |
 | `AdminCreateUser` with `MessageAction RESEND` | **Not supported** (`Unsupported`) |
+| `RespondToAuthChallenge` with a made-up `Session` (tried 2026-11-25, `docs/EMAIL_PLAN.md` step m7) | **Tokens**: the session is not checked, so a challenge never ends locally |
+| `RespondToAuthChallenge` with a new password the pool's rule refuses (`weak`) | **Tokens**: the rule is not checked for the new password |
 
-So the first sign-in can be tested end to end locally. The resend cannot: as for the global
+So the first sign-in can be tested end to end locally, but not its two refusals: the page checks
+the rule itself before it sends the new password, and the end of the 3 minutes of section 5.2
+(Cognito's `NotAuthorizedException`, AWS's API reference of `RespondToAuthChallenge`) is proved by
+the front end's unit tests and seen only in the cloud (`docs/EMAIL_PLAN.md` step m9). The resend cannot: as for the global
 sign-out today, either the local stack takes a different path behind a flag that only
 `env.local.json` sets, or the route is only proved by the smoke test in the cloud (open point
 O5). The integration journeys get the temporary password without reading the container's log:

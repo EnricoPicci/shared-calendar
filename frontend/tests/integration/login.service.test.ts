@@ -1,7 +1,12 @@
-import type { HelloResponse } from '@shared-calendar/shared';
+import type { HelloResponse, MeResponse } from '@shared-calendar/shared';
+import { firstValueFrom } from 'rxjs';
+import { filter } from 'rxjs/operators';
 import { decodeClaims } from '../../src/services/jwt';
-import type { Session } from '../../src/services/login.types';
-import { API, current, PASSWORDS, signIn } from './local';
+import { LoginService } from '../../src/services/login.service';
+import type { LoginResult, Session } from '../../src/services/login.types';
+import { SessionStore } from '../../src/services/session.store';
+import { UsersService } from '../../src/services/users.service';
+import { API, cognito, current, newUser, outcome, PASSWORDS, setTemporaryPassword, signedIn, signIn } from './local';
 
 // docs/FRONTEND_SERVICES.md sections 7 and 9.9, against the back end's local stack:
 // `DYNAMODB_PORT=8002 npm run local:up -w backend` (cognito-local on 9229, writes env.local.json)
@@ -60,4 +65,94 @@ it("the store's access token is accepted by POST /hello: the session and the aut
   const body = (await res.json()) as HelloResponse;
   expect(body.message).toBe('Hello World, I am alice');
   expect(body.role).toBe('user');
+});
+
+// The first sign-in of an account whose password is temporary (docs/FRONTEND_SERVICES.md section
+// 4.9, docs/EMAIL_ARCHITECTURE.md section 5.1): the challenge NEW_PASSWORD_REQUIRED, a new password
+// of the person's own, then signed in. It plays a throw-away User of its own, `fe-first`, created
+// through UsersService as the Administrator and given a temporary password by a helper, removed
+// before and after, so that a run that failed half-way is repeated without a step by hand.
+// cognito-local checks neither the challenge's session nor the pool's rule for the new password
+// (docs/EMAIL_ARCHITECTURE.md section 14.1): an expired session is only in the unit tests.
+//
+// Secrets: the passwords stay in constants and the session inside the service; no assertion
+// prints one.
+const FIRST = 'fe-first';
+const TEMPORARY = 'Fe-First-Temp-1!';
+const CHOSEN = 'Fe-First-Chosen-2?';
+
+// Explained in simple words in docs/journeys/frontend/first-sign-in.md.
+describe('first sign-in with a temporary password', () => {
+  let admin: SessionStore;
+  const store = new SessionStore(); // the person's, filled when the new password is taken
+  const service = new LoginService(cognito(), store); // one service: it holds the open challenge
+  const stores: SessionStore[] = [store];
+
+  async function removeFirst(): Promise<void> {
+    const users = new UsersService(API, admin);
+    const result = await outcome(users.deleteUserResult$, () => users.deleteUser(FIRST));
+    if (result.status === 'failure' && result.reason !== 'user_not_found') throw new Error(`could not remove ${FIRST}: ${result.reason}`);
+  }
+
+  // The next outcome of the shared service after `trigger`, when it is not a step on the way.
+  function next(trigger: () => void): Promise<LoginResult> {
+    return outcome(service.loginResult$, trigger);
+  }
+
+  beforeAll(async () => {
+    admin = await signedIn('admin');
+    stores.push(admin);
+    await removeFirst();
+    const users = new UsersService(API, admin);
+    const created = await outcome(users.createUserResult$, () => users.createUser(newUser(FIRST)));
+    if (created.status !== 'success') throw new Error(`could not create ${FIRST}: ${JSON.stringify(created)}`);
+    await setTemporaryPassword(FIRST, TEMPORARY);
+  });
+
+  afterAll(async () => {
+    await removeFirst();
+    for (const each of stores) each.clear(); // stops the expiry timers
+  });
+
+  it('1. the temporary password gives the state "a new password is needed", the username only, and no token', async () => {
+    const result = await next(() => service.login(FIRST, TEMPORARY));
+    expect(result).toEqual({ status: 'new_password_required', username: FIRST });
+    expect(await firstValueFrom(service.loginState$)).toBe(result);
+    expect(await current(store)).toBeNull();
+  });
+
+  it('2. a too-weak new password is refused before any request, and the challenge stays open', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    try {
+      const result = await next(() => service.choosePassword('weak'));
+      expect(result).toEqual({
+        status: 'new_password_required',
+        username: FIRST,
+        refusal: { reason: 'new_password_refused', problems: ['too_short', 'no_uppercase', 'no_digit', 'no_symbol'] },
+      });
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+    expect(await current(store)).toBeNull();
+  });
+
+  it('3. a good new password signs the person in: the store holds the session, and GET /me answers the User', async () => {
+    const result = await next(() => service.choosePassword(CHOSEN));
+    expect(result).toMatchObject({ status: 'success', username: FIRST, role: 'user' });
+    const session = await firstValueFrom(store.session$.pipe(filter((s): s is Session => s !== null)));
+    expect(session).toMatchObject({ username: FIRST, role: 'user' });
+    const res = await fetch(`${API.apiUrl}/me`, { headers: { Authorization: `Bearer ${session.accessToken}` } });
+    expect(res.status).toBe(200);
+    expect((await res.json()) as MeResponse).toMatchObject({ username: FIRST, role: 'user', email: `${FIRST}@example.com` });
+  });
+
+  it('4. the temporary password then no longer signs in, and the new one does', async () => {
+    const old = await signIn(FIRST, TEMPORARY);
+    stores.push(old.store);
+    expect(old.result).toMatchObject({ status: 'failure', reason: 'invalid_credentials' });
+    const chosen = await signIn(FIRST, CHOSEN);
+    stores.push(chosen.store);
+    expect(chosen.result).toMatchObject({ status: 'success', username: FIRST, role: 'user' });
+  });
 });

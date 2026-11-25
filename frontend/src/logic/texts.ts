@@ -168,6 +168,10 @@ const PLAIN_WORDS = new Map<string, string>([
   ['password_reset_required', 'Your password must be reset before you can sign in. Please ask the Administrator.'],
   ['challenge', 'This account needs a sign-in step that this page does not offer. Please ask the Administrator.'],
   ['no_role', 'Your account has no role yet, so it cannot use the calendar. Please ask the Administrator.'],
+  // The first sign-in with a temporary password (docs/FRONTEND_SERVICES.md section 4.9): Cognito's
+  // 3 minutes for the new password are over, or Cognito did not take the new password.
+  ['session_expired', 'This took too long. Please sign in again.'],
+  ['password_refused', 'This password was not accepted. Please choose another one.'],
   // The change of one's own password (docs/FRONTEND_SERVICES.md section 22.3). Its other reasons
   // have the sentences above: `too_many_attempts` is the login's, since a wrong current password
   // counts towards the same lockout at Cognito.

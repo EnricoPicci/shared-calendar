@@ -90,6 +90,11 @@ the scripts themselves win, and this document is fixed.
 - cognito-local does not implement `AdminUserGlobalSignOut`. `env.local.json` sets
   `SKIP_GLOBAL_SIGN_OUT=true` for `DeleteUserFunction` so local deletes work; the cloud never
   sets it (`docs/ARCHITECTURE.md` section 8, note on Cognito emulation).
+- cognito-local gives an account with a temporary password the challenge `NEW_PASSWORD_REQUIRED`
+  and takes the answer, but checks neither the challenge's session (a made-up one gets tokens,
+  so its 3 minutes never end) nor the pool's rule for the new password
+  (`docs/EMAIL_ARCHITECTURE.md` section 14.1). A temporary password it sets itself is 6
+  characters, not by the pool's rule.
 - The tables are plain `calendar`, `hello-messages`, `assistant` and `mail`; in the cloud they carry the
   stack's name (`shared-calendar-api-calendar`, `shared-calendar-api-hello-messages`; the
   assistant's table is in the template and not deployed yet).
@@ -345,7 +350,10 @@ mailer as `local:lambda` names it); and sections of their own for `MailerFunctio
   removes the throw-away users `fe-journey`, `fe-calendar` and `fe-calendar-b` (removed first
   too, so it can be rerun after a failed run). `change-password.test.ts` changes the password of
   its own throw-away user `fe-password` only, removed first and last, never of `admin` or
-  `alice`; it leaves that user's deleted-user marker in `calendar`, and nothing else. `calendar.test.ts` **never resets the local
+  `alice`; it leaves that user's deleted-user marker in `calendar`, and nothing else. The block
+  `first sign-in with a temporary password` of `login.service.test.ts` plays its own throw-away
+  user `fe-first`, removed first and last, given a temporary password by `setTemporaryPassword`
+  of `local.ts`; it leaves that user's deleted-user marker, and nothing else. `calendar.test.ts` **never resets the local
   `calendar` table**:
   - it works on top of what the back-end journeys and the smoke test leave, creates only types
     named `fe-calendar …` and items of those types on free dates from today + 330 days, and
@@ -505,6 +513,19 @@ Every command of this section that names a stack acts on a real AWS account. `CL
   before the password; an empty first name keeps the facts as they are. A fact refused changes
   nothing. Reads stdin, so `printf '%s\n%s\n\n' "$pw" "$pw" | npm run bootstrap-admin -w backend
   -- local` (an empty first name) works in tests.
+- `npm run test-user -w backend -- local <username>` (`backend/scripts/test-user.sh`): makes one
+  User straight in the local Cognito, in group `user`, with a **temporary** password, so that its
+  first sign-in shows "Choose your password" (`docs/EMAIL_ARCHITECTURE.md` section 5.4,
+  `docs/FRONTEND_WALK.md` section 15). The four facts are made up from the username
+  (`<username>@example.com`, "Test User <username>", an address in Rome); only the temporary
+  password is asked for, hidden, twice, checked against the pool policy, and set through
+  `backend/scripts/cognito.mjs` (`set-temporary-password`). It refuses an account that exists, the
+  name `admin` and a name the username rule refuses, and changes nothing then; a step that fails
+  after the creation deletes the account again. The User stays until it is deleted in the Users
+  page. Only the target `local` exists; any other is refused, and the target `cloud` (the
+  operator's own e-mail, asked for) is step m8 of `docs/EMAIL_PLAN.md`. cognito-local checks
+  neither the challenge's session nor the rule for the new password: the page does the latter
+  itself, and the end of Cognito's 3 minutes is seen only in the cloud.
 - `DYNAMODB_PORT=8002 npm run smoke -w backend -- <stack|local>`: journeys 3, 4, 6 and 11 of
   `docs/IMPLEMENTATION_PLAN.md` step 9 with a throw-away `smoke-<epoch>` user and, before the
   last, the calendar journey of `docs/SHARED_CALENDAR_SPEC.md` section 18.4 (a type
@@ -538,7 +559,8 @@ Every command of this section that names a stack acts on a real AWS account. `CL
   `backend/scripts/cognito.mjs`, its helper for the Cognito calls that carry a secret, reads every
   password and token on stdin: `sign-in`, `tokens` (access and refresh token, one per line),
   `refresh`, `change-password` (three lines: access token, current, new), `sign-out`
-  (`GlobalSignOut`), `set-password`; errors print `<name> <message>` with any secret blanked.
+  (`GlobalSignOut`), `set-password`, `set-temporary-password` (the next sign-in must choose
+  another); errors print `<name> <message>` with any secret blanked.
 - `npm run assistant-key -w backend -- <stack>` (`backend/scripts/assistant-key.sh`): stores the
   Anthropic API key as the SecureString `/<stack>/anthropic-api-key`, encrypted with the
   account's default key for Parameter Store, or replaces it (a rotation); the procedure is

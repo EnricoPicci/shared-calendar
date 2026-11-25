@@ -30,6 +30,20 @@ export function changePasswordConfig(): ChangePasswordConfig {
 
 export const PASSWORDS = { alice: 'Alice-Local-Pass-1!', admin: 'Admin-Local-Pass-1!' };
 
+// Gives an account a temporary password, as an invitation does (docs/EMAIL_ARCHITECTURE.md
+// section 14.1): AdminSetUserPassword with Permanent false, so that its next sign-in gets the
+// challenge NEW_PASSWORD_REQUIRED. cognito-local takes the administrator's calls unsigned, so a
+// plain request does it. The password goes into the body and nowhere else.
+export async function setTemporaryPassword(username: string, password: string): Promise<void> {
+  const env = JSON.parse(readFileSync(ENV_FILE, 'utf8')) as { AuthorizerFunction: { USER_POOL_ID: string } };
+  const response = await fetch(cognito().cognitoUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-amz-json-1.1', 'X-Amz-Target': 'AWSCognitoIdentityProviderService.AdminSetUserPassword' },
+    body: JSON.stringify({ UserPoolId: env.AuthorizerFunction.USER_POOL_ID, Username: username, Password: password, Permanent: false }),
+  });
+  if (response.status !== 200) throw new Error(`could not give ${username} a temporary password: ${response.status}`);
+}
+
 // What "Create user" sends for a throw-away User of a journey: the username and four facts made
 // from it (docs/EMAIL_ARCHITECTURE.md section 4.1). The e-mail is at example.com, a domain kept
 // for examples, so no mail could ever reach a real person.

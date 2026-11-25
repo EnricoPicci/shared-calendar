@@ -7,8 +7,10 @@ import type { Session } from './login.types';
 // What the services that talk to Cognito share (docs/FRONTEND_SERVICES.md section 10.1): one
 // request for any target of Cognito's user-pool API and the reading of its answer; for
 // LoginService and RefreshService the InitiateAuth request, the mapping of its answer
-// (docs/FRONTEND_SERVICES.md section 4.5) and toSession; for LogoutService the RevokeToken
-// request and the reading of its answer (docs/FRONTEND_SERVICES.md section 20.5).
+// (docs/FRONTEND_SERVICES.md section 4.5) and toSession; for LoginService also the challenge
+// NEW_PASSWORD_REQUIRED and its answer, RespondToAuthChallenge (docs/FRONTEND_SERVICES.md
+// section 4.9); for LogoutService the RevokeToken request and the reading of its answer
+// (docs/FRONTEND_SERVICES.md section 20.5).
 
 export type CognitoConfig = {
   cognitoUrl: string; // 'https://cognito-idp.eu-north-1.amazonaws.com/' or 'http://localhost:9229/'
@@ -22,7 +24,7 @@ export type AuthFailureReason =
   | 'not_authorized'
   | 'too_many_attempts' // TooManyRequestsException, LimitExceededException
   | 'password_reset_required' // PasswordResetRequiredException
-  | 'challenge' // 200 without AuthenticationResult
+  | 'challenge' // 200 without AuthenticationResult, for any challenge but NEW_PASSWORD_REQUIRED
   | 'no_role' // the access token is in neither group
   | 'server' // 5xx, or a body that is not JSON
   | 'unexpected'; // any other __type; an access token whose claims cannot be read
@@ -34,9 +36,10 @@ export type AuthOutcome =
   | { status: 'failure'; reason: AuthFailureReason; message: string };
 
 // The targets of Cognito's user-pool API the front end calls: the sign-in and the refresh, the
-// revocation of a refresh token at sign-out, and a person's change of their own password with the
-// sign-out everywhere that follows it (docs/ARCHITECTURE.md section 6.9).
-export type CognitoTarget = 'InitiateAuth' | 'RevokeToken' | 'ChangePassword' | 'GlobalSignOut';
+// answer to the challenge of a temporary password, the revocation of a refresh token at sign-out,
+// and a person's change of their own password with the sign-out everywhere that follows it
+// (docs/ARCHITECTURE.md section 6.9).
+export type CognitoTarget = 'InitiateAuth' | 'RespondToAuthChallenge' | 'RevokeToken' | 'ChangePassword' | 'GlobalSignOut';
 
 // One request to Cognito: JSON over HTTPS, the action named in a header, no signing and no secret.
 // Emits one { status, text } and completes; errors only when fetch rejects. The body holds
@@ -79,6 +82,23 @@ export function initiateAuth(
   return cognitoRequest(config, 'InitiateAuth', { AuthFlow: flow, ClientId: config.clientId, AuthParameters: parameters });
 }
 
+// The answer to the challenge NEW_PASSWORD_REQUIRED: the person's username, the new password and
+// the challenge's session, which Cognito gave with the challenge (docs/FRONTEND_SERVICES.md
+// section 4.9). The body holds a password and a session: it goes into the request and nowhere else.
+export function respondToNewPassword(
+  config: CognitoConfig,
+  username: string,
+  newPassword: string,
+  session: string,
+): Observable<{ status: number; text: string }> {
+  return cognitoRequest(config, 'RespondToAuthChallenge', {
+    ChallengeName: 'NEW_PASSWORD_REQUIRED',
+    ClientId: config.clientId,
+    Session: session,
+    ChallengeResponses: { USERNAME: username, NEW_PASSWORD: newPassword },
+  });
+}
+
 // The body of Cognito's answer: the parsed object, an empty object for JSON that is not an object
 // (null, a number), or undefined when the text is not JSON at all.
 export function readCognitoBody(text: string): Record<string, unknown> | undefined {
@@ -106,7 +126,7 @@ export function describe(err: unknown): string {
 
 // The two bodies Cognito can answer with (docs/FRONTEND_SERVICES.md section 4.1).
 type AuthenticationResult = { AccessToken?: string; IdToken?: string; RefreshToken?: string; ExpiresIn?: number };
-type InitiateAuthResponse = { AuthenticationResult?: AuthenticationResult; ChallengeName?: string };
+type InitiateAuthResponse = { AuthenticationResult?: AuthenticationResult; ChallengeName?: string; Session?: string };
 type CognitoError = { __type?: string; message?: string };
 
 function failure(reason: AuthFailureReason, message: string): AuthOutcome {
@@ -139,6 +159,58 @@ export function toAuthOutcome(status: number, text: string, refreshToken?: strin
   const { type, message } = readCognitoError(body);
   const reason = REASON_BY_TYPE[type] ?? (status >= 500 ? 'server' : 'unexpected');
   return failure(reason, message ?? `Cognito answered ${status}`);
+}
+
+// The sign-in's outcome: an AuthOutcome, or the challenge NEW_PASSWORD_REQUIRED of an account
+// whose password is temporary, with the challenge's session (docs/FRONTEND_SERVICES.md section
+// 4.9). Internal to LoginService, which keeps the session to itself: it is a secret for 3 minutes.
+export type SignInOutcome = AuthOutcome | { status: 'new_password_required'; session: string };
+
+// Reads Cognito's answer to InitiateAuth with USER_PASSWORD_AUTH. Only NEW_PASSWORD_REQUIRED with a
+// session is told apart; any other challenge stays the failure `challenge` of toAuthOutcome.
+export function toSignInOutcome(status: number, text: string): SignInOutcome {
+  if (status === 200) {
+    const body = readCognitoBody(text) as InitiateAuthResponse | undefined;
+    if (body?.ChallengeName === 'NEW_PASSWORD_REQUIRED' && typeof body.Session === 'string' && body.Session !== '') {
+      return { status: 'new_password_required', session: body.Session };
+    }
+  }
+  return toAuthOutcome(status, text);
+}
+
+// What a refused answer to the challenge leaves open: the person may try again with the same
+// challenge (docs/FRONTEND_SERVICES.md section 4.9).
+export type ChallengeRefusalReason = 'password_refused' | 'too_many_attempts' | 'server' | 'unexpected';
+
+// The answer's outcome. Tokens give an AuthOutcome, as a sign-in does. `expired` is a session
+// Cognito no longer takes, its 3 minutes over: the challenge is gone and the person signs in
+// again. `refused` leaves the challenge open.
+export type ChallengeOutcome =
+  | AuthOutcome
+  | { status: 'expired'; message: string }
+  | { status: 'refused'; reason: ChallengeRefusalReason; message: string };
+
+// The error types of RespondToAuthChallenge read for the challenge NEW_PASSWORD_REQUIRED. Cognito
+// answers a session it no longer takes with NotAuthorizedException; ExpiredCodeException is read
+// the same way. cognito-local checks neither the session nor the pool's rule
+// (docs/EMAIL_ARCHITECTURE.md section 14.1), so locally only tokens come back.
+const CHALLENGE_REFUSAL_BY_TYPE: Record<string, ChallengeRefusalReason | 'expired'> = {
+  NotAuthorizedException: 'expired',
+  ExpiredCodeException: 'expired',
+  InvalidPasswordException: 'password_refused',
+  TooManyRequestsException: 'too_many_attempts',
+  LimitExceededException: 'too_many_attempts',
+};
+
+// Reads Cognito's answer to RespondToAuthChallenge. A 200 is read as a sign-in's answer; a
+// refusal's message is Cognito's own, as for a sign-in, and never quotes the password.
+export function toChallengeOutcome(status: number, text: string): ChallengeOutcome {
+  if (status === 200) return toAuthOutcome(status, text);
+  const body = readCognitoBody(text);
+  if (body === undefined) return { status: 'refused', reason: 'server', message: `Cognito answered ${status} without JSON` };
+  const { type, message = `Cognito answered ${status}` } = readCognitoError(body);
+  const known = CHALLENGE_REFUSAL_BY_TYPE[type] ?? (status >= 500 ? 'server' : 'unexpected');
+  return known === 'expired' ? { status: 'expired', message } : { status: 'refused', reason: known, message };
 }
 
 // Reads username, cognito:groups and exp from the access token. A token whose claims cannot be

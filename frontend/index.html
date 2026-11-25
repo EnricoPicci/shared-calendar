@@ -10,17 +10,45 @@
   <body>
     <!-- Everything starts hidden: the script shows the login or the frame (src/views/shell.ts). -->
 
-    <!-- The login view (src/views/login.view.ts) -->
+    <!-- The login view (src/views/login.view.ts); its sign-in form is hidden while "Choose your
+         password" is shown in its place -->
     <main id="login" class="login" hidden>
       <h1>Shared calendar</h1>
       <!-- What the page says after the person changed their password, until the next "Sign in" -->
       <p class="notice" role="status"></p>
-      <form>
+      <form class="sign-in">
         <label>Username <input name="username" autocomplete="username" autocapitalize="none" required /></label>
         <label>Password <input name="password" type="password" autocomplete="current-password" required /></label>
         <button class="primary">Sign in</button>
         <p class="error" role="alert"></p>
       </form>
+      <!-- "Choose your password" (src/views/choose-password.view.ts): an account whose password is
+           temporary signs in, and chooses its own before it gets in. Two fields, each a .field
+           with its hint; what the new password still misses is a list under it. The browser's
+           own check is off: the script says in words what is missing. -->
+      <section class="first-password" aria-labelledby="first-password-heading" hidden>
+        <h2 id="first-password-heading">Choose your password</h2>
+        <p class="about">You signed in as <strong class="account"></strong> with a temporary password. Choose your own password to go on.</p>
+        <form class="new-password" novalidate>
+          <div class="field new-field">
+            <label>New password <input name="next" type="password" autocomplete="new-password" aria-describedby="first-next-needs" /></label>
+            <ul class="needs hint" id="first-next-needs"></ul>
+          </div>
+          <div class="field again-field">
+            <label>New password again <input name="again" type="password" autocomplete="new-password" aria-describedby="first-again-hint" /></label>
+            <p class="hint" id="first-again-hint"></p>
+          </div>
+          <p class="error failure" role="alert"></p>
+          <div class="actions">
+            <button class="primary submit">Choose password</button>
+            <button type="button" class="cancel">Cancel</button>
+          </div>
+        </form>
+        <!-- One condition the new password still misses -->
+        <template id="tpl-first-password-need">
+          <li class="need"></li>
+        </template>
+      </section>
     </main>
 
     <!-- The frame of the application, for a signed-in person (src/views/shell.ts) -->

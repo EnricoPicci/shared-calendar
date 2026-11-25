@@ -12,9 +12,10 @@ export type LoginDeps = Pick<LoginService, 'login' | 'loginState$'>;
 // (docs/FRONTEND_ARCHITECTURE.md section 6); it stays until the next "Sign in".
 export function mountLogin(root: HTMLElement, login: LoginDeps, notice = ''): Subscription {
   // 1. Find the elements, once.
-  const form = root.querySelector('form')!;
-  const button = root.querySelector('button')!;
-  const error = root.querySelector('.error')!;
+  const form = root.querySelector<HTMLFormElement>('form.sign-in')!;
+  const button = form.querySelector('button')!;
+  const error = form.querySelector('.error')!;
+  const password = form.querySelector<HTMLInputElement>('[name="password"]')!;
   const said = root.querySelector('.notice')!;
   said.textContent = notice;
 
@@ -28,8 +29,17 @@ export function mountLogin(root: HTMLElement, login: LoginDeps, notice = ''): Su
   };
 
   // 3. The stream's notifications fill the elements. A failure is shown in plain words, by its
-  // reason: the service's own message is written for a developer.
+  // reason: the service's own message is written for a developer. While a new password is asked
+  // for, "Choose your password" stands in place of the form (docs/FRONTEND_ARCHITECTURE.md section
+  // 4): the temporary password is wiped from its field, and the username stays for the way back,
+  // where the keyboard is put on the password.
+  let choosing = false;
   const subscription = login.loginState$.subscribe((state) => {
+    const asking = state.status === 'new_password_required' || state.status === 'answering';
+    if (asking && !choosing) password.value = '';
+    if (!asking && choosing) password.focus();
+    choosing = asking;
+    form.hidden = asking;
     button.disabled = state.status === 'pending';
     error.textContent = state.status === 'failure' ? failureText(state.reason) : '';
   });
@@ -38,6 +48,7 @@ export function mountLogin(root: HTMLElement, login: LoginDeps, notice = ''): Su
   // last failure are wiped (docs/FRONTEND_ARCHITECTURE.md section 3, rule 9).
   subscription.add(() => {
     form.reset();
+    form.hidden = false;
     error.textContent = '';
     said.textContent = '';
   });

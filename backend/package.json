@@ -20,6 +20,7 @@
     "verify": "bash scripts/verify.sh",
     "deploy": "bash scripts/deploy.sh",
     "bootstrap-admin": "bash scripts/bootstrap-admin.sh",
+    "test-user": "bash scripts/test-user.sh",
     "smoke": "bash scripts/smoke.sh",
     "assistant-key": "bash scripts/assistant-key.sh",
     "assistant:eval": "bash scripts/assistant-eval.sh",

@@ -13,6 +13,9 @@
 //   node scripts/cognito.mjs sign-out                            access token -> GlobalSignOut,
 //                                                                 every token of the person revoked
 //   node scripts/cognito.mjs set-password <poolId> <username>    password -> set as permanent
+//   node scripts/cognito.mjs set-temporary-password <poolId> <username>
+//                                                                 password -> set as temporary: the
+//                                                                 first sign-in must choose another
 //   node scripts/cognito.mjs set-profile <poolId> <username>     a person's four facts, one per
 //                                                                 line: first name, last name,
 //                                                                 e-mail, then the postal address,
@@ -51,6 +54,7 @@ const ARGUMENTS = {
   'change-password': [],
   'sign-out': [],
   'set-password': ['poolId', 'username'],
+  'set-temporary-password': ['poolId', 'username'],
   'set-profile': ['poolId', 'username'],
 };
 
@@ -59,7 +63,7 @@ const expected = Object.hasOwn(ARGUMENTS, action ?? '') ? ARGUMENTS[action] : un
 if (!expected || args.length !== expected.length || args.some((arg) => !arg)) {
   console.error(
     'usage: node scripts/cognito.mjs <sign-in|tokens> <clientId> <username> | refresh <clientId> | ' +
-      'change-password | sign-out | <set-password|set-profile> <poolId> <username>   (secrets on stdin)',
+      'change-password | sign-out | <set-password|set-temporary-password|set-profile> <poolId> <username>   (secrets on stdin)',
   );
   process.exit(2);
 }
@@ -151,8 +155,9 @@ try {
   } else if (action === 'set-profile') {
     await client.send(new AdminUpdateUserAttributesCommand({ UserPoolId: id, Username: username, UserAttributes: profile() }));
   } else {
+    // set-password or set-temporary-password: the whole of stdin, as typed.
     await client.send(
-      new AdminSetUserPasswordCommand({ UserPoolId: id, Username: username, Password: input, Permanent: true }),
+      new AdminSetUserPasswordCommand({ UserPoolId: id, Username: username, Password: input, Permanent: action === 'set-password' }),
     );
   }
 } catch (err) {

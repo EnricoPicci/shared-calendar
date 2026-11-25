@@ -1,6 +1,9 @@
 # Shared Calendar: e-mail (implementation plan)
 
-**Version:** v7 (2026-11-25): step m6 done, its "As done" note written; no step's content
+**Version:** v9 (2026-11-25): step m7 done, its "As done" note written; the look at an expired
+session moved from step m7's check to step m9's, since cognito-local never ends a challenge. v8 (2026-11-25): the root `CLAUDE.md`'s password rule moved from step m7 to step
+m8, where the code makes it true; step m7's local script is `test-user` with its target `local`,
+step m8 adds `cloud` (the Product Owner's decisions, with the brief of step m7). v7 (2026-11-25): step m6 done, its "As done" note written; no step's content
 changed. v6 (2026-11-25): step m5 done, its "As done" note written; no step's content
 changed. v5 (2026-11-25): steps m3 and m4 done, their "As done" notes written; no step's
 content changed. v4 (2026-11-25): steps m1 and m2 done, their "As done" notes written; no step's
@@ -212,8 +215,8 @@ breaks it**, not later.
 | m4 | `docs/ARCHITECTURE.md` (`POST /mail/calendar`, its limits); `docs/FRONTEND_SERVICES.md`, `docs/FRONTEND_ARCHITECTURE.md`, `docs/FRONTEND_WALK.md` (the week's dialog) |
 | m5 | `docs/ARCHITECTURE.md` (the settings routes, the daily run, the timer, the alarm); the three front-end documents (the settings section) |
 | m6 | **Root `CLAUDE.md`: "changes the calendar, or sends a mail, only through `confirmProposal`"**. `docs/CONVERSATIONAL_ARCHITECTURE.md` (the tool, its proposal, the evaluation's requests, a version row); `docs/FRONTEND_WALK.md` if the panel's check gains a mail proposal |
-| m7 | **Root `CLAUDE.md`: the hard rule's password part** becomes "A User's first password is temporary: Cognito makes it, e-mails it and forces its change at the first sign-in; the API never sees it or answers it. The Administrator's password is set once as permanent by the bootstrap" (the page's answer to the challenge is the first code that handles a forced change). `docs/FRONTEND_SERVICES.md` (the sign-in's challenge), `docs/FRONTEND_ARCHITECTURE.md` and `docs/FRONTEND_WALK.md` (the screen "Choose your password") |
-| m8 | `docs/ARCHITECTURE.md` sections 1.2, 5.1, 6.3, 7.3, 7.4, 10 and 13 rewritten from `docs/EMAIL_ARCHITECTURE.md` (its section 17), with the stages and parameters; `docs/RUNBOOK.md` section 6 and a draft of the stages' steps; the three front-end documents (the users screen's invitation); every changed journey's page |
+| m7 | `docs/FRONTEND_SERVICES.md` (the sign-in's challenge), `docs/FRONTEND_ARCHITECTURE.md` and `docs/FRONTEND_WALK.md` (the screen "Choose your password") |
+| m8 | **Root `CLAUDE.md`: the hard rule's password part** becomes "A User's first password is temporary: Cognito makes it, e-mails it and forces its change at the first sign-in; the API never sees it or answers it. The Administrator's password is set once as permanent by the bootstrap" (the creation without a password is what makes it true), with F15's exception for the operator's test User. `docs/ARCHITECTURE.md` sections 1.2, 5.1, 6.3, 7.3, 7.4, 10 and 13 rewritten from `docs/EMAIL_ARCHITECTURE.md` (its section 17), with the stages and parameters; `docs/RUNBOOK.md` section 6 and a draft of the stages' steps; the three front-end documents (the users screen's invitation); every changed journey's page |
 | m9 | `docs/RUNBOOK.md`: the stage `domain`, the DNS records, the production access, the suppression list; section 5.9, the deployment record, opened |
 | m10 | `docs/EMAIL_ARCHITECTURE.md` a record (status line); `docs/ARCHITECTURE.md` v16 closed; `docs/SHARED_CALENDAR_SPEC.md` section 15's sentence on the address confirmed; `docs/CONVERSATIONAL_ARCHITECTURE.md` status line (deployed); `docs/RUNBOOK.md` section 5.9 closed; `README.md` "Versions": v3.0.0; root `CLAUDE.md`: `docs/EMAIL_PLAN.md` among the records of finished work |
 
@@ -758,8 +761,9 @@ Builds:
   usual; a session older than 3 minutes is said and leads back to the sign-in.
 - The view: "Choose your password", with the rule and the live checks of the change-password
   screen (`shared/src/password.ts`).
-- The local stack: a script that makes a local account with a temporary password, for the look
-  at the screen (`AdminSetUserPassword` with `Permanent: false`).
+- The local stack: `npm run test-user -w backend -- local <username>` (F15, target `local` only;
+  step m8 adds `cloud`), which makes a local account with a temporary password, for the look at
+  the screen (`AdminSetUserPassword` with `Permanent: false`).
 
 Not here: the back end (the authorizer and the routes need nothing: Cognito gives no token before
 the change).
@@ -767,10 +771,66 @@ the change).
 Journeys: in the front end's `login.service.test.ts`, a block: an account given a temporary
 password by a helper, the challenge, the new password, signed in, the old one refused.
 
-Documents: section 4's row m7, with the root `CLAUDE.md`'s hard rule on passwords.
+Documents: section 4's row m7. The root `CLAUDE.md`'s hard rule on passwords waits for step m8.
 
-**Check:** section 5.1; the screen: "Choose your password", including a too-weak password and an
-expired session.
+**Check:** section 5.1; the screen: "Choose your password", including a too-weak password. The
+expired session is looked at in the cloud, in step m9's check: cognito-local accepts any session
+(`docs/EMAIL_ARCHITECTURE.md` section 14.1).
+
+**As done (2026-11-25).** Root `typecheck`, `lint` and `test:unit` green, 100 % lines (shared
+577 tests, back end 1 993, front end 3 033). The new journey block alone green, 4 tests, twice in
+a row; the whole of `login.service.test.ts` green, 9. Brief
+`prompts/mail-m07-first-sign-in-implementation.md`.
+
+- **What Cognito and cognito-local answered.** cognito-local 5.3.0 answers a temporary password's
+  `InitiateAuth` with `ChallengeName: NEW_PASSWORD_REQUIRED` and a `Session`, and
+  `RespondToAuthChallenge` with the three tokens. It checks neither the session (a made-up one
+  gets tokens) nor the pool's rule for the new password (`weak` gets tokens):
+  `docs/EMAIL_ARCHITECTURE.md` section 14.1 corrected. So the page checks the rule itself before
+  sending (as "Password" does), and the end of the 3 minutes (real Cognito's
+  `NotAuthorizedException`, also read: `ExpiredCodeException`) is proved by unit tests only; its
+  look is in step m9's check and `docs/FRONTEND_WALK.md` check 202. Real Cognito was not tried.
+- **Built.** `cognito.ts`: `respondToNewPassword`, `toSignInOutcome` (the challenge apart from any
+  other, which stays `challenge`), `toChallengeOutcome`. `LoginService`: the result and state
+  `new_password_required` (the username only, with a refusal after a failed try), the state
+  `answering`, `choosePassword()`; the session stays in a private field, never in a state or a
+  result; `reset()` is the Cancel and forgets it. New reasons `session_expired` ("This took too
+  long. Please sign in again.") and `password_refused`. Kept apart from `toAuthOutcome`, so the
+  `RefreshService` is untouched.
+- **The screen, and the reuse.** `ChoosePasswordScreen` and `mountChoosePassword`, a section of
+  `#login` beside the sign-in form, which hides while the challenge is open. The live checks are
+  those of the "Password" screen: `password.model.ts` gains `newPasswordHints`, built on the same
+  `newProblems`/`problemTexts` and on `againHint`, factored out of `passwordHints`; the rule stays
+  `shared/src/password.ts`, so nothing under `shared/` moved. The shell mounts it with the login.
+- **Existing tests changed, and why.** `login.service.test.ts` (unit): its "any challenge" case
+  used `NEW_PASSWORD_REQUIRED`, which is no longer "any": now `SOFTWARE_TOKEN_MFA`.
+  `login.view.test.ts`: the form is `#login form.sign-in`, since `#login` holds two forms.
+  `page.test.ts`: the template list gains `tpl-first-password-need`, the fields 58 → 60, the
+  places of a failure 72 → 73. No journey's story changed; `login.service.test.ts` (integration)
+  only gained its block, with the page `docs/journeys/frontend/first-sign-in.md`.
+- **The script.** `backend/scripts/test-user.sh` (`npm run test-user -w backend -- local
+  <username>`): refuses another target (naming step m8), a name the username rule refuses,
+  `admin`, an existing account; the temporary password typed twice, checked by
+  `password_problems` (moved from `bootstrap-admin.sh` into `target.sh`, so both use it) and sent
+  on stdin through `cognito.mjs`'s new action `set-temporary-password`; the four facts made up; a
+  failure after the creation deletes the account. Tried: each refusal; a first run failed, the
+  AWS CLI's short form splitting the address at its comma (now JSON); then the account made
+  (`FORCE_CHANGE_PASSWORD`, group `user`, the four facts), a second run refused.
+- **The look** (`docs/FRONTEND_WALK.md` checks 193 to 201), with the script's account: the
+  challenge leads to "Choose your password", the focus in the field; `weak` shrinks the list
+  live and the button stays off; Cancel goes back with the username kept, the password wiped; at
+  390 × 844, a repeat that differs is said live, a good password signs in as the User; after the
+  sign-out the temporary password is refused and the new one accepted. The account deleted
+  after.
+- **`CLAUDE.md` files.** Root unchanged (the password rule waits for step m8). `frontend/CLAUDE.md`:
+  `choose-password` among the views and the screens. `backend/CLAUDE.md`: `test-user.sh` among
+  the scripts; "the Cognito calls carrying a password", no longer two. `.claude/rules/frontend-views.md`:
+  the counts of `page.test.ts` (already stale) dropped, the rule kept.
+- **What step m8 finds ready.** The page answers the challenge an invitation gives, so the
+  invitation needs nothing of the page's sign-in; `test-user.sh` takes a new target `cloud`
+  beside `local` (`load_target` already knows both); `setTemporaryPassword()` in
+  `frontend/tests/integration/local.ts` stands for the invitation's temporary password in the
+  invitation's journey.
 
 ### Step m8 — The invitation, the stages, the release prepared
 
@@ -802,7 +862,7 @@ Builds:
   pages under `docs/journeys/` changed with them; a journey of the invitation locally: created,
   `invited` in the list, cognito-local's challenge answered (the temporary password set by the
   helper), then `active`; the resend's refusals.
-- `backend/scripts/test-user.sh` and its npm script (F15), tried locally: the User made, the
+- `backend/scripts/test-user.sh` gains its target `cloud` (F15; the target `local` is step m7's), tried locally: the User made, the
   temporary password answered in the page's "Choose your password", the User deleted.
 - `backend/scripts/smoke.sh`: as F1 decides; the invitation to the operator's address (a
   parameter of the run), its state, its resend, the User deleted; a mail on demand for `admin`;
@@ -871,7 +931,9 @@ Documents: section 4's row m9.
 
 **Check:** the smoke test PASS in the cloud; the stack's outputs show the DKIM records; the
 operator reports the records added, the subscription confirmed, the request sent, the test User
-signed in with its own password.
+signed in with its own password; and, with a second test User, "Choose your password" left open
+more than 3 minutes says "This took too long. Please sign in again." and leads back to the
+sign-in, the username kept (`docs/FRONTEND_WALK.md` check 202).
 
 ### Step m10 — Cloud, stage `on`, and the release v3.0.0 (each command on the operator's explicit instruction)
 

@@ -18,7 +18,7 @@ function mounted(first: LoginState = { status: 'idle' }) {
     login,
     root,
     subscription,
-    form: find<HTMLFormElement>('#login form'),
+    form: find<HTMLFormElement>('#login form.sign-in'),
     username: find<HTMLInputElement>('#login [name="username"]'),
     password: find<HTMLInputElement>('#login [name="password"]'),
     button: find<HTMLButtonElement>('#login button'),
@@ -163,6 +163,48 @@ describe('mountLogin', () => {
     const again = mountLogin(find('#login'), login, 'Password changed.');
     again.unsubscribe();
     expect(notice.textContent).toBe('');
+  });
+
+  it('a new password asked for: the sign-in form hidden, the temporary password wiped, the username kept', () => {
+    const { state$, form, username, password } = mounted();
+    username.value = 'anna';
+    password.value = PASSWORD;
+    state$.next({ status: 'pending', username: 'anna' });
+    state$.next({ status: 'new_password_required', username: 'anna' });
+    expect(form.hidden).toBe(true);
+    expect([username.value, password.value]).toEqual(['anna', '']);
+    password.value = 'typed meanwhile';
+    state$.next({ status: 'answering', username: 'anna' });
+    expect(form.hidden).toBe(true);
+    expect(password.value).toBe('typed meanwhile'); // wiped once, on the way in
+  });
+
+  it('back from "Choose your password" (the 3 minutes over): the form with the username, its sentence, the keyboard on the password', () => {
+    const { state$, form, username, password, error } = mounted();
+    username.value = 'anna';
+    state$.next({ status: 'new_password_required', username: 'anna' });
+    state$.next({ status: 'failure', reason: 'session_expired', message: 'Invalid session for the user, session is expired.' });
+    expect(form.hidden).toBe(false);
+    expect(username.value).toBe('anna');
+    expect(error.textContent).toBe('This took too long. Please sign in again.');
+    expect(document.activeElement).toBe(password);
+  });
+
+  it('back by Cancel: the form, no sentence, the keyboard on the password', () => {
+    const { state$, form, password, error } = mounted();
+    expect(document.activeElement).not.toBe(password);
+    state$.next({ status: 'new_password_required', username: 'anna' });
+    state$.next({ status: 'idle' });
+    expect(form.hidden).toBe(false);
+    expect(error.textContent).toBe('');
+    expect(document.activeElement).toBe(password);
+  });
+
+  it('left while a new password is asked for: the form is shown again for the next time', () => {
+    const { state$, form, subscription } = mounted();
+    state$.next({ status: 'new_password_required', username: 'anna' });
+    subscription.unsubscribe();
+    expect(form.hidden).toBe(false);
   });
 
   it('without a notice the place stays empty', () => {

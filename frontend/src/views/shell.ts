@@ -4,6 +4,7 @@ import { distinctUntilChanged, filter, map, startWith } from 'rxjs/operators';
 import { AppointmentsScreen } from '../logic/appointments.screen';
 import { AssistantScreen } from '../logic/assistant.screen';
 import { AvailabilityScreen } from '../logic/availability.screen';
+import { ChoosePasswordScreen } from '../logic/choose-password.screen';
 import { DateScreen } from '../logic/date.screen';
 import { DailyMailScreen } from '../logic/daily-mail.screen';
 import { MailScreen } from '../logic/mail.screen';
@@ -34,6 +35,7 @@ import { mountAppointments } from './appointments.view';
 import { mountAssistant } from './assistant.view';
 import { mountConfirm } from './availability.parts';
 import { mountAvailability } from './availability.view';
+import { mountChoosePassword, type ChoosePasswordDeps } from './choose-password.view';
 import { mountDate } from './date.view';
 import { mountLogin, type LoginDeps } from './login.view';
 import { mountMe } from './me.view';
@@ -72,6 +74,10 @@ export type ShellDeps = {
   // (docs/FRONTEND_SERVICES.md section 2, rule 9). The shell itself uses `session$` only.
   store: SessionStore;
   login: LoginDeps;
+  // "Choose your password", shown in the login's place while the LoginService asks for a new
+  // password (docs/FRONTEND_ARCHITECTURE.md section 6): mounted and started with the login view,
+  // ended with it. None unless given.
+  choose?: ChoosePasswordDeps & Pick<ChoosePasswordScreen, 'start'>;
   logout: LogoutDeps;
   // The services that live as long as the page, put back to their first state after a change of
   // password as "Sign out" puts them back (docs/FRONTEND_SERVICES.md section 8, decision 53):
@@ -304,15 +310,17 @@ export function runShell(config: AppConfig): Subscription {
   const login = new LoginService(config, store);
   const refresh = new RefreshService(config, store);
   const logout = new LogoutService(config, store, [login, refresh]);
+  // Lives as long as the page, as the LoginService it follows does.
+  const choose = new ChoosePasswordScreen(login);
   refresh.start();
-  const subscription = mountShell(document.body, { config, store, login, logout, pageWide: [login, refresh] });
+  const subscription = mountShell(document.body, { config, store, login, choose, logout, pageWide: [login, refresh] });
   subscription.add(() => refresh.stop());
   return subscription;
 }
 
 // Shows the login or the frame at every change of person, and in the frame the screen of the
 // address. `root` holds the elements #login and #app of index.html.
-export function mountShell(root: HTMLElement, { config, store, login, logout, pageWide = [], screens: table = SCREENS }: ShellDeps): Subscription {
+export function mountShell(root: HTMLElement, { config, store, login, choose, logout, pageWide = [], screens: table = SCREENS }: ShellDeps): Subscription {
   const find = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
   const loginRoot = find('#login');
   const frame = find('#app');
@@ -410,6 +418,17 @@ export function mountShell(root: HTMLElement, { config, store, login, logout, pa
     return session;
   };
 
+  // The login view, with "Choose your password" beside it when given: view first, then its logic
+  // object (docs/FRONTEND_ARCHITECTURE.md section 3, rule 8).
+  const showLogin = (): Subscription => {
+    const shown = mountLogin(loginRoot, login, notice);
+    if (choose) {
+      shown.add(mountChoosePassword(loginRoot, choose));
+      shown.add(choose.start());
+    }
+    return shown;
+  };
+
   // What is on screen: the login view, or one person's frame.
   let current: Subscription | undefined;
 
@@ -425,7 +444,7 @@ export function mountShell(root: HTMLElement, { config, store, login, logout, pa
       current?.unsubscribe(); // leaves the login view or the previous person's frame
       loginRoot.hidden = person !== null;
       frame.hidden = person === null;
-      current = person === null ? mountLogin(loginRoot, login, notice) : enter(person);
+      current = person === null ? showLogin() : enter(person);
       notice = ''; // said once
     });
 

@@ -1,5 +1,5 @@
 # shellcheck shell=bash disable=SC2034 # sourced: the variables set here are used by the caller
-# Sourced by bootstrap-admin.sh and smoke.sh. Resolves the target named on their command line:
+# Sourced by bootstrap-admin.sh, test-user.sh and smoke.sh. Resolves the target named on their command line:
 #
 #   local         the emulators of npm run local:up: ids from env.local.json, dummy credentials
 #   <stack name>  a deployed stack: ids from its CloudFormation outputs, your AWS credentials
@@ -65,6 +65,22 @@ ddb() { aws dynamodb ${DYNAMODB_URL:+--endpoint-url "$DYNAMODB_URL"} "$@"; }
 
 # cognito <action> [args]: the calls of cognito.mjs that carry a password or a token, on stdin.
 cognito() { COGNITO_URL="$COGNITO_URL" node scripts/cognito.mjs "$@"; }
+
+# password_problems: what the password on stdin misses of the pool policy (template.yaml), as one
+# line of "a digit; a symbol" and so on, or nothing when it meets it. Checked by the scripts for a
+# clear message; Cognito has the last word. Reads stdin, so the password is never an argument.
+password_problems() {
+  local password problems=""
+  IFS= read -r password || true
+  (( ${#password} >= 12 )) || problems+=" at least 12 characters;"
+  [[ "$password" =~ [[:upper:]] ]] || problems+=" an upper-case letter;"
+  [[ "$password" =~ [[:lower:]] ]] || problems+=" a lower-case letter;"
+  [[ "$password" =~ [[:digit:]] ]] || problems+=" a digit;"
+  [[ "$password" =~ [^[:alnum:]] ]] || problems+=" a symbol;"
+  [[ ! "$password" =~ [[:cntrl:]] ]] || problems+=" no control characters;"
+  [[ "$password" != " "* && "$password" != *" " ]] || problems+=" no space at the start or end;"
+  printf '%s' "${problems%;}"
+}
 
 # json_field <name>: the string field <name> of the JSON object on stdin, or nothing (also for
 # input that is not JSON). Reads stdin, so it is safe for answers that hold a password.

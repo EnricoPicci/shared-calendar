@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v9 (2026-11-25, `docs/EMAIL_PLAN.md` step m6): a mail asked for through the assistant's panel is section 14, checks 189 to 192. v8 (2026-11-25, `docs/EMAIL_PLAN.md` step m5): the settings' "Daily e-mail" is section 13, checks 181 to 188. v7 (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): the week's "E-mail…" dialog is section 12, checks 171 to 180; section 1 says what it needs. v6 (2026-11-25, `docs/EMAIL_PLAN.md` step m2): the four facts of a person and "My details" are section 11, checks 157 to 170; checks 3, 40, 53 and section 1 in line. v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
+| Status | v10 (2026-11-25, `docs/EMAIL_PLAN.md` step m7): "Choose your password", the first sign-in with a temporary password, is section 15, checks 193 to 202. v9 (2026-11-25, `docs/EMAIL_PLAN.md` step m6): a mail asked for through the assistant's panel is section 14, checks 189 to 192. v8 (2026-11-25, `docs/EMAIL_PLAN.md` step m5): the settings' "Daily e-mail" is section 13, checks 181 to 188. v7 (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): the week's "E-mail…" dialog is section 12, checks 171 to 180; section 1 says what it needs. v6 (2026-11-25, `docs/EMAIL_PLAN.md` step m2): the four facts of a person and "My details" are section 11, checks 157 to 170; checks 3, 40, 53 and section 1 in line. v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
 | What it is | One list of checks that walks every screen of the front end and the assistant's panel in a browser, as a User and as the Administrator, against the local stack. **The check to repeat after a later change to the view layer** |
 | What it is not | A source of truth, and not an automated test. On any conflict `docs/FRONTEND_ARCHITECTURE.md` and the tests win, and this page is fixed. No end-to-end test tool is in the repository (`docs/FRONTEND_VIEW_PLAN.md` section 8, decision 6): a person follows the list by hand, or drives a browser with a script kept outside the repository |
 | Made from | The browser checks of `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 68, of `docs/CONVERSATIONAL_PLAN.md` step c12 and of `docs/CAPACITY_PLAN.md` step u5, in the order a person would follow, and `docs/SHARED_CALENDAR_SPEC.md` section 16.8 |
@@ -22,6 +22,7 @@
 | v7 | 2026-11-25 | `docs/EMAIL_PLAN.md` steps m3 and m4: **the mail of two dates**, section 12, checks 171 to 180: the week's "E-mail…" dialog for both roles, a refused range, the address masked, the mail and its file at the fake mail, the limit of five a day, the phone width; section 1 gains `local:lambda` and the fake mail; the row of m4 in section 8. Section 11's checks 159, 162, 164, 167, 168 and 170 walked that day (168 at 606 px, the narrowest the browser of the walk allowed). |
 | v9 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m6: **a mail through the assistant**, section 14, checks 189 to 192: the panel's proposal with the dates and the masked address, Confirm and the mail at the fake mail, Don't, against the fake Claude. No screen of the page changed. |
 | v8 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m5: **the daily e-mail**, section 13, checks 181 to 188: the settings' part "Daily e-mail", a save, a refused hour, the daily mail started by hand and its two files at the fake mail, "E-mail is not available yet." with the stage off, the phone width; the row of m5 in section 8. |
+| v10 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m7: **the first sign-in with a temporary password**, section 15, checks 193 to 202: an account made by `npm run test-user -w backend -- local`, "Choose your password" in the login's place, its hints, a too-weak password, Cancel, a good one signing in, the temporary password refused afterwards and the new one accepted, the phone width. The end of Cognito's 3 minutes cannot be walked locally (cognito-local never ends a challenge): check 202 is for the deployed page. No other check changed. |
 
 ---
 
@@ -656,11 +657,12 @@ section 6 and the journeys run on the fake only.
 | m4 | The week's "E-mail…" for `alice` and `admin`: the dates of the week on show, a range refused, the address masked, the mail and its file at the fake mail, the sixth of the day refused, the phone | 171 to 180 |
 | m5 | The settings' "Daily e-mail": a save, a value refused, the daily mail by hand at the hour set with its two files, "not available yet" with `MAIL_STAGE=off` | 181 to 188 |
 | m6 | The assistant's mail: the proposal with the two dates and the masked address, Confirm and the mail at the fake mail, Don't | 189 to 192 |
+| m7 | "Choose your password": an account made by the script, its temporary password leading to the screen, a too-weak password refused with the live checks, a good one signing in, the temporary one refused afterwards and the new one accepted, the 3 minutes over (at the deployed page), the phone width | 193 to 202 |
 | p3 | The hints while typing, the two new ones differing, a wrong current password, a change that succeeds, "Password changed" at the login, the old password refused, the new one accepted; as `alice` and as `admin`, at the two widths | 123 to 133 |
 
 Steps 60 to 68 are those of `docs/FRONTEND_VIEW_PLAN.md`; step c12 is of
 `docs/CONVERSATIONAL_PLAN.md`; step p3 of `docs/CHANGE_PASSWORD_PLAN.md`; step u5 of
-`docs/CAPACITY_PLAN.md`; steps m2, m4, m5 and m6 of `docs/EMAIL_PLAN.md`.
+`docs/CAPACITY_PLAN.md`; steps m2, m4, m5, m6 and m7 of `docs/EMAIL_PLAN.md`.
 
 Left out on purpose: "the screens of the earlier steps still work, in short" (`docs/FRONTEND_VIEW_PLAN.md`
 section 4), which was each step's own short walk and is this whole list.
@@ -916,3 +918,47 @@ mail and the day's count of `admin` at two.
      the fake mail.
 192. → At 390 × 844 the proposal's line breaks inside the panel, the masked address with it,
      and the page does not scroll sideways.
+
+## 15. The first sign-in: "Choose your password"
+
+Walked as a User of its own, after section 14, or alone on any running stack: it needs only
+`local:up`, `local:api` and the page. It makes one User with a temporary password through
+`npm run test-user -w backend -- local walk-<tag>-first` (the e-mail
+`walk-<tag>-first@example.com`, the name "Test User walk-<tag>-first", an address made up; the
+temporary password typed twice, `Walk-<tag>-Temp-1!`), and leaves nothing: the User is deleted
+in the Users page at the end (check 200). The new password: `Walk-<tag>-First-2?`.
+
+cognito-local checks neither the challenge's session nor the pool's rule for the new password
+(`docs/EMAIL_ARCHITECTURE.md` section 14.1): the page checks the rule itself before it sends
+anything, and the end of Cognito's 3 minutes is walked at the deployed page only (check 202).
+
+193. `[K]` Sign in as `walk-<tag>-first` with the temporary password. → In place of the sign-in
+     form, "Choose your password", "You signed in as walk-<tag>-first with a temporary password.
+     Choose your own password to go on.", the keyboard in "New password". Under it the five
+     conditions of the password screen (check 123); under "New password again" "Type the new
+     password once more."; "Choose password" out of use; "Cancel". No frame, no header, no
+     panel. In the Network panel one request to `/cognito/`, `InitiateAuth`, answered 200.
+194. `[K]` In "New password" type `walk`, then go on to `Walk-<tag>-First-2?` one character at a
+     time. → Each condition goes from the list as soon as it is met. In "New password again"
+     the new password with its last character missing → "The two new passwords are not the
+     same."; whole, the sentence goes and "Choose password" can be pressed.
+195. `[K]` "Cancel". → The sign-in form again, the username still in its field, the password field
+     empty, the keyboard in it, no sentence; nothing sent to `/cognito/`. Sign in again with the
+     temporary password. → "Choose your password" again, both fields empty.
+196. `[N]` Type `Weak-1` in both fields and press Enter in the second. → Nothing is sent: the
+     conditions it misses stay under "New password" and the button stays out of use.
+197. `[K]` `[N]` The new password twice, "Choose password". → One request to `/cognito/`,
+     `RespondToAuthChallenge`, answered 200; the frame, the header says `walk-<tag>-first` and
+     "User", the address ends in `#/week`. Neither password, nor the session, is anywhere in the
+     page or the address.
+198. `[K]` "Sign out", then sign in with the temporary password. → "The username or the password
+     is not correct."; no "Choose your password".
+199. `[K]` Sign in with the new password. → The frame, as in check 197. Sign out.
+200. Sign in as `admin`, "Users": `walk-<tag>-first` is in the list. Delete it. Sign out.
+201. → At 390 × 844, with a new account made by the script (checks 193, 194): the card takes the
+     width, the list of conditions and the two buttons wrap inside it, and the page does not
+     scroll sideways. Delete the account afterwards (check 200).
+202. At the deployed page only (`docs/EMAIL_PLAN.md` step m9, with the operator's test User):
+     sign in with the temporary password, wait more than 3 minutes on "Choose your password",
+     then "Choose password" with a good one. → The sign-in form, the username in its field,
+     "This took too long. Please sign in again."; the temporary password still works.

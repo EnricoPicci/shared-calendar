@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v15 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` step m5): `MailSettingsService` reads and saves the daily mail's settings (section 25). v14 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): `MailService` asks for the mail of a range of dates (section 24). v13 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m1 and m2): the four facts of a person in `UsersService` (`createUser` with them, `updateUser`, section 13) and `MeService` (section 23). v12 — implemented (2026-11-24, brief `prompts/e14-step-u4-implementation.md`, `docs/CAPACITY_PLAN.md` step u4): the capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` v17, decisions D24 to D31) in the services: `AvailabilityTypesService.create` and `rename` take an optional `capacity` (section 16, decision 70); `AppointmentsService.book` and `change` pass `overbook` through and answer `user_busy` (section 19). v11 — implemented (2026-11-23, brief `prompts/e05-step-p3-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p3): `ChangePasswordService` says its success before it clears the store (section 22.4, decision 69), so that the shell reacts while the person is still signed in. v10 — implemented (2026-11-22, brief `prompts/e03-step-p2-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p2): `ChangePasswordService` (section 22), a person's change of their own password straight at Cognito, with `cognito.ts` making one request for any target of Cognito (section 10.1). v9 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 21), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v8 — implemented (2026-11-21, brief `prompts/95-step-71-implementation.md`, `docs/FRONTEND_DEPLOY_PLAN.md` step 71; the design reviewed before the code): `LogoutService` (section 20), `revokeToken` and `toRevokeOutcome` in `cognito.ts` (section 10.1), `reset()` on `LoginService` and `RefreshService`; proven against cognito-local, and at the deployed page as far as the revocation answered 200 (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; section 20.9 says what was seen and what was not). v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). |
-| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-21; v9 and v10 2026-11-22; v11 2026-11-23; v12 2026-11-24; v13, v14 and v15 2026-11-25 |
+| Status | v16 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` step m7): the first sign-in with a temporary password, the challenge `NEW_PASSWORD_REQUIRED` answered with a new password (section 4.9). v15 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` step m5): `MailSettingsService` reads and saves the daily mail's settings (section 25). v14 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): `MailService` asks for the mail of a range of dates (section 24). v13 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m1 and m2): the four facts of a person in `UsersService` (`createUser` with them, `updateUser`, section 13) and `MeService` (section 23). v12 — implemented (2026-11-24, brief `prompts/e14-step-u4-implementation.md`, `docs/CAPACITY_PLAN.md` step u4): the capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` v17, decisions D24 to D31) in the services: `AvailabilityTypesService.create` and `rename` take an optional `capacity` (section 16, decision 70); `AppointmentsService.book` and `change` pass `overbook` through and answer `user_busy` (section 19). v11 — implemented (2026-11-23, brief `prompts/e05-step-p3-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p3): `ChangePasswordService` says its success before it clears the store (section 22.4, decision 69), so that the shell reacts while the person is still signed in. v10 — implemented (2026-11-22, brief `prompts/e03-step-p2-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p2): `ChangePasswordService` (section 22), a person's change of their own password straight at Cognito, with `cognito.ts` making one request for any target of Cognito (section 10.1). v9 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 21), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v8 — implemented (2026-11-21, brief `prompts/95-step-71-implementation.md`, `docs/FRONTEND_DEPLOY_PLAN.md` step 71; the design reviewed before the code): `LogoutService` (section 20), `revokeToken` and `toRevokeOutcome` in `cognito.ts` (section 10.1), `reset()` on `LoginService` and `RefreshService`; proven against cognito-local, and at the deployed page as far as the revocation answered 200 (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; section 20.9 says what was seen and what was not). v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). |
+| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-21; v9 and v10 2026-11-22; v11 2026-11-23; v12 2026-11-24; v13, v14, v15 and v16 2026-11-25 |
 | Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows); since v7 the calendar view and the appointments; since v8 the sign-out; since v9 the conversation with the assistant; since v10 the change of one's own password; since v12 the capacity of a type |
 | Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), since v6 v12 (sections 3 and 4: the calendar routes as implemented); `docs/SHARED_CALENDAR_SPEC.md` v15 section 16 (v13 when v6 was written), and for v7 sections 8, 11.1 (routes 15–20), 11.2, 11.5, 11.6; for v8 `docs/FRONTEND_ARCHITECTURE.md` section 13.7 and section 11, decision 152 (the direction for logout as v14 had it; its v15 follows this design), and `docs/ARCHITECTURE.md` section 7.3; `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/`; for v9 `docs/CONVERSATIONAL_ARCHITECTURE.md` v14 (sections 4.4, 5.1 to 5.5, 6, 6.1 and 13) and `docs/ARCHITECTURE.md` section 4, "The assistant's routes"; for v10 `docs/ARCHITECTURE.md` v14 (sections 5.1, 6.9, 7.3 and 8) and `docs/CHANGE_PASSWORD_PLAN.md` |
 
@@ -29,6 +29,7 @@
 | v13 | 2026-11-25 | `docs/EMAIL_PLAN.md` steps m1 and m2 (brief `prompts/mail-m03-pair-m1-m2-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` section 4. **The four facts of a person**: `UsersService.createUser` takes the username and the four facts (`NewUser`), `updateUser(username, profile)` is its fourth pair (`PUT /users/{username}`), `listUsers` checks each User's facts (section 13); new section 23, `MeService.getMe()` (`GET /me`, both roles). |
 | v14 | 2026-11-25 | `docs/EMAIL_PLAN.md` steps m3 and m4 (brief `prompts/mail-m04-pair-m3-m4-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 6 and 9.1. New section 24, **`MailService.sendCalendar(range)`** (`POST /mail/calendar`, both roles): the range checked with the shared `MailCalendarBody` before any request, success only on `202 { status: "queued" }`. The address the page shows after it is read with `MeService` (section 23), never answered by the route. |
 | v15 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m5 (brief `prompts/mail-m05-daily-mail-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 6.2 and 9.1. New section 25, **`MailSettingsService`**: `getSettings()` (`GET /mail/settings`) and `updateSettings(settings)` (`PUT /mail/settings`), the Administrator's; the body checked with the shared `MailSettingsBody` before any request. A service of its own, not a part of `CalendarSettingsService` (the Product Owner's choice, 2026-11-25): the settings screen uses both. |
+| v16 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m7 (brief `prompts/mail-m07-first-sign-in-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 5.1 and 5.2. New section 4.9, **the first sign-in**: an account whose password is temporary gets the challenge `NEW_PASSWORD_REQUIRED` instead of tokens; `LoginService` gives the result and state `new_password_required` (the username only), keeps the challenge's session to itself, and `choosePassword(newPassword)` checks the new password with the shared rule, answers with `RespondToAuthChallenge` (state `answering`) and signs the person in as `login` does; a session Cognito no longer takes is the failure `session_expired`; any other refusal leaves the challenge open (`refusal` on the result). `reset()` is also the screen's Cancel. `cognito.ts` (section 10.1) gains `respondToNewPassword`, `toSignInOutcome` and `toChallengeOutcome`; any other challenge stays the failure `challenge`. Found: cognito-local 5.3.0 checks neither the challenge's session (a made-up session gets tokens) nor the pool's rule for the new password, so the expiry is proved by the unit tests only; Cognito's own answer to an expired session, `NotAuthorizedException`, is read from AWS's API reference and is to be seen in the cloud (`docs/EMAIL_PLAN.md` step m9). Unit tests in sections 6 and 10.4; the journey in section 14.11. |
 
 ---
 
@@ -236,8 +237,8 @@ Facts the design relies on:
 
 - The pool has `PreventUserExistenceErrors: ENABLED`, so an unknown username is answered
   exactly like a wrong password. The service does not distinguish them either.
-- Every password is permanent (architecture v2), so Cognito never answers with a challenge in
-  v1. The service still handles a challenge answer defensively, as a failure.
+- An account whose password is temporary gets the challenge `NEW_PASSWORD_REQUIRED` instead of
+  tokens (section 4.9). Any other challenge is handled defensively, as the failure `challenge`.
 - The request's content type is not one of the "simple" ones, so the browser sends a CORS
   preflight (`OPTIONS`). Cognito and cognito-local both answer it.
 - `fetch` rejects only when no HTTP answer arrives (offline, DNS, refused connection, CORS
@@ -515,6 +516,81 @@ may use the schema for an early hint if it wishes.
 | `UsersService` | `POST /users`, `DELETE /users/{username}` | `Session.accessToken`, from the store; `CreateUserResponse`, `Username` | 13 |
 | `LogoutService` (v8) | `reset()` on the page-wide `LoginService` and `RefreshService` and `SessionStore.clear()` first; then `RevokeToken` | `Session.refreshToken`, from the store, read at the press. `session$` emits `null` before the request leaves; the result says whether Cognito revoked. The services of one person's session have no `reset()`: the view layer makes new ones for each person (`docs/FRONTEND_ARCHITECTURE.md` section 6, point 4) | 20 |
 | `ChangePasswordService` (v10) | `ChangePassword`, then `GlobalSignOut`, at Cognito | `Session.accessToken`, from the store; the shared `passwordProblems` | 22 |
+| `LoginService.choosePassword` (v16) | `RespondToAuthChallenge`, at Cognito | the challenge's session, kept in the service; the shared `passwordProblems` | 4.9 |
+
+
+### 4.9 The first sign-in: a temporary password (v16)
+
+An account whose password is temporary (an invitation, `docs/EMAIL_ARCHITECTURE.md` section 5.1,
+or the operator's test User, its section 5.4) signs in with it, and Cognito answers with no token:
+
+```json
+{ "ChallengeName": "NEW_PASSWORD_REQUIRED", "Session": "…", "ChallengeParameters": { "USER_ID_FOR_SRP": "anna", "requiredAttributes": "[]", "userAttributes": "{…}" } }
+```
+
+The person must choose a password of their own, sent with `RespondToAuthChallenge` (same URL and
+headers as section 4.1, target `AWSCognitoIdentityProviderService.RespondToAuthChallenge`):
+
+```json
+{ "ChallengeName": "NEW_PASSWORD_REQUIRED", "ClientId": "<client id>", "Session": "…", "ChallengeResponses": { "USERNAME": "anna", "NEW_PASSWORD": "…" } }
+```
+
+Cognito answers it as a sign-in, with the three tokens, and the account's password is the new one;
+the temporary one no longer signs in. The session lasts 3 minutes; an answer after that is refused
+with `NotAuthorizedException` (AWS's API reference of `RespondToAuthChallenge`).
+
+**The types** (`login.types.ts`), added to those of section 4.3:
+
+```ts
+export type LoginFailureReason = /* … */ | 'session_expired';
+
+// Why a new password was not taken while the challenge stays open.
+export type NewPasswordRefusal =
+  | { reason: 'new_password_refused'; problems: PasswordProblem[] } // the shared rule, no request
+  | { reason: 'password_refused' | 'too_many_attempts' | 'network' | 'server' | 'unexpected'; message: string };
+
+export type LoginResult =
+  | /* success, failure as before */
+  | { status: 'new_password_required'; username: string; refusal?: NewPasswordRefusal };
+
+export type LoginState = /* idle, pending, LoginResult as before */ | { status: 'answering'; username: string };
+```
+
+**The service.** `login` reads the answer with `toSignInOutcome` (section 10.1). On the challenge
+it keeps `{ username, session }` in a private field and gives `new_password_required` with the
+username: the session is a secret for its 3 minutes and is never in a state, a result or a log,
+like the tokens (rule 9) and the password (rule 6). Then:
+
+- `choosePassword(newPassword)`: without an open challenge it does nothing. Otherwise the state
+  becomes `answering`; a password the shared rule (`passwordProblems`) refuses is never sent and
+  gives `new_password_required` with the refusal `new_password_refused` and its problems; a good one
+  goes to `RespondToAuthChallenge`, read by `toChallengeOutcome`:
+  - tokens: settled as a sign-in (`settle`): the session to the store, then `success`; or
+    `no_role`, `unexpected`; the challenge is closed;
+  - `NotAuthorizedException` (or `ExpiredCodeException`): the failure `session_expired`, the
+    challenge forgotten. The service keeps no clock: Cognito says when the 3 minutes are over;
+  - `InvalidPasswordException` (`password_refused`), the throttling types, a 5xx, a body that is
+    not JSON, an unknown type, and a rejected `fetch` (`network`): `new_password_required` with that
+    refusal, the challenge still open for another try.
+
+  A second call while an answer is on its way aborts it, as a second `login` does.
+- `login` again forgets an open challenge; `reset()` forgets it too. The screen's Cancel is
+  `reset()`: nothing changes at Cognito, and the temporary password still signs in the next time.
+
+| Event | `loginState$` | `loginResult$` |
+|---|---|---|
+| `login('anna', temporary)` | `pending anna` | |
+| Cognito answers the challenge | `new_password_required anna` | the same |
+| `choosePassword('short')` | `answering anna`, then `new_password_required anna` with `new_password_refused` | the latter |
+| `choosePassword(good)` | `answering anna` | |
+| Cognito answers tokens | `success` | `success` |
+| … or `NotAuthorizedException` | `failure session_expired` | the same |
+| `reset()` (Cancel) | `idle` | (nothing replayed) |
+
+**Locally**, cognito-local 5.3.0 gives the challenge and takes the answer, but checks neither the
+session (a made-up one gets tokens, so its 3 minutes never end) nor the pool's rule for the new
+password (`docs/EMAIL_ARCHITECTURE.md` section 14.1). The expiry is proved by the unit tests
+(section 6); its look in a browser waits for the cloud (`docs/EMAIL_PLAN.md` step m9).
 
 ---
 
@@ -564,7 +640,7 @@ The global `fetch` is replaced with `vi.stubGlobal('fetch', vi.fn())` and answer
 | throttled | 400 `TooManyRequestsException` | `failure too_many_attempts` |
 | unknown error class | 400 `SomethingElseException` | `failure unexpected` |
 | non-JSON 502 | 502, HTML body | `failure server` |
-| challenge | 200 with `ChallengeName`, no `AuthenticationResult` | `failure challenge` |
+| challenge | 200 with a `ChallengeName` other than `NEW_PASSWORD_REQUIRED`, no `AuthenticationResult` | `failure challenge` |
 | offline | fetch rejects with `TypeError` | `failure network`; the subject is still alive |
 | retry after failure | wrong password, then correct one | two results on `loginResult$`; the second is `success` (proves neither `error` nor `complete` reached the subject) |
 | cancel | first fetch pending, `login` called again | the first request's `signal.aborted` is `true`; only the second answer is emitted |
@@ -574,6 +650,22 @@ The global `fetch` is replaced with `vi.stubGlobal('fetch', vi.fn())` and answer
 | reset while pending (v8) | first fetch pending, `reset()`, then the fetch answers 200 | the request's `signal.aborted` is `true`; no outcome on either stream; the store stays empty |
 | reset keeps the subscribers (v8) | subscribe, success, `reset()`, a second login | the subscriber of before receives both outcomes and nothing in between |
 | reset before any login (v8) | `reset()` | `idle`; nothing on `loginResult$`; no request |
+
+The first sign-in (v16, section 4.9), in a block of its own:
+
+| Test | Stub answers | Expect |
+|---|---|---|
+| the challenge | 200 `NEW_PASSWORD_REQUIRED` with a session | `{ status: 'new_password_required', username }` on both streams; states `idle`, `pending`, it; the store empty |
+| a good new password | the challenge, then tokens | the request `RespondToAuthChallenge` with the session, the username and the new password; state `answering`, then `success` as a sign-in's; the store holds the session; a second `choosePassword` sends nothing |
+| the rule refuses it | the challenge | no request; `new_password_required` with `new_password_refused` and the problems; the next good one is sent |
+| the 3 minutes over | the challenge, then 400 `NotAuthorizedException` | `failure session_expired`; the challenge forgotten; the store empty |
+| refused, challenge open (`it.each`) | `InvalidPasswordException`, `LimitExceededException`, a 500, a rejected `fetch` | `new_password_required` with `password_refused`, `too_many_attempts`, `server`, `network`; the next answer is sent with the same session |
+| tokens of an account in no group | the challenge, then tokens without groups | `failure no_role`; the challenge closed; the store empty |
+| no challenge | — | `choosePassword` sends nothing and changes no state |
+| Cancel | the challenge, then `reset()` | `idle`, nothing replayed, the challenge forgotten |
+| a new sign-in | the challenge, then `login` | the challenge forgotten before the sign-in's answer |
+| a second new password | the first answer pending | the first request aborted, its late answer never reported |
+| no leak | the challenge, a refusal, tokens | no state or result holds the session, a password or a token |
 
 `jwt.test.ts`: decodes a known payload, handles base64url characters (`-`, `_`) and missing
 padding, and throws on a string that is not a JWT (which `toSession` maps to `failure
@@ -924,7 +1016,7 @@ the four targets the front end uses; `init` adds what one request needs and the 
 the `keepalive` of the revocation (decision 56):
 
 ```ts
-export type CognitoTarget = 'InitiateAuth' | 'RevokeToken' | 'ChangePassword' | 'GlobalSignOut';
+export type CognitoTarget = 'InitiateAuth' | 'RespondToAuthChallenge' | 'RevokeToken' | 'ChangePassword' | 'GlobalSignOut';
 
 // Emits one { status, text } and completes; errors only when fetch rejects.
 export function cognitoRequest(
@@ -948,6 +1040,23 @@ missing one always was. `revokeToken` (below) is `cognitoRequest(config, 'Revoke
 Token }, { keepalive: true })`, read by `toRevokeOutcome` as before. `ChangePasswordService`
 (section 22) uses `cognitoRequest` and the two
 readers with a mapping of its own.
+
+**The first sign-in** (v16, section 4.9), for `LoginService` alone:
+
+- `toSignInOutcome(status, text)` reads the answer of a sign-in: a 200 with `ChallengeName`
+  `NEW_PASSWORD_REQUIRED` and a session that is a non-empty text is `{ status:
+  'new_password_required', session }`; everything else is `toAuthOutcome`'s, so any other
+  challenge, or this one without a session, stays the failure `challenge`. `RefreshService` keeps
+  `toAuthOutcome`: a refresh never meets the challenge.
+- `respondToNewPassword(config, username, newPassword, session)` is `cognitoRequest(config,
+  'RespondToAuthChallenge', { ChallengeName: 'NEW_PASSWORD_REQUIRED', ClientId, Session,
+  ChallengeResponses: { USERNAME, NEW_PASSWORD } })`.
+- `toChallengeOutcome(status, text)` reads its answer: a 200 as `toAuthOutcome`; otherwise
+  `{ status: 'expired', message }` for `NotAuthorizedException` and `ExpiredCodeException`, or
+  `{ status: 'refused', reason, message }` with `password_refused` (`InvalidPasswordException`),
+  `too_many_attempts` (`TooManyRequestsException`, `LimitExceededException`), `server` (5xx, or a
+  body that is not JSON) or `unexpected`. The message is Cognito's own, as for a sign-in: the
+  request's secrets are the new password and the session, which Cognito does not quote back.
 
 **`InitiateAuth`**
 
@@ -1300,6 +1409,9 @@ section 6, which stays unchanged):
 | revoke answer, not JSON (v8) | 502 HTML → `server`; 400 with JSON that is not an object → `unexpected` |
 | revoke answer that quotes the request (v8) | a 400 whose `message`, and one whose `__type`, hold the token: the outcome does not contain the token |
 | `cognitoRequest` (v10) | one POST with `AWSCognitoIdentityProviderService.<target>` for each of the four targets and the body as JSON, no `keepalive` unless `init` gives it; no client id needed; what `init` adds is passed on, its own method, headers and body are not |
+| request, `RespondToAuthChallenge` (v16) | one POST with `AWSCognitoIdentityProviderService.RespondToAuthChallenge` and the body `{ ChallengeName: 'NEW_PASSWORD_REQUIRED', ClientId, Session, ChallengeResponses: { USERNAME, NEW_PASSWORD } }` exactly, no `keepalive` |
+| `toSignInOutcome` (v16) | the challenge with a session → `new_password_required` with it, nothing of the attributes; without a session, with an empty one or one that is not a text, and another challenge → `failure challenge`; a 200 that is not JSON → `server`; tokens and refusals as `toAuthOutcome` |
+| `toChallengeOutcome` (v16) | tokens → `success`; tokens without a group → `no_role`; `NotAuthorizedException`, `ExpiredCodeException` and a namespaced one → `expired` with Cognito's message; `InvalidPasswordException` → `password_refused`; the two throttling types → `too_many_attempts`; another type → `unexpected`; a 5xx without type or message → `server`, `Cognito answered <status>`; not JSON → `server` |
 | `readCognitoBody`, `readCognitoError` (v10) | an object as it is, other JSON as `{}`, a text that is not JSON (`''` included) as `undefined`; the class behind a namespace prefix; a message that is not a string as absent |
 
 `api.test.ts` (every row subscribes to `apiCall(...)` first, with a real `SessionStore`):
@@ -2334,6 +2446,29 @@ of `local.ts`, `changePasswordConfig()`: the sign-out everywhere skipped (decisi
 3. `backend/tests/unit/lib/password.test.ts`: the pool's policy and 2 000 generated passwords
    held to the shared rule, both green.
 4. `git status`: no change under `backend/src` or in `backend/template.yaml`.
+
+### 14.11 The first sign-in journey (v16)
+
+`frontend/tests/integration/login.service.test.ts` (`docs/EMAIL_PLAN.md` step m7), its block
+`first sign-in with a temporary password`, with its page `docs/journeys/frontend/first-sign-in.md`.
+It runs one `LoginService` straight at cognito-local through the four tests, since the service
+holds the open challenge.
+
+- **Its account** is `fe-first`, created through `UsersService` as the Administrator in `beforeAll`
+  (after removing it, accepting `user_not_found`), then given a temporary password by the helper
+  `setTemporaryPassword` of `local.ts` (`AdminSetUserPassword` with `Permanent: false`, an unsigned
+  request, which cognito-local takes), and removed in `afterAll`.
+- **What stays behind**: nothing in Cognito; in the `calendar` table the deleted-user marker of
+  `fe-first` of each run, as for every account deleted.
+- **What it cannot show**: cognito-local checks neither the session nor the pool's rule, so the 3
+  minutes over are in the unit tests only (section 4.9).
+
+| # | Journey | Expect |
+|---|---|---|
+| 1 | `login` with the temporary password | `{ status: 'new_password_required', username: 'fe-first' }`, the state the same object; the store empty |
+| 2 | `choosePassword('weak')` (a `fetch` spy counts requests) | `new_password_required` with `new_password_refused` and `too_short`, `no_uppercase`, `no_digit`, `no_symbol`; no request; the store empty |
+| 3 | `choosePassword` with a good password; `GET /me` with the store's access token | `success` as `fe-first`, `role: 'user'`; the session in the store; `200` with the username, the role and the e-mail of the account |
+| 4 | a sign-in with the temporary password, then with the new one | `invalid_credentials`; then `success` |
 
 ---
 

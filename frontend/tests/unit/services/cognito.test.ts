@@ -5,16 +5,20 @@ import {
   initiateAuth,
   readCognitoBody,
   readCognitoError,
+  respondToNewPassword,
   revokeToken,
   toAuthOutcome,
+  toChallengeOutcome,
   toRevokeOutcome,
+  toSignInOutcome,
   type CognitoConfig,
 } from '../../../src/services/cognito';
 import { call, cognitoError, cognitoTokens, json, jwt } from './fixtures';
 
 // docs/FRONTEND_SERVICES.md section 10.4. Most of the mapping is exercised through
-// login.service.test.ts; these tests cover what the refresh flow adds, and the RevokeToken
-// request with the reading of its answer.
+// login.service.test.ts; these tests cover what the refresh flow adds, the RevokeToken request
+// with the reading of its answer, and the challenge of a temporary password with its answer
+// (docs/FRONTEND_SERVICES.md section 4.9).
 
 const CONFIG: CognitoConfig = { cognitoUrl: 'http://cognito.test/', clientId: 'client-123' };
 const EXP = Math.floor(Date.now() / 1000) + 900;
@@ -52,6 +56,103 @@ describe('initiateAuth', () => {
     expect(JSON.parse(init.body as string)).toEqual({ AuthFlow: flow, ClientId: 'client-123', AuthParameters: parameters });
     // Only the revocation outlives the page.
     expect(init.keepalive).toBeUndefined();
+  });
+});
+
+describe('respondToNewPassword', () => {
+  it('request: one POST to RespondToAuthChallenge with the challenge, the client id, the session, the username and the new password', async () => {
+    fetchMock.mockResolvedValueOnce(cognitoTokens({}));
+    const answer = await firstValueFrom(respondToNewPassword(CONFIG, 'anna', 'New-Pass-1!xyz', 'session-1'));
+    expect(answer.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = call(fetchMock);
+    expect(url).toBe('http://cognito.test/');
+    expect(init.method).toBe('POST');
+    expect(init.headers).toEqual({
+      'Content-Type': 'application/x-amz-json-1.1',
+      'X-Amz-Target': 'AWSCognitoIdentityProviderService.RespondToAuthChallenge',
+    });
+    expect(JSON.parse(init.body as string)).toEqual({
+      ChallengeName: 'NEW_PASSWORD_REQUIRED',
+      ClientId: 'client-123',
+      Session: 'session-1',
+      ChallengeResponses: { USERNAME: 'anna', NEW_PASSWORD: 'New-Pass-1!xyz' },
+    });
+    expect(init.keepalive).toBeUndefined();
+  });
+});
+
+describe('toSignInOutcome', () => {
+  async function signInOf(answer: Response) {
+    return toSignInOutcome(answer.status, await answer.text());
+  }
+
+  it('NEW_PASSWORD_REQUIRED with a session: the challenge with its session, and nothing of the attributes Cognito sends with it', async () => {
+    const outcome = await signInOf(
+      json(200, { ChallengeName: 'NEW_PASSWORD_REQUIRED', Session: 'session-1', ChallengeParameters: { userAttributes: '{"email":"anna@example.com"}' } }),
+    );
+    expect(outcome).toEqual({ status: 'new_password_required', session: 'session-1' });
+  });
+
+  it.each([
+    ['without a session', { ChallengeName: 'NEW_PASSWORD_REQUIRED' }],
+    ['with an empty session', { ChallengeName: 'NEW_PASSWORD_REQUIRED', Session: '' }],
+    ['with a session that is not a text', { ChallengeName: 'NEW_PASSWORD_REQUIRED', Session: 7 }],
+    ['another challenge', { ChallengeName: 'SOFTWARE_TOKEN_MFA', Session: 'session-1' }],
+  ])('%s: the failure challenge', async (_name, body) => {
+    expect(await signInOf(json(200, body))).toMatchObject({ status: 'failure', reason: 'challenge' });
+  });
+
+  it('a 200 that is not JSON: the failure server, as toAuthOutcome reads it', async () => {
+    expect(await signInOf(new Response('<html>', { status: 200 }))).toMatchObject({ status: 'failure', reason: 'server' });
+  });
+
+  it('tokens and refusals: read as toAuthOutcome reads them', async () => {
+    expect(await signInOf(cognitoTokens({ AccessToken: jwt(ALICE), IdToken: 'id', RefreshToken: 'r' }))).toMatchObject({ status: 'success' });
+    expect(await signInOf(cognitoError('NotAuthorizedException', 'no'))).toEqual({ status: 'failure', reason: 'not_authorized', message: 'no' });
+  });
+});
+
+describe('toChallengeOutcome', () => {
+  async function answerOf(answer: Response) {
+    return toChallengeOutcome(answer.status, await answer.text());
+  }
+
+  it('tokens: the session, as for a sign-in', async () => {
+    const outcome = await answerOf(cognitoTokens({ AccessToken: jwt(ALICE), IdToken: 'id', RefreshToken: 'r' }));
+    expect(outcome).toMatchObject({ status: 'success', session: { username: 'alice', refreshToken: 'r' } });
+  });
+
+  it('tokens of an account in no group: the failure no_role', async () => {
+    const outcome = await answerOf(cognitoTokens({ AccessToken: jwt({ username: 'anna', exp: EXP }), IdToken: 'id', RefreshToken: 'r' }));
+    expect(outcome).toMatchObject({ status: 'failure', reason: 'no_role' });
+  });
+
+  it.each(['NotAuthorizedException', 'ExpiredCodeException', 'com.amazonaws.cognito#NotAuthorizedException'])(
+    '%s: expired, with Cognito\'s message',
+    async (type) => {
+      expect(await answerOf(cognitoError(type, 'Invalid session for the user, session is expired.'))).toEqual({
+        status: 'expired',
+        message: 'Invalid session for the user, session is expired.',
+      });
+    },
+  );
+
+  it.each([
+    ['InvalidPasswordException', 'password_refused'],
+    ['TooManyRequestsException', 'too_many_attempts'],
+    ['LimitExceededException', 'too_many_attempts'],
+    ['InvalidParameterException', 'unexpected'],
+  ])('%s: refused, %s', async (type, reason) => {
+    expect(await answerOf(cognitoError(type, 'said'))).toEqual({ status: 'refused', reason, message: 'said' });
+  });
+
+  it('a 5xx without a type or a message: refused, server, the message names the status', async () => {
+    expect(await answerOf(json(503, {}))).toEqual({ status: 'refused', reason: 'server', message: 'Cognito answered 503' });
+  });
+
+  it('a failure that is not JSON: refused, server', async () => {
+    expect(await answerOf(new Response('<html>', { status: 502 }))).toEqual({ status: 'refused', reason: 'server', message: 'Cognito answered 502 without JSON' });
   });
 });
 

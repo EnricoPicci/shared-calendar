@@ -137,6 +137,8 @@ describe('texts', () => {
       'password_reset_required',
       'challenge',
       'no_role',
+      'session_expired',
+      'password_refused',
       // Booking, cancelling and the list of users.
       'invalid_json',
       'slot_taken',
@@ -211,6 +213,11 @@ describe('texts', () => {
       expect(failureText('type_in_use')).toBe('This type is in use, so it cannot be deleted. A type is in use while a weekly pattern, a date of today or later or an upcoming appointment uses it.');
       expect(failureText('availability_overlap')).toBe('Another window of the same day covers part of these hours, whatever its type. Choose other hours.');
       expect(failureText('availability_conflict')).toBe('This would leave booked appointments outside the hours open for booking. Cancel or move them in the week first.');
+    });
+
+    it('the first sign-in: the 3 minutes over lead back to the sign-in; a new password Cognito refused asks for another', () => {
+      expect(failureText('session_expired')).toBe('This took too long. Please sign in again.');
+      expect(failureText('password_refused')).toBe('This password was not accepted. Please choose another one.');
     });
 
     it('says the same for a wrong password and an unknown user: both are invalid_credentials', () => {

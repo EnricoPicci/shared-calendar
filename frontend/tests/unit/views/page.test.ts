@@ -38,6 +38,7 @@ describe('index.html', () => {
   it('every <template> has an id of its own and holds exactly one element', () => {
     const templates = [...pageAside().querySelectorAll('template')];
     expect(templates.map((template) => template.id)).toEqual([
+      'tpl-first-password-need',
       'tpl-nav-link',
       'tpl-legend-item',
       'tpl-hour',
@@ -79,7 +80,7 @@ describe('index.html', () => {
 
     it('every field has its label: a <label> around it, with words of its own', () => {
       const fields = everywhere('input, select, textarea');
-      expect(fields).toHaveLength(58);
+      expect(fields).toHaveLength(60);
       for (const field of fields) {
         const label = field.closest('label');
         expect(label, field.getAttribute('name')!).not.toBeNull();
@@ -118,7 +119,7 @@ describe('index.html', () => {
       const place = (element: Element) => [...element.classList].join('.');
       const alerts = everywhere('[role="alert"]');
       const failures = everywhere('.error');
-      expect(failures).toHaveLength(72);
+      expect(failures).toHaveLength(73);
       expect(alerts).toEqual(failures);
       for (const alert of alerts) expect(['P', alert.textContent], place(alert)).toEqual(['P', '']);
       const loading = everywhere('.loading');

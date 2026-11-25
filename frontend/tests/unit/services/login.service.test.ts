@@ -183,8 +183,8 @@ describe('LoginService', () => {
     expect(result).toEqual({ status: 'failure', reason: 'unexpected', message: 'Cognito answered 400' });
   });
 
-  it('challenge: 200 with ChallengeName and no AuthenticationResult gives failure challenge', async () => {
-    const { result } = await loginOnce(json(200, { ChallengeName: 'NEW_PASSWORD_REQUIRED', Session: 's' }));
+  it('challenge: 200 with a ChallengeName other than NEW_PASSWORD_REQUIRED and no AuthenticationResult gives failure challenge', async () => {
+    const { result } = await loginOnce(json(200, { ChallengeName: 'SOFTWARE_TOKEN_MFA', Session: 's' }));
     expect(result).toMatchObject({ status: 'failure', reason: 'challenge' });
   });
 
@@ -351,5 +351,171 @@ describe('LoginService.reset', () => {
     expect(results).toEqual([]);
     expect(states).toEqual([{ status: 'idle' }, { status: 'idle' }]);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+// docs/FRONTEND_SERVICES.md section 4.9: an account whose password is temporary. The challenge's
+// session is a secret: no state or result holds it.
+describe('LoginService, a temporary password', () => {
+  const SESSION = 'challenge-session-xyz';
+  const TEMPORARY = 'Temp-Pass-1!x';
+  const CHOSEN = 'Chosen-Pass-2?';
+  const ANNA = { username: 'anna', 'cognito:groups': ['user'], exp: EXP };
+  const challenge = () => json(200, { ChallengeName: 'NEW_PASSWORD_REQUIRED', Session: SESSION, ChallengeParameters: { userAttributes: '{}' } });
+
+  // Signs in with the temporary password and waits for the challenge.
+  async function challenged() {
+    fetchMock.mockResolvedValueOnce(challenge());
+    const s = subscribed();
+    s.service.login('anna', TEMPORARY);
+    await vi.waitFor(() => expect(s.results).toHaveLength(1));
+    return s;
+  }
+
+  // The new password, and the one outcome it brings.
+  async function choose(s: Awaited<ReturnType<typeof challenged>>, password: string) {
+    const before = s.results.length;
+    s.service.choosePassword(password);
+    await vi.waitFor(() => expect(s.results).toHaveLength(before + 1));
+    return s.results.at(-1) as LoginResult;
+  }
+
+  it('the sign-in: new_password_required with the username, no session in any value, the store empty; states idle, pending, the result', async () => {
+    const { results, states, sessions } = await challenged();
+    expect(results).toEqual([{ status: 'new_password_required', username: 'anna' }]);
+    expect(states).toEqual([{ status: 'idle' }, { status: 'pending', username: 'anna' }, results[0]]);
+    expect(states[2]).toBe(results[0]);
+    expect(sessions).toEqual([null]);
+  });
+
+  it('a good new password: RespondToAuthChallenge with the session, state answering, then signed in as by a sign-in', async () => {
+    const s = await challenged();
+    fetchMock.mockResolvedValueOnce(tokens(ANNA));
+    const result = await choose(s, CHOSEN);
+    expect(result).toEqual({ status: 'success', username: 'anna', role: 'user', expiresAt: new Date(EXP * 1000) });
+    expect(s.states.slice(3)).toEqual([{ status: 'answering', username: 'anna' }, result]);
+    const [, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect((init.headers as Record<string, string>)['X-Amz-Target']).toBe('AWSCognitoIdentityProviderService.RespondToAuthChallenge');
+    expect(JSON.parse(init.body as string)).toEqual({
+      ChallengeName: 'NEW_PASSWORD_REQUIRED',
+      ClientId: 'client-123',
+      Session: SESSION,
+      ChallengeResponses: { USERNAME: 'anna', NEW_PASSWORD: CHOSEN },
+    });
+    expect(s.sessions.at(-1)).toMatchObject({ username: 'anna', role: 'user', accessToken: jwt(ANNA), refreshToken: 'refresh-token' });
+    // The challenge is closed: a second new password sends nothing.
+    s.service.choosePassword(CHOSEN);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    s.store.clear();
+  });
+
+  it('a new password the shared rule refuses: no request, its problems, and the challenge still open', async () => {
+    const s = await challenged();
+    const result = await choose(s, 'short');
+    expect(result).toEqual({
+      status: 'new_password_required',
+      username: 'anna',
+      refusal: { reason: 'new_password_refused', problems: ['too_short', 'no_uppercase', 'no_digit', 'no_symbol'] },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    fetchMock.mockResolvedValueOnce(tokens(ANNA));
+    expect(await choose(s, CHOSEN)).toMatchObject({ status: 'success' });
+    s.store.clear();
+  });
+
+  it("Cognito's 3 minutes are over (NotAuthorizedException): the failure session_expired, the challenge forgotten, the store empty", async () => {
+    const s = await challenged();
+    fetchMock.mockResolvedValueOnce(cognitoError('NotAuthorizedException', 'Invalid session for the user, session is expired.'));
+    expect(await choose(s, CHOSEN)).toEqual({ status: 'failure', reason: 'session_expired', message: 'Invalid session for the user, session is expired.' });
+    s.service.choosePassword(CHOSEN);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(s.sessions).toEqual([null]);
+  });
+
+  it.each([
+    ['Cognito refuses the password', () => Promise.resolve(cognitoError('InvalidPasswordException', 'Password does not conform to policy')), 'password_refused'],
+    ['too many attempts', () => Promise.resolve(cognitoError('LimitExceededException', 'Attempt limit exceeded')), 'too_many_attempts'],
+    ['a server failure', () => Promise.resolve(json(500, {})), 'server'],
+    ['offline', () => Promise.reject(new TypeError('fetch failed')), 'network'],
+  ])('%s: still new_password_required with the refusal %s, and the challenge still open', async (_name, answer, reason) => {
+    const s = await challenged();
+    fetchMock.mockImplementationOnce(answer);
+    const result = await choose(s, CHOSEN);
+    expect(result).toMatchObject({ status: 'new_password_required', username: 'anna', refusal: { reason } });
+    expect(s.sessions).toEqual([null]);
+    fetchMock.mockResolvedValueOnce(tokens(ANNA));
+    expect(await choose(s, CHOSEN)).toMatchObject({ status: 'success' });
+    expect(JSON.parse((fetchMock.mock.calls[2] as [string, RequestInit])[1].body as string).Session).toBe(SESSION);
+    s.store.clear();
+  });
+
+  it('the answer gives tokens of an account in no group: the failure no_role, the challenge closed, the store empty', async () => {
+    const s = await challenged();
+    fetchMock.mockResolvedValueOnce(tokens({ username: 'anna', exp: EXP }));
+    expect(await choose(s, CHOSEN)).toMatchObject({ status: 'failure', reason: 'no_role' });
+    s.service.choosePassword(CHOSEN);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(s.sessions).toEqual([null]);
+  });
+
+  it('without a challenge: choosePassword sends nothing and changes no state', () => {
+    const { service, results, states } = subscribed();
+    service.choosePassword(CHOSEN);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(results).toEqual([]);
+    expect(states).toEqual([{ status: 'idle' }]);
+  });
+
+  it('reset() (Cancel): idle, nothing replayed, and the challenge forgotten', async () => {
+    const s = await challenged();
+    s.service.reset();
+    expect(s.states.at(-1)).toEqual({ status: 'idle' });
+    const late: LoginResult[] = [];
+    s.service.loginResult$.subscribe((r) => late.push(r));
+    expect(late).toEqual([]);
+    s.service.choosePassword(CHOSEN);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('a new sign-in forgets the challenge, even before its answer', async () => {
+    const s = await challenged();
+    fetchMock.mockImplementationOnce(() => new Promise<Response>(() => {}));
+    s.service.login('anna', TEMPORARY);
+    s.service.choosePassword(CHOSEN);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(s.states.at(-1)).toEqual({ status: 'pending', username: 'anna' });
+  });
+
+  it('a second new password while the first is on its way: the first is aborted and never reports', async () => {
+    const s = await challenged();
+    let signal: AbortSignal | undefined;
+    let answer: (r: Response) => void = () => {};
+    fetchMock.mockImplementationOnce((_url: string, init: RequestInit) => {
+      signal = init.signal ?? undefined;
+      return new Promise<Response>((resolve) => (answer = resolve));
+    });
+    s.service.choosePassword(CHOSEN);
+    fetchMock.mockResolvedValueOnce(tokens(ANNA));
+    const result = await choose(s, CHOSEN);
+    expect(signal?.aborted).toBe(true);
+    answer(cognitoError('NotAuthorizedException', 'late'));
+    await new Promise((r) => setTimeout(r, 10));
+    expect(result).toMatchObject({ status: 'success' });
+    expect(s.results.map((r) => r.status)).toEqual(['new_password_required', 'success']);
+    s.store.clear();
+  });
+
+  it('no leak: no state or result holds the session, a password or a token', async () => {
+    const s = await challenged();
+    await choose(s, 'weak');
+    fetchMock.mockResolvedValueOnce(cognitoError('InvalidPasswordException', 'refused'));
+    await choose(s, CHOSEN);
+    fetchMock.mockResolvedValueOnce(tokens(ANNA));
+    await choose(s, CHOSEN);
+    for (const secret of [SESSION, TEMPORARY, CHOSEN, 'weak', jwt(ANNA), 'id-token', 'refresh-token']) {
+      expect(JSON.stringify(s.results)).not.toContain(secret);
+      expect(JSON.stringify(s.states)).not.toContain(secret);
+    }
+    s.store.clear();
   });
 });

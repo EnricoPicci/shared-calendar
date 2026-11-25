@@ -334,6 +334,52 @@ describe('runShell', () => {
     expect(html()).not.toContain('refresh-token');
   });
 
+  it('a temporary password: "Choose your password" in the login\'s place; a good new password answers the challenge and shows the frame', async () => {
+    fetchMock.mockResolvedValueOnce(json(200, { ChallengeName: 'NEW_PASSWORD_REQUIRED', Session: 'challenge-session' }));
+    shell = runShell(CONFIG);
+    signIn('anna', 'Temp-Pass-1!x');
+    await vi.waitFor(() => expect(find('#login .first-password').hidden).toBe(false));
+    expect(find('#login form.sign-in').hidden).toBe(true);
+    expect(find('#login .first-password .account').textContent).toBe('anna');
+    expect(find<HTMLInputElement>('#login [name="password"]').value).toBe('');
+
+    const form = find<HTMLFormElement>('#login form.new-password');
+    find<HTMLInputElement>('#login [name="next"]').value = 'Chosen-Pass-2?';
+    find<HTMLInputElement>('#login [name="again"]').value = 'Chosen-Pass-2?';
+    form.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(find<HTMLButtonElement>('#login .new-password .submit').disabled).toBe(false);
+    fetchMock.mockResolvedValueOnce(tokensFor('anna', 'user'));
+    submit(form);
+
+    await vi.waitFor(() => expect(find('#app').hidden).toBe(false));
+    const [, init] = call(fetchMock, 1);
+    expect(JSON.parse(String(init.body))).toEqual({
+      ChallengeName: 'NEW_PASSWORD_REQUIRED',
+      ClientId: 'client-123',
+      Session: 'challenge-session',
+      ChallengeResponses: { USERNAME: 'anna', NEW_PASSWORD: 'Chosen-Pass-2?' },
+    });
+    expect(find('#app .username').textContent).toBe('anna');
+    expect(find('#login').hidden).toBe(true);
+    // Left with the login: the screen hidden and empty, nothing of the two passwords or the session in the page.
+    expect(find('#login .first-password').hidden).toBe(true);
+    expect(find('#login form.sign-in').hidden).toBe(false);
+    for (const secret of ['Temp-Pass-1!x', 'Chosen-Pass-2?', 'challenge-session', 'refresh-token']) expect(html()).not.toContain(secret);
+    for (const field of document.querySelectorAll<HTMLInputElement>('#login input')) expect(field.value).toBe('');
+  });
+
+  it('a temporary password, then Cancel: back to the sign-in with the username, nothing sent', async () => {
+    fetchMock.mockResolvedValueOnce(json(200, { ChallengeName: 'NEW_PASSWORD_REQUIRED', Session: 'challenge-session' }));
+    shell = runShell(CONFIG);
+    signIn('anna', 'Temp-Pass-1!x');
+    await vi.waitFor(() => expect(find('#login .first-password').hidden).toBe(false));
+    find<HTMLButtonElement>('#login .new-password .cancel').click();
+    expect(find('#login .first-password').hidden).toBe(true);
+    expect(find('#login form.sign-in').hidden).toBe(false);
+    expect(find<HTMLInputElement>('#login [name="username"]').value).toBe('anna');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('a wrong password shows the failure and stays at the login; the next try signs in', async () => {
     fetchMock.mockResolvedValueOnce(cognitoError('NotAuthorizedException', 'Incorrect username or password.'));
     shell = runShell(CONFIG);
