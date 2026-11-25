@@ -1,6 +1,7 @@
 # Shared Calendar: windows of whole hours, slots counted from the window's start (implementation plan)
 
-**Version:** v5 (2026-11-25): step w4 done (its "As done" note), with brief
+**Version:** v6 (2026-11-25): step w5 done, the release `v2.5.0` (its "As done" notes), with brief
+`prompts/slot-s10-step-w5-release.md`; the plan is finished. v5 (2026-11-25): step w4 done (its "As done" note), with brief
 `prompts/slot-s09-step-w4-implementation.md`; two decisions of the Product Owner added beside
 decision 6 (section 2, 6a and 6b). v4 (2026-11-25): step w3 done (its "As done" note), with brief
 `prompts/slot-s08-step-w3-implementation.md`; two decisions of the Product Owner added beside Q1
@@ -545,6 +546,18 @@ right: 14:05–17:05 kept to the minute; the block of 10:10–10:35 widened to 1
 asked before the proposal; 09:05–12:00 and 10:10–11:40 explained, the nearest whole hours inside
 and around offered, nothing proposed (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3). Nothing
 in `backend/src/assistant` changed.
+
+**As done (step w5, parts E and F, 2026-11-25).** The check once more at `2dfd39c`: `none`. The
+gate passed on the clean tree; the API deployed with a change set of 30 functions' `Code` and
+`HttpApi`'s `Body`, nothing added, removed or replaced; the smoke test in the cloud 53 PASS; the
+log search clean; the page released, its `app.js` served byte for byte; the Product Owner's quick
+look, five yes. The record is `docs/RUNBOOK.md` section 5.10. Documents closed:
+`docs/ARCHITECTURE.md` v17 (its number provisional until the merge with `main`), the status
+lines of `docs/SHARED_CALENDAR_SPEC.md`, `docs/CONVERSATIONAL_ARCHITECTURE.md`,
+`docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md`, `README.md` section "Versions"
+with `v2.5.0`, tagged locally on the commit of this note. **The plan is finished.** What the merge
+into `main` meets is section 6: the mail work's own documents and code, and the v17 row of
+`docs/ARCHITECTURE.md` to renumber after main's.
 
 ## 6. Beside the mail work
 

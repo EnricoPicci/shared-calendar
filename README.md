@@ -125,8 +125,9 @@ takes the next minor version; the major version changes when a client would brea
 | `v2.2.0` | `72215ae` | The change of one's own password (`docs/CHANGE_PASSWORD_PLAN.md`) | `docs/RUNBOOK.md` section 5.7 |
 | `v2.3.0` | `a8b3a2b` | The capacity of a type, several people in one slot (`docs/CAPACITY_PLAN.md`) | `docs/RUNBOOK.md` section 5.8 |
 | `v2.4.0` | the record's commit after `259e0d6`, whose code was deployed | Times on 5-minute steps (`docs/SLOT_STEP_PLAN.md`), released from the branch `slot-5min` | `docs/RUNBOOK.md` section 5.9 |
+| `v2.5.0` | the record's commit after `2dfd39c`, whose code was deployed | Windows of whole hours (`docs/WINDOW_HOURS_PLAN.md`), released from the branch `slot-5min` | `docs/RUNBOOK.md` section 5.10 |
 
-`git checkout v2.4.0` gives the code as it was released; `git tag -n1` lists the tags with
+`git checkout v2.5.0` gives the code as it was released; `git tag -n1` lists the tags with
 their one-line message.
 
 ## Commands

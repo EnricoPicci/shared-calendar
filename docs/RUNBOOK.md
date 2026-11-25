@@ -1094,7 +1094,7 @@ availability_conflict` holds a booked appointment: change the window to whole ho
 or move the appointment first (`docs/WINDOW_HOURS_PLAN.md` F6). Then run the check again: it must
 print `none`.
 
-- **The first run**, at `e302668` before the deploy: 3 patterns, 1 date with its own windows and 3
+- **The first run**, at `e302668`: 3 patterns, 1 date with its own windows and 3
   one-off windows read; two listed, neither holding a booked appointment: the pattern Monday
   13:00–14:45 of `piscina`, valid from 2026-11-22 with no end, and the one-off window 2026-12-03
   11:10–12:00 of `look-step`, left by the quick look of section 5.9.
@@ -1102,7 +1102,53 @@ print `none`.
   changed to Monday 13:00–15:00, so Mondays keep it, widened to two whole hours; the one-off
   window of `look-step` deleted.
 - **The second run**: 3 patterns, 1 date with its own windows and 2 one-off windows read;
-  `none`.
+  `none`. Run once more just before the deploy, at `2dfd39c`: `none`.
+
+**The release**, from the branch `slot-5min`, not from `main`, as in 5.9
+(`docs/WINDOW_HOURS_PLAN.md` section 6). Who did what, as in 5.9: the operator changed the
+windows on the page, ran the API's deployment and the smoke test in a terminal inside `script -q`,
+typed `y` and the admin password, and looked at the deployed page by hand from a short list; the
+session ran the check, the gates, the page's release, read-only `aws` commands and curl without
+credentials, and saw no password and no token. Nothing was pushed.
+
+- **The smoke test locally first**, with its new window and line (section 2.1): 51 PASS and the 2
+  SKIP of `GlobalSignOut`, 53 lines.
+- **The gate:** root `DYNAMODB_PORT=8002 npm run verify` PASSED on the clean tree at `2dfd39c`.
+- **Deployment of the API**, `AWS_PROFILE=shared-calendar-admin script -q /tmp/deploy.txt npm run
+  deploy -w backend` at `2dfd39c`. **Change set: 31 Modify, all with replacement `False`, no Add,
+  no Remove, no Replace**, read back with `describe-change-set` before the operator's `y`: 30
+  functions with `Code` their only change, and `HttpApi`, its `Body`, as in 5.9.
+  `UPDATE_COMPLETE`. The mark of the assistant's instructions changed with this code, so every
+  conversation in progress ended.
+- **The smoke test**, `npm run smoke -w backend -- shared-calendar-api` at `2dfd39c`, inside
+  `script -q`: **53 PASS**, throw-away user `smoke-1795635643`, the calendar journey on
+  2027-01-14 (Europe/Rome), the window 03:05–03:50 refused `400 invalid_request` with nothing
+  written, the window 03:05–04:05 and its slot 03:05 booked, listed and cancelled.
+- **The log search** of section 2.1, over the stack's 32 log groups from ten minutes before the
+  run, read as raw events with `aws logs filter-log-events`, 248 events in 18 groups: 0 for the
+  note, for `eyJ`, for `ChangePassword`, `GlobalSignOut` and `REFRESH_TOKEN`, for `"password"`
+  and for the assistant's sentence; the control search for the user's name matched 29 events in
+  12 groups.
+- **The release of the page**, `npm run deploy -w frontend` within the gate's 30 minutes: SAM
+  `No changes to deploy` for `shared-calendar-web`; the build `index.html` 40 835 bytes (6 991
+  gzipped), `style.css` 25 382 (7 197), `app.js` 616 291 (140 027); the four uploads,
+  `index.html` last; the invalidation of `/*` on `E2V5GRRPLMET12` waited for; the four checks
+  PASS. Read back with curl: the served `app.js` is byte for byte the build.
+- **The quick look at the deployed page** (operator, by hand, as the Administrator and as a
+  User), five yes: the type `look-hours` and the user `look-user` created; on 2026-12-13 an
+  extra window 09:05–11:05 of `look-hours` saved, the end's minute list holding 05 alone;
+  09:05–10:30 not possible to enter; as `look-user`, that Sunday offering 09:05–10:05 and
+  10:05–11:05; the window, the user and the type deleted.
+- **The way back** (`docs/WINDOW_HOURS_PLAN.md` F12). A roll-back to `v2.4.0` is possible at any
+  time: its API accepts every window of whole hours, and its slots come back on the whole local
+  hour, so a window 09:05–11:05 would offer a User one slot, 10:00, again. The windows changed
+  or deleted before this release do not come back.
+- **What stays**, by design: the smoke test's history (sections 2.1 and 2.3); of the quick look,
+  the deleted user's `DELETEDUSER` marker. The types `look-step` and `look-cap` of the looks of
+  5.8 and 5.9 are still in the calendar, with no window: they block nothing.
+- **Cost:** AWS within the free tier; at Anthropic the smoke test's one exchange, about a US
+  cent, and the paid evaluation before the deployment, 48.93 US cents
+  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3).
 
 ## 6. A person's password: what to tell them
 
