@@ -6,7 +6,8 @@
 #      template.yaml; assistant with its time to live)
 #   2. user pool local_pool and app client local_client on cognito-local
 #   3. groups admin and user
-#   4. user admin (group admin) and user alice (group user), permanent passwords
+#   4. user admin (group admin) and user alice (group user), permanent passwords, each with the
+#      four facts of a person (invented, at example.com)
 #   5. env.local.json with the generated pool and client ids, for sam local, and with which Claude
 #      the assistant talks to: the fake of the Docker stack, or the real one when ANTHROPIC_API_KEY
 #      is set in the shell that runs this script
@@ -168,21 +169,29 @@ for group in admin user; do
   fi
 done
 
-# 4. Users. The password is (re)set as permanent on every run, so it is always the known one.
+# 4. Users. The password is (re)set as permanent on every run, so it is always the known one, and
+# so are the four facts of a person (docs/EMAIL_ARCHITECTURE.md section 4.1): first name, last
+# name, e-mail (verified, as the API sets it) and postal address, given as JSON, the only form
+# of the AWS CLI that holds the address's line break. They are invented: example.com receives no
+# mail, and nobody lives there.
 ensure_user() {
-  local username=$1 password=$2 group=$3
+  local username=$1 password=$2 group=$3 facts=$4
   if idp admin-get-user --user-pool-id "$POOL_ID" --username "$username" >/dev/null 2>&1; then
     echo "user $username: exists"
   else
     idp admin-create-user --user-pool-id "$POOL_ID" --username "$username" --message-action SUPPRESS >/dev/null
     echo "user $username: created"
   fi
+  idp admin-update-user-attributes --user-pool-id "$POOL_ID" --username "$username" --user-attributes "$facts"
   idp admin-set-user-password --user-pool-id "$POOL_ID" --username "$username" \
     --password "$password" --permanent
   idp admin-add-user-to-group --user-pool-id "$POOL_ID" --username "$username" --group-name "$group"
 }
-ensure_user admin "$ADMIN_PASSWORD" admin
-ensure_user alice "$ALICE_PASSWORD" user
+facts_of() {
+  printf '[{"Name":"given_name","Value":"%s"},{"Name":"family_name","Value":"%s"},{"Name":"email","Value":"%s"},{"Name":"email_verified","Value":"true"},{"Name":"address","Value":"%s"}]' "$@"
+}
+ensure_user admin "$ADMIN_PASSWORD" admin "$(facts_of Ada Lovelace admin@example.com 'Via dei Calcoli 1\n00100 Roma')"
+ensure_user alice "$ALICE_PASSWORD" user "$(facts_of Alice Liddell alice@example.com 'Piazza delle Meraviglie 7\n20100 Milano')"
 
 # 5. Environment for sam local. Lambda containers use service names; the token issuer is the
 # address the tokens were requested from (the host), hence localhost in COGNITO_ISSUER.
@@ -198,7 +207,8 @@ ensure_user alice "$ALICE_PASSWORD" user
 # address and the dummy credentials in a section of its own, like CreateUserFunction.
 # DeleteUserFunction also declares the calendar variables (it cancels the deleted user's
 # appointments, docs/SHARED_CALENDAR_SPEC.md section 10.2) and gets the table and the endpoint from
-# "Parameters" too, beside its own section. ListUsersFunction reads Cognito only.
+# "Parameters" too, beside its own section. ListUsersFunction, UpdateUserFunction and GetMeFunction
+# read or write Cognito only.
 # The three assistant functions that run tools (SendAssistantMessageFunction,
 # ContinueAssistantFunction, ConfirmProposalFunction) call Cognito too, through the code of
 # GET /users and of the booking route, when the Administrator lists the Users or books for one:
@@ -305,6 +315,18 @@ EOF
     "AWS_SECRET_ACCESS_KEY": "local"
   },
   "ListUsersFunction": {
+    "USER_POOL_ID": "$POOL_ID",
+    "COGNITO_ENDPOINT": "http://cognito:9229",
+    "AWS_ACCESS_KEY_ID": "local",
+    "AWS_SECRET_ACCESS_KEY": "local"
+  },
+  "UpdateUserFunction": {
+    "USER_POOL_ID": "$POOL_ID",
+    "COGNITO_ENDPOINT": "http://cognito:9229",
+    "AWS_ACCESS_KEY_ID": "local",
+    "AWS_SECRET_ACCESS_KEY": "local"
+  },
+  "GetMeFunction": {
     "USER_POOL_ID": "$POOL_ID",
     "COGNITO_ENDPOINT": "http://cognito:9229",
     "AWS_ACCESS_KEY_ID": "local",

@@ -1,4 +1,5 @@
 import type { Role } from './roles';
+import type { UserProfile, UserStatus } from './user';
 
 // The error codes the handlers answer with (docs/ARCHITECTURE.md section 4); API Gateway's own
 // 401/403/500 bodies ({ "message": "…" }) are not in this shape.
@@ -42,7 +43,14 @@ export type ApiErrorCode =
   | 'proposal_not_found' // 404: unknown, already settled, or dropped
   | 'assistant_limit_reached' // 429, the person has sent their messages for today
   | 'assistant_unavailable' // 503, Claude cannot be reached or asked, for a reason that is not the person's
-  | 'assistant_budget_reached'; // 503, the spending limit of the Anthropic account is reached
+  | 'assistant_budget_reached' // 503, the spending limit of the Anthropic account is reached
+  // The codes of the users' facts and of e-mail, with the routes that answer each one
+  // (docs/EMAIL_ARCHITECTURE.md section 9.1).
+  | 'cannot_edit_admin' // 403, the target is another administrator: their facts are their own
+  | 'not_invited' // 409, a new invitation for an account that has already chosen its password
+  | 'no_email_address' // 409, the person asking for a mail has no e-mail address
+  | 'mail_limit_reached' // 429, the person has asked for their mails of today
+  | 'mail_unavailable'; // 503, e-mail is not switched on in this stack
 
 // An appointment that an availability write would leave outside the availability
 // (docs/SHARED_CALENDAR_SPEC.md R-AV-03).
@@ -56,7 +64,8 @@ export type HelloResponse = { messageId: string; role: Role; message: string; cr
 export type CreateUserResponse = { username: string; password: string };
 
 // One account of GET /users (docs/SHARED_CALENDAR_SPEC.md section 10.1): the members of group
-// `user`, never an administrator.
-export type UserSummary = { username: string; createdAt: string };
+// `user`, never an administrator, with their four facts and the state of their account
+// (docs/EMAIL_ARCHITECTURE.md section 9.1). Also the answer of PUT /users/{username}.
+export type UserSummary = { username: string; createdAt: string; status: UserStatus } & UserProfile;
 // 200 of GET /users.
 export type ListUsersResponse = { users: UserSummary[] };

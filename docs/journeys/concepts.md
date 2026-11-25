@@ -16,6 +16,8 @@ Each section explains one idea in simple words and names the document that defin
 | `fe-calendar`, `fe-calendar-b` | throw-away Users of the front end's calendar journeys | `frontend/tests/integration/calendar.test.ts` |
 | `fe-journey` | a throw-away User of the front end's Hello World journeys | `frontend/tests/integration/journeys.test.ts` |
 | `fe-assistant-read`, `fe-assistant-book`, `fe-assistant-decline` | throw-away Users of the front end's assistant journeys, one per block | `frontend/tests/integration/assistant.test.ts` |
+| `profile-user`, `profile-admin` | a throw-away User of the back end's profiles journey, and a second administrator made straight in cognito-local, with no fact | `backend/tests/integration/journeys.test.ts` |
+| `fe-profile` | a throw-away User of the front end's profiles journey | `frontend/tests/integration/profiles.test.ts` |
 | `fe-password` | a throw-away User of the front end's change of password journey, the only account whose password a journey changes | `frontend/tests/integration/change-password.test.ts` |
 | `chat-text`, `chat-lingua`, `chat-read`, `chat-book`, `chat-decline`, `chat-trouble`, `chat-note`, `chat-move`, `chat-cancel`, `chat-limit`, `chat-down`, `chat-notadmin`, `chat-full`, `chat-mark` | throw-away Users of the assistant's journeys, one per block | `backend/tests/integration/assistant.test.ts` |
 | `chat-rival` | a second throw-away User of one assistant journey, who books through the calendar's own route | `backend/tests/integration/assistant.test.ts` |
@@ -26,6 +28,26 @@ Each section explains one idea in simple words and names the document that defin
 
 Every test file removes its own throw-away Users before it starts and after it ends, so it can be
 run again after a failed run.
+
+## The four facts of a person
+
+Every account holds four facts besides its username: a first name (`givenName`), a last name
+(`familyName`), an e-mail (`email`) and a postal address (`address`), kept in Cognito's standard
+attributes (`docs/ARCHITECTURE.md` section 5.1, `docs/EMAIL_ARCHITECTURE.md` section 4).
+
+- **The rule** is one schema of `shared/src/user.ts`, used by the API and by the page alike: the
+  names trimmed, 1 to 100 characters; the e-mail trimmed and lower-cased; the address on one or
+  more lines, 1 to 300 characters. What is stored and answered is what the rule made of the input.
+- **`POST /users` needs all four.** So every journey that creates a User sends them, through one
+  helper per package: `withFacts(username)` of `backend/tests/integration/setup.ts`, and
+  `newUser(username)` of `frontend/tests/integration/local.ts`. Both give made-up facts (Throw,
+  Away + the username, an `example.com` address).
+- **Who reads and who changes them.** `GET /users` lists each User's facts for the Administrator;
+  `GET /me` gives each person their own, `null` for a fact the account does not hold (an account
+  made straight in cognito-local); only the Administrator changes them, with
+  `PUT /users/{username}`, a User's or their own, never another administrator's.
+- **The seed gives `admin` and `alice` their facts** (`backend/scripts/local-seed.sh`). A journey
+  that saves `admin`'s facts saves the seed's values, so the local stack is left as it was found.
 
 ## One local calendar, shared
 

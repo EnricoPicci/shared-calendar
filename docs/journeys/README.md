@@ -103,11 +103,13 @@ The pages written so far. Which pages are still to come, and in which order, is 
 | [`frontend/assistant-declined.md`](frontend/assistant-declined.md) | `frontend/tests/integration/assistant.test.ts`, `a proposal declined` |
 | [`frontend/logout.md`](frontend/logout.md) | `frontend/tests/integration/logout.service.test.ts`, `logout` |
 | [`frontend/change-password.md`](frontend/change-password.md) | `frontend/tests/integration/change-password.test.ts`, `change password` |
+| [`frontend/profiles.md`](frontend/profiles.md) | `frontend/tests/integration/profiles.test.ts`, `profiles` |
 
 ### Back end
 
 | Page | Explains |
 |---|---|
+| [`backend/profiles.md`](backend/profiles.md) | `backend/tests/integration/journeys.test.ts`, `profiles` |
 | [`backend/calendar-booking.md`](backend/calendar-booking.md) | `backend/tests/integration/calendar.test.ts`, `booking (route 17)` |
 | [`backend/calendar-capacity.md`](backend/calendar-capacity.md) | `backend/tests/integration/calendar.test.ts`, `the capacity of a type (AC-37 to AC-44)` |
 | [`backend/assistant-text.md`](backend/assistant-text.md) | `backend/tests/integration/assistant.test.ts`, `a conversation in text (5.6, 6)` |

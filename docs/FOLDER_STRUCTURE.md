@@ -152,13 +152,18 @@ stays at the root.
     │   ├── index.ts             # the public surface: re-exports the files below
     │   ├── api.ts               # response bodies, error body, error codes (architecture section 4)
     │   ├── roles.ts             # Role, resolveRole (architecture section 3, "admin wins")
-    │   ├── username.ts          # the username rule and the zod schemas built on it
+    │   ├── user.ts              # the username rule and its schemas; the four facts of a person
+    │   │                        # (UserProfile), CreateUserBody, UpdateUserBody, UserSummary,
+    │   │                        # MeResponse (docs/EMAIL_ARCHITECTURE.md 4)
     │   ├── password.ts          # the pool's password rule: PASSWORD_POLICY, the 32 symbols,
     │   │                        # passwordProblems and the Password schema (architecture 6.9)
     │   ├── calendar/            # the shared calendar's contract (docs/SHARED_CALENDAR_SPEC.md 12):
     │   │                        # time.ts (time-zone helpers, Intl only), schemas.ts (primitives,
     │   │                        # bodies, parameters), types.ts (responses, events), rules.ts (pure
     │   │                        # availability and slot rules), defaults.ts (defaults, limits, ranges)
+    │   ├── mail/                # the mail's contract (docs/EMAIL_ARCHITECTURE.md): schemas.ts (the
+    │   │                        # mail settings, MailCalendarBody), limits.ts, texts.ts (subject,
+    │   │                        # text and HTML of each kind), mask.ts (maskAddress)
     │   └── assistant/           # the assistant's contract (docs/CONVERSATIONAL_ARCHITECTURE.md 6):
     │                            # types.ts (AssistantReply and its parts), schemas.ts (the body of
     │                            # a message), limits.ts, languages.ts (en, it), texts.ts with
@@ -330,7 +335,7 @@ The back end is the only consumer today, so the first content of `shared/` is ex
 
 | File | Contents | Extracted from |
 |---|---|---|
-| `shared/src/username.ts` | `USERNAME_PATTERN` (the regex of architecture section 4), the `Username` zod schema, `CreateUserBody` and `UsernameParam` schemas and their inferred types | `backend/src/lib/validation.ts` (the `validate()` helper stays in the back end: it builds an HTTP response) |
+| `shared/src/username.ts` (since `docs/EMAIL_PLAN.md` step m1 `shared/src/user.ts`, with the four facts of a person) | `USERNAME_PATTERN` (the regex of architecture section 4), the `Username` zod schema, `CreateUserBody` and `UsernameParam` schemas and their inferred types | `backend/src/lib/validation.ts` (the `validate()` helper stays in the back end: it builds an HTTP response) |
 | `shared/src/roles.ts` | `type Role = 'admin' \| 'user'`, `resolveRole(groups)` with the admin-wins rule | `backend/src/lib/auth.ts` (`getClaims` and `requireGroup` stay: they read an API Gateway event) |
 | `shared/src/api.ts` | `HelloResponse`, `CreateUserResponse`, `ApiErrorBody` and the `ApiErrorCode` union: `unauthorized`, `forbidden`, `invalid_json`, `invalid_request`, `user_exists`, `user_not_found`, `cannot_delete_admin`, `internal_error` | New: these shapes were only implicit in the handlers and in architecture section 4 |
 | `shared/src/index.ts` | Re-exports the three files above; the only module consumers import | New |
@@ -553,6 +558,8 @@ repository, they cross-reference each other, and `CLAUDE.md` points at them.
   the tests, and the documents above win. `docs/journeys/README.md` holds the format and the list
   of pages, `PLAN.md` the plan of the pages still to write, `concepts.md` the ideas several pages
   share.
+- `docs/RENAME_PLAN.md` says why Hello World (`/hello`, `…hello-messages`) kept its name when
+  the project became "shared-calendar".
 - `prompts/` keeps one numbered sequence for the whole repository, whichever component a brief
   concerns.
 

@@ -5,23 +5,29 @@ import {
   AdminGetUserCommand,
   AdminListGroupsForUserCommand,
   AdminSetUserPasswordCommand,
+  AdminUpdateUserAttributesCommand,
   AdminUserGlobalSignOutCommand,
   CognitoIdentityProviderClient,
   ListUsersInGroupCommand,
   UsernameExistsException,
   UserNotFoundException,
+  type UserStatusType,
 } from '@aws-sdk/client-cognito-identity-provider';
 import { mockClient } from 'aws-sdk-client-mock';
 import {
   addToGroup,
+  asMe,
+  asUserSummary,
   createUser,
   deleteUser,
+  getProfile,
   getUserSub,
   globalSignOut,
   isPlainUser,
   listGroups,
   listPlainUsers,
   setPermanentPassword,
+  updateProfile,
   UserExistsError,
   UserNotFoundError,
 } from '../../../src/lib/cognito';
@@ -31,6 +37,15 @@ const POOL = 'eu-west-1_TEST';
 
 const notFound = () => new UserNotFoundException({ message: 'User does not exist.', $metadata: {} });
 const exists = () => new UsernameExistsException({ message: 'User account already exists', $metadata: {} });
+
+// A person's four facts, and the attributes Cognito holds them in.
+const FACTS = { givenName: 'Anna', familyName: 'Rossi', email: 'anna.rossi@example.com', address: 'Via Roma 1\n00100 Roma' };
+const factAttributes = (facts = FACTS) => [
+  { Name: 'given_name', Value: facts.givenName },
+  { Name: 'family_name', Value: facts.familyName },
+  { Name: 'email', Value: facts.email },
+  { Name: 'address', Value: facts.address },
+];
 
 beforeEach(() => {
   cognito.reset();
@@ -42,23 +57,111 @@ afterEach(() => {
 });
 
 describe('createUser', () => {
-  it('sends AdminCreateUser with MessageAction SUPPRESS and no other attributes', async () => {
+  it('sends AdminCreateUser with MessageAction SUPPRESS and the four facts, the e-mail verified', async () => {
     cognito.on(AdminCreateUserCommand).resolves({});
-    await createUser('bob');
+    await createUser('bob', FACTS);
     const calls = cognito.commandCalls(AdminCreateUserCommand);
     expect(calls).toHaveLength(1);
-    expect(calls[0]!.args[0].input).toEqual({ UserPoolId: POOL, Username: 'bob', MessageAction: 'SUPPRESS' });
+    expect(calls[0]!.args[0].input).toEqual({
+      UserPoolId: POOL,
+      Username: 'bob',
+      MessageAction: 'SUPPRESS',
+      UserAttributes: [...factAttributes(), { Name: 'email_verified', Value: 'true' }],
+    });
+  });
+
+  it('lower-cases the e-mail', async () => {
+    cognito.on(AdminCreateUserCommand).resolves({});
+    await createUser('bob', { ...FACTS, email: 'Anna.Rossi@Example.COM' });
+    expect(cognito.commandCalls(AdminCreateUserCommand)[0]!.args[0].input.UserAttributes).toContainEqual({ Name: 'email', Value: 'anna.rossi@example.com' });
   });
 
   it('maps UsernameExistsException to UserExistsError', async () => {
     cognito.on(AdminCreateUserCommand).rejects(exists());
-    await expect(createUser('bob')).rejects.toBeInstanceOf(UserExistsError);
+    await expect(createUser('bob', FACTS)).rejects.toBeInstanceOf(UserExistsError);
   });
 
   it('fails clearly when USER_POOL_ID is not set', async () => {
     vi.stubEnv('USER_POOL_ID', '');
-    await expect(createUser('bob')).rejects.toThrow('USER_POOL_ID is not set');
+    await expect(createUser('bob', FACTS)).rejects.toThrow('USER_POOL_ID is not set');
     expect(cognito.calls()).toHaveLength(0);
+  });
+});
+
+describe('updateProfile', () => {
+  it('sends AdminUpdateUserAttributes with the four facts, the e-mail lower-cased and verified', async () => {
+    cognito.on(AdminUpdateUserAttributesCommand).resolves({});
+    await updateProfile('bob', { ...FACTS, email: 'ANNA.ROSSI@example.com' });
+    expect(cognito.commandCalls(AdminUpdateUserAttributesCommand)[0]!.args[0].input).toEqual({
+      UserPoolId: POOL,
+      Username: 'bob',
+      UserAttributes: [...factAttributes(), { Name: 'email_verified', Value: 'true' }],
+    });
+  });
+
+  it('maps UserNotFoundException to UserNotFoundError', async () => {
+    cognito.on(AdminUpdateUserAttributesCommand).rejects(notFound());
+    await expect(updateProfile('ghost', FACTS)).rejects.toBeInstanceOf(UserNotFoundError);
+  });
+});
+
+describe('getProfile', () => {
+  const created = new Date(Date.UTC(2026, 10, 25, 9));
+
+  it('sends AdminGetUser and answers the facts, the state and the creation date', async () => {
+    cognito
+      .on(AdminGetUserCommand, { UserPoolId: POOL, Username: 'bob' })
+      .resolves({ Username: 'bob', UserCreateDate: created, UserStatus: 'CONFIRMED', UserAttributes: [{ Name: 'sub', Value: 's-1' }, ...factAttributes()] });
+    expect(await getProfile('bob')).toEqual({ username: 'bob', createdAt: '2026-11-25T09:00:00.000Z', status: 'active', ...FACTS });
+  });
+
+  it('answers invited for an account that must change its first password', async () => {
+    cognito.on(AdminGetUserCommand).resolves({ UserCreateDate: created, UserStatus: 'FORCE_CHANGE_PASSWORD', UserAttributes: factAttributes() });
+    expect((await getProfile('bob')).status).toBe('invited');
+  });
+
+  it('answers null for a fact the account does not hold, or holds empty', async () => {
+    cognito.on(AdminGetUserCommand).resolves({ UserCreateDate: created, UserAttributes: [{ Name: 'email', Value: '' }, { Name: 'given_name', Value: 'Anna' }] });
+    expect(await getProfile('admin')).toEqual({
+      username: 'admin',
+      createdAt: '2026-11-25T09:00:00.000Z',
+      status: 'active',
+      givenName: 'Anna',
+      familyName: null,
+      email: null,
+      address: null,
+    });
+  });
+
+  it('answers null for every fact when the answer has no attributes', async () => {
+    cognito.on(AdminGetUserCommand).resolves({ UserCreateDate: created });
+    expect(await getProfile('admin')).toMatchObject({ givenName: null, familyName: null, email: null, address: null });
+  });
+
+  it('fails as an ordinary error when the answer has no creation date', async () => {
+    cognito.on(AdminGetUserCommand).resolves({ UserAttributes: factAttributes() });
+    await expect(getProfile('bob')).rejects.toThrow('User bob has no creation date');
+  });
+
+  it('maps UserNotFoundException to UserNotFoundError', async () => {
+    cognito.on(AdminGetUserCommand).rejects(notFound());
+    await expect(getProfile('ghost')).rejects.toBeInstanceOf(UserNotFoundError);
+  });
+});
+
+describe('asUserSummary and asMe', () => {
+  const account = { username: 'bob', createdAt: '2026-11-25T09:00:00.000Z', status: 'active' as const, ...FACTS };
+
+  it('makes a User of GET /users from a stored account', () => {
+    expect(asUserSummary(account)).toEqual(account);
+  });
+
+  it('refuses an account without every fact, naming the missing ones and no value', () => {
+    expect(() => asUserSummary({ ...account, email: null, address: null })).toThrow('User bob lacks email, address');
+  });
+
+  it('makes the answer of GET /me, with the role and the missing facts as null', () => {
+    expect(asMe({ ...account, familyName: null }, 'admin')).toEqual({ username: 'bob', role: 'admin', ...FACTS, familyName: null });
   });
 });
 
@@ -187,7 +290,12 @@ describe('isPlainUser', () => {
 });
 
 describe('listPlainUsers', () => {
-  const member = (Username: string, day: number) => ({ Username, UserCreateDate: new Date(Date.UTC(2026, 10, day, 8)) });
+  const member = (Username: string, day: number, UserStatus: UserStatusType = 'CONFIRMED') => ({
+    Username,
+    UserCreateDate: new Date(Date.UTC(2026, 10, day, 8)),
+    UserStatus,
+    Attributes: factAttributes({ ...FACTS, givenName: Username }),
+  });
   const pageOf = (group: string, token: string | undefined, users: ReturnType<typeof member>[], next?: string) =>
     cognito
       .on(ListUsersInGroupCommand, { UserPoolId: POOL, GroupName: group, NextToken: token })
@@ -196,18 +304,19 @@ describe('listPlainUsers', () => {
   it('follows NextToken in both groups, keeps the members of user not in admin, sorted by username', async () => {
     pageOf('user', undefined, [member('erin', 3), member('dave', 2)], 'u2');
     pageOf('user', 'u2', [member('both', 1), member('alice', 4)], 'u3');
-    pageOf('user', 'u3', [member('carol.b', 5), member('carol-a', 6)]);
+    pageOf('user', 'u3', [member('carol.b', 5), member('carol-a', 6, 'FORCE_CHANGE_PASSWORD')]);
     pageOf('admin', undefined, [member('admin', 1)], 'a2');
     pageOf('admin', 'a2', [member('both', 1)]);
 
     const users = await listPlainUsers();
 
+    const user = (username: string, createdAt: string, status = 'active') => ({ username, createdAt, status, ...FACTS, givenName: username });
     expect(users).toEqual([
-      { username: 'alice', createdAt: '2026-11-04T08:00:00.000Z' },
-      { username: 'carol-a', createdAt: '2026-11-06T08:00:00.000Z' },
-      { username: 'carol.b', createdAt: '2026-11-05T08:00:00.000Z' },
-      { username: 'dave', createdAt: '2026-11-02T08:00:00.000Z' },
-      { username: 'erin', createdAt: '2026-11-03T08:00:00.000Z' },
+      user('alice', '2026-11-04T08:00:00.000Z'),
+      user('carol-a', '2026-11-06T08:00:00.000Z', 'invited'),
+      user('carol.b', '2026-11-05T08:00:00.000Z'),
+      user('dave', '2026-11-02T08:00:00.000Z'),
+      user('erin', '2026-11-03T08:00:00.000Z'),
     ]);
     const calls = cognito.commandCalls(ListUsersInGroupCommand).map((c) => c.args[0].input);
     expect(calls).toHaveLength(5);
@@ -224,6 +333,18 @@ describe('listPlainUsers', () => {
     pageOf('user', undefined, [{ Username: 'dave' } as ReturnType<typeof member>]);
     pageOf('admin', undefined, []);
     await expect(listPlainUsers()).rejects.toThrow('A member of group user has no username or creation date');
+  });
+
+  it('fails as an ordinary error for a member without one of the facts', async () => {
+    pageOf('user', undefined, [{ ...member('dave', 2), Attributes: factAttributes().slice(0, 2) }]);
+    pageOf('admin', undefined, []);
+    await expect(listPlainUsers()).rejects.toThrow('User dave lacks email, address');
+  });
+
+  it('fails as an ordinary error for a member without attributes', async () => {
+    pageOf('user', undefined, [{ ...member('dave', 2), Attributes: undefined } as unknown as ReturnType<typeof member>]);
+    pageOf('admin', undefined, []);
+    await expect(listPlainUsers()).rejects.toThrow('User dave lacks givenName, familyName, email, address');
   });
 
   it('rethrows a Cognito failure unchanged', async () => {
@@ -287,7 +408,7 @@ describe('error mapping', () => {
   it('rethrows any other error unchanged', async () => {
     const throttled = Object.assign(new Error('Rate exceeded'), { name: 'TooManyRequestsException' });
     cognito.on(AdminCreateUserCommand).rejects(throttled);
-    await expect(createUser('bob')).rejects.toBe(throttled);
+    await expect(createUser('bob', FACTS)).rejects.toBe(throttled);
   });
 
   it('rethrows a non-Error rejection unchanged', async () => {

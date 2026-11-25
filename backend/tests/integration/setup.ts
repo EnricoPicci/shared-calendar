@@ -1,4 +1,5 @@
 import {
+  AdminAddUserToGroupCommand,
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
   AdminSetUserPasswordCommand,
@@ -457,6 +458,29 @@ export function assistantStepCost(step: string, before: AssistantWeight, after: 
 export function reportAssistantCosts(costs: AssistantStepCost[]): void {
   const file = process.env.ASSISTANT_CAPACITY_FILE;
   if (file) appendFileSync(file, costs.map((cost) => `${JSON.stringify(cost)}\n`).join(''));
+}
+
+// The four facts a journey sends with a throw-away User it creates (docs/EMAIL_ARCHITECTURE.md
+// section 4.1), made from its username. The e-mail is at example.com, a domain kept for examples,
+// so no mail could ever reach a real person; a username that is not one still gives a good e-mail.
+export function factsOf(username: string): { givenName: string; familyName: string; email: string; address: string } {
+  const local = username.toLowerCase().replace(/[^a-z0-9.-]/g, '-');
+  return { givenName: 'Throw', familyName: `Away ${username}`, email: `${local}@example.com`, address: 'Via di Prova 1\n00100 Roma' };
+}
+
+// The body of POST /users for a throw-away User: the username and its four facts.
+export function withFacts(username: string): { username: string } & ReturnType<typeof factsOf> {
+  return { username, ...factsOf(username) };
+}
+
+// Creates a second administrator, straight in cognito-local: the API can never create one
+// (docs/ARCHITECTURE.md section 6.1). The account is in the group `admin` only, its password set as
+// permanent, and holds no fact. Remove it with removeUserIfPresent.
+export async function createSecondAdmin(username: string, password: string): Promise<void> {
+  const UserPoolId = localPool().userPoolId;
+  await cognito.send(new AdminCreateUserCommand({ UserPoolId, Username: username, MessageAction: 'SUPPRESS' }));
+  await cognito.send(new AdminSetUserPasswordCommand({ UserPoolId, Username: username, Password: password, Permanent: true }));
+  await cognito.send(new AdminAddUserToGroupCommand({ UserPoolId, Username: username, GroupName: 'admin' }));
 }
 
 // Creates an account that is in neither group, straight in cognito-local: a state the API cannot

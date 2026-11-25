@@ -1,27 +1,44 @@
 import { ReplaySubject, Subject } from 'rxjs';
+import { NO_REFUSALS, PROFILE_RULES } from '../../../src/logic/profile.model';
 import { NO_USERS, USERNAME_HINT } from '../../../src/logic/users.model';
-import { UsersScreen, type CreateOutcome, type UsersCalls, type UsersState } from '../../../src/logic/users.screen';
+import { UsersScreen, type CreateOutcome, type UpdateOutcome, type UsersCalls, type UsersState } from '../../../src/logic/users.screen';
 import type { DeleteUserResult, ListUsersResult } from '../../../src/services/users.types';
 import { useFarBrowserZone } from './zone';
 
-// A fake UsersService: three result streams that replay their last value, as the real ones
-// do, and two spies. No network, no DOM. A create's success is given as the screen reads it,
+// A fake UsersService: four result streams that replay their last value, as the real ones
+// do, and three spies. No network, no DOM. A create's success is given as the screen reads it,
 // with the username only: nothing in this file stands for a generated password.
 
 const UNREACHABLE = 'The server cannot be reached. Check the connection and try again.';
-const START: UsersState = { loading: false, unread: null, rows: null, empty: null, field: { username: '' }, creating: false, refusal: null, failure: null, created: null };
-const user = (username: string) => ({ username, createdAt: '2026-11-01T10:00:00.000Z' });
-const row = (username: string) => ({ username, deleteLabel: `Delete ${username}` });
+const FACTS = { givenName: 'Anna', familyName: 'Rossi', email: 'anna@example.com', address: 'Via Po 2\n10100 Torino' };
+const EMPTY = { givenName: '', familyName: '', email: '', address: '' };
+const NO_EDIT = { saving: false, refusals: NO_REFUSALS, failure: null, saved: null };
+const START: UsersState = { loading: false, unread: null, rows: null, empty: null, field: { username: '', ...EMPTY }, creating: false, refusal: null, refusals: NO_REFUSALS, failure: null, created: null, edit: NO_EDIT };
+const user = (username: string) => ({ username, createdAt: '2026-11-01T10:00:00.000Z', status: 'active' as const, ...FACTS });
+const row = (username: string) => ({ username, name: 'Anna Rossi', email: FACTS.email, facts: FACTS, editLabel: `Edit ${username}`, deleteLabel: `Delete ${username}` });
+// The create form with a username typed and four good facts; what the service is then given.
+const form = (username: string) => ({ username, ...FACTS });
+const sent = (username: string) => ({ username, ...FACTS });
 
 function screenOf() {
   const listUsersResult$ = new ReplaySubject<ListUsersResult>(1);
   const createUserResult$ = new ReplaySubject<CreateOutcome>(1);
   const deleteUserResult$ = new ReplaySubject<DeleteUserResult>(1);
+  const updateUserResult$ = new ReplaySubject<UpdateOutcome>(1);
   const visible$ = new Subject<void>();
   const listUsers = vi.fn<UsersCalls['listUsers']>();
   const createUser = vi.fn<UsersCalls['createUser']>();
+  const updateUser = vi.fn<UsersCalls['updateUser']>();
   const screen = new UsersScreen(
-    { listUsers, createUser, listUsersResult$: listUsersResult$.asObservable(), createUserResult$: createUserResult$.asObservable(), deleteUserResult$: deleteUserResult$.asObservable() },
+    {
+      listUsers,
+      createUser,
+      updateUser,
+      listUsersResult$: listUsersResult$.asObservable(),
+      createUserResult$: createUserResult$.asObservable(),
+      deleteUserResult$: deleteUserResult$.asObservable(),
+      updateUserResult$: updateUserResult$.asObservable(),
+    },
     visible$,
   );
   const states: UsersState[] = [];
@@ -38,8 +55,10 @@ function screenOf() {
     listed(...usernames);
     return started;
   };
-  const streams = { listUsersResult$, createUserResult$, deleteUserResult$, visible$ };
-  return { screen, ...streams, listUsers, createUser, states, listed, unread, created, notCreated, deleted, notDeleted, shown, last: () => states.at(-1)! };
+  const updated = () => updateUserResult$.next({ status: 'success' });
+  const notUpdated = (reason: Extract<UpdateOutcome, { status: 'failure' }>['reason']) => updateUserResult$.next({ status: 'failure', reason });
+  const streams = { listUsersResult$, createUserResult$, deleteUserResult$, updateUserResult$, visible$ };
+  return { screen, ...streams, listUsers, createUser, updateUser, updated, notUpdated, states, listed, unread, created, notCreated, deleted, notDeleted, shown, last: () => states.at(-1)! };
 }
 
 describe('UsersScreen', () => {
@@ -54,12 +73,16 @@ describe('UsersScreen', () => {
       expect(states).toEqual([START]);
     });
 
-    it('create() and retry() do nothing', () => {
-      const { screen, listUsers, createUser, states } = screenOf();
-      screen.create('carol');
-      screen.create('Bob');
+    it('create(), typed(), retry() and the Edit dialog\'s three do nothing', () => {
+      const { screen, listUsers, createUser, updateUser, states } = screenOf();
+      screen.create(form('carol'));
+      screen.create(form('Bob'));
+      screen.typed(form('carol'));
       screen.retry();
-      expect([listUsers.mock.calls.length, createUser.mock.calls.length, states.length]).toEqual([0, 0, 1]);
+      screen.editOpened();
+      screen.editTyped(FACTS);
+      screen.save('alice', FACTS);
+      expect([listUsers.mock.calls.length, createUser.mock.calls.length, updateUser.mock.calls.length, states.length]).toEqual([0, 0, 0, 1]);
     });
   });
 
@@ -117,8 +140,8 @@ describe('UsersScreen', () => {
       const { screen, createUser, unread, last } = screenOf();
       screen.start();
       unread();
-      screen.create('carol');
-      expect(createUser).toHaveBeenCalledWith('carol');
+      screen.create(form('carol'));
+      expect(createUser).toHaveBeenCalledWith(sent('carol'));
       expect(last()).toMatchObject({ creating: true, unread: UNREACHABLE });
     });
 
@@ -158,9 +181,9 @@ describe('UsersScreen', () => {
       const { screen, createUser, listUsers, shown, last } = screenOf();
       shown('alice');
       const { rows, field } = last();
-      screen.create('carol');
+      screen.create(form('carol'));
       expect(createUser).toHaveBeenCalledTimes(1);
-      expect(createUser).toHaveBeenCalledWith('carol');
+      expect(createUser).toHaveBeenCalledWith(sent('carol'));
       expect(listUsers).toHaveBeenCalledTimes(1);
       expect(last()).toEqual({ ...START, rows, creating: true });
       expect(last().field).toBe(field); // what was typed stays while the call is under way
@@ -169,22 +192,22 @@ describe('UsersScreen', () => {
     it('spaces around the name are removed before it is sent', () => {
       const { screen, createUser, shown } = screenOf();
       shown();
-      screen.create(' carol ');
-      expect(createUser).toHaveBeenCalledWith('carol');
+      screen.create(form(' carol '));
+      expect(createUser).toHaveBeenCalledWith(sent('carol'));
     });
 
     it('"admin" passes the check: the server is the one to say that it exists', () => {
       const { screen, createUser, shown } = screenOf();
       shown();
-      screen.create('admin');
-      expect(createUser).toHaveBeenCalledWith('admin');
+      screen.create(form('admin'));
+      expect(createUser).toHaveBeenCalledWith(sent('admin'));
     });
 
     it.each(['', 'ab', 'Bob', 'alice smith', '-alice', 'a'.repeat(33)])('"%s" is refused by the check: the refusal, no call, the list kept and not read again', (text) => {
       const { screen, createUser, listUsers, shown, states, last } = screenOf();
       shown('alice');
       const before = last();
-      screen.create(text);
+      screen.create(form(text));
       expect(createUser).not.toHaveBeenCalled();
       expect(listUsers).toHaveBeenCalledTimes(1);
       expect(last()).toEqual({ ...before, refusal: USERNAME_HINT });
@@ -196,12 +219,12 @@ describe('UsersScreen', () => {
     it('the refusal goes at the next create that is sent; a refusal takes an earlier failure away', () => {
       const { screen, shown, notCreated, last } = screenOf();
       shown();
-      screen.create('Bob');
-      screen.create('bob');
+      screen.create(form('Bob'));
+      screen.create(form('bob'));
       expect(last()).toMatchObject({ refusal: null, creating: true });
       notCreated('user_exists');
       expect(last().failure).not.toBeNull();
-      screen.create('Bob');
+      screen.create(form('Bob'));
       expect(last()).toMatchObject({ refusal: USERNAME_HINT, failure: null });
     });
 
@@ -209,11 +232,11 @@ describe('UsersScreen', () => {
       const { screen, listUsers, shown, created, listed, last } = screenOf();
       shown('alice');
       const { rows, field } = last();
-      screen.create('carol');
+      screen.create(form('carol'));
       created('carol');
       expect(last()).toEqual({ ...START, rows, loading: true, created: 'carol' });
       expect(last().field).not.toBe(field); // another object: the view empties the field
-      expect(last().field).toEqual({ username: '' });
+      expect(last().field).toEqual({ username: '', ...EMPTY });
       expect(listUsers).toHaveBeenCalledTimes(2);
       const emptied = last().field;
       listed('alice', 'carol');
@@ -224,11 +247,11 @@ describe('UsersScreen', () => {
     it('no state of the stream has a place for a password: a create is known by its username only', () => {
       const { screen, shown, created, listed, states } = screenOf();
       shown('alice');
-      screen.create('carol');
+      screen.create(form('carol'));
       created('carol');
       listed('alice', 'carol');
       const keys = new Set(states.flatMap((s) => Object.keys(s)));
-      expect([...keys].sort()).toEqual(['created', 'creating', 'empty', 'failure', 'field', 'loading', 'refusal', 'rows', 'unread']);
+      expect([...keys].sort()).toEqual(['created', 'creating', 'edit', 'empty', 'failure', 'field', 'loading', 'refusal', 'refusals', 'rows', 'unread']);
       expect(JSON.stringify(states)).not.toMatch(/password/i);
     });
 
@@ -242,7 +265,7 @@ describe('UsersScreen', () => {
       const { screen, createUser, listUsers, shown, notCreated, created, listed, last } = screenOf();
       shown('alice');
       const { field } = last();
-      screen.create('alice');
+      screen.create(form('alice'));
       notCreated(reason);
       expect(last()).toMatchObject({ creating: false, failure: sentence, refusal: null, created: null, loading: true });
       expect(last().field).toBe(field);
@@ -251,7 +274,7 @@ describe('UsersScreen', () => {
       listed('alice', 'carol');
       expect(last()).toMatchObject({ rows: [row('alice'), row('carol')], failure: sentence });
 
-      screen.create('dave');
+      screen.create(form('dave'));
       expect(createUser).toHaveBeenCalledTimes(2);
       expect(last()).toMatchObject({ creating: true, failure: null });
       created('dave');
@@ -261,10 +284,10 @@ describe('UsersScreen', () => {
     it('a second create while one is under way goes to the service, which keeps the last', () => {
       const { screen, createUser, shown, created, last } = screenOf();
       shown();
-      screen.create('carol');
-      screen.create('dave');
+      screen.create(form('carol'));
+      screen.create(form('dave'));
       expect(createUser).toHaveBeenCalledTimes(2);
-      expect(createUser).toHaveBeenLastCalledWith('dave');
+      expect(createUser).toHaveBeenLastCalledWith(sent('dave'));
       expect(last().creating).toBe(true);
       created('dave');
       expect(last()).toMatchObject({ creating: false, created: 'dave' });
@@ -273,13 +296,13 @@ describe('UsersScreen', () => {
     it('"created" goes at the next create, sent or refused', () => {
       const { screen, shown, created, last } = screenOf();
       shown();
-      screen.create('carol');
+      screen.create(form('carol'));
       created('carol');
-      screen.create('Bob');
+      screen.create(form('Bob'));
       expect(last().created).toBeNull();
-      screen.create('dave');
+      screen.create(form('dave'));
       created('dave');
-      screen.create('erin');
+      screen.create(form('erin'));
       expect(last().created).toBeNull();
     });
 
@@ -290,6 +313,121 @@ describe('UsersScreen', () => {
       listed('alice', 'carol');
       expect(listUsers).toHaveBeenCalledTimes(1);
       expect(last()).toEqual({ ...START, rows: [row('alice'), row('carol')] });
+    });
+  });
+
+  describe('the four facts of the create form', () => {
+    it('a fact that does not follow its rule: its refusal, no call; a username refused at the same time is said too', () => {
+      const { screen, createUser, shown, last } = screenOf();
+      shown();
+      screen.create({ ...form('Bob'), email: 'anna', address: '' });
+      expect(createUser).not.toHaveBeenCalled();
+      expect(last()).toMatchObject({ refusal: USERNAME_HINT, refusals: { ...NO_REFUSALS, email: PROFILE_RULES.email, address: PROFILE_RULES.address }, creating: false });
+    });
+
+    it('a good username with one fact refused: nothing is sent, the username not refused', () => {
+      const { screen, createUser, shown, last } = screenOf();
+      shown();
+      screen.create({ ...form('carol'), givenName: ' ' });
+      expect(createUser).not.toHaveBeenCalled();
+      expect(last()).toMatchObject({ refusal: null, refusals: { ...NO_REFUSALS, givenName: PROFILE_RULES.givenName } });
+    });
+
+    it('while typing, a refused fact that becomes right loses its refusal; one not refused yet is left alone', () => {
+      const { screen, shown, last } = screenOf();
+      shown();
+      screen.create({ ...form('carol'), email: 'anna', familyName: '' });
+      screen.typed({ ...form('carol'), email: 'anna@example.com', familyName: '', givenName: '' });
+      expect(last().refusals).toEqual({ ...NO_REFUSALS, familyName: PROFILE_RULES.familyName });
+    });
+
+    it('the facts go as the shared rules make them, and the refusals go at the create that is sent', () => {
+      const { screen, createUser, shown, last } = screenOf();
+      shown();
+      screen.create({ ...form('carol'), email: 'x' });
+      screen.create({ username: 'carol', givenName: ' Anna ', familyName: 'Rossi', email: 'Anna@Example.com', address: 'Via Po 2\r\n10100 Torino' });
+      expect(createUser).toHaveBeenCalledWith(sent('carol'));
+      expect(last()).toMatchObject({ refusals: NO_REFUSALS, creating: true });
+    });
+
+    it('a create that succeeds empties the four facts too', () => {
+      const { screen, shown, created, last } = screenOf();
+      shown();
+      screen.create(form('carol'));
+      created('carol');
+      expect(last().field).toEqual({ username: '', ...EMPTY });
+    });
+  });
+
+  describe('the Edit dialog', () => {
+    it('a save with four good facts: the update of that user, once; saving while it is under way', () => {
+      const { screen, updateUser, shown, last } = screenOf();
+      shown('alice');
+      screen.editOpened();
+      screen.save('alice', { ...FACTS, email: ' Anna@Example.com ' });
+      expect(updateUser).toHaveBeenCalledTimes(1);
+      expect(updateUser).toHaveBeenCalledWith('alice', FACTS);
+      expect(last().edit).toEqual({ ...NO_EDIT, saving: true });
+      screen.save('alice', FACTS); // a second press while under way
+      expect(updateUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('a save that succeeds: another "saved" object, the list read again', () => {
+      const { screen, listUsers, shown, updated, last } = screenOf();
+      shown('alice');
+      screen.save('alice', FACTS);
+      updated();
+      expect(last().edit).toEqual({ ...NO_EDIT, saved: expect.any(Object) });
+      const first = last().edit.saved;
+      expect(listUsers).toHaveBeenCalledTimes(2);
+      screen.save('alice', FACTS);
+      updated();
+      expect(last().edit.saved).not.toBe(first);
+    });
+
+    it.each([
+      ['cannot_edit_admin', "Another Administrator's details cannot be changed."],
+      ['user_not_found', 'This user no longer exists.'],
+      ['network', UNREACHABLE],
+    ] as const)('a save that fails with %s: its sentence in the dialog, nothing "saved", the list read again', (reason, sentence) => {
+      const { screen, listUsers, shown, notUpdated, last } = screenOf();
+      shown('alice');
+      screen.save('alice', FACTS);
+      notUpdated(reason);
+      expect(last().edit).toEqual({ ...NO_EDIT, failure: sentence });
+      expect(listUsers).toHaveBeenCalledTimes(2);
+    });
+
+    it('a fact refused: no call, its refusal in the dialog; typing it right takes it away', () => {
+      const { screen, updateUser, shown, last } = screenOf();
+      shown('alice');
+      screen.save('alice', { ...FACTS, familyName: '' });
+      expect(updateUser).not.toHaveBeenCalled();
+      expect(last().edit).toEqual({ ...NO_EDIT, refusals: { ...NO_REFUSALS, familyName: PROFILE_RULES.familyName } });
+      screen.editTyped(FACTS);
+      expect(last().edit.refusals).toEqual(NO_REFUSALS);
+    });
+
+    it('opened again: refusals and failure gone; a save still under way stays under way', () => {
+      const { screen, shown, notUpdated, last } = screenOf();
+      shown('alice');
+      screen.save('alice', FACTS);
+      notUpdated('internal_error');
+      screen.save('alice', { ...FACTS, email: '' });
+      screen.editOpened();
+      expect(last().edit).toEqual(NO_EDIT);
+      screen.save('alice', FACTS);
+      screen.editOpened();
+      expect(last().edit).toEqual({ ...NO_EDIT, saving: true });
+    });
+
+    it('an update not asked for here (from "My details") is not this screen\'s: nothing said, nothing read', () => {
+      const { listUsers, shown, updated, notUpdated, last } = screenOf();
+      shown('alice');
+      updated();
+      notUpdated('internal_error');
+      expect(last().edit).toEqual(NO_EDIT);
+      expect(listUsers).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -328,7 +466,7 @@ describe('UsersScreen', () => {
     it('the list is read again, each time, and what the form says stays', () => {
       const { screen, listUsers, shown, visible$, last } = screenOf();
       shown('alice');
-      screen.create('Bob');
+      screen.create(form('Bob'));
       visible$.next();
       visible$.next();
       expect(listUsers).toHaveBeenCalledTimes(3);
@@ -338,13 +476,13 @@ describe('UsersScreen', () => {
 
   describe('after the subscription of start() ends', () => {
     it('everything is forgotten, no stream is heard, and nothing is read or created', () => {
-      const { screen, listUsersResult$, createUserResult$, deleteUserResult$, visible$, listUsers, createUser, shown, created, deleted, listed, last } = screenOf();
+      const { screen, listUsersResult$, createUserResult$, deleteUserResult$, updateUserResult$, visible$, listUsers, createUser, shown, created, deleted, listed, last } = screenOf();
       const started = shown('alice');
-      screen.create('Bob');
+      screen.create(form('Bob'));
       started.unsubscribe();
       expect(last()).toEqual(START);
-      expect([listUsersResult$.observed, createUserResult$.observed, deleteUserResult$.observed, visible$.observed]).toEqual([false, false, false, false]);
-      screen.create('carol');
+      expect([listUsersResult$.observed, createUserResult$.observed, deleteUserResult$.observed, updateUserResult$.observed, visible$.observed]).toEqual([false, false, false, false, false]);
+      screen.create(form('carol'));
       screen.retry();
       created('carol');
       deleted('alice');
@@ -367,7 +505,7 @@ describe('UsersScreen', () => {
     it('left while a create was under way, its late answer is not the next start\'s', () => {
       const { screen, listUsers, shown, created, listed, last } = screenOf();
       const started = shown();
-      screen.create('carol');
+      screen.create(form('carol'));
       started.unsubscribe();
       created('carol');
       screen.start();

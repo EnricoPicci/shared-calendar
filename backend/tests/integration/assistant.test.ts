@@ -12,8 +12,9 @@ import {
   signIn,
   storedEntries,
   subOf,
-  weighAssistant,
   type AssistantStepCost,
+  weighAssistant,
+  withFacts,
 } from './setup';
 
 // The assistant's journeys (docs/CONVERSATIONAL_ARCHITECTURE.md section 12.2), end to end through
@@ -49,7 +50,7 @@ let adminToken: string;
 // Creates the throw-away User again (an earlier, interrupted run may have left it) and signs in.
 async function newUser(username: string): Promise<string> {
   await removeUserIfPresent(username);
-  const created = await api('POST', '/users', adminToken, { username });
+  const created = await api('POST', '/users', adminToken, withFacts(username));
   expect(created.status).toBe(201);
   return signIn(username, created.body?.password as string);
 }

@@ -30,13 +30,13 @@ when those files are touched (`.claude/rules/frontend-views.md`).
 - `src/services/`: `session.store.ts`; `cognito.ts`, `api.ts` and `jwt.ts`, the building
   blocks; then one `<name>.service.ts` + `<name>.types.ts` per service: `login`, `refresh`,
   `logout`, `hello`, `users`, `calendar-settings`, `availability-types`, `availability-rules`,
-  `calendar`, `appointments`, `assistant`, `change-password` (straight at Cognito, no route).
+  `calendar`, `appointments`, `assistant`, `change-password` (straight at Cognito, no route), `me`.
   One result/state pair per method, except `assistant`: one stream, `outcome$`, for its six
   calls. Input checked with the shared schemas before sending. Tokens live only in the
   `SessionStore`: no result, state or service field holds one.
 - `index.html`: all the markup, everything `hidden`: the login `#login`; the frame `#app` with
   the header, the navigation and `main.screen`, which holds one element per screen (`#week`,
-  `#appointments`, `#settings`, `#users`, `#availability`, `#password`), each with its dialogs and its
+  `#appointments`, `#settings`, `#users`, `#availability`, `#me`, `#password`), each with its dialogs and its
   `<template>`s; and, in no screen, `dialog#detail` and the assistant's panel `#assistant`. One module script `app.js`, one style
   sheet, nothing inline. No range, pattern, length or choice of a list is written in the page:
   the script sets them.
@@ -48,15 +48,16 @@ when those files are touched (`.claude/rules/frontend-views.md`).
   never the week's; the assistant's panel, mounted once per session and in no row of
   `SCREENS`); one `<name>.view.ts` per view, `mount<Name>(root, deps): Subscription`: `login`,
   `week`, `appointments`, `settings`, `users`, `availability` and `date` (two views of one
-  screen), `assistant`, `password`; `detail.view.ts`, the dialog two views mount; `availability.parts.ts`, the
-  helpers the availability's two views share, with `mountConfirm`.
+  screen), `assistant`, `me`, `password`; `detail.view.ts`, the dialog two views mount; `availability.parts.ts`, the
+  helpers the availability's two views share, with `mountConfirm`; `profile.parts.ts`, the four
+  facts' fields and the Edit dialog, shared by the users view and `me`.
 - `src/logic/`: pure models (`texts.ts`, `week.model.ts`, `booking.ts`,
   `appointment.detail.ts`, `appointments.model.ts`, `settings.model.ts`, `users.model.ts`,
   `availability.model.ts`, `conflicts.ts`, `date.model.ts`, `assistant.model.ts`,
-  `password.model.ts`) and one class
+  `password.model.ts`, `profile.model.ts`, `me.model.ts`) and one class
   per screen, and one for the panel, with one stream and `start()` (`week.screen.ts`,
   `appointments.screen.ts`, `settings.screen.ts`, `users.screen.ts`, `availability.screen.ts`,
-  `date.screen.ts`, `assistant.screen.ts`, `password.screen.ts`).
+  `date.screen.ts`, `assistant.screen.ts`, `password.screen.ts`, `me.screen.ts`).
 - `scripts/` (Node, outside the browser's lint rules): `bundle.mjs`, `build.mjs`, `dev.mjs`,
   `seed-local.mjs`; and `deploy.sh`, the release of the page (`npm run deploy -w frontend`).
 - `tests/unit/services/`, `tests/unit/logic/` (project `unit`, in node; `zone.ts`,
@@ -64,7 +65,7 @@ when those files are touched (`.claude/rules/frontend-views.md`).
   `page.test.ts`, `shell.test.ts`) mirror `src/`; `tests/unit/scripts/bundle.test.ts` (project
   `unit`) holds the bundle's constants; `tests/integration/` (`local.ts`,
   `login.service.test.ts`, `journeys.test.ts`, `logout.service.test.ts`, `calendar.test.ts`,
-  `change-password.test.ts`; `assistant.test.ts`, against the fake Claude only: `claude.ts`,
+  `change-password.test.ts`, `profiles.test.ts`; `assistant.test.ts`, against the fake Claude only: `claude.ts`,
   tested in `tests/unit/integration/`) runs the services against the local stack.
 - Generated, git-ignored: `coverage/`, `dist/`.
 

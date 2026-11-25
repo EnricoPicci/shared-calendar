@@ -9,6 +9,9 @@ import { CONFIG, describeMethod, type MethodSpec } from './suite';
 // every test subscribes first, then calls.
 
 const GENERATED = 'Gen3rated-Pass-word!';
+// A person's four facts, as the form holds them and as they are sent.
+const FACTS = { givenName: 'Carol', familyName: 'Conti', email: 'carol@example.com', address: 'Via Roma 1\n00100 Roma' };
+const newUser = (username: string) => ({ username, ...FACTS });
 
 let fetchMock: ReturnType<typeof vi.fn>;
 let store: SessionStore;
@@ -45,7 +48,7 @@ afterEach(() => {
 async function createOnce(answer: Response, username = 'carol') {
   fetchMock.mockResolvedValueOnce(answer);
   const before = created.length;
-  service.createUser(username);
+  service.createUser(newUser(username));
   await vi.waitFor(() => expect(created).toHaveLength(before + 1));
   return created.at(-1) as CreateUserResult;
 }
@@ -72,13 +75,26 @@ describe('UsersService.createUser', () => {
     expect(url).toBe('http://api.test/users');
     expect(init.method).toBe('POST');
     expect(init.headers).toEqual({ Authorization: 'Bearer access-token-admin', 'Content-Type': 'application/json' });
-    expect(JSON.parse(init.body as string)).toEqual({ username: 'carol' });
+    expect(JSON.parse(init.body as string)).toEqual(newUser('carol'));
+  });
+
+  it('the facts are sent as the shared rule makes them: trimmed, the e-mail lower-cased, the line ends of the address made one', async () => {
+    fetchMock.mockResolvedValueOnce(json(201, { username: 'carol', password: GENERATED }));
+    service.createUser({ username: 'carol', givenName: ' Carol ', familyName: 'Conti ', email: ' Carol@Example.COM', address: ' Via Roma 1\r\n00100 Roma ' });
+    await vi.waitFor(() => expect(created).toHaveLength(1));
+    expect(JSON.parse(call(fetchMock)[1].body as string)).toEqual(newUser('carol'));
   });
 
   it('invalid name: pending, then failure invalid_request; fetch never called', () => {
-    service.createUser('Bob');
+    service.createUser(newUser('Bob'));
     expect(created).toEqual([{ status: 'failure', reason: 'invalid_request', message: expect.stringContaining('3 to 32') }]);
     expect(createStates.map((s) => s.status)).toEqual(['idle', 'pending', 'failure']);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a fact that is not one: failure invalid_request naming the field; fetch never called', () => {
+    service.createUser({ ...newUser('carol'), email: 'not-an-address' });
+    expect(created).toEqual([{ status: 'failure', reason: 'invalid_request', message: 'email: not an e-mail address' }]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -109,7 +125,7 @@ describe('UsersService.createUser', () => {
       firstSignal = init.signal ?? undefined;
       return new Promise<Response>(() => {});
     });
-    service.createUser('dave');
+    service.createUser(newUser('dave'));
     await createOnce(json(201, { username: 'carol', password: GENERATED }));
     expect(firstSignal?.aborted).toBe(true);
     expect(created).toHaveLength(1);
@@ -168,7 +184,7 @@ describe('UsersService, both pairs', () => {
 
   it('not signed in: failure not_signed_in; fetch never called', () => {
     store.clear();
-    service.createUser('carol');
+    service.createUser(newUser('carol'));
     service.deleteUser('carol');
     expect(created).toEqual([{ status: 'failure', reason: 'not_signed_in', message: 'Nobody is signed in' }]);
     expect(deleted).toEqual([{ status: 'failure', reason: 'not_signed_in', message: 'Nobody is signed in' }]);
@@ -182,7 +198,7 @@ describe('UsersService, both pairs', () => {
       createSignal = init.signal ?? undefined;
       return new Promise<Response>((resolve) => (answerCreate = resolve));
     });
-    service.createUser('dave');
+    service.createUser(newUser('dave'));
     await deleteOnce(new Response(null, { status: 204 }));
     expect(createSignal?.aborted).toBe(false);
     answerCreate(json(201, { username: 'dave', password: GENERATED }));
@@ -220,8 +236,8 @@ describe('UsersService.deleteUser, the calendar lock', () => {
 });
 
 const USERS = [
-  { username: 'alice', createdAt: '2026-11-01T09:00:00.000Z' },
-  { username: 'fe-calendar', createdAt: '2026-11-15T09:00:00.000Z' },
+  { username: 'alice', createdAt: '2026-11-01T09:00:00.000Z', status: 'active', ...FACTS, givenName: 'Alice' },
+  { username: 'fe-calendar', createdAt: '2026-11-15T09:00:00.000Z', status: 'invited', ...FACTS },
 ];
 const listUsers: MethodSpec<UsersService> = {
   name: 'listUsers',
@@ -234,7 +250,9 @@ const listUsers: MethodSpec<UsersService> = {
   success: { status: 'success', users: USERS },
   wrong: [
     ['200 without users', () => json(200, {})],
-    ['an element without username', () => json(200, { users: [{ createdAt: 'x' }] })],
+    ['an element without username', () => json(200, { users: [{ ...USERS[0], username: undefined }] })],
+    ['an element without its e-mail', () => json(200, { users: [{ ...USERS[0], email: undefined }] })],
+    ['an element with a name that is no text', () => json(200, { users: [{ ...USERS[0], familyName: 7 }] })],
     ['201', () => json(201, { users: USERS })],
   ],
   codes: ['forbidden', 'internal_error'],
@@ -243,3 +261,30 @@ const listUsers: MethodSpec<UsersService> = {
 const deleteForCancel: MethodSpec<UsersService> = { ...listUsers, name: 'deleteUser', call: (s) => s.deleteUser('carol') };
 
 describeMethod((store) => new UsersService(CONFIG, store), listUsers, deleteForCancel);
+
+// PUT /users/{username} (docs/FRONTEND_SERVICES.md section 13.1): the four facts of one user.
+const UPDATED = { ...USERS[0] };
+const updateUser: MethodSpec<UsersService> = {
+  name: 'updateUser',
+  result$: (s) => s.updateUserResult$,
+  state$: (s) => s.updateUserState$,
+  call: (s) => s.updateUser('alice', { ...FACTS, givenName: ' Alice ' }),
+  pending: { status: 'pending', username: 'alice' },
+  request: { method: 'PUT', path: '/users/alice', body: { ...FACTS, givenName: 'Alice' } },
+  ok: () => json(200, UPDATED),
+  success: { status: 'success', user: UPDATED },
+  wrong: [
+    ['200 without the e-mail', () => json(200, { ...UPDATED, email: undefined })],
+    ['200 empty', () => new Response(null, { status: 200 })],
+    ['201', () => json(201, UPDATED)],
+  ],
+  codes: ['forbidden', 'invalid_json', 'invalid_request', 'user_not_found', 'cannot_edit_admin', 'internal_error'],
+  notCodes: ['cannot_delete_admin'],
+  invalid: [
+    ['a username that is not one', (s) => s.updateUser('../admin', FACTS), expect.stringContaining('3 to 32') as unknown as string],
+    ['an empty first name', (s) => s.updateUser('alice', { ...FACTS, givenName: '  ' }), expect.stringMatching(/^givenName: /) as unknown as string],
+    ['an address too long', (s) => s.updateUser('alice', { ...FACTS, address: 'x'.repeat(301) }), expect.stringMatching(/^address: /) as unknown as string],
+  ],
+};
+
+describeMethod((store) => new UsersService(CONFIG, store), updateUser, listUsers);

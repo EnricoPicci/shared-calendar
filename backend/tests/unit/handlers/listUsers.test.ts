@@ -18,12 +18,24 @@ function eventWith(lambda: Record<string, string> | undefined) {
 }
 const asCaller = (username: string, groups: string[]) => eventWith({ sub: `sub-${username}`, username, groups: JSON.stringify(groups) });
 
-const member = (Username: string) => ({ Username, UserCreateDate: new Date('2026-11-10T09:00:00.000Z') });
+// Each member holds the four facts (docs/EMAIL_ARCHITECTURE.md section 4.1), its first name its username.
+const factsOf = (username: string) => ({ givenName: username, familyName: 'Rossi', email: `${username}@example.com`, address: 'Via Roma 1' });
+const member = (Username: string, UserStatus: 'CONFIRMED' | 'FORCE_CHANGE_PASSWORD' = 'CONFIRMED') => ({
+  Username,
+  UserCreateDate: new Date('2026-11-10T09:00:00.000Z'),
+  UserStatus,
+  Attributes: [
+    { Name: 'given_name', Value: Username },
+    { Name: 'family_name', Value: 'Rossi' },
+    { Name: 'email', Value: `${Username}@example.com` },
+    { Name: 'address', Value: 'Via Roma 1' },
+  ],
+});
 
 let output: string[];
 beforeEach(async () => {
   cognito.reset();
-  cognito.on(ListUsersInGroupCommand, { GroupName: 'user' }).resolves({ Users: [member('erin'), member('alice'), member('dave'), member('both')] });
+  cognito.on(ListUsersInGroupCommand, { GroupName: 'user' }).resolves({ Users: [member('erin'), member('alice'), member('dave', 'FORCE_CHANGE_PASSWORD'), member('both')] });
   cognito.on(ListUsersInGroupCommand, { GroupName: 'admin' }).resolves({ Users: [member('admin'), member('both')] });
   vi.stubEnv('USER_POOL_ID', POOL);
   output = [];
@@ -44,17 +56,23 @@ const logLines = () => output.map((line) => JSON.parse(line) as Record<string, u
 const body = (response: Awaited<ReturnType<Handler>>) => JSON.parse(response.body ?? '') as Record<string, unknown>;
 
 describe('listUsers handler', () => {
-  it('answers 200 with the plain Users, sorted by username, admins excluded', async () => {
+  it('answers 200 with the plain Users, their facts and state, sorted by username, admins excluded', async () => {
     const response = await handler(asCaller('admin', ['admin']));
     expect(response.statusCode).toBe(200);
     const createdAt = '2026-11-10T09:00:00.000Z';
     expect(body(response)).toEqual({
       users: [
-        { username: 'alice', createdAt },
-        { username: 'dave', createdAt },
-        { username: 'erin', createdAt },
+        { username: 'alice', createdAt, status: 'active', ...factsOf('alice') },
+        { username: 'dave', createdAt, status: 'invited', ...factsOf('dave') },
+        { username: 'erin', createdAt, status: 'active', ...factsOf('erin') },
       ],
     });
+  });
+
+  it('writes no fact of a User into the log line', async () => {
+    await handler(asCaller('admin', ['admin']));
+    expect(output.join('')).not.toContain('@example.com');
+    expect(output.join('')).not.toContain('Rossi');
   });
 
   it('allows a caller in both admin and user', async () => {

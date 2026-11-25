@@ -5,12 +5,15 @@ import {
   AdminGetUserCommand,
   AdminListGroupsForUserCommand,
   AdminSetUserPasswordCommand,
+  AdminUpdateUserAttributesCommand,
   AdminUserGlobalSignOutCommand,
+  type AttributeType,
   CognitoIdentityProviderClient,
   ListUsersInGroupCommand,
+  type UserStatusType,
   type UserType,
 } from '@aws-sdk/client-cognito-identity-provider';
-import type { UserSummary } from '@shared-calendar/shared';
+import type { MeResponse, UserProfile, UserStatus, UserSummary } from '@shared-calendar/shared';
 
 export class UserExistsError extends Error {
   constructor(username: string) {
@@ -47,11 +50,106 @@ function mapError(err: unknown, username: string): never {
   throw err;
 }
 
-// MessageAction SUPPRESS: Cognito sends no invitation (no e-mail in v1).
-export async function createUser(username: string): Promise<void> {
+// The four facts about a person and the standard Cognito attribute that holds each one
+// (docs/EMAIL_ARCHITECTURE.md section 4.1). They are standard attributes, so the pool's schema
+// does not list them.
+const PROFILE_ATTRIBUTES = { givenName: 'given_name', familyName: 'family_name', email: 'email', address: 'address' } as const satisfies Record<keyof UserProfile, string>;
+
+// The facts as Cognito attributes, the e-mail lower-cased. `email_verified` is true because the
+// Administrator typed the address: there is no verification code to send
+// (docs/EMAIL_ARCHITECTURE.md section 4.1).
+function profileAttributes(profile: UserProfile): AttributeType[] {
+  return [
+    { Name: PROFILE_ATTRIBUTES.givenName, Value: profile.givenName },
+    { Name: PROFILE_ATTRIBUTES.familyName, Value: profile.familyName },
+    { Name: PROFILE_ATTRIBUTES.email, Value: profile.email.toLowerCase() },
+    { Name: PROFILE_ATTRIBUTES.address, Value: profile.address },
+    { Name: 'email_verified', Value: 'true' },
+  ];
+}
+
+// The facts an account holds, each null when its attribute is missing or empty.
+type StoredFacts = { [Fact in keyof UserProfile]: string | null };
+
+function storedFacts(attributes: AttributeType[] | undefined): StoredFacts {
+  const value = (name: string) => attributes?.find((attribute) => attribute.Name === name)?.Value || null;
+  return {
+    givenName: value(PROFILE_ATTRIBUTES.givenName),
+    familyName: value(PROFILE_ATTRIBUTES.familyName),
+    email: value(PROFILE_ATTRIBUTES.email),
+    address: value(PROFILE_ATTRIBUTES.address),
+  };
+}
+
+// The state of an account as the page shows it (docs/EMAIL_PLAN.md finding F11): an account that
+// must still change its first password is `invited`, any other state `active`.
+function statusOf(status: UserStatusType | string | undefined): UserStatus {
+  return status === 'FORCE_CHANGE_PASSWORD' ? 'invited' : 'active';
+}
+
+// The four facts of a User, all of them. Every User has them from its creation
+// (docs/EMAIL_ARCHITECTURE.md section 4.3): a User without one is a broken directory, an ordinary
+// error (500). The error names the missing facts, never a value.
+function requiredFacts(username: string, facts: StoredFacts): UserProfile {
+  const { givenName, familyName, email, address } = facts;
+  if (givenName !== null && familyName !== null && email !== null && address !== null) return { givenName, familyName, email, address };
+  const missing = Object.entries(facts).flatMap(([fact, held]) => (held === null ? [fact] : []));
+  throw new Error(`User ${username} lacks ${missing.join(', ')}`);
+}
+
+// A member of a group as GET /users answers it. A member without a username or a creation date is
+// a broken directory: an ordinary error (500).
+function summaryOf(user: UserType): UserSummary {
+  if (!user.Username || !user.UserCreateDate) throw new Error('A member of group user has no username or creation date');
+  const facts = requiredFacts(user.Username, storedFacts(user.Attributes));
+  return { username: user.Username, createdAt: user.UserCreateDate.toISOString(), status: statusOf(user.UserStatus), ...facts };
+}
+
+// MessageAction SUPPRESS: Cognito sends no invitation; the handler sets a permanent password.
+export async function createUser(username: string, profile: UserProfile): Promise<void> {
   await cognitoClient
-    .send(new AdminCreateUserCommand({ UserPoolId: userPoolId(), Username: username, MessageAction: 'SUPPRESS' }))
+    .send(
+      new AdminCreateUserCommand({
+        UserPoolId: userPoolId(),
+        Username: username,
+        MessageAction: 'SUPPRESS',
+        UserAttributes: profileAttributes(profile),
+      }),
+    )
     .catch((err: unknown) => mapError(err, username));
+}
+
+// Replaces the four facts of an account (AdminUpdateUserAttributes). The pool verifies no
+// attribute by itself, so a new e-mail sends nothing.
+export async function updateProfile(username: string, profile: UserProfile): Promise<void> {
+  await cognitoClient
+    .send(new AdminUpdateUserAttributesCommand({ UserPoolId: userPoolId(), Username: username, UserAttributes: profileAttributes(profile) }))
+    .catch((err: unknown) => mapError(err, username));
+}
+
+/** One account read whole (AdminGetUser): its facts, each null when missing, its state and creation date. */
+export type StoredAccount = { username: string; createdAt: string; status: UserStatus } & StoredFacts;
+
+// An account read by AdminGetUser. The facts may be missing: the Administrator's account exists
+// before its facts are typed (docs/EMAIL_ARCHITECTURE.md section 4.3). An answer without a
+// creation date is a broken directory: an ordinary error (500).
+export async function getProfile(username: string): Promise<StoredAccount> {
+  const result = await cognitoClient
+    .send(new AdminGetUserCommand({ UserPoolId: userPoolId(), Username: username }))
+    .catch((err: unknown) => mapError(err, username));
+  if (!result.UserCreateDate) throw new Error(`User ${username} has no creation date`);
+  return { username, createdAt: result.UserCreateDate.toISOString(), status: statusOf(result.UserStatus), ...storedFacts(result.UserAttributes) };
+}
+
+/** A stored account as a User of GET /users: every fact required (a missing one is a 500). */
+export function asUserSummary(account: StoredAccount): UserSummary {
+  const { username, createdAt, status, ...facts } = account;
+  return { username, createdAt, status, ...requiredFacts(username, facts) };
+}
+
+/** A stored account as GET /me answers it, with the role the token gives. */
+export function asMe(account: StoredAccount, role: MeResponse['role']): MeResponse {
+  return { username: account.username, role, givenName: account.givenName, familyName: account.familyName, email: account.email, address: account.address };
 }
 
 // Permanent: true, so the first sign-in has no password-change challenge.
@@ -120,17 +218,15 @@ async function membersOf(group: 'user' | 'admin'): Promise<UserType[]> {
 // The plain Users for GET /users (docs/SHARED_CALENDAR_SPEC.md section 10.1 and section 11.1,
 // route 21): the members of 'user' that are not in 'admin' (admin wins, docs/ARCHITECTURE.md section 3);
 // an account in no group is not one. Sorted by username in UTF-16 code-unit order
-// (docs/SHARED_CALENDAR_SPEC.md section 10.1), `createdAt` from UserCreateDate as an ISO instant.
-// A member without a username or a creation date is a broken directory: an ordinary error (500).
+// (docs/SHARED_CALENDAR_SPEC.md section 10.1), `createdAt` from UserCreateDate as an ISO instant,
+// the four facts and the state from the same answer, with no call per User. A member without a
+// username, a creation date or one of the facts is a broken directory: an ordinary error (500).
 export async function listPlainUsers(): Promise<UserSummary[]> {
   const [users, admins] = await Promise.all([membersOf('user'), membersOf('admin')]);
   const adminNames = new Set(admins.map((a) => a.Username));
   return users
     .filter((u) => !adminNames.has(u.Username))
-    .map((u): UserSummary => {
-      if (!u.Username || !u.UserCreateDate) throw new Error('A member of group user has no username or creation date');
-      return { username: u.Username, createdAt: u.UserCreateDate.toISOString() };
-    })
+    .map(summaryOf)
     .sort((a, b) => (a.username < b.username ? -1 : a.username > b.username ? 1 : 0));
 }
 

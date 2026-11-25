@@ -26,13 +26,12 @@ part you touch.
   it is merged into the architecture (the spec's section 19), the architecture wins as usual.
 - `docs/IMPLEMENTATION_PLAN.md`: the order of work, with an acceptance check per step.
 - `docs/FRONTEND_SERVICES.md`: the truth for the front end's services layer.
-- `docs/FRONTEND_ARCHITECTURE.md`: the truth for the front end's view layer: the rules of a
-  view (its section 3), the shape of a dialog and of a form (4), the logic layer (5.1), the
-  shell (6), the tests (8), the open points (10), the tooling (12), the page's hosting (13).
+- `docs/FRONTEND_ARCHITECTURE.md`: the truth for the front end's view layer.
 - `docs/FOLDER_STRUCTURE.md`: the layout and where a new file goes.
 - `docs/CONVERSATIONAL_ARCHITECTURE.md`: the assistant's design, its instructions, tools and
   evaluation. Where it is merged into the architecture, the architecture wins as usual.
-- `docs/RENAME_PLAN.md`: why Hello World (`/hello`, `…hello-messages`) kept its name.
+- `docs/EMAIL_ARCHITECTURE.md`: e-mail and the four facts of a person, built step by step in
+  `docs/EMAIL_PLAN.md`; each step merges what it built into the documents above.
 - `prompts/`: the numbered briefs behind the documents and the code. Number new ones in sequence.
 
 Not sources of truth; when one disagrees with the documents above or with the tests, it is the
@@ -63,7 +62,8 @@ one that is fixed:
 - `shared/` imports no AWS SDK, no Node-only module and no DOM API: only TypeScript and `zod`.
   The API contract and the username rule live there and the back end imports them; a new error
   code or response field starts in `shared/src/api.ts`.
-- Logs never contain tokens, passwords, the body of the create-user response or a text of a
+- Logs never contain tokens, passwords, the body of the create-user response, an e-mail
+  address, a name, a postal address, a mail's text or attachment, or a text of a
   conversation with the assistant (a message, an answer, a tool's input or result).
 - The assistant changes the calendar only through `confirmProposal`, after the person's button,
   and reaches it through a route's handler, never through `backend/src/lib/calendarDb.ts`.

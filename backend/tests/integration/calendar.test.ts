@@ -9,6 +9,7 @@ import {
   removeUserIfPresent,
   resetCalendarTable,
   signIn,
+  withFacts,
 } from './setup';
 
 // The shared calendar's journeys (docs/SHARED_CALENDAR_SPEC.md 18.2), end to end through sam
@@ -724,7 +725,7 @@ describe('booking (route 17)', () => {
   beforeAll(async () => {
     for (const username of ['dave', 'erin']) {
       await removeUserIfPresent(username);
-      const res = await api('POST', '/users', adminToken, { username });
+      const res = await api('POST', '/users', adminToken, withFacts(username));
       expect(res.status).toBe(201);
       const token = await signIn(username, res.body?.password as string);
       if (username === 'dave') daveToken = token;
@@ -1052,7 +1053,7 @@ describe('listing, note and cancel (routes 16, 18, 19)', () => {
   beforeAll(async () => {
     for (const username of ['dave', 'erin']) {
       await removeUserIfPresent(username);
-      const res = await api('POST', '/users', adminToken, { username });
+      const res = await api('POST', '/users', adminToken, withFacts(username));
       expect(res.status).toBe(201);
       const token = await signIn(username, res.body?.password as string);
       if (username === 'dave') daveToken = token;
@@ -1318,7 +1319,7 @@ describe('change (route 20)', () => {
   beforeAll(async () => {
     for (const username of ['dave', 'erin']) {
       await removeUserIfPresent(username);
-      const res = await api('POST', '/users', adminToken, { username });
+      const res = await api('POST', '/users', adminToken, withFacts(username));
       expect(res.status).toBe(201);
       const token = await signIn(username, res.body?.password as string);
       if (username === 'dave') daveToken = token;
@@ -1541,7 +1542,7 @@ describe('users (route 21, deletion)', () => {
   beforeAll(async () => {
     for (const username of ['dave', 'erin']) {
       await removeUserIfPresent(username);
-      const res = await api('POST', '/users', adminToken, { username });
+      const res = await api('POST', '/users', adminToken, withFacts(username));
       expect(res.status).toBe(201);
       const token = await signIn(username, res.body?.password as string);
       if (username === 'dave') daveToken = token;
@@ -1577,7 +1578,8 @@ describe('users (route 21, deletion)', () => {
     expect(names).not.toContain('admin');
     expect(names).toEqual([...names].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)));
     for (const u of users) expect(u.createdAt).toBe(new Date(Date.parse(u.createdAt)).toISOString());
-    expect(Object.keys(users[0]!).sort()).toEqual(['createdAt', 'username']);
+    // Each user with its state and four facts (docs/EMAIL_ARCHITECTURE.md section 9.1).
+    expect(Object.keys(users[0]!).sort()).toEqual(['address', 'createdAt', 'email', 'familyName', 'givenName', 'status', 'username']);
 
     const asUser = await api('GET', '/users', aliceToken);
     expect(asUser.status).toBe(403);
@@ -1715,7 +1717,7 @@ describe('the capacity of a type (AC-37 to AC-44)', () => {
   beforeAll(async () => {
     for (const username of PEOPLE) {
       await removeUserIfPresent(username);
-      const res = await api('POST', '/users', adminToken, { username });
+      const res = await api('POST', '/users', adminToken, withFacts(username));
       expect(res.status).toBe(201);
       tokens[username] = await signIn(username, res.body?.password as string);
     }

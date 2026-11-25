@@ -96,8 +96,8 @@ describe('booking', () => {
 
     it('a list: the names in the order received, ready', () => {
       const users = [
-        { username: 'alice', createdAt: '2026-11-01T10:00:00.000Z' },
-        { username: 'bob', createdAt: '2026-11-02T10:00:00.000Z' },
+        { username: 'alice', createdAt: '2026-11-01T10:00:00.000Z', status: 'active' as const, givenName: 'G', familyName: 'F', email: 'alice@example.com', address: 'A' },
+        { username: 'bob', createdAt: '2026-11-02T10:00:00.000Z', status: 'active' as const, givenName: 'G', familyName: 'F', email: 'bob@example.com', address: 'A' },
       ];
       expect(userChoice({ status: 'success', users })).toEqual({ usernames: ['alice', 'bob'], message: '', ready: true });
     });

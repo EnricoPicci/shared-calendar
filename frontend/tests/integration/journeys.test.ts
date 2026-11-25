@@ -4,7 +4,7 @@ import type { Session } from '../../src/services/login.types';
 import { RefreshService } from '../../src/services/refresh.service';
 import { SessionStore } from '../../src/services/session.store';
 import { UsersService } from '../../src/services/users.service';
-import { API, cognito, current, signedIn, signIn } from './local';
+import { API, cognito, current, newUser, signedIn, signIn } from './local';
 
 // docs/FRONTEND_SERVICES.md section 14.2: the services against the back end's local stack, in
 // order. Every service gets its token from a real SessionStore that a real LoginService filled.
@@ -38,7 +38,7 @@ function hello(store: SessionStore) {
 }
 function createUser(store: SessionStore, username: string) {
   const service = new UsersService(API, store);
-  return outcome(service.createUserResult$, () => service.createUser(username));
+  return outcome(service.createUserResult$, () => service.createUser(newUser(username)));
 }
 function deleteUser(store: SessionStore, username: string) {
   const service = new UsersService(API, store);

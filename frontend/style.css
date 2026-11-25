@@ -163,10 +163,25 @@ label.check { display: flex; align-items: center; gap: 0.4rem; }
 .create .actions { justify-content: flex-start; }
 /* The refusal of the username says what the hint says: while it shows, the hint does not */
 .field:has(.refusal:not(:empty)) .hint { display: none; }
-.users-screen .list { max-width: 26rem; }
 .user-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.4rem 0.4rem 0.4rem 0.75rem; border: 1px solid #d9dee5; border-radius: 6px; background: #fff; }
 .user-row .username { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
 .user-row button { flex: none; }
+/* The row's texts share its width, the e-mail the larger part; on a narrow screen they wrap
+   onto more lines rather than break an address in the middle */
+.users-screen .list { max-width: 44rem; }
+.user-row { flex-wrap: wrap; }
+.user-row .username { flex: 1 1 6rem; }
+.user-row .name { flex: 1 1 8rem; overflow-wrap: break-word; color: #52606d; }
+.user-row .email { flex: 2 1 13rem; overflow-wrap: break-word; color: #52606d; }
+/* A field of the four facts in fault, a textarea as an input */
+.field textarea[aria-invalid="true"] { border-color: #b3261e; }
+.create textarea, .profile textarea { resize: vertical; }
+/* My details: the person's facts as a list of labels and values, the address on its lines */
+.me-screen .details { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.4rem 1rem; max-width: 32rem; margin: 0.75rem 0; }
+.me-screen dt { color: #52606d; font-size: 0.85rem; }
+.me-screen dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.me-screen .about { font-size: 0.8rem; color: #52606d; }
+.me-screen > .actions { justify-content: flex-start; }
 /* The generated password: a fixed-width face, large enough to tell l from 1 and O from 0; one
    click selects it whole, to be copied by hand */
 dialog .password { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 1.35rem; letter-spacing: 0.06em; user-select: all; }

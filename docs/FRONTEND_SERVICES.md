@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v12 — implemented (2026-11-24, brief `prompts/e14-step-u4-implementation.md`, `docs/CAPACITY_PLAN.md` step u4): the capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` v17, decisions D24 to D31) in the services: `AvailabilityTypesService.create` and `rename` take an optional `capacity` (section 16, decision 70); `AppointmentsService.book` and `change` pass `overbook` through and answer `user_busy` (section 19). v11 — implemented (2026-11-23, brief `prompts/e05-step-p3-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p3): `ChangePasswordService` says its success before it clears the store (section 22.4, decision 69), so that the shell reacts while the person is still signed in. v10 — implemented (2026-11-22, brief `prompts/e03-step-p2-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p2): `ChangePasswordService` (section 22), a person's change of their own password straight at Cognito, with `cognito.ts` making one request for any target of Cognito (section 10.1). v9 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 21), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v8 — implemented (2026-11-21, brief `prompts/95-step-71-implementation.md`, `docs/FRONTEND_DEPLOY_PLAN.md` step 71; the design reviewed before the code): `LogoutService` (section 20), `revokeToken` and `toRevokeOutcome` in `cognito.ts` (section 10.1), `reset()` on `LoginService` and `RefreshService`; proven against cognito-local, and at the deployed page as far as the revocation answered 200 (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; section 20.9 says what was seen and what was not). v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). |
-| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-21; v9 and v10 2026-11-22; v11 2026-11-23; v12 2026-11-24 |
+| Status | v13 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m1 and m2): the four facts of a person in `UsersService` (`createUser` with them, `updateUser`, section 13) and `MeService` (section 23). v12 — implemented (2026-11-24, brief `prompts/e14-step-u4-implementation.md`, `docs/CAPACITY_PLAN.md` step u4): the capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` v17, decisions D24 to D31) in the services: `AvailabilityTypesService.create` and `rename` take an optional `capacity` (section 16, decision 70); `AppointmentsService.book` and `change` pass `overbook` through and answer `user_busy` (section 19). v11 — implemented (2026-11-23, brief `prompts/e05-step-p3-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p3): `ChangePasswordService` says its success before it clears the store (section 22.4, decision 69), so that the shell reacts while the person is still signed in. v10 — implemented (2026-11-22, brief `prompts/e03-step-p2-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p2): `ChangePasswordService` (section 22), a person's change of their own password straight at Cognito, with `cognito.ts` making one request for any target of Cognito (section 10.1). v9 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 21), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v8 — implemented (2026-11-21, brief `prompts/95-step-71-implementation.md`, `docs/FRONTEND_DEPLOY_PLAN.md` step 71; the design reviewed before the code): `LogoutService` (section 20), `revokeToken` and `toRevokeOutcome` in `cognito.ts` (section 10.1), `reset()` on `LoginService` and `RefreshService`; proven against cognito-local, and at the deployed page as far as the revocation answered 200 (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; section 20.9 says what was seen and what was not). v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). |
+| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-21; v9 and v10 2026-11-22; v11 2026-11-23; v12 2026-11-24; v13 2026-11-25 |
 | Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows); since v7 the calendar view and the appointments; since v8 the sign-out; since v9 the conversation with the assistant; since v10 the change of one's own password; since v12 the capacity of a type |
 | Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), since v6 v12 (sections 3 and 4: the calendar routes as implemented); `docs/SHARED_CALENDAR_SPEC.md` v15 section 16 (v13 when v6 was written), and for v7 sections 8, 11.1 (routes 15–20), 11.2, 11.5, 11.6; for v8 `docs/FRONTEND_ARCHITECTURE.md` section 13.7 and section 11, decision 152 (the direction for logout as v14 had it; its v15 follows this design), and `docs/ARCHITECTURE.md` section 7.3; `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/`; for v9 `docs/CONVERSATIONAL_ARCHITECTURE.md` v14 (sections 4.4, 5.1 to 5.5, 6, 6.1 and 13) and `docs/ARCHITECTURE.md` section 4, "The assistant's routes"; for v10 `docs/ARCHITECTURE.md` v14 (sections 5.1, 6.9, 7.3 and 8) and `docs/CHANGE_PASSWORD_PLAN.md` |
 
@@ -26,6 +26,7 @@
 | v10 | 2026-11-22 | Implemented (brief `prompts/e03-step-p2-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p2). New section 22, `ChangePasswordService`: `changePassword(current, next)` with `changePasswordResult$` and `changePasswordState$`, straight at Cognito (`ChangePassword`, then `GlobalSignOut`, then the store cleared), no route of the API. The new password checked before any request with the pool's rule of `shared/src/password.ts`, its problems named in `new_password_refused` (decision 63), the current password given again among them (decision 64); one success whatever the sign-out did (decision 65); the sign-out skipped by a value of the configuration, locally only (decision 67); the store cleared unguarded (decision 68). `cognito.ts` makes one request for any target of Cognito (section 10.1, decision 53), with no change to `LoginService` or `RefreshService` and none to their tests. The journey `frontend/tests/integration/change-password.test.ts` under the account `fe-password` (section 14.9). Acceptance in section 14.10. Written on the branch `change-password` at the same time as the sign-out and the assistant on `main`, and first numbered v9, section 21, decisions 50 to 55; on the merge into `main` (`docs/MERGE_CHANGE_PASSWORD.md`) they became v10, section 22, decisions 63 to 68, every reference changed with them. With the merge `cognitoRequest` also serves `RevokeToken` and takes the sign-out's `init` (decision 58). |
 | v11 | 2026-11-23 | `docs/CHANGE_PASSWORD_PLAN.md` step p3 (brief `prompts/e05-step-p3-implementation.md`), decided by the Product Owner at the start of the step. **The order at the end of a change is reversed**: `ChangePasswordService` gives the success on both streams first and clears the store after it (section 22.4, step 6; section 22.6; decision 68 amended; new decision 69). The password screen and the shell hear the success while the person is still signed in: the screen empties its fields, the shell puts the `LoginService` and the `RefreshService` back to their first state, as at a sign-out (decision 53), and words the login's "Password changed"; then the store's `null` brings the login. The service takes no page-wide service: the shell calls the two `reset()`s. The configuration's `skipGlobalSignOut` comes from the bundle's constant `SKIP_GLOBAL_SIGN_OUT` (section 22.2). One test of the service changed with it, its name and two assertions (section 22.8). |
 | v12 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u4 (brief `prompts/e14-step-u4-implementation.md`), from `docs/SHARED_CALENDAR_SPEC.md` v17 (decisions D24 to D31) and the back end as `docs/ARCHITECTURE.md` section 4 describes it. **`AvailabilityTypesService`**: `create(name, capacity?)` and `rename(typeId, name, capacity?)`, the methods keeping their names as the route keeps its path; a `capacity` left out is not sent, so a new type gets 1 and an edited one keeps its own, and today's callers work unchanged; `TypeBody` checks it before sending (0, 101 and 2.5 are `invalid_request`, no request); each `pending` carries the `capacity` given (sections 16.1, 16.3, 16.4, decision 70, decided by the Product Owner). The answer's `capacity` is passed through, not checked (section 16.5). **`AppointmentsService`**: `overbook` in `book` and `change` goes out as the caller gives it, absent staying absent; a User's `true` is the API's `403 forbidden`, already a reason; `user_busy` is a reason of both routes, between `outside_availability` and `slot_taken`, the server's order (sections 19.1, 19.3, 19.4). Unit tests (sections 16.8 and 19.8) and two journeys (section 14.4, blocks "types" and "appointments"). The status line's sentence that this document was not yet in line with the capacity is removed. |
+| v13 | 2026-11-25 | `docs/EMAIL_PLAN.md` steps m1 and m2 (brief `prompts/mail-m03-pair-m1-m2-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` section 4. **The four facts of a person**: `UsersService.createUser` takes the username and the four facts (`NewUser`), `updateUser(username, profile)` is its fourth pair (`PUT /users/{username}`), `listUsers` checks each User's facts (section 13); new section 23, `MeService.getMe()` (`GET /me`, both roles). |
 
 ---
 
@@ -1694,15 +1695,25 @@ gives `null`.
 
 | Call | Request | Success | Errors (architecture section 4) |
 |---|---|---|---|
-| `createUser(username)` | `POST /users`, body `{ "username": "…" }` | `201` `CreateUserResponse` `{ username, password }` | 400 `invalid_json` / `invalid_request`, 403 `forbidden`, 409 `user_exists`, 500 `internal_error` |
+| `createUser(user)` (v13: the username and the four facts, `NewUser`) | `POST /users`, body `CreateUserBody` `{ username, givenName, familyName, email, address }` as the shared rule makes it (facts trimmed, e-mail lower-cased) | `201` `CreateUserResponse` `{ username, password }` | 400 `invalid_json` / `invalid_request`, 403 `forbidden`, 409 `user_exists`, 500 `internal_error` |
+| `updateUser(username, profile)` (v13) | `PUT /users/{username}`, body `UpdateUserBody`: the four facts, as the shared rule makes them | `200` `UserSummary` | 400 `invalid_json` / `invalid_request`, 403 `forbidden` / `cannot_edit_admin`, 404 `user_not_found`, 500 `internal_error` |
 | `deleteUser(username)` | `DELETE /users/{username}`, no body | `204`, no body | 400 `invalid_request`, 403 `forbidden` / `cannot_delete_admin`, 404 `user_not_found`, 409 `concurrent_update` (v6), 500 `internal_error` |
-| `listUsers()` (v6) | `GET /users`, no body | `200` `ListUsersResponse` `{ users: UserSummary[] }`, the plain Users sorted by username, never an administrator (spec 10.1) | 403 `forbidden`, 500 `internal_error` |
+| `listUsers()` (v6) | `GET /users`, no body | `200` `ListUsersResponse` `{ users: UserSummary[] }`, the plain Users sorted by username, never an administrator (spec 10.1), each with its state and four facts (v13) | 403 `forbidden`, 500 `internal_error` |
 
 All through `apiCall` (section 10.2), so the token rules of section 9.4 apply. Since plan step 51
 a delete first cancels the User's future appointments under the calendar lock (architecture
 section 4), which can be busy: `409 concurrent_update`, before any Cognito change; the view may
 offer "try again" (v6, decision 37). Every route of this section is admin only, so `UsersService`
 stays the Administrator's service; `listUsers` feeds the "book for a User" choice (spec 16.8).
+
+**The four facts (v13).** `createUser` and `updateUser` check the username with `Username`
+first, for its own sentence, then the body with `CreateUserBody` or `UpdateUserBody` from
+`@shared-calendar/shared` (the rules of `docs/EMAIL_ARCHITECTURE.md` section 4.1); a refusal is
+`invalid_request` with zod's message, which names the fields, and no request is sent
+(`invalidRequest` of `api.ts`). What is sent is what the rule makes of the input. `updateUser` is
+the fourth pair, `updateUserResult$` / `updateUserState$`, its `pending` carrying the username; it
+cancels a pending update only. Its success is `{ status: 'success', user }`. The users screen and
+"My details" share one `UsersService` per session (section 23).
 
 ### 13.2 Configuration
 
@@ -1822,7 +1833,8 @@ export class UsersService {
 | the username fails `Username` | `invalid_request`, no request | `invalid_request`, no request |
 | `201` with `username` and `password` strings | `success`, `user: { username, password }` | — |
 | `204` | — | `success`, `username` of the call |
-| `200` with an array `users` whose every element has a string `username` (v6) | `listUsers`: `success`, `users` | |
+| `200` with an array `users` whose every element has a string `username` and string `givenName`, `familyName`, `email`, `address` (v6, the facts v13) | `listUsers`: `success`, `users` | |
+| `200` with string `username`, `givenName`, `familyName`, `email`, `address` (v13) | `updateUser`: `success`, `user` | |
 | any other 2xx | `unexpected` | `unexpected` |
 | an `error` code of the route | that code (`user_exists`, `forbidden`, …) | that code (`user_not_found`, `cannot_delete_admin`, `concurrent_update` (v6), …) |
 | everything else | the transport rows of section 10.2 | the transport rows of section 10.2 |
@@ -1891,7 +1903,8 @@ answers `forbidden` otherwise.
 
 ### 13.9 Integration checks
 
-As admin (section 14): create `fe-journey` → `success` with a password; `fe-journey` signs in with
+Every account the journeys create is sent with four made-up facts by one helper, `newUser(username)`
+of `tests/integration/local.ts` (v13). As admin (section 14): create `fe-journey` → `success` with a password; `fe-journey` signs in with
 `LoginService` and says hello; create it again → `user_exists`; `Bob` → `invalid_request` with no
 request sent; delete `admin` → `cannot_delete_admin`; delete `fe-journey` → `success`, after which
 its sign-in is `invalid_credentials`; delete it again → `user_not_found`. As alice: create →
@@ -3712,3 +3725,69 @@ the session's three tokens.
 ### 22.9 Integration checks
 
 Section 14.9, its five journeys.
+
+`updateUser` and `MeService` (v13, `profiles.test.ts`, page `docs/journeys/frontend/profiles.md`):
+section 23.7.
+
+---
+
+## 23. `MeService` (v13)
+
+### 23.1 The remote call
+
+| Call | Request | Success | Errors (architecture section 4) |
+|---|---|---|---|
+| `getMe()` | `GET /me`, no body | `200` `MeResponse` `{ username, role, givenName, familyName, email, address }`, a fact the account does not hold yet `null` | 403 `forbidden`, 404 `user_not_found`, 500 `internal_error` |
+
+Both roles call it: it reads the signed-in person's own facts, for the screen "My details"
+(`docs/FRONTEND_ARCHITECTURE.md` section 5.1). A change of them goes through
+`UsersService.updateUser` (section 13), the Administrator's only.
+
+### 23.2 Configuration
+
+`ApiConfig = { apiUrl }` and the `SessionStore`, as for `HelloService`. The shell makes one per
+person (section 20.6).
+
+### 23.3 Types (`me.types.ts`)
+
+```ts
+type MeCode = Extract<ApiErrorCode, 'forbidden' | 'user_not_found' | 'internal_error'>;
+export type MeFailureReason = MeCode | TransportFailureReason;
+export type MeResult = { status: 'success'; me: MeResponse } | ApiFailure<MeCode>;
+export type MeState = { status: 'idle' } | { status: 'pending' } | MeResult;
+```
+
+### 23.4 The class
+
+One pair, `meResult$` / `meState$`, in the shape of `HelloService.hello()`: no argument, so its
+`pending` carries nothing; a read asked again cancels the one under way.
+
+### 23.5 Mapping the answer
+
+| Answer | `getMe` |
+|---|---|
+| `200` with a string `username`, `role` `admin` or `user`, and each of the four facts a string or `null` | `success`, `me` with those six fields only |
+| any other 2xx | `unexpected` |
+| an `error` code of the route | that code |
+| everything else | the transport rows of section 10.2 |
+
+### 23.6 Security notes
+
+The facts are personal data (`docs/EMAIL_ARCHITECTURE.md` section 4): held in the result only,
+never logged, never in a URL. No token passes beyond the `SessionStore`.
+
+### 23.7 Tests
+
+Unit (`me.service.test.ts`): the per-method suite of section 14.1 (success with facts and with
+`null`s, request shape, the three route codes, wrong answers: a missing fact, a fact neither a
+string nor `null`, a role neither of the two, a 201; `session_rejected`, `not_signed_in`, network
+then success, cancel, late subscriber, no leak), and that a field the answer adds is not kept.
+
+Integration (`profiles.test.ts`, one `describe`, against the local stack; page
+`docs/journeys/frontend/profiles.md`): the throw-away User `fe-profile` created with its facts
+appears with them in `listUsers`, the account active; it reads them with `getMe`, and the
+Administrator reads their own, the seed's; the Administrator changes those of `fe-profile`, the
+e-mail sent lower-cased, and `fe-profile` reads the change; the Administrator saves their own;
+an unknown User is `user_not_found`; `fe-profile`'s own `updateUser` is `forbidden`, the session
+kept; a fact the rule refuses sends nothing.
+

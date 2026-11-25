@@ -18,7 +18,7 @@ import { CalendarService } from '../../src/services/calendar.service';
 import { CalendarSettingsService } from '../../src/services/calendar-settings.service';
 import { SessionStore } from '../../src/services/session.store';
 import { UsersService } from '../../src/services/users.service';
-import { API, outcome, signedIn, signIn } from './local';
+import { API, newUser, outcome, signedIn, signIn } from './local';
 
 // The calendar journeys of docs/FRONTEND_SERVICES.md section 14.4: every calendar service and
 // listUsers, against the back end's local stack. Runs only with RUN_INTEGRATION=1, never at the
@@ -215,8 +215,8 @@ beforeAll(async () => {
   await removeUsers();
   await cleanUp();
   const s = users(admin);
-  ok(await outcome(s.createUserResult$, () => s.createUser(USER_B)), `create ${USER_B}`);
-  const password = ok(await outcome(s.createUserResult$, () => s.createUser(USER)), `create ${USER}`).user.password;
+  ok(await outcome(s.createUserResult$, () => s.createUser(newUser(USER_B))), `create ${USER_B}`);
+  const password = ok(await outcome(s.createUserResult$, () => s.createUser(newUser(USER))), `create ${USER}`).user.password;
   const signed = await signIn(USER, password);
   ok(signed.result, `${USER} signs in`);
   user = signed.store;

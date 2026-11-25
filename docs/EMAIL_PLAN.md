@@ -1,6 +1,7 @@
 # Shared Calendar: e-mail (implementation plan)
 
-**Version:** v3 (2026-11-25): steps m1 and m2, and steps m3 and m4, built and reviewed as pairs,
+**Version:** v4 (2026-11-25): steps m1 and m2 done, their "As done" notes written; no step's
+content changed. v3 (2026-11-25): steps m1 and m2, and steps m3 and m4, built and reviewed as pairs,
 one brief, one check and one stop each (the Product Owner's decision); no step's content changes.
 v2 (2026-11-25): the deletion of the existing Users moved from a step m0 at the start
 to step m9, just before the first cloud deploy; the five proposals F1 to F5 decided as proposed;
@@ -298,6 +299,21 @@ into `docs/EMAIL_ARCHITECTURE.md`.
 each fact's bounds, the e-mail lower-cased, the 366 days, an unknown field refused; the texts;
 `maskAddress`). No journey, no screen of its own.
 
+**As done (2026-11-25, with step m2).** Changes under `shared/` and the documents.
+`shared/src/username.ts` became `shared/src/user.ts` (its test `shared/tests/user.test.ts`) with
+`UserProfile`, `PROFILE_LIMITS`, `UpdateUserBody`, `MeResponse` and the state; `shared/src/mail/`
+(`schemas.ts`, `limits.ts`, `texts.ts`, `mask.ts`) with its tests under `shared/tests/mail/`; the
+five codes in `shared/src/api.ts`. `docs/EMAIL_ARCHITECTURE.md` holds the Product Owner's
+decisions of section 3 and the facts of its section 22, confirmed that day: **the Excel library
+is `write-excel-file`** (MIT, kept up, 76 KB added to a bundle against 1 MB for `exceljs`, measured with
+esbuild in a scratch folder outside the repository, a file written and read back; the Product
+Owner's choice), not installed until step m3; SES's prices, Cognito's placeholders and limits
+read in AWS's documentation; F10 recorded. `docs/ARCHITECTURE.md` has its v16 row, open. Root
+`CLAUDE.md`, "Where the truth lives", lists `docs/EMAIL_ARCHITECTURE.md` with this plan; to make
+room, the line of `docs/RENAME_PLAN.md` moved to `docs/FOLDER_STRUCTURE.md` section 8, and the
+line of `docs/FRONTEND_ARCHITECTURE.md` lost its list of section numbers (the Product Owner's
+decision). `shared/CLAUDE.md` names `user.ts` and `mail/`.
+
 ### Step m2 — Profiles: the four facts, edited by the Administrator, read by everyone (built with step m1)
 
 Builds:
@@ -337,6 +353,61 @@ Documents: section 4's row m2, with the root `CLAUDE.md`'s logging rule.
 
 **Check**, the pair's: step m1's and this one, once: section 5.1; the screens: Users (create,
 edit) and "My details", by their new checks.
+
+**As done (2026-11-25, with step m1).** Changes under `shared/`, `backend/`, `frontend/`, the
+documents, the `CLAUDE.md` files and `.claude/rules/frontend-views.md`; nothing deployed, no
+`aws` command. Root `typecheck`, `lint` and `test:unit` green, 100 % lines (shared 576 tests,
+back end 1 884, front end 2 839).
+
+- **Built as planned**: `cognito.ts` (`createUser` with the facts, `updateProfile`,
+  `getProfile`, `listPlainUsers` with the facts and the state), `updateUser.ts`, `getMe.ts`, the
+  logger blanking the names of F7, the two functions and roles in `template.yaml`, the seed and
+  `bootstrap-admin.sh` (tried on the local stack only: the facts set, then the password; a fact
+  refused changes nothing); the page's users service, a `me` service, the form's four fields with
+  live checks, the list's name and e-mail, the Edit dialog, "My details" (`profile.parts.ts`,
+  `profile.model.ts`, `me.model.ts`, `me.screen.ts`, `me.view.ts`). `GET /me` answers `null` for
+  a fact not held (the Product Owner's choice). No existing log field held one of the blanked
+  names.
+- **Tests changed, and why.** Back end: `createUser.test.ts`, `listUsers.test.ts`,
+  `cognito.test.ts`, `validation.test.ts` (the facts in every body and answer), `logger.test.ts`
+  (the names blanked), `adminTools.test.ts` (F6: `list_users` gives Claude no fact, no state, no
+  date). Front end: `users.service.test.ts`, `users.model.test.ts`, `users.screen.test.ts`,
+  `users.view.test.ts`, `shell.test.ts` (the facts typed and answered, the row's two buttons,
+  "My details" in both navigations), `page.test.ts` (54 fields, 68 places of a failure, six
+  "Try again", ten dialogs), `booking.test.ts` and `week.view.test.ts` (fixtures of `UserSummary`
+  with the facts). New: `updateUser.test.ts`, `getMe.test.ts`, `me.service.test.ts`,
+  `profile.model.test.ts`, `me.model.test.ts`, `me.screen.test.ts`, `me.view.test.ts`.
+- **Journeys changed, and why**, each file run alone, green: the back end's `journeys` (22, a new
+  block `profiles`), `calendar` (88) and `assistant` (107); the front end's `profiles` (8, new),
+  `journeys` (14), `change-password` (5), `calendar` (29) and `assistant` (19). Every User they
+  create gets the four facts from one helper (`withFacts()` of
+  `backend/tests/integration/setup.ts`, `newUser()` of `frontend/tests/integration/local.ts`);
+  `createSecondAdmin()` makes the second administrator. Beyond sending the facts one existing
+  assertion changed: the back end's AC-32 of `calendar.test.ts` expects the keys of a
+  `UserSummary` with the facts and the state, the contract of this step. Pages:
+  `docs/journeys/backend/profiles.md`, `docs/journeys/frontend/profiles.md`, and the section
+  "The four facts of a person" of `docs/journeys/concepts.md`.
+- **Found on the way.** Three local accounts made by hand earlier (`roberto`, `walk-r1-en`,
+  `walk-r1-it`) had no facts, so `GET /users` answered `500`, as `docs/EMAIL_ARCHITECTURE.md`
+  section 4.3 wants; deleted from cognito-local on the Product Owner's choice, and the case is
+  noted in `docs/ARCHITECTURE.md` section 8 and `docs/COMMANDS.md`. `scripts/cognito.mjs` named an
+  empty address wrongly in its refusal: fixed.
+- **Browser look** (local stack, desktop width): as `admin`, the form's fields and refusals, a
+  create, the row's name and e-mail, Edit saved and the list updated, "My details" with Edit, a
+  refusal and Cancel; as `alice`, "My details" read-only with its sentence and no "Users". The
+  walk's new checks are `docs/FRONTEND_WALK.md` section 11; six of them, and the phone width,
+  not yet walked.
+- **Documents**: root `CLAUDE.md`'s logging rule (199 lines); `docs/ARCHITECTURE.md` sections 4,
+  5.1, 7.1, 8, 11 and v16; `docs/SHARED_CALENDAR_SPEC.md` v19 (section 10.1, route 21);
+  `docs/FRONTEND_SERVICES.md` v13 (section 13, new section 23); `docs/FRONTEND_ARCHITECTURE.md`
+  v24 (sections 4, 5.1, 6); `docs/FRONTEND_WALK.md` v6; `docs/FOLDER_STRUCTURE.md`;
+  `docs/COMMANDS.md`; `backend/CLAUDE.md`, `frontend/CLAUDE.md`.
+
+**What pair m3/m4 finds ready**: the mail's contract in `shared/src/mail/` (settings, the body of
+`POST /mail/calendar`, the limits, the texts, `maskAddress`) and its error codes; every person's
+facts readable through `cognito.getProfile`, the Administrator's e-mail among them; the
+`write-excel-file` choice, to install; the users service and "My details" to which the week's mail
+dialog will add nothing of their own.
 
 ### Step m3 — The table `mail`, the fake mail, the mailer run by hand (built with step m4)
 

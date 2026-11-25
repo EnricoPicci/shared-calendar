@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Status | v16 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; implemented (plan steps 41–59). v17 — the capacity of a type (decisions D24 to D31): several people in one slot; implemented and deployed (`docs/CAPACITY_PLAN.md` steps u1–u7, 2026-11-24; `docs/RUNBOOK.md` section 5.8). v18 — status only |
-| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10, v11, v12 and v13 2026-11-14; v14 and v15 2026-11-15; v16 2026-11-16; v17 2026-11-24 |
+| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10, v11, v12 and v13 2026-11-14; v14 and v15 2026-11-15; v16 2026-11-16; v17 2026-11-24; v19 2026-11-25 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
@@ -30,6 +30,7 @@
 | v16 | 2026-11-16 | Brief 71 (`docs/RENAME_PLAN.md`, plan step 56): the table's physical name in the cloud follows the stack, `<stack>-calendar`; locally it stays `calendar` (13.1). The plan's calendar steps run 41–59. |
 | v17 | 2026-11-24 | Brief `prompts/e11-step-u1-implementation.md` (`docs/CAPACITY_PLAN.md` step u1), decided by the Product Owner on 2026-11-24. **The capacity of a type**: a type holds 1 to 100 people at the same time, default 1 (D24 to D31, 6.1, R-TYPE-05). The people in an interval are counted at their peak; a slot is free while they are fewer than the capacity, and says its places left (glossary, R-SLOT-02 to R-SLOT-05, 11.6). A User never holds two appointments at the same time, `409 user_busy` (R-BOOK-12). The Administrator goes over the capacity only with `overbook: true` (R-BOOK-07, R-BOOK-13, R-CHG-01, the order of the checks in 8.2 and 8.4). `busy` is the time that is full (R-SLOT-06); the Administrator's slots include the full ones (11.6, R-VIEW-01). `capacity` optional in the type's bodies (11.1, 11.4); `capacity` on the `TYPE` item, absent = 1 (13.2). Group appointments no longer out of scope as several Users each with their own appointment (1.3). The views' needs (16.8), privacy (17), unit tests (18.1), AC-37 to AC-44 (18.3). The 11.6 example gains `capacity` and `placesLeft` on each slot and keeps every other value. AC-15 answers `user_busy`, since the 09:15 it overlaps is alice's own (found at `docs/CAPACITY_PLAN.md` step u3). Not built yet. |
 | v18 | 2026-11-24 | Brief `prompts/e17-step-u7-implementation.md` (`docs/CAPACITY_PLAN.md` step u7). Status only: the capacity of a type (decisions D24 to D31) is built and deployed to `shared-calendar-api` and `shared-calendar-web`, and proven there by the smoke test's capacity journey (`docs/RUNBOOK.md` sections 2.3 and 5.8); the marks "not built yet" of section 3, the `TYPE` item, the slots and the booking checks removed. No rule changes. |
+| v19 | 2026-11-25 | Brief `prompts/mail-m03-pair-m1-m2-implementation.md` (`docs/EMAIL_PLAN.md` steps m1 and m2). `GET /users` (section 10.1, route 21 of section 11.1) answers each User's state and four facts, first name, last name, e-mail and postal address (`docs/EMAIL_ARCHITECTURE.md` section 4); nothing of the calendar changes. |
 
 ---
 
@@ -694,8 +695,11 @@ event is therefore a real change.
 ### 10.1 Listing Users (D14)
 
 `GET /users`, Administrator only. It returns the members of group `user` that are not in group
-`admin`, sorted by username: `{ "users": [ { "username": "alice", "createdAt": "…" } ] }`. It is
-needed for the "book for a User" choice. It reads Cognito (`ListUsersInGroup` for both groups,
+`admin`, sorted by username: `{ "users": [ { "username": "alice", "createdAt": "…", "status":
+"active", "givenName": "Alice", "familyName": "Liddell", "email": "alice@example.com", "address":
+"…" } ] }` (v19: each User's state, `invited` or `active`, and four facts, whose rules are
+`docs/EMAIL_ARCHITECTURE.md` section 4.1; a listed User that lacks one makes the answer `500`). It
+is needed for the "book for a User" choice and for the users screen. It reads Cognito (`ListUsersInGroup` for both groups,
 following pagination); there is still no users table (architecture section 13). Usernames are
 compared by UTF-16 code units, as the type list is (v12); `createdAt` is the account's creation
 instant. An account in no group is not listed (it cannot be booked for: R-BOOK-01). A User or a
@@ -798,7 +802,7 @@ are validated the same way.
 | 18 | `PATCH /calendar/appointments/{appointmentId}` | admin, owner | `{ note }` | `200` `Appointment` | 400 · 404 `appointment_not_found` · 409 `appointment_not_active`, `concurrent_update` |
 | 19 | `POST /calendar/appointments/{appointmentId}/cancel` | admin, owner | — | `200` `Appointment` | 400 · 403 `cancellation_notice_too_short` · 404 `appointment_not_found` · 409 `appointment_not_active`, `concurrent_update` |
 | 20 | `POST /calendar/appointments/{appointmentId}/change` | admin, owner | `ChangeBody` | `201` `{ cancelled, booked }` | 400 · 403 `cancellation_notice_too_short` · 404 `appointment_not_found`, `user_not_found` · 409 `appointment_not_active`, `booking_in_past`, `booking_notice_too_short`, `booking_beyond_horizon`, `outside_availability`, `user_busy`, `slot_taken`, `appointment_limit_reached`, `concurrent_update` (v11; in the order of 8.4) |
-| 21 | `GET /users` | admin | — | `200` `{ users: UserSummary[] }` | — |
+| 21 | `GET /users` | admin | — | `200` `{ users: UserSummary[] }`, each `{ username, createdAt, status, givenName, familyName, email, address }` (v19) | — |
 
 ¹ Deleting a pattern cannot create an overlap. The code is listed only because the shared
 availability-write helper can answer it; in practice it never does.

@@ -1,18 +1,38 @@
 import { Username, type UserSummary } from '@shared-calendar/shared';
+import type { ProfileFields } from './profile.model';
 
 // The users screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the list of users as the API
 // answers it (docs/SHARED_CALENDAR_SPEC.md section 10.1) turned into rows ready to draw, from
 // what the username field holds to the argument of UsersService.createUser or to why not, and
 // the words of the dialog that confirms a deletion. Pure.
 
-// A row of the list: the username, and the name a screen reader says for its "Delete" button,
-// which tells whom it deletes.
-export type UserRow = { username: string; deleteLabel: string };
+// A row of the list: the username, the first and last name, the e-mail; the four facts as the
+// Edit dialog is filled with them; the names a screen reader says for its two buttons, which tell
+// whom they edit and delete. The postal address is shown only in the Edit dialog
+// (docs/EMAIL_ARCHITECTURE.md section 11).
+export type UserRow = { username: string; name: string; email: string; facts: ProfileFields; editLabel: string; deleteLabel: string };
 
 // The rows, in the order the server gives: sorted by username, never an administrator
-// (docs/SHARED_CALENDAR_SPEC.md section 10.1). Nothing else of a user is shown.
+// (docs/SHARED_CALENDAR_SPEC.md section 10.1). The state of an account is not shown here.
 export function userRows(users: readonly UserSummary[]): UserRow[] {
-  return users.map(({ username }) => ({ username, deleteLabel: `Delete ${username}` }));
+  return users.map(({ username, givenName, familyName, email, address }) => ({
+    username,
+    name: `${givenName} ${familyName}`,
+    email,
+    facts: { givenName, familyName, email, address },
+    editLabel: `Edit ${username}`,
+    deleteLabel: `Delete ${username}`,
+  }));
+}
+
+// Whether two rows show and hold the same.
+export function sameRow(a: UserRow, b: UserRow): boolean {
+  return a.username === b.username && a.facts.givenName === b.facts.givenName && a.facts.familyName === b.facts.familyName && a.facts.email === b.facts.email && a.facts.address === b.facts.address;
+}
+
+// The title of the Edit dialog: whose facts it changes.
+export function editTitle(username: string): string {
+  return `Edit ${username}`;
 }
 
 // The sentence of a list with no row.

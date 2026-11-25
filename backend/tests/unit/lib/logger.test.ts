@@ -47,6 +47,25 @@ describe('log', () => {
     });
   });
 
+  it("redacts the fields named after a person's facts, at any depth, case-insensitively", () => {
+    const [raw] = captureLines(() =>
+      log('info', {
+        requestId: 'req-1',
+        email: 'anna@example.com',
+        target: { givenName: 'Anna', FamilyName: 'Rossi', postalAddress: 'Via Roma 1', mailAddress: 'anna@example.com' },
+        changed: ['givenName', 'email'],
+      }),
+    );
+    expect(raw).not.toContain('anna@example.com');
+    expect(raw).not.toContain('Rossi');
+    expect(raw).not.toContain('Via Roma');
+    expect(JSON.parse(raw!)).toMatchObject({
+      email: '[REDACTED]',
+      target: { givenName: '[REDACTED]', FamilyName: '[REDACTED]', postalAddress: '[REDACTED]', mailAddress: '[REDACTED]' },
+      changed: ['givenName', 'email'],
+    });
+  });
+
   it('keeps the name and message of an Error, without the stack', () => {
     const [raw] = captureLines(() => log('error', { requestId: 'req-1', err: new TypeError('boom') }));
     expect(JSON.parse(raw!).err).toEqual({ name: 'TypeError', message: 'boom' });

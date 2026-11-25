@@ -5,6 +5,7 @@ import { AppointmentsScreen } from '../logic/appointments.screen';
 import { AssistantScreen } from '../logic/assistant.screen';
 import { AvailabilityScreen } from '../logic/availability.screen';
 import { DateScreen } from '../logic/date.screen';
+import { MeScreen } from '../logic/me.screen';
 import { PasswordScreen } from '../logic/password.screen';
 import { SettingsScreen } from '../logic/settings.screen';
 import { PASSWORD_TEXTS } from '../logic/texts';
@@ -23,6 +24,7 @@ import { LoginService } from '../services/login.service';
 import { LogoutService, type Resettable } from '../services/logout.service';
 import { RefreshService } from '../services/refresh.service';
 import { SessionStore } from '../services/session.store';
+import { MeService } from '../services/me.service';
 import { UsersService } from '../services/users.service';
 import { mountAppointments } from './appointments.view';
 import { mountAssistant } from './assistant.view';
@@ -30,6 +32,7 @@ import { mountConfirm } from './availability.parts';
 import { mountAvailability } from './availability.view';
 import { mountDate } from './date.view';
 import { mountLogin, type LoginDeps } from './login.view';
+import { mountMe } from './me.view';
 import { mountPassword } from './password.view';
 import { mountSettings } from './settings.view';
 import { mountUsers } from './users.view';
@@ -85,8 +88,9 @@ const ROLE_IN_WORDS: Record<Role, string> = { admin: 'Administrator', user: 'Use
 // service the week's book dialog and the users screen share; `types` and `rules` are the two
 // services of the availability, whose view calls their deletes. `assistant` is the logic object
 // of the assistant's panel, which is no screen: it is mounted once for the session, beside
-// whichever screen is on show. `password` is the logic object of the password screen, and
-// `changes` the service it uses, whose success the shell also hears.
+// whichever screen is on show. `me` is the logic object of "My details". `password` is the
+// logic object of the password screen, and `changes` the service it uses, whose success the
+// shell also hears.
 export type SessionObjects = {
   role: Role;
   week: WeekScreen;
@@ -100,6 +104,7 @@ export type SessionObjects = {
   types: AvailabilityTypesService;
   rules: AvailabilityRulesService;
   assistant: AssistantScreen;
+  me: MeScreen;
   password: PasswordScreen;
   changes: ChangePasswordService;
 };
@@ -136,11 +141,14 @@ function sessionObjects(config: ShellConfig, store: SessionStore, person: Person
   // the week's must keep the week (docs/FRONTEND_SERVICES.md section 18). What the
   // availability screen knows (the time zone, the types, the patterns) is handed over.
   const date = new DateScreen(availability.known$, new CalendarService(config, store), types, rules, now, again$);
+  // The person's own facts: read through GET /me, the Administrator's saved through the users
+  // service, the one the users screen uses (docs/EMAIL_ARCHITECTURE.md section 9.1).
+  const me = new MeScreen(new MeService(config, store), users, person.role, again$);
   // The change of the person's own password, straight at Cognito (docs/FRONTEND_SERVICES.md
   // section 22).
   const changes = new ChangePasswordService({ cognitoUrl: config.cognitoUrl, skipGlobalSignOut: config.skipGlobalSignOut === true }, store);
   const password = new PasswordScreen(changes);
-  return { role: person.role, week, list, settings, accounts, availability, date, appointments, users, types, rules, assistant, password, changes };
+  return { role: person.role, week, list, settings, accounts, availability, date, appointments, users, types, rules, assistant, me, password, changes };
 }
 
 // A screen of the application: its address (the URL's hash), its name in the navigation, the
@@ -235,6 +243,19 @@ export const SCREENS: readonly Screen[] = [
       subscription.add(confirm.subscription);
       subscription.add(availability.start());
       subscription.add(date.start());
+      return subscription;
+    },
+  },
+  {
+    // For both roles, just before the password: each person reads their own facts; the
+    // Administrator also changes them (docs/EMAIL_ARCHITECTURE.md section 11).
+    hash: '#/me',
+    label: 'My details',
+    roles: ['admin', 'user'],
+    element: '#me',
+    show: (root, { me }) => {
+      const subscription = mountMe(root, me);
+      subscription.add(me.start());
       return subscription;
     },
   },

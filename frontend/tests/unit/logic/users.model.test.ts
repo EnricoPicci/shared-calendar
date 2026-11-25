@@ -1,28 +1,40 @@
 import { Username } from '@shared-calendar/shared';
-import { deleteQuestion, NO_USERS, USERNAME_HINT, userRows, usernameFor } from '../../../src/logic/users.model';
+import { deleteQuestion, editTitle, NO_USERS, sameRow, USERNAME_HINT, userRows, usernameFor } from '../../../src/logic/users.model';
 import { useFarBrowserZone } from './zone';
 
 const SCRIPT = '<script>window.hacked = true</script>';
-const user = (username: string) => ({ username, createdAt: '2026-11-01T10:00:00.000Z' });
+const FACTS = { givenName: 'Anna', familyName: 'Rossi', email: 'anna@example.com', address: 'Via Po 2\n10100 Torino' };
+const user = (username: string, facts = FACTS) => ({ username, createdAt: '2026-11-01T10:00:00.000Z', status: 'active' as const, ...facts });
+const row = (username: string, facts = FACTS) => ({
+  username,
+  name: `${facts.givenName} ${facts.familyName}`,
+  email: facts.email,
+  facts,
+  editLabel: `Edit ${username}`,
+  deleteLabel: `Delete ${username}`,
+});
 
 describe('the users screen\'s model', () => {
   useFarBrowserZone();
 
   describe('userRows', () => {
-    it('several users: one row each, in the server\'s order, with the username and whom its button deletes', () => {
-      expect(userRows([user('alice'), user('bob'), user('zoe.2')])).toEqual([
-        { username: 'alice', deleteLabel: 'Delete alice' },
-        { username: 'bob', deleteLabel: 'Delete bob' },
-        { username: 'zoe.2', deleteLabel: 'Delete zoe.2' },
-      ]);
+    it('several users: one row each, in the server\'s order, with the username, the name, the e-mail, the facts and whom its buttons edit and delete', () => {
+      expect(userRows([user('alice'), user('bob'), user('zoe.2')])).toEqual([row('alice'), row('bob'), row('zoe.2')]);
       // The order is the server's, not this function's.
       expect(userRows([user('zoe'), user('alice')]).map((row) => row.username)).toEqual(['zoe', 'alice']);
     });
 
-    it('one user: one row, and nothing of the creation date in it', () => {
+    it('one user: one row, and nothing of the creation date or the state of the account in it', () => {
       const rows = userRows([user('alice')]);
       expect(rows).toHaveLength(1);
       expect(JSON.stringify(rows)).not.toContain('2026');
+      expect(JSON.stringify(rows)).not.toContain('active');
+    });
+
+    it('the postal address is held for the Edit dialog only: it is not in the texts of the row', () => {
+      const [first] = userRows([user('alice')]);
+      expect([first!.username, first!.name, first!.email].join(' ')).not.toContain('Via Po');
+      expect(first!.facts.address).toBe(FACTS.address);
     });
 
     it('no user: no row; the sentence of an empty list is a sentence', () => {
@@ -31,8 +43,29 @@ describe('the users screen\'s model', () => {
     });
 
     it('a username containing <script> is kept as text, as it is', () => {
-      expect(userRows([user(SCRIPT)])).toEqual([{ username: SCRIPT, deleteLabel: `Delete ${SCRIPT}` }]);
+      expect(userRows([user(SCRIPT)])).toEqual([row(SCRIPT)]);
+      expect(userRows([user('alice', { ...FACTS, givenName: SCRIPT })])[0]!.name).toBe(`${SCRIPT} Rossi`);
     });
+  });
+
+  describe('sameRow', () => {
+    const [a] = userRows([user('alice')]);
+    it('the same user with the same facts: the same row', () => {
+      expect(sameRow(a!, userRows([user('alice')])[0]!)).toBe(true);
+    });
+    it.each([
+      ['another username', user('bob')],
+      ['another first name', user('alice', { ...FACTS, givenName: 'Anne' })],
+      ['another last name', user('alice', { ...FACTS, familyName: 'Russo' })],
+      ['another e-mail', user('alice', { ...FACTS, email: 'a@example.com' })],
+      ['another address', user('alice', { ...FACTS, address: 'Via Po 3' })],
+    ])('%s: another row', (_name, other) => {
+      expect(sameRow(a!, userRows([other])[0]!)).toBe(false);
+    });
+  });
+
+  it('editTitle names the user', () => {
+    expect(editTitle('alice')).toBe('Edit alice');
   });
 
   describe('usernameFor', () => {

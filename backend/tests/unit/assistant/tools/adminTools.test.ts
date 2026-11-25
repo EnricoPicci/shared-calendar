@@ -1,4 +1,4 @@
-import { ASSISTANT_TEXTS_EN, ASSISTANT_TEXTS_IT, type SettingsSummary, type TypeEditSummary, type TypeSummary } from '@shared-calendar/shared';
+import { ASSISTANT_TEXTS_EN, ASSISTANT_TEXTS_IT, type SettingsSummary, type TypeEditSummary, type TypeSummary, type UserSummary } from '@shared-calendar/shared';
 import { createType, createTypeDefinition } from '../../../../src/assistant/tools/createType';
 import { deleteType, deleteTypeDefinition } from '../../../../src/assistant/tools/deleteType';
 import { editType, editTypeDefinition } from '../../../../src/assistant/tools/editType';
@@ -39,6 +39,17 @@ beforeEach(() => {
   vi.resetAllMocks();
 });
 
+// A User as GET /users answers it: the four facts and the state with the username.
+const user = (username: string, givenName: string, familyName: string): UserSummary => ({
+  username,
+  createdAt: '2026-11-01T10:00:00.000Z',
+  status: username === 'bob' ? 'invited' : 'active',
+  givenName,
+  familyName,
+  email: `${username}@example.com`,
+  address: 'Via Roma 1\n20100 Milano',
+});
+
 // Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
 describe("the Administrator's two reads (3, 8.3)", () => {
   it('list_users: for the Administrator only, no input, the usernames and nothing else of an account', () => {
@@ -46,8 +57,17 @@ describe("the Administrator's two reads (3, 8.3)", () => {
     expect(forClaude(listUsersDefinition, 'admin').input_schema).toEqual({ type: 'object', properties: {}, additionalProperties: false });
     expect(listUsers.toHandler.handler).toBe(listUsersHandler);
     expect(listUsers.toHandler.request({}, ADMIN)).toEqual({ routeKey: 'GET /users', path: '/users' });
-    const result = listUsers.toModel({ users: [{ username: 'alice', createdAt: '2026-11-01T10:00:00.000Z' }, { username: 'bob', createdAt: '2026-11-02T10:00:00.000Z' }] }, ADMIN);
+    const result = listUsers.toModel({ users: [user('alice', 'Alice', 'Liddell'), user('bob', 'Roberto', 'Bianchi')] }, ADMIN);
     expect(result).toEqual({ fields: {}, list: { name: 'users', items: ['alice', 'bob'] } });
+  });
+
+  // docs/EMAIL_PLAN.md finding F6: the names, e-mails and postal addresses that GET /users answers
+  // are never sent to Anthropic.
+  it("list_users: no fact of a person reaches the model, nor an account's state or creation date", () => {
+    const sent = JSON.stringify(listUsers.toModel({ users: [user('alice', 'Alice', 'Liddell'), user('bob', 'Roberto', 'Bianchi')] }, ADMIN));
+    for (const fact of ['Alice', 'Liddell', 'Roberto', 'Bianchi', '@example.com', 'Via ', 'Milano', 'invited', 'active', '2026-11-0']) {
+      expect(sent).not.toContain(fact);
+    }
   });
 
   it('list_patterns: for the Administrator only, reads the patterns and then the types, and gives each pattern with its id and the name of its type', () => {

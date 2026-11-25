@@ -1,4 +1,4 @@
-import { api, removeUserIfPresent, scanMessages, signIn } from './setup';
+import { api, createSecondAdmin, factsOf, removeUserIfPresent, scanMessages, signIn, withFacts } from './setup';
 
 // The journeys of docs/ARCHITECTURE.md section 6, end to end through sam local, as numbered in the
 // table of docs/IMPLEMENTATION_PLAN.md step 9 (journeys 1 to 12). They run in order and share
@@ -77,13 +77,13 @@ it('4. /hello as admin stores an Administrator message', async () => {
 });
 
 it('5. POST /users as alice is 403', async () => {
-  const res = await api('POST', '/users', aliceToken, { username: 'carol' });
+  const res = await api('POST', '/users', aliceToken, withFacts('carol'));
   expect(res.status).toBe(403);
   expect(res.body).toMatchObject({ error: 'forbidden' });
 });
 
 it('6. POST /users as admin creates carol, who can sign in and say hello', async () => {
-  const res = await api('POST', '/users', adminToken, { username: 'carol' });
+  const res = await api('POST', '/users', adminToken, withFacts('carol'));
   expect(res.status).toBe(201);
   // Never compare the whole body: a failure would print the password.
   expect(Object.keys(res.body ?? {}).sort()).toEqual(['password', 'username']);
@@ -103,13 +103,13 @@ it('6. POST /users as admin creates carol, who can sign in and say hello', async
 });
 
 it('7. POST /users again with carol is 409', async () => {
-  const res = await api('POST', '/users', adminToken, { username: 'carol' });
+  const res = await api('POST', '/users', adminToken, withFacts('carol'));
   expect(res.status).toBe(409);
   expect(res.body).toMatchObject({ error: 'user_exists' });
 });
 
 it('8. POST /users with an invalid username is 400 naming the field', async () => {
-  const res = await api('POST', '/users', adminToken, { username: 'Bad Name' });
+  const res = await api('POST', '/users', adminToken, withFacts('Bad Name'));
   expect(res.status).toBe(400);
   expect(res.body).toEqual({ error: 'invalid_request', message: 'Invalid input: username' });
 });
@@ -151,4 +151,100 @@ it('12. DELETE /users/carol again is 404', async () => {
   const res = await api('DELETE', '/users/carol', adminToken);
   expect(res.status).toBe(404);
   expect(res.body).toMatchObject({ error: 'user_not_found' });
+});
+
+// The four facts of a person (docs/EMAIL_ARCHITECTURE.md section 4): POST /users with the facts,
+// GET /users, GET /me for both roles, PUT /users/{username}. It plays a throw-away User,
+// `profile-user`, and a second administrator, `profile-admin`, made straight in cognito-local
+// since the API can never create one; both are removed before and after. The Administrator's own
+// facts are saved once with the values the seed gives them (scripts/local-seed.sh), so the stack is
+// left as it was found.
+//
+// Explained in simple words in docs/journeys/backend/profiles.md.
+describe('profiles', () => {
+  const USER = 'profile-user';
+  const OTHER_ADMIN = 'profile-admin';
+  const OTHER_ADMIN_PASSWORD = 'Profile-Admin-Pass-1!';
+  const ADMIN_FACTS = { givenName: 'Ada', familyName: 'Lovelace', email: 'admin@example.com', address: 'Via dei Calcoli 1\n00100 Roma' };
+  const CHANGED = { givenName: 'Changed', familyName: 'Person', email: 'changed@example.com', address: 'Corso Nuovo 9\n10100 Torino' };
+  let userToken: string;
+
+  const removeBoth = async () => {
+    await removeUserIfPresent(USER);
+    await removeUserIfPresent(OTHER_ADMIN);
+  };
+  beforeAll(removeBoth);
+  afterAll(removeBoth);
+
+  it('POST /users with the four facts creates the User; the answer is the username and the password only', async () => {
+    const res = await api('POST', '/users', adminToken, { ...withFacts(USER), givenName: ' Throw ', email: 'Profile-User@Example.com' });
+    expect(res.status).toBe(201);
+    // Never compare the whole body: a failure would print the password.
+    expect(Object.keys(res.body ?? {}).sort()).toEqual(['password', 'username']);
+    userToken = await signIn(USER, res.body?.password as string);
+  });
+
+  it('POST /users without the facts, or with an e-mail that is not one, is 400 naming the fields', async () => {
+    const bare = await api('POST', '/users', adminToken, { username: 'profile-bare' });
+    expect(bare.status).toBe(400);
+    expect(bare.body).toEqual({ error: 'invalid_request', message: 'Invalid input: givenName, familyName, email, address' });
+    const wrong = await api('POST', '/users', adminToken, { ...withFacts('profile-bare'), email: 'not-an-address' });
+    expect(wrong.body).toEqual({ error: 'invalid_request', message: 'Invalid input: email' });
+  });
+
+  it('GET /users lists the User with the four facts as stored (trimmed, the e-mail lower-cased) and the state active', async () => {
+    const res = await api('GET', '/users', adminToken);
+    expect(res.status).toBe(200);
+    const listed = (res.body?.users as Record<string, unknown>[]).find((user) => user.username === USER);
+    expect(listed).toEqual({ username: USER, createdAt: expect.any(String), status: 'active', ...factsOf(USER), email: 'profile-user@example.com' });
+  });
+
+  it('GET /me: the User reads their own facts; the Administrator reads theirs, those of the seed', async () => {
+    const asUser = await api('GET', '/me', userToken);
+    expect(asUser.status).toBe(200);
+    expect(asUser.body).toEqual({ username: USER, role: 'user', ...factsOf(USER), email: 'profile-user@example.com' });
+    const asAdmin = await api('GET', '/me', adminToken);
+    expect(asAdmin.body).toEqual({ username: 'admin', role: 'admin', ...ADMIN_FACTS });
+  });
+
+  it('PUT /users/profile-user as the Administrator replaces the four facts; the answer and the User\'s GET /me say the new ones', async () => {
+    const res = await api('PUT', `/users/${USER}`, adminToken, CHANGED);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ username: USER, createdAt: expect.any(String), status: 'active', ...CHANGED });
+    expect((await api('GET', '/me', userToken)).body).toEqual({ username: USER, role: 'user', ...CHANGED });
+  });
+
+  it('PUT /users/admin as the Administrator saves their own facts', async () => {
+    const res = await api('PUT', '/users/admin', adminToken, ADMIN_FACTS);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ username: 'admin', ...ADMIN_FACTS });
+  });
+
+  it('PUT on a user that does not exist is 404 user_not_found; a body with a field too many is 400', async () => {
+    const missing = await api('PUT', '/users/profile-nobody', adminToken, CHANGED);
+    expect(missing.status).toBe(404);
+    expect(missing.body).toMatchObject({ error: 'user_not_found' });
+    const extra = await api('PUT', `/users/${USER}`, adminToken, { ...CHANGED, username: 'other' });
+    expect(extra.status).toBe(400);
+    expect(extra.body).toEqual({ error: 'invalid_request', message: 'Invalid input: username' });
+  });
+
+  it('PUT on another administrator is 403 cannot_edit_admin; that administrator\'s GET /me says no fact is held yet', async () => {
+    await createSecondAdmin(OTHER_ADMIN, OTHER_ADMIN_PASSWORD);
+    const res = await api('PUT', `/users/${OTHER_ADMIN}`, adminToken, CHANGED);
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ error: 'cannot_edit_admin', message: "Another administrator's details cannot be changed" });
+    const otherToken = await signIn(OTHER_ADMIN, OTHER_ADMIN_PASSWORD);
+    expect((await api('GET', '/me', otherToken)).body).toEqual({ username: OTHER_ADMIN, role: 'admin', givenName: null, familyName: null, email: null, address: null });
+  });
+
+  it('PUT as a User, even on their own account, is 403 forbidden, and nothing changes', async () => {
+    for (const target of [USER, 'alice']) {
+      const res = await api('PUT', `/users/${target}`, userToken, ADMIN_FACTS);
+      expect(res.status).toBe(403);
+      expect(res.body).toMatchObject({ error: 'forbidden' });
+    }
+    expect((await api('PUT', '/users/alice', aliceToken, ADMIN_FACTS)).status).toBe(403);
+    expect((await api('GET', '/me', userToken)).body).toMatchObject(CHANGED);
+  });
 });

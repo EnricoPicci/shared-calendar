@@ -231,12 +231,30 @@
             <h2>Users</h2>
             <span class="loading" role="status" hidden>Loading…</span>
           </div>
-          <!-- novalidate: a text that is not a username is refused by the script, in words,
-               under the field. A browser must neither offer nor correct a username. -->
+          <!-- novalidate: a text that is not a username, or a fact that does not follow its rule,
+               is refused by the script, in words, under its field. A browser must neither offer
+               nor correct a username, nor fill another person's facts with the Administrator's
+               own. -->
           <form class="create" novalidate>
-            <div class="field">
+            <div class="field username-field">
               <label>Username <input name="username" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="username-hint" /></label>
               <p class="hint" id="username-hint"></p>
+              <p class="error refusal" role="alert"></p>
+            </div>
+            <div class="field given-name-field">
+              <label>First name <input name="givenName" autocomplete="off" /></label>
+              <p class="error refusal" role="alert"></p>
+            </div>
+            <div class="field family-name-field">
+              <label>Last name <input name="familyName" autocomplete="off" /></label>
+              <p class="error refusal" role="alert"></p>
+            </div>
+            <div class="field email-field">
+              <label>E-mail <input name="email" type="email" autocomplete="off" autocapitalize="none" spellcheck="false" /></label>
+              <p class="error refusal" role="alert"></p>
+            </div>
+            <div class="field address-field">
+              <label>Postal address <textarea name="address" rows="3" autocomplete="off"></textarea></label>
               <p class="error refusal" role="alert"></p>
             </div>
             <p class="error failure" role="alert"></p>
@@ -252,11 +270,43 @@
           <p class="empty" hidden></p>
           <ul class="list"></ul>
 
-          <!-- A row of the list: the username and its button, whose name for a screen reader
-               the script completes with the username -->
+          <!-- A row of the list: the username, the name and the e-mail, and two buttons, whose
+               names for a screen reader the script completes with the username -->
           <template id="tpl-user-row">
-            <li class="user-row"><span class="username"></span> <button type="button" class="danger ask-delete">Delete</button></li>
+            <li class="user-row">
+              <span class="username"></span> <span class="name"></span> <span class="email"></span>
+              <button type="button" class="ask-edit">Edit</button> <button type="button" class="danger ask-delete">Delete</button>
+            </li>
           </template>
+
+          <!-- The four facts of one User, changed by the Administrator. "Cancel" closes it and
+               keeps nothing typed; it closes by itself once a save succeeded. -->
+          <dialog class="edit" aria-labelledby="edit-title">
+            <h3 id="edit-title"></h3>
+            <form class="profile" novalidate>
+              <div class="field given-name-field">
+                <label>First name <input name="givenName" autocomplete="off" /></label>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <div class="field family-name-field">
+                <label>Last name <input name="familyName" autocomplete="off" /></label>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <div class="field email-field">
+                <label>E-mail <input name="email" type="email" autocomplete="off" autocapitalize="none" spellcheck="false" /></label>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <div class="field address-field">
+                <label>Postal address <textarea name="address" rows="3" autocomplete="off"></textarea></label>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <p class="error failure" role="alert"></p>
+              <div class="actions">
+                <button type="button" class="cancel">Cancel</button>
+                <button class="primary submit">Save</button>
+              </div>
+            </form>
+          </dialog>
 
           <!-- Shown once, after a user was created: the password the server generated. The
                Escape key does not close it (closedby="none"), only its button does: the
@@ -638,6 +688,68 @@
           <template id="tpl-password-need">
             <li class="need"></li>
           </template>
+        </section>
+        <!-- My details (src/views/me.view.ts), at the address #/me, for both roles: the
+             person's own four facts. The Administrator has "Edit", which opens a dialog with
+             the four fields; a User reads only. A fact the account does not hold yet reads
+             "Not set". -->
+        <section id="me" class="me-screen" hidden>
+          <div class="toolbar">
+            <h2>My details</h2>
+            <span class="loading" role="status" hidden>Loading…</span>
+          </div>
+          <!-- Shown in the place of the details when they could not be read -->
+          <div class="unread" hidden>
+            <p class="error" role="alert"></p>
+            <button type="button" class="retry" aria-label="Try again to read your details">Try again</button>
+          </div>
+          <dl class="details" hidden>
+            <dt>Username</dt>
+            <dd class="username"></dd>
+            <dt>Role</dt>
+            <dd class="role"></dd>
+            <dt>First name</dt>
+            <dd class="given-name"></dd>
+            <dt>Last name</dt>
+            <dd class="family-name"></dd>
+            <dt>E-mail</dt>
+            <dd class="email"></dd>
+            <dt>Postal address</dt>
+            <dd class="address"></dd>
+          </dl>
+          <p class="about user-only" hidden>To change your details, ask the Administrator.</p>
+          <div class="actions">
+            <button type="button" class="primary ask-edit" hidden>Edit</button>
+          </div>
+
+          <!-- The Administrator's own four facts. "Cancel" closes it and keeps nothing typed; it
+               closes by itself once a save succeeded. -->
+          <dialog class="edit" aria-labelledby="me-edit-title">
+            <h3 id="me-edit-title">Edit my details</h3>
+            <form class="profile" novalidate>
+              <div class="field given-name-field">
+                <label>First name <input name="givenName" autocomplete="given-name" /></label>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <div class="field family-name-field">
+                <label>Last name <input name="familyName" autocomplete="family-name" /></label>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <div class="field email-field">
+                <label>E-mail <input name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" /></label>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <div class="field address-field">
+                <label>Postal address <textarea name="address" rows="3" autocomplete="street-address"></textarea></label>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <p class="error failure" role="alert"></p>
+              <div class="actions">
+                <button type="button" class="cancel">Cancel</button>
+                <button class="primary submit">Save</button>
+              </div>
+            </form>
+          </dialog>
         </section>
       </main>
 

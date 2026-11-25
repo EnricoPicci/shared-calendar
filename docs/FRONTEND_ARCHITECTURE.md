@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v23 — the assistant's panel says a refused change for the person's role (2026-11-24, `docs/CAPACITY_PLAN.md` step u6, section 6.1). v22 — **the capacity of a type on the screens** (2026-11-24, `docs/CAPACITY_PLAN.md` step u5, brief `prompts/e15-step-u5-implementation.md`): a slot's places, the Administrator's full slot and a slot under appointments as a tab beside them, the Administrator's overlapping appointments side by side or as one block with its list, "Book anyway" after `slot_taken`, the `user_busy` sentences that name the appointment in the way, a type's capacity in the form and in the dialog "Edit type" (sections 4, 5.1 and 11); walked against the local stack (`docs/FRONTEND_WALK.md` section 10). v21 — **the password screen built** (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3, brief `prompts/e05-step-p3-implementation.md`): a sixth screen, "Password", last for both roles (section 6), its logic in section 5.1, the login's "Password changed" and the reaction of the shell to a change (section 6), the bundle's fourth constant (section 12.1); walked against the local stack (`docs/FRONTEND_WALK.md` section 9). v20 — the view layer **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12, walked at step c13 on 2026-11-23); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`), **written** (`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21, brief `prompts/94-step-70-implementation.md`: the template, the deploy command and its gate) **and deployed** (step 72, 2026-11-21, brief `prompts/96-step-72-implementation.md`): the stack `shared-calendar-web` exists and the page is in use at the address of its output `PageUrl`; section 13 says what is built and deployed, with how each thing was seen. `docs/FRONTEND_DEPLOY_PLAN.md` is done (its step 73, 2026-11-21, brief `prompts/97-step-73-implementation.md`), **with checks at the deployed page still owed**: a refresh with the revoked token refused by the real Cognito, a session renewed after its fifteen minutes, "Sign out" with the network off, a reload and the console, and the rest of the walk with the phone width (the open items of `docs/RUNBOOK.md` section 5.5); **logout is built** (step 71, 2026-11-21, brief `prompts/95-step-71-implementation.md`: `docs/FRONTEND_SERVICES.md` v8, section 20; here sections 6 and 13.7), proven against the local stack, and at the deployed page as far as the revocation answered 200. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it. |
+| Status | v24 — the four facts of a person on the users screen, its Edit dialog, and the screen "My details" (2026-11-25, `docs/EMAIL_PLAN.md` steps m1 and m2; sections 4, 5.1 and 6). v23 — the assistant's panel says a refused change for the person's role (2026-11-24, `docs/CAPACITY_PLAN.md` step u6, section 6.1). v22 — **the capacity of a type on the screens** (2026-11-24, `docs/CAPACITY_PLAN.md` step u5, brief `prompts/e15-step-u5-implementation.md`): a slot's places, the Administrator's full slot and a slot under appointments as a tab beside them, the Administrator's overlapping appointments side by side or as one block with its list, "Book anyway" after `slot_taken`, the `user_busy` sentences that name the appointment in the way, a type's capacity in the form and in the dialog "Edit type" (sections 4, 5.1 and 11); walked against the local stack (`docs/FRONTEND_WALK.md` section 10). v21 — **the password screen built** (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3, brief `prompts/e05-step-p3-implementation.md`): a sixth screen, "Password", last for both roles (section 6), its logic in section 5.1, the login's "Password changed" and the reaction of the shell to a change (section 6), the bundle's fourth constant (section 12.1); walked against the local stack (`docs/FRONTEND_WALK.md` section 9). v20 — the view layer **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12, walked at step c13 on 2026-11-23); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`), **written** (`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21, brief `prompts/94-step-70-implementation.md`: the template, the deploy command and its gate) **and deployed** (step 72, 2026-11-21, brief `prompts/96-step-72-implementation.md`): the stack `shared-calendar-web` exists and the page is in use at the address of its output `PageUrl`; section 13 says what is built and deployed, with how each thing was seen. `docs/FRONTEND_DEPLOY_PLAN.md` is done (its step 73, 2026-11-21, brief `prompts/97-step-73-implementation.md`), **with checks at the deployed page still owed**: a refresh with the revoked token refused by the real Cognito, a session renewed after its fifteen minutes, "Sign out" with the network off, a reload and the console, and the rest of the walk with the phone width (the open items of `docs/RUNBOOK.md` section 5.5); **logout is built** (step 71, 2026-11-21, brief `prompts/95-step-71-implementation.md`: `docs/FRONTEND_SERVICES.md` v8, section 20; here sections 6 and 13.7), proven against the local stack, and at the deployed page as far as the revocation answered 200. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it. |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders; and, since v13, how the page is hosted and deployed (section 13) |
 | Not in scope | Keeping the session across a reload, the size of the bundle, a domain of our own: open points of section 10, none of which blocked the deployment. The design of the logout service: it is `docs/FRONTEND_SERVICES.md` section 20; section 13.7 here keeps the direction and what follows from it for the page |
 | Depends on | `docs/FRONTEND_SERVICES.md` v9 (the services the views use, the sign-out and the assistant among them), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work of the views), `docs/FRONTEND_DEPLOY_PLAN.md` (the order of work of the hosting) |
@@ -37,6 +37,7 @@
 | v20 | 2026-11-23 | Step c13 of `docs/CONVERSATIONAL_PLAN.md`: the walk with the assistant's panel (`docs/FRONTEND_WALK.md` v3). Section 6.1: after a message that got one of the two `503` answers the conversation is read once and not continued (decision 172, rewritten as what was done); the conversation stays scrolled to its end when a proposal or a line appears under it; the heading's arrow has no words for a screen reader. Section 8: the panel's rows after the table of the dialogs, and the order a date is typed in. Decisions 173 and 174. |
 | v21 | 2026-11-23 | `docs/CHANGE_PASSWORD_PLAN.md` step p3 (brief `prompts/e05-step-p3-implementation.md`): the password screen. Section 5.1: twenty files (`password.model.ts` and `password.screen.ts` are new), the sentences of `texts.ts` for the new password's conditions and the screen. Section 6: the sixth entry of `SCREENS`, `#/password`, "Password", both roles, last; the `ChangePasswordService` and the `PasswordScreen` among a session's objects; the shell's reaction to a change (the page-wide services put back, the login's notice) and the sequence of a change; `mountShell` takes `pageWide`. Section 9: the tree. Section 12.1: the fourth constant, `SKIP_GLOBAL_SIGN_OUT`. Section 11: decision 16 amended, decisions 175 to 183. The service changed with it: `docs/FRONTEND_SERVICES.md` v11, decision 69 (the success before the store is cleared). |
 | v23 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u6 (brief `prompts/e16-step-u6-implementation.md`): the assistant's panel says a refused change for the person's role ("Failures in plain words", section 6.1, decision 194). |
+| v24 | 2026-11-25 | `docs/EMAIL_PLAN.md` steps m1 and m2 (brief `prompts/mail-m03-pair-m1-m2-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 4 and 9. Section 4: the users screen's form gains the four facts, each a field checked live; a row shows the name and the e-mail and has "Edit"; the Edit dialog of the four facts, shared with "My details" (`profile.parts.ts`). Section 5.1: `profile.model.ts`, `me.model.ts`, `me.screen.ts`; `UsersScreen` gains the facts and the edit. Section 6: a seventh entry, `#/me`, "My details", both roles, before "Password". |
 | v22 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u5 (brief `prompts/e15-step-u5-implementation.md`), with the Product Owner's four decisions and one found in the walk: the capacity of a type on the screens. Section 4: the slot's template says its places; a slot that appointments overlap is a tab beside them; the group block and its list dialog, `dialog.group`; "Book anyway" in the book dialog; the types' form and the dialog "Edit type" gain the capacity. Section 5.1: `week.model.ts` (places, `full`, `tab`, `beside`, the columns and the groups), `booking.ts` (`overbook`, `inTheWay`, `refusalOf`), `availability.model.ts` (`TypeFields`, `typeFor`), `texts.ts` (`failureText` told who attempted), `Moving.who`, `WeekScreen.refusal`; the lanes paragraph widened to the Administrator's overlapping appointments; the Administrator's sentence of `user_busy`. Section 8: the table of where the keyboard is. Section 11: decisions 184 to 193. |
 | v20, note | 2026-11-23 | The branch `deploy-frontend` merged into `main`, where the assistant's panel had been written at the same time. The panel's two versions, first numbered v13 and v14, are v19 and v20, after the hosting's v13 to v18; its decisions, first numbered 138 to 153, are 159 to 174, after the hosting's 138 to 158; every reference to them was changed with them. The status row says both. No other text changed. |
 
@@ -542,8 +543,31 @@ one field:
   succeeded; after a refusal or a failure what was typed stays.
 - **A name that exists is the form's failure, not a field in fault**: it is the server's
   answer, said under the field's box in plain words, and the field is not marked.
-- The form is outside the list the script redraws (section 3, rule 4); the rows hold a button
-  each and nothing to type in.
+- The form is outside the list the script redraws (section 3, rule 4); the rows hold buttons
+  and nothing to type in.
+
+**The four facts of a person** (`docs/EMAIL_ARCHITECTURE.md` section 4.1; the users screen's form,
+its Edit dialog, and "My details"). Each fact is a `.field` like the username's, with its own
+class (`.given-name-field`, `.family-name-field`, `.email-field`, `.address-field`), an input (a
+`<textarea>` for the postal address, on several lines) and a refusal; `frontend/src/views/profile.parts.ts`
+reads, fills, marks and empties the four the same way in every form that holds them.
+
+- **Checked live.** A fact is checked at "Create user" or "Save" with the shared rule
+  (`profile.model.ts`), and from then on at every key: a refused fact is checked again as the
+  person types, so its refusal goes once it is right; a fact not yet refused is not judged while
+  typed. A field in fault carries `aria-invalid="true"`.
+- **The create form** has the username and the four facts; on the users screen the browser
+  offers nothing (`autocomplete="off"`): the facts are another person's. A success empties all
+  five; a refusal or a failure keeps what was typed.
+- **A row** shows the username, the name ("Alice Liddell") and the e-mail, then "Edit" and
+  "Delete" (`.ask-edit`, `.ask-delete`, each named for its user, "Edit alice"). The row wraps on
+  a narrow screen, and an e-mail breaks where it must rather than leave the row.
+- **The Edit dialog** (`dialog.edit`, a dialog with a form, the pattern of the availability's
+  dialogs): its title names the user, its form the four facts filled from the row, then
+  `.failure`, "Cancel" and "Save". Opening it starts its state clean; "Cancel" and the Escape
+  key close it with nothing done; "Save" checks, then sends; a success closes it, and only a
+  success asked for since it opened (the logic's `saved` is a new object each time). A failure
+  is said under the form, and the dialog stays open with what was typed.
 
 **The password dialog** (`dialog.created`, inside `#users`). Creating a user shows the password
 the server generated, once: it cannot be shown again and no route sets another
@@ -872,11 +896,11 @@ Its rules:
 7. **Tested like the services**: unit tests with no network and no DOM, inside the 100 % line
    coverage of `frontend/src`.
 
-### 5.1 As built: twenty files
+### 5.1 As built: twenty-three files
 
 `frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` steps 61 to 68,
 `docs/CONVERSATIONAL_PLAN.md` step c12 for the assistant's two and `docs/CHANGE_PASSWORD_PLAN.md`
-step p3 for the password's two), each with its test in
+step p3 for the password's two, `docs/EMAIL_PLAN.md` step m2 for the facts' three), each with its test in
 `frontend/tests/unit/logic/`:
 
 | File | What it holds |
@@ -890,8 +914,8 @@ step p3 for the password's two), each with its test in
 | `appointments.screen.ts` | The class `AppointmentsScreen`: which of the two lists is on show, the period of the history, the time zone read from the settings, the loads and reloads, the detail of one of its appointments, and the hand-over of one to the week screen |
 | `settings.model.ts` | Pure, for the settings form: what the fields are filled with (`settingsFields`), what the form says beside them (`settingsInfo`: the time zone, who saved last and when), the range of a field with its words (`settingRange`), and from what the fields hold to the body of the save or to the refusals (`settingsFor`) |
 | `settings.screen.ts` | The class `SettingsScreen`: the settings read when the screen is shown, the save with its checks, and the read that follows every save |
-| `users.model.ts` | Pure, for the users screen: the list ready to draw (`userRows`: the username, and whom its "Delete" button deletes), the sentence of an empty list (`NO_USERS`), what a username is in words (`USERNAME_HINT`), from what the field holds to the username to create or to the refusal (`usernameFor`), and the words of the dialog that confirms a deletion (`deleteQuestion`) |
-| `users.screen.ts` | The class `UsersScreen`: the list read when the screen is shown, a create with its check, and the list read again after every create and delete and when the page becomes visible |
+| `users.model.ts` | Pure, for the users screen: the list ready to draw (`userRows`: the username, the name and the e-mail, the facts the Edit dialog opens with, and the names of its "Edit" and "Delete" buttons; `sameRow`), the Edit dialog's title (`editTitle`), the sentence of an empty list (`NO_USERS`), what a username is in words (`USERNAME_HINT`), from what the field holds to the username to create or to the refusal (`usernameFor`), and the words of the dialog that confirms a deletion (`deleteQuestion`) |
+| `users.screen.ts` | The class `UsersScreen`: the list read when the screen is shown, a create with its checks (the username and the four facts), the Edit dialog's state and save, and the list read again after every create, edit and delete and when the page becomes visible |
 | `availability.model.ts` | Pure, for the availability screen. The types: the list ready to draw (`typeRows`, with "· 3 places" and the fields "Edit type" opens with), the sentence of an empty list (`NO_TYPES`), what a name and a capacity are in words (`TYPE_NAME_HINT`, `TYPE_CAPACITY_HINT`), what the form starts with (`STARTING_TYPE`), from what the field holds to the name or to the refusal (`typeNameFor`), from the two fields to the type or to the refusals (`typeFor`), the question before a deletion (`deleteTypeQuestion`). The patterns: the choices of the form's lists (`WEEKDAY_CHOICES`, `START_CHOICES`, `END_CHOICES`, `typeChoices`), what the form starts with (`startingFields`), the fields of an existing pattern (`patternFields`), from what the form holds to the body or to the refusals (`patternFor`), the list grouped by weekday and ready to draw (`patternGroups`), the question before a deletion (`deletePatternQuestion`) |
 | `conflicts.ts` | Pure: `conflictList(conflicts, zone)`, the appointments in the way of a refused change of availability, ready to draw, with the sentence that counts them |
 | `availability.screen.ts` | The class `AvailabilityScreen`: the settings (for the time zone), the types and the patterns read when the screen is shown, the four writes that have a check, and the lists read again after every write and when the page becomes visible; and `known$`, what it knows, for the object of a single date |
@@ -901,6 +925,9 @@ step p3 for the password's two), each with its test in
 | `assistant.screen.ts` | The class `AssistantScreen`: whether the panel is open, the first read at the first opening, the conversation on show, the loop that calls `continue`, the proposal, the failure line, what is in use, one state on one stream (`assistant$`), and `changed$`, which tells the shell that a change was made. Its methods: `open`, `close`, `toggle`, `send`, `confirm`, `decline`, `end` |
 | `password.model.ts` | Pure, for the password screen: what a new password still misses (`newProblems`: the shared rule's conditions, then being the current one again), their sentences (`problemTexts`), the hints of the three fields from what they hold (`passwordHints`, `EMPTY_HINTS`: the current password missing, the conditions, the new one again missing or different), whether one stands (`hintStands`), and where a failure is said (`failurePlace`: a wrong current password under its field, the rest under the form). It keeps no text typed |
 | `password.screen.ts` | The class `PasswordScreen`: the hints while the person types (`typed`), the change asked of the `ChangePasswordService` only when no hint stands and none is under way (`change`), the button disabled meanwhile, and what each outcome means for the form: the fields emptied after a success and after a wrong current password, the other failures said under the form. One stream, `password$`; no password on it or on the object |
+| `profile.model.ts` | Pure, the four facts of a person in a form: their fields (`ProfileFields`, `EMPTY_FIELDS`), what is refused and why (`profileRefusals`, with the sentences of `PROFILE_RULES` built from the shared limits), a refused field checked again as it is typed (`recheck`), from the fields to the facts to send or the refusals (`profileFor`), and the fields a person's facts fill (`fieldsOf`) |
+| `me.model.ts` | Pure, for "My details": a `MeResponse` ready to show (`meDetails`: the role in words, a fact not held yet "Not set"), and the fields its Edit dialog opens with (`meFields`) |
+| `me.screen.ts` | The class `MeScreen`: the person's own facts read when the screen is shown and when the page becomes visible, `retry` after a read that failed, and for the Administrator only the Edit dialog's state and save through `UsersService.updateUser`, after which the facts are read again |
 
 **"Now" is passed in.** Nothing in `logic/` reads the clock by itself. `WeekScreen` receives a
 function `now: () => Date` through its constructor (the shell passes `() => new Date()`, a test a
@@ -1264,8 +1291,12 @@ export class SettingsScreen {
 // `created` the username of the last create that succeeded.
 export type UsersState = {
   loading: boolean; unread: string | null; rows: readonly UserRow[] | null; empty: string | null;
-  field: { username: string }; creating: boolean; refusal: string | null; failure: string | null; created: string | null;
+  field: NewUserFields; creating: boolean; refusal: string | null; refusals: ProfileRefusals;
+  failure: string | null; created: string | null; edit: EditState;
 };
+// The Edit dialog: `saving` while a save is under way, `refusals` and `failure` until the next save
+// or opening, `saved` another object at each success of a save asked for from the dialog.
+export type EditState = { saving: boolean; refusals: ProfileRefusals; failure: string | null; saved: object | null };
 
 export class UsersScreen {
   readonly users$: Observable<UsersState>;
@@ -1274,11 +1305,20 @@ export class UsersScreen {
   constructor(users: UsersCalls, visible$: Observable<unknown>) { … }
   start(): Subscription { … }      // reads the list
   retry(): void { … }              // reads again, after a read that failed
-  create(text: string): void { … } // checks the text; creates the user, or says why not
+  typed(fields: NewUserFields): void { … }  // checks again a refused fact
+  create(fields: NewUserFields): void { … } // checks the five; creates the user, or says why not
+  editOpened(): void { … }                  // the Edit dialog starts clean
+  editTyped(fields: ProfileFields): void { … }
+  save(username: string, fields: ProfileFields): void { … } // checks the four; sends them
 }
 ```
 
-- **One request.** A row is the username and its "Delete" button. The creation date that
+- **The facts** are checked like the username, with the shared rule and nothing else
+  (`profile.model.ts`); all five are judged at "Create user", so every refusal shows at once.
+  **The edit hears only its own updates**: the `UsersService` is shared with "My details", and
+  an update this screen did not ask for (`editAsked`) changes nothing here. After an edit asked
+  here, a failure included, the list is read again.
+- **One request.** A row is the username, the name, the e-mail and its two buttons. The creation date that
   `GET /users` also gives is not shown, so the screen needs no time zone and asks for nothing
   but the list. The order is the server's: by username, never an administrator
   (`docs/SHARED_CALENDAR_SPEC.md` section 10.1).
@@ -1326,6 +1366,18 @@ export class UsersScreen {
   for it. `createUser` and `deleteUser` are this screen's only.
 - **What is kept, and what is not.** Nothing: the end of the subscription of `start()`
   forgets the list, what the form said and what was typed, and the next `start()` reads.
+
+**"My details"** (`#me`, `frontend/src/views/me.view.ts`, `MeScreen`; both roles;
+`docs/EMAIL_ARCHITECTURE.md` section 9.1). A small screen that reads `GET /me` when shown and when
+the page becomes visible: the username, the role in words and the four facts as a list of terms
+(`dl.details`), a fact not held yet "Not set", the address on its lines. A read that fails says
+why in place of the details, with "Try again". The Administrator has "Edit", the same Edit
+dialog as the users screen's (`profile.parts.ts`), whose fields the browser may fill
+(`autocomplete` `given-name`, `family-name`, `email`, `street-address`: these are the person's
+own); its save is `UsersService.updateUser` on their own username, after which the facts are
+read again. A User has no "Edit" and the sentence "To change your details, ask the
+Administrator." The `MeScreen` is given the session's `UsersService` and hears only the
+updates it asked for, as the users screen does.
 
 **The availability screen** (`docs/FRONTEND_VIEW_PLAN.md` step 67; the Administrator's; the
 first screen that uses two services at once, and a third for the time zone).
@@ -1769,9 +1821,9 @@ API's configuration and the whole store because it creates the API services of e
    the `CalendarSettingsService` (read by the list screen for the time zone, read and saved by
    the settings screen), the `WeekScreen`, the `AppointmentsScreen`, which is given the
    `WeekScreen` for the hand-over of section 5.1, the `SettingsScreen` and the `UsersScreen`,
-   which is given the session's `UsersService`, the one the week's book dialog asks for its list, the `AvailabilityTypesService`, the `AvailabilityRulesService` and the `AvailabilityScreen`, which is given both and the session's `CalendarSettingsService`, and the `DateScreen`, which is given the `AvailabilityScreen`'s `known$`, the two availability services and **a second `CalendarService`**, of its own: the service has one pair of streams and one pending call, and `reload()` runs its last range again, so the week's must never be asked for a single date. They live as long as the person's session, not as long as a screen is on
+   which is given the session's `UsersService`, the one the week's book dialog asks for its list, the `AvailabilityTypesService`, the `AvailabilityRulesService` and the `AvailabilityScreen`, which is given both and the session's `CalendarSettingsService`, the `MeService` and the `MeScreen`, which is given it, the session's `UsersService` for the Administrator's save and the stream of the page becoming visible, and the `DateScreen`, which is given the `AvailabilityScreen`'s `known$`, the two availability services and **a second `CalendarService`**, of its own: the service has one pair of streams and one pending call, and `reload()` runs its last range again, so the week's must never be asked for a single date. They live as long as the person's session, not as long as a screen is on
    show: coming back to a screen finds its logic object as it was left. The same function builds
-   the stream the week, the list, the users and the availability screens reload on (section 5.1): the document's `visibilitychange` event,
+   the stream the week, the list, the users, the availability and "My details" screens reload on (section 5.1): the document's `visibilitychange` event,
    keeping the notifications at which `document.visibilityState` is `visible`. And the
    `ChangePasswordService`, with Cognito's address and the skip value of the configuration
    (`skipGlobalSignOut`, true only when the configuration says exactly so; section 12.1), with
@@ -1801,9 +1853,10 @@ export type Screen = {
 };
 ```
 
-There are six entries: `#/week`, "Week", both roles; `#/appointments`, "My
+There are seven entries: `#/week`, "Week", both roles; `#/appointments`, "My
 appointments", the role `user` only; `#/settings`, "Settings", `#/users`, "Users", and
-`#/availability`, "Availability", the role `admin` only; and last `#/password`, "Password",
+`#/availability`, "Availability", the role `admin` only; `#/me`, "My details", both roles
+(`docs/EMAIL_PLAN.md` step m2); and last `#/password`, "Password",
 both roles (`docs/CHANGE_PASSWORD_PLAN.md` section 2, decisions D1 and D3). The dialogs have no address. A new screen is a new entry,
 its element in `index.html`, and its services and logic object in `sessionObjects`; the code
 that reads the address, fills the navigation and switches between screens does not change: it

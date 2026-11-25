@@ -27,7 +27,10 @@ function eventWith(lambda: Record<string, string> | undefined, body?: string, is
 
 const asCaller = (username: string, groups: string[], body?: string) =>
   eventWith({ sub: `sub-${username}`, username, groups: JSON.stringify(groups) }, body);
-const asAdmin = (body = JSON.stringify({ username: 'bob' })) => asCaller('admin', ['admin'], body);
+// The four facts every account is created with (docs/EMAIL_ARCHITECTURE.md section 4.1).
+const FACTS = { givenName: 'Bob', familyName: 'Bianchi', email: 'bob.bianchi@example.com', address: 'Via Po 2\n10100 Torino' };
+const create = (username: string, extra: Record<string, unknown> = {}) => JSON.stringify({ username, ...FACTS, ...extra });
+const asAdmin = (body = create('bob')) => asCaller('admin', ['admin'], body);
 
 const exists = () => new UsernameExistsException({ message: 'User account already exists', $metadata: {} });
 const badPassword = () => new InvalidPasswordException({ message: 'Password does not conform to policy', $metadata: {} });
@@ -58,7 +61,7 @@ const body = (response: Awaited<ReturnType<typeof handler>>) => JSON.parse(respo
 const sent = () => cognito.calls().map((call) => (call.args[0] as object).constructor.name);
 
 describe('createUser handler', () => {
-  it('creates the user, sets a permanent password, adds the user group and returns the password', async () => {
+  it('creates the user with the four facts, sets a permanent password, adds the user group and returns the password', async () => {
     const response = await handler(asAdmin());
 
     expect(response.statusCode).toBe(201);
@@ -72,6 +75,13 @@ describe('createUser handler', () => {
       UserPoolId: POOL,
       Username: 'bob',
       MessageAction: 'SUPPRESS',
+      UserAttributes: [
+        { Name: 'given_name', Value: 'Bob' },
+        { Name: 'family_name', Value: 'Bianchi' },
+        { Name: 'email', Value: 'bob.bianchi@example.com' },
+        { Name: 'address', Value: 'Via Po 2\n10100 Torino' },
+        { Name: 'email_verified', Value: 'true' },
+      ],
     });
     expect(cognito.commandCalls(AdminSetUserPasswordCommand)[0]!.args[0].input).toEqual({
       UserPoolId: POOL,
@@ -88,12 +98,12 @@ describe('createUser handler', () => {
 
   it('generates a new password for every user', async () => {
     const first = body(await handler(asAdmin()));
-    const second = body(await handler(asAdmin(JSON.stringify({ username: 'carol' }))));
+    const second = body(await handler(asAdmin(create('carol'))));
     expect(first.password).not.toBe(second.password);
   });
 
   it('accepts a base64-encoded body', async () => {
-    const encoded = Buffer.from(JSON.stringify({ username: 'bob' })).toString('base64');
+    const encoded = Buffer.from(create('bob')).toString('base64');
     const response = await handler(
       eventWith({ sub: 'sub-admin', username: 'admin', groups: '["admin"]' }, encoded, true),
     );
@@ -101,19 +111,19 @@ describe('createUser handler', () => {
   });
 
   it('allows a caller in both admin and user', async () => {
-    const response = await handler(asCaller('admin', ['user', 'admin'], JSON.stringify({ username: 'bob' })));
+    const response = await handler(asCaller('admin', ['user', 'admin'], create('bob')));
     expect(response.statusCode).toBe(201);
   });
 
   it.each([[['user']], [[]], [['other']]])('answers 403 and calls nothing for groups %j', async (groups) => {
-    const response = await handler(asCaller('alice', groups, JSON.stringify({ username: 'bob' })));
+    const response = await handler(asCaller('alice', groups, create('bob')));
     expect(response.statusCode).toBe(403);
     expect(body(response)).toEqual({ error: 'forbidden', message: 'Not allowed for this account' });
     expect(cognito.calls()).toHaveLength(0);
   });
 
   it('answers 401 and calls nothing without an authorizer context', async () => {
-    const response = await handler(eventWith(undefined, JSON.stringify({ username: 'bob' })));
+    const response = await handler(eventWith(undefined, create('bob')));
     expect(response.statusCode).toBe(401);
     expect(body(response).error).toBe('unauthorized');
     expect(cognito.calls()).toHaveLength(0);
@@ -123,13 +133,17 @@ describe('createUser handler', () => {
     { name: 'no body', raw: undefined, code: 'invalid_json' },
     { name: 'malformed JSON', raw: '{"username":', code: 'invalid_json' },
     { name: 'a JSON array', raw: '["bob"]', code: 'invalid_request' },
-    { name: 'a missing username', raw: '{}', code: 'invalid_request' },
-    { name: 'a username that is not a string', raw: '{"username":42}', code: 'invalid_request' },
-    { name: 'a username that is too short', raw: '{"username":"bo"}', code: 'invalid_request' },
-    { name: 'a username that is too long', raw: JSON.stringify({ username: 'b'.repeat(33) }), code: 'invalid_request' },
-    { name: 'an uppercase username', raw: '{"username":"Bob"}', code: 'invalid_request' },
-    { name: 'a username starting with a dot', raw: '{"username":".bob"}', code: 'invalid_request' },
-    { name: 'an extra group field', raw: '{"username":"bob","group":"admin"}', code: 'invalid_request' },
+    { name: 'a missing username', raw: JSON.stringify(FACTS), code: 'invalid_request' },
+    { name: 'a username that is not a string', raw: create('bob', { username: 42 }), code: 'invalid_request' },
+    { name: 'a username that is too short', raw: create('bo'), code: 'invalid_request' },
+    { name: 'a username that is too long', raw: create('b'.repeat(33)), code: 'invalid_request' },
+    { name: 'an uppercase username', raw: create('Bob'), code: 'invalid_request' },
+    { name: 'a username starting with a dot', raw: create('.bob'), code: 'invalid_request' },
+    { name: 'an extra group field', raw: create('bob', { group: 'admin' }), code: 'invalid_request' },
+    { name: 'the username alone', raw: '{"username":"bob"}', code: 'invalid_request' },
+    { name: 'an empty first name', raw: create('bob', { givenName: '  ' }), code: 'invalid_request' },
+    { name: 'an e-mail that is not one', raw: create('bob', { email: 'bob@' }), code: 'invalid_request' },
+    { name: 'an address too long', raw: create('bob', { address: 'a'.repeat(301) }), code: 'invalid_request' },
   ])('answers 400 $code and calls nothing for $name', async ({ raw, code }) => {
     // asCaller rather than asAdmin, whose default body would replace an undefined one.
     const response = await handler(asCaller('admin', ['admin'], raw));
@@ -204,17 +218,24 @@ describe('createUser handler logging', () => {
       },
     ]);
     expect(output.join('')).not.toContain(password as string);
+    for (const fact of Object.values(FACTS)) expect(output.join('')).not.toContain(JSON.stringify(fact).slice(1, -1));
+  });
+
+  it('names the rejected fields of a body, never their values', async () => {
+    const response = await handler(asAdmin(create('bob', { email: 'secret-typo@', givenName: '' })));
+    expect(body(response)).toEqual({ error: 'invalid_request', message: 'Invalid input: givenName, email' });
+    expect(output.join('')).not.toContain('secret-typo');
   });
 
   it('logs a forbidden call with the caller and no target', async () => {
-    await handler(asCaller('alice', ['user'], JSON.stringify({ username: 'bob' })));
+    await handler(asCaller('alice', ['user'], create('bob')));
     const [line] = logLines();
     expect(line).toEqual(expect.objectContaining({ level: 'info', username: 'alice', role: 'user', outcome: 'forbidden', status: 403 }));
     expect(line).not.toHaveProperty('target');
   });
 
   it('logs a rejected body without echoing the rejected username', async () => {
-    await handler(asAdmin('{"username":"Not Valid"}'));
+    await handler(asAdmin(create('Not Valid')));
     const [line] = logLines();
     expect(line).toEqual(expect.objectContaining({ level: 'info', username: 'admin', outcome: 'invalid_request', status: 400 }));
     expect(line).not.toHaveProperty('target');

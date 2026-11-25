@@ -1,27 +1,30 @@
 import type { Subscription } from 'rxjs';
 import { failureText } from '../logic/texts';
-import { deleteQuestion, USERNAME_HINT, type UserRow } from '../logic/users.model';
+import { deleteQuestion, editTitle, USERNAME_HINT, type UserRow } from '../logic/users.model';
 import type { UsernameField, UsersScreen } from '../logic/users.screen';
 import type { UsersService } from '../services/users.service';
+import { editDialog, profileForm } from './profile.parts';
 
-// What the users view uses: of the UsersScreen its stream, the create and the new try after a
-// read that failed; of the UsersService the state of a create, for the generated password
+// What the users view uses: of the UsersScreen its stream, the create, the edit and the new try
+// after a read that failed; of the UsersService the state of a create, for the generated password
 // only, and the delete with its state, for the dialog that confirms it.
 export type UsersDeps = {
-  screen: Pick<UsersScreen, 'users$' | 'create' | 'retry'>;
+  screen: Pick<UsersScreen, 'users$' | 'create' | 'typed' | 'retry' | 'editOpened' | 'editTyped' | 'save'>;
   users: Pick<UsersService, 'createUserState$' | 'deleteUser' | 'deleteUserState$'>;
 };
 
 // The users view (docs/FRONTEND_ARCHITECTURE.md sections 3 and 4): wires the element #users of
-// index.html. It draws the rows the logic layer hands over, sends the username field as text
-// at "Create user", shows once the password the server generated, and asks before a delete.
+// index.html. It draws the rows the logic layer hands over, sends the form's fields as text at
+// "Create user", shows once the password the server generated, opens the Edit dialog of a row,
+// and asks before a delete.
 export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Subscription {
   // 1. Find the elements, once.
   const find = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
   const form = find<HTMLFormElement>('form.create');
   const field = find<HTMLInputElement>('[name="username"]');
-  const hint = find('.field .hint');
-  const refusal = find('.field .refusal');
+  const facts = profileForm(form);
+  const hint = find('.username-field .hint');
+  const refusal = find('.username-field .refusal');
   const failure = find('form.create .failure');
   const submit = find<HTMLButtonElement>('form.create .submit');
   const loading = find('.loading');
@@ -37,6 +40,14 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
   const question = find('dialog.delete .question');
   const removeError = find('dialog.delete .error');
   const removeSubmit = find<HTMLButtonElement>('dialog.delete .submit');
+  const editTitleText = find('dialog.edit h3');
+  // The user the Edit dialog is about, set when it opens.
+  let editing = '';
+  const edit = editDialog(find<HTMLDialogElement>('dialog.edit'), {
+    opened: () => screen.editOpened(),
+    typed: (fields) => screen.editTyped(fields),
+    save: (fields) => screen.save(editing, fields),
+  });
 
   // What a username is, under the field: the logic layer's words, which are also its refusal.
   hint.textContent = USERNAME_HINT;
@@ -89,24 +100,35 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
   const rowFor = (row: UserRow) => {
     const item = rowTemplate.content.firstElementChild!.cloneNode(true) as HTMLElement;
     item.querySelector('.username')!.textContent = row.username;
+    item.querySelector('.name')!.textContent = row.name;
+    item.querySelector('.email')!.textContent = row.email;
+    const editButton = item.querySelector<HTMLElement>('.ask-edit')!;
+    editButton.setAttribute('aria-label', row.editLabel);
+    editButton.onclick = () => {
+      editing = row.username;
+      editTitleText.textContent = editTitle(row.username);
+      edit.open(row.facts);
+    };
     const button = item.querySelector<HTMLElement>('.ask-delete')!;
     button.setAttribute('aria-label', row.deleteLabel);
     button.onclick = () => openDelete(row);
     return item;
   };
   // What is now in the page: the list is rebuilt only when the stream brings another one, so
-  // the keyboard stays on a row's button; the field is filled only when the stream brings
-  // another object for it, so a name being typed is left alone.
+  // the keyboard stays on a row's button; the form is filled only when the stream brings
+  // another object for it, so what is being typed is left alone.
   let drawn: readonly UserRow[] | null = null;
   let filled: UsernameField | null = null;
 
   // 6. The user's actions become calls: what follows on screen comes from the streams.
   // Without preventDefault the browser would send the form itself and load the page again. The
-  // field goes as it is, as text: the logic layer checks it.
+  // fields go as they are, as text: the logic layer checks them.
+  const typed = () => ({ username: field.value, ...facts.read() });
+  form.oninput = () => screen.typed(typed());
   form.onsubmit = (event) => {
     event.preventDefault();
     createAsked = true;
-    screen.create(field.value);
+    screen.create(typed());
   };
   find('.retry').onclick = () => screen.retry();
 
@@ -124,7 +146,10 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
     if (state.field !== filled) {
       filled = state.field;
       field.value = filled.username;
+      facts.fill(filled);
     }
+    facts.refuse(state.refusals);
+    edit.show(state.edit);
     // A field in fault: marked for a screen reader and for the style sheet, its sentence under it.
     refusal.textContent = state.refusal ?? '';
     if (state.refusal === null) field.removeAttribute('aria-invalid');
@@ -161,6 +186,9 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
     created.close();
     forget();
     remove.close();
+    edit.clear();
+    editTitleText.textContent = '';
+    facts.clear();
     form.reset();
     list.replaceChildren();
     field.removeAttribute('aria-invalid');

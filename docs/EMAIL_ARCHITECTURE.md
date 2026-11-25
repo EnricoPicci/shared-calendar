@@ -2,13 +2,13 @@
 
 | | |
 |---|---|
-| Status | A proposal under review: the decisions of sections 2.2 and 2.3 are confirmed by the Product Owner (2026-11-25); every open point is decided (section 21). Ready to become a plan. Nothing is built, nothing is planned yet |
+| Status | Being built, `docs/EMAIL_PLAN.md`. The decisions of sections 2.2 and 2.3 and every open point (section 21) are confirmed by the Product Owner (2026-11-25); the plan's decisions F1 to F5, F13 and F15 (its section 3), and the deletion of the existing Users moved to step 9, are written in here (2026-11-25) |
 | Date | 2026-11-25 |
 | Brief | `prompts/mail-m01-integrate-mail-idea.md`, with the answers of the clarification round (section 2.2) |
 | Builds on | `docs/ARCHITECTURE.md` (sections 4, 5, 6.3, 7, 9, 10), `docs/SHARED_CALENDAR_SPEC.md` section 15 (e-mail notifications prepared), `docs/CONVERSATIONAL_ARCHITECTURE.md` sections 5.4 and 8 (proposals and tools) |
 | Would add to the stack | Amazon SES (one domain identity, one configuration set), one SNS topic, one DynamoDB table `mail`, one scheduled function `mailer`, five routes, one assistant tool |
 | Would change | The creation of a user (an invitation e-mail and a forced password change instead of a password shown to the Administrator); four new facts about every person (first name, last name, e-mail, address) |
-| What comes next | Once this document is final: `docs/EMAIL_PLAN.md`, the implementation plan, from section 20's outline |
+| What comes next | `docs/EMAIL_PLAN.md`, the implementation plan, steps m1 to m10 from section 20's outline; when it is finished, this document becomes a record and `docs/ARCHITECTURE.md` holds its content |
 
 This document says how the shared calendar would send e-mail, what changes for the people who
 use it, what changes in the code and in the cloud, and what you, as Product Owner and operator,
@@ -215,12 +215,15 @@ invitation goes nowhere (or to a stranger); the Administrator corrects it and re
 
 ### 4.3 The accounts that exist today
 
-**They are deleted at the beginning of the implementation** (decision of 2026-11-25), so no
-facts are filled in by hand and every User has the four facts from the start. The Administrator
-deletes them with the existing route (`DELETE /users/{username}`, the Users page), which also
-cancels their future appointments (`cancelReason` `user_deleted`,
-`docs/SHARED_CALENDAR_SPEC.md` section 10.2). People who still need an account are created
-again once invitations work (step 10 of section 20), and receive one.
+**They are deleted in step 9 of section 20, just before the new API reaches the cloud**
+(decision of 2026-11-25; first planned at the beginning of the work, moved so that the people
+keep their access while it is built). So no facts are filled in by hand, and every User in the
+new release has the four facts from the start. The Administrator deletes them in the deployed
+page, still the old release, with the existing route (`DELETE /users/{username}`, the Users
+page), which also cancels their future appointments (`cancelReason` `user_deleted`,
+`docs/SHARED_CALENDAR_SPEC.md` section 10.2). Before deleting, the Administrator notes, outside
+the system, who will need an account again and their future appointments. Those people are
+created again once invitations work (step 10 of section 20), and receive one.
 
 Consequences: no account without facts exists, so `GET /users` never answers a missing fact;
 nothing ever needs to tell an "old" account from a new one; no existing User keeps a password
@@ -229,7 +232,10 @@ that was never forced to change.
 The Administrator's account is not deleted. It gets its four facts from
 `npm run bootstrap-admin` on a new stack, or from "My details" on the existing one. Until its
 e-mail is set, a mail the Administrator asks for is refused with `409 no_email_address`, and the
-daily mail is skipped with a log line.
+daily mail is skipped with a log line. Until then `GET /me` answers `null` for each fact the
+account does not hold, and "My details" says "not set" (decided by the Product Owner on
+2026-11-25); `GET /users`, which lists Users only, treats a missing fact as a broken directory
+(`500`).
 
 ---
 
@@ -339,6 +345,18 @@ Unchanged: created by the deployment, its permanent password set once by
 `npm run bootstrap-admin`. The script also sets the Administrator's four facts (prompted, never
 in a file or an argument, as for the password today).
 
+**A test User for the operator.** Between the deploys of steps 9 and 10 of section 20 no User
+can be created through the page (`POST /users` answers `503 mail_unavailable`, section 13.2), so
+the User's side of the app could not be tried. A command,
+`npm run test-user -w backend -- <local|cloud> <username>`, creates one User straight in
+Cognito, in group `user`, with the four facts (the e-mail is the operator's own, prompted) and a
+**temporary** password the operator types (prompted, sent on stdin through
+`backend/scripts/cognito.mjs`, never saved). At the first sign-in the page asks for a new
+password, so the screen "Choose your password" is tried as a real User sees it. The User stays
+until the operator deletes it in the Users page. It is the one deliberate exception to "Cognito
+makes and e-mails the first password", made by the operator's own command while mail is not on.
+It is not the smoke test's: that one removes everything it makes.
+
 ---
 
 ## 6. The calendar mails
@@ -414,10 +432,12 @@ columns of others. The backup on 26 November 2026 covers 1 October 2026 onwards:
 The files are made in memory and attached; they are never stored. Size is no concern: a year
 of this calendar is a few thousand rows, well under a megabyte.
 
-**A library is needed** to write `.xlsx` (a zip of XML files). The candidates are `exceljs` and
-`write-excel-file`; the plan's first step picks one on licence, upkeep and the size it adds to
-the mailer's bundle. It is imported by one module, `backend/src/lib/excel.ts`, and bundled into
-the mailer only, as the Anthropic SDK is kept to its one module today.
+**A library is needed** to write `.xlsx` (a zip of XML files): **`write-excel-file`**, chosen by
+the Product Owner on 2026-11-25 over `exceljs` on licence, upkeep and the size it adds to the
+mailer's bundle (the measures in section 22). It only writes; the tests read a file back with its
+sister library `read-excel-file`, a development dependency. It is imported by one module,
+`backend/src/lib/excel.ts`, and bundled into the mailer only, as the Anthropic SDK is kept to its
+one module today.
 
 ### 6.4 The appointments are read through the calendar's own code
 
@@ -432,7 +452,9 @@ calendar's read-only permission set. It never writes the calendar.
   The daily mail does not count.
 - A range of at most 366 days, `from` ≤ `to`: else `400 invalid_request`.
 - A person without an e-mail: `409 no_email_address`, before anything is counted.
-- Mail switched off in this stack (section 13, stage not `on`): `503 mail_unavailable`.
+- Mail switched off in this stack (section 13, stage not `on`): `503 mail_unavailable`. This
+  holds for `POST /users` and `POST /users/{username}/invitation` too, which then create and send
+  nothing (section 13.2).
 
 ### 6.6 The texts
 
@@ -468,9 +490,21 @@ caller's identity, exactly as it runs a booking. The handler checks, counts and 
 mailer; the outcome ("on its way", or the reason it was refused) goes back to Claude, which
 words the answer.
 
+**The address is known at the proposal**, before Confirm: the tool's `confirmation.read` gets
+the person's facts through the handler of `GET /me` (as the cancel tool reads through the list's
+handler), so the proposal shows the masked address, and a person without one is told
+`no_email_address` at the proposal, not after the button. The two functions that make
+proposals, `sendAssistantMessage` and `continueAssistant`, gain `AdminGetUser` for it (section
+12.2).
+
 This keeps both rules intact: the assistant acts only through a route's handler and only after
-the person's button. The confirming function's role gains one permission: to start the mailer
+the person's button. The confirming function's role gains the right to start the mailer
 (section 12.2). The assistant itself never holds the right to send mail.
+
+A new tool changes the mark of the instructions, which ends the conversations in progress at the
+deploy (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 4.3). The paid evaluation of that document
+(its section 12.3) is run again with requests for a mail, in both languages and for each role,
+its cost said and agreed before it runs.
 
 Note on the root rule "the assistant changes the calendar only through `confirmProposal`": a
 mail does not change the calendar, but it is an act with an effect outside the system, so it
@@ -540,17 +574,19 @@ address, and try everything with them.
 
 | Method & path | Role | Request | Success | New errors |
 |---|---|---|---|---|
-| `POST /users` (changed) | admin | `{ username, givenName, familyName, email, address }` | `201 { username, status: "invited" }`: **no password** | 400 for each field's rule |
+| `POST /users` (changed) | admin | `{ username, givenName, familyName, email, address }` | `201 { username, status: "invited" }`: **no password** | 400 for each field's rule · 503 `mail_unavailable` |
 | `GET /users` (changed) | admin | | `200 { users }`, each `{ username, createdAt, givenName, familyName, email, address, status }`, `status` `invited` or `active` | |
 | `PUT /users/{username}` (new) | admin | `{ givenName, familyName, email, address }`, all four | `200` the user as in `GET /users` | 404 `user_not_found` · 403 `cannot_edit_admin` (another administrator) |
-| `POST /users/{username}/invitation` (new) | admin | | `202` | 404 `user_not_found` · 409 `not_invited` · 403 `cannot_edit_admin` |
-| `GET /me` (new) | admin or user | | `200 { username, role, givenName, familyName, email, address }` | |
+| `POST /users/{username}/invitation` (new) | admin | | `202` | 404 `user_not_found` · 409 `not_invited` · 403 `cannot_edit_admin` · 503 `mail_unavailable` |
+| `GET /me` (new) | admin or user | | `200 { username, role, givenName, familyName, email, address }`, a fact not held yet `null` (section 4.3) | |
 | `GET /mail/settings` (new) | admin | | `200 { dailyEnabled, dailyHour }` (defaults `true`, `7`) | 503 `mail_unavailable` |
 | `PUT /mail/settings` (new) | admin | `{ dailyEnabled: boolean, dailyHour: 0–23 }` | `200` the settings | 503 `mail_unavailable` |
 | `POST /mail/calendar` (new) | admin or user | `{ from, to }`, local dates | `202 { status: "queued" }` | 409 `no_email_address` · 429 `mail_limit_reached` · 503 `mail_unavailable` |
 
 The common errors (401, 403 `forbidden`, 400 `invalid_json`/`invalid_request`, 500
-`internal_error`) as today. The new codes start in `shared/src/api.ts` (root `CLAUDE.md`).
+`internal_error`) as today. `503 mail_unavailable` answers at a stage other than `on` (section
+13.2), before anything is created, counted or sent. The new codes start in `shared/src/api.ts`
+(root `CLAUDE.md`).
 
 **A breaking change**: an old page that reads `password` from the creation answer finds none.
 The page and the API are released together, as v3.0.0 (the project's rule on versions: a
@@ -630,6 +666,8 @@ views follow `docs/FRONTEND_ARCHITECTURE.md` sections 3 and 4 (a dialog, a form)
 | `mailer` (new) | `ses:SendEmail` on the domain identity and the configuration set; `CalendarReadPolicy`; the `mail` table read/write; Cognito `ListUsersInGroup` and `AdminGetUser` on the one pool |
 | `sendCalendarMail` (new route) | `lambda:InvokeFunction` on the mailer; Cognito `AdminGetUser` (has the person an address?); the `mail` table (counter) |
 | `confirmProposal` | `lambda:InvokeFunction` on the mailer, plus what `sendCalendarMail` needs |
+| `sendAssistantMessage`, `continueAssistant` | Cognito `AdminGetUser` on the one pool: the tool's proposal reads the person's address through the handler of `GET /me` (section 7) |
+| The hourly schedule (a role of its own) | assumable by `scheduler.amazonaws.com` only; `lambda:InvokeFunction` on the mailer alone |
 | `createUser` | unchanged actions (`AdminCreateUser` now also sends; same permission) |
 | `updateUser`, `resendInvitation`, `getMe` (new routes) | Cognito `AdminUpdateUserAttributes`, `AdminCreateUser` (resend), `AdminGetUser`, `AdminListGroupsForUser`, on the one pool |
 | `getMailSettings`, `updateMailSettings` (new routes) | the `mail` table, read or read/write |
@@ -681,11 +719,19 @@ values.
 The pool cannot be pointed at an SES identity that is not verified yet, and verification waits
 for DNS. Hence a stage parameter:
 
-1. **`MailStage=off`** (the default): nothing of this document exists in the cloud; the new
-   routes answer `503 mail_unavailable`; profiles work. The code can ship this way.
+1. **`MailStage=off`** (the default): nothing of this document exists in the cloud; the mail
+   routes, `POST /users` and `POST /users/{username}/invitation` answer `503 mail_unavailable`
+   and create nothing; profiles work. The code can ship this way. (Without our SES, Cognito
+   would send the invitation through its own default service, from
+   `no-reply@verificationemail.com` with its default text: hence no creation at all.)
 2. **`MailStage=domain`**: the stack creates the domain identity, the configuration set, the
    SNS topic, the `mail` table. The operator adds the DKIM records, confirms the SNS
-   subscription, and asks for production access. Still no mail is sent.
+   subscription, and asks for production access. Still no mail is sent, and the routes of
+   stage `off` still answer `503`. **The new page is deployed with this API** (step 9 of section
+   20): the old page takes the challenge `NEW_PASSWORD_REQUIRED` for a failed sign-in, so the
+   operator's test User (section 5.4) could not sign in with it. The new page says "E-mail is not
+   available yet" wherever `503 mail_unavailable` answers: the creation of a User, the resend,
+   the week's "E-mail…", the settings' "Daily e-mail".
 3. **`MailStage=on`**, once the domain is verified and the account out of the sandbox: the pool
    sends through SES with its invitation template and 7-day validity, the creation route sends
    invitations, the mailer and its timer exist, the routes work.
@@ -701,6 +747,16 @@ pool, not a replacement; the plan confirms it with a change set before the deplo
 of the smoke run), see the invitation state, resend it, delete the User; ask a mail for
 `admin`; read the mailer's log line for `sent`. The mailbox is checked by the operator's eyes,
 as the quick look at the page is today.
+
+Only that invitation's check uses the operator's address: one real mail per run. The other
+throw-away Users the smoke test signs in with (its own User, and the two of the capacity
+journey) get SES's mailbox simulator address `success@simulator.amazonses.com` (delivered, never
+a real mailbox, never a bounce), and the script sets their permanent password through
+`backend/scripts/cognito.mjs`, with the operator's own credentials and the password on stdin, as
+`npm run bootstrap-admin` does for the Administrator. At stage `domain` the smoke test creates
+its Users straight in Cognito, with the four facts and the group, and checks the `503`s. That the
+simulator accepts mail sent by Cognito, in the sandbox too, is to be confirmed in AWS's
+documentation when the smoke test is rewritten.
 
 ---
 
@@ -734,8 +790,18 @@ today. Ready-made emulators exist (for example `aws-ses-v2-local`); our own is p
 it must accept attachments in the simple message form and stay as small as the fake Claude
 (open point O7).
 
-The hourly timer does not run locally; a script starts the mailer's daily run by hand, and the
-journeys call it with a fixed "now".
+**Starting the mailer locally.** `sam local start-api` offers no Lambda endpoint for the
+routes' asynchronous invoke. A third local process, `npm run local:lambda -w backend`
+(`sam local start-lambda`, in the foreground like `local:api`), serves the functions' invoke on
+`127.0.0.1:3001`; an `Event` invocation runs in the background and is answered at once. The
+routes' Lambda client takes its endpoint from `LAMBDA_ENDPOINT` (empty in the cloud,
+`http://host.docker.internal:3001` in `env.local.json`), as Cognito's and DynamoDB's do;
+`verify` checks that it runs, as it checks `local:api`.
+
+The hourly timer does not run locally; a script starts the mailer's daily run by hand through
+the same endpoint, and the journeys call it with a fixed "now" in the event, which the mailer
+honours only when `MAIL_ALLOW_NOW` is `true`, set by `env.local.json` alone (as
+`SKIP_GLOBAL_SIGN_OUT` is).
 
 ### 14.3 Tests
 
@@ -820,17 +886,16 @@ routes of this document.
 
 ## 20. Outline for the implementation plan
 
-Each step ends green (`npm run verify`) and is reviewed before the next. Nothing reaches the
-cloud before step 9.
+Each step is reviewed before the next; `docs/EMAIL_PLAN.md` refines this outline (its steps m1
+to m10) and says each step's check. Nothing reaches the cloud before step 9.
 
-0. **The existing Users deleted** (operator, in the cloud, before any code; section 4.3). The
-   local seed creates `alice` with the four facts from then on.
 1. **The contract** in `shared/`: `UserProfile`, the changed and new bodies and answers, the
    new error codes, the mail settings, the texts. Choose the Excel library; read SES's prices
    again.
 2. **Profiles**: `POST /users` takes the four facts (still with a permanent password, so the
    page keeps working), `PUT /users/{username}`, `GET /users` with the facts, `GET /me`; the
-   users screen and "My details". Bootstrap script asks the Administrator's facts.
+   users screen and "My details". Bootstrap script asks the Administrator's facts; the local
+   seed creates `admin` and `alice` with the four facts.
 3. **The table `mail`, the fake mail, the mailer** with `excel.ts` and `ses.ts`; the kind
    `calendar` and `mine` run by hand locally.
 4. **`POST /mail/calendar`** with its counter and limits; the week page's button.
@@ -841,11 +906,13 @@ cloud before step 9.
    with a temporary password.
 8. **The invitation**: `createUser` lets Cognito send; the answer without password; resend; the
    invitation template; the users screen's states. The template's stages (`off`, `domain`,
-   `on`) and the parameters.
-9. **Cloud, stage `domain`** (operator): deploy, DNS records, SNS confirmation, production
-   access request.
-10. **Cloud, stage `on`**: deploy, smoke test, the page released, the quick look by the
-    operator with a real invitation and a real daily mail; the Administrator's facts set; the
+   `on`) and the parameters. The command for the test User (section 5.4).
+9. **Cloud, stage `domain`** (operator): the existing Users deleted, the last thing before the
+   deploy (section 4.3); the API and the new page deployed together (section 13.2); the
+   Administrator's facts set; the test User made and signed in (section 5.4); DNS records, SNS
+   confirmation, production access request.
+10. **Cloud, stage `on`**: deploy, smoke test, the page deployed again only if it changed after
+    step 9, the quick look by the operator with a real invitation and a real daily mail; the
     Users who need an account created again; documents merged; tag v3.0.0.
 
 ---
@@ -871,7 +938,9 @@ cloud before step 9.
    `docs/CUSTOM_DOMAIN.md`): three DKIM records and one DMARC record.
 2. Request SES production access for `eu-north-1` (section 8.5).
 3. Confirm the SNS subscription mail that arrives at the alarm address.
-4. At the start: delete the existing Users (section 4.3). At step 10: set your own four facts, and create again the Users who still need an account.
+4. At step 9, just before the deploy: delete the existing Users (section 4.3), noting who needs
+   an account again; then set your own four facts and make the test User (section 5.4). At
+   step 10: create again the Users who still need an account.
 5. Update the privacy notice with the new data and the Excel files in your mailbox, ahead of the
    GDPR work.
 
@@ -891,6 +960,43 @@ cloud before step 9.
 - AWS regional availability, checked through AWS's own catalogue: `AWS::SES::EmailIdentity`,
   `AWS::SES::ConfigurationSet`, `AWS::SES::ConfigurationSetEventDestination`,
   `AWS::Scheduler::Schedule` available in `eu-north-1`.
-- Not confirmed yet, for the plan's first steps: that pointing the existing pool at SES is an
-  update without replacement; Cognito's exact invitation placeholders and the template's size
-  limit; the Excel library's bundle size.
+
+### 22.1 Confirmed on 2026-11-25, for step m1 of `docs/EMAIL_PLAN.md`
+
+- **SES's prices** (https://aws.amazon.com/ses/pricing/, read again): new accounts, and account
+  and region pairs with no SES use since 2025-06-01, start on the Essentials plan from
+  2026-07-21, at 0.16 USD per 1 000 mails up to 10 million a month, with no monthly fee (Pro and
+  Enterprise have one); attachments cost 0.12 USD per GB; à la carte pricing, 0.10 USD per 1 000,
+  can be chosen instead. Mails to SES's mailbox simulator are billed as ordinary mails. Section
+  15 holds: about 100 mails a month cost about 0.02 USD.
+- **Cognito's invitation** (Amazon Cognito developer guide, "Configuring MFA, authentication,
+  verification and invitation messages",
+  https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-message-customizations.html):
+  the invitation's template **must** hold both `{username}` and `{####}` (the temporary
+  password); an e-mail message is at most 20 000 UTF-8 characters, HTML allowed; there is no
+  placeholder for a name (O3 holds). The CloudFormation reference
+  (https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-cognito-userpool-invitemessagetemplate.html):
+  `EmailMessage` 6 to 20 000 characters, `EmailSubject` 1 to 140, both allowed only with
+  `EmailSendingAccount: DEVELOPER`, both "Update requires: No interruption".
+- **The pool's update**: `EmailConfiguration` is "Update requires: No interruption" in the
+  CloudFormation reference of the user pool (`docs/EMAIL_PLAN.md` finding F10), so pointing the
+  pool at SES updates it in place; the change set that proves it for our stack is read in step
+  m9.
+- **The Excel library**, measured in a scratch folder outside the repository with esbuild
+  (`--bundle --platform=node --target=node22 --minify`), a sheet of the 11 columns of section 6.3
+  and 3 000 rows with accented names, written and read back:
+
+  | | `write-excel-file` (chosen) | `exceljs` |
+  |---|---|---|
+  | Licence | MIT | MIT |
+  | Last release | 4.1.1, 2026-06-08; last commit 2026-11-20 | 4.4.0, 2023-10-19; last commit 2024-01-12 |
+  | Open issues | 32 (GitLab, its home) | about 670 (GitHub) |
+  | Packages installed | 2 (itself and `fflate`) | 193, three of them deprecated |
+  | `npm audit` | nothing | 2 moderate (`uuid`) |
+  | Size added to a bundle | 76 KB (22 KB gzipped) | 1 MB (314 KB gzipped), and it runs bundled only with a `require` shim |
+  | 3 000 rows written | 0.09 s, a file of 105 KB | 0.15 s, a file of 124 KB |
+  | Read back | every row and the accents, by `read-excel-file` and by `exceljs` | the same |
+
+  Sources: `npm view <library> version license time`, the projects' issue trackers
+  (`gh api`, GitLab's API), `npm audit`. The mailer's memory and timeout are set from these in
+  step m3, with its own measure inside a Lambda container.

@@ -62,6 +62,8 @@ the scripts themselves win, and this document is fixed.
   real Claude whose messages, proposals and cost are to be counted afterwards needs this file.
 - `npm run local:down -w backend`: stops the stack. The table is in memory and is lost; Cognito
   data survives in `backend/.cognito/`.
+  So does an account made by hand before the four facts of a person existed: it has none, and
+  `GET /users` answers `500` until it is deleted (`docs/ARCHITECTURE.md` section 4).
   Stop `local:api` first. When it answers "Network shared-calendar-local … Resource is still in
   use", the emulators are stopped all the same and Lambda containers of `sam local` are still
   on the network: remove them with
@@ -428,8 +430,11 @@ Every command of this section that names a stack acts on a real AWS account. `CL
     password. A fifth file of the page is a change to the bucket's policy in the template and
     to the script's list.
 - `npm run bootstrap-admin -w backend -- <stack|local>`: sets the admin password (hidden prompt,
-  twice, pool policy checked first). Only sets the password. Reads stdin, so
-  `printf '%s\n%s\n' "$pw" "$pw" | npm run bootstrap-admin -w backend -- local` works in tests.
+  twice, pool policy checked first), then asks the Administrator's four facts (first name, last
+  name, e-mail, the postal address a line at a time, an empty line ending it) and sets them
+  before the password; an empty first name keeps the facts as they are. A fact refused changes
+  nothing. Reads stdin, so `printf '%s\n%s\n\n' "$pw" "$pw" | npm run bootstrap-admin -w backend
+  -- local` (an empty first name) works in tests.
 - `DYNAMODB_PORT=8002 npm run smoke -w backend -- <stack|local>`: journeys 3, 4, 6 and 11 of
   `docs/IMPLEMENTATION_PLAN.md` step 9 with a throw-away `smoke-<epoch>` user and, before the
   last, the calendar journey of `docs/SHARED_CALENDAR_SPEC.md` section 18.4 (a type

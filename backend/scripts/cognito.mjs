@@ -13,6 +13,15 @@
 //   node scripts/cognito.mjs sign-out                            access token -> GlobalSignOut,
 //                                                                 every token of the person revoked
 //   node scripts/cognito.mjs set-password <poolId> <username>    password -> set as permanent
+//   node scripts/cognito.mjs set-profile <poolId> <username>     a person's four facts, one per
+//                                                                 line: first name, last name,
+//                                                                 e-mail, then the postal address,
+//                                                                 whose lines are all the rest
+//
+// The facts are no secret, but they are personal data (docs/EMAIL_ARCHITECTURE.md section 12.3):
+// stdin keeps them out of ps and off the disk, like a password. They are checked first by the rule
+// of shared/src/user.ts, written again here because a script cannot import TypeScript; the API's
+// own check stays the one the page and the routes use.
 //
 // A password holds no line break (docs/ARCHITECTURE.md section 6.9: no blank character at all)
 // and a token neither, so the three secrets of change-password are told apart by their line;
@@ -26,6 +35,7 @@
 // out of the message, should Cognito ever quote one. Nothing else is printed.
 import {
   AdminSetUserPasswordCommand,
+  AdminUpdateUserAttributesCommand,
   ChangePasswordCommand,
   CognitoIdentityProviderClient,
   GlobalSignOutCommand,
@@ -41,6 +51,7 @@ const ARGUMENTS = {
   'change-password': [],
   'sign-out': [],
   'set-password': ['poolId', 'username'],
+  'set-profile': ['poolId', 'username'],
 };
 
 const [action, ...args] = process.argv.slice(2);
@@ -48,7 +59,7 @@ const expected = Object.hasOwn(ARGUMENTS, action ?? '') ? ARGUMENTS[action] : un
 if (!expected || args.length !== expected.length || args.some((arg) => !arg)) {
   console.error(
     'usage: node scripts/cognito.mjs <sign-in|tokens> <clientId> <username> | refresh <clientId> | ' +
-      'change-password | sign-out | set-password <poolId> <username>   (secrets on stdin)',
+      'change-password | sign-out | <set-password|set-profile> <poolId> <username>   (secrets on stdin)',
   );
   process.exit(2);
 }
@@ -86,6 +97,33 @@ function oneLine() {
   return lines[0];
 }
 
+// The four facts read from stdin, trimmed, the e-mail lower-cased, each checked by the rule of
+// shared/src/user.ts (lengths in UTF-16 code units, as there): a name 1–100 characters on one
+// line, an e-mail of at most 254 characters with the shape name@domain.tld, an address 1–300.
+function profile() {
+  // Three lines at least: an address left empty is refused below with the other facts' problems.
+  if (lines.length < 3) {
+    throw Object.assign(new Error('expected four facts on stdin: first name, last name, e-mail, address'), { name: 'Input' });
+  }
+  const [givenName, familyName, email] = lines.slice(0, 3).map((line) => line.trim());
+  const address = lines.slice(3).join('\n').trim();
+  const problems = [];
+  for (const [name, value] of [['first name', givenName], ['last name', familyName]]) {
+    if (value.length < 1 || value.length > 100 || /\p{Cc}/u.test(value)) problems.push(`the ${name} needs 1 to 100 characters`);
+  }
+  const lowered = email.toLowerCase();
+  if (lowered.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lowered)) problems.push('the e-mail is not an address');
+  if (address.length < 1 || address.length > 300 || /[^\P{Cc}\n]/u.test(address)) problems.push('the address needs 1 to 300 characters');
+  if (problems.length > 0) throw Object.assign(new Error(problems.join('; ')), { name: 'Input' });
+  return [
+    { Name: 'given_name', Value: givenName },
+    { Name: 'family_name', Value: familyName },
+    { Name: 'email', Value: lowered },
+    { Name: 'email_verified', Value: 'true' },
+    { Name: 'address', Value: address },
+  ];
+}
+
 try {
   if (action === 'sign-in') {
     process.stdout.write(`${(await signIn(input)).AccessToken}\n`);
@@ -110,6 +148,8 @@ try {
     await client.send(new ChangePasswordCommand({ AccessToken: accessToken, PreviousPassword: previous, ProposedPassword: proposed }));
   } else if (action === 'sign-out') {
     await client.send(new GlobalSignOutCommand({ AccessToken: oneLine() }));
+  } else if (action === 'set-profile') {
+    await client.send(new AdminUpdateUserAttributesCommand({ UserPoolId: id, Username: username, UserAttributes: profile() }));
   } else {
     await client.send(
       new AdminSetUserPasswordCommand({ UserPoolId: id, Username: username, Password: input, Permanent: true }),

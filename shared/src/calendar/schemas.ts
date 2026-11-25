@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Username } from '../username';
+import { Username } from '../user';
 import { CALENDAR_LIMITS, SETTINGS_RANGES, TYPE_CAPACITY } from './defaults';
 import { addDays } from './time';
 

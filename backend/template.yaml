@@ -99,7 +99,9 @@ Resources:
         RecoveryMechanisms:
           - Name: admin_only
             Priority: 1
-      # Optional e-mail attribute, unused in v1, kept so the forgot-password upgrade needs no pool change.
+      # The e-mail attribute, optional and mutable. A person's other facts (given_name, family_name,
+      # address, docs/EMAIL_ARCHITECTURE.md section 4.1) are standard attributes that need no line
+      # here. This list is never changed: changing a pool's schema can replace the pool.
       Schema:
         - Name: email
           AttributeDataType: String
@@ -533,7 +535,7 @@ Resources:
                   - dynamodb:PutItem
                 Resource: !GetAtt MessagesTable.Arn
 
-  # POST /users: creates a user with a permanent password in the "user" group.
+  # POST /users: creates a user with its four facts and a permanent password in the "user" group.
   # AdminDeleteUser is only used to roll back a half-created user.
   CreateUserFunction:
     Type: AWS::Serverless::Function
@@ -765,6 +767,151 @@ Resources:
               - Effect: Allow
                 Action:
                   - cognito-idp:ListUsersInGroup
+                Resource: !GetAtt UserPool.Arn
+
+  # PUT /users/{username} (docs/EMAIL_ARCHITECTURE.md sections 4.2 and 9.1; Administrator only):
+  # replaces the four facts of a User, or the Administrator's own. Reads the target's groups (to
+  # refuse another administrator), reads its facts before the change (to log which ones change)
+  # and writes the new ones. Cognito only, on this user pool; no table.
+  UpdateUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: updateUser.handler
+      Role: !GetAtt UpdateUserRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref UpdateUserLogGroup
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref UserPool
+          COGNITO_ENDPOINT: ''
+      Events:
+        UpdateUser:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: PUT
+            Path: /users/{username}
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/updateUser.ts
+
+  UpdateUserLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-updateUser
+      RetentionInDays: 14
+
+  UpdateUserRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${UpdateUserLogGroup}:log-stream:*
+        - PolicyName: update-user
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminListGroupsForUser
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:AdminUpdateUserAttributes
+                Resource: !GetAtt UserPool.Arn
+
+  # GET /me (docs/EMAIL_ARCHITECTURE.md sections 4.2 and 9.1; the Administrator and Users): the
+  # caller's own four facts. Reads one account of this user pool, the caller's; no table. The role
+  # comes from the token, so no group is read.
+  GetMeFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: getMe.handler
+      Role: !GetAtt GetMeRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref GetMeLogGroup
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref UserPool
+          COGNITO_ENDPOINT: ''
+      Events:
+        GetMe:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /me
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/getMe.ts
+
+  GetMeLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-getMe
+      RetentionInDays: 14
+
+  GetMeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${GetMeLogGroup}:log-stream:*
+        - PolicyName: read-own-profile
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminGetUser
                 Resource: !GetAtt UserPool.Arn
 
   # ---------------------------------------------------------------------------

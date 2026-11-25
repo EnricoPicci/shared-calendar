@@ -7,6 +7,7 @@ import type { CognitoConfig } from '../../src/services/cognito';
 import { LoginService } from '../../src/services/login.service';
 import type { LoginResult, Session } from '../../src/services/login.types';
 import { SessionStore } from '../../src/services/session.store';
+import type { NewUser } from '../../src/services/users.service';
 
 // The back end's local stack (docs/FRONTEND_SERVICES.md section 14): cognito-local on 9229 and
 // the API of `npm run local:api -w backend` on 3000. A helper, not a test file. Tests may use
@@ -28,6 +29,13 @@ export function changePasswordConfig(): ChangePasswordConfig {
 }
 
 export const PASSWORDS = { alice: 'Alice-Local-Pass-1!', admin: 'Admin-Local-Pass-1!' };
+
+// What "Create user" sends for a throw-away User of a journey: the username and four facts made
+// from it (docs/EMAIL_ARCHITECTURE.md section 4.1). The e-mail is at example.com, a domain kept
+// for examples, so no mail could ever reach a real person.
+export function newUser(username: string): NewUser {
+  return { username, givenName: 'Throw', familyName: `Away ${username}`, email: `${username.toLowerCase()}@example.com`, address: `Via di Prova 1\n00100 Roma` };
+}
 
 // A real LoginService fills the given store; subscribe first, then call, then wait for the one
 // outcome. Checks that the state machine ends on the same object as the result stream.

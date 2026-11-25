@@ -128,6 +128,13 @@ const PLAIN_WORDS = new Map<string, string>([
   // Creating and deleting a user (docs/FRONTEND_SERVICES.md section 13.1).
   ['user_exists', 'A user with this username exists already. Choose another username.'],
   ['cannot_delete_admin', 'An Administrator cannot be deleted.'],
+  // A person's facts and e-mail (docs/EMAIL_ARCHITECTURE.md section 9.1). `mail_unavailable` is
+  // the answer of a stack where e-mail is not switched on yet (docs/EMAIL_PLAN.md finding F13).
+  ['cannot_edit_admin', "Another Administrator's details cannot be changed."],
+  ['not_invited', 'This user has already chosen a password: there is no invitation to send again.'],
+  ['no_email_address', 'There is no e-mail address in your details. Ask the Administrator to add one.'],
+  ['mail_limit_reached', 'You have asked for as many e-mails as a day allows. Please try again tomorrow.'],
+  ['mail_unavailable', 'E-mail is not available yet.'],
   // The availability types and the weekly patterns (docs/FRONTEND_SERVICES.md sections 16.1
   // and 17.1). A type is in use as docs/SHARED_CALENDAR_SPEC.md R-TYPE-03 says; two windows of
   // one date may not overlap whatever their types (docs/SHARED_CALENDAR_SPEC.md R-AV-01); and

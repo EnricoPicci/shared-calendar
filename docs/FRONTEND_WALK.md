@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
+| Status | v6 (2026-11-25, `docs/EMAIL_PLAN.md` step m2): the four facts of a person and "My details" are section 11, checks 157 to 170; checks 3, 40, 53 and section 1 in line. v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
 | What it is | One list of checks that walks every screen of the front end and the assistant's panel in a browser, as a User and as the Administrator, against the local stack. **The check to repeat after a later change to the view layer** |
 | What it is not | A source of truth, and not an automated test. On any conflict `docs/FRONTEND_ARCHITECTURE.md` and the tests win, and this page is fixed. No end-to-end test tool is in the repository (`docs/FRONTEND_VIEW_PLAN.md` section 8, decision 6): a person follows the list by hand, or drives a browser with a script kept outside the repository |
 | Made from | The browser checks of `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 68, of `docs/CONVERSATIONAL_PLAN.md` step c12 and of `docs/CAPACITY_PLAN.md` step u5, in the order a person would follow, and `docs/SHARED_CALENDAR_SPEC.md` section 16.8 |
@@ -18,6 +18,7 @@
 | v4 | 2026-11-23 | `docs/CHANGE_PASSWORD_PLAN.md` step p3: **the password screen**, section 9, checks 123 to 133, as `alice` and as `admin`, with what they need and leave in its opening; it is walked last, after section 6, since it changes both local passwords, and puts them back itself. Checks 3 and 40: "Password" is last in each role's navigation. The row of step p3 in section 8. No earlier check changed its number. 133 checks. |
 | v3, note | 2026-11-23 | The branch `deploy-frontend` merged into `main`: the panel's version, first numbered v2, is v3, after the sign-out's v2. Walked on the merged page that day by a script in headless Chromium, at a desktop and a phone width, against the local stack with the fake Claude, as `alice`: checks 3, 4 (one `RevokeToken`, answered 200) and 103 to 105, then "Sign out" while the panel waited for an answer (the login at once, the panel gone, no `continue` sent after it, the conversation read again at the next sign-in); all yes. The console held `zod`'s `eval` probe only. The rest of the walk was not run again. |
 | v5 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u5: **the capacity of a type**, section 10, checks 134 to 156, with what they need and leave in its opening; the row of step u5 in section 8. Check 12: the Administrator's booking for `alice` makes `alice`'s attempt a `user_busy`, whose sentence it quotes. Check 41: the tab "Full" beside an appointment. Checks 66 and 70: "Edit" in the place of "Rename", and the capacity. Walked that day by a script in headless Chromium (Playwright 1.62), at 1280 × 800 and at 390 × 844, on a fresh, seeded local stack, as `admin`, `alice` and three Users of the run: every check of section 10 answered yes at both widths, and check 12 as written; at check 140 the tab "1 left" was seen on top and within reach, not pressed, and check 150 was seen on the screenshots, its tabs not pressed. The console held the known report of `zod` and the browser's own line for each answer 409 of checks 144, 145, 146 and 152. The rest of the walk was not run again. 156 checks. |
+| v6 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m2: **the four facts of a person**, section 11, checks 157 to 170: the users screen's form and its refusals, a row's name and e-mail, the Edit dialog, "My details" for both roles; the facts every user of the walk is given (section 1); checks 3 and 40 (the navigation's "My details") and 53 (a row) in line; the row of step m2 in section 8. Walked on the local stack that day at a desktop width: 157, 158, 160, 161, 163, 165, 166 as `admin` and 169 as `alice`; 159, 162, 164, 167, 168 and 170 not yet. |
 
 ---
 
@@ -41,6 +42,10 @@
 - **A tag for the run**, a few lowercase letters and digits (say `w7`). Every name and every
   note the walk writes carries it (`walk-w7`), so that what one run made can be told from the
   seed's and from another run's.
+- **The four facts of every user the walk creates**: first name `Walk`, last name the user's
+  name after `walk-` (`w7-b`), e-mail `<the username>@example.com`, postal address
+  `Via di Prova 1` on one line and `00100 Roma` on a second. "Create user" without them is
+  refused (check 54).
 - **For the assistant's panel (section 6): the fake Claude**, which is what `local:up` wires
   when no `ANTHROPIC_API_KEY` is given (`docs/COMMANDS.md` section 3.4), and the local limit of
   10 messages a person a day. Section 6 is never walked with the real Claude wired: its
@@ -122,7 +127,7 @@ The widths: 1280 × 800 for the desktop, 390 × 844 for the phone.
 2. `[=]` Sign in as `alice` with the right password, and watch the button. → "Sign in" is
    disabled while the call is under way (the first call after the stack starts takes seconds).
 3. `[K]` → The frame: the header says `alice` and "User"; the navigation holds "Week", "My
-   appointments" and "Password" and nothing else; the address ends in `#/week`.
+   appointments", "My details" and "Password" and nothing else; the address ends in `#/week`.
 4. `[K]` `[N]` Press "Sign out". → The login again, at once, both fields empty, no failure shown.
    In the Network panel: one request to `/cognito/` sent at the press, its header
    `X-Amz-Target` ending in `RevokeToken`, answered 200. (With the local Cognito stopped the
@@ -268,7 +273,7 @@ Sign in as `alice`.
 Sign out, sign in as `admin`.
 
 40. `[K]` → The header says `admin` and "Administrator"; the navigation holds "Week",
-    "Settings", "Users", "Availability" and "Password", and no "My appointments". `[=]` The address
+    "Settings", "Users", "Availability", "My details" and "Password", and no "My appointments". `[=]` The address
     `#/appointments`, typed by hand, shows the week.
 
 **The week.** In next week.
@@ -310,7 +315,7 @@ Sign out, sign in as `admin`.
 **The users.**
 
 53. `[K]` `[N]` Press "Users". → The list, with `alice` and without `admin`, each row with
-    "Delete"; one request, `GET /users`.
+    the name, the e-mail, "Edit" and "Delete"; one request, `GET /users`.
 54. `[K]` `[=]` Type `Bob` and press "Create user"; then `ab`. → Refused under the field, in
     the words of the hint, which is shown once, in red; `[N]` no request.
 55. `[K]` Type `alice`, "Create user". → A failure in plain words under the field's box: a user
@@ -639,11 +644,12 @@ section 6 and the journeys run on the fake only.
 | c12 | No panel at the login, the bar on every screen, no request before the first opening; a read with its progress line; moving between screens, a reload; a booking confirmed with the week on show; a dialog over the panel; a decline; a message that drops a proposal; each of the three sentences; a text with markup; another person finds nothing; the keyboard alone; the console | 103, 104, 121; 106; 108, 110; 111, 113; 112; 114; 115; 116, 118, 119; 107; 120; 104, 105, 109, 113, 114, 118; 122. What the browser's tools show a screen reader is check 117; the two points step c12 left (the count after a 503, "New conversation" after one) are in checks 116 and 118 |
 
 | u5 | A type's capacity: created, refused, edited; the places left; a time full for Users, busy for a fourth, refused to a page read before; the Administrator's full slot as a tab, refused, "Book anyway", the offer hidden by a change; two and three side by side, four as one block and its list; `user_busy` named for the Administrator; the User's own time not offered | 134 to 156, 12, 41, 66, 70 |
+| m2 | The create form's facts and their live refusals; a row's name and e-mail; Edit, saved and cancelled; "My details" for the Administrator, with Edit, and for a User, without | 157 to 170 |
 | p3 | The hints while typing, the two new ones differing, a wrong current password, a change that succeeds, "Password changed" at the login, the old password refused, the new one accepted; as `alice` and as `admin`, at the two widths | 123 to 133 |
 
 Steps 60 to 68 are those of `docs/FRONTEND_VIEW_PLAN.md`; step c12 is of
 `docs/CONVERSATIONAL_PLAN.md`; step p3 of `docs/CHANGE_PASSWORD_PLAN.md`; step u5 of
-`docs/CAPACITY_PLAN.md`.
+`docs/CAPACITY_PLAN.md`; step m2 of `docs/EMAIL_PLAN.md`.
 
 Left out on purpose: "the screens of the earlier steps still work, in short" (`docs/FRONTEND_VIEW_PLAN.md`
 section 4), which was each step's own short walk and is this whole list.
@@ -776,3 +782,38 @@ its own, with its own tag, on the Sunday after.
 156. Clean up as `admin`: in "Users" delete `walk-<tag>-b`, `-c` and `-d` (their appointments go
      with them); as `alice` cancel `walk-<tag> one` and `walk-<tag> two`; in "Availability"
      delete the pattern of check 137, then the type. → The type is gone from the list.
+
+## 11. The four facts of a person, and "My details"
+
+Walked as `admin`, then `alice`, after section 10 (`docs/EMAIL_ARCHITECTURE.md` section 4). It
+leaves nothing behind: the user it creates is deleted at its end, and `admin`'s facts are put
+back as found.
+
+157. `[K]` As `admin`, in "Users". → The form: "Username", "First name", "Last name", "E-mail",
+     "Postal address" (a box of several lines), then "Create user".
+158. `[K]` `[N]` Type `walk-<tag>-e` and nothing else, "Create user". → A refusal under each of
+     the four facts, in red, every field in fault marked; no request.
+159. `[K]` Type an e-mail without "@". → Its refusal stays. Complete it. → It goes as the last key
+     is typed; the other refusals stay until their own field is right.
+160. `[K]` Fill the four facts (section 1) and "Create user". → The password dialog; behind it the
+     row `walk-<tag>-e` with "Walk <tag>-e" and its e-mail, and the five fields empty. Close it.
+161. `[K]` Press "Edit" on that row. → A dialog "Edit walk-<tag>-e", the four facts filled from
+     the row, the keyboard on the first field.
+162. `[K]` Empty the first name, "Save". → Refused under the field; the dialog stays open. Type it
+     again: the refusal goes.
+163. `[K]` `[N]` Change the last name to `Verdi`, "Save". → One `PUT /users/walk-<tag>-e`; the
+     dialog closes; the row says "Walk Verdi".
+164. `[K]` "Edit" again, change a field, then "Cancel"; then again and the Escape key. → Nothing
+     saved; the row as it was.
+165. `[K]` Press "My details". → "My details": Username `admin`, Role "Administrator", the four
+     facts of the seed, the address on its two lines; the button "Edit".
+166. `[K]` "Edit". → "Edit my details", filled; the browser may offer its own address there.
+     Empty the first name, "Save". → Refused. "Cancel".
+167. `[K]` `[N]` "Edit", change the first name, "Save". → One `PUT /users/admin`, then one
+     `GET /me`; the details show the change. Put it back the same way.
+168. → At 390 × 844 the rows wrap rather than run off, an e-mail breaks inside the row, and the
+     page does not scroll sideways. Delete `walk-<tag>-e`.
+169. `[K]` Sign out, sign in as `alice`, press "My details". → Her username, "User", her four
+     facts; no "Edit"; the sentence "To change your details, ask the Administrator."
+170. `[=]` The address `#/users`, typed by hand as `alice`. → The week.
+

@@ -369,8 +369,8 @@ describe('mountWeek', () => {
   const ALICE_AND_BOB: ListUsersState = {
     status: 'success',
     users: [
-      { username: 'alice', createdAt: '2026-11-01T10:00:00.000Z' },
-      { username: 'bob', createdAt: '2026-11-02T10:00:00.000Z' },
+      { username: 'alice', createdAt: '2026-11-01T10:00:00.000Z', status: 'active' as const, givenName: 'G', familyName: 'F', email: 'alice@example.com', address: 'A' },
+      { username: 'bob', createdAt: '2026-11-02T10:00:00.000Z', status: 'active' as const, givenName: 'G', familyName: 'F', email: 'bob@example.com', address: 'A' },
     ],
   };
   const TAKEN = 'This time is full: there is no place left. The calendar has been refreshed: please choose another time.';
@@ -650,7 +650,7 @@ describe('mountWeek', () => {
       find('#week .slot').click();
       expect(bookSubmit().disabled).toBe(true);
       listUsersState$.next({ status: 'pending' });
-      listUsersState$.next({ status: 'success', users: [{ username: 'carol', createdAt: '2026-11-03T10:00:00.000Z' }] });
+      listUsersState$.next({ status: 'success', users: [{ username: 'carol', createdAt: '2026-11-03T10:00:00.000Z', status: 'active' as const, givenName: 'G', familyName: 'F', email: 'x@example.com', address: 'A' }] });
       expect(options('username')).toEqual(['carol']);
     });
 
@@ -759,7 +759,7 @@ describe('mountWeek', () => {
     const { listUsersState$ } = mounted(state({ week }), 'admin', [scripted]);
 
     find('#week .slot').click();
-    listUsersState$.next({ status: 'success', users: [{ username: SCRIPT, createdAt: '2026-11-01T10:00:00.000Z' }] });
+    listUsersState$.next({ status: 'success', users: [{ username: SCRIPT, createdAt: '2026-11-01T10:00:00.000Z', status: 'active' as const, givenName: 'G', familyName: 'F', email: 'x@example.com', address: 'A' }] });
     expect(find('#week dialog.book .what').textContent).toBe(`${SCRIPT}, ${SCRIPT} · ${SCRIPT}`);
     expect(find('#week dialog.book .what').children).toHaveLength(0);
     expect(select('username').options[0]!.textContent).toBe(SCRIPT);
@@ -830,7 +830,7 @@ describe('mountWeek', () => {
       const before = html();
       const { subscription, listUsersState$, bookState$ } = mounted(state({ week: WEEK }), 'admin');
       find('#week .slot').click();
-      listUsersState$.next({ status: 'success', users: [{ username: 'alice', createdAt: '2026-11-01T10:00:00.000Z' }] });
+      listUsersState$.next({ status: 'success', users: [{ username: 'alice', createdAt: '2026-11-01T10:00:00.000Z', status: 'active' as const, givenName: 'G', familyName: 'F', email: 'alice@example.com', address: 'A' }] });
       note().value = 'A private note';
       submit(bookForm());
       bookState$.next({ status: 'failure', reason: 'slot_taken', message: 'taken' });

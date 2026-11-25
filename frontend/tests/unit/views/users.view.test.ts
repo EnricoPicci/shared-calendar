@@ -1,6 +1,7 @@
 import { BehaviorSubject } from 'rxjs';
-import { deleteQuestion, USERNAME_HINT, userRows, usernameFor } from '../../../src/logic/users.model';
-import type { UsersState } from '../../../src/logic/users.screen';
+import { NO_REFUSALS, PROFILE_RULES } from '../../../src/logic/profile.model';
+import { deleteQuestion, editTitle, USERNAME_HINT, userRows, usernameFor } from '../../../src/logic/users.model';
+import type { EditState, UsersState } from '../../../src/logic/users.screen';
 import type { CreateUserState, DeleteUserState } from '../../../src/services/users.types';
 import { mountUsers, type UsersDeps } from '../../../src/views/users.view';
 import { find, submit, useRealPage } from './page';
@@ -19,9 +20,26 @@ const OTHER_PASSWORD = 'Zq9-other.one_Pass?2';
 
 // The field's object stays the same from one state to the next unless a test brings another:
 // another object is what tells the view to fill the field again.
-const FIELD = { username: '' };
-const state = (over: Partial<UsersState> = {}): UsersState => ({ loading: false, unread: null, rows: null, empty: null, field: FIELD, creating: false, refusal: null, failure: null, created: null, ...over });
-const rows = (...usernames: string[]) => userRows(usernames.map((username) => ({ username, createdAt: '2026-11-01T10:00:00.000Z' })));
+const EMPTY = { givenName: '', familyName: '', email: '', address: '' };
+const FIELD = { username: '', ...EMPTY };
+const NO_EDIT: EditState = { saving: false, refusals: NO_REFUSALS, failure: null, saved: null };
+const state = (over: Partial<UsersState> = {}): UsersState => ({
+  loading: false,
+  unread: null,
+  rows: null,
+  empty: null,
+  field: FIELD,
+  creating: false,
+  refusal: null,
+  refusals: NO_REFUSALS,
+  failure: null,
+  created: null,
+  edit: NO_EDIT,
+  ...over,
+});
+// Each user's facts are made from the username, so that each row holds texts of its own.
+const factsOf = (username: string) => ({ givenName: `Given-${username}`, familyName: `Family-${username}`, email: `${username}@example.com`, address: `Street of ${username}\nTown` });
+const rows = (...usernames: string[]) => userRows(usernames.map((username) => ({ username, createdAt: '2026-11-01T10:00:00.000Z', status: 'active' as const, ...factsOf(username) })));
 const TWO = rows('alice', 'bob');
 const listed = (over: Partial<UsersState> = {}) => state({ rows: TWO, ...over });
 const createdAs = (username: string, password = PASSWORD): CreateUserState => ({ status: 'success', user: { username, password } });
@@ -30,7 +48,15 @@ function mounted(first: UsersState = state(), create: CreateUserState = { status
   const users$ = new BehaviorSubject<UsersState>(first);
   const createUserState$ = new BehaviorSubject<CreateUserState>(create);
   const deleteUserState$ = new BehaviorSubject<DeleteUserState>(remove);
-  const screen = { users$: users$.asObservable(), create: vi.fn<UsersDeps['screen']['create']>(), retry: vi.fn<UsersDeps['screen']['retry']>() };
+  const screen = {
+    users$: users$.asObservable(),
+    create: vi.fn<UsersDeps['screen']['create']>(),
+    typed: vi.fn<UsersDeps['screen']['typed']>(),
+    retry: vi.fn<UsersDeps['screen']['retry']>(),
+    editOpened: vi.fn<UsersDeps['screen']['editOpened']>(),
+    editTyped: vi.fn<UsersDeps['screen']['editTyped']>(),
+    save: vi.fn<UsersDeps['screen']['save']>(),
+  };
   const users = { createUserState$: createUserState$.asObservable(), deleteUser: vi.fn<UsersDeps['users']['deleteUser']>(), deleteUserState$: deleteUserState$.asObservable() };
   const root = find('#users');
   const subscription = mountUsers(root, { screen, users });
@@ -40,10 +66,16 @@ function mounted(first: UsersState = state(), create: CreateUserState = { status
 const one = <T extends HTMLElement = HTMLElement>(selector: string) => find<T>(`#users ${selector}`);
 const form = () => one<HTMLFormElement>('form.create');
 const field = () => one<HTMLInputElement>('[name="username"]');
-const refusal = () => one('.field .refusal');
+const refusal = () => one('.username-field .refusal');
 const items = () => [...document.querySelectorAll<HTMLElement>('#users .list > li')];
 const names = () => items().map((item) => item.querySelector('.username')!.textContent);
-const deleteOf = (username: string) => items().find((item) => item.querySelector('.username')!.textContent === username)!.querySelector<HTMLButtonElement>('button')!;
+const rowOf = (username: string) => items().find((item) => item.querySelector('.username')!.textContent === username)!;
+const deleteOf = (username: string) => rowOf(username).querySelector<HTMLButtonElement>('.ask-delete')!;
+const editOf = (username: string) => rowOf(username).querySelector<HTMLButtonElement>('.ask-edit')!;
+const edit = () => one<HTMLDialogElement>('dialog.edit');
+const editField = (name: string) => one<HTMLInputElement | HTMLTextAreaElement>(`dialog.edit [name="${name}"]`);
+const editFields = () => ['givenName', 'familyName', 'email', 'address'].map((name) => editField(name).value);
+const createField = (name: string) => one<HTMLInputElement | HTMLTextAreaElement>(`form.create [name="${name}"]`);
 const created = () => one<HTMLDialogElement>('dialog.created');
 const remove = () => one<HTMLDialogElement>('dialog.delete');
 const removeSubmit = () => one<HTMLButtonElement>('dialog.delete .submit');
@@ -90,13 +122,18 @@ describe('mountUsers', () => {
       expect([form().hidden, one<HTMLButtonElement>('.submit').disabled]).toEqual([false, false]);
     });
 
-    it('the list: one row per user, in the order given, each with the username and a "Delete" that says whom', () => {
+    it('the list: one row per user, in the order given, each with the username, the name, the e-mail, and an "Edit" and a "Delete" that say whom; never the postal address', () => {
       mounted(listed());
       expect(names()).toEqual(['alice', 'bob']);
-      expect(items().map((item) => [item.querySelector('button')!.textContent, item.querySelector('button')!.getAttribute('aria-label')])).toEqual([
-        ['Delete', 'Delete alice'],
-        ['Delete', 'Delete bob'],
+      expect(items().map((item) => [item.querySelector('.name')!.textContent, item.querySelector('.email')!.textContent])).toEqual([
+        ['Given-alice Family-alice', 'alice@example.com'],
+        ['Given-bob Family-bob', 'bob@example.com'],
       ]);
+      expect(items().map((item) => [...item.querySelectorAll('button')].map((button) => [button.textContent, button.getAttribute('aria-label')]))).toEqual([
+        [['Edit', 'Edit alice'], ['Delete', 'Delete alice']],
+        [['Edit', 'Edit bob'], ['Delete', 'Delete bob']],
+      ]);
+      expect(one('.list').textContent).not.toContain('Street of');
       expect([one('.unread').hidden, one('.empty').hidden]).toEqual([true, true]);
     });
 
@@ -166,7 +203,7 @@ describe('mountUsers', () => {
       const { prevented } = submit(form());
       expect(prevented).toBe(true);
       expect(screen.create).toHaveBeenCalledTimes(1);
-      expect(screen.create).toHaveBeenCalledWith(' Carol ');
+      expect(screen.create).toHaveBeenCalledWith({ ...FIELD, username: ' Carol ' });
       expect(html()).toBe(before);
       expect([field().value, one<HTMLButtonElement>('.submit').disabled, refusal().textContent]).toEqual([' Carol ', false, '']);
     });
@@ -174,7 +211,7 @@ describe('mountUsers', () => {
     it('an empty field goes as an empty text: the view checks nothing', () => {
       const { screen } = mounted(listed());
       submit(form());
-      expect(screen.create).toHaveBeenCalledWith('');
+      expect(screen.create).toHaveBeenCalledWith(FIELD);
       expect([refusal().textContent, field().hasAttribute('aria-invalid')]).toEqual(['', false]);
     });
 
@@ -185,7 +222,7 @@ describe('mountUsers', () => {
       users$.next(listed({ failure: FAILURE }));
       users$.next(listed({ rows: rows('alice') }));
       expect(field().value).toBe('carol');
-      users$.next(listed({ field: { username: '' }, created: 'carol' }));
+      users$.next(listed({ field: { ...FIELD }, created: 'carol' }));
       expect(field().value).toBe('');
     });
 
@@ -290,7 +327,7 @@ describe('mountUsers', () => {
       ask('carol');
       createUserState$.next(createdAs('carol'));
       one('dialog.created .understood').click();
-      users$.next(listed({ rows: rows('alice', 'bob', 'carol'), field: { username: '' }, created: 'carol' }));
+      users$.next(listed({ rows: rows('alice', 'bob', 'carol'), field: { ...FIELD }, created: 'carol' }));
       users$.next(listed({ rows: rows('alice', 'bob', 'carol'), loading: true, created: 'carol' }));
       expect(created().open).toBe(false);
       expect(anywhere(PASSWORD)).toBe(false);
@@ -307,7 +344,7 @@ describe('mountUsers', () => {
       const { createUserState$, users$ } = mounted(listed());
       ask('carol');
       createUserState$.next(createdAs('carol'));
-      users$.next(listed({ loading: true, field: { username: '' }, created: 'carol' }));
+      users$.next(listed({ loading: true, field: { ...FIELD }, created: 'carol' }));
       users$.next(listed({ rows: rows('alice', 'bob', 'carol'), created: 'carol' }));
       expect(names()).toEqual(['alice', 'bob', 'carol']);
       expect(created().open).toBe(true);
@@ -325,6 +362,115 @@ describe('mountUsers', () => {
       expect(anywhere(PASSWORD)).toBe(false);
       expect(anywhere('carol')).toBe(false);
       expect(html()).toBe(before);
+    });
+  });
+
+  describe('the four facts of the create form', () => {
+    it('each field typed in goes to typed() with the whole form as text', () => {
+      const { screen } = mounted(listed());
+      field().value = 'carol';
+      createField('email').value = 'Carol@';
+      form().dispatchEvent(new Event('input', { bubbles: true }));
+      expect(screen.typed).toHaveBeenLastCalledWith({ ...FIELD, username: 'carol', email: 'Carol@' });
+    });
+
+    it('"Create user" sends the four facts as typed, the address with its lines', () => {
+      const { screen } = mounted(listed());
+      field().value = 'carol';
+      createField('givenName').value = ' Carol';
+      createField('familyName').value = 'Conti';
+      createField('email').value = 'carol@example.com';
+      createField('address').value = 'Via Po 2\nTorino';
+      submit(form());
+      expect(screen.create).toHaveBeenCalledWith({ username: 'carol', givenName: ' Carol', familyName: 'Conti', email: 'carol@example.com', address: 'Via Po 2\nTorino' });
+    });
+
+    it('a fact in fault: its sentence under its field, announced, the field marked; gone when the stream says so, the text kept', () => {
+      const { users$ } = mounted(listed());
+      createField('email').value = 'carol@';
+      users$.next(listed({ refusals: { ...NO_REFUSALS, email: PROFILE_RULES.email, address: PROFILE_RULES.address } }));
+      const box = (name: string) => createField(name).closest('.field')!;
+      expect([box('email').querySelector('.refusal')!.textContent, createField('email').getAttribute('aria-invalid')]).toEqual([PROFILE_RULES.email, 'true']);
+      expect([box('address').querySelector('.refusal')!.textContent, createField('address').getAttribute('aria-invalid')]).toEqual([PROFILE_RULES.address, 'true']);
+      expect([box('givenName').querySelector('.refusal')!.textContent, createField('givenName').hasAttribute('aria-invalid')]).toEqual(['', false]);
+      users$.next(listed());
+      expect([box('email').querySelector('.refusal')!.textContent, createField('email').hasAttribute('aria-invalid'), createField('email').value]).toEqual(['', false, 'carol@']);
+    });
+
+    it('the four facts are emptied with the username when the stream brings another object for the form', () => {
+      const { users$ } = mounted(listed());
+      for (const name of ['givenName', 'familyName', 'email', 'address']) createField(name).value = 'x';
+      users$.next(listed({ creating: true }));
+      expect(createField('email').value).toBe('x');
+      users$.next(listed({ field: { ...FIELD }, created: 'carol' }));
+      expect(['givenName', 'familyName', 'email', 'address'].map((name) => createField(name).value)).toEqual(['', '', '', '']);
+    });
+  });
+
+  describe('the Edit dialog', () => {
+    it('a row\'s "Edit" opens it with that user\'s name in its heading and four facts in its fields, and tells the logic layer', () => {
+      const { screen } = mounted(listed());
+      editOf('bob').click();
+      expect(edit().open).toBe(true);
+      expect(one('dialog.edit h3').textContent).toBe(editTitle('bob'));
+      expect(editFields()).toEqual(Object.values(factsOf('bob')));
+      expect(screen.editOpened).toHaveBeenCalledTimes(1);
+      expect(screen.save).not.toHaveBeenCalled();
+    });
+
+    it('typing calls editTyped() with the fields; "Save" calls save() with the user and the fields, once', () => {
+      const { screen } = mounted(listed());
+      editOf('bob').click();
+      editField('email').value = 'bobby@example.com';
+      one('dialog.edit form').dispatchEvent(new Event('input', { bubbles: true }));
+      expect(screen.editTyped).toHaveBeenLastCalledWith({ ...factsOf('bob'), email: 'bobby@example.com' });
+      const { prevented } = submit(one<HTMLFormElement>('dialog.edit form'));
+      expect(prevented).toBe(true);
+      expect(screen.save).toHaveBeenCalledTimes(1);
+      expect(screen.save).toHaveBeenCalledWith('bob', { ...factsOf('bob'), email: 'bobby@example.com' });
+    });
+
+    it('a save under way disables "Save"; a failure is said in the dialog; a refused fact is marked; the dialog stays open', () => {
+      const { users$ } = mounted(listed());
+      editOf('bob').click();
+      users$.next(listed({ edit: { ...NO_EDIT, saving: true } }));
+      expect(one<HTMLButtonElement>('dialog.edit .submit').disabled).toBe(true);
+      users$.next(listed({ edit: { ...NO_EDIT, failure: FAILURE, refusals: { ...NO_REFUSALS, givenName: PROFILE_RULES.givenName } } }));
+      expect([one<HTMLButtonElement>('dialog.edit .submit').disabled, one('dialog.edit .failure').textContent, edit().open]).toEqual([false, FAILURE, true]);
+      expect([editField('givenName').closest('.field')!.querySelector('.refusal')!.textContent, editField('givenName').getAttribute('aria-invalid')]).toEqual([PROFILE_RULES.givenName, 'true']);
+    });
+
+    it('a save that succeeds closes it; a "saved" there before it opened does not', () => {
+      const saved = {};
+      const { users$ } = mounted(listed({ edit: { ...NO_EDIT, saved } }));
+      editOf('bob').click();
+      users$.next(listed({ edit: { ...NO_EDIT, saved } }));
+      expect(edit().open).toBe(true);
+      users$.next(listed({ edit: { ...NO_EDIT, saved: {} } }));
+      expect(edit().open).toBe(false);
+    });
+
+    it('"Cancel" closes it with no call; opened again for another user, it shows that user and no failure', () => {
+      const { users$, screen } = mounted(listed());
+      editOf('bob').click();
+      editField('givenName').value = 'typed';
+      users$.next(listed({ edit: { ...NO_EDIT, failure: FAILURE } }));
+      one('dialog.edit .cancel').click();
+      expect(edit().open).toBe(false);
+      expect(screen.save).not.toHaveBeenCalled();
+      editOf('alice').click();
+      expect(one('dialog.edit .failure').textContent).toBe('');
+      expect(editFields()).toEqual(Object.values(factsOf('alice')));
+      submit(one<HTMLFormElement>('dialog.edit form'));
+      expect(screen.save).toHaveBeenCalledWith('alice', factsOf('alice'));
+    });
+
+    it('a list that arrives behind the open dialog leaves it and what is typed as they are', () => {
+      const { users$ } = mounted(listed());
+      editOf('bob').click();
+      editField('familyName').value = 'Typed';
+      users$.next(listed({ rows: rows('alice', 'bob', 'carol') }));
+      expect([edit().open, editField('familyName').value]).toEqual([true, 'Typed']);
     });
   });
 
@@ -497,25 +643,39 @@ describe('mountUsers', () => {
     expect(document.querySelectorAll('#users script, #users b')).toHaveLength(0);
   });
 
+  it('a name and an e-mail containing <script> are shown as text in the row and in the Edit dialog\'s fields', () => {
+    const [first] = rows('alice');
+    const odd = { ...first!, name: SCRIPT, email: SCRIPT, facts: { ...first!.facts, givenName: SCRIPT, address: SCRIPT } };
+    mounted(state({ rows: [odd] }));
+    expect([items()[0]!.querySelector('.name')!.textContent, items()[0]!.querySelector('.email')!.textContent]).toEqual([SCRIPT, SCRIPT]);
+    editOf('alice').click();
+    expect([editField('givenName').value, editField('address').value]).toEqual([SCRIPT, SCRIPT]);
+    expect(document.querySelectorAll('#users script, #users b')).toHaveLength(0);
+  });
+
   describe('leaving the view', () => {
     it('after unsubscribing nothing is left in the page, which is as index.html has it: no row, no name, both dialogs closed and empty, the field emptied and not in fault', () => {
       const before = html();
-      const { subscription, createUserState$, deleteUserState$ } = mounted(listed({ loading: true, creating: true, failure: FAILURE, refusal: USERNAME_HINT, created: 'carol' }));
+      const { subscription, users$, createUserState$, deleteUserState$ } = mounted(listed({ loading: true, creating: true, failure: FAILURE, refusal: USERNAME_HINT, created: 'carol' }));
       ask('carol');
       createUserState$.next(createdAs('carol'));
       deleteOf('bob').click(); // the emulated page lets a click through a modal dialog
       removeSubmit().click();
       deleteUserState$.next({ status: 'pending', username: 'bob' });
       field().value = 'dave';
-      expect([created().open, remove().open]).toEqual([true, true]);
+      createField('givenName').value = 'Anna';
+      editOf('alice').click();
+      users$.next(listed({ refusals: { ...NO_REFUSALS, email: PROFILE_RULES.email }, edit: { ...NO_EDIT, saving: true, failure: FAILURE, refusals: { ...NO_REFUSALS, email: PROFILE_RULES.email } } }));
+      expect([created().open, remove().open, edit().open]).toEqual([true, true, true]);
       expect(html()).not.toBe(before);
 
       subscription.unsubscribe();
       expect(items()).toHaveLength(0);
-      expect([created().open, remove().open]).toEqual([false, false]);
+      expect([created().open, remove().open, edit().open]).toEqual([false, false, false]);
       expect([field().value, field().hasAttribute('aria-invalid')]).toEqual(['', false]);
+      expect(editFields()).toEqual(['', '', '', '']);
       expect([one<HTMLButtonElement>('.submit').disabled, removeSubmit().disabled]).toEqual([false, false]);
-      for (const gone of ['alice', 'bob', 'carol', 'dave', PASSWORD, 'A username has']) expect(anywhere(gone), gone).toBe(false);
+      for (const gone of ['alice', 'bob', 'carol', 'dave', 'Given-', 'Family-', 'Street of', 'Anna', PASSWORD, 'A username has', PROFILE_RULES.email]) expect(anywhere(gone), gone).toBe(false);
       expect(html()).toBe(before);
     });
 
@@ -557,7 +717,7 @@ describe('mountUsers', () => {
       expect(anywhere(PASSWORD)).toBe(false);
       ask('dave');
       expect(first.screen.create).toHaveBeenCalledTimes(1);
-      expect(second.screen.create).toHaveBeenCalledWith('dave');
+      expect(second.screen.create).toHaveBeenCalledWith({ ...FIELD, username: 'dave' });
       deleteOf('zoe').click();
       removeSubmit().click();
       expect(first.users.deleteUser).not.toHaveBeenCalled();

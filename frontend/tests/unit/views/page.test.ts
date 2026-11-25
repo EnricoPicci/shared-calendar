@@ -29,7 +29,7 @@ describe('index.html', () => {
   it('every screen of the frame has an id and starts hidden; the navigation and the lists start empty', () => {
     loadPage();
     const screens = [...document.querySelectorAll<HTMLElement>('#app main.screen > :not(template)')];
-    expect(screens.map((element) => element.id)).toEqual(['week', 'appointments', 'settings', 'users', 'availability', 'password']);
+    expect(screens.map((element) => element.id)).toEqual(['week', 'appointments', 'settings', 'users', 'availability', 'password', 'me']);
     expect(screens.every((element) => element.hidden)).toBe(true);
     expect(document.querySelector('#app .nav')!.children).toHaveLength(0);
     for (const list of document.querySelectorAll('#week .legend, #week .hours, #week .days, #appointments .list, #users .list, #availability .list, #availability .groups, #availability .conflicts-list, #password .needs')) expect(list.children).toHaveLength(0);
@@ -79,7 +79,7 @@ describe('index.html', () => {
 
     it('every field has its label: a <label> around it, with words of its own', () => {
       const fields = everywhere('input, select, textarea');
-      expect(fields).toHaveLength(42);
+      expect(fields).toHaveLength(54);
       for (const field of fields) {
         const label = field.closest('label');
         expect(label, field.getAttribute('name')!).not.toBeNull();
@@ -101,8 +101,9 @@ describe('index.html', () => {
         ['Try again', 'Try again to read the types'],
         ['Try again', 'Try again to read the weekly patterns'],
         ['Try again', 'Try again to read this date'],
+        ['Try again', 'Try again to read your details'],
       ]);
-      expect(everywhere('.retry')).toHaveLength(5);
+      expect(everywhere('.retry')).toHaveLength(6);
     });
 
     it('a dialog that asks before an action is described by its question, which a screen reader says when it opens', () => {
@@ -116,11 +117,11 @@ describe('index.html', () => {
       const place = (element: Element) => [...element.classList].join('.');
       const alerts = everywhere('[role="alert"]');
       const failures = everywhere('.error');
-      expect(failures).toHaveLength(53);
+      expect(failures).toHaveLength(68);
       expect(alerts).toEqual(failures);
       for (const alert of alerts) expect(['P', alert.textContent], place(alert)).toEqual(['P', '']);
       const loading = everywhere('.loading');
-      expect(loading.map((element) => [element.getAttribute('role'), element.textContent, element.hidden])).toEqual(Array.from({ length: 6 }, () => ['status', 'Loading…', true]));
+      expect(loading.map((element) => [element.getAttribute('role'), element.textContent, element.hidden])).toEqual(Array.from({ length: 7 }, () => ['status', 'Loading…', true]));
       // What else is news: "Password changed" at the login, the appointment being moved, the
       // list of Users being read for the book dialog, "Settings saved.", and what the assistant
       // answers.
@@ -148,20 +149,21 @@ describe('index.html', () => {
     for (const template of templates) expect(template.content.querySelectorAll('input, select, textarea'), template.id).toHaveLength(0);
   });
 
-  it('the page has eight dialogs, closed, each named by its heading: the book dialog and the list of a group are the week\'s, two are the users\' and three the availability\'s, outside the regions that are redrawn; the detail belongs to no screen', () => {
+  it('the page has ten dialogs, closed, each named by its heading: the book dialog and the list of a group are the week\'s, three are the users\', three the availability\'s and one is "My details", outside the regions that are redrawn; the detail belongs to no screen', () => {
     loadPage();
     const dialogs = [...document.querySelectorAll<HTMLDialogElement>('dialog')];
-    expect(dialogs.map((dialog) => dialog.className)).toEqual(['book', 'group', 'created', 'delete', 'rename', 'change', 'delete', 'detail']);
+    expect(dialogs.map((dialog) => dialog.className)).toEqual(['book', 'group', 'edit', 'created', 'delete', 'rename', 'change', 'delete', 'edit', 'detail']);
     for (const dialog of dialogs) {
       expect(dialog.open, dialog.className).toBe(false);
       expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)!.tagName, dialog.className).toBe('H3');
     }
-    const [book, group, created, remove, rename, change, removeAvailability, detail] = dialogs as [HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement];
+    const [book, group, edit, created, remove, rename, change, removeAvailability, editMe, detail] = dialogs as HTMLDialogElement[] as [HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement];
     for (const dialog of [book, group]) {
       expect(dialog.parentElement!.id, dialog.className).toBe('week');
       expect(dialog.closest('.week'), dialog.className).toBeNull();
     }
-    for (const dialog of [created, remove]) {
+    expect(editMe.parentElement!.id).toBe('me');
+    for (const dialog of [created, remove, edit]) {
       expect(dialog.parentElement!.id, dialog.className).toBe('users');
       expect(dialog.closest('.list'), dialog.className).toBeNull();
     }
@@ -351,15 +353,16 @@ describe('index.html', () => {
     expect(document.querySelector<HTMLTemplateElement>('#tpl-password-need')!.content.firstElementChild!.outerHTML).toBe('<li class="need"></li>');
   });
 
-  it('the users start with the form empty and the list empty: one text field in a field of its own, with its label, its hint and its refusal, which a browser neither offers nor corrects', () => {
+  it('the users start with the form empty and the list empty: the username in a field of its own, with its label, its hint and its refusal, which a browser neither offers nor corrects', () => {
     loadPage();
     const one = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector<T>(`#users ${selector}`)!;
     const form = one<HTMLFormElement>('form.create');
     // The script says in words what is wrong with a username: the browser's own check is off.
     expect(form.noValidate).toBe(true);
     expect(form.closest('.list')).toBeNull();
-    const fields = [...document.querySelectorAll<HTMLInputElement>('#users input, #users select, #users textarea')];
-    expect(fields.map((field) => [field.name, field.type, field.value, field.closest('label')!.textContent.trim()])).toEqual([['username', 'text', '', 'Username']]);
+    const fields = [...form.querySelectorAll<HTMLInputElement>('input, select, textarea')];
+    expect(fields.map((field) => field.name)).toEqual(['username', 'givenName', 'familyName', 'email', 'address']);
+    expect([fields[0]!.name, fields[0]!.type, fields[0]!.value, fields[0]!.closest('label')!.textContent.trim()]).toEqual(['username', 'text', '', 'Username']);
     const field = fields[0]!;
     expect([field.getAttribute('autocomplete'), field.getAttribute('autocapitalize'), field.getAttribute('spellcheck')]).toEqual(['off', 'none', 'false']);
     // What a username is comes from the script, with the shared rule: no pattern and no length in the page.
@@ -374,14 +377,72 @@ describe('index.html', () => {
     expect([one('.unread .error').getAttribute('role'), one('.empty').textContent]).toEqual(['alert', '']);
   });
 
-  it('a row of the users is the username and one button of type "button", "Delete", and nothing in it can be typed in', () => {
+  it('a row of the users is the username, the name, the e-mail and two buttons of type "button", "Edit" and "Delete", and nothing in it can be typed in', () => {
     const row = pageAside().querySelector<HTMLTemplateElement>('#tpl-user-row')!.content.firstElementChild!;
     expect(row.tagName).toBe('LI');
-    expect([...row.children].map((part) => [part.tagName, part.textContent])).toEqual([['SPAN', ''], ['BUTTON', 'Delete']]);
-    expect(row.querySelector('button')!.getAttribute('type')).toBe('button');
-    // Whom it deletes is the script's to say.
-    expect(row.querySelector('button')!.hasAttribute('aria-label')).toBe(false);
+    expect([...row.children].map((part) => [part.tagName, part.className, part.textContent])).toEqual([
+      ['SPAN', 'username', ''],
+      ['SPAN', 'name', ''],
+      ['SPAN', 'email', ''],
+      ['BUTTON', 'ask-edit', 'Edit'],
+      ['BUTTON', 'danger ask-delete', 'Delete'],
+    ]);
+    // Whom they edit and delete is the script's to say.
+    for (const button of row.querySelectorAll('button')) expect([button.getAttribute('type'), button.hasAttribute('aria-label')]).toEqual(['button', false]);
     expect(row.querySelectorAll('input, select, textarea, a')).toHaveLength(0);
+  });
+
+  // The fields of the four facts of docs/EMAIL_ARCHITECTURE.md section 4.1, in the three forms
+  // that hold them.
+  it.each([
+    ['#users form.create', 'off'],
+    ['#users dialog.edit form.profile', 'off'],
+    ['#me dialog.edit form.profile', 'own'],
+  ])('the four facts of %s: each in a .field with its label and its refusal, the address on lines, no length or pattern in the page', (selector, autocomplete) => {
+    loadPage();
+    const form = document.querySelector<HTMLFormElement>(selector)!;
+    expect(form.noValidate).toBe(true);
+    const facts = [...form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('.given-name-field *, .family-name-field *, .email-field *, .address-field *')].filter((element) => ['INPUT', 'TEXTAREA'].includes(element.tagName));
+    expect(facts.map((field) => [field.name, field.tagName, field.closest('label')!.firstChild!.textContent!.trim(), field.value])).toEqual([
+      ['givenName', 'INPUT', 'First name', ''],
+      ['familyName', 'INPUT', 'Last name', ''],
+      ['email', 'INPUT', 'E-mail', ''],
+      ['address', 'TEXTAREA', 'Postal address', ''],
+    ]);
+    // Another person's facts are never offered from the Administrator's own; one's own are.
+    const offered = facts.map((field) => field.getAttribute('autocomplete'));
+    expect(offered).toEqual(autocomplete === 'off' ? ['off', 'off', 'off', 'off'] : ['given-name', 'family-name', 'email', 'street-address']);
+    for (const field of facts) {
+      expect(['pattern', 'minlength', 'maxlength', 'required', 'aria-invalid'].filter((name) => field.hasAttribute(name)), field.name).toEqual([]);
+      const refusal = field.closest('.field')!.querySelector('.refusal')!;
+      expect([refusal.getAttribute('role'), refusal.textContent]).toEqual(['alert', '']);
+    }
+  });
+
+  it('the Edit dialogs: "Cancel" of type "button" first, "Save" the form\'s; the users\' heading the script\'s, "My details"\' its own', () => {
+    loadPage();
+    for (const dialog of document.querySelectorAll('dialog.edit')) {
+      expect([...dialog.querySelectorAll('button')].map((button) => [button.textContent, button.getAttribute('type')])).toEqual([['Cancel', 'button'], ['Save', null]]);
+      expect(dialog.querySelector('.failure')!.closest('form')).toBe(dialog.querySelector('form'));
+    }
+    expect(document.querySelector('#users dialog.edit h3')!.textContent).toBe('');
+    expect(document.querySelector('#me dialog.edit h3')!.textContent).toBe('Edit my details');
+  });
+
+  it('"My details" starts with its list hidden and empty, Edit and the sentence for a User hidden', () => {
+    loadPage();
+    const one = (selector: string) => document.querySelector<HTMLElement>(`#me ${selector}`)!;
+    expect([one('.details').hidden, one('.ask-edit').hidden, one('.user-only').hidden, one('.unread').hidden, one('.loading').hidden]).toEqual([true, true, true, true, true]);
+    expect([...one('.details').querySelectorAll('dt')].map((term) => term.textContent)).toEqual(['Username', 'Role', 'First name', 'Last name', 'E-mail', 'Postal address']);
+    expect([...one('.details').querySelectorAll('dd')].map((value) => [value.className, value.textContent])).toEqual([
+      ['username', ''],
+      ['role', ''],
+      ['given-name', ''],
+      ['family-name', ''],
+      ['email', ''],
+      ['address', ''],
+    ]);
+    expect(one('.ask-edit').getAttribute('type')).toBe('button');
   });
 
   it('the password dialog starts empty, cannot be closed by the Escape key, and has one button and no field; the keyboard lands on its heading', () => {

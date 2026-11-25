@@ -7,9 +7,10 @@ import { log } from '../lib/logger';
 import { generatePassword } from '../lib/password';
 import { validate } from '../lib/validation';
 
-// The flow of docs/ARCHITECTURE.md section 6.3, including the rollback. One log line per request
-// (docs/ARCHITECTURE.md section 11): "username" is the caller, "target" the account being created.
-// The response body carries the password, so it is never passed to the logger.
+// The flow of docs/ARCHITECTURE.md section 6.3, including the rollback. The account is created
+// with its four facts (docs/EMAIL_ARCHITECTURE.md section 4.1). One log line per request
+// (docs/ARCHITECTURE.md section 11): "username" is the caller, "target" the account being created;
+// never a fact. The response body carries the password, so it is never passed to the logger.
 export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpResponse> => {
   const started = Date.now();
   const requestId = event.requestContext?.requestId ?? 'unknown';
@@ -31,11 +32,11 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<HttpRespon
   if (!json.ok) return done('invalid_request', json.response, caller);
   const body = validate(CreateUserBody, json.value);
   if (!body.ok) return done('invalid_request', body.response, caller);
-  const target = body.value.username;
+  const { username: target, ...profile } = body.value;
 
   const password = generatePassword();
   try {
-    await createUser(target);
+    await createUser(target, profile);
   } catch (err) {
     if (err instanceof UserExistsError) {
       return done('conflict', error(409, 'user_exists', 'A user with this username already exists'), { ...caller, target });

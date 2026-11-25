@@ -91,9 +91,9 @@ Paths in this file are relative to `backend/`.
   - `cancellableUntilFor` (a User on a booked appointment, else `null`); `calendarView`, the
     calendar view built for one caller's role from what `calendarDb.readCalendarRange` reads;
     `toResponse`, an appointment as a response.
-- `cognito.ts` also has `getUserSub` (`AdminGetUser`, the `sub`), `isPlainUser` (in `user`, not
-  in `admin`) and `listPlainUsers` (`ListUsersInGroup` for both groups, every page; sorted by
-  code units).
+- `cognito.ts` also has `getUserSub`, `isPlainUser`, `listPlainUsers` (both groups, every page,
+  sorted by code units, each with its state and four facts) and the facts: `createUser` takes
+  them, `updateProfile` (`email_verified` true), `getProfile`, `asUserSummary`, `asMe`.
 - `http.ts`: `parseJsonBody` for bodies, `parseQuery` for query strings (the object a
   `.strict()` query schema checks).
 

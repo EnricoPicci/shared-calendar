@@ -12,7 +12,8 @@ adds to the root `CLAUDE.md`, whose rules all apply here. Paths are relative to 
 
 - `src/api.ts`: response and error body types, `ApiErrorCode`.
 - `src/roles.ts`: `Role`, `resolveRole`.
-- `src/username.ts`: the username pattern and zod schemas.
+- `src/user.ts`: the username pattern and schemas; the four facts of a person (`UserProfile`,
+  `PROFILE_LIMITS`), `CreateUserBody`, `UpdateUserBody`, `UserSummary`, `MeResponse`.
 - `src/password.ts`: the pool's password rule (`PASSWORD_POLICY`, `PASSWORD_SYMBOLS`,
   `passwordProblems`, `Password`); a unit test of the back end holds it to
   `backend/template.yaml`, so a change of the pool's policy is a change of both.
@@ -25,6 +26,8 @@ adds to the root `CLAUDE.md`, whose rules all apply here. Paths are relative to 
   `schemas.ts`, the body of a message; `limits.ts`; `languages.ts`, the list `en`, `it`;
   `texts.ts`, the type `AssistantTexts`, with one object per language in `texts.en.ts` and
   `texts.it.ts`: a new text goes into both.
+- `src/mail/`: the mail's contract. `schemas.ts`, the mail settings and `MailCalendarBody`;
+  `limits.ts`; `texts.ts`, a mail's subject, text and HTML per kind; `mask.ts`, `maskAddress`.
 - `src/index.ts`: re-exports.
 - `tests/` mirrors `src/`. Generated, git-ignored: `coverage/`.
 

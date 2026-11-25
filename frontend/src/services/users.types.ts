@@ -6,6 +6,13 @@ import type { ApiFailure, TransportFailureReason } from './api';
 export type CreateUserFailureReason =
   | Extract<ApiErrorCode, 'forbidden' | 'invalid_json' | 'invalid_request' | 'user_exists' | 'internal_error'>
   | TransportFailureReason;
+// PUT /users/{username}: the four facts of a User, or the Administrator's own
+// (docs/EMAIL_ARCHITECTURE.md section 9.1).
+type UpdateUserCode = Extract<ApiErrorCode, 'forbidden' | 'invalid_json' | 'invalid_request' | 'user_not_found' | 'cannot_edit_admin' | 'internal_error'>;
+export type UpdateUserFailureReason = UpdateUserCode | TransportFailureReason;
+export type UpdateUserResult = { status: 'success'; user: UserSummary } | ApiFailure<UpdateUserCode>;
+export type UpdateUserState = { status: 'idle' } | { status: 'pending'; username: string } | UpdateUserResult;
+
 export type DeleteUserFailureReason =
   | Extract<ApiErrorCode, 'forbidden' | 'invalid_request' | 'cannot_delete_admin' | 'user_not_found' | 'concurrent_update' | 'internal_error'>
   | TransportFailureReason;
