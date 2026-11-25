@@ -1,5 +1,5 @@
 import { lastsWholeHours, LocalEndTime, LocalTime, TIME_STEP_MINUTES, WindowBody } from '@shared-calendar/shared';
-import { clockOf, endFor, LAST_TIME, minuteOfClock, MINUTES, minutesOf, partsOf, timeOf, WINDOW_HOURS, windowHours } from '../../../src/logic/times';
+import { clockOf, endAfter, endFor, LAST_TIME, minuteOfClock, MINUTES, minutesOf, partsOf, startMinutesOf, timeOf, WINDOW_STARTS, windowEnds, windowHours } from '../../../src/logic/times';
 import { STUDIO } from './fixtures';
 import { useFarBrowserZone } from './zone';
 
@@ -7,9 +7,17 @@ import { useFarBrowserZone } from './zone';
 // of the book dialog from a real slot, and what is sent, are in booking.test.ts.
 
 const minute = (time: string) => minuteOfClock(time);
-const every = (hours: readonly string[]) => hours.flatMap((hour) => minutesOf(hour).map((m) => timeOf(hour, m)));
+const every = (hours: readonly string[], minutes = minutesOf) => hours.flatMap((hour) => minutes(hour).map((m) => timeOf(hour, m)));
+// Every start a form of a window offers, and every end it offers for one start.
+const starts = every(WINDOW_STARTS, startMinutesOf);
+const endsOf = (start: string) => {
+  const { hours, minute } = windowEnds(start);
+  return every(hours, () => [minute]);
+};
 
-// Test names: S… decisions and F… findings are those of docs/SLOT_STEP_PLAN.md.
+// Test names: S… decisions and F… findings are those of docs/SLOT_STEP_PLAN.md, except in the
+// two blocks on a form of a window, whose F… findings are those of docs/WINDOW_HOURS_PLAN.md and
+// whose D… decision is one of docs/SHARED_CALENDAR_SPEC.md.
 describe('times', () => {
   useFarBrowserZone();
 
@@ -43,32 +51,60 @@ describe('times', () => {
     });
   });
 
-  describe('the hours of a form of a window', () => {
-    it('a start from 00 to 23, an end from 00 to 24; with their minutes, 00:00 to 23:55 and 00:00 to 24:00', () => {
-      expect([WINDOW_HOURS.starts.length, WINDOW_HOURS.starts[0], WINDOW_HOURS.starts.at(-1)]).toEqual([24, '00', '23']);
-      expect([WINDOW_HOURS.ends.length, WINDOW_HOURS.ends[0], WINDOW_HOURS.ends.at(-1)]).toEqual([25, '00', '24']);
-      const starts = every(WINDOW_HOURS.starts);
-      const ends = every(WINDOW_HOURS.ends);
-      expect([starts.length, starts[0], starts[1], starts.at(-1)]).toEqual([288, '00:00', '00:05', '23:55']);
-      expect([ends.length, ends.at(-2), ends.at(-1)]).toEqual([289, '23:55', '24:00']);
+  describe('the times of a form of a window (D33, F3, F4)', () => {
+    it('a start from 00:00 to 23:00: every hour all twelve minutes, the hour 23 only 00', () => {
+      expect([WINDOW_STARTS.length, WINDOW_STARTS[0], WINDOW_STARTS.at(-1)]).toEqual([24, '00', '23']);
+      expect(startMinutesOf('23')).toEqual(['00']);
+      for (const hour of ['00', '09', '22']) expect(startMinutesOf(hour)).toBe(MINUTES);
+      expect([starts.length, starts[0], starts[1], starts.at(-2), starts.at(-1)]).toEqual([277, '00:00', '00:05', '22:55', '23:00']);
       expect(LAST_TIME).toBe('24:00');
     });
 
-    it('every time the lists can hold is on the step: the shared schemas accept each one', () => {
-      for (const start of every(WINDOW_HOURS.starts)) expect(LocalTime.safeParse(start).success, start).toBe(true);
-      for (const end of every(WINDOW_HOURS.ends)) expect(LocalEndTime.safeParse(end).success, end).toBe(true);
+    it('a start 08:05: the end\'s hours 09 to 23, one minute, 05; 24 is not offered', () => {
+      expect(windowEnds('08:05')).toEqual({ hours: ['09', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23'], minute: '05' });
     });
 
-    // The shared schema also refuses a window that is not a whole number of hours
-    // (docs/SHARED_CALENDAR_SPEC.md decision D33), always on its end.
-    it('every pair is a window the shared schema accepts, or refuses on its end for the order or for not lasting whole hours', () => {
-      const starts = every(WINDOW_HOURS.starts);
-      const ends = every(WINDOW_HOURS.ends);
+    it('a start 08:00: the end\'s hours 09 to 24, the minute 00', () => {
+      const { hours, minute } = windowEnds('08:00');
+      expect([hours[0], hours.at(-1), hours.length, minute]).toEqual(['09', '24', 16, '00']);
+    });
+
+    it('a start 23:00: the hour 24 alone, so the end 24:00; a start 22:30: the hour 23 alone', () => {
+      expect([windowEnds('23:00'), windowEnds('22:30')]).toEqual([{ hours: ['24'], minute: '00' }, { hours: ['23'], minute: '30' }]);
+    });
+
+    it('every start offered has an end offered, and every end offered for it makes a window the shared schema accepts', () => {
       for (const start of starts) {
+        const ends = endsOf(start);
+        expect(ends.length, start).toBeGreaterThan(0);
         for (const end of ends) {
-          const parsed = WindowBody.safeParse({ start, end, typeId: STUDIO });
-          if (parsed.success !== (end > start && lastsWholeHours(start, end))) throw new Error(`${start}–${end}: ${String(parsed.success)}`);
-          if (!parsed.success) expect(parsed.error.issues.map((issue) => issue.path.join('.'))).toEqual(['end']);
+          expect(LocalTime.safeParse(start).success && LocalEndTime.safeParse(end).success, `${start}–${end}`).toBe(true);
+          if (!WindowBody.safeParse({ start, end, typeId: STUDIO }).success || !lastsWholeHours(start, end)) throw new Error(`${start}–${end}`);
+        }
+      }
+    });
+  });
+
+  describe('the end after a start chosen (F4)', () => {
+    it('the start\'s hour chosen: one hour later; 08:05 gives 09:05, 23:00 gives 24:00', () => {
+      expect([endAfter('08:05', '12:05', 'hour'), endAfter('23:00', '12:05', 'hour')]).toEqual(['09:05', '24:00']);
+    });
+
+    it('the start\'s minute changed from 05 to 30: the end keeps its hour and takes the minute, 08:30–11:30', () => {
+      expect(endAfter('08:30', '11:05', 'minute')).toBe('11:30');
+    });
+
+    it('the start\'s minute changed when the end\'s hour is no longer offered: one hour after the start', () => {
+      expect([endAfter('08:05', '24:00', 'minute'), endAfter('08:30', '08:00', 'minute')]).toEqual(['09:05', '09:30']);
+    });
+
+    it('every start offered, its hour or its minute chosen from any end offered, gives an end offered for it', () => {
+      for (const start of starts) {
+        for (const before of ['09:00', '12:05', '24:00']) {
+          for (const changed of ['hour', 'minute'] as const) {
+            const end = endAfter(start, before, changed);
+            if (!endsOf(start).includes(end)) throw new Error(`${start} ${before} ${changed}: ${end}`);
+          }
         }
       }
     });
@@ -109,14 +145,6 @@ describe('times', () => {
 
     it('a start at or after the end of the window, outside it: one hour later, up to 24:00, so the end stays after the start', () => {
       expect([endFor('12:00', '12:00'), endFor('12:30', '12:00'), endFor('23:30', '12:00')]).toEqual(['13:00', '13:30', '24:00']);
-    });
-
-    it('every start of a form of a window gives an end the end\'s lists hold, after the start', () => {
-      const ends = every(WINDOW_HOURS.ends);
-      for (const start of every(WINDOW_HOURS.starts)) {
-        const end = endFor(start, LAST_TIME);
-        expect(ends.includes(end) && end > start, `${start}–${end}`).toBe(true);
-      }
     });
   });
 });

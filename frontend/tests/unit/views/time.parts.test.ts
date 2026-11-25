@@ -1,9 +1,10 @@
-import { startSetsEnd, timeLists, type TimeLists } from '../../../src/views/time.parts';
+import { startSetsEnd, timeLists, windowTimes, type TimeLists } from '../../../src/views/time.parts';
 import { choose, chooseTime, find, choicesOf, timeIn, useRealPage } from './page';
 
 // The DOM test of the two lists of a time (docs/FRONTEND_ARCHITECTURE.md section 8), on the
-// real index.html: the book dialog's form, which holds a start and an end. What each view does
-// with them is in its own test; the end a start sets is computed in src/logic/times.ts.
+// real index.html: the book dialog's form, which holds a start and an end; and the two times of a
+// form of a window, wired on the same lists. What each view does with them is in its own test;
+// the end a start sets is computed in src/logic/times.ts.
 
 const form = () => find<HTMLFormElement>('#week dialog.book form');
 const option = (text: string) => {
@@ -22,7 +23,8 @@ function wired(last = '12:00'): { start: TimeLists; end: TimeLists } {
   return { start, end };
 }
 
-// Test names: S… decisions and F… findings are those of docs/SLOT_STEP_PLAN.md.
+// Test names: S… decisions and F… findings are those of docs/SLOT_STEP_PLAN.md, except the D…
+// decision of the block on a form of a window, one of docs/SHARED_CALENDAR_SPEC.md.
 describe('the two lists of a time', () => {
   useRealPage();
 
@@ -100,5 +102,35 @@ describe('the two lists of a time', () => {
     start.lists[0].replaceChildren();
     choose(start.lists[1], '05');
     expect(end.read()).toBe('11:00');
+  });
+
+  it('a time written by the script that the lists do not offer is shown as it is, its hour and its minute added', () => {
+    const { end } = wired();
+    end.offer(['10', '11'], () => ['05']);
+    end.write('09:45');
+    expect([end.read(), choicesOf(end.lists[0]), choicesOf(end.lists[1])]).toEqual(['09:45', ['09', '10', '11'], ['05', '45']]);
+    choose(end.lists[0], '10');
+    expect([end.read(), choicesOf(end.lists[1])]).toEqual(['10:05', ['05']]);
+  });
+
+  describe('the two times of a form of a window (D33)', () => {
+    const window = () => {
+      const start = timeLists(form(), 'start', option);
+      const end = timeLists(form(), 'end', option);
+      windowTimes(start, end);
+      return { start, end };
+    };
+
+    it('the end follows a start set by the script, so a window opened is shown as it is', () => {
+      const { start, end } = window();
+      start.write('08:05');
+      end.write('12:05');
+      expect([start.read(), end.read(), choicesOf(end.lists[0])[0], choicesOf(end.lists[1])]).toEqual(['08:05', '12:05', '09', ['05']]);
+    });
+
+    it('the book dialog\'s lists, wired alone, keep all twelve minutes', () => {
+      const { start } = wired();
+      expect(choicesOf(start.lists[1]).length).toBe(12);
+    });
   });
 });

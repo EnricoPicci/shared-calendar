@@ -147,10 +147,13 @@ describe('mountAvailability', () => {
       for (const selector of [CREATE_PATTERN, CHANGE]) {
         expect(options(selector, 'weekday')).toEqual([['1', 'Monday'], ['2', 'Tuesday'], ['3', 'Wednesday'], ['4', 'Thursday'], ['5', 'Friday'], ['6', 'Saturday'], ['7', 'Sunday']]);
         const [startHour, startMinute] = clock(form(selector), 'start');
-        const [endHour] = clock(form(selector), 'end');
-        expect([choicesOf(startHour).length, choicesOf(startHour)[0], choicesOf(startHour).at(-1), choicesOf(endHour).length, choicesOf(endHour)[0], choicesOf(endHour).at(-1)]).toEqual([24, '00', '23', 25, '00', '24']);
+        const [endHour, endMinute] = clock(form(selector), 'end');
+        expect([choicesOf(startHour).length, choicesOf(startHour)[0], choicesOf(startHour).at(-1)]).toEqual([24, '00', '23']);
         expect(choicesOf(startMinute)).toEqual(['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55']);
         expect([...startMinute.options].map((option) => option.value)).toEqual(choicesOf(startMinute));
+        // The end's hours are those after the start's, up to 24 since the start is on the hour,
+        // and its one minute is the start's.
+        expect([choicesOf(endHour)[0], choicesOf(endHour).at(-1), choicesOf(endMinute)]).toEqual([String(Number(startHour.value) + 1).padStart(2, '0'), '24', ['00']]);
         expect(options(selector, 'typeId')).toEqual([]);
       }
       expect(all('.name-hint').map((hint) => hint.textContent)).toEqual([TYPE_NAME_HINT, TYPE_NAME_HINT]);
@@ -449,11 +452,11 @@ describe('mountAvailability', () => {
       expect(html()).toBe(before);
     });
 
-    it('fields that would be refused go as they are: no type chosen, an end before the start, no date; the view checks nothing', () => {
+    it('fields that would be refused go as they are: no type chosen, no date; the view checks nothing', () => {
       const { screen } = mounted();
-      set(CREATE_PATTERN, { start: '10:00', end: '09:00', validFrom: '' });
+      set(CREATE_PATTERN, { start: '09:00', end: '12:00', validFrom: '' });
       submit(form(CREATE_PATTERN));
-      expect(screen.createPattern).toHaveBeenCalledWith({ weekday: '1', start: '10:00', end: '09:00', typeId: '', validFrom: '', validUntil: '' });
+      expect(screen.createPattern).toHaveBeenCalledWith({ weekday: '1', start: '09:00', end: '12:00', typeId: '', validFrom: '', validUntil: '' });
       expect(marked(CREATE_PATTERN)).toEqual([]);
     });
 
@@ -479,13 +482,20 @@ describe('mountAvailability', () => {
     });
   });
 
-  describe('the two times of the pattern forms: hours and minutes, the start setting the end', () => {
+  describe('the two times of the pattern forms: hours and minutes, the end chosen as an hour (D33)', () => {
     // Opens the dialog that changes the first pattern, Monday 09:00–13:00, when asked.
     const ready = (selector: string) => {
       const view = mounted();
       if (selector === CHANGE) patternButton(0, '.ask-change').click();
       return view;
     };
+    // Opens the dialog that changes a pattern of the given times, the only one listed.
+    const openedOn = (start: string, end: string) => {
+      const view = mounted(listed({ groups: patternGroups([pattern(P1, { start, end })], TYPES, '2026-11-20') }));
+      patternButton(0, '.ask-change').click();
+      return view;
+    };
+    const endChoices = (selector: string) => clock(form(selector), 'end').map(choicesOf);
     const PLACES = [
       ['the form that creates a pattern', CREATE_PATTERN],
       ['the dialog that changes one', CHANGE],
@@ -499,43 +509,70 @@ describe('mountAvailability', () => {
       expect([value(selector, 'start'), value(selector, 'end')]).toEqual(['14:10', '15:10']);
     });
 
-    it.each(PLACES)('%s: an end chosen leaves the start as it is', (_what, selector) => {
+    it.each(PLACES)('%s: a start 08:05 offers the end\'s hours 09 to 23 and one minute, 05; the end\'s hour 12 gives 12:05, the start kept', (_what, selector) => {
       ready(selector);
-      const start = value(selector, 'start');
-      chooseTime(form(selector), 'end', '17:35');
-      expect([value(selector, 'start'), value(selector, 'end')]).toEqual([start, '17:35']);
+      chooseTime(form(selector), 'start', '08:05');
+      const [hours, minutes] = endChoices(selector);
+      expect([hours![0], hours!.at(-1), hours!.length, minutes, value(selector, 'end')]).toEqual(['09', '23', 15, ['05'], '09:05']);
+      choose(clock(form(selector), 'end')[0], '12');
+      expect([value(selector, 'start'), value(selector, 'end')]).toEqual(['08:05', '12:05']);
     });
 
-    it.each(PLACES)('%s: a start at 23:30 sets the end at 24:00, whose minutes are only 00', (_what, selector) => {
+    it.each(PLACES)('%s: a start 08:00 offers the end\'s hour 24; its minute changed to 05 takes it away', (_what, selector) => {
       ready(selector);
-      chooseTime(form(selector), 'start', '23:30');
-      expect([value(selector, 'end'), choicesOf(clock(form(selector), 'end')[1])]).toEqual(['24:00', ['00']]);
+      chooseTime(form(selector), 'start', '08:00');
+      choose(clock(form(selector), 'end')[0], '24');
+      expect([endChoices(selector)[0]!.at(-1), value(selector, 'end')]).toEqual(['24', '24:00']);
+      choose(clock(form(selector), 'start')[1], '05');
+      expect([endChoices(selector)[0]!.at(-1), value(selector, 'end')]).toEqual(['23', '09:05']);
     });
 
-    it.each(PLACES)('%s: the hour 24 chosen for an end leaves the minute 00 alone; another hour brings back all twelve, the minute kept', (_what, selector) => {
+    it.each(PLACES)('%s: the start\'s minute changed alone keeps the end\'s hour, with the new minute: 08:05–11:05 becomes 08:30–11:30', (_what, selector) => {
       ready(selector);
-      const [hour, minute] = clock(form(selector), 'end');
-      choose(hour, '24');
-      expect([choicesOf(minute), value(selector, 'end')]).toEqual([['00'], '24:00']);
-      choose(hour, '22');
-      choose(minute, '45');
-      expect([choicesOf(minute).length, value(selector, 'end')]).toEqual([12, '22:45']);
-      choose(hour, '23');
-      expect(value(selector, 'end')).toBe('23:45');
+      chooseTime(form(selector), 'start', '08:05');
+      choose(clock(form(selector), 'end')[0], '11');
+      choose(clock(form(selector), 'start')[1], '30');
+      expect([value(selector, 'start'), value(selector, 'end'), endChoices(selector)[1]]).toEqual(['08:30', '11:30', ['30']]);
+    });
+
+    it.each(PLACES)('%s: the start\'s hour 23 offers the minute 00 only, and the end 24:00 alone', (_what, selector) => {
+      ready(selector);
+      chooseTime(form(selector), 'start', '10:30');
+      choose(clock(form(selector), 'start')[0], '23');
+      expect([choicesOf(clock(form(selector), 'start')[1]), value(selector, 'start'), endChoices(selector), value(selector, 'end')]).toEqual([['00'], '23:00', [['24'], ['00']], '24:00']);
+      choose(clock(form(selector), 'start')[0], '22');
+      expect(choicesOf(clock(form(selector), 'start')[1]).length).toBe(12);
     });
 
     it.each(PLACES)('%s: what is sent is each time as `HH:mm`', (_what, selector) => {
       const { screen } = ready(selector);
       chooseTime(form(selector), 'start', '08:05');
-      chooseTime(form(selector), 'end', '11:55');
+      choose(clock(form(selector), 'end')[0], '11');
       submit(form(selector));
       const sent = selector === CHANGE ? screen.change.mock.lastCall![1] : screen.createPattern.mock.lastCall![0];
-      expect([sent.start, sent.end]).toEqual(['08:05', '11:55']);
+      expect([sent.start, sent.end]).toEqual(['08:05', '11:05']);
     });
 
     it('the dialog that changes a pattern opens with its times as they are: nothing sets the end', () => {
       ready(CHANGE);
       expect([value(CHANGE, 'start'), value(CHANGE, 'end')]).toEqual(['09:00', '13:00']);
+    });
+
+    it('the dialog opened on 08:05–12:05 shows it as it is, the end\'s lists those of its start', () => {
+      openedOn('08:05', '12:05');
+      expect([value(CHANGE, 'start'), value(CHANGE, 'end'), endChoices(CHANGE)[0]![0], endChoices(CHANGE)[1]]).toEqual(['08:05', '12:05', '09', ['05']]);
+    });
+
+    it('the dialog opened on a window stored that is not whole hours, 08:30–09:45, shows 09:45 as it is; the save sends it and the model refuses it', () => {
+      const { screen } = openedOn('08:30', '09:45');
+      expect([value(CHANGE, 'start'), value(CHANGE, 'end'), endChoices(CHANGE)[1]]).toEqual(['08:30', '09:45', ['30', '45']]);
+      submit(form(CHANGE));
+      expect(patternFor(screen.change.mock.lastCall![1])).toEqual({ refusals: { end: 'End must be a whole number of hours after Start.' } });
+    });
+
+    it('the dialog opened on a window stored with a start after 23:00, 23:30–24:00, shows it as it is', () => {
+      openedOn('23:30', '24:00');
+      expect([value(CHANGE, 'start'), value(CHANGE, 'end')]).toEqual(['23:30', '24:00']);
     });
 
     it('the form put back by the stream after a create shows 09:00 and 10:00 as they are, whatever the end was', () => {
@@ -751,11 +788,11 @@ describe('mountAvailability', () => {
 
     it('refusals: beside their fields in the dialog, announced, the fields marked; the dialog stays open and the form that creates shows none of it', () => {
       const { availability$ } = opened();
-      set(CHANGE, { end: '14:00' });
+      set(CHANGE, { end: '16:00' });
       submit(form(CHANGE));
-      availability$.next(listed({ change: ask({ about: P2, refusals: { end: 'End must be later than Start.', validUntil: 'Valid until must not be before Valid from.' } }) }));
+      availability$.next(listed({ change: ask({ about: P2, refusals: { end: 'End must be a whole number of hours after Start.', validUntil: 'Valid until must not be before Valid from.' } }) }));
       expect(marked(CHANGE)).toEqual(['end', 'validUntil']);
-      expect([refusalOf(CHANGE, 'end').textContent, refusalOf(CHANGE, 'end').getAttribute('role'), dialog('change').open, value(CHANGE, 'end')]).toEqual(['End must be later than Start.', 'alert', true, '14:00']);
+      expect([refusalOf(CHANGE, 'end').textContent, refusalOf(CHANGE, 'end').getAttribute('role'), dialog('change').open, value(CHANGE, 'end')]).toEqual(['End must be a whole number of hours after Start.', 'alert', true, '16:00']);
       expect(marked(CREATE_PATTERN)).toEqual([]);
       availability$.next(listed({ change: ask({ about: P2, busy: true }) }));
       expect([marked(CHANGE), submitOf(CHANGE).disabled]).toEqual([[], true]);

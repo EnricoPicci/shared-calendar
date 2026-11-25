@@ -1,7 +1,9 @@
-import { CALENDAR_LIMITS, lastsWholeHours, PatternBody, TYPE_CAPACITY, TypeBody, type AvailabilityType, type WeeklyPattern } from '@shared-calendar/shared';
+import { CALENDAR_LIMITS, PatternBody, TYPE_CAPACITY, TypeBody, type AvailabilityType, type WeeklyPattern } from '@shared-calendar/shared';
 import {
   deletePatternQuestion,
   deleteTypeQuestion,
+  END_NOT_LATER,
+  END_NOT_WHOLE_HOURS,
   NO_PATTERNS,
   NO_TYPE_YET,
   NO_TYPES,
@@ -21,7 +23,7 @@ import {
   WEEKDAY_CHOICES,
   type PatternFields,
 } from '../../../src/logic/availability.model';
-import { minutesOf, timeOf, WINDOW_HOURS } from '../../../src/logic/times';
+import { startMinutesOf, timeOf, WINDOW_STARTS, windowEnds } from '../../../src/logic/times';
 import { POOL, STUDIO } from './fixtures';
 import { useFarBrowserZone } from './zone';
 
@@ -44,7 +46,7 @@ const pattern = (over: Partial<WeeklyPattern> = {}): WeeklyPattern => ({
 const TODAY = '2026-11-20';
 const FIELDS: PatternFields = { weekday: '3', start: '09:00', end: '13:00', typeId: STUDIO, validFrom: '2026-11-20', validUntil: '' };
 
-// Test names: section numbers and R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
+// Test names: section numbers, R-… rules and D… decisions are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('availability.model', () => {
   useFarBrowserZone();
 
@@ -166,23 +168,19 @@ describe('availability.model', () => {
       expect(WEEKDAY_CHOICES.map(({ value, label }) => `${value} ${label}`)).toEqual(['1 Monday', '2 Tuesday', '3 Wednesday', '4 Thursday', '5 Friday', '6 Saturday', '7 Sunday']);
     });
 
-    it('every pair of times the form\'s lists can hold is accepted, or refused for the order of the two times or for not lasting whole hours, never for the step', () => {
-      const all = (hours: readonly string[]) => hours.flatMap((hour) => minutesOf(hour).map((minute) => timeOf(hour, minute)));
-      const starts = all(WINDOW_HOURS.starts);
-      const ends = all(WINDOW_HOURS.ends);
-      expect([starts.length, starts[0], starts.at(-1), ends.length, ends[0], ends.at(-1)]).toEqual([288, '00:00', '23:55', 289, '00:00', '24:00']);
+    it('every pair of times the form\'s lists can hold is accepted, by the model and by the shared schema', () => {
+      const starts = WINDOW_STARTS.flatMap((hour) => startMinutesOf(hour).map((minute) => timeOf(hour, minute)));
       const fields = (start: string, end: string): PatternFields => ({ weekday: '1', start, end, typeId: STUDIO, validFrom: TODAY, validUntil: '' });
-      // What the model and the shared schema say of a pair: the model's refusal of the end, or
-      // the schema's verdict on the body, which also refuses a window that is not a whole number
-      // of hours (docs/SHARED_CALENDAR_SPEC.md decision D33).
-      const verdict = (start: string, end: string) => {
-        const checked = patternFor(fields(start, end));
-        return 'refusals' in checked ? Object.keys(checked.refusals) : PatternBody.safeParse(checked.pattern).success;
-      };
-      const pairs = [...starts.flatMap((start) => ['00:00', start, ends[ends.indexOf(start) + 1]!, '24:00'].map((end) => [start, end] as const)), ...ends.flatMap((end) => ['00:00', '23:55'].map((start) => [start, end] as const))];
-      for (const [start, end] of pairs) expect(verdict(start, end), `${start}–${end}`).toEqual(end > start ? lastsWholeHours(start, end) : ['end']);
-      // And the schema refuses exactly those the model refuses, for the order alone.
-      expect(PatternBody.safeParse({ weekday: 1, start: '10:05', end: '10:05', typeId: STUDIO, validFrom: TODAY, validUntil: null }).error!.issues.map((issue) => issue.path.join('.'))).toEqual(['end']);
+      let pairs = 0;
+      for (const start of starts) {
+        const { hours, minute } = windowEnds(start);
+        for (const end of hours.map((hour) => timeOf(hour, minute))) {
+          const checked = patternFor(fields(start, end));
+          if (!('pattern' in checked) || !PatternBody.safeParse(checked.pattern).success) throw new Error(`${start}–${end}`);
+          pairs += 1;
+        }
+      }
+      expect(pairs).toBeGreaterThan(3000);
     });
 
     it('the types to choose from: their ids as values, their names as labels, in the order given; a name with <script> as text', () => {
@@ -213,7 +211,7 @@ describe('availability.model', () => {
     it.each([
       pattern(),
       pattern({ weekday: 7, start: '00:00', end: '24:00', typeId: POOL, validFrom: '2020-01-01', validUntil: '2020-01-01' }),
-      pattern({ weekday: 4, start: '22:15', end: '23:45', validUntil: '2030-12-31' }),
+      pattern({ weekday: 4, start: '22:15', end: '23:15', validUntil: '2030-12-31' }),
     ])('the fields of pattern %# sent back unchanged make the same body', (existing) => {
       const { weekday, start, end, typeId, validFrom, validUntil } = existing;
       expect(patternFor(patternFields(existing))).toEqual({ pattern: { weekday, start, end, typeId, validFrom, validUntil } });
@@ -255,6 +253,19 @@ describe('availability.model', () => {
       ['00:15 after a start at 23:45', '23:45', '00:15'],
     ])('an end %s is refused, the End field alone', (_what, start, end) => {
       expect(refusals({ start, end })).toEqual({ end: 'End must be later than Start.' });
+    });
+
+    it('D33: an end that is not a whole number of hours after the start, 09:05–10:30, is refused, the End field alone', () => {
+      expect(refusals({ start: '09:05', end: '10:30' })).toEqual({ end: 'End must be a whole number of hours after Start.' });
+      expect(refusals({ start: '08:30', end: '09:45' })).toEqual({ end: END_NOT_WHOLE_HOURS });
+    });
+
+    it('D33: an end before the start that is not whole hours either is said once, for the order', () => {
+      expect(refusals({ start: '10:30', end: '09:05' })).toEqual({ end: END_NOT_LATER });
+    });
+
+    it('D33: whole hours from any 5-minute start are accepted: 09:05–11:05, 08:00–24:00', () => {
+      expect([accepted({ ...FIELDS, start: '09:05', end: '11:05' }).end, accepted({ ...FIELDS, start: '08:00', end: '24:00' }).end]).toEqual(['11:05', '24:00']);
     });
 
     it('no type chosen is refused, the Type field alone', () => {

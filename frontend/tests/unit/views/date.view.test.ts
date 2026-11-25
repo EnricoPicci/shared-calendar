@@ -139,6 +139,7 @@ const dialog = () => find<HTMLDialogElement>('#availability dialog.delete');
 const inDialog = <T extends HTMLElement = HTMLElement>(selector: string) => find<T>(`#availability dialog.delete ${selector}`);
 const dialogConflicts = () => conflictsOf(inDialog('.conflicts'));
 
+// Test names: D… decisions are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('mountDate', () => {
   useRealPage();
 
@@ -147,9 +148,11 @@ describe('mountDate', () => {
       const { calls, NONE } = mounted(state({ choices: [] }));
       for (const selector of [ADD, WINDOW]) {
         const [startHour, startMinute] = clock(form(selector), 'start');
-        const [endHour] = clock(form(selector), 'end');
-        expect([choicesOf(startHour).length, choicesOf(startHour)[0], choicesOf(startHour).at(-1), choicesOf(endHour).length, choicesOf(endHour)[0], choicesOf(endHour).at(-1)]).toEqual([24, '00', '23', 25, '00', '24']);
+        const [endHour, endMinute] = clock(form(selector), 'end');
+        expect([choicesOf(startHour).length, choicesOf(startHour)[0], choicesOf(startHour).at(-1)]).toEqual([24, '00', '23']);
         expect(choicesOf(startMinute)).toEqual(['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55']);
+        // The end's hours follow the start 09:00: 10 to 24, and its one minute, 00.
+        expect([choicesOf(endHour).length, choicesOf(endHour)[0], choicesOf(endHour).at(-1), choicesOf(endMinute)]).toEqual([15, '10', '24', ['00']]);
         expect(options(selector, 'typeId')).toEqual([]);
         expect(held(selector)).toEqual({ start: '09:00', end: '10:00', typeId: '' });
       }
@@ -334,9 +337,9 @@ describe('mountDate', () => {
 
     it('"Add" calls add() with the three fields as they are, as text, once', () => {
       const { screen, calls, NONE } = mounted(editing());
-      set(ADD, { start: '17:00', end: '18:15', typeId: POOL });
+      set(ADD, { start: '17:00', end: '19:00', typeId: POOL });
       expect(submit(form(ADD)).prevented).toBe(true);
-      expect([screen.add.mock.calls, calls()]).toEqual([[[{ start: '17:00', end: '18:15', typeId: POOL }]], { ...NONE, add: 1 }]);
+      expect([screen.add.mock.calls, calls()]).toEqual([[[{ start: '17:00', end: '19:00', typeId: POOL }]], { ...NONE, add: 1 }]);
     });
 
     it('fields that would be refused go as they are: no type, an end before the start; the view checks nothing', () => {
@@ -466,45 +469,56 @@ describe('mountDate', () => {
     });
   });
 
-  describe('the two times of the window forms: hours and minutes, the start setting the end', () => {
+  describe('the two times of the window forms: hours and minutes, the end chosen as an hour (D33)', () => {
     const PLACES = [
       ['the form that adds a window to "this day only"', ADD],
       ['the form that adds an extra window', WINDOW],
     ] as const;
     const value = (selector: string, name: 'start' | 'end') => timeIn(form(selector), name);
+    const endChoices = (selector: string) => clock(form(selector), 'end').map(choicesOf);
 
-    it.each(PLACES)('%s: a start chosen sets the end one hour later; chosen twice, sets it twice; an end chosen leaves the start', (_what, selector) => {
+    it.each(PLACES)('%s: a start chosen sets the end one hour later; chosen twice, sets it twice; the end\'s hour chosen leaves the start', (_what, selector) => {
       mounted(editing());
       chooseTime(form(selector), 'start', '09:05');
       expect([value(selector, 'start'), value(selector, 'end')]).toEqual(['09:05', '10:05']);
       chooseTime(form(selector), 'start', '10:10');
       expect([value(selector, 'start'), value(selector, 'end')]).toEqual(['10:10', '11:10']);
-      chooseTime(form(selector), 'end', '10:35');
-      expect([value(selector, 'start'), value(selector, 'end')]).toEqual(['10:10', '10:35']);
+      choose(clock(form(selector), 'end')[0], '13');
+      expect([value(selector, 'start'), value(selector, 'end')]).toEqual(['10:10', '13:10']);
     });
 
-    it.each(PLACES)('%s: a start at 23:30 sets the end at 24:00; the hour 24 has the minute 00 only', (_what, selector) => {
+    it.each(PLACES)('%s: a start 08:05 offers the end\'s hours 09 to 23 and one minute, 05; its minute changed to 30 keeps the end\'s hour', (_what, selector) => {
       mounted(editing());
-      chooseTime(form(selector), 'start', '23:30');
-      expect([value(selector, 'end'), choicesOf(clock(form(selector), 'end')[1])]).toEqual(['24:00', ['00']]);
-      choose(clock(form(selector), 'end')[0], '23');
-      expect([value(selector, 'end'), choicesOf(clock(form(selector), 'end')[1]).length]).toEqual(['23:00', 12]);
+      chooseTime(form(selector), 'start', '08:05');
+      choose(clock(form(selector), 'end')[0], '11');
+      const [hours, minutes] = endChoices(selector);
+      expect([hours![0], hours!.at(-1), minutes, value(selector, 'end')]).toEqual(['09', '23', ['05'], '11:05']);
+      choose(clock(form(selector), 'start')[1], '30');
+      expect([value(selector, 'start'), value(selector, 'end'), endChoices(selector)[1]]).toEqual(['08:30', '11:30', ['30']]);
+    });
+
+    it.each(PLACES)('%s: the start\'s hour 23 offers the minute 00 only, and the end 24:00 alone; a start 08:00 offers the end\'s hour 24', (_what, selector) => {
+      mounted(editing());
+      chooseTime(form(selector), 'start', '23:00');
+      expect([choicesOf(clock(form(selector), 'start')[1]), endChoices(selector), value(selector, 'end')]).toEqual([['00'], [['24'], ['00']], '24:00']);
+      chooseTime(form(selector), 'start', '08:00');
+      expect([endChoices(selector)[0]!.at(-1), value(selector, 'end')]).toEqual(['24', '09:00']);
     });
 
     it.each(PLACES)('%s: what is sent is each time as `HH:mm`', (_what, selector) => {
       const { screen } = mounted(editing());
       chooseTime(form(selector), 'start', '10:10');
-      chooseTime(form(selector), 'end', '10:15');
+      choose(clock(form(selector), 'end')[0], '12');
       submit(form(selector));
       const sent = selector === ADD ? screen.add.mock.lastCall![0] : screen.addWindow.mock.lastCall![0];
-      expect([sent.start, sent.end]).toEqual(['10:10', '10:15']);
+      expect([sent.start, sent.end]).toEqual(['10:10', '12:10']);
     });
 
     it('a form put back by the stream after it added a window shows 09:00 and 10:00 as they are, whatever the end was', () => {
       const { date$ } = mounted(editing());
       for (const selector of [ADD, WINDOW]) {
         chooseTime(form(selector), 'start', '18:00');
-        chooseTime(form(selector), 'end', '20:00');
+        choose(clock(form(selector), 'end')[0], '20');
       }
       date$.next(editing({ addFields: { ...STARTING_WINDOW }, windowFields: { ...STARTING_WINDOW } }));
       for (const selector of [ADD, WINDOW]) expect([value(selector, 'start'), value(selector, 'end')], selector).toEqual(['09:00', '10:00']);

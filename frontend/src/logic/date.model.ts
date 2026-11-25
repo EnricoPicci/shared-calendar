@@ -12,7 +12,7 @@ import {
   type WeeklyPattern,
   type WindowBody,
 } from '@shared-calendar/shared';
-import { END_NOT_LATER, TYPE_NOT_CHOSEN, UNKNOWN_TYPE, WEEKDAY_CHOICES } from './availability.model';
+import { endRefusal, TYPE_NOT_CHOSEN, UNKNOWN_TYPE, WEEKDAY_CHOICES } from './availability.model';
 import { longDateText } from './texts';
 
 // A single date of the availability screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the
@@ -171,11 +171,12 @@ export const OVERLAPS_DRAFT = 'Start and End overlap another window of this day.
 export const IN_FAULT_TOO = '';
 export const DRAFT_FULL = `A day can have ${CALENDAR_LIMITS.overrideWindowsPerDate} windows of its own at most. Remove one to add another.`;
 
-// The refusals of the three fields by themselves: the end not after the start (two times of
-// one day, written alike: the later one is the greater text, "24:00" included) and no type.
+// The refusals of the three fields by themselves: the end not after the start, or not a whole
+// number of hours after it (endRefusal of src/logic/availability.model.ts), and no type.
 function fieldRefusals(fields: WindowFields): Partial<Record<WindowField, string>> {
   const refusals: Partial<Record<WindowField, string>> = {};
-  if (fields.end <= fields.start) refusals.end = END_NOT_LATER;
+  const end = endRefusal(fields.start, fields.end);
+  if (end !== undefined) refusals.end = end;
   if (fields.typeId === '') refusals.typeId = TYPE_NOT_CHOSEN;
   return refusals;
 }

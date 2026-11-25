@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v7 (2026-11-25, `docs/SLOT_STEP_PLAN.md` step s6): walked whole at 1280 × 800 and at 390 × 844 in headless Chromium against the local stack, every check yes after one fix of the style sheet (its change log); checks 102 and 169 corrected. v6 (2026-11-25, `docs/SLOT_STEP_PLAN.md` steps s4 and s5): times on 5-minute steps are section 11, checks 157 to 170, looked at against the local stack that day (its change log); checks 42, 43, 45, 76 and 86 in line. v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
+| Status | v8 (2026-11-25, `docs/WINDOW_HOURS_PLAN.md` step w4): the end of a window chosen as an hour; checks 73, 86, 87, 157 to 168 and 170 rewritten, the last on a Sunday pattern 08:05–12:05; still 170 checks. v7 (2026-11-25, `docs/SLOT_STEP_PLAN.md` step s6): walked whole at 1280 × 800 and at 390 × 844 in headless Chromium against the local stack, every check yes after one fix of the style sheet (its change log); checks 102 and 169 corrected. v6 (2026-11-25, `docs/SLOT_STEP_PLAN.md` steps s4 and s5): times on 5-minute steps are section 11, checks 157 to 170, looked at against the local stack that day (its change log); checks 42, 43, 45, 76 and 86 in line. v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
 | What it is | One list of checks that walks every screen of the front end and the assistant's panel in a browser, as a User and as the Administrator, against the local stack. **The check to repeat after a later change to the view layer** |
 | What it is not | A source of truth, and not an automated test. On any conflict `docs/FRONTEND_ARCHITECTURE.md` and the tests win, and this page is fixed. No end-to-end test tool is in the repository (`docs/FRONTEND_VIEW_PLAN.md` section 8, decision 6): a person follows the list by hand, or drives a browser with a script kept outside the repository |
 | Made from | The browser checks of `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 68, of `docs/CONVERSATIONAL_PLAN.md` step c12 and of `docs/CAPACITY_PLAN.md` step u5, in the order a person would follow, and `docs/SHARED_CALENDAR_SPEC.md` section 16.8 |
@@ -20,6 +20,7 @@
 | v5 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u5: **the capacity of a type**, section 10, checks 134 to 156, with what they need and leave in its opening; the row of step u5 in section 8. Check 12: the Administrator's booking for `alice` makes `alice`'s attempt a `user_busy`, whose sentence it quotes. Check 41: the tab "Full" beside an appointment. Checks 66 and 70: "Edit" in the place of "Rename", and the capacity. Walked that day by a script in headless Chromium (Playwright 1.62), at 1280 × 800 and at 390 × 844, on a fresh, seeded local stack, as `admin`, `alice` and three Users of the run: every check of section 10 answered yes at both widths, and check 12 as written; at check 140 the tab "1 left" was seen on top and within reach, not pressed, and check 150 was seen on the screenshots, its tabs not pressed. The console held the known report of `zod` and the browser's own line for each answer 409 of checks 144, 145, 146 and 152. The rest of the walk was not run again. 156 checks. |
 | v6 | 2026-11-25 | `docs/SLOT_STEP_PLAN.md` steps s4 and s5: **times on 5-minute steps**, section 11, checks 157 to 170, with what they need and leave in its opening; the row of steps s4 and s5 in section 8. Checks 42, 43 and 45: each time an hour and a minute, the custom times on 5-minute steps. Check 76: the hour 24 with only 00. Check 86: a start chosen sets the end. Looked at that day in Chrome against the local stack after `seed:local`, as `admin` and `alice`, at 1280 wide: checks 157 to 168 answered yes, 163 to 168 on the Sundays 29 November and 6 December 2026; not done in the browser: the end's hour 23 of check 159 (a unit test of the views holds it) and the cancelling of check 164. The browser's window could not be made narrower, so check 169 was looked at with the page's body held to 390 pixels and the style sheet's phone rules applied by a script: the forms' two lists fit two to a row, the dialogs at 358 pixels hold their four lists, nothing scrolls sideways; a real phone width is still to be seen. Check 170 was not done: the pattern and the appointments stay in the local stack until it is restarted. The rest of the walk was not run again. 170 checks. |
 | v7 | 2026-11-25 | `docs/SLOT_STEP_PLAN.md` step s6, the full regression before the release of `v2.4.0`. **Walked whole** by a script kept outside the repository, in headless Chromium 151 (Playwright 1.62), on a fresh, seeded local stack with the fake Claude, as `alice`, `admin` and the Users of each run: at 1280 × 800 every check yes; at 390 × 844 every check yes, the `[=]` checks and check 109 left out as the marks allow, check 164 yes when section 11 was walked again (the first pass read the week before it was drawn again). The `[S]` checks ended the session with Playwright's clock. **Found at 390 × 844, a defect, fixed:** in the box "This day only" the four lists of the times were 47 pixels wide and showed "0" for "09"; `frontend/style.css` gives the fields of a date's window at least 9rem, the type taking a row of its own on a phone (76 pixels a list). After the fix, sections 4 and 11 were walked again at both widths: every check yes, check 41 aside at the phone width, where a User left by the first of those two partial runs stood in the week (a script's leftover; check 41 was yes in the whole run). **Checks corrected:** 102, which now cancels `walk-<tag> listed` (left booked by check 33, it took next week's Wednesday 10:00 from a run at the other width), and 169, which asks that each list show its whole value. After each run the stack held the seed's data only. 170 checks. |
+| v8 | 2026-11-25 | `docs/WINDOW_HOURS_PLAN.md` step w4: **the end of a window chosen as an hour** (`docs/SHARED_CALENDAR_SPEC.md` decision D33; `docs/FRONTEND_ARCHITECTURE.md` section 11, decisions 201 and 202). Section 11 rewritten, the numbers kept: 157 says the end's minute is the start's, shown and not a choice; 158 and 159 the end's lists after the start's hour and minute, and the start's hour 23; 160 to 168 and 170 on a Sunday pattern 08:05–12:05, whose slots are 08:05, 09:05, 10:05 and 11:05, and 168 gains `alice` booking 11:05, the one slot left free. Check 87: 12:00 to 14:00, which still overlaps. Checks 73 and 86 no longer ask for an end not later than the start, which the lists cannot hold. The row of step w4 in section 8. No check added: 170 checks. Looked at in Chrome at 1280 × 800 against a fresh, seeded local stack, as `admin` and `alice`: 158, 159, 160, 163 and 168 yes; 168 without the five appointments of check 166, so `alice` saw the four slots and booked 11:05; the pattern and that booking removed afterwards. |
 
 ---
 
@@ -363,8 +364,7 @@ Sign out, sign in as `admin`.
     "Create pattern". → Under "Sunday": "05:00 – 07:00", the type, "from" today's date.
 72. Press "Week", then "›". → With no reload of the page: Sunday has a window 05:00–07:00 of the
     new type with two free slots, the hours start at 05:00, and the legend names the type.
-73. `[=]` In "Availability", "Create pattern" with "End" not later than "Start", no type chosen,
-    "Valid from" emptied, then with "Valid until" before "Valid from". → Each field in fault is
+73. `[=]` In "Availability", "Create pattern" with no type chosen and "Valid from" emptied, then with "Valid until" before "Valid from". → Each field in fault is
     marked and has its sentence under it, `[N]` with no request.
 74. `[K]` Create a second Sunday pattern, 06:00 to 08:00, same type. → Refused by the server,
     under the fields: another window of the same day covers part of these hours.
@@ -400,11 +400,10 @@ Sign out, sign in as `admin`.
     Show the walk's date again.
 85. `[K]` Press "This day only…". → A box "This day only" with one row, "09:00 – 13:00" Studio
     and "Remove"; the day's own buttons are no longer shown.
-86. `[K]` In the box: "Add" with "End" not later than "Start" and no type. → Both said under
-    their fields. Then choose 14 as the start's hour (→ "End" 15:00) and add 14:00 to 15:00 of
+86. `[K]` In the box: "Add" with no type. → Said under its field. Then choose 14 as the start's hour (→ "End" 15:00) and add 14:00 to 15:00 of
     `walk-<tag> two`. → A second row, in the order of
     the hours; the form is back on 09:00, 10:00 and no type.
-87. `[K]` Add 12:00 to 14:30, Studio. → Refused: **"Start" and "End" both have a red border, and
+87. `[K]` Add 12:00 to 14:00, Studio. → Refused: **"Start" and "End" both have a red border, and
     the sentence ("Start and End overlap another window of this day. Choose other hours.")
     stands once, under "Start"**. Then add 13:00 to 14:00, Studio, which only touches. →
     Accepted.
@@ -645,6 +644,7 @@ section 6 and the journeys run on the fake only.
 | 68 | The date field; a date shown; refused dates; "this day only" put together and saved; discarded; overlaps; "not available"; the way back; an extra window; an appointment on the day; a write that cannot reach the server; a pattern changed while a date is on show; "Show" refused; signing out with the list open; the phone; the keyboard | 82 to 95 |
 | c12 | No panel at the login, the bar on every screen, no request before the first opening; a read with its progress line; moving between screens, a reload; a booking confirmed with the week on show; a dialog over the panel; a decline; a message that drops a proposal; each of the three sentences; a text with markup; another person finds nothing; the keyboard alone; the console | 103, 104, 121; 106; 108, 110; 111, 113; 112; 114; 115; 116, 118, 119; 107; 120; 104, 105, 109, 113, 114, 118; 122. What the browser's tools show a screen reader is check 117; the two points step c12 left (the count after a 503, "New conversation" after one) are in checks 116 and 118 |
 
+| w4 | The end of a window chosen as an hour, its minute the start's; the start's hour 23 with 00 only; a change of the start's minute keeps the end's hour; a pattern 08:05–12:05 and its four slots from 08:05; `alice` books 11:05; an overlap of whole hours | 157 to 168, 170, 73, 86, 87 |
 | s4, s5 | Each time an hour and a minute in the five places; a start sets the end, an end leaves the start; 23:30 gives 24:00, the hour 24 with 00 only; a form filled shows its times as they are; a pattern from 08:05 and its first slot at 09:00; 10:10–10:35 from the dialog; a time outside the window refused; 5- and 10-minute appointments, one beside the next; `alice`'s week; the keyboard; the two widths | 157 to 170, 42, 43, 45, 76, 86 |
 | u5 | A type's capacity: created, refused, edited; the places left; a time full for Users, busy for a fourth, refused to a page read before; the Administrator's full slot as a tab, refused, "Book anyway", the offer hidden by a change; two and three side by side, four as one block and its list; `user_busy` named for the Administrator; the User's own time not offered | 134 to 156, 12, 41, 66, 70 |
 | p3 | The hints while typing, the two new ones differing, a wrong current password, a change that succeeds, "Password changed" at the login, the old password refused, the new one accepted; as `alice` and as `admin`, at the two widths | 123 to 133 |
@@ -788,53 +788,58 @@ its own, with its own tag, on the Sunday after.
 ## 11. Times on 5-minute steps
 
 Walked as `admin` and `alice`, in **next week's Sunday**, which the seed leaves without
-windows (`docs/SHARED_CALENDAR_SPEC.md` decision D32; `docs/FRONTEND_ARCHITECTURE.md` section
-11, decisions 195 to 200). **What it needs**: nothing more than section 1. **What it leaves**:
-nothing, after check 170. A run at the other width is a run of its own, on the Sunday after.
+windows (`docs/SHARED_CALENDAR_SPEC.md` decisions D32 and D33; `docs/FRONTEND_ARCHITECTURE.md`
+section 11, decisions 195 to 202). **What it needs**: nothing more than section 1. **What it
+leaves**: nothing, after check 170. A run at the other width is a run of its own, on the Sunday
+after.
 
 **The two lists.** As `admin`, in "Availability".
 
 157. `[K]` The pattern's form. → "Start" and "End" are each two lists side by side with a colon
      between them, the hour and the minute; Tab goes from the start's hour to its minute, then
      to the end's hour and minute. A screen reader names them "Hour" and "Minute" in the group
-     "Start" or "End". The minutes are 00 to 55, five apart.
-158. `[K]` Choose the start's hour 08, then its minute 05. → "End" is 09:05. Choose "End" 12:00.
-     → "Start" stays 08:05.
-159. `[K]` Choose "Start" 23:30. → "End" is 24:00, its minute list holding only 00. Choose the
-     end's hour 23. → Its minutes are the twelve again, on 00.
-160. `[K]` Create a pattern on Sunday, 08:05 to 12:00, Studio, valid from today. → The row
-     "08:05 – 12:00 Studio"; the form back on 09:00 to 10:00.
-161. `[K]` Its "Change". → The dialog with 08:05 and 12:00 as they are. Choose the start's hour
+     "Start" or "End". The start's minutes are 00 to 55, five apart; the end's minute list holds
+     one value, the start's minute: it is shown and is not a choice.
+158. `[K]` Choose the start's hour 08, then its minute 05. → "End" is 09:05; its hours are 09 to
+     23, its minute 05 alone. Choose the end's hour 12. → "End" is 12:05, "Start" stays 08:05.
+     Choose the start's minute 30. → "End" is 12:30: the end keeps its hour.
+159. `[K]` Choose the start's hour 23. → Its minute list holds only 00; "End" is 24:00, its hour
+     list holding only 24. Choose "Start" 08:00. → The end's hours reach 24.
+160. `[K]` Create a pattern on Sunday, 08:05 to 12:05, Studio, valid from today. → The row
+     "08:05 – 12:05 Studio"; the form back on 09:00 to 10:00.
+161. `[K]` Its "Change". → The dialog with 08:05 and 12:05 as they are. Choose the start's hour
      10. → "End" is 11:05. "Close".
 162. `[K]` Show next week's Sunday, "This day only…". In the box's form choose the start's hour
-     14. → "End" is 15:00. In "Extra windows" choose "Start" 16:40. → "End" is 17:40.
-     "Discard".
+     14. → "End" is 15:00. In "Extra windows" choose "Start" 16:40. → "End" is 17:40, its minute
+     40 alone. "Discard".
 
 **The book dialog.** In "Week", next week.
 
-163. → Sunday has a Studio window from 08:05; its first slot is 09:00–10:00, then 10:00–11:00
-     and 11:00–12:00.
-164. `[K]` Press the slot 10:00–11:00. → "Start" 10:00 and "End" 11:00; the start's hours are
-     08 to 11, the end's 08 to 12, each minute list 00 to 55. Choose "Start" 10:10. → "End"
+163. → Sunday has a Studio window 08:05–12:05 with four slots: 08:05–09:05, 09:05–10:05,
+     10:05–11:05 and 11:05–12:05.
+164. `[K]` Press the slot 10:05–11:05. → "Start" 10:05 and "End" 11:05; the start's hours are
+     08 to 12, the end's 08 to 12, each minute list 00 to 55. Choose "Start" 10:10. → "End"
      11:10. Choose "End" 10:35, `alice`, "Book". → An appointment 10:10–10:35 of `alice`,
      and the slot a tab "Full" beside it. Open it: "10:10–10:35"; cancel it.
-165. `[K]` Press the slot 09:00–10:00, choose "Start" 08:00, before the window. → "End" 09:00.
+165. `[K]` Press the slot 09:05–10:05, choose "Start" 08:00, before the window. → "End" 09:00.
      "Book". → "This time is not within the hours open for booking. Please choose another
-     time."; the dialog stays open. Choose "Start" 11:40. → "End" 12:00, the window's end.
+     time."; the dialog stays open. Choose "Start" 11:40. → "End" 12:05, the window's end.
      "Close".
 
 **Short appointments.**
 
-166. `[K]` For `alice`: 09:00–09:05 and 09:30–09:40 from the slot 09:00–10:00, 10:10–10:15 and
-     10:15–11:00 from the slot 10:00–11:00, 11:00–11:15 from the slot 11:00–12:00.
+166. `[K]` For `alice`: 08:05–08:10 from the slot 08:05–09:05, 09:05–09:20 and 09:30–09:40 from
+     the slot 09:05–10:05, 10:10–10:15 and 10:15–11:05 from the slot 10:05–11:05. The slot
+     11:05–12:05 stays free.
 167. → The four short ones are as tall as a quarter of an hour, their time and "alice" readable
-     on one line; 10:10–10:15 and 10:15–11:00 stand side by side, each half the width; the
+     on one line; 10:10–10:15 and 10:15–11:05 stand side by side, each half the width; the
      others the whole width, leaving the tab "Full" its room. Press 10:10–10:15. → Its detail
      says "10:10–10:15". "Close".
-168. As `alice`, next week. → The same five, "You", drawn the same; no slot of Sunday is
-     offered.
+168. As `alice`, next week. → The same five, "You", drawn the same; Sunday offers one slot,
+     11:05–12:05, the one left free. `[K]` Book it. → An appointment 11:05–12:05, "You", and no
+     slot of Sunday is offered any more.
 169. → At both widths: at 390 × 844 the two lists of a time fit beside each other in every
      form and dialog, each showing its whole value ("09", not "0"), and the page does not
      scroll sideways.
-170. Clean up as `admin`: cancel the five appointments of check 166, delete the pattern of
-     check 160. → Sunday is empty again.
+170. Clean up as `admin`: cancel the five appointments of check 166 and `alice`'s 11:05 of check
+     168, delete the pattern of check 160. → Sunday is empty again.

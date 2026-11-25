@@ -1,4 +1,4 @@
-import { CALENDAR_LIMITS, LocalDate, TYPE_CAPACITY, TypeName, type AvailabilityType, type PatternBody, type WeeklyPattern } from '@shared-calendar/shared';
+import { CALENDAR_LIMITS, lastsWholeHours, LocalDate, TYPE_CAPACITY, TypeName, type AvailabilityType, type PatternBody, type WeeklyPattern } from '@shared-calendar/shared';
 import { longDateText } from './texts';
 
 // The availability screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the availability types
@@ -123,21 +123,33 @@ export function patternFields(pattern: PatternBody): PatternFields {
 
 const isDate = (text: string) => LocalDate.safeParse(text).success;
 
-// The two refusals of a window's fields, which a pattern, a window of one date's own and an
-// extra window share: each starts with the words of its field's label.
+// The refusals of a window's fields, which a pattern, a window of one date's own and an extra
+// window share: each starts with the words of its field's label. A window lasts a whole number
+// of hours (docs/SHARED_CALENDAR_SPEC.md decision D33): the end's lists offer nothing else, but
+// a window stored before the rule can still be opened in a form.
 export const END_NOT_LATER = 'End must be later than Start.';
+export const END_NOT_WHOLE_HOURS = 'End must be a whole number of hours after Start.';
 export const TYPE_NOT_CHOSEN = 'Type must be chosen.';
+
+// The refusal of a window's two times, or none: an end not after its start (two times of one
+// day, written alike: the later one is the greater text, "24:00" included), and only when it is
+// after it, an end that is not a whole number of hours later (lastsWholeHours of shared/), so
+// one sentence is said.
+export function endRefusal(start: string, end: string): string | undefined {
+  if (end <= start) return END_NOT_LATER;
+  return lastsWholeHours(start, end) ? undefined : END_NOT_WHOLE_HOURS;
+}
 
 // From what the form holds to the body of a create or of a change, or to the refusals: one
 // sentence per field in fault, each naming its field in the words of its label, and every
 // field in fault said. The weekday and the two times come from lists that hold nothing off the
-// step; an end not after its start is the one fault two times can have;
-// the shared schema, through the service, has the last word on the body
+// step; an end not after its start, or not a whole number of hours after it, is the one fault
+// two times can have; the shared schema, through the service, has the last word on the body
 // (docs/FRONTEND_SERVICES.md section 17.4).
 export function patternFor(fields: PatternFields): { pattern: PatternBody } | { refusals: Partial<Record<PatternField, string>> } {
   const refusals: Partial<Record<PatternField, string>> = {};
-  // Two times of one day, written alike: the later one is the greater text, "24:00" included.
-  if (fields.end <= fields.start) refusals.end = END_NOT_LATER;
+  const end = endRefusal(fields.start, fields.end);
+  if (end !== undefined) refusals.end = end;
   if (fields.typeId === '') refusals.typeId = TYPE_NOT_CHOSEN;
   if (!isDate(fields.validFrom)) refusals.validFrom = 'Valid from must be a date.';
   if (fields.validUntil !== '') {

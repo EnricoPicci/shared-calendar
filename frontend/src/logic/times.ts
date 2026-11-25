@@ -4,8 +4,9 @@ import { TIME_STEP_MINUTES } from '@shared-calendar/shared';
 // 5.1): two short lists, its hour and its minute, on the step of shared/ (TIME_STEP_MINUTES,
 // docs/SHARED_CALENDAR_SPEC.md decision D32), and the end a chosen start sets. The five places
 // with a start and an end, the two forms of a pattern, the two forms of a window of a date and
-// the book dialog, all use what is here. Pure: times are local `HH:mm` texts, "24:00" being the
-// midnight that ends a day.
+// the book dialog, all use what is here; the four forms of a window offer an end of whole hours
+// only (docs/SHARED_CALENDAR_SPEC.md decision D33). Pure: times are local `HH:mm` texts, "24:00"
+// being the midnight that ends a day.
 
 export const DAY_MINUTES = 24 * 60;
 const HOUR = 60;
@@ -40,12 +41,33 @@ export function timeOf(hour: string, minute: string): string {
 // The hours of a start and of an end.
 export type TimeHours = { starts: readonly string[]; ends: readonly string[] };
 
-// In a form of a window: a start from 00:00 to 23:55, an end up to 24:00
-// (docs/SHARED_CALENDAR_SPEC.md section 6.2). The end may be chosen as early as 00:00: an end
-// not after its start is the form's to refuse, in words, like any other.
-export const WINDOW_HOURS: TimeHours = { starts: hoursFrom(0, 23), ends: hoursFrom(0, 24) };
 // The last end a form of a window allows.
 export const LAST_TIME = '24:00';
+
+// In a form of a window a window lasts a whole number of hours and ends on its own date, at
+// 24:00 at the latest (docs/SHARED_CALENDAR_SPEC.md section 6.2). So a start is 00:00 to 23:00:
+// the hour 23 has the minute 00 only, since 23:05 would end past midnight.
+export const WINDOW_STARTS: readonly string[] = hoursFrom(0, 23);
+export function startMinutesOf(hour: string): readonly string[] {
+  return hour === '23' ? ['00'] : MINUTES;
+}
+
+// What the end of a form of a window offers for a start: the hours after the start's, up to 23,
+// and 24 only when the start is on the hour; and one minute, the start's. 08:05 gives the hours
+// 09 to 23 and the minute 05; 08:00 the hours 09 to 24; 23:00 the hour 24 alone.
+export function windowEnds(start: string): { hours: readonly string[]; minute: string } {
+  const { hour, minute } = partsOf(start);
+  return { hours: hoursFrom(Number(hour) + 1, minute === '00' ? 24 : 23), minute };
+}
+
+// The end after the person chose the start's hour or its minute, `end` being the end before. A
+// new hour sets the end one hour later (endFor). A new minute alone keeps the end's hour, with the
+// new minute, so the length chosen stays (08:05–11:05, the minute 30: 08:30–11:30); when that hour
+// is no longer offered (08:00–24:00, the minute 05), the end is one hour after the start.
+export function endAfter(start: string, end: string, changed: 'hour' | 'minute'): string {
+  const kept = partsOf(end).hour;
+  return changed === 'minute' && windowEnds(start).hours.includes(kept) ? timeOf(kept, partsOf(start).minute) : endFor(start, LAST_TIME);
+}
 
 // In the book dialog, the hours that the window holding the slot touches, `from` and `to` being
 // minutes on the clock of the slot's day: a start may begin at the window's start and up to a

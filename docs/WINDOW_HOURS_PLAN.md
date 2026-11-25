@@ -1,6 +1,8 @@
 # Shared Calendar: windows of whole hours, slots counted from the window's start (implementation plan)
 
-**Version:** v4 (2026-11-25): step w3 done (its "As done" note), with brief
+**Version:** v5 (2026-11-25): step w4 done (its "As done" note), with brief
+`prompts/slot-s09-step-w4-implementation.md`; two decisions of the Product Owner added beside
+decision 6 (section 2, 6a and 6b). v4 (2026-11-25): step w3 done (its "As done" note), with brief
 `prompts/slot-s08-step-w3-implementation.md`; two decisions of the Product Owner added beside Q1
 and Q4 (section 2). v3 (2026-11-25): steps w1 and w2 done (their "As done" notes), with brief
 `prompts/slot-s07-pair-w1-w2-implementation.md`; decision 5 restated (the server's 400 names the
@@ -56,6 +58,8 @@ The rest follows:
 | 4 | The nights the clocks change: the window is checked as whole hours on the local clock; its slots are 60 real minutes each from its start, as many as fit. |
 | 5 | A window not whole hours is refused by the page's form before it is sent, and by the server with `400 invalid_request`. The sentence ("end must be a whole number of hours after start") is the shared schema's, read by the page and the assistant's tools; the server's answer names the field only, "Invalid input: end", as for every refusal of a schema (the Product Owner, 2026-11-25, at step w2: `backend/src/lib/validation.ts` never sends a schema's message). |
 | 6 | In the window forms the end is chosen as an hour only; its minute follows the start's. A start chosen still sets the end one hour later. |
+| 6a | A change of the start's minute alone keeps the end's hour, with the new minute, so the length chosen stays (08:05–11:05, the start changed to 08:30: 08:30–11:30); when that hour is no longer offered, the end is one hour after the start (the Product Owner, 2026-11-25, step w4). |
+| 6b | A window stored that is not whole hours, opened in a form, is shown as stored (08:30–09:45, its end's minute 45 shown), and a save is refused with "End must be a whole number of hours after Start.": the Administrator sees the real end and fixes it; the end is never corrected without a word. The check of step w5 should leave none (the Product Owner, 2026-11-25, step w4). |
 | 7 | Windows already stored that are not whole hours are not changed by code: a read-only check lists them in the cloud before the release. |
 | 8 | Built on `slot-5min`, released alone before the mail work, as the next minor version. |
 
@@ -438,6 +442,35 @@ hand.
 -t '<describe>'`); **a look at one width** (1280) on the local stack after `seed:local`, five
 checks: the new 158 and 159 (the end's lists), 160 (a Sunday pattern 08:05–12:05 saved), 163
 (its four slots in the week), the new 168 (alice books 11:05). Then the stop.
+
+**As done (step w4, 2026-11-25).** `frontend/src/logic/times.ts`: `WINDOW_STARTS` and
+`startMinutesOf` (the hour 23 has 00 only, F3), `windowEnds` (the end's hours after the start's,
+24 only with a start on the hour, and its one minute, F4) and `endAfter` (a new start's hour: one
+hour later through `endFor`, unchanged; a new minute alone: the end's hour kept, decision 6a);
+`WINDOW_HOURS` removed. `frontend/src/views/time.parts.ts`: `timeLists` takes the minutes of an
+hour as a parameter of `offer`, tells `chosen` which list the person changed, has `written` for a
+time set by the script, and shows a time it does not offer as it is (decision 6b); `windowTimes`
+wires the four forms of a window in `availability.view.ts` and `date.view.ts`; the book dialog
+keeps `startSetsEnd` and all twelve minutes. `availability.model.ts`: `END_NOT_WHOLE_HOURS` and
+`endRefusal` (through `lastsWholeHours`, after the order check and only when it passed), used by
+`patternFor` and by `fieldRefusals` of `date.model.ts`. Unit tests: the logic's cases of the
+brief; the four forms' lists after a choice of the start's hour and minute, a dialog opened on
+08:05–12:05 and on a stored 08:30–09:45 (09:45 shown, the save refused) and on 23:30–24:00;
+`times.test.ts` and `availability.model.test.ts` rewritten for the new lists, `shell.test.ts`
+left as w2 made it (10:00–13:00 still holds). The journey "starts off a slot" (block
+"appointments"): on a bookable date, 08:17 `invalid_request` and 08:15 `outside_availability`, two
+requests sent; its page `docs/journeys/frontend/calendar-appointments.md`. Documents:
+`docs/FRONTEND_ARCHITECTURE.md` v25 (section 4, 5.1, decisions 92, 201 and 202);
+`docs/FRONTEND_WALK.md` v8, still 170 checks, with 73 and 86 also rewritten (they asked for an end
+not later than the start, which the lists can no longer hold; F11 had not listed them);
+`docs/FRONTEND_SERVICES.md` decision 42, section 19 and the status line;
+`frontend/src/services/appointments.service.ts`'s comment; `docs/SHARED_CALENDAR_SPEC.md` 16.8 and
+the status line; the v17 row of `docs/ARCHITECTURE.md`. Checked: typecheck, lint, test:unit green
+at the root, 100 % line coverage kept; the journey alone, 6 passed; the look at 1280 × 800 as
+`admin` and `alice`, the five checks yes (168 without the appointments of 166, so `alice` saw four
+slots and booked 11:05), what it made removed. **What step w5 finds ready:** the page, the API and
+the assistant complete on `slot-5min`, nothing deployed; the read-only check of part A, the smoke
+test's 53 lines (F10), the full regression, the paid evaluation and the release are all its own.
 
 ### Step w5 — The release
 

@@ -2,9 +2,8 @@ import type { Subscription } from 'rxjs';
 import type { Choice } from '../logic/availability.model';
 import { WINDOW_FIELDS, type DayModel, type DraftModel, type WindowFields, type WindowRow } from '../logic/date.model';
 import type { DateScreen } from '../logic/date.screen';
-import { LAST_TIME, WINDOW_HOURS } from '../logic/times';
 import { availabilityParts, type Confirm, type Tell } from './availability.parts';
-import { startSetsEnd } from './time.parts';
+import { windowTimes } from './time.parts';
 
 // What the view of a single date uses: of the DateScreen its stream and its methods, and the
 // dialog that confirms, which the screen's other view opens too.
@@ -39,13 +38,10 @@ export function mountDate(root: HTMLElement, { screen, confirm }: DateDeps): Sub
   const save = find<HTMLButtonElement>('.save');
   const discard = find<HTMLButtonElement>('.discard');
 
-  // The hours a window may start and end at never change; the types follow the stream. A
-  // start chosen by the person sets the end one hour later, up to 24:00.
-  for (const { times } of windowForms) {
-    times.start!.offer(WINDOW_HOURS.starts);
-    times.end!.offer(WINDOW_HOURS.ends);
-    startSetsEnd(times.start!, times.end!, () => LAST_TIME);
-  }
+  // The hours a window may start at never change; the types follow the stream. The end is
+  // chosen as an hour, its minute the start's, and a start chosen by the person sets the end
+  // (windowTimes of src/views/time.parts.ts).
+  for (const { times } of windowForms) windowTimes(times.start!, times.end!);
 
   // 2. Pure view state (docs/FRONTEND_ARCHITECTURE.md section 3, rule 10): what this view last
   // opened the dialog that confirms for, as the stream names it, and how to tell that opening
