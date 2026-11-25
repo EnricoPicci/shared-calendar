@@ -1,5 +1,5 @@
 import { effectiveWindows, localDateOf, localTimeOf, type CalendarView, type Role } from '@shared-calendar/shared';
-import { dateText, offsetChangesOn, rangeText } from './texts';
+import { dateText, offsetChangesOn, rangeText, timeText } from './texts';
 
 // The week ready to draw (docs/FRONTEND_ARCHITECTURE.md section 5): what GET /calendar answers
 // (docs/SHARED_CALENDAR_SPEC.md section 11.6) turned into days of blocks, each with its place in
@@ -41,6 +41,10 @@ export type AppointmentBlock = Placed & {
   colour: number;
   beside: boolean; // a slot's tab stands beside it, and it leaves the tab room
   short: boolean; // drawn at the least height, SHORTEST_DRAWN: room for one tight line of text
+  // The time drawn on the block: `time`, or its start alone for a short block that shares its
+  // width with others, too narrow for both times and the User on its one line. `time` stays whole
+  // for a screen reader and the detail.
+  shown: string;
 };
 // Four or more of the Administrator's appointments that overlap, drawn as one block over their
 // whole span that opens the list of them (docs/SHARED_CALENDAR_SPEC.md section 16.8). `what`
@@ -280,6 +284,7 @@ export function weekModel(view: CalendarView, role: Role): WeekModel {
             colour: colourOf(a.typeId),
             beside: overlaps(spanOf(a, day.date, zone), slotSpans),
             short: tall(a) <= SHORTEST_DRAWN,
+            shown: tall(a) <= SHORTEST_DRAWN && a.lanes > 1 ? timeText(a.start, zone, offsetChanges) : a.time,
           })),
         groups,
       };

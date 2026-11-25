@@ -1631,15 +1631,19 @@ status and the error code only, since an answer may hold a note).
    earliest start's date if that is later (never, with the ranges of section 9: 720 h is 30 days).
    One `GET /calendar` as the admin covers the 31 days from there, forward. A date is taken when
    03:00 local exists, is a whole hour and 03:00–04:00 lasts 60 real minutes (a DST day where it
-   does not is skipped), starts no earlier than the earliest start, and that hour overlaps none of
-   the date's `windows` (every source) and none of the view's `appointments` (all active ones, for
-   the Administrator), with fewer than 10 one-off windows on the date. None found: a FAIL line
+   does not is skipped), starts no earlier than the earliest start, and 03:00–04:05 overlaps none
+   of the date's `windows` (every source) and none of the view's `appointments` (all active ones,
+   for the Administrator), with fewer than 10 one-off windows on the date: the journey's window is
+   03:05–04:05, and the capacity journey of `docs/RUNBOOK.md` section 2.3 uses 03:00–04:00 there
+   after it. None found: a FAIL line
    naming the range (or, when every date was too soon, the setting and the earliest start) and no
    calendar journey. Something created between the read and the writes answers 409: FAIL with
    its code, clean-up, no retry.
-3. **The journey, one check line each** (22 checks with Hello World's 10; the assistant's exchange of `docs/ARCHITECTURE.md` section 9.3 adds 7): the settings read; the
-   free hour found; as the admin, create the type `smoke-<epoch>` (the User's epoch), create the
-   one-off window 03:00–04:00 on the date, book it for the User (`username`, `start`, no `end`,
+3. **The journey, one check line each** (23 checks with Hello World's 10; the assistant's exchange of `docs/ARCHITECTURE.md` section 9.3 adds 7): the settings read; the
+   free hour found; as the admin, create the type `smoke-<epoch>` (the User's epoch), send the
+   one-off window 03:05–03:50, not whole hours (D33): `400 invalid_request`, and the date shows no
+   window of the type; create the one-off window 03:05–04:05 on the date, book its one slot, 03:05
+   (R-SLOT-01), for the User (`username`, `start`, no `end`,
    and the note `smoke-test note <epoch>, must never reach a log`; the answer is `booked`, 60
    minutes, that type, that note); as the User, `upcoming` holds exactly that appointment (id,
    start, end, type, `booked`, note, a `cancellableUntil`), then cancel it (`cancelled`,
@@ -1648,13 +1652,13 @@ status and the error code only, since an answer may hold a note).
    two instants, D32 and R-BOOK-02), cancel it, and send 03:07–03:35, whose start is off the
    step: `400 invalid_request`, and the User's appointments (`status=all`) hold none at 03:07;
    then delete the window, then the type (R-TYPE-03: the cancelled appointments do not block
-   it). The script never prints the note. With these three, the journey has 12 lines.
+   it). The script never prints the note. The journey has 13 lines.
 4. **Clean-up.** After a failed calendar check, and on every exit (Ctrl-C included), the script
    cancels the appointment if still booked, then deletes the window and the type, through the API
    as the admin, before the User is deleted; a write whose answer was not read is looked up first.
    It does not rely on the User's deletion (10.2), which the exit path does directly in Cognito.
    A clean-up call that fails prints the ids to remove by hand, never a body, and the exit is 1.
-5. **History.** The two appointments, 03:00–04:00 and 03:10–03:35 (cancelled, by the User, by
+5. **History.** The two appointments, 03:05–04:05 and 03:10–03:35 (cancelled, by the User, by
    the admin or by the admin's clean-up), their pointers, their two events each and, after the User's deletion through the API, the deleted-user marker stay, as
    the smoke test's messages do. They carry the username and type name `smoke-<epoch>`.
 

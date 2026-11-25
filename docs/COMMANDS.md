@@ -433,10 +433,11 @@ Every command of this section that names a stack acts on a real AWS account. `CL
 - `DYNAMODB_PORT=8002 npm run smoke -w backend -- <stack|local>`: journeys 3, 4, 6 and 11 of
   `docs/IMPLEMENTATION_PLAN.md` step 9 with a throw-away `smoke-<epoch>` user and, before the
   last, the calendar journey of `docs/SHARED_CALENDAR_SPEC.md` section 18.4 (a type
-  `smoke-<epoch>` and a one-off window on the first free 03:00–04:00 from 50 days ahead, booked
-  for the user, listed and cancelled by it; in that window 03:10–03:35 booked for the user by the
+  `smoke-<epoch>`, a one-off window 03:05–03:50 refused `400 invalid_request` (not whole hours),
+  and the one-off window 03:05–04:05 on the first date whose 03:00–04:05 is free from 50 days
+  ahead, its slot 03:05 booked for the user, listed and cancelled by it; in that window 03:10–03:35 booked for the user by the
   Administrator and cancelled, and a start at 03:07, off the 5-minute step, refused
-  `400 invalid_request`; then window and type deleted; settings never changed), then on that date and hour the capacity journey (`docs/RUNBOOK.md` section 2.3: two
+  `400 invalid_request`; then window and type deleted; settings never changed), then on that date, 03:00–04:00, the capacity journey (`docs/RUNBOOK.md` section 2.3: two
   more throw-away users `smoke-<epoch>-b` and `-c`, a type `smoke-cap-<epoch>` of capacity 2 and
   its window; a User's own `overbook: true` refused `403` with nothing written; two people booked
   into the slot, full in the Administrator's view and busy in the third's; the third refused
@@ -447,8 +448,8 @@ Every command of this section that names a stack acts on a real AWS account. `CL
   change of the user's own password at Cognito through `backend/scripts/cognito.mjs` (a wrong
   current password refused, the error named; the change; the refresh token from before it still
   valid after `ChangePassword` alone; `GlobalSignOut`, after which that refresh token is refused;
-  the old password refused, the new one signing in; `docs/RUNBOOK.md` section 2.2); 52 checks,
-  PASS/FAIL each, 12 of them the calendar's, 16 the capacity's, 7 the assistant's and 7 the password's. Locally the two checks of
+  the old password refused, the new one signing in; `docs/RUNBOOK.md` section 2.2); 53 checks,
+  PASS/FAIL each, 13 of them the calendar's, 16 the capacity's, 7 the assistant's and 7 the password's. Locally the two checks of
   `GlobalSignOut` print `SKIP` (cognito-local has none) and the last line counts them; only a run
   against a stack proves which error a wrong current password gets and the revocation. The new
   passwords come from `backend/src/lib/password.ts`, checked against `shared/src/password.ts`,

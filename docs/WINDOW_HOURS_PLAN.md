@@ -505,6 +505,47 @@ Nothing here is run without an explicit instruction in the request of the step (
 **Check:** C and D green before E; the check of A empty before the API is deployed; the smoke
 test green in the cloud; the operator's look.
 
+**As done (step w5, parts A and B, 2026-11-25),** with brief
+`prompts/slot-s10-step-w5-release.md`. **A.** The check written into `docs/RUNBOOK.md` section
+5.10 (three read-only queries of the `calendar` table and a few lines of `node`) and run at
+`e302668`: two windows listed, neither holding a booked appointment, the pattern Monday
+13:00–14:45 of `piscina` (valid from 2026-11-22, no end) and the one-off window 2026-12-03
+11:10–12:00 of `look-step` left by the look of `v2.4.0`. The Product Owner changed the pattern to
+13:00–15:00, keeping Mondays, and deleted the one-off window, in the page of `v2.4.0`; the second
+run printed `none`. The types `look-step` and `look-cap`, of the looks of earlier releases, are
+still in the cloud: they hold no window and block nothing. **B.** `backend/scripts/smoke.sh`: the
+calendar journey's date search looks for 03:00–04:05 free, its window is 03:05–04:05 and its slot
+03:05, and one line more, the one-off window 03:05–03:50 refused `400 invalid_request` with no
+window of the type on the date; the capacity journey unchanged on 03:00–04:00, after the calendar
+journey has deleted its window. The lock's `version` per run stays 21: the refusal comes before
+the lock. `npm run smoke -w backend -- local`: 51 PASS and the 2 SKIP of `GlobalSignOut`, 53 lines.
+Documents: `docs/RUNBOOK.md` sections 1 and 2.1, `docs/SHARED_CALENDAR_SPEC.md` 18.4,
+`docs/ARCHITECTURE.md` section 9.3, `docs/COMMANDS.md` (`smoke`), `README.md` (the smoke test's
+row).
+
+**As done (step w5, part C, 2026-11-25).** The gate at `e302668` with parts A and B: the root
+`DYNAMODB_PORT=8002 npm run verify` passed (the back end's 217 journeys among its tests), then,
+apart, the front end's journeys, 79 passed. The walk on a stack started afresh and seeded, by a
+script kept outside the repository in headless Chromium (`docs/FRONTEND_WALK.md` v9): the 28
+checks, 27 yes on the first run; **check 167 no**, the 5-minute block at half the width showing
+"10:10–" alone, as it already did in `v2.4.0`. The Product Owner decided to fix it in this
+release, against the brief's "not in this step" for `frontend/src`: such a block shows its start
+and its User, "10:10 alice" (`docs/FRONTEND_ARCHITECTURE.md` v26, decision 203; `shown` in
+`frontend/src/logic/week.model.ts`, the block named with its whole time in
+`frontend/src/views/week.view.ts`, less padding and a long name ending in "…" in
+`frontend/style.css`, with the model's and the view's tests). `npm run verify -w frontend` green,
+100 % line coverage kept; check 167 rewritten and walked again, yes, so 28 of 28. Seen beside
+it: the half-width 10:15–11:05 wraps onto three lines at 1280 wide and the foot of "alice" is cut
+by a pixel or two, as before; left as it is.
+
+**As done (step w5, part D, 2026-11-25).** On a stack started afresh by the Product Owner with
+the real key: `npm run assistant:eval -w backend -- --ceiling 4`, 61 of 61 passed, 120 steps,
+48.93 US cents, `claude-sonnet-5-5` at effort `low`. The four requests of F8 read by hand, each
+right: 14:05–17:05 kept to the minute; the block of 10:10–10:35 widened to 10:00–11:00, said and
+asked before the proposal; 09:05–12:00 and 10:10–11:40 explained, the nearest whole hours inside
+and around offered, nothing proposed (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3). Nothing
+in `backend/src/assistant` changed.
+
 ## 6. Beside the mail work
 
 As `docs/SLOT_STEP_PLAN.md` section 6, with one release more. `main` carries the mail work

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v23: windows of whole hours (`docs/SHARED_CALENDAR_SPEC.md` decision D33), built in step w3 of `docs/WINDOW_HOURS_PLAN.md`, evaluated in its step w5, not deployed (sections 7.3, 8.2, 12.3). v22: hours on 5-minute steps (`docs/SLOT_STEP_PLAN.md` step s3), evaluated in step s6, 59 of 59 (section 12.3), and deployed (`docs/RUNBOOK.md` section 5.9). v21, implemented, merged and deployed: steps c00 to c16 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` sections 5.6 and 5.8). Where this document is merged into `docs/ARCHITECTURE.md` (its change log, v13), `docs/FRONTEND_SERVICES.md` or `docs/FRONTEND_ARCHITECTURE.md`, those documents win. This one stays as the assistant's design and the home of what only it holds: the instructions, the tools' four parts, the evaluation, the alternatives, a second channel (section 16). |
+| Status | v23: windows of whole hours (`docs/SHARED_CALENDAR_SPEC.md` decision D33), built in step w3 of `docs/WINDOW_HOURS_PLAN.md`, evaluated in its step w5, 61 of 61 (section 12.3), not deployed (sections 7.3, 8.2). v22: hours on 5-minute steps (`docs/SLOT_STEP_PLAN.md` step s3), evaluated in step s6, 59 of 59 (section 12.3), and deployed (`docs/RUNBOOK.md` section 5.9). v21, implemented, merged and deployed: steps c00 to c16 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` sections 5.6 and 5.8). Where this document is merged into `docs/ARCHITECTURE.md` (its change log, v13), `docs/FRONTEND_SERVICES.md` or `docs/FRONTEND_ARCHITECTURE.md`, those documents win. This one stays as the assistant's design and the home of what only it holds: the instructions, the tools' four parts, the evaluation, the alternatives, a second channel (section 16). |
 | Date | 2026-11-25 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |
@@ -1512,11 +1512,19 @@ Tuesday 8 December from 10:10 to 10:35, it proposed that day's hours as 09:00–
 Nothing in the instructions or the tools was changed after the run. The merge with the mail
 work, which adds a tool, makes its own run.
 
-**Windows of whole hours** (`docs/WINDOW_HOURS_PLAN.md` step w3): the list holds 61 requests;
-**no run has been made on it yet**. The last run is still the one above, of `v2.4.0`. It is
-run once, in step w5 of that plan, on the code that is deployed, about 50 US cents; the four
-requests of the change (`step-pattern-new`, `step-block`, `hours-not-whole`,
-`hours-not-whole-it`) are then read by hand whatever their result.
+**The run for windows of whole hours** (2026-11-25, `docs/WINDOW_HOURS_PLAN.md` step w5, ceiling
+US$4, `claude-sonnet-5-5` at effort `low`), on the branch `slot-5min` before the release of
+`v2.5.0`: 61 of 61 passed, 120 steps, 48.93 US cents (288.96 without the cache). Read by hand:
+asked for eval Lesson every Sunday from 14:05 to 17:05 from 6 December, the model read the types
+and proposed that pattern to the minute, valid from 2026-12-06; asked in Italian to block Tuesday
+8 December from 10:10 to 10:35, it read the day, said the block must be widened to 10:00–11:00 to
+keep whole hours, listed what would stay open (09:00–10:00 and 11:00–13:00 eval Visit,
+15:00–18:00 eval Lesson) and asked, and after "Va bene, proceda." proposed exactly that day;
+asked for eval Visit every Tuesday from 09:05 to 12:00, it said a window lasts whole hours and
+offered 09:05–11:05 inside and 09:05–12:05 around, proposing nothing (it named the type
+"Visit", without "eval"); asked in Italian for an extra window on Sunday 6 December from 10:10 to
+11:40, it offered 10:10–11:10 and 10:10–12:10 and asked which, proposing nothing. Nothing in the
+instructions or the tools was changed after the run.
 
 ---
 

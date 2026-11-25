@@ -66,7 +66,7 @@ const WEEK: WeekModel = {
         slot(at('60%', '10%', '02:00 +01:00 – 03:00 +01:00', 1, 2), 5),
       ],
       busy: [at('10%', '10%', '09:00–10:00')],
-      appointments: [{ ...at('30%', '12.5%', '11:00–12:15'), appointmentId: APPOINTMENT, who: 'You', typeName: 'Studio', note: 'First lesson', colour: 2, beside: false, short: false }],
+      appointments: [{ ...at('30%', '12.5%', '11:00–12:15'), appointmentId: APPOINTMENT, who: 'You', typeName: 'Studio', note: 'First lesson', colour: 2, beside: false, short: false, shown: '11:00–12:15' }],
     }),
     day('2026-11-17', 'Tue 17 Nov', { today: true }),
     ...['Wed 18 Nov', 'Thu 19 Nov', 'Fri 20 Nov', 'Sat 21 Nov', 'Sun 22 Nov'].map((label, i) => day(`2026-11-${18 + i}`, label)),
@@ -80,7 +80,7 @@ const OTHER: WeekModel = {
   legend: [{ name: 'Piscina', colour: 1 }],
   days: [
     day('2026-11-23', 'Mon 23 Nov', {
-      appointments: [{ ...at('0%', '50%', '06:00–07:00'), appointmentId: OTHER_APPOINTMENT, who: 'bob', typeName: 'Piscina', note: '', colour: 1, beside: false, short: false }],
+      appointments: [{ ...at('0%', '50%', '06:00–07:00'), appointmentId: OTHER_APPOINTMENT, who: 'bob', typeName: 'Piscina', note: '', colour: 1, beside: false, short: false, shown: '06:00–07:00' }],
     }),
   ],
 };
@@ -312,7 +312,7 @@ describe('mountWeek', () => {
           windows: [{ ...at('0%', '10%', SCRIPT), typeName: SCRIPT, colour: 0 }],
           slots: [slot(at('0%', '10%', SCRIPT), 0)],
           busy: [at('0%', '10%', SCRIPT)],
-          appointments: [{ ...at('0%', '10%', SCRIPT), appointmentId: APPOINTMENT, who: SCRIPT, typeName: SCRIPT, note: SCRIPT, colour: 0, beside: false, short: false }],
+          appointments: [{ ...at('0%', '10%', SCRIPT), appointmentId: APPOINTMENT, who: SCRIPT, typeName: SCRIPT, note: SCRIPT, colour: 0, beside: false, short: false, shown: SCRIPT }],
         }),
       ],
     };
@@ -794,7 +794,7 @@ describe('mountWeek', () => {
   it('a note and a username containing <script> are shown as text in both dialogs', () => {
     const week: WeekModel = { ...WEEK, days: [day('2026-11-16', 'Mon 16 Nov', {
       slots: [slot(at('0%', '10%', SCRIPT), 0, { day: SCRIPT, typeName: SCRIPT })],
-      appointments: [{ ...at('0%', '10%', '11:00–12:15'), appointmentId: APPOINTMENT, who: SCRIPT, typeName: SCRIPT, note: SCRIPT, colour: 0, beside: false, short: false }],
+      appointments: [{ ...at('0%', '10%', '11:00–12:15'), appointmentId: APPOINTMENT, who: SCRIPT, typeName: SCRIPT, note: SCRIPT, colour: 0, beside: false, short: false, shown: '11:00–12:15' }],
     })] };
     const scripted: AppointmentDetail = { ...DETAIL, when: SCRIPT, typeName: SCRIPT, who: SCRIPT, note: SCRIPT, booked: SCRIPT, hint: SCRIPT };
     const { listUsersState$ } = mounted(state({ week }), 'admin', [scripted]);
@@ -975,7 +975,7 @@ describe('mountWeek', () => {
   const TWO: WeekModel = {
     ...WEEK,
     days: [
-      { ...WEEK.days[0]!, appointments: [...WEEK.days[0]!.appointments, { ...at('70%', '10%', '15:00–16:00'), appointmentId: OTHER_APPOINTMENT, who: 'You', typeName: 'Swimming Pool', note: '', colour: 5, beside: false, short: false }] },
+      { ...WEEK.days[0]!, appointments: [...WEEK.days[0]!.appointments, { ...at('70%', '10%', '15:00–16:00'), appointmentId: OTHER_APPOINTMENT, who: 'You', typeName: 'Swimming Pool', note: '', colour: 5, beside: false, short: false, shown: '15:00–16:00' }] },
       ...WEEK.days.slice(1),
     ],
   };
@@ -1508,9 +1508,9 @@ describe('mountWeek', () => {
             slot(at('10%', '10%', '09:00–10:00'), 5, { places: 'Full', full: true, start: '2026-11-16T08:00:00.000Z', end: '2026-11-16T09:00:00.000Z' }),
           ],
           appointments: [
-            { ...at('30%', '10%', '11:00–12:00', 0, 3), appointmentId: 'appt-x', who: 'erin', typeName: 'Swimming Pool', note: '', colour: 5, beside: false, short: false },
-            { ...at('30%', '10%', '11:00–12:00', 1, 3), appointmentId: 'appt-y', who: 'fred', typeName: 'Swimming Pool', note: '', colour: 5, beside: false, short: false },
-            { ...at('30%', '10%', '11:00–12:00', 2, 3), appointmentId: 'appt-z', who: 'gina', typeName: 'Swimming Pool', note: '', colour: 5, beside: false, short: false },
+            { ...at('30%', '10%', '11:00–12:00', 0, 3), appointmentId: 'appt-x', who: 'erin', typeName: 'Swimming Pool', note: '', colour: 5, beside: false, short: false, shown: '11:00–12:00' },
+            { ...at('30%', '10%', '11:00–12:00', 1, 3), appointmentId: 'appt-y', who: 'fred', typeName: 'Swimming Pool', note: '', colour: 5, beside: false, short: false, shown: '11:00–12:00' },
+            { ...at('30%', '10%', '11:00–12:00', 2, 3), appointmentId: 'appt-z', who: 'gina', typeName: 'Swimming Pool', note: '', colour: 5, beside: false, short: false, shown: '11:00–12:00' },
           ],
           groups: [GROUP],
         }),
@@ -1576,6 +1576,13 @@ describe('mountWeek', () => {
         const shortOne: WeekModel = { ...CAPACITY, days: [{ ...CAPACITY.days[0]!, appointments: CAPACITY.days[0]!.appointments.map((a, i) => ({ ...a, short: i === 0 })) }] };
         mounted(state({ week: shortOne }), 'admin');
         expect(all('.appointment').map((button) => button.classList.contains('short'))).toEqual([true, false, false, false]);
+      });
+
+      it('a block draws the time it is given to show, its start alone, and is named with its whole time', () => {
+        const narrow: WeekModel = { ...CAPACITY, days: [{ ...CAPACITY.days[0]!, appointments: CAPACITY.days[0]!.appointments.map((a, i) => ({ ...a, short: i === 0, shown: i === 0 ? '11:00' : a.shown })) }] };
+        mounted(state({ week: narrow }), 'admin');
+        const first = all('.appointment')[0]!;
+        expect([first.querySelector('.time')!.textContent, first.getAttribute('aria-label')]).toEqual(['11:00', `Mon 16 Nov 11:00–12:00 ${CAPACITY.days[0]!.appointments[0]!.who}`]);
       });
 
       it('a slot of capacity one says "free", as the page always did', () => {

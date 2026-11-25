@@ -143,9 +143,11 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
     element.onclick = () => openBook(block, timeZone);
     return element;
   };
-  const appointmentFor = (block: AppointmentBlock) => {
+  // A screen reader is told the whole time, also when the block shows its start alone.
+  const appointmentFor = (block: AppointmentBlock, dayLabel: string) => {
     const element = place('tpl-appointment', block, block.colour);
-    element.querySelector('.time')!.textContent = block.time;
+    element.querySelector('.time')!.textContent = block.shown;
+    element.setAttribute('aria-label', [dayLabel, block.time, block.who, block.note].filter((text) => text !== '').join(' '));
     element.querySelector('.who')!.textContent = block.who;
     element.querySelector('.note')!.textContent = block.note;
     element.classList.toggle('beside', block.beside);
@@ -172,13 +174,13 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, role
       ...day.windows.map(windowFor),
       ...day.busy.map(busyFor),
       ...day.slots.map((slot) => slotFor(slot, model.timeZone)),
-      ...day.appointments.map(appointmentFor),
+      ...day.appointments.map((block) => appointmentFor(block, day.label)),
       ...day.groups.map(groupFor),
     );
-    // An appointment and a group show their time, and their day is the column they stand in: a
-    // screen reader, which reaches a button without its column, is told the day first. A slot
-    // has its name already.
-    for (const button of body.querySelectorAll('button:not(.slot)')) button.setAttribute('aria-label', `${day.label} ${button.textContent.trim()}`);
+    // A group shows its time, and its day is the column it stands in: a screen reader, which
+    // reaches a button without its column, is told the day first. A slot and an appointment have
+    // their names already.
+    for (const button of body.querySelectorAll('button:not([aria-label])')) button.setAttribute('aria-label', `${day.label} ${button.textContent.trim()}`);
     return element;
   };
   const itemFor = (id: string, text: string, colour?: number) => {

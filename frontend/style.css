@@ -127,6 +127,10 @@ button.block.beside.lane-2-of-3 { left: calc((100% - var(--room)) * 2 / 3); widt
    above and below, and a line exactly as tall as its letters, so that its time and its User
    can still be read. */
 button.block.short { padding-block: 0; line-height: 1; }
+/* A short appointment that shares its width shows its start and its User on its one line: less
+   padding at the sides, and a name too long for what is left ends in "…". */
+button.block.short:not(.lane-0-of-1) { flex-wrap: nowrap; padding-inline: 0.2rem; }
+button.block.short:not(.lane-0-of-1) .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 button.block:hover { filter: brightness(0.95); }
 button.block:focus-visible { outline-offset: 1px; z-index: 1; }
 

@@ -75,7 +75,7 @@ describe('weekModel', () => {
 
     it('the User\'s own appointment says "You", with its type and its note', () => {
       expect(monday.appointments).toEqual([
-        { top: '30%', height: '10%', time: '11:00–12:00', ...FULL, appointmentId: 'appt-2026-11-16T10:00:00.000Z', who: 'You', typeName: 'Studio', note: 'First lesson', colour: colourOf(STUDIO), beside: false, short: false },
+        { top: '30%', height: '10%', time: '11:00–12:00', ...FULL, appointmentId: 'appt-2026-11-16T10:00:00.000Z', who: 'You', typeName: 'Studio', note: 'First lesson', colour: colourOf(STUDIO), beside: false, short: false, shown: '11:00–12:00' },
       ]);
     });
 
@@ -549,6 +549,15 @@ describe('weekModel', () => {
     it('marked short: every appointment drawn at the least height, 15 minutes included; none longer', () => {
       const day = dayOf([at('09:00', '09:05', 'a'), at('11:00', '11:15', 'b'), at('13:00', '13:20', 'c'), at('15:00', '16:00', 'd')]);
       expect(day.appointments.map((a) => [a.who, a.short])).toEqual([['a', true], ['b', true], ['c', false], ['d', false]]);
+    });
+
+    it('a short one alone shows its whole time; beside another, its start alone, the other its whole time', () => {
+      expect(dayOf([at('10:10', '10:15', 'alice')]).appointments.map((a) => [a.time, a.shown])).toEqual([['10:10–10:15', '10:10–10:15']]);
+      expect(dayOf([at('10:15', '11:00', 'bob'), at('10:10', '10:15', 'alice')]).appointments.map((a) => [a.who, a.time, a.shown])).toEqual([
+        ['bob', '10:15–11:00', '10:15–11:00'],
+        ['alice', '10:10–10:15', '10:10'],
+      ]);
+      expect(dayOf([at('10:00', '10:05', 'a'), at('10:05', '10:10', 'b'), at('10:10', '10:15', 'c')], 'admin').appointments.map((a) => a.shown)).toEqual(['10:00', '10:05', '10:10']);
     });
 
     it('followed at once by 10:15–11:00: the two side by side, the short one on the left, each its own height', () => {
