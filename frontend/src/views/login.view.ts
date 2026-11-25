@@ -37,9 +37,11 @@ export function mountLogin(root: HTMLElement, login: LoginDeps, notice = ''): Su
   const subscription = login.loginState$.subscribe((state) => {
     const asking = state.status === 'new_password_required' || state.status === 'answering';
     if (asking && !choosing) password.value = '';
-    if (!asking && choosing) password.focus();
+    const back = !asking && choosing;
     choosing = asking;
     form.hidden = asking;
+    // The form is shown first: a browser gives no keyboard to a field of a hidden form.
+    if (back) password.focus();
     button.disabled = state.status === 'pending';
     error.textContent = state.status === 'failure' ? failureText(state.reason) : '';
   });

@@ -200,6 +200,17 @@ describe('mountLogin', () => {
     expect(document.activeElement).toBe(password);
   });
 
+  it('back from "Choose your password": the keyboard is given to the password once its form is shown', () => {
+    const { state$, form, password } = mounted();
+    state$.next({ status: 'new_password_required', username: 'anna' });
+    // happy-dom lets a field of a hidden form take the keyboard, a browser does not: so the test
+    // looks at whether the form was shown when the field was given it.
+    const shownAtFocus: boolean[] = [];
+    password.addEventListener('focus', () => shownAtFocus.push(!form.hidden));
+    state$.next({ status: 'idle' });
+    expect(shownAtFocus).toEqual([true]);
+  });
+
   it('left while a new password is asked for: the form is shown again for the next time', () => {
     const { state$, form, subscription } = mounted();
     state$.next({ status: 'new_password_required', username: 'anna' });

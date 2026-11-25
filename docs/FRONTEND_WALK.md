@@ -744,7 +744,7 @@ signed in here, and is not a check.
      "Password changed." at the login; `alice` signs in with `Alice-Local-Pass-1!`; sign out.
 132. As `admin`, checks 123, 126, 127 (with `Admin-Local-Pass-1!` and `Walk-<tag>-Admin-1!`),
      128 and 129, then 131 back to `Admin-Local-Pass-1!`. → The same, with "Password" after
-     "Availability".
+     "My details".
 133. `[=]` The console. → Besides the known report of `zod`, only the browser's own line for each
      answer 400, those of checks 126 and of the wrong sign-ins of check 128. No password, no token
      in any line.
