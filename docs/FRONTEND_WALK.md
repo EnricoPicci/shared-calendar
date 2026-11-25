@@ -336,8 +336,9 @@ Sign out, sign in as `admin`.
     the name, the e-mail, "Edit" and "Delete"; one request, `GET /users`.
 54. `[K]` `[=]` Type `Bob` and press "Create user"; then `ab`. → Refused under the field, in
     the words of the hint, which is shown once, in red; `[N]` no request.
-55. `[K]` Type `alice`, "Create user". → A failure in plain words under the field's box: a user
-    with this username exists already. The field is not marked.
+55. `[K]` Fill the four facts, type `alice`, "Create user", "Confirm". → In the dialog, a
+    failure in plain words: a user with this username exists already; "Back" and "Confirm" stay.
+    The field is not marked. "Back".
 56. `[K]` `[N]` Fill the four facts, type `walk-<tag>` and press "Create user". → A dialog "Send
     an invitation" says "An invitation will be sent to walk-<tag>@example.com.", with "Back" and
     "Confirm". Nothing is sent yet: no `POST /users`.
@@ -987,7 +988,7 @@ restarted with `MAIL_STAGE` `off`, as check 186 does; it leaves nothing, since n
 
 203. `[N]` With the API at `MAIL_STAGE` `off`: in "Users" fill the form for `walk-<tag>-off`,
      "Create user", "Confirm". → In the dialog "E-mail is not available yet."; one `POST /users`
-     answered 503; the list has no `walk-<tag>-off`. "Close". On the row of an invited User,
+     answered 503; the list has no `walk-<tag>-off`. "Back". On the row of an invited User,
      "Resend invitation", "Confirm" → the same sentence.
 204. Set `MAIL_STAGE` back to `on` and restart the API. → "Create user" and "Confirm" invite
      again (check 57). Delete what was made.

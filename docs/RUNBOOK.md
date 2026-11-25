@@ -88,10 +88,13 @@ both fit into its 30 minutes; otherwise run it again before the second.
    `script -q -c "npm run deploy -w backend" /tmp/deploy.txt`: the prompt stays interactive.
    Never `> out.txt` inside the repository: the new file makes the tree dirty and the deploy
    refuses, and the change set and its prompt would go to the file instead of the screen.
-5. `npm run smoke -w backend -- shared-calendar-api` (asks for the admin password; `-w backend` is
-   needed, the root has no `smoke` script): all 49 lines must say PASS (10 Hello World checks,
-   9 calendar checks: section 2.1; 16 of the capacity of a type: section 2.3; 7 of the
-   assistant: section 3.2; 7 of the change of password: section 2.2). Once the assistant is
+5. `npm run smoke -w backend -- shared-calendar-api` (asks for the admin password, and at
+   `MailStage` `on` for your own e-mail address, for the invitation's check; `-w backend` is
+   needed, the root has no `smoke` script): every line must say PASS. At `on`, 61 lines (11 Hello
+   World and Users checks, 9 calendar checks: section 2.1; 19 of the capacity of a type: section
+   2.3; 7 of the assistant: section 3.2; 7 of the change of password: section 2.2; 6 of the
+   invitation and 2 of the mail: section 2.4); at `off` or `domain`, 58 (section 2.4). At `on`
+   one invitation reaches your mailbox: look that it came. Once the assistant is
    deployed the smoke test needs its key (section 3.2), and its exchange costs about a US cent
    at Anthropic. `script -q -c "…" /tmp/smoke.txt` works here too; the
    password prompt does not echo, so the password does not reach the file.
@@ -210,7 +213,7 @@ After the assistant's exchange and before the user's deletion, the throw-away us
 own password straight at Cognito, as the page's screen "Password" does (`docs/ARCHITECTURE.md`
 section 6.9). No Lambda runs and nothing reaches a log of the stack. Both passwords, the access
 token and the refresh token stay in the script's variables and pipes; the two new passwords come
-from the generator of `POST /users`, checked against the page's rule. Its lines, all starting
+from the script's own generator, checked against the pool's rule. Its lines, all starting
 with `password:`:
 
 | Line | Checks |
@@ -235,15 +238,15 @@ that journey found the hour free of any window and active appointment and left i
 cancelled appointment blocks nothing), so the new window overlaps no real one
 (`docs/SHARED_CALENDAR_SPEC.md` R-AV-01) and there is no second search. It runs only when the
 calendar journey ended; otherwise one line `capacity: not run, …` says so (a FAIL). Two more
-throw-away users, `smoke-<epoch>-b` and `smoke-<epoch>-c`, are made like the first, through
-`POST /users`. The Administrator books, so the settings' notice, horizon and limit do not bear on
+throw-away users, `smoke-<epoch>-b` and `smoke-<epoch>-c`, are made like the first (section
+2.4). The Administrator books, so the settings' notice, horizon and limit do not bear on
 the date; nothing of the settings, no real type and no real person's appointment is touched, and
 no booking is forced on a real slot. Its lines, all starting with `capacity:`:
 
 | Line | Checks |
 |---|---|
-| `POST /users smoke-<epoch>-b -> 201 with a password` | the second user |
-| `POST /users smoke-<epoch>-c -> 201, signed in as it` | the third user, who also signs in |
+| `POST /users smoke-<epoch>-b -> 201, invited`, `a permanent password set for smoke-<epoch>-b …` | the second user, made as section 2.4 says (three lines at `off` and `domain`) |
+| the same two for `smoke-<epoch>-c`, then `signed in as smoke-<epoch>-c, no challenge` | the third user, who also signs in |
 | `POST /calendar/types smoke-cap-<epoch> capacity 2 -> 201, capacity 2` | a type of its own that holds two people |
 | `POST /calendar/windows <date> 03:00-04:00 of smoke-cap-<epoch> -> 201` | its one-off window |
 | `overbook: true as smoke-<epoch>-c -> 403 forbidden, nothing written` | a User's own booking with `overbook` is refused, and that User has no appointment (`docs/SHARED_CALENDAR_SPEC.md` AC-41) |
@@ -284,6 +287,45 @@ extra users. The refused bookings write nothing. No type, no window and no user 
   Administrator, delete the window, then the type, then the user, in this order, as in
   section 2.1.
 
+### 2.4 The smoke test's Users, invitation and mail
+
+The smoke test reads the stack's `MailStage` and says it on its first line
+(`docs/ARCHITECTURE.md` section 9.3). Its throw-away Users, `smoke-<epoch>` and the capacity
+journey's two, never write to a real mailbox: their address is SES's mailbox simulator,
+`success@simulator.amazonses.com`, and the script gives each a permanent password of its own
+making, so that it signs in without the invitation. Only the invitation's check uses your own
+address.
+
+| Stage | How each throw-away User is made (lines starting `journey 6:` or `capacity:`) |
+|---|---|
+| `on` | `POST /users <name> -> 201, invited` (Cognito mails the simulator), then `a permanent password set for <name> through scripts/cognito.mjs` |
+| `off`, `domain` | `POST /users <name> -> 503 mail_unavailable, nothing made`, then `<name> made straight in Cognito, with its four facts, in group user`, then the password's line |
+
+At `on`, after the change of password, the lines starting `invitation:` and `mail:`:
+
+| Line | Checks |
+|---|---|
+| `POST /users smoke-<epoch>-i -> 201, invited: the invitation is on its way` | a User with your address; **the invitation reaches your mailbox**, from `noreply@<domain>`: look for it, and in the spam folder |
+| `GET /users lists smoke-<epoch>-i as invited` | its state in the Users screen |
+| `POST /users/smoke-<epoch>-i/invitation -> 202, sent again` | a second invitation, with a new temporary password, reaches you |
+| `… /users/smoke-<epoch>/invitation -> 409 not_invited` | a User who has chosen a password is not invited again |
+| `… /users/admin/invitation -> 403 cannot_edit_admin` | an administrator is never invited |
+| `DELETE /users/smoke-<epoch>-i -> 204, the account is gone` | the two invitations you received open nothing any more |
+| `POST /mail/calendar <today> to <today> as admin -> 202, queued` | a mail on demand to the Administrator's own address |
+| `the mailer's log line says sent, after <n> s` | the mailer sent it through SES, read in the log group `/aws/lambda/<stack>-mailer` within a minute; the mail itself, with its Excel file, reaches the Administrator's mailbox |
+
+At `off` and `domain`, instead, `invitation: … -> 503 mail_unavailable` and `mail: … -> 503
+mail_unavailable`, and no address is asked for.
+
+Against the local stack the invitation's address is a made-up one and cognito-local prints the
+invitation in its log; the resend's success prints `SKIP` (cognito-local cannot resend), and the
+mail's last line is `the mail reached the fake mail …`, since the mailer's own line is in
+`local:lambda`'s terminal. The local run needs `local:lambda` running. It ends `PASSED (3
+check(s) skipped on the local stack)`.
+
+If the run stops half-way, the clean-up deletes `smoke-<epoch>-i` with the other Users; a
+`CLEANUP FAILED:` line names it, to delete in the page's Users screen.
+
 ---
 
 ## 3. Deploying from scratch (new stack, new account or after deleting it)
@@ -309,7 +351,8 @@ Plan step 11 has the full list; in short:
    status is `FORCE_CHANGE_PASSWORD` and the smoke test cannot sign in.
 4. The assistant's key, `npm run assistant-key -w backend -- shared-calendar-api`, after
    Anthropic's side is ready (section 3.2). Then `npm run smoke -w backend -- shared-calendar-api`:
-   49 PASS (sections 2.1, 2.2, 2.3 and 3.2); without the key, 48 and the assistant's one FAIL. On a new
+   at `MailStage` `off`, 58 PASS (sections 2.1 to 2.4 and 3.2); without the key, the assistant's
+   one FAIL. E-mail's stages follow in section 3.3. On a new
    stack the calendar is empty, so the first date searched is free.
 5. `npm run budget -w backend -- shared-calendar-api --dry-run`, then
    `npm run budget -w backend -- shared-calendar-api`. The
@@ -434,7 +477,7 @@ account's owner):
    refuses `local`, `hello-world-api`, a stack it cannot read (no login) and a stack without
    the assistant (deploy first); a key that does not start with `sk-ant-` or holds a space is
    refused before anything is stored. `docs/COMMANDS.md` section 6 has its messages.
-5. The smoke test again: **49 PASS**. Its exchange costs about a US cent at Anthropic (up to 4
+5. The smoke test again: every line PASS (section 2, step 5). Its exchange costs about a US cent at Anthropic (up to 4
    when the assistant has been silent for a few minutes). When the FAIL of step 3 is still
    there, read the function's log line (below): `key_missing` is P2.
 6. **The page released again**, section 2, step 6, from the same commit and inside the same 30
@@ -491,10 +534,51 @@ other route.
 3. Wait ten minutes: each function keeps the key it read for ten minutes, so the old key may
    still serve until then.
 4. Delete the old key in the Console.
-5. The smoke test: 49 PASS.
+5. The smoke test: every line PASS (section 2, step 5).
 
 A key that leaked is deleted in the Console at once, without waiting: the assistant then
 answers `503` (`key_refused`) until step 2 is done and ten minutes have passed.
+
+### 3.3 E-mail: the stages (a draft, run and corrected in `docs/EMAIL_PLAN.md` steps m9 and m10)
+
+E-mail is switched on in two deploys, because SES must first prove the domain, which waits for
+DNS, and lift the sandbox, which waits for AWS (`docs/ARCHITECTURE.md` section 9.2,
+`docs/EMAIL_ARCHITECTURE.md` section 13.2). Each deploy is section 2's steps 1 to 6, with the one
+line of `backend/samconfig.toml` changed: `MailStage=off` → `domain` → `on`. `MailDomain`,
+`MailFromLocalPart`, `MailFromName` and `PageAddress` are already in that line; `MailReplyTo` is
+left out, so replies and bounce reports go to `AlertEmail`. No e-mail address goes into the file.
+
+**Before the deploy at `domain`** (read-only checks):
+
+1. The deploying profile may create Cognito's service-linked role (`iam:CreateServiceLinkedRole`),
+   which `EmailConfiguration` needs at `on`: a policy simulation, which changes nothing.
+2. A change set with `MailStage=on`, created, read and deleted, never executed: the user pool
+   must show "Modify", never "Replacement", and nothing else a replacement.
+3. The Users that exist were created with a permanent password and no invitation: the plan
+   decides what becomes of them (step m9 deletes them in the page, the last thing before the
+   deploy, after noting who needs an account again).
+
+**At `domain`**, after the deploy and its smoke test (58 PASS, `off`'s count):
+
+- The stack's outputs `MailDkimRecord1` to `3`: at the domain's DNS provider (the same place as
+  the page's records, `docs/CUSTOM_DOMAIN.md`), add each as a CNAME, its name and its value; and
+  the DMARC record, TXT `_dmarc.<domain>`, `v=DMARC1; p=none;`. SES verifies the domain by itself,
+  in minutes to hours (SES console, `eu-north-1`, Identities).
+- In the Reply-To mailbox (the alarm address unless `MailReplyTo` was given): "Confirm
+  subscription" in AWS's mail for the bounces' topic.
+- In the SES console: request production access, with the use case of
+  `docs/EMAIL_ARCHITECTURE.md` section 8.5. Until it is granted SES writes only to verified
+  addresses and to the mailbox simulator.
+- In the page, as the Administrator: "My details" (the four facts) and the daily mail's hour.
+- The operator's test User, the one way to try the User's side while `POST /users` answers `503`:
+  `npm run test-user -w backend -- cloud <username>` (your own address and a temporary password,
+  typed), then sign in on the page and choose a password. Delete it in the Users screen when done.
+
+**At `on`**, once SES shows the domain verified and the account out of the sandbox: the deploy,
+the smoke test (61 PASS, section 2.4) and its invitation in your mailbox; a User created in the
+page with your own address, its invitation, its first sign-in; a mail on demand from the week
+page; the next morning, the daily mail. A bounce report, should one come, reaches the Reply-To
+mailbox: correct the User's address in the Users screen and "Resend invitation".
 
 ---
 
@@ -978,8 +1062,25 @@ nobody was told beforehand. The commits were not pushed before, during or after 
 ## 6. A person's password: what to tell them
 
 Nobody can change another person's password: not the Administrator, not the API, not the
-operator through the page (`docs/ARCHITECTURE.md` section 6.9). There is no e-mail, so there is no
-"forgot my password" either.
+operator through the page (`docs/ARCHITECTURE.md` section 6.9). Nobody hands a User's password
+over either: Cognito makes the first one and e-mails it (`docs/ARCHITECTURE.md` section 6.3).
+There is no "forgot my password".
+
+**A new User** (once `MailStage` is `on`):
+
+- The Administrator creates the account in the page's "Users", with the person's e-mail. The
+  page shows the address once more before sending: check it, since a wrong address that belongs
+  to someone else would give them the account.
+- The person receives an invitation from `noreply@<domain>`: their username, a temporary
+  password and the page's address. Tell them to look in the spam folder too.
+- At the first sign-in with it the page says "Choose your password": they type a password of
+  their own twice, with the same hints as the screen "Password". From then on the Users screen
+  shows them `active`.
+- The temporary password works for 7 days. Past that, or if the mail never came, the
+  Administrator presses "Resend invitation" (the User is still `invited`): a new mail, with a new
+  temporary password; the old one opens nothing. A wrong address: correct the e-mail in the Users
+  screen first, then resend. A User shown `active` who says they never signed in: someone else
+  did; delete the account and create it again with the right address.
 
 **A person who knows their password** and wants another one, a User or the Administrator:
 
@@ -997,10 +1098,10 @@ operator through the page (`docs/ARCHITECTURE.md` section 6.9). There is no e-ma
 **A person who lost their password:**
 
 - **A User:** the Administrator deletes the account in the page's "Users" and creates it again
-  with the same username. The page shows the new password once; hand it over out of band (in
-  person, by phone), never by e-mail or chat. Deleting the account cancels the User's future
-  appointments (`docs/SHARED_CALENDAR_SPEC.md` section 10.2): book them again for the new account
-  if needed. The User can then change the handed-over password in "Password".
+  with the same username and their address: a new invitation goes to them. Deleting the account
+  cancels the User's future appointments (`docs/SHARED_CALENDAR_SPEC.md` section 10.2): book them
+  again for the new account if needed. Before `MailStage` is `on` no User can be created, so this
+  waits.
 - **The Administrator:** the operator runs `npm run bootstrap-admin -w backend --
   shared-calendar-api` in a terminal set up as in section 1, item 3, and types the new password
   twice. It sets the password only; the Administrator's appointments and data stay.

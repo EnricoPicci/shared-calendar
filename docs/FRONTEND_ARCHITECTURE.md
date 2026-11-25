@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v27 — "Choose your password", the first sign-in with a temporary password, in the login's place (2026-11-25, `docs/EMAIL_PLAN.md` step m7; sections 4, 5.1 and 6). v26 — the settings' section "Daily e-mail", the Administrator's (2026-11-25, `docs/EMAIL_PLAN.md` step m5; sections 4, 5.1 and 6). v25 — the week's "E-mail…" dialog, for both roles (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4; sections 4, 5.1 and 6). v24 — the four facts of a person on the users screen, its Edit dialog, and the screen "My details" (2026-11-25, `docs/EMAIL_PLAN.md` steps m1 and m2; sections 4, 5.1 and 6). v23 — the assistant's panel says a refused change for the person's role (2026-11-24, `docs/CAPACITY_PLAN.md` step u6, section 6.1). v22 — **the capacity of a type on the screens** (2026-11-24, `docs/CAPACITY_PLAN.md` step u5, brief `prompts/e15-step-u5-implementation.md`): a slot's places, the Administrator's full slot and a slot under appointments as a tab beside them, the Administrator's overlapping appointments side by side or as one block with its list, "Book anyway" after `slot_taken`, the `user_busy` sentences that name the appointment in the way, a type's capacity in the form and in the dialog "Edit type" (sections 4, 5.1 and 11); walked against the local stack (`docs/FRONTEND_WALK.md` section 10). v21 — **the password screen built** (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3, brief `prompts/e05-step-p3-implementation.md`): a sixth screen, "Password", last for both roles (section 6), its logic in section 5.1, the login's "Password changed" and the reaction of the shell to a change (section 6), the bundle's fourth constant (section 12.1); walked against the local stack (`docs/FRONTEND_WALK.md` section 9). v20 — the view layer **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12, walked at step c13 on 2026-11-23); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`), **written** (`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21, brief `prompts/94-step-70-implementation.md`: the template, the deploy command and its gate) **and deployed** (step 72, 2026-11-21, brief `prompts/96-step-72-implementation.md`): the stack `shared-calendar-web` exists and the page is in use at the address of its output `PageUrl`; section 13 says what is built and deployed, with how each thing was seen. `docs/FRONTEND_DEPLOY_PLAN.md` is done (its step 73, 2026-11-21, brief `prompts/97-step-73-implementation.md`), **with checks at the deployed page still owed**: a refresh with the revoked token refused by the real Cognito, a session renewed after its fifteen minutes, "Sign out" with the network off, a reload and the console, and the rest of the walk with the phone width (the open items of `docs/RUNBOOK.md` section 5.5); **logout is built** (step 71, 2026-11-21, brief `prompts/95-step-71-implementation.md`: `docs/FRONTEND_SERVICES.md` v8, section 20; here sections 6 and 13.7), proven against the local stack, and at the deployed page as far as the revocation answered 200. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it. |
+| Status | v28 — the invitation on the users screen: a last look at the address before "Confirm", the answer that says where the invitation went, each User's state, "Resend invitation"; no password shown (2026-11-25, `docs/EMAIL_PLAN.md` step m8; sections 4, 5.1, 8 and 11). v27 — "Choose your password", the first sign-in with a temporary password, in the login's place (2026-11-25, `docs/EMAIL_PLAN.md` step m7; sections 4, 5.1 and 6). v26 — the settings' section "Daily e-mail", the Administrator's (2026-11-25, `docs/EMAIL_PLAN.md` step m5; sections 4, 5.1 and 6). v25 — the week's "E-mail…" dialog, for both roles (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4; sections 4, 5.1 and 6). v24 — the four facts of a person on the users screen, its Edit dialog, and the screen "My details" (2026-11-25, `docs/EMAIL_PLAN.md` steps m1 and m2; sections 4, 5.1 and 6). v23 — the assistant's panel says a refused change for the person's role (2026-11-24, `docs/CAPACITY_PLAN.md` step u6, section 6.1). v22 — **the capacity of a type on the screens** (2026-11-24, `docs/CAPACITY_PLAN.md` step u5, brief `prompts/e15-step-u5-implementation.md`): a slot's places, the Administrator's full slot and a slot under appointments as a tab beside them, the Administrator's overlapping appointments side by side or as one block with its list, "Book anyway" after `slot_taken`, the `user_busy` sentences that name the appointment in the way, a type's capacity in the form and in the dialog "Edit type" (sections 4, 5.1 and 11); walked against the local stack (`docs/FRONTEND_WALK.md` section 10). v21 — **the password screen built** (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3, brief `prompts/e05-step-p3-implementation.md`): a sixth screen, "Password", last for both roles (section 6), its logic in section 5.1, the login's "Password changed" and the reaction of the shell to a change (section 6), the bundle's fourth constant (section 12.1); walked against the local stack (`docs/FRONTEND_WALK.md` section 9). v20 — the view layer **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12, walked at step c13 on 2026-11-23); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`), **written** (`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21, brief `prompts/94-step-70-implementation.md`: the template, the deploy command and its gate) **and deployed** (step 72, 2026-11-21, brief `prompts/96-step-72-implementation.md`): the stack `shared-calendar-web` exists and the page is in use at the address of its output `PageUrl`; section 13 says what is built and deployed, with how each thing was seen. `docs/FRONTEND_DEPLOY_PLAN.md` is done (its step 73, 2026-11-21, brief `prompts/97-step-73-implementation.md`), **with checks at the deployed page still owed**: a refresh with the revoked token refused by the real Cognito, a session renewed after its fifteen minutes, "Sign out" with the network off, a reload and the console, and the rest of the walk with the phone width (the open items of `docs/RUNBOOK.md` section 5.5); **logout is built** (step 71, 2026-11-21, brief `prompts/95-step-71-implementation.md`: `docs/FRONTEND_SERVICES.md` v8, section 20; here sections 6 and 13.7), proven against the local stack, and at the deployed page as far as the revocation answered 200. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it. |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders; and, since v13, how the page is hosted and deployed (section 13) |
 | Not in scope | Keeping the session across a reload, the size of the bundle, a domain of our own: open points of section 10, none of which blocked the deployment. The design of the logout service: it is `docs/FRONTEND_SERVICES.md` section 20; section 13.7 here keeps the direction and what follows from it for the page |
 | Depends on | `docs/FRONTEND_SERVICES.md` v9 (the services the views use, the sign-out and the assistant among them), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work of the views), `docs/FRONTEND_DEPLOY_PLAN.md` (the order of work of the hosting) |
@@ -41,6 +41,7 @@
 | v25 | 2026-11-25 | `docs/EMAIL_PLAN.md` steps m3 and m4 (brief `prompts/mail-m04-pair-m3-m4-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 6.5 and 9.1. Section 4: the week's "E-mail…" button and its dialog `dialog.mail`, two dates, the week on show by default, the address the mail goes to, masked. Section 5.1: `mail.screen.ts`; `texts.ts` gains `MAIL_TEXTS` and the sentence of a refused range; `WeekScreen.range()`. Section 6: the shell makes one `MailScreen` per person, with a `MeService` of its own. |
 | v26 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m5 (brief `prompts/mail-m05-daily-mail-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 6.2 and 11. Section 4: the settings screen gains a part "Daily e-mail" after its form, `section.daily-mail`, with a switch, the hour as `07:00` and the calendar's time zone beside it, its own Save, and "E-mail is not available yet." in place of its fields when the route answers `503 mail_unavailable`. Section 5.1: `daily-mail.model.ts`, `daily-mail.screen.ts`; `texts.ts` gains `DAILY_MAIL_TEXTS`. Section 6: the shell makes one `DailyMailScreen` per person, with a `MailSettingsService` of its own, mounted and started beside the settings. |
 | v27 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m7 (brief `prompts/mail-m07-first-sign-in-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` section 5.2. Section 4: "Choose your password", `section.first-password` inside `#login`, shown in place of the sign-in form (`form.sign-in`) while the `LoginService` asks for a new password: the account's name, two fields with the password screen's hints, "Choose password" and "Cancel"; the login view hides its form meanwhile, wipes the temporary password and keeps the username for the way back. Section 5.1: `choose-password.screen.ts`; `password.model.ts` gains the hints of the two new fields (`newPasswordHints`, `againHint`, `newHintStands`, `EMPTY_NEW_HINTS`), which `passwordHints` now uses for its own two; `texts.ts` gains the sentences of `session_expired` and `password_refused`. Section 6: `runShell` makes one `ChoosePasswordScreen`, which lives as long as the page; `mountShell` takes it as `choose` and mounts and starts it with the login view. Section 11: decisions 195 to 199. Section 7.1 is not measured again; the new files' sizes are in section 4. |
+| v28 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m8 (brief `prompts/mail-m08-invitation-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 5.1 to 5.3.1, 9.1 and 11. Section 4: the users screen's password dialog `dialog.created` is removed; "Create user" opens the invitation's dialog `dialog.invite`, "Send an invitation": the last look ("An invitation will be sent to …", "Back" and "Confirm"), then the answer ("An invitation was sent to …") with "Close", which gets the keyboard, or a failure said in the dialog, "E-mail is not available yet." among them; the form loses its failure line; a row shows the state, `invited` or `active`, and "Resend invitation" for an invited User, which opens the same dialog. Section 5.1: `users.model.ts` gains the state of a row, `resendLabel`, `inviteQuestion` and `invitedAnswer`; `UsersScreen` gains `invite` in its state (`InviteState`), `resend`, `confirm` and `closeInvite`, and loses `creating`, `failure` and `created`; the view no longer reads the service's create state. Section 8: the dialogs and the focus, the Escape key (no dialog has `closedby`), a password in the tests. Section 11: decisions 77, 78, 81 and 83 no longer hold; decisions 200 to 207. Section 7.1 is not measured again; the users view's size is in decision 207. The walk's checks: `docs/FRONTEND_WALK.md` checks 56 to 60 and 203 to 205. |
 | v22 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u5 (brief `prompts/e15-step-u5-implementation.md`), with the Product Owner's four decisions and one found in the walk: the capacity of a type on the screens. Section 4: the slot's template says its places; a slot that appointments overlap is a tab beside them; the group block and its list dialog, `dialog.group`; "Book anyway" in the book dialog; the types' form and the dialog "Edit type" gain the capacity. Section 5.1: `week.model.ts` (places, `full`, `tab`, `beside`, the columns and the groups), `booking.ts` (`overbook`, `inTheWay`, `refusalOf`), `availability.model.ts` (`TypeFields`, `typeFor`), `texts.ts` (`failureText` told who attempted), `Moving.who`, `WeekScreen.refusal`; the lanes paragraph widened to the Administrator's overlapping appointments; the Administrator's sentence of `user_busy`. Section 8: the table of where the keyboard is. Section 11: decisions 184 to 193. |
 | v20, note | 2026-11-23 | The branch `deploy-frontend` merged into `main`, where the assistant's panel had been written at the same time. The panel's two versions, first numbered v13 and v14, are v19 and v20, after the hosting's v13 to v18; its decisions, first numbered 138 to 153, are 159 to 174, after the hosting's 138 to 158; every reference to them was changed with them. The status row says both. No other text changed. |
 
@@ -581,7 +582,6 @@ one field:
     <p class="hint" id="username-hint"></p>       <!-- what a username is, set by the script -->
     <p class="error refusal" role="alert"></p>    <!-- the same words, when the text was refused -->
   </div>
-  <p class="error failure" role="alert"></p>      <!-- a create the server refused, or that failed -->
   <div class="actions"><button class="primary submit">Create user</button></div>
 </form>
 ```
@@ -592,11 +592,13 @@ one field:
   announced. The field names the hint as its description (`aria-describedby`).
 - **A browser neither offers nor corrects a username**: `autocomplete="off"`,
   `autocapitalize="none"`, `spellcheck="false"`. No pattern and no length is in the page.
-- **"Create user" sends the field as text**, as it is, to the logic object. The field is
+- **"Create user" sends the field as text**, as it is, to the logic object, which opens the
+  invitation's dialog (below); nothing goes to the server before its "Confirm". The field is
   emptied only when the stream brings another object for it, which is after a create that
   succeeded; after a refusal or a failure what was typed stays.
-- **A name that exists is the form's failure, not a field in fault**: it is the server's
-  answer, said under the field's box in plain words, and the field is not marked.
+- **A name that exists is the server's answer, not a field in fault**: it is said in plain
+  words in the invitation's dialog, after "Confirm", and the field is not marked. The form has
+  no line of its own for a failure.
 - The form is outside the list the script redraws (section 3, rule 4); the rows hold buttons
   and nothing to type in.
 
@@ -613,9 +615,13 @@ reads, fills, marks and empties the four the same way in every form that holds t
 - **The create form** has the username and the four facts; on the users screen the browser
   offers nothing (`autocomplete="off"`): the facts are another person's. A success empties all
   five; a refusal or a failure keeps what was typed.
-- **A row** shows the username, the name ("Alice Liddell") and the e-mail, then "Edit" and
-  "Delete" (`.ask-edit`, `.ask-delete`, each named for its user, "Edit alice"). The row wraps on
-  a narrow screen, and an e-mail breaks where it must rather than leave the row.
+- **A row** shows the username, the name ("Alice Liddell"), the e-mail and the state of the
+  account, `invited` until the first sign-in and `active` after it (`.status`; the row of an
+  invited User has the class `is-invited`, which colours its state as a thing to do), then
+  "Edit", "Resend invitation" for an invited User only, and "Delete" (`.ask-edit`,
+  `.ask-resend`, `.ask-delete`, each named for its user: "Edit alice", "Resend the invitation to
+  alice"). The row wraps on a narrow screen, and an e-mail breaks where it must rather than leave
+  the row.
 - **The Edit dialog** (`dialog.edit`, a dialog with a form, the pattern of the availability's
   dialogs): its title names the user, its form the four facts filled from the row, then
   `.failure`, "Cancel" and "Save". Opening it starts its state clean; "Cancel" and the Escape
@@ -623,62 +629,71 @@ reads, fills, marks and empties the four the same way in every form that holds t
   success asked for since it opened (the logic's `saved` is a new object each time). A failure
   is said under the form, and the dialog stays open with what was typed.
 
-**The password dialog** (`dialog.created`, inside `#users`). Creating a user shows the password
-the server generated, once: it cannot be shown again and no route sets another
-(`docs/FRONTEND_SERVICES.md` section 2, rule 6, the one exception, and section 13.7).
+**The invitation's dialog** (`dialog.invite`, inside `#users`; `docs/EMAIL_ARCHITECTURE.md`
+sections 5.1, 5.3 and 5.3.1). Creating a user sends the User an e-mail with a temporary
+password, which Cognito makes: the page never sees a password. What can go wrong is the address,
+which the Administrator typed, so the dialog shows it once more before anything is sent, and
+again once the invitation went. "Resend invitation" on an invited User's row opens the same
+dialog with that User's address.
 
 ```html
-<dialog class="created" aria-labelledby="created-title" closedby="none">
-  <h3 id="created-title" tabindex="-1" autofocus>User created</h3>
-  <dl><dt>Username</dt><dd class="username"></dd><dt>Password</dt><dd class="password"></dd></dl>
-  <p>This password cannot be shown again. Give it to the user now.</p>
-  <div class="actions"><button type="button" class="primary understood">I have noted the password</button></div>
+<dialog class="invite" aria-labelledby="invite-title" aria-describedby="invite-question">
+  <h3 id="invite-title">Send an invitation</h3>
+  <p class="question" id="invite-question"></p> <!-- "An invitation will be sent to anna@example.com." -->
+  <p class="answer" role="status"></p>          <!-- "An invitation was sent to anna@example.com." -->
+  <p class="error" role="alert"></p>
+  <div class="actions">
+    <button type="button" class="back">Back</button>
+    <button type="button" class="primary submit">Confirm</button>
+    <button type="button" class="primary done" hidden>Close</button>
+  </div>
 </dialog>
 ```
 
 ```ts
-let createAsked = false;                       // a create was asked for from this mount
-const forget = () => { createdName.textContent = ''; password.textContent = ''; };
-created.oncancel = (event) => event.preventDefault();
-find('dialog.created .understood').onclick = () => { created.close(); forget(); };
-form.onsubmit = (event) => { event.preventDefault(); createAsked = true; screen.create(field.value); };
-users.createUserState$.subscribe((state) => {  // the service's own state: the password is there
-  if (!createAsked || state.status !== 'success') return;
-  createAsked = false;
-  createdName.textContent = state.user.username;
-  password.textContent = state.user.password;
-  created.showModal();
-});
+inviteBack.onclick = () => screen.closeInvite();
+inviteDone.onclick = () => screen.closeInvite();
+inviteSubmit.onclick = () => screen.confirm();
+invite.oncancel = () => screen.closeInvite();      // the Escape key closes it, and the logic agrees
+// in the subscription to users$:
+const look = state.invite;                         // null while the dialog is closed
+inviteQuestion.textContent = look?.question ?? '';
+inviteAnswer.textContent = look?.answer ?? '';
+inviteError.textContent = look?.failure ?? '';
+const went = look?.answer != null;                 // the question, "Back" and "Confirm" give way to "Close"
+if (went && inviteDone.hidden) { inviteDone.hidden = false; inviteDone.focus(); }
+inviteSubmit.disabled = look?.sending ?? false;
+if (look !== null && !invite.open) invite.showModal();
+if (look === null && invite.open) invite.close();
 ```
 
-- **Where the password is.** In one element of the dialog, through `textContent`, from the
-  opening to the close: in no attribute, no field, not in the address or the title, and in no
-  `console` call. It comes from the service's own create state, read by the view at the moment
-  it shows it; it never passes through the logic layer (section 5.1).
-- **Where it goes.** The button takes it out of the page in the same handler that closes the
-  dialog, not at the `close` event, which a browser sends a moment later. Leaving the view
-  (another screen, signing out) closes the dialog and takes it out too (section 3, rule 9).
-- **Shown once.** The service keeps the create's success, password included, until the next
-  create or the end of the session. A success that was there when the view was mounted is an
-  earlier visit's: the dialog opens only for a create asked for from this mount (the "asked"
-  of the shape of a dialog). **Known limit:** a create left under way when the screen is left
-  is answered to nobody: the user exists, its password was never shown, and the Administrator
-  deletes the user and creates it again.
-- **The Escape key does not close it**, pressed once or many times: a key pressed by mistake
-  must not lose the password. `closedby="none"` is what holds in Chromium (section 8); the
-  `cancel` event is refused as well, for a browser that does not know the attribute. A click
-  outside it closes no modal dialog. The other dialogs of the page keep closing with Escape.
-- **The keyboard lands on the heading**, not on the button (`tabindex="-1"` and `autofocus`
-  on the `<h3>`): Enter or the space bar pressed by habit when the dialog appears does
-  nothing, and the button is the next Tab. A screen reader says the dialog's name, "User
-  created" (`aria-labelledby`).
-- **No "Copy" button**, and the page never touches the clipboard. The password is plain text
-  in a fixed-width face, large enough to tell `l` from `1` and `O` from `0`; one click selects
-  it whole (`user-select: all`), to be copied by hand.
+- **The logic layer says whether it is open and what it shows** (`UsersState.invite`, section
+  5.1); the view only copies its texts and tells the logic of each button. "Create user" checks
+  the form first: a field refused opens nothing.
+- **The last look.** The question names the address as the shared rule makes it (spaces
+  removed, lower-cased): "An invitation will be sent to anna@example.com." Nothing is sent yet.
+  "Back" and the Escape key close it with nothing done, and the form keeps what was typed; a
+  click outside it closes no modal dialog.
+- **"Confirm"** sends the creation (or the resend) once; it and "Create user" are out of use
+  while the call is under way.
+- **The answer.** Once the invitation went, the dialog says where, "An invitation was sent to
+  anna@example.com.", in place of the question; "Back" and "Confirm" are hidden and "Close" is the
+  one button. The keyboard was on "Confirm", which is now hidden, so the view moves it to "Close",
+  once: the one line of the users' view that moves the focus. Behind the dialog the form is
+  empty and the list, read again, has the new User, `invited`.
+- **A failure** is said in the dialog in plain words (`failureText`): a name that exists, "E-mail
+  is not available yet." while e-mail is not switched on in the stack, the resend's "This user has
+  already chosen a password: there is no invitation to send again."; a creation the server
+  failed, "The user could not be created, and nothing was kept. Please try again in a moment."
+  (`docs/EMAIL_ARCHITECTURE.md` section 5.1). The dialog stays open with
+  "Back" and "Confirm", which tries again.
+- **Closed while the call is under way**, the call goes on: the list is read again at its result,
+  and the dialog does not open again for it.
+- **No password is in the page**, at any moment; the address is in the dialog's two sentences only,
+  and leaving the view (another screen, signing out) closes the dialog and empties them (section
+  3, rule 9).
 - **A list that arrives behind it** (the read after the create, the tab shown again) redraws
   the rows and leaves the dialog as it is.
-- **While it is open nothing else of the page can be reached**, "Sign out" included: it is a
-  modal dialog. A session that ends by itself meanwhile closes it through the view's teardown.
 
 **A dialog that confirms a deletion** (`dialog.delete`, inside `#users`; the pattern of the
 dialog that confirms on the availability screen, below).
@@ -968,8 +983,8 @@ step p3 for the password's two, `docs/EMAIL_PLAN.md` step m2 for the facts' thre
 | `appointments.screen.ts` | The class `AppointmentsScreen`: which of the two lists is on show, the period of the history, the time zone read from the settings, the loads and reloads, the detail of one of its appointments, and the hand-over of one to the week screen |
 | `settings.model.ts` | Pure, for the settings form: what the fields are filled with (`settingsFields`), what the form says beside them (`settingsInfo`: the time zone, who saved last and when), the range of a field with its words (`settingRange`), and from what the fields hold to the body of the save or to the refusals (`settingsFor`) |
 | `settings.screen.ts` | The class `SettingsScreen`: the settings read when the screen is shown, the save with its checks, and the read that follows every save |
-| `users.model.ts` | Pure, for the users screen: the list ready to draw (`userRows`: the username, the name and the e-mail, the facts the Edit dialog opens with, and the names of its "Edit" and "Delete" buttons; `sameRow`), the Edit dialog's title (`editTitle`), the sentence of an empty list (`NO_USERS`), what a username is in words (`USERNAME_HINT`), from what the field holds to the username to create or to the refusal (`usernameFor`), and the words of the dialog that confirms a deletion (`deleteQuestion`) |
-| `users.screen.ts` | The class `UsersScreen`: the list read when the screen is shown, a create with its checks (the username and the four facts), the Edit dialog's state and save, and the list read again after every create, edit and delete and when the page becomes visible |
+| `users.model.ts` | Pure, for the users screen: the list ready to draw (`userRows`: the username, the name, the e-mail and the state of the account, the facts the Edit dialog opens with, and the names of its "Edit", "Resend invitation" (an invited User's only) and "Delete" buttons; `sameRow`), the two sentences of the invitation's dialog (`inviteQuestion`, `invitedAnswer`), the Edit dialog's title (`editTitle`), the sentence of an empty list (`NO_USERS`), what a username is in words (`USERNAME_HINT`), from what the field holds to the username to create or to the refusal (`usernameFor`), and the words of the dialog that confirms a deletion (`deleteQuestion`) |
+| `users.screen.ts` | The class `UsersScreen`: the list read when the screen is shown, a create with its checks (the username and the four facts) and the invitation's dialog, its last look at the address before "Confirm", the resend of an invitation through the same dialog, the Edit dialog's state and save, and the list read again after every create, resend, edit and delete and when the page becomes visible |
 | `availability.model.ts` | Pure, for the availability screen. The types: the list ready to draw (`typeRows`, with "· 3 places" and the fields "Edit type" opens with), the sentence of an empty list (`NO_TYPES`), what a name and a capacity are in words (`TYPE_NAME_HINT`, `TYPE_CAPACITY_HINT`), what the form starts with (`STARTING_TYPE`), from what the field holds to the name or to the refusal (`typeNameFor`), from the two fields to the type or to the refusals (`typeFor`), the question before a deletion (`deleteTypeQuestion`). The patterns: the choices of the form's lists (`WEEKDAY_CHOICES`, `START_CHOICES`, `END_CHOICES`, `typeChoices`), what the form starts with (`startingFields`), the fields of an existing pattern (`patternFields`), from what the form holds to the body or to the refusals (`patternFor`), the list grouped by weekday and ready to draw (`patternGroups`), the question before a deletion (`deletePatternQuestion`) |
 | `conflicts.ts` | Pure: `conflictList(conflicts, zone)`, the appointments in the way of a refused change of availability, ready to draw, with the sentence that counts them |
 | `availability.screen.ts` | The class `AvailabilityScreen`: the settings (for the time zone), the types and the patterns read when the screen is shown, the four writes that have a check, and the lists read again after every write and when the page becomes visible; and `known$`, what it knows, for the object of a single date |
@@ -1380,39 +1395,56 @@ export class DailyMailScreen {
 ```ts
 // `rows` is the last list read: null until there is one and after a read that failed, and
 // another object only when the users read differ from those on show. `field` is what the
-// username field is filled with: another object only when it is to be emptied. `refusal` is
-// why the text typed was not sent, `failure` why a create that was sent did not succeed,
-// `created` the username of the last create that succeeded.
+// form is filled with: another object only when it is to be emptied. `refusal` is why the
+// username was not sent, `refusals` why each fact was not. `invite` is the invitation's dialog,
+// null while it is closed.
 export type UsersState = {
   loading: boolean; unread: string | null; rows: readonly UserRow[] | null; empty: string | null;
-  field: NewUserFields; creating: boolean; refusal: string | null; refusals: ProfileRefusals;
-  failure: string | null; created: string | null; edit: EditState;
+  field: NewUserFields; refusal: string | null; refusals: ProfileRefusals;
+  invite: InviteState | null; edit: EditState;
 };
+// The invitation's dialog: the last look at the address (`question`); `sending` while the
+// creation or the resend is under way; then `answer`, where the invitation went, or `failure`.
+export type InviteState = { question: string; sending: boolean; answer: string | null; failure: string | null };
 // The Edit dialog: `saving` while a save is under way, `refusals` and `failure` until the next save
 // or opening, `saved` another object at each success of a save asked for from the dialog.
 export type EditState = { saving: boolean; refusals: ProfileRefusals; failure: string | null; saved: object | null };
 
 export class UsersScreen {
   readonly users$: Observable<UsersState>;
-  // `users`: `listUsers`, `listUsersResult$`, `createUser`, `createUserResult$` and
-  // `deleteUserResult$` of the UsersService. `visible$` notifies each time the page becomes visible.
+  // `users`: `listUsers`, `createUser`, `resendInvitation`, `updateUser` and the results of
+  // those four and of the delete, of the UsersService. `visible$` notifies each time the page
+  // becomes visible.
   constructor(users: UsersCalls, visible$: Observable<unknown>) { … }
   start(): Subscription { … }      // reads the list
   retry(): void { … }              // reads again, after a read that failed
   typed(fields: NewUserFields): void { … }  // checks again a refused fact
-  create(fields: NewUserFields): void { … } // checks the five; creates the user, or says why not
+  create(fields: NewUserFields): void { … } // checks the five; opens the invitation's dialog, or says why not
+  resend(row: UserRow): void { … }          // an invited User's row: opens the same dialog
+  confirm(): void { … }                     // "Confirm": the creation or the resend is sent, once
+  closeInvite(): void { … }                 // "Back", "Close" or the Escape key
   editOpened(): void { … }                  // the Edit dialog starts clean
   editTyped(fields: ProfileFields): void { … }
   save(username: string, fields: ProfileFields): void { … } // checks the four; sends them
 }
 ```
 
+- **The invitation's dialog** (`docs/EMAIL_ARCHITECTURE.md` section 5.3.1). `create` checks
+  the five fields and, when all are right, keeps the new user and opens the dialog with
+  `inviteQuestion(email)`, the address as the shared rule makes it; `resend` does the same for
+  an invited User's row, with the row's address. Only `confirm` calls the service, once per
+  look (not while `sending`, not after the answer). The result is shown in the dialog that sent
+  it, if it is still open: a success as `invitedAnswer(email)`, a failure as `failureText`, but
+  a creation the server failed (`internal_error`) as `CREATE_FAILED`, "The user could not be
+  created, and nothing was kept. …" (the route deletes what it half made).
+  `closeInvite` closes it; a call already sent goes on, and the list is read again at its
+  result. A create that succeeds empties the form, whether the dialog is open or not.
 - **The facts** are checked like the username, with the shared rule and nothing else
   (`profile.model.ts`); all five are judged at "Create user", so every refusal shows at once.
   **The edit hears only its own updates**: the `UsersService` is shared with "My details", and
   an update this screen did not ask for (`editAsked`) changes nothing here. After an edit asked
   here, a failure included, the list is read again.
-- **One request.** A row is the username, the name, the e-mail and its two buttons. The creation date that
+- **One request.** A row is the username, the name, the e-mail, the state and its buttons. The creation date that
   `GET /users` also gives is not shown, so the screen needs no time zone and asks for nothing
   but the list. The order is the server's: by username, never an administrator
   (`docs/SHARED_CALENDAR_SPEC.md` section 10.1).
@@ -1429,18 +1461,19 @@ export class UsersScreen {
   (section 11, decision 27). A name accepted here and refused there would be a defect.
 - **A name that exists is the server's to say**: "admin" and "alice" pass the check, the
   server answers `user_exists`, and the stream carries that as `failure`, not as a refusal.
-- **The generated password never passes through this object.** The screen reads a create's
-  result through a type of its own (`CreateOutcome`: a success with its username, or a failure
-  with its reason), which the service's result fits and which does not name the password: no
-  line of the logic layer can read it, no state can hold it, and no fixture of the logic's
-  tests stands for one. The stream says that a create is under way (`creating`), that it
-  failed and why (`failure`), or for which username it succeeded (`created`). The view takes
-  the password from the service's own state (section 4). The view does not use `created`.
+- **No password passes through this object**, nor through the service: the creation's answer
+  is the username and the state `invited` (`docs/FRONTEND_SERVICES.md` section 13.5). The
+  screen reads a create's and a resend's result through types of its own (`CreateOutcome`,
+  `ResendOutcome`: a success, or a failure with its reason), so it uses nothing of a success but
+  the fact that it came.
+- **The state of the account** is the server's (`GET /users`): a row says `invited` or `active`,
+  and only an invited row has a `resendLabel`, so only it offers "Resend invitation". Two reads
+  that differ only in a User's state are different lists, and the rows are drawn again.
 - **Reading.** `start()` reads the list; until it arrives the stream says `loading`. A read
   that fails is `unread`, in plain words, in the place of the list, and `retry()` reads again;
   the form stays usable meanwhile. **A list that could not be read again is taken off the
   screen**: it is no longer known to be true (a user deleted from elsewhere may be in it).
-- **The list is read again** after every result of a create and of a delete, a failure
+- **The list is read again** after every result of a create, a resend and a delete, a failure
   included: a failed write may have been applied (`docs/SHARED_CALENDAR_SPEC.md` section
   16.3), and a delete answered `user_not_found` means the list on show is old. And every time
   the page becomes visible, through the stream the shell hands the week and the list screens.
@@ -1457,9 +1490,10 @@ export class UsersScreen {
   two never ask together. This screen takes no list that was there before its `start()` (the
   book dialog may have left one) and reads its own; the book dialog asks at every opening
   (section 4), so a user created here is in its list and a deleted one is not, with no code
-  for it. `createUser` and `deleteUser` are this screen's only.
+  for it. `createUser`, `resendInvitation` and `deleteUser` are this screen's only.
 - **What is kept, and what is not.** Nothing: the end of the subscription of `start()`
-  forgets the list, what the form said and what was typed, and the next `start()` reads.
+  forgets the list, what the form said, what was typed and the invitation's dialog with its
+  address, and the next `start()` reads.
 
 **"My details"** (`#me`, `frontend/src/views/me.view.ts`, `MeScreen`; both roles;
 `docs/EMAIL_ARCHITECTURE.md` section 9.1). A small screen that reads `GET /me` when shown and when
@@ -2444,8 +2478,9 @@ first and the third held by `page.test.ts` from now on:
 
 **The dialogs and the focus**, as Chromium 159 does it at a desktop width, each dialog opened
 by keyboard from the element named (probed at `docs/FRONTEND_VIEW_PLAN.md` step 69; the lines of
-the steps below say the same of single cases). No line of the views moves the focus: this is
-the native modal `<dialog>`, and one `autofocus` in the page (section 11, decision 134).
+the steps below say the same of single cases). One line of the views moves the focus in a
+dialog, to the invitation's "Close" (section 4); the rest is the native modal `<dialog>`, with no
+`autofocus` in the page (section 11, decision 134).
 **In every dialog Tab stays inside it.**
 
 | Dialog | Opened from | The keyboard is on, when it opens | After "Close", "Keep" or the Escape key | After its action succeeded |
@@ -2455,7 +2490,7 @@ the native modal `<dialog>`, and one `autofocus` in the page (section 11, decisi
 | The list of a group (`dialog.group`) | The Administrator's block of four or more | The first row | Back on the block | A row closes it and opens the detail: the keyboard is in the detail, and after it on nothing |
 | Detail (`dialog#detail`), from the week | An appointment | The note's field; "Close" when the note cannot be edited | Back on the appointment | "Save note" and "Cancel appointment" close it: on nothing (the week was redrawn; after a cancellation the appointment is gone); one Tab: the first slot or appointment of the week. "Change": on nothing, since the appointment's button is disabled while moving; one Tab: the next slot after it |
 | Detail, from "My appointments" | A row | The same | Back on the row | "Save note", "Cancel appointment": on nothing (the list was redrawn, or the row is gone); one Tab: the first row. "Change": the week is shown |
-| The password (`dialog.created`) | "Create user", or Enter in the field | Its heading, "User created" (`autofocus`): Enter and the space bar do nothing there; one Tab: its button | The Escape key does not close it | Its button: back where the keyboard was, the username field or "Create user" |
+| The invitation (`dialog.invite`) | "Create user", or Enter in a field; a row's "Resend invitation" | "Back", the first button | Back where the keyboard was, as the browser does it | "Confirm": the view moves the keyboard to "Close", the one button left (`docs/FRONTEND_WALK.md` check 57) |
 | Delete a user (`dialog.delete` of `#users`) | A row's "Delete" | "Keep" | Back on the row's "Delete" | "Delete user": on nothing (the row is gone); one Tab: the first "Delete" of the list |
 | Edit type (`dialog.rename`) | A row's "Edit" | The name | Back on the row's "Edit" | On nothing (the list was redrawn); one Tab: the first "Edit" of the list |
 | Change a pattern (`dialog.change`) | A row's "Change" | "Weekday" | Back on the row's "Change" | On nothing (the list was redrawn); one Tab: the first "Change" of the list |
@@ -2562,16 +2597,17 @@ What the tests of the users rely on (plan step 66), and what was learnt in the b
   event refused (`preventDefault()`): the dialog stays open at the first and at the second
   press and **closes at the third**, whatever the handler does: a page cannot keep refusing.
   With the attribute `closedby="none"`: no `cancel` event at all, and the dialog stays open
-  however many times the key is pressed (eight in a row in the check). The page uses both: the
-  attribute is what holds, the refusal is for a browser that does not know the attribute. A
-  click outside a modal dialog closes it in none of these cases.
+  however many times the key is pressed (eight in a row in the check). A click outside a modal
+  dialog closes it in none of these cases. The page uses neither today: the dialog they were
+  for, the one that showed a created user's password, is gone with the password, and every
+  dialog of the page closes with Escape (`page.test.ts` checks that no dialog has `closedby`).
 - **`happy-dom` 21 has neither**: no Escape key, no `cancel` event of its own, and `closedby`
-  is an attribute like any other. The view's test sends a `cancel` event itself and checks that
-  it is refused, and `page.test.ts` checks the attribute; that the dialog stays open under the
-  key is the browser's only.
-- **`autofocus` and where the keyboard lands** when a dialog opens are the browser's only
-  (`happy-dom` moves no focus). In Chromium the heading of the password dialog has it, Enter
-  and the space bar there do nothing, and one Tab reaches the button.
+  is an attribute like any other. The view's test of the invitation's dialog sends a `cancel`
+  event itself and checks that it tells the logic layer and is not refused.
+- **Where the keyboard lands** when a dialog opens is the browser's only (`happy-dom` moves
+  no focus by itself). The one `focus()` of the users' view, to the invitation's "Close", is
+  seen by the view's test (`document.activeElement`); that "Back" has the keyboard at the
+  opening is for the browser check.
 - **A `close` event that arrives late.** `happy-dom` sends `close` inside `close()`; a browser
   sends it a moment later, and input that arrives meanwhile is handled first. A test stands
   for it by sending a `close` event itself after the dialog was opened again: the delete
@@ -2583,9 +2619,11 @@ What the tests of the users rely on (plan step 66), and what was learnt in the b
   (`dialog .noted { display: contents; }`, the detail's note): in the browser it was invisible
   and out of the keyboard's reach, with every test green. A new class is looked for in
   `style.css` before it is used, and the browser check reaches every button by keyboard.
-- **A password in the tests.** The view's and the shell's tests use made-up texts as the
-  generated password and look for them in the whole document's source, in every field's value
-  and in the address; the logic's tests have none. No test takes a snapshot.
+- **A password in the tests** is a made-up text, in the views' and the shell's tests only, and
+  "nowhere in the document" is looked for in the whole document's source, in every field's value
+  and in the address; the logic's tests have none. No test takes a snapshot. The users' tests
+  hold no password since the creation answers none; the shell's test of a sign-out with the
+  invitation's dialog open looks for the address in the same way.
 - **The shell's test of a second person** no longer looks for a word. It compares the whole
   page (its source and what every field holds) as the Administrator finds it after a User was
   there with the page the Administrator finds when nobody was there before, with the clock
@@ -2835,13 +2873,13 @@ than what the trial showed: these deserve the first look in a review.
 | 74 | Two wordings decided at the reviews of steps 63 and 64: the book dialog's two lists of times are labelled "Start" and "End"; `appointment_limit_reached` after a change has its own sentence (sections 4 and 5.1) | "From" and "To" were also the words of the two lines above them in the confirmation. A change books nothing more, so "Cancel one to book another" did not say what to do | |
 | 75 | The label of the limit says "per person", not "per User" (section 4) | The page's fixed texts are in the document also while they are hidden, and the shell's test of a second person signing in looks for the word "User", the first person's role, in the whole frame. **That reason ended with plan step 66**, whose screen is called "Users": the test now compares whole pages (decision 87). The label stays as it is | Yes |
 | 76 | No condition of section 7 was met at plan step 65 | `settings.view.ts` is 110 lines, 16 of which look a node up. The fields are in a fixed form, not in a redrawn region; the refusals are shown and cleared by one loop of the subscription, not by a helper that builds or updates nodes | |
-| 77 | The password dialog has no "Copy" button; the password is plain text, to be selected and copied by hand, and the page never touches the clipboard (section 4) | Decided with the Product Owner (`docs/FRONTEND_VIEW_PLAN.md` step 66). One click selects the whole password, through the style sheet (`user-select: all`), which touches no clipboard | The selection by one click, yes |
-| 78 | The password dialog is closed by its button only, "I have noted the password": `closedby="none"` on the dialog, and its `cancel` event refused (sections 4 and 8) | Decided with the Product Owner: the password cannot be shown again and no route sets another, so a key pressed by mistake must not lose it. In Chromium a refused `cancel` alone gives way at the third Escape; the attribute holds. The other dialogs keep closing with Escape | |
+| 77 | ~~The password dialog has no "Copy" button; the password is plain text, to be selected and copied by hand, and the page never touches the clipboard (section 4)~~ No longer holds since v28: the dialog that showed a created user's password is gone, since the creation answers none (decision 200) | Decided with the Product Owner (`docs/FRONTEND_VIEW_PLAN.md` step 66). One click selects the whole password, through the style sheet (`user-select: all`), which touches no clipboard | The selection by one click, yes |
+| 78 | ~~The password dialog is closed by its button only, "I have noted the password": `closedby="none"` on the dialog, and its `cancel` event refused (sections 4 and 8)~~ No longer holds since v28: the dialog that showed a created user's password is gone, since the creation answers none (decision 200) | Decided with the Product Owner: the password cannot be shown again and no route sets another, so a key pressed by mistake must not lose it. In Chromium a refused `cancel` alone gives way at the third Escape; the attribute holds. The other dialogs keep closing with Escape | |
 | 79 | Deleting asks first, in a dialog with two buttons, "Keep" and "Delete user", which names the user and says that their future appointments will be cancelled and that this cannot be undone; nothing is typed to confirm (section 4) | Decided with the Product Owner. A deleted user cannot be brought back, unlike a cancelled slot (decision 35) | |
 | 80 | A row of the users shows the username only; the creation date is not shown (section 5.1) | Decided with the Product Owner: the screen then needs no time zone and makes one request | |
-| 81 | The generated password goes from the service's own create state to one element of the page, through `textContent`, and out at the dialog's close and at the view's teardown; it never passes through the logic layer, whose screen reads a create's result through a type that does not name it (sections 4 and 5.1) | `docs/FRONTEND_SERVICES.md` section 2, rule 6 and section 13.7. No state object, no fixture of the logic's tests and no log of a stream can then hold it. The price: the view listens to one stream of the service beside the screen's, and the stream's `created` is used by no view. Known limit: a create left under way when the screen is left shows its password to nobody | Yes |
+| 81 | ~~The generated password goes from the service's own create state to one element of the page, through `textContent`, and out at the dialog's close and at the view's teardown; it never passes through the logic layer, whose screen reads a create's result through a type that does not name it (sections 4 and 5.1)~~ No longer holds since v28: the dialog that showed a created user's password is gone, since the creation answers none (decision 200) | `docs/FRONTEND_SERVICES.md` section 2, rule 6 and section 13.7. No state object, no fixture of the logic's tests and no log of a stream can then hold it. The price: the view listens to one stream of the service beside the screen's, and the stream's `created` is used by no view. Known limit: a create left under way when the screen is left shows its password to nobody | Yes |
 | 82 | The username is checked in `logic/users.model.ts` with the shared `Username` schema, spaces around it removed and nothing else changed; its refusal and the hint under the field are the same sentence, written once, and the style sheet hides the hint while the refusal shows (sections 4 and 5.1) | Decision 66 again, for a text. The pattern and the lengths stay in `shared/`; the numbers are in the sentence's words only, and a test holds them to the schema | The hint hidden, yes |
-| 83 | When the password dialog opens the keyboard is on its heading, one Tab before the button (section 4) | The brief of the step allowed either. A button with the keyboard on it is pressed by Enter and by the space bar: the same slip the Escape key was closed against | Yes |
+| 83 | ~~When the password dialog opens the keyboard is on its heading, one Tab before the button (section 4)~~ No longer holds since v28: the dialog that showed a created user's password is gone, since the creation answers none (decision 200) | The brief of the step allowed either. A button with the keyboard on it is pressed by Enter and by the space bar: the same slip the Escape key was closed against | Yes |
 | 84 | No dialog has a handler of the `close` event: what a dialog is about and its "asked" are replaced at the next opening, and the list of users is applied to the book dialog while `book.open` (sections 4 and 8) | Found in the browser check of step 66: the event can arrive after the dialog was opened again, and a handler that forgets then breaks the new opening. The delete dialog was built without one; the handlers of the detail and of the book dialog were removed at the review of the step, with a test of the late event for each of the three | Yes |
 | 85 | A list of users that could not be read again is taken off the screen; users read again that are those on show keep the same rows object (section 5.1) | The week keeps its last week under a failure; a list with "Delete" buttons that may be old is better not offered. The same object keeps the keyboard on a row's button through the read after a refused delete and when the tab is shown again | Yes |
 | 86 | "Delete user" calls the `UsersService` from the view; "Create user" goes through the `UsersScreen` (sections 4 and 5.1) | Section 2: a view may call a service, and the logic layer holds only what would otherwise end up in a view. A create has a check and words; a delete has none | |
@@ -2949,6 +2987,14 @@ than what the trial showed: these deserve the first look in a review.
 | 197 | Its hints are the password screen's, from `password.model.ts`: the shared rule's sentences and the second field's; `passwordHints` is built on the same two pieces | The brief of `docs/EMAIL_PLAN.md` step m7: the rule and the live checks reused, not copied. A first password has no current one, so there is no `same_as_current` | |
 | 198 | The temporary password is wiped from the sign-in form when "Choose your password" opens; the username stays, for the way back after Cancel or after Cognito's 3 minutes | `docs/FRONTEND_SERVICES.md` section 2, rule 6: a password stays no longer than it is needed. The way back is a sign-in again, with the same name | |
 | 199 | The page keeps no clock for the challenge: its end is Cognito's refusal of the answer, said as "This took too long. Please sign in again." on the sign-in form | Decided by the Product Owner for `docs/EMAIL_PLAN.md` step m7: Cognito is the one that knows; a clock in the page could disagree with it. Locally cognito-local never ends a challenge, so the sentence is shown by the tests only until the cloud | A countdown on the screen |
+| 200 | Creating a user shows no password: the page sends an invitation. "Create user" opens the invitation's dialog, `dialog.invite`, with a last look at the address ("An invitation will be sent to …", "Back" and "Confirm"); only "Confirm" sends; the answer says the address again ("An invitation was sent to …") with "Close" (sections 4 and 5.1). `dialog.created` and its password are removed | `docs/EMAIL_ARCHITECTURE.md` sections 5.1, 5.3.1 and 11, and the brief of `docs/EMAIL_PLAN.md` step m8: Cognito makes the temporary password and mails it, so the page never sees one; a wrong address is the risk left, and the look before sending is its practical safeguard | |
+| 201 | "Resend invitation" uses the same dialog, with the User's address; it is offered on an invited User's row only (`resendLabel` null for an active one) | `docs/EMAIL_ARCHITECTURE.md` section 5.3: an account that has chosen its password is answered `not_invited`, so the button is not offered for it. The same look, the same answer and the same failures as a creation | |
+| 202 | The dialog is the logic layer's: `UsersState.invite` says whether it is open and what it shows; the view copies its texts and tells `confirm` and `closeInvite` of its buttons and of the Escape key. A result is shown only in the dialog that sent it, while it is open | Section 3, rule 1: what the dialog says is decided out of the view. The screen keeps which call was sent from the dialog (`inviteAsked`), as the "asked" of the shape of a dialog does | |
+| 203 | A failure of a creation is said in the invitation's dialog, which stays open with "Back" and "Confirm"; the form has no failure line of its own (`form.create .failure` removed) | The creation is sent from the dialog, so its answer belongs there; "Confirm" tries again with no retyping | |
+| 204 | When the invitation went, the view moves the keyboard to "Close", once: the one `focus()` of a dialog in the views, against decision 134's "no focus management of our own" | The keyboard was on "Confirm", which is then hidden: without it the keyboard is on nothing inside an open modal dialog | Yes |
+| 205 | The invitation's dialog closes with the Escape key, like every other dialog of the page; no dialog has `closedby` | Nothing is lost by closing it: the invitation is in the User's mailbox, and "Resend invitation" sends another | |
+| 206 | A row shows the account's state as the server's word, `invited` or `active`, the invited one coloured as a thing to do (`.is-invited`) | `docs/EMAIL_ARCHITECTURE.md` sections 5.3 and 11: the state tells the Administrator whether the invitation was used | |
+| 207 | No condition of section 7 was met at `docs/EMAIL_PLAN.md` step m8 | `users.view.ts` is 210 lines (158 of code) and listens to two streams; 35 of its lines look a node up or copy a template. The new dialog has no field, its buttons are in the page, and one loop of the subscription fills it | |
 
 ## 12. The tooling (open points O4, O6 and O8, decided)
 
@@ -3045,10 +3091,12 @@ decision 40), those of "My appointments": the status of a row, the empty list an
 period's refusals (`appointments.model.ts`), and those of the settings: the range under a
 field, a field's refusal and the line about the last save (`settings.model.ts`), and those of
 the users: what a username is, which is the hint and the refusal, the sentence of an empty
-list, the name of a row's button for a screen reader and the question of the delete dialog
-(`users.model.ts`); the fixed words of the two dialogs of the users ("User created", "This
-password cannot be shown again. Give it to the user now.", "I have noted the password",
-"Delete user", "Keep") are in the page. Those of the availability are made by the logic
+list, the names of a row's buttons for a screen reader, the two sentences of the invitation's
+dialog ("An invitation will be sent to …", "An invitation was sent to …"), the creation's
+server failure (`CREATE_FAILED`) and the question of
+the delete dialog (`users.model.ts`); the state of a row (`invited`, `active`) is the server's
+word; the fixed words of the dialogs of the users ("Send an invitation", "Back", "Confirm",
+"Close", "Resend invitation", "Delete user", "Keep") are in the page. Those of the availability are made by the logic
 layer too: what a type's name and its capacity are, which are the hints and the refusals,
 a type's places ("· 3 places"), the refusals of a
 pattern's fields, the two sentences of an empty list, the word for a type that is not known,

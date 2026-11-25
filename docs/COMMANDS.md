@@ -341,6 +341,13 @@ mailer as `local:lambda` names it); and sections of their own for `MailerFunctio
   calendar journeys empty the local `calendar` table first** (helper `resetCalendarTable()`,
   which refuses any endpoint but `localhost`/`127.0.0.1`): calendar data made by hand is lost
   when they run.
+- **The creation answers no password**, so every journey that creates a User through
+  `POST /users` sets it one right after, with cognito-local's `AdminSetUserPassword`
+  (`Permanent: true`): `setPasswordOf` in `backend/tests/integration/setup.ts`,
+  `setPermanentPassword` in `frontend/tests/integration/local.ts` (both the project's test value
+  `THROWAWAY_PASSWORD` unless given one); `setTemporaryPassword` of `local.ts` gives a temporary
+  one instead, to walk the first sign-in. The invitation cognito-local prints in its log is not
+  read.
 - `RUN_INTEGRATION=1 npm run test:integration -w frontend`: runs `frontend/tests/integration`
   (`login.service.test.ts`, `journeys.test.ts`, `logout.service.test.ts`, `calendar.test.ts`,
   `change-password.test.ts`, `profiles.test.ts`, `mail.test.ts` and `assistant.test.ts`: the services against cognito-local on 9229
@@ -355,7 +362,11 @@ mailer as `local:lambda` names it); and sections of their own for `MailerFunctio
   `alice`; it leaves that user's deleted-user marker in `calendar`, and nothing else. The block
   `first sign-in with a temporary password` of `login.service.test.ts` plays its own throw-away
   user `fe-first`, removed first and last, given a temporary password by `setTemporaryPassword`
-  of `local.ts`; it leaves that user's deleted-user marker, and nothing else. `calendar.test.ts` **never resets the local
+  of `local.ts`; it leaves that user's deleted-user marker, and nothing else. The block
+  `the invitation` of the same file plays `fe-invited`, removed first and last: created through
+  `UsersService` (`invited`), given a temporary password by `setTemporaryPassword`, its "Choose
+  your password" answered (`active`), and the resend's refusals (`409`, `403` for `admin`, `404`);
+  the resend's success is not reachable locally. `calendar.test.ts` **never resets the local
   `calendar` table**:
   - it works on top of what the back-end journeys and the smoke test leave, creates only types
     named `fe-calendar …` and items of those types on free dates from today + 330 days, and
@@ -515,20 +526,28 @@ Every command of this section that names a stack acts on a real AWS account. `CL
   before the password; an empty first name keeps the facts as they are. A fact refused changes
   nothing. Reads stdin, so `printf '%s\n%s\n\n' "$pw" "$pw" | npm run bootstrap-admin -w backend
   -- local` (an empty first name) works in tests.
-- `npm run test-user -w backend -- local <username>` (`backend/scripts/test-user.sh`): makes one
-  User straight in the local Cognito, in group `user`, with a **temporary** password, so that its
-  first sign-in shows "Choose your password" (`docs/EMAIL_ARCHITECTURE.md` section 5.4,
-  `docs/FRONTEND_WALK.md` section 15). The four facts are made up from the username
-  (`<username>@example.com`, "Test User <username>", an address in Rome); only the temporary
-  password is asked for, hidden, twice, checked against the pool policy, and set through
+- `npm run test-user -w backend -- <local|cloud> <username>` (`backend/scripts/test-user.sh`):
+  makes one User straight in Cognito (`local`: cognito-local; `cloud`: the stack of
+  `backend/samconfig.toml`, your AWS login; **it changes the cloud**), in group `user`, with a
+  **temporary** password, so that its first sign-in shows "Choose your password"
+  (`docs/EMAIL_ARCHITECTURE.md` section 5.4, `docs/FRONTEND_WALK.md` section 15). It is the one
+  User whose first password the operator chooses, the exception the root `CLAUDE.md`'s password
+  rule names. The name and the address are made up from the username ("Test User <username>",
+  an address in Rome); the e-mail is `<username>@example.com` locally and, for `cloud`, your own,
+  asked for, never written to a file. The temporary password is asked for, hidden, twice, checked
+  against the pool policy, and set through
   `backend/scripts/cognito.mjs` (`set-temporary-password`). It refuses an account that exists, the
   name `admin` and a name the username rule refuses, and changes nothing then; a step that fails
   after the creation deletes the account again. The User stays until it is deleted in the Users
-  page. Only the target `local` exists; any other is refused, and the target `cloud` (the
-  operator's own e-mail, asked for) is step m8 of `docs/EMAIL_PLAN.md`. cognito-local checks
+  page. Any other target is refused. cognito-local checks
   neither the challenge's session nor the rule for the new password: the page does the latter
   itself, and the end of Cognito's 3 minutes is seen only in the cloud.
-- `DYNAMODB_PORT=8002 npm run smoke -w backend -- <stack|local>`: journeys 3, 4, 6 and 11 of
+- `DYNAMODB_PORT=8002 npm run smoke -w backend -- <stack|local>`: follows the stack's
+  `MailStage` (locally `on`; `docs/RUNBOOK.md` section 2.4): its throw-away Users get SES's
+  mailbox simulator as their address and a permanent password the script makes (node's `crypto`,
+  checked by `password_problems`) and sets through `cognito.mjs`, after `POST /users` at `on`, or
+  straight in Cognito after checking that `POST /users` answers `503` at `off` and `domain`.
+  Journeys 3, 4, 6 and 11 of
   `docs/IMPLEMENTATION_PLAN.md` step 9 with a throw-away `smoke-<epoch>` user and, before the
   last, the calendar journey of `docs/SHARED_CALENDAR_SPEC.md` section 18.4 (a type
   `smoke-<epoch>` and a one-off window on the first free 03:00–04:00 from 50 days ahead, booked
@@ -544,25 +563,30 @@ Every command of this section that names a stack acts on a real AWS account. `CL
   change of the user's own password at Cognito through `backend/scripts/cognito.mjs` (a wrong
   current password refused, the error named; the change; the refresh token from before it still
   valid after `ChangePassword` alone; `GlobalSignOut`, after which that refresh token is refused;
-  the old password refused, the new one signing in; `docs/RUNBOOK.md` section 2.2); 49 checks,
-  PASS/FAIL each, 16 of them the capacity's, 7 the assistant's and 7 the password's. Locally the two checks of
-  `GlobalSignOut` print `SKIP` (cognito-local has none) and the last line counts them; only a run
-  against a stack proves which error a wrong current password gets and the revocation. The new
-  passwords come from `backend/src/lib/password.ts`, checked against `shared/src/password.ts`,
-  both run in node like the time helpers. Against a stack the exchange needs the key
+  the old password refused, the new one signing in; `docs/RUNBOOK.md` section 2.2), then at `on`
+  the invitation (a User `smoke-<epoch>-i` with an address asked for at the start, your own, never
+  printed: `invited` in the list, the resend `202`, its refusals `409` and `403`, the User
+  deleted) and a mail on demand for the Administrator (`202`, then the mailer's log line `sent`
+  in its log group, read-only), at `off` and `domain` their two `503`s. 61 checks at `on`, 58 at
+  `off` and `domain`, PASS/FAIL each (`docs/RUNBOOK.md` section 2, step 5). Locally the two checks of
+  `GlobalSignOut` and the resend's success print `SKIP` (cognito-local has neither), the address
+  of the invitation is made up, the mail is looked for in the fake mail instead of the mailer's
+  log (which `local:lambda` prints), so `local:lambda` must run; the last line counts the
+  `SKIP`s. Only a run against a stack proves which error a wrong current password gets, the
+  revocation and the resend. Against a stack the exchange needs the key
   (`assistant-key` below) and costs about a US cent at Anthropic; without the key the message
   answers `503 assistant_unavailable`, one FAIL, and the other checks run. Locally it answers
   through the fake Claude, whose `answers.json` scripts the sentence as a read of the settings
   and a text. On every exit it ends the conversation, removes the types, windows and bookings and
-  deletes the three users. Prompts for the admin password (stdin). Leaves its message rows and, in
-  `calendar`, the four cancelled appointments, their events and the three users' deleted-user
-  markers (history). Its date arithmetic imports `shared/src/calendar/time.ts` in node (Node ≥ 22.18,
+  deletes the four users. Prompts for the admin password, and at `on` against a stack for your
+  e-mail (stdin). Leaves its message rows and, in `calendar`, the four cancelled appointments,
+  their events and the four users' deleted-user markers (history). Its date arithmetic imports `shared/src/calendar/time.ts` in node (Node ≥ 22.18,
   type stripping).
   `backend/scripts/cognito.mjs`, its helper for the Cognito calls that carry a secret, reads every
   password and token on stdin: `sign-in`, `tokens` (access and refresh token, one per line),
   `refresh`, `change-password` (three lines: access token, current, new), `sign-out`
   (`GlobalSignOut`), `set-password`, `set-temporary-password` (the next sign-in must choose
-  another); errors print `<name> <message>` with any secret blanked.
+  another), `set-profile` (the four facts, one per line); errors print `<name> <message>` with any secret blanked.
 - `npm run assistant-key -w backend -- <stack>` (`backend/scripts/assistant-key.sh`): stores the
   Anthropic API key as the SecureString `/<stack>/anthropic-api-key`, encrypted with the
   account's default key for Parameter Store, or replaces it (a rotation); the procedure is

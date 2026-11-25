@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v16 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` step m7): the first sign-in with a temporary password, the challenge `NEW_PASSWORD_REQUIRED` answered with a new password (section 4.9). v15 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` step m5): `MailSettingsService` reads and saves the daily mail's settings (section 25). v14 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): `MailService` asks for the mail of a range of dates (section 24). v13 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m1 and m2): the four facts of a person in `UsersService` (`createUser` with them, `updateUser`, section 13) and `MeService` (section 23). v12 — implemented (2026-11-24, brief `prompts/e14-step-u4-implementation.md`, `docs/CAPACITY_PLAN.md` step u4): the capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` v17, decisions D24 to D31) in the services: `AvailabilityTypesService.create` and `rename` take an optional `capacity` (section 16, decision 70); `AppointmentsService.book` and `change` pass `overbook` through and answer `user_busy` (section 19). v11 — implemented (2026-11-23, brief `prompts/e05-step-p3-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p3): `ChangePasswordService` says its success before it clears the store (section 22.4, decision 69), so that the shell reacts while the person is still signed in. v10 — implemented (2026-11-22, brief `prompts/e03-step-p2-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p2): `ChangePasswordService` (section 22), a person's change of their own password straight at Cognito, with `cognito.ts` making one request for any target of Cognito (section 10.1). v9 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 21), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v8 — implemented (2026-11-21, brief `prompts/95-step-71-implementation.md`, `docs/FRONTEND_DEPLOY_PLAN.md` step 71; the design reviewed before the code): `LogoutService` (section 20), `revokeToken` and `toRevokeOutcome` in `cognito.ts` (section 10.1), `reset()` on `LoginService` and `RefreshService`; proven against cognito-local, and at the deployed page as far as the revocation answered 200 (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; section 20.9 says what was seen and what was not). v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). |
-| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-21; v9 and v10 2026-11-22; v11 2026-11-23; v12 2026-11-24; v13, v14, v15 and v16 2026-11-25 |
+| Status | v17 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` step m8): the invitation; `UsersService.createUser` answers the username and the state `invited`, no password, and `resendInvitation` sends the invitation again (section 13). v16 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` step m7): the first sign-in with a temporary password, the challenge `NEW_PASSWORD_REQUIRED` answered with a new password (section 4.9). v15 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` step m5): `MailSettingsService` reads and saves the daily mail's settings (section 25). v14 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): `MailService` asks for the mail of a range of dates (section 24). v13 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m1 and m2): the four facts of a person in `UsersService` (`createUser` with them, `updateUser`, section 13) and `MeService` (section 23). v12 — implemented (2026-11-24, brief `prompts/e14-step-u4-implementation.md`, `docs/CAPACITY_PLAN.md` step u4): the capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` v17, decisions D24 to D31) in the services: `AvailabilityTypesService.create` and `rename` take an optional `capacity` (section 16, decision 70); `AppointmentsService.book` and `change` pass `overbook` through and answer `user_busy` (section 19). v11 — implemented (2026-11-23, brief `prompts/e05-step-p3-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p3): `ChangePasswordService` says its success before it clears the store (section 22.4, decision 69), so that the shell reacts while the person is still signed in. v10 — implemented (2026-11-22, brief `prompts/e03-step-p2-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p2): `ChangePasswordService` (section 22), a person's change of their own password straight at Cognito, with `cognito.ts` making one request for any target of Cognito (section 10.1). v9 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 21), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v8 — implemented (2026-11-21, brief `prompts/95-step-71-implementation.md`, `docs/FRONTEND_DEPLOY_PLAN.md` step 71; the design reviewed before the code): `LogoutService` (section 20), `revokeToken` and `toRevokeOutcome` in `cognito.ts` (section 10.1), `reset()` on `LoginService` and `RefreshService`; proven against cognito-local, and at the deployed page as far as the revocation answered 200 (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; section 20.9 says what was seen and what was not). v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). |
+| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-21; v9 and v10 2026-11-22; v11 2026-11-23; v12 2026-11-24; v13, v14, v15, v16 and v17 2026-11-25 |
 | Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows); since v7 the calendar view and the appointments; since v8 the sign-out; since v9 the conversation with the assistant; since v10 the change of one's own password; since v12 the capacity of a type |
 | Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), since v6 v12 (sections 3 and 4: the calendar routes as implemented); `docs/SHARED_CALENDAR_SPEC.md` v15 section 16 (v13 when v6 was written), and for v7 sections 8, 11.1 (routes 15–20), 11.2, 11.5, 11.6; for v8 `docs/FRONTEND_ARCHITECTURE.md` section 13.7 and section 11, decision 152 (the direction for logout as v14 had it; its v15 follows this design), and `docs/ARCHITECTURE.md` section 7.3; `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/`; for v9 `docs/CONVERSATIONAL_ARCHITECTURE.md` v14 (sections 4.4, 5.1 to 5.5, 6, 6.1 and 13) and `docs/ARCHITECTURE.md` section 4, "The assistant's routes"; for v10 `docs/ARCHITECTURE.md` v14 (sections 5.1, 6.9, 7.3 and 8) and `docs/CHANGE_PASSWORD_PLAN.md` |
 
@@ -30,6 +30,7 @@
 | v14 | 2026-11-25 | `docs/EMAIL_PLAN.md` steps m3 and m4 (brief `prompts/mail-m04-pair-m3-m4-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 6 and 9.1. New section 24, **`MailService.sendCalendar(range)`** (`POST /mail/calendar`, both roles): the range checked with the shared `MailCalendarBody` before any request, success only on `202 { status: "queued" }`. The address the page shows after it is read with `MeService` (section 23), never answered by the route. |
 | v15 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m5 (brief `prompts/mail-m05-daily-mail-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 6.2 and 9.1. New section 25, **`MailSettingsService`**: `getSettings()` (`GET /mail/settings`) and `updateSettings(settings)` (`PUT /mail/settings`), the Administrator's; the body checked with the shared `MailSettingsBody` before any request. A service of its own, not a part of `CalendarSettingsService` (the Product Owner's choice, 2026-11-25): the settings screen uses both. |
 | v16 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m7 (brief `prompts/mail-m07-first-sign-in-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 5.1 and 5.2. New section 4.9, **the first sign-in**: an account whose password is temporary gets the challenge `NEW_PASSWORD_REQUIRED` instead of tokens; `LoginService` gives the result and state `new_password_required` (the username only), keeps the challenge's session to itself, and `choosePassword(newPassword)` checks the new password with the shared rule, answers with `RespondToAuthChallenge` (state `answering`) and signs the person in as `login` does; a session Cognito no longer takes is the failure `session_expired`; any other refusal leaves the challenge open (`refusal` on the result). `reset()` is also the screen's Cancel. `cognito.ts` (section 10.1) gains `respondToNewPassword`, `toSignInOutcome` and `toChallengeOutcome`; any other challenge stays the failure `challenge`. Found: cognito-local 5.3.0 checks neither the challenge's session (a made-up session gets tokens) nor the pool's rule for the new password, so the expiry is proved by the unit tests only; Cognito's own answer to an expired session, `NotAuthorizedException`, is read from AWS's API reference and is to be seen in the cloud (`docs/EMAIL_PLAN.md` step m9). Unit tests in sections 6 and 10.4; the journey in section 14.11. |
+| v17 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m8 (brief `prompts/mail-m08-invitation-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 5.1, 5.3 and 9.1. **The invitation**: `POST /users` answers `201 { username, status: 'invited' }` and no password, since Cognito makes the temporary one and e-mails it; `createUser`'s success is that, and nothing else of the body is kept (section 13.5). Section 2, rule 6 loses its exception for a new user's password; section 13.7 says there is no password in the service. A fifth pair, **`resendInvitation(username)`** (`POST /users/{username}/invitation`, `202 { username, status: 'invited' }`; `user_not_found`, `not_invited`, `cannot_edit_admin`), the username checked before any request. Both calls answer `mail_unavailable` while e-mail is not switched on (`docs/EMAIL_ARCHITECTURE.md` section 13.2). `listUsers` and `updateUser` check each User's `status` too. Sections 13.1 to 13.9 brought in line with the code as it is, the parts of v13 included (`createUser(user)` with the four facts, `updateUser`). The journeys give a created account its password with `setPermanentPassword` of `local.ts`; a new journey, section 14.12, the invitation. |
 
 ---
 
@@ -105,12 +106,9 @@ a remote service and exposes the result", and it follows the same pattern as eve
    request body: never stored on the instance, never logged, never put in an observable, a URL
    or an error message. Tokens never appear in URLs.
 
-   **The one exception** (v4) is the password that `POST /users` *generates* for a new user.
-   Showing it once to the administrator is the purpose of that call (architecture section 4),
-   so it travels in the success value of `createUser`, in `createUserResult$` and
-   `createUserState$`, until the next `createUser` replaces it (section 13.7). It is never
-   logged, never put in a URL or an error message, and it is never the password of the person
-   who is signed in.
+   The rule has no exception for a new user: `POST /users` answers no password, since Cognito
+   makes the temporary one and e-mails it to the User (`docs/EMAIL_ARCHITECTURE.md` section
+   5.1), and `createUser` keeps nothing of a body but the username and the state (section 13.7).
 7. **No persistence in v1.** A service holds its state in memory. Whether a session is kept in
    `sessionStorage` across a page reload is a decision for the front-end architecture document.
 8. **Unit tests, no network.** vitest, the global `fetch` replaced by a stub, 100 % line
@@ -513,7 +511,7 @@ may use the schema for an early hint if it wishes.
 | `cognito.ts`, `api.ts` | `InitiateAuth`; any API route | shared by the services below | 10 |
 | `RefreshService` | `InitiateAuth` with `REFRESH_TOKEN_AUTH` | `Session.refreshToken`, from the store | 11 |
 | `HelloService` | `POST /hello` | `Session.accessToken`, from the store; `HelloResponse` | 12 |
-| `UsersService` | `POST /users`, `DELETE /users/{username}` | `Session.accessToken`, from the store; `CreateUserResponse`, `Username` | 13 |
+| `UsersService` | `POST /users`, `DELETE /users/{username}`; `GET /users` (v6); `PUT /users/{username}` (v13); `POST /users/{username}/invitation` (v17) | `Session.accessToken`, from the store; `CreateUserResponse`, `UserSummary`, `Username`, `CreateUserBody`, `UpdateUserBody` | 13 |
 | `LogoutService` (v8) | `reset()` on the page-wide `LoginService` and `RefreshService` and `SessionStore.clear()` first; then `RevokeToken` | `Session.refreshToken`, from the store, read at the press. `session$` emits `null` before the request leaves; the result says whether Cognito revoked. The services of one person's session have no `reset()`: the view layer makes new ones for each person (`docs/FRONTEND_ARCHITECTURE.md` section 6, point 4) | 20 |
 | `ChangePasswordService` (v10) | `ChangePassword`, then `GlobalSignOut`, at Cognito | `Session.accessToken`, from the store; the shared `passwordProblems` | 22 |
 | `LoginService.choosePassword` (v16) | `RespondToAuthChallenge`, at Cognito | the challenge's session, kept in the service; the shared `passwordProblems` | 4.9 |
@@ -1809,10 +1807,11 @@ gives `null`.
 
 | Call | Request | Success | Errors (architecture section 4) |
 |---|---|---|---|
-| `createUser(user)` (v13: the username and the four facts, `NewUser`) | `POST /users`, body `CreateUserBody` `{ username, givenName, familyName, email, address }` as the shared rule makes it (facts trimmed, e-mail lower-cased) | `201` `CreateUserResponse` `{ username, password }` | 400 `invalid_json` / `invalid_request`, 403 `forbidden`, 409 `user_exists`, 500 `internal_error` |
+| `createUser(user)` (v13: the username and the four facts, `NewUser`) | `POST /users`, body `CreateUserBody` `{ username, givenName, familyName, email, address }` as the shared rule makes it (facts trimmed, e-mail lower-cased) | `201` `CreateUserResponse` `{ username, status: 'invited' }`: no password (v17) | 400 `invalid_json` / `invalid_request`, 403 `forbidden`, 409 `user_exists`, 503 `mail_unavailable` (v17), 500 `internal_error` |
+| `resendInvitation(username)` (v17) | `POST /users/{username}/invitation`, no body | `202` `{ username, status: 'invited' }` | 400 `invalid_request`, 403 `forbidden` / `cannot_edit_admin` (any administrator), 404 `user_not_found`, 409 `not_invited`, 503 `mail_unavailable`, 500 `internal_error` |
 | `updateUser(username, profile)` (v13) | `PUT /users/{username}`, body `UpdateUserBody`: the four facts, as the shared rule makes them | `200` `UserSummary` | 400 `invalid_json` / `invalid_request`, 403 `forbidden` / `cannot_edit_admin`, 404 `user_not_found`, 500 `internal_error` |
 | `deleteUser(username)` | `DELETE /users/{username}`, no body | `204`, no body | 400 `invalid_request`, 403 `forbidden` / `cannot_delete_admin`, 404 `user_not_found`, 409 `concurrent_update` (v6), 500 `internal_error` |
-| `listUsers()` (v6) | `GET /users`, no body | `200` `ListUsersResponse` `{ users: UserSummary[] }`, the plain Users sorted by username, never an administrator (spec 10.1), each with its state and four facts (v13) | 403 `forbidden`, 500 `internal_error` |
+| `listUsers()` (v6) | `GET /users`, no body | `200` `ListUsersResponse` `{ users: UserSummary[] }`, the plain Users sorted by username, never an administrator (spec 10.1), each with its state (`invited` or `active`) and four facts (v13) | 403 `forbidden`, 500 `internal_error` |
 
 All through `apiCall` (section 10.2), so the token rules of section 9.4 apply. Since plan step 51
 a delete first cancels the User's future appointments under the calendar lock (architecture
@@ -1829,6 +1828,19 @@ the fourth pair, `updateUserResult$` / `updateUserState$`, its `pending` carryin
 cancels a pending update only. Its success is `{ status: 'success', user }`. The users screen and
 "My details" share one `UsersService` per session (section 23).
 
+**The invitation (v17).** A new User receives an e-mail from Cognito with the username, a
+temporary password and the page's address, and chooses a password of their own at the first
+sign-in (section 4.9; `docs/EMAIL_ARCHITECTURE.md` section 5.1). So the creation's success is the
+username and the state `invited`, and nothing else. `resendInvitation(username)` is the fifth
+pair, `resendInvitationResult$` / `resendInvitationState$`: Cognito makes a new temporary password
+and sends it again to the address on file, for an account that has not chosen its password yet
+(`docs/EMAIL_ARCHITECTURE.md` section 5.3); one that has is `not_invited`, and an administrator is
+`cannot_edit_admin`. The username is checked with `Username` before any request, its `pending`
+carries it, and it cancels a pending resend only. Its success names the account the answer names,
+`{ status: 'success', username }`. Both calls answer `mail_unavailable` while e-mail is not
+switched on in the stack (`docs/EMAIL_ARCHITECTURE.md` section 13.2): then nobody is created and
+nothing is sent; the page says "E-mail is not available yet." (`frontend/src/logic/texts.ts`).
+
 ### 13.2 Configuration
 
 `ApiConfig = { apiUrl }`, plus the `SessionStore` as the second argument, as for `HelloService`.
@@ -1836,22 +1848,28 @@ cancels a pending update only. Its success is `{ status: 'success', user }`. The
 ### 13.3 Types (`users.types.ts`)
 
 ```ts
-import type { ApiErrorCode, CreateUserResponse } from '@shared-calendar/shared';
-import type { TransportFailureReason } from './api';
+import type { ApiErrorCode, CreateUserResponse, UserSummary } from '@shared-calendar/shared';
+import type { ApiFailure, TransportFailureReason } from './api';
 
+// mail_unavailable: a stack where e-mail is not switched on creates nobody.
 export type CreateUserFailureReason =
-  | Extract<ApiErrorCode, 'forbidden' | 'invalid_json' | 'invalid_request' | 'user_exists' | 'internal_error'>
+  | Extract<ApiErrorCode, 'forbidden' | 'invalid_json' | 'invalid_request' | 'user_exists' | 'mail_unavailable' | 'internal_error'>
   | TransportFailureReason;
-export type DeleteUserFailureReason =
-  | Extract<ApiErrorCode, 'forbidden' | 'invalid_request' | 'cannot_delete_admin' | 'user_not_found' | 'concurrent_update' | 'internal_error'>
-  | TransportFailureReason;
-
-// The success carries the generated password: the one exception of rule 6 (section 13.7).
+// The success names the account and its state, `invited`: no password.
 export type CreateUserResult =
-  | { status: 'success'; user: CreateUserResponse }
+  | { status: 'success'; user: CreateUserResponse } // { username, status: 'invited' }
   | { status: 'failure'; reason: CreateUserFailureReason; message: string };
 export type CreateUserState = { status: 'idle' } | { status: 'pending'; username: string } | CreateUserResult;
 
+// PUT /users/{username} (v13).
+type UpdateUserCode = Extract<ApiErrorCode, 'forbidden' | 'invalid_json' | 'invalid_request' | 'user_not_found' | 'cannot_edit_admin' | 'internal_error'>;
+export type UpdateUserFailureReason = UpdateUserCode | TransportFailureReason;
+export type UpdateUserResult = { status: 'success'; user: UserSummary } | ApiFailure<UpdateUserCode>;
+export type UpdateUserState = { status: 'idle' } | { status: 'pending'; username: string } | UpdateUserResult;
+
+export type DeleteUserFailureReason =
+  | Extract<ApiErrorCode, 'forbidden' | 'invalid_request' | 'cannot_delete_admin' | 'user_not_found' | 'concurrent_update' | 'internal_error'>
+  | TransportFailureReason;
 // The 204 has no body; the success names the account of the call (decision 24).
 export type DeleteUserResult =
   | { status: 'success'; username: string }
@@ -1863,79 +1881,99 @@ type ListUsersCode = Extract<ApiErrorCode, 'forbidden' | 'internal_error'>;
 export type ListUsersFailureReason = ListUsersCode | TransportFailureReason;
 export type ListUsersResult = { status: 'success'; users: UserSummary[] } | ApiFailure<ListUsersCode>;
 export type ListUsersState = { status: 'idle' } | { status: 'pending' } | ListUsersResult;
+
+// POST /users/{username}/invitation (v17): the invitation sent again.
+type ResendInvitationCode = Extract<
+  ApiErrorCode,
+  'forbidden' | 'invalid_request' | 'user_not_found' | 'not_invited' | 'cannot_edit_admin' | 'mail_unavailable' | 'internal_error'
+>;
+export type ResendInvitationFailureReason = ResendInvitationCode | TransportFailureReason;
+export type ResendInvitationResult = { status: 'success'; username: string } | ApiFailure<ResendInvitationCode>;
+export type ResendInvitationState = { status: 'idle' } | { status: 'pending'; username: string } | ResendInvitationResult;
 ```
 
 The v6 types write a failure as `ApiFailure<Code>` rather than spelling out its fields: the same
 object `apiCall` produces, so the result types cannot drift from it (sections 15–17 do the same).
 
 `invalid_request` is both the API's code and the outcome of the check made before any request
-(section 13.4): the same name, because it is the same rule (the shared `Username` schema).
+(section 13.4): the same name, because it is the same rule (the shared `Username` schema, and
+for the facts `CreateUserBody` and `UpdateUserBody`).
 
 ### 13.4 The class
 
-```ts
-import { Username, type ApiErrorCode } from '@shared-calendar/shared';
+The five pairs have one shape; the create and the resend are shown, the delete, the update and
+the list follow them (`frontend/src/services/users.service.ts`).
 
-const CREATE_CODES = ['forbidden', 'invalid_json', 'invalid_request', 'user_exists', 'internal_error'] as const satisfies readonly ApiErrorCode[];
+```ts
+import { CreateUserBody, UpdateUserBody, Username, type ApiErrorCode, type UserProfile, type UserSummary } from '@shared-calendar/shared';
+
+const CREATE_CODES = ['forbidden', 'invalid_json', 'invalid_request', 'user_exists', 'mail_unavailable', 'internal_error'] as const satisfies readonly ApiErrorCode[];
+const RESEND_CODES = ['forbidden', 'invalid_request', 'user_not_found', 'not_invited', 'cannot_edit_admin', 'mail_unavailable', 'internal_error'] as const satisfies readonly ApiErrorCode[];
 const DELETE_CODES = ['forbidden', 'invalid_request', 'cannot_delete_admin', 'user_not_found', 'concurrent_update', 'internal_error'] as const satisfies readonly ApiErrorCode[];
 const LIST_CODES = ['forbidden', 'internal_error'] as const satisfies readonly ApiErrorCode[]; // v6
-const INVALID_USERNAME =
-  'A username has 3 to 32 characters: lowercase letters, digits, ".", "_" or "-", starting with a letter or a digit';
+const UPDATE_CODES = ['forbidden', 'invalid_json', 'invalid_request', 'user_not_found', 'cannot_edit_admin', 'internal_error'] as const satisfies readonly ApiErrorCode[]; // v13
+
+/** What "Create user" sends: the username and the four facts, as the form holds them. */
+export type NewUser = { username: string } & UserProfile;
 
 export class UsersService {
-  // Pair 1: create.
+  // Pair 1: create. Pair 2: delete. Pair 3: list. Pair 4: update. Pair 5: the invitation sent again.
   private readonly createResultSubject = new ReplaySubject<CreateUserResult>(1);
   readonly createUserResult$: Observable<CreateUserResult> = this.createResultSubject.asObservable();
   private readonly createStateSubject = new BehaviorSubject<CreateUserState>({ status: 'idle' });
   readonly createUserState$: Observable<CreateUserState> = this.createStateSubject.asObservable();
   private pendingCreate?: Subscription;
-
-  // Pair 2: delete.
-  private readonly deleteResultSubject = new ReplaySubject<DeleteUserResult>(1);
-  readonly deleteUserResult$: Observable<DeleteUserResult> = this.deleteResultSubject.asObservable();
-  private readonly deleteStateSubject = new BehaviorSubject<DeleteUserState>({ status: 'idle' });
-  readonly deleteUserState$: Observable<DeleteUserState> = this.deleteStateSubject.asObservable();
-  private pendingDelete?: Subscription;
+  // … deleteUserResult$ / deleteUserState$, listUsersResult$ / listUsersState$,
+  //   updateUserResult$ / updateUserState$, the same way …
+  private readonly resendResultSubject = new ReplaySubject<ResendInvitationResult>(1);
+  readonly resendInvitationResult$: Observable<ResendInvitationResult> = this.resendResultSubject.asObservable();
+  private readonly resendStateSubject = new BehaviorSubject<ResendInvitationState>({ status: 'idle' });
+  readonly resendInvitationState$: Observable<ResendInvitationState> = this.resendStateSubject.asObservable();
+  private pendingResend?: Subscription;
 
   constructor(private readonly config: ApiConfig, private readonly store: SessionStore) {}
 
-  createUser(username: string): void {
+  createUser(user: NewUser): void {
     this.pendingCreate?.unsubscribe(); // cancels a pending create only, never a delete
-    this.createStateSubject.next({ status: 'pending', username });
+    this.createStateSubject.next({ status: 'pending', username: user.username });
 
-    const call: Observable<CreateUserResult> = Username.safeParse(username).success
-      ? apiCall(this.config, this.store, { method: 'POST', path: '/users', body: { username }, codes: CREATE_CODES })
-          .pipe(map((answer) => (answer.status === 'ok' ? toCreateResult(answer) : answer)))
-      : of(failure('invalid_request', INVALID_USERNAME)); // no request sent
+    const checked = CreateUserBody.safeParse(user);
+    const call: Observable<CreateUserResult> = !Username.safeParse(user.username).success
+      ? of(apiFailure('invalid_request', INVALID_USERNAME)) // no request sent
+      : !checked.success
+        ? of(invalidRequest(checked.error)) // no request sent
+        : apiCall(this.config, this.store, { method: 'POST', path: '/users', body: checked.data, codes: CREATE_CODES })
+            .pipe(map((answer) => (answer.status === 'ok' ? toCreateResult(answer) : answer)));
 
     this.pendingCreate = call
       .pipe(tap((result) => this.createStateSubject.next(result)))
       .subscribe((result) => this.createResultSubject.next(result)); // next only: section 3.2
   }
 
-  deleteUser(username: string): void {
-    this.pendingDelete?.unsubscribe(); // cancels a pending delete only, never a create
-    this.deleteStateSubject.next({ status: 'pending', username });
+  resendInvitation(username: string): void {
+    this.pendingResend?.unsubscribe(); // cancels a pending resend only, never another call
+    this.resendStateSubject.next({ status: 'pending', username });
 
-    const call: Observable<DeleteUserResult> = Username.safeParse(username).success
+    const call: Observable<ResendInvitationResult> = Username.safeParse(username).success
       ? apiCall(this.config, this.store, {
-          method: 'DELETE',
-          path: `/users/${encodeURIComponent(username)}`,
-          codes: DELETE_CODES,
-        }).pipe(map((answer) => (answer.status === 'ok' ? toDeleteResult(answer, username) : answer)))
-      : of(failure('invalid_request', INVALID_USERNAME)); // no request sent
+          method: 'POST',
+          path: `/users/${encodeURIComponent(username)}/invitation`,
+          codes: RESEND_CODES,
+        }).pipe(map((answer) => (answer.status === 'ok' ? toResendResult(answer) : answer)))
+      : of(apiFailure('invalid_request', INVALID_USERNAME)); // no request sent
 
-    this.pendingDelete = call
-      .pipe(tap((result) => this.deleteStateSubject.next(result)))
-      .subscribe((result) => this.deleteResultSubject.next(result)); // next only: section 3.2
+    this.pendingResend = call
+      .pipe(tap((result) => this.resendStateSubject.next(result)))
+      .subscribe((result) => this.resendResultSubject.next(result)); // next only: section 3.2
   }
 }
 ```
 
-- `Username` comes from `@shared-calendar/shared`, never from `zod` directly (the ESLint guard of
-  section 5 would reject `zod`). So the front end rejects exactly what the API rejects, and
-  `Bob` never leaves the browser.
-- The pairs are independent: a create, a delete and a list can be pending together.
+- `Username`, `CreateUserBody` and `UpdateUserBody` come from `@shared-calendar/shared`, never
+  from `zod` directly (the ESLint guard of section 5 would reject `zod`). So the front end
+  rejects exactly what the API rejects, and `Bob` never leaves the browser.
+- The pairs are independent: a create, a resend, an update, a delete and a list can be pending
+  together.
 - **`listUsers()`** (v6) is the third pair, `listUsersResult$` / `listUsersState$`, in the shape
   of `HelloService.hello()`: no argument, so its `pending` carries nothing (decision 31); it
   cancels a pending list only. Its success is `{ status: 'success', users }`.
@@ -1945,33 +1983,37 @@ export class UsersService {
 | Answer | `createUser` | `deleteUser` |
 |---|---|---|
 | the username fails `Username` | `invalid_request`, no request | `invalid_request`, no request |
-| `201` with `username` and `password` strings | `success`, `user: { username, password }` | — |
+| a fact fails `CreateUserBody` (v13) | `invalid_request` with zod's message, no request | — |
+| `201` with a string `username` and `status` `'invited'` (v17) | `success`, `user: { username, status: 'invited' }`; any other field of the body, a `password` included, is not kept | — |
 | `204` | — | `success`, `username` of the call |
-| `200` with an array `users` whose every element has a string `username` and string `givenName`, `familyName`, `email`, `address` (v6, the facts v13) | `listUsers`: `success`, `users` | |
-| `200` with string `username`, `givenName`, `familyName`, `email`, `address` (v13) | `updateUser`: `success`, `user` | |
-| any other 2xx | `unexpected` | `unexpected` |
-| an `error` code of the route | that code (`user_exists`, `forbidden`, …) | that code (`user_not_found`, `cannot_delete_admin`, `concurrent_update` (v6), …) |
+| `202` with a string `username` and `status` `'invited'` (v17) | `resendInvitation`: `success`, `username` of the answer | |
+| `200` with an array `users` whose every element has string `username`, `status`, `givenName`, `familyName`, `email`, `address` (v6, the facts v13, the state v17) | `listUsers`: `success`, `users` | |
+| `200` with string `username`, `status`, `givenName`, `familyName`, `email`, `address` (v13, the state v17) | `updateUser`: `success`, `user` | |
+| any other 2xx (for the resend, a `200` or a `202` without the state) | `unexpected` | `unexpected` |
+| an `error` code of the route | that code (`user_exists`, `mail_unavailable`, `forbidden`, …) | that code (`user_not_found`, `cannot_delete_admin`, `concurrent_update` (v6), …) |
 | everything else | the transport rows of section 10.2 | the transport rows of section 10.2 |
 
-`forbidden` and `cannot_delete_admin` are handler 403s with an `error` field: the session stays
-(section 9.4).
+`forbidden`, `cannot_delete_admin` and `cannot_edit_admin` are handler 403s with an `error` field:
+the session stays (section 9.4).
 
 ### 13.6 Use from the view layer
+
+The users screen's logic object, `UsersScreen`, makes the calls and reads their results
+(`docs/FRONTEND_ARCHITECTURE.md` section 5.1); in outline:
 
 ```ts
 const users = new UsersService({ apiUrl }, store);
 
-users.createUserState$.subscribe((state) => {
-  createButton.disabled = state.status === 'pending';
-  // Shown once; the view drops it from the screen when the administrator closes the dialog.
-  if (state.status === 'success') passwordDialog.show(state.user.username, state.user.password);
-  if (state.status === 'failure') createError.textContent = state.message;
+users.createUserResult$.subscribe((r) => {
+  // Where the invitation went: the address the Administrator confirmed, kept by the screen.
+  if (r.status === 'success') inviteDialog.answer(`An invitation was sent to ${email}.`);
+  if (r.status === 'failure') inviteDialog.failure(failureText(r.reason));
+  users.listUsers(); // the new User is in the list, `invited`
 });
-users.deleteUserResult$.subscribe((r) => {
-  if (r.status === 'success') userList.remove(r.username);
-});
+users.resendInvitationResult$.subscribe((r) => { /* the same, for the resend */ });
 
-createButton.onclick = () => users.createUser(usernameInput.value);
+confirmButton.onclick = () => users.createUser({ username, givenName, familyName, email, address });
+resendButton.onclick = () => users.resendInvitation(row.username); // a row whose state is `invited`
 deleteButton.onclick = () => users.deleteUser(selectedUsername);
 ```
 
@@ -1980,26 +2022,34 @@ answers `forbidden` otherwise.
 
 ### 13.7 Security notes
 
-- **The generated password** (rule 6, the exception). It arrives in the `201` body and lives only
-  in the create success value. That value is held by `createUserState$` until the next
-  `createUser` call (its `pending` replaces it) and by `createUserResult$` until the next
-  `createUser` outcome. It is never logged, never in a URL or a message, never stored elsewhere by
-  the service. A sign-out drops it with the service: the view layer makes a new `UsersService` for each person, so no `reset()` is needed here (section 20.6).
+- **No password passes through this service** (rule 6, without exception): the creation's answer
+  carries none, and if a body held one, `toCreateResult` keeps only the username and the state
+  (a test holds it, section 13.8). The temporary password goes from Cognito to the User's mailbox
+  only (`docs/EMAIL_ARCHITECTURE.md` section 5.1).
+- **The four facts**, the e-mail address among them, are personal data: they are in the request
+  body of a create or an update and in the results of the list and the update, and they are never
+  logged, never put in a URL or a message. The service logs nothing at all.
 - No password of the person signed in is involved.
 - The token rules are those of section 10.2. The username goes into the path only after the
   shared schema has accepted it, and through `encodeURIComponent`.
 - The front-end check is a convenience; the API validates again (architecture section 4).
+- A sign-out drops the service's last results with it: the view layer makes a new `UsersService`
+  for each person, so no `reset()` is needed here (section 20.6).
 
 ### 13.8 Unit tests (`users.service.test.ts`)
 
 | Test | Stub answer | Expect |
 |---|---|---|
-| create success | 201 `{ username, password }` | `createUserResult$` gives `success` with both; states `idle`, `pending carol`, `success` |
-| create request shape | 201 | one `POST` to `apiUrl + '/users'`, bearer token from the store, `Content-Type: application/json`, body `{ "username": "carol" }` |
-| create invalid name | — | `createUser('Bob')`: `pending`, then `failure invalid_request`; fetch never called |
+| create success | 201 `{ username, status: 'invited' }` | `createUserResult$` gives `success` with `{ username: 'carol', status: 'invited' }`, no password; states `idle`, `pending carol`, the same success object |
+| create request shape | 201 | one `POST` to `apiUrl + '/users'`, bearer token from the store, `Content-Type: application/json`, body the username and the four facts |
+| create, the facts as the rule makes them (v13) | 201 | facts with spaces around them, an e-mail in capitals and an address with `\r\n` are sent trimmed, lower-cased and with `\n` |
+| create invalid name | — | `createUser` with `Bob`: `pending`, then `failure invalid_request`; fetch never called |
+| create, a fact that is not one (v13) | — | `failure invalid_request` with `email: not an e-mail address`; fetch never called |
 | create exists | 409 `{ error: 'user_exists' }` | `failure user_exists` |
 | create forbidden | 403 `{ error: 'forbidden' }` | `failure forbidden`; the session stays |
-| create wrong body | 201 `{ username }` without password | `failure unexpected` |
+| create, e-mail not switched on (v17) | 503 `{ error: 'mail_unavailable' }` | `failure mail_unavailable` with its message |
+| create, a password in the answer (v17) | 201 `{ username, status: 'invited', password }` | the password is in no result and no state |
+| create wrong body (`it.each`, v17) | 201 without the state, 201 with `status: 'active'`, 200 with both, 201 empty | `failure unexpected` |
 | delete success | 204 | `deleteUserResult$` gives `success` with the username |
 | delete request shape | 204 | one `DELETE` to `apiUrl + '/users/carol'`, bearer token, no body, no `Content-Type` |
 | delete invalid name | — | `deleteUser('../admin')`: `failure invalid_request`; fetch never called |
@@ -2011,21 +2061,29 @@ answers `forbidden` otherwise.
 | independent pairs | create pending, then `deleteUser` | the create is not aborted; both results arrive on their own streams |
 | cancel | create pending, `createUser` again | the first signal is aborted; one create result |
 | retry after failure | 409, then 201 | two results, the second `success` |
-| password only where allowed | create success | the password appears in the create success value only: not in the delete streams, not in the store |
+| no leak | a create and a delete | no state or result contains the token |
 | delete, busy lock (v6) | 409 `{ error: 'concurrent_update' }` | `failure concurrent_update` with the message; the session stays |
 | `listUsers` (v6) | 200 `{ users }` and the rest | the per-method suite of section 14.1 (`suite.ts`): success, request shape (`GET /users`, no body), both route codes, `user_not_found` → `unexpected`, wrong answers (no `users`, an element without `username`, a 201), `session_rejected`, `not_signed_in`, network then success, cancel (a pending `deleteUser` survives), late subscriber, no leak |
+| `updateUser` (v13) | 200, the user | the per-method suite: `PUT /users/alice` with the four facts, the route's codes, a username or a fact refused before any request |
+| `resendInvitation` (v17) | 202 `{ username: 'fe-calendar', status: 'invited' }` | the per-method suite: success `{ status: 'success', username: 'fe-calendar' }`, `POST /users/fe-calendar/invitation` with no body, the seven route codes, `cannot_delete_admin` and `user_exists` → `unexpected`, wrong answers (202 without the state, 202 empty, a 200), `../admin` refused before any request |
 
 ### 13.9 Integration checks
 
 Every account the journeys create is sent with four made-up facts by one helper, `newUser(username)`
-of `tests/integration/local.ts` (v13). As admin (section 14): create `fe-journey` → `success` with a password; `fe-journey` signs in with
-`LoginService` and says hello; create it again → `user_exists`; `Bob` → `invalid_request` with no
-request sent; delete `admin` → `cannot_delete_admin`; delete `fe-journey` → `success`, after which
-its sign-in is `invalid_credentials`; delete it again → `user_not_found`. As alice: create →
-`forbidden`, and `session$` still gives her session.
+of `tests/integration/local.ts` (v13). The creation answers no password, so a journey that signs
+the new account in first gives it one with `setPermanentPassword(username)` of the same file, as
+the User's own first sign-in would end (v17; `AdminSetUserPassword` on cognito-local, an
+unsigned request). As admin (section 14): create `fe-journey` → `success`, `invited`, with no
+password; `fe-journey`, given its password, signs in with `LoginService` and says hello; create
+it again → `user_exists`; `Bob` → `invalid_request` with no request sent; delete `admin` →
+`cannot_delete_admin`; delete `fe-journey` → `success`, after which its sign-in is
+`invalid_credentials`; delete it again → `user_not_found`. As alice: create → `forbidden`, and
+`session$` still gives her session.
 
 `listUsers` (v6, `calendar.test.ts`): as admin, the list contains `fe-calendar` and `alice`, never
 `admin`; as `fe-calendar`, `forbidden`.
+
+The invitation and the resend (v17): section 14.12.
 
 ---
 
@@ -2045,7 +2103,7 @@ frontend/src/services/
 ├── refresh.types.ts      # RefreshFailureReason, RefreshResult, RefreshState
 ├── hello.service.ts      # HelloService (12)
 ├── hello.types.ts        # HelloFailureReason, HelloResult, HelloState
-├── users.service.ts      # UsersService (13; listUsers since v6)
+├── users.service.ts      # UsersService (13; listUsers since v6, updateUser v13, resendInvitation v17)
 ├── users.types.ts        # Create/Delete/ListUsers FailureReason, Result, State
 ├── calendar-settings.service.ts   # CalendarSettingsService (15, v6)
 ├── calendar-settings.types.ts     # Settings / UpdateSettings FailureReason, Result, State
@@ -2078,7 +2136,8 @@ frontend/tests/
     ├── local.ts           # the local stack's URLs and client id (reads backend/env.local.json);
     │                      # since v6 also `outcome()`, used by calendar.test.ts;
     │                      # since v10 `changePasswordConfig()`, the sign-out skipped
-    ├── login.service.test.ts  # the same journeys; tokens read from the store (section 9.9)
+    ├── login.service.test.ts  # the same journeys; tokens read from the store (section 9.9);
+    │                          # v16: the first sign-in (14.11); v17: the invitation (14.12)
     ├── journeys.test.ts   # sections 11.9, 12.9, 13.9, in order
     ├── logout.service.test.ts  # v8: section 20.9, the block `logout`
     ├── calendar.test.ts   # v6: sections 13.9 (listUsers), 15.9, 16.9, 17.9; v7: 18.9, 19.9 (section 14.4)
@@ -2120,8 +2179,8 @@ removed in `beforeAll` and `afterAll` through `UsersService` as admin, accepting
 | 1 | alice signs in into store A | `session$` gives her session (`username: 'alice'`, `role: 'user'`) |
 | 2 | `HelloService` on store A | `201`, `Hello World, I am alice` |
 | 3 | admin signs in into store B; `HelloService` on B | `Hello World, the Administrator is speaking` |
-| 4 | `UsersService` on B: create `fe-journey` | `success` with a non-empty password |
-| 5 | `fe-journey` signs in into store C with that password; hello | `success`; `Hello World, I am fe-journey` |
+| 4 | `UsersService` on B: create `fe-journey`; the journey gives it a password with `setPermanentPassword` (v17) | `success` with `{ username: 'fe-journey', status: 'invited' }` and no password |
+| 5 | `fe-journey` signs in into store C with the password the journey gave it; hello | `success`; `Hello World, I am fe-journey` |
 | 6 | create `fe-journey` again | `user_exists` |
 | 7 | create `Bob` (a `fetch` spy counts requests) | `invalid_request`; no request sent |
 | 8 | delete `admin` | `cannot_delete_admin`; store B unchanged |
@@ -2408,7 +2467,8 @@ local API with **the fake Claude** of the Docker stack answering for Anthropic
 of `local.ts`, `changePasswordConfig()`: the sign-out everywhere skipped (decision 67).
 
 - **Its account** is `fe-password`, created through `UsersService` as the Administrator in
-  `beforeAll` (after removing it, accepting `user_not_found`) and removed in `afterAll`, so that a
+  `beforeAll` (after removing it, accepting `user_not_found`), given its first password with
+  `setPermanentPassword` of `local.ts` (the creation answers none, v17), and removed in `afterAll`, so that a
   run that failed half-way, with the account left at another password, is repeated without a step
   by hand. `admin` only creates and removes it; neither `admin` nor `alice` changes a password.
 - **What stays behind**: nothing in Cognito; in the `calendar` table the deleted-user marker of
@@ -2469,6 +2529,30 @@ holds the open challenge.
 | 2 | `choosePassword('weak')` (a `fetch` spy counts requests) | `new_password_required` with `new_password_refused` and `too_short`, `no_uppercase`, `no_digit`, `no_symbol`; no request; the store empty |
 | 3 | `choosePassword` with a good password; `GET /me` with the store's access token | `success` as `fe-first`, `role: 'user'`; the session in the store; `200` with the username, the role and the e-mail of the account |
 | 4 | a sign-in with the temporary password, then with the new one | `invalid_credentials`; then `success` |
+
+### 14.12 The invitation journey (v17)
+
+`frontend/tests/integration/login.service.test.ts` (`docs/EMAIL_PLAN.md` step m8), its block
+`the invitation`, with its page `docs/journeys/frontend/invitation.md`. One `UsersService` as the
+Administrator runs the four tests (`docs/EMAIL_ARCHITECTURE.md` sections 5.1 and 5.3).
+
+- **Its account** is `fe-invited`, removed in `beforeAll` (accepting `user_not_found`) and in
+  `afterAll`. cognito-local prints the invitation's temporary password in its log instead of
+  mailing it, and a journey does not read the log, so the account is given a temporary password
+  of the journey's own with `setTemporaryPassword` of `local.ts`.
+- **What it cannot show**: the success of a resend, which cognito-local does not support
+  (`docs/EMAIL_ARCHITECTURE.md` section 14.1); the unit tests (section 13.8) and the deployed page
+  (`docs/FRONTEND_WALK.md` check 60) cover it. `mail_unavailable` needs the API at another stage,
+  and is left to the walk (`docs/FRONTEND_WALK.md` check 203).
+- **What stays behind**: nothing in Cognito; in the `calendar` table the deleted-user marker of
+  `fe-invited` of each run, as for every account deleted.
+
+| # | Journey | Expect |
+|---|---|---|
+| 1 | the Administrator creates `fe-invited`; `listUsers` | `{ status: 'success', user: { username: 'fe-invited', status: 'invited' } }`, no password; in the list its state is `invited` |
+| 2 | a temporary password with `setTemporaryPassword`; `login` with it, then `choosePassword` | `new_password_required` for `fe-invited`; then `success` as `fe-invited`, `role: 'user'` |
+| 3 | `listUsers` | its state is `active` |
+| 4 | `resendInvitation` for `fe-invited`, for `admin`, for `fe-nobody` | `not_invited`; `cannot_edit_admin`; `user_not_found` |
 
 ---
 

@@ -3,7 +3,7 @@ import type { NewUser, UsersService } from '../services/users.service';
 import type { CreateUserFailureReason, ResendInvitationFailureReason, UpdateUserFailureReason } from '../services/users.types';
 import { EMPTY_FIELDS, NO_REFUSALS, profileFor, recheck, type ProfileFields, type ProfileRefusals } from './profile.model';
 import { failureText } from './texts';
-import { invitedAnswer, inviteQuestion, NO_USERS, sameRow, userRows, usernameFor, type UserRow } from './users.model';
+import { CREATE_FAILED, invitedAnswer, inviteQuestion, NO_USERS, sameRow, userRows, usernameFor, type UserRow } from './users.model';
 
 // The users screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the list of users read when
 // the screen is shown; a user created from what the form holds, after a last look at the address
@@ -239,7 +239,11 @@ export class UsersScreen {
     if (this.inviteAsked !== kind || this.invitation === null || invite === null) return;
     this.inviteAsked = null;
     if (result.status === 'success') this.patch({ invite: { ...invite, sending: false, answer: invitedAnswer(this.invitation.email) } });
-    else this.patch({ invite: { ...invite, sending: false, failure: failureText(result.reason) } });
+    else {
+      // A creation the server failed says that nothing was kept; any other failure, its own sentence.
+      const failure = kind === 'create' && result.reason === 'internal_error' ? CREATE_FAILED : failureText(result.reason);
+      this.patch({ invite: { ...invite, sending: false, failure } });
+    }
   }
 
   // The Edit dialog opened: it starts clean.

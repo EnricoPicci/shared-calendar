@@ -618,7 +618,7 @@ address, and try everything with them.
 | `POST /users` (changed) | admin | `{ username, givenName, familyName, email, address }` | `201 { username, status: "invited" }`: **no password** | 400 for each field's rule · 503 `mail_unavailable` |
 | `GET /users` (changed) | admin | | `200 { users }`, each `{ username, createdAt, givenName, familyName, email, address, status }`, `status` `invited` or `active` | |
 | `PUT /users/{username}` (new) | admin | `{ givenName, familyName, email, address }`, all four | `200` the user as in `GET /users` | 404 `user_not_found` · 403 `cannot_edit_admin` (another administrator) |
-| `POST /users/{username}/invitation` (new) | admin | | `202` | 404 `user_not_found` · 409 `not_invited` · 403 `cannot_edit_admin` · 503 `mail_unavailable` |
+| `POST /users/{username}/invitation` (new) | admin | | `202 { username, status: "invited" }`, the same shape as the creation's | 400 `invalid_request` (the username in the path) · 404 `user_not_found` · 409 `not_invited` · 403 `cannot_edit_admin` · 503 `mail_unavailable` |
 | `GET /me` (new) | admin or user | | `200 { username, role, givenName, familyName, email, address }`, a fact not held yet `null` (section 4.3) | |
 | `GET /mail/settings` (new) | admin | | `200 { dailyEnabled, dailyHour }` (defaults `true`, `7`) | 503 `mail_unavailable` |
 | `PUT /mail/settings` (new) | admin | `{ dailyEnabled: boolean, dailyHour: 0–23 }` | `200` the settings | 503 `mail_unavailable` |

@@ -414,7 +414,7 @@ tool for a mail, with its sentence `sendCalendarMail` in `changes` (the type `Ma
 the kind of read `details`.
 
 What stays out of `shared/`: the DynamoDB item shape (`MessageItem`), the authorizer context,
-the logger, the password generator (server-side secret handling), and everything that imports
+the logger, and everything that imports
 `aws-lambda` types or the AWS SDK.
 
 ---
@@ -486,8 +486,8 @@ What exists:
   screens. No new script and no new dependency.
 - **The users, since 2026-11-20** (`docs/FRONTEND_VIEW_PLAN.md` step 66):
   `src/logic/users.model.ts` and `src/logic/users.screen.ts`, `src/views/users.view.ts` (the
-  form, the list and the screen's two dialogs, the password's and the delete's, which are in
-  `index.html` inside the screen's element), and in `src/views/shell.ts` the fourth entry of
+  form, the list and the screen's dialogs, the Edit of the four facts, the invitation's last
+  look and the delete's, which are in `index.html` inside the screen's element), and in `src/views/shell.ts` the fourth entry of
   the table of screens. No new script and no new dependency.
 - **The availability types and the weekly patterns, since 2026-11-20**
   (`docs/FRONTEND_VIEW_PLAN.md` step 67): `src/logic/availability.model.ts`,

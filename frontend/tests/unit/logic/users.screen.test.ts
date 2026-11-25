@@ -352,7 +352,7 @@ describe('UsersScreen', () => {
       ['network', UNREACHABLE],
       ['invalid_request', 'The request was not accepted. Check what you entered and try again.'],
       ['forbidden', 'Your account is not allowed to do this.'],
-      ['internal_error', 'Something went wrong on the server. Please try again in a moment.'],
+      ['internal_error', 'The user could not be created, and nothing was kept. Please try again in a moment.'],
     ] as const)('a create that fails with %s: its sentence in the dialog, which stays open, the field not emptied, the list read again all the same, and Confirm can be pressed again', (reason, sentence) => {
       const { screen, createUser, listUsers, shown, notCreated, created, confirmed, listed, last } = screenOf();
       shown('alice');

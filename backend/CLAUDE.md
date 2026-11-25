@@ -94,7 +94,8 @@ Paths in this file are relative to `backend/`.
     `toResponse`, an appointment as a response.
 - `cognito.ts` also has `getUserSub`, `isPlainUser`, `listPlainUsers` (both groups, every page,
   sorted by code units, each with its state and four facts) and the facts: `createUser` takes
-  them, `updateProfile` (`email_verified` true), `getProfile`, `asUserSummary`, `asMe`.
+  them and no password (Cognito mails the invitation), `resendInvitation` sends it again,
+  `updateProfile` (`email_verified` true), `getProfile`, `asUserSummary`, `asMe`.
 - E-mail (`docs/ARCHITECTURE.md` sections 4 and 5.5): `mailDb.ts`, the only module that knows
   the `mail` table (the day's count, the mail settings, the daily mark, each write one
   conditional write but the settings'; "now" passed in); `excel.ts`, the only file that imports

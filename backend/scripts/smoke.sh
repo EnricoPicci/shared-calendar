@@ -1,11 +1,46 @@
 #!/usr/bin/env bash
 # Post-deploy smoke test (docs/ARCHITECTURE.md section 9.3): docs/IMPLEMENTATION_PLAN.md step 9,
 # journeys 3, 4, 6 and 11, with a throw-away user smoke-<timestamp>, and between journeys 3 and 11
-# the calendar journey of docs/SHARED_CALENDAR_SPEC.md section 18.4. Prints PASS, FAIL or SKIP per
-# check (49 checks; locally 2 of them SKIP); exits 1 if any check failed.
+# the calendar journey of docs/SHARED_CALENDAR_SPEC.md section 18.4, then the invitation and a mail
+# (docs/EMAIL_ARCHITECTURE.md section 13.3). Prints PASS, FAIL or SKIP per check; exits 1 if any
+# check failed.
 #
 #   npm run smoke <stack-name>   the deployed stack, your AWS login (run after every deploy)
-#   npm run smoke local          the local stack (local:up + local:api; pass DYNAMODB_PORT)
+#   npm run smoke local          the local stack (local:up, local:api and local:lambda; pass DYNAMODB_PORT)
+#
+# The checks follow the stage of e-mail, MAIL_STAGE (docs/EMAIL_ARCHITECTURE.md section 13.2): the
+# stack's parameter MailStage, read by target.sh; the local stack runs at 'on'.
+#
+#   on            the throw-away Users are created through POST /users, which answers 201 and the
+#                 state invited, and Cognito e-mails each an invitation; then the script sets them a
+#                 permanent password through scripts/cognito.mjs, so that they sign in without the
+#                 challenge. Their address is SES's mailbox simulator, success@simulator.amazonses.com:
+#                 SES takes the mail, also in the sandbox, and nobody receives it (AWS's Cognito guide,
+#                 "Email settings for Amazon Cognito user pools", and SES's guide on the mailbox
+#                 simulator). Then the invitation's check, the only one that writes to a real mailbox:
+#                 a User smoke-<timestamp>-i with the operator's own address, asked for when the run
+#                 starts and never printed or written down; its state invited in GET /users; the
+#                 invitation sent again (202); the refusals of the resend (409 not_invited for the
+#                 throw-away user, who has chosen a password, 403 cannot_edit_admin for the
+#                 Administrator); the User deleted. Then a mail on demand for the Administrator
+#                 (POST /mail/calendar, today to today, 202) and the mailer's log line with the outcome
+#                 sent, read in its log group.
+#   off, domain   POST /users answers 503 mail_unavailable and makes nothing, which is checked for
+#                 each throw-away User; each is then made straight in Cognito (no invitation, its four
+#                 facts with the simulator's address, the group user) and given a permanent password
+#                 the same way. The resend and POST /mail/calendar answer 503 mail_unavailable. No
+#                 mail is sent, and no address is asked for.
+#
+# The passwords the script sets come from a generator of its own (new_password, node's crypto),
+# each checked against the pool's rule by password_problems in target.sh before it is used. The
+# throw-away Users' four facts are made-up values.
+#
+# Locally the invitation goes to cognito-local, which prints it in its log; its address is a
+# made-up one, invitation@smoke.example, and no address is asked for. cognito-local cannot send an
+# invitation again (docs/EMAIL_ARCHITECTURE.md section 14.1): the resend's success is one SKIP line,
+# its refusals are checked as in the cloud. The mailer's log line is printed in local:lambda's
+# terminal, which the script cannot read: locally the check is that the mail reached the fake mail
+# (http://localhost:8025), for the Administrator's address, read with GET /me and never printed.
 #
 # Locally the global sign-out on delete is skipped (SKIP_GLOBAL_SIGN_OUT), so only the cloud run
 # exercises refresh-token revocation; both prove that the deleted user can no longer sign in.
@@ -25,7 +60,7 @@
 # checks, each line starting "capacity:", on the same date and in the same hour, which the calendar
 # journey found free of any window and active appointment and left so (its cancelled appointment
 # blocks nothing), so its window overlaps no real one. It creates two more throw-away users,
-# smoke-<timestamp>-b and smoke-<timestamp>-c, through POST /users, and the type
+# smoke-<timestamp>-b and smoke-<timestamp>-c, as the throw-away user is made, and the type
 # smoke-cap-<timestamp> of capacity 2 with a one-off window 03:00-04:00. smoke-<timestamp>-c sending
 # its own booking with overbook: true gets 403 forbidden and nothing is written
 # (docs/SHARED_CALENDAR_SPEC.md AC-41). The Administrator books smoke-<timestamp> and
@@ -59,8 +94,7 @@
 # the refresh token from before the change still works, since ChangePassword alone revokes nothing;
 # GlobalSignOut with the access token from before the change succeeds, and that refresh token is
 # then refused (both skipped locally); the old password no longer signs in, the new one does. The
-# new password and the wrong current one come from the generator of POST /users
-# (src/lib/password.ts), each checked against shared/src/password.ts. Only the cloud run proves
+# new password and the wrong current one come from new_password. Only the cloud run proves
 # which error a wrong current password gets and that GlobalSignOut revokes the refresh token.
 # From the change on, the deletion's check (docs/IMPLEMENTATION_PLAN.md step 9, journey 11) signs
 # in with the new password. Nothing of the change is
@@ -71,11 +105,12 @@
 # or Ctrl-C, the assistant's conversation is ended once its message was sent, the calendar
 # journey's appointment is cancelled and its window and type deleted, the capacity journey's
 # appointments are cancelled, its window and type deleted and its two users removed through the
-# API (straight in Cognito if the API fails), and the throw-away user is deleted. What stays, by
+# API (straight in Cognito if the API fails), the invitation's User removed the same way, and the
+# throw-away user is deleted. What stays, by
 # design, as history: the user's message row, and in the calendar table the calendar journey's
 # cancelled appointment (username and type name smoke-<timestamp>), the capacity journey's three
 # cancelled appointments (type name smoke-cap-<timestamp>), the pointer and the booked and
-# cancelled events of each, and the deleted-user markers of the three users, which the deletion
+# cancelled events of each, and the deleted-user markers of the four users, which the deletion
 # through DELETE /users/{username} (docs/IMPLEMENTATION_PLAN.md step 9, journey 11) writes.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -84,6 +119,12 @@ source scripts/target.sh
 [[ $# -eq 1 ]] || die "usage: npm run smoke <stack-name|local>"
 load_target "$1"
 TARGET=$1
+[[ "$MAIL_STAGE" == off || "$MAIL_STAGE" == domain || "$MAIL_STAGE" == on ]] ||
+  die "the stage of e-mail of $TARGET is '$MAIL_STAGE', not off, domain or on (a stack made before e-mail?)."
+
+# The address of every throw-away User but the invitation's: SES's mailbox simulator, which takes
+# the mail and delivers it to nobody (the header says where AWS confirms it).
+SIMULATOR_EMAIL="success@simulator.amazonses.com"
 
 SMOKE_USER="smoke-$(date +%s)"
 # The booking's note: the log search of docs/SHARED_CALENDAR_SPEC.md AC-36 looks for "must never
@@ -138,6 +179,13 @@ cap_c_created=false
 cap_c_deleted=false
 # The assistant's message was sent and its conversation not ended yet: clean-up ends it.
 asst_open=false
+# The invitation's User, created with the operator's own address at stage 'on', and removed like
+# the capacity journey's.
+INV_USER="$SMOKE_USER-i"
+inv_created=false
+inv_deleted=false
+# The password new_password made for the User make_user made last; the caller takes it at once.
+made_password=""
 
 # Ends the throw-away user's conversation with the assistant, then removes what the calendar
 # journey created, then removes the throw-away user straight in Cognito if the API did not
@@ -147,6 +195,7 @@ cleanup() {
   assistant_cleanup
   calendar_cleanup
   capacity_cleanup
+  cap_user_delete "$INV_USER" inv_created inv_deleted
   [[ "$cal_cleanup_failed" == true ]] && status=1
   if [[ "$created" == true && "$deleted" == false ]]; then
     if err=$(idp admin-delete-user --user-pool-id "$POOL_ID" --username "$SMOKE_USER" 2>&1); then
@@ -182,7 +231,8 @@ api() {
 # field <name>: a string field of the API answer in BODY (see json_field in target.sh).
 field() { printf '%s' "$BODY" | json_field "$1"; }
 
-# The error code of an API answer, safe to print (never the body itself: it may hold a password).
+# The error code of an API answer, safe to print (never the body itself: it may hold a person's
+# facts).
 error_code() {
   local code
   code=$(field error)
@@ -599,34 +649,21 @@ cap_booked() {
 # booked again, forced, refused user_busy (docs/SHARED_CALENDAR_SPEC.md R-BOOK-12). Then everything
 # is removed. Stops at the first failed check.
 capacity_journey() {
-  local password id status
+  local id status
   cap_b_created=true
-  api POST /users "$admin_token" "{\"username\": \"$CAP_USER_B\"}"
-  password=""
-  if [[ "$STATUS" == 201 && "$(field username)" == "$CAP_USER_B" ]]; then password=$(field password); fi
-  BODY=""
-  if [[ -n "$password" ]]; then
-    pass "capacity: POST /users $CAP_USER_B -> 201 with a password"
-  else
-    cap_fail "POST /users $CAP_USER_B -> $STATUS"
-    return 0
-  fi
-  password=""
+  make_user capacity "$CAP_USER_B" || { capacity_cleanup; return 0; }
+  made_password=""
 
   cap_c_created=true
-  api POST /users "$admin_token" "{\"username\": \"$CAP_USER_C\"}"
-  password=""
-  if [[ "$STATUS" == 201 && "$(field username)" == "$CAP_USER_C" ]]; then password=$(field password); fi
-  status=$STATUS
-  BODY=""
-  if [[ -n "$password" ]] && cap_token=$(printf '%s' "$password" | sign_in "$CAP_USER_C"); then
-    pass "capacity: POST /users $CAP_USER_C -> 201, signed in as it"
+  make_user capacity "$CAP_USER_C" || { capacity_cleanup; return 0; }
+  if cap_token=$(printf '%s' "$made_password" | sign_in "$CAP_USER_C"); then
+    pass "capacity: signed in as $CAP_USER_C, no challenge"
   else
     cap_token=""
-    cap_fail "POST /users $CAP_USER_C -> $status, or its sign-in failed"
+    cap_fail "sign-in as $CAP_USER_C"
     return 0
   fi
-  password=""
+  made_password=""
 
   cap_pending="type"
   api POST /calendar/types "$admin_token" "{\"name\": \"$CAP_TYPE\", \"capacity\": 2}"
@@ -770,18 +807,207 @@ capacity_journey() {
   fi
 }
 
-# new_password: a password from the generator of POST /users (src/lib/password.ts), on stdout for
-# the caller's variable only; fails unless it passes the page's rule, shared/src/password.ts. Both
-# files are TypeScript, which Node 22 runs, stripping the types, as cal does.
+# new_password: a new random password of 20 characters, on stdout for the caller's variable only:
+# one upper-case letter, one lower-case letter, one digit and one symbol at least, the rest from all
+# four, shuffled, each pick by node's crypto.randomInt. Fails unless password_problems (target.sh)
+# finds nothing missing of the pool's rule.
 new_password() {
-  node --disable-warning=ExperimentalWarning -e '
-const path = require("path"), { pathToFileURL } = require("url");
-const load = (file) => import(pathToFileURL(path.resolve(file)).href);
-Promise.all([load("src/lib/password.ts"), load("../shared/src/password.ts")]).then(([g, s]) => {
-  const p = g.generatePassword();
-  if (s.passwordProblems(p).length > 0) process.exit(1);
-  process.stdout.write(p);
-}).catch(() => process.exit(1));'
+  local password
+  password=$(node -e '
+const { randomInt } = require("crypto");
+const sets = ["ABCDEFGHJKLMNPQRSTUVWXYZ", "abcdefghijkmnopqrstuvwxyz", "23456789", "-_!#%+=.,"];
+const all = sets.join("");
+const chars = sets.map((set) => set[randomInt(set.length)]);
+while (chars.length < 20) chars.push(all[randomInt(all.length)]);
+for (let i = chars.length - 1; i > 0; i--) {
+  const j = randomInt(i + 1);
+  [chars[i], chars[j]] = [chars[j], chars[i]];
+}
+process.stdout.write(chars.join(""));') || return 1
+  [[ -z "$(printf '%s' "$password" | password_problems)" ]] || return 1
+  printf '%s' "$password"
+}
+
+# user_body <username> <email>: the body of POST /users, the four facts made-up but the address. The
+# address is the simulator's or one checked by the shape of the invitation's question, so it holds
+# no quote to escape.
+user_body() {
+  printf '{"username": "%s", "givenName": "Smoke", "familyName": "Test", "email": "%s", "address": "1 Smoke Street"}' "$1" "$2"
+}
+
+# in_cognito <username>: exit 0 if cognito-local or Cognito has the account.
+in_cognito() { idp admin-get-user --user-pool-id "$POOL_ID" --username "$1" >/dev/null 2>&1; }
+
+# make_user <check prefix> <username>: makes a throw-away User with the simulator's address, as its
+# stage allows (the header says how), and sets it a permanent password; prints one line per check,
+# each starting with the prefix, and stops at the first failure (exit 1). The password is left in
+# made_password for the caller.
+make_user() {
+  local prefix=$1 name=$2
+  made_password=""
+  api POST /users "$admin_token" "$(user_body "$name" "$SIMULATOR_EMAIL")"
+  if [[ "$MAIL_STAGE" == on ]]; then
+    if [[ "$STATUS" == 201 && "$(field username)" == "$name" && "$(field status)" == invited ]]; then
+      pass "$prefix: POST /users $name -> 201, invited"
+    else
+      fail "$prefix: POST /users $name -> $STATUS $(error_code)"
+      return 1
+    fi
+  else
+    if [[ "$STATUS" == 503 && "$(error_code)" == mail_unavailable ]] && ! in_cognito "$name"; then
+      pass "$prefix: POST /users $name -> 503 mail_unavailable, nothing made (stage $MAIL_STAGE)"
+    else
+      fail "$prefix: POST /users $name at stage $MAIL_STAGE -> $STATUS $(error_code), expected 503 mail_unavailable and nothing made"
+      return 1
+    fi
+    # Straight in Cognito, as test-user.sh does: the account without a password and without a
+    # message, its four facts through scripts/cognito.mjs (on stdin), then the group.
+    if idp admin-create-user --user-pool-id "$POOL_ID" --username "$name" --message-action SUPPRESS >/dev/null &&
+      printf 'Smoke\nTest\n%s\n1 Smoke Street\n' "$SIMULATOR_EMAIL" | cognito set-profile "$POOL_ID" "$name" &&
+      idp admin-add-user-to-group --user-pool-id "$POOL_ID" --username "$name" --group-name user >/dev/null; then
+      pass "$prefix: $name made straight in Cognito, with its four facts, in group user"
+    else
+      fail "$prefix: $name could not be made straight in Cognito"
+      return 1
+    fi
+  fi
+  if made_password=$(new_password) && printf '%s' "$made_password" | cognito set-password "$POOL_ID" "$name"; then
+    pass "$prefix: a permanent password set for $name through scripts/cognito.mjs"
+  else
+    made_password=""
+    fail "$prefix: no permanent password could be set for $name"
+    return 1
+  fi
+}
+
+# user_status <username>: the state (invited or active) of <username> in the GET /users answer in
+# BODY, or nothing when it is not listed.
+user_status() { cal get 'const u = (b.users || []).find((x) => x.username === a[0]); return u ? u.status : "";' "$1"; }
+
+# The invitation (docs/EMAIL_ARCHITECTURE.md sections 5.1, 5.3 and 13.3), at stage 'on': a User
+# created with the operator's address, invited in the list, its invitation sent again, the
+# resend's refusals, the User deleted. Stops at the first failed check that leaves nothing to test.
+invitation_journey() {
+  inv_created=true
+  api POST /users "$admin_token" "$(user_body "$INV_USER" "$invitation_email")"
+  if [[ "$STATUS" == 201 && "$(field username)" == "$INV_USER" && "$(field status)" == invited ]]; then
+    pass "invitation: POST /users $INV_USER -> 201, invited: the invitation is on its way"
+  else
+    fail "invitation: POST /users $INV_USER -> $STATUS $(error_code)"
+    return 0
+  fi
+
+  api GET /users "$admin_token"
+  if [[ "$STATUS" == 200 && "$(user_status "$INV_USER")" == invited ]]; then
+    pass "invitation: GET /users lists $INV_USER as invited"
+  else
+    fail "invitation: GET /users -> $STATUS, $INV_USER listed as '$(user_status "$INV_USER")', expected invited"
+  fi
+
+  api POST "/users/$INV_USER/invitation" "$admin_token"
+  if [[ "$STATUS" == 202 && "$(field status)" == invited ]]; then
+    pass "invitation: POST /users/$INV_USER/invitation -> 202, sent again"
+  elif [[ "$TARGET" == local && "$STATUS" == 500 ]]; then
+    skip "invitation: POST /users/$INV_USER/invitation (cognito-local cannot send an invitation again, docs/EMAIL_ARCHITECTURE.md section 14.1)"
+  else
+    fail "invitation: POST /users/$INV_USER/invitation -> $STATUS $(error_code)"
+  fi
+
+  api POST "/users/$SMOKE_USER/invitation" "$admin_token"
+  if [[ "$STATUS" == 409 && "$(error_code)" == not_invited ]]; then
+    pass "invitation: POST /users/$SMOKE_USER/invitation -> 409 not_invited (its password is chosen)"
+  else
+    fail "invitation: POST /users/$SMOKE_USER/invitation -> $STATUS $(error_code), expected 409 not_invited"
+  fi
+  api POST "/users/$ADMIN_USERNAME/invitation" "$admin_token"
+  if [[ "$STATUS" == 403 && "$(error_code)" == cannot_edit_admin ]]; then
+    pass "invitation: POST /users/$ADMIN_USERNAME/invitation -> 403 cannot_edit_admin"
+  else
+    fail "invitation: POST /users/$ADMIN_USERNAME/invitation -> $STATUS $(error_code), expected 403 cannot_edit_admin"
+  fi
+
+  api DELETE "/users/$INV_USER" "$admin_token"
+  [[ "$STATUS" == 204 ]] && inv_deleted=true
+  if [[ "$inv_deleted" == true ]] && ! in_cognito "$INV_USER"; then
+    pass "invitation: DELETE /users/$INV_USER -> 204, the account is gone"
+  else
+    fail "invitation: DELETE /users/$INV_USER -> $STATUS $(error_code), or the account is still there"
+  fi
+}
+
+# fake_mail_count <address>: how many mails the local fake mail holds for <address> (stdin of node,
+# never printed), or nothing when the fake mail cannot be read.
+fake_mail_count() {
+  curl -sS --max-time 10 -G --data-urlencode "to=$1" http://localhost:8025/mails 2>/dev/null |
+    node -e 'try { process.stdout.write(String(JSON.parse(require("fs").readFileSync(0, "utf8")).mails.length)); } catch {}'
+}
+
+# mailer_sent_since <epoch ms>: how many of the mailer's log lines since then say that a calendar
+# mail for the Administrator was sent; read-only, in the stack's log group of the mailer
+# (backend/template.yaml, MailerLogGroup).
+mailer_sent_since() {
+  aws logs filter-log-events --log-group-name "/aws/lambda/$TARGET-mailer" --start-time "$1" \
+    --filter-pattern "{ (\$.outcome = \"sent\") && (\$.kind = \"calendar\") && (\$.username = \"$ADMIN_USERNAME\") }" \
+    --query 'length(events)' --output text 2>/dev/null
+}
+
+# A mail on demand for the Administrator (docs/EMAIL_ARCHITECTURE.md section 13.3): today to
+# today, POST /mail/calendar answers 202; then, for up to a minute, the proof that the mailer sent
+# it (the header says how locally). At a stage other than 'on', the 503 only.
+mail_check() {
+  local today since address before="" count="" tries=0
+  today=$(date -u +%Y-%m-%d)
+  if [[ "$MAIL_STAGE" != on ]]; then
+    api POST /mail/calendar "$admin_token" "{\"from\": \"$today\", \"to\": \"$today\"}"
+    if [[ "$STATUS" == 503 && "$(error_code)" == mail_unavailable ]]; then
+      pass "mail: POST /mail/calendar -> 503 mail_unavailable (stage $MAIL_STAGE)"
+    else
+      fail "mail: POST /mail/calendar at stage $MAIL_STAGE -> $STATUS $(error_code), expected 503 mail_unavailable"
+    fi
+    return 0
+  fi
+
+  if [[ "$TARGET" == local ]]; then
+    api GET /me "$admin_token"
+    address=$(field email)
+    BODY=""
+    [[ -n "$address" ]] && before=$(fake_mail_count "$address")
+    if [[ ! "$before" =~ ^[0-9]+$ ]]; then
+      fail "mail: no address for $ADMIN_USERNAME in GET /me, or the fake mail cannot be read (npm run local:up)"
+      return 0
+    fi
+  fi
+  since=$(node -p 'Date.now() - 5000')
+  api POST /mail/calendar "$admin_token" "{\"from\": \"$today\", \"to\": \"$today\"}"
+  if [[ "$STATUS" == 202 && "$(field status)" == queued ]]; then
+    pass "mail: POST /mail/calendar $today to $today as $ADMIN_USERNAME -> 202, queued"
+  else
+    fail "mail: POST /mail/calendar as $ADMIN_USERNAME -> $STATUS $(error_code)"
+    return 0
+  fi
+
+  while (( tries < 12 )); do
+    sleep 5
+    tries=$((tries + 1))
+    if [[ "$TARGET" == local ]]; then
+      count=$(fake_mail_count "$address")
+      [[ "$count" =~ ^[0-9]+$ ]] && (( count > before )) && break
+    else
+      count=$(mailer_sent_since "$since")
+      [[ "$count" =~ ^[0-9]+$ ]] && (( count > 0 )) && break
+    fi
+    count=""
+  done
+  address=""
+  if [[ -n "$count" && "$TARGET" == local ]]; then
+    pass "mail: the mail reached the fake mail after $((tries * 5)) s (local:lambda's terminal shows the line sent)"
+  elif [[ -n "$count" ]]; then
+    pass "mail: the mailer's log line says sent, after $((tries * 5)) s"
+  elif [[ "$TARGET" == local ]]; then
+    fail "mail: no mail in the fake mail after a minute (is npm run local:lambda running? Its terminal says why)"
+  else
+    fail "mail: no log line of the mailer saying sent after a minute (/aws/lambda/$TARGET-mailer)"
+  fi
 }
 
 # The change of the throw-away user's own password (the header says what and why). Stops at the
@@ -798,7 +1024,7 @@ password_journey() {
   tokens=""
   old=$user_password
   if ! new=$(new_password) || ! wrong=$(new_password) || [[ "$new" == "$old" || "$wrong" == "$old" ]]; then
-    fail "password: no new password from src/lib/password.ts that passes shared/src/password.ts"
+    fail "password: no new password from new_password that passes the pool's rule"
     return 0
   fi
 
@@ -964,7 +1190,18 @@ assistant_end() {
 
 IFS= read -rs -p "Password of $ADMIN_USERNAME: " admin_password || die "no password entered."
 echo >&2
-echo "Smoke test of $1 ($API_URL) with throw-away user $SMOKE_USER"
+# The invitation's address: the operator's own, asked for a stack at stage 'on' only, kept in a
+# variable, never printed, never written down; a made-up one locally (the header says why).
+invitation_email=""
+if [[ "$MAIL_STAGE" == on && "$TARGET" == local ]]; then
+  invitation_email="invitation@smoke.example"
+elif [[ "$MAIL_STAGE" == on ]]; then
+  IFS= read -r -p "Your own e-mail address, for the invitation's check: " invitation_email || die "no address entered."
+  invitation_email=$(printf '%s' "$invitation_email" | tr '[:upper:]' '[:lower:]')
+  [[ "$invitation_email" =~ ^[^[:space:]@\"\\]+@[^[:space:]@\"\\]+\.[^[:space:]@\"\\]+$ ]] ||
+    die "that is not an e-mail address."
+fi
+echo "Smoke test of $1 ($API_URL), e-mail stage $MAIL_STAGE, with throw-away user $SMOKE_USER"
 echo
 
 if admin_token=$(printf '%s' "$admin_password" | sign_in "$ADMIN_USERNAME"); then
@@ -984,18 +1221,12 @@ else
   fail "journey 4: /hello as $ADMIN_USERNAME -> $STATUS $BODY"
 fi
 
-# docs/IMPLEMENTATION_PLAN.md step 9, journey 6: create the throw-away user, sign in as it,
-# /hello as it (journey 3 of the same step).
+# docs/IMPLEMENTATION_PLAN.md step 9, journey 6: create the throw-away user as its stage allows
+# (the header says how), sign in as it, /hello as it (journey 3 of the same step).
 created=true
-api POST /users "$admin_token" "{\"username\": \"$SMOKE_USER\"}"
 user_password=""
-if [[ "$(field username)" == "$SMOKE_USER" ]]; then user_password=$(field password); fi
-if [[ "$STATUS" == 201 && -n "$user_password" ]]; then
-  pass "journey 6: POST /users $SMOKE_USER -> 201 with a password"
-else
-  fail "journey 6: POST /users $SMOKE_USER -> $STATUS $(error_code)"
-fi
-BODY=""
+if make_user "journey 6" "$SMOKE_USER"; then user_password=$made_password; fi
+made_password=""
 
 user_token=""
 if [[ -n "$user_password" ]]; then
@@ -1049,6 +1280,23 @@ if [[ -n "$user_token" ]]; then assistant_exchange; fi
 
 # The change of its own password (docs/ARCHITECTURE.md section 6.9), before the user is deleted.
 if [[ -n "$user_token" ]]; then password_journey; fi
+
+# The invitation, at stage 'on', while the throw-away user still exists for the 409 of the resend;
+# at the other stages the resend's 503.
+if [[ "$MAIL_STAGE" == on && -n "$user_token" ]]; then
+  invitation_journey
+elif [[ "$MAIL_STAGE" != on ]]; then
+  api POST "/users/$SMOKE_USER/invitation" "$admin_token"
+  if [[ "$STATUS" == 503 && "$(error_code)" == mail_unavailable ]]; then
+    pass "invitation: POST /users/$SMOKE_USER/invitation -> 503 mail_unavailable (stage $MAIL_STAGE)"
+  else
+    fail "invitation: POST /users/$SMOKE_USER/invitation at stage $MAIL_STAGE -> $STATUS $(error_code), expected 503 mail_unavailable"
+  fi
+fi
+invitation_email=""
+
+# A mail on demand for the Administrator, and the proof that the mailer sent it.
+mail_check
 
 # docs/IMPLEMENTATION_PLAN.md step 9, journey 11: delete the throw-away user; it can no longer
 # sign in, with the password it has at the end (the new one after a change); its message row stays.

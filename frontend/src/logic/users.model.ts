@@ -62,6 +62,11 @@ export function invitedAnswer(email: string): string {
   return `An invitation was sent to ${email}.`;
 }
 
+// What the dialog says when the server failed a creation: the route deletes an account it made
+// but could not finish, so nothing is kept and the same username can be tried again
+// (docs/EMAIL_ARCHITECTURE.md section 5.1).
+export const CREATE_FAILED = 'The user could not be created, and nothing was kept. Please try again in a moment.';
+
 // The title of the Edit dialog: whose facts it changes.
 export function editTitle(username: string): string {
   return `Edit ${username}`;

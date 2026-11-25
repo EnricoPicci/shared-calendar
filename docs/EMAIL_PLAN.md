@@ -1,6 +1,7 @@
 # Shared Calendar: e-mail (implementation plan)
 
-**Version:** v10 (2026-11-25): step m8 cut into parts A (the invitation), B (the stages) and C
+**Version:** v11 (2026-11-25): step m8 done, its "As done" note written; no step's content
+changed. v10 (2026-11-25): step m8 cut into parts A (the invitation), B (the stages) and C
 (the smoke test and the documents), each with its check and its commit; `backend/src/lib/password.ts`
 removed, the smoke test making its own passwords (the Product Owner's decisions, with the brief of
 step m8). v9 (2026-11-25): step m7 done, its "As done" note written; the look at an expired
@@ -883,6 +884,107 @@ makes its own passwords, checked against the pool's rule.
 **Check:** section 5.1, which here runs **most journey files** of both packages (F1), each alone;
 `npm run smoke -w backend -- local` once, since this step rewrites it; the screens: Users
 (creation with the last look, the states, resend).
+
+**As done (2026-11-25), in three parts.** A, the invitation, committed `254b3f8` with the brief
+`prompts/mail-m08-invitation-implementation.md`; B, the stages, committed `223a49a`; C, the smoke
+test and the documents. After each part root `typecheck`, `lint` and `test:unit` green, 100 %
+lines.
+
+- **What cognito-local answered.** `AdminCreateUser` without a password and without `SUPPRESS`
+  makes the account `FORCE_CHANGE_PASSWORD` with a temporary password of 6 characters, not by the
+  pool's rule, printed in its log (a box "Confirmation Code Delivery", the line "Code") instead of
+  mailed; the first sign-in gets `NEW_PASSWORD_REQUIRED`. `MessageAction: RESEND` is not
+  supported: the route's refusals answer locally as in the cloud, its success ends in a 500, and
+  is proved by unit tests only (O5). `docs/COMMANDS.md` section 3.1 and `docs/ARCHITECTURE.md`
+  section 8 say so.
+- **Built (A).** `CreateUserResponse` `{ username, status: 'invited' }`; the codes `not_invited`
+  and `mail_unavailable` on their routes. `cognito.ts`: `createUser` with
+  `DesiredDeliveryMediums: EMAIL`, no password; `resendInvitation`; `setPermanentPassword` and
+  `backend/src/lib/password.ts` removed with their tests. `createUser.ts` answers `503` before
+  anything is made unless `MAIL_STAGE` is `on`, the rollback kept; its role lost
+  `AdminSetUserPassword`. `resendInvitation.ts` with its function and role (`AdminListGroupsForUser`,
+  `AdminGetUser`, `AdminCreateUser`, the one pool); the route in `env.local.json`. The page: the
+  last look ("An invitation will be sent to …", Confirm), "An invitation was sent to …", the
+  states in the list, "Resend invitation", "E-mail is not available yet"; `dialog.created` gone.
+- **The journeys, and how each story was kept (A).** Every one that read the answered password
+  now sets one with a helper right after the creation, `setPasswordOf` in
+  `backend/tests/integration/setup.ts` and `setPermanentPassword` in
+  `frontend/tests/integration/local.ts` (cognito-local's `AdminSetUserPassword`, `Permanent:
+  true`), and signs in with it as before: in the back end `journeys.test.ts` (journey 6 checks
+  the answer is the username and `invited`, then carol's password is set), `assistant.test.ts`,
+  `calendar.test.ts` (five places), `mail.test.ts`; in the front end `journeys.test.ts`,
+  `calendar.test.ts`, `assistant.test.ts`, `change-password.test.ts`, `profiles.test.ts`,
+  `mail.test.ts`. No story changed: only where the password comes from. New: the block `the
+  invitation` of the front end's `login.service.test.ts` (`fe-invited`: created, `invited`, a
+  temporary password by `setTemporaryPassword`, "Choose your password" answered, `active`; the
+  resend's `409`, `403` for `admin`, `404`), with its page `docs/journeys/frontend/invitation.md`;
+  the changed pages refreshed with the skill `explain-journey`. Each changed file green, run
+  alone. The walk: `docs/FRONTEND_WALK.md` checks 56 to 60 and 203 to 205, at both widths.
+  Found, not caused by this step: the back end's `calendar.test.ts` leaves `bookingHorizonDays`
+  at 30 while `mail.test.ts` books 45 days ahead, so their order matters.
+- **The stages (B).** `PageAddress`; the conditions `MailDomainStage` and `MailOn`; at `domain`
+  and `on` the SES identity with Easy DKIM, the configuration set and its event destination
+  (bounces and complaints) to an SNS topic subscribed to the Reply-To, with its policy, the three
+  DKIM records as outputs; at `on` only the pool's `EmailConfiguration`, `InviteMessageTemplate`
+  (section 6.6's text, `{username}`, `{####}`, the page's address) and
+  `TemporaryPasswordValidityDays` 7, the mailer, its log group, role, timer and alarm, and the
+  routes' `MAILER_FUNCTION` and invoke permission. `MAIL_STAGE` reaches nine functions. The
+  pool's `Schema` untouched. `samconfig.toml`: the parameters, `MailStage=off`, no address;
+  `local-api.sh` and `local-lambda.sh` run the local stack at `on`. `sam validate --lint` clean,
+  `npm run build -w backend` green. `test-user.sh` gained `cloud` (the operator's own address
+  asked for), tried with `local` only.
+- **What AWS's references confirmed.** Each new property of the template is cited in its comment
+  from AWS's CloudFormation reference: `EmailConfiguration` (`DEVELOPER` creates Cognito's
+  service-linked role), `InviteMessageTemplate`, the `PasswordPolicy`'s
+  `TemporaryPasswordValidityDays`, `AWS::SES::EmailIdentity` (Easy DKIM without
+  `DkimSigningAttributes`, the `DkimDNSTokenName`/`Value` attributes),
+  `AWS::SES::ConfigurationSet` and its event destination; SES's guide for the SNS notifications.
+  F1's simulator: AWS's Cognito guide, "Email settings for Amazon Cognito user pools", says a pool
+  sending through SES in the sandbox can send "to Amazon SES mailbox simulator addresses"; SES's
+  guide says the simulator works in the sandbox, counts against no daily quota and no reputation,
+  and is billed like any mail. No page shows Cognito itself writing to the simulator: the smoke
+  test at `on` (step m10) is the proof.
+- **The smoke test (C).** `backend/scripts/smoke.sh` rewritten as F1 says: it reads `MailStage`
+  (`target.sh`'s `load_target` now sets `MAIL_STAGE`); its three Users through `POST /users` at
+  `on`, or after a checked `503` straight in Cognito at `off` and `domain`, with the simulator's
+  address and a permanent password from its own generator (`new_password`, node's `crypto`,
+  checked by `password_problems`) set through `cognito.mjs`; at `on` the invitation to the
+  operator's address, asked for at the start (state, resend, the resend's `409` and `403`, the
+  User deleted), and a mail on demand for `admin` with the mailer's log line `sent` read with
+  `aws logs filter-log-events` (read-only); at `off` and `domain` the two `503`s. Locally a
+  made-up address, the resend's success a `SKIP`, the mail looked for in the fake mail. 61 checks
+  at `on`, 58 at `off` and `domain`.
+  Run once locally, `npm run smoke -w backend -- local`, the admin password piped in: **PASSED**,
+  61 lines, 58 PASS and 3 SKIP (the two of `GlobalSignOut`, the resend's success); the mail
+  reached the fake mail after 5 s; every User and the calendar's items removed. The stages
+  `off` and `domain`, and the mailer's log line, run only against a stack (step m9).
+- **The documents (C).** `docs/ARCHITECTURE.md`: the status line and v16's row; F4; sections
+  1.2, 3, 4 (`POST /users`, the new resend route, the conventions), 5.1, 6.2, 6.3 (a new diagram
+  and the resend), 7.1, 7.3, 7.4, 8, 8.1, 9.2 (`PageAddress`, the stages' table), 9.3 (the smoke
+  test's stages, invitation and mail), 10, 13 (why the rejection of v2 no longer holds) and 14.
+  `docs/RUNBOOK.md`: section 2's smoke counts, a new section 2.4, a draft of the stages as
+  section 3.3 for steps m9 and m10, section 6 rewritten (a new User's invitation, a lost
+  password). `docs/COMMANDS.md`: `test-user cloud`, the smoke test's stages and address, the
+  journeys' helpers. `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md`: the users
+  screen's invitation, states and resend (v17 and v28). `docs/FRONTEND_WALK.md`: checks 55 and
+  203 corrected to the page as built (the `409` said in the dialog; "Back" after a failure).
+  `docs/FOLDER_STRUCTURE.md`: the generator gone, the
+  users' dialogs. `backend/CLAUDE.md`: `cognito.ts`'s line.
+- **Two mismatches with `docs/EMAIL_ARCHITECTURE.md`, found in C and fixed** (the Product
+  Owner's decision): section 9.1's resend row gains its body `{ username, status: "invited" }`
+  and its `400`, as built; and the page now says section 5.1's "nothing was kept" when the
+  server fails a creation (`CREATE_FAILED` in `users.model.ts`, its unit test changed), where it
+  said the general server sentence.
+- **What moved in the root `CLAUDE.md` (A).** The password rule of section 4's row m8, with
+  `test-user` named as its one exception. To make room, three notes of "Everyday commands" went
+  to `docs/COMMANDS.md` (zsh's word splitting, section 1; the Codespace's iptables rule, section
+  3.3; stopping a background `dev`, section 5, where each already was), replaced by one line that
+  points at sections 1 and 3.3. The file is at 199 lines.
+- **What step m9 finds ready.** The code and the template of all three stages, never deployed;
+  `samconfig.toml` at `off`; `test-user cloud` for the operator's test User; the smoke test
+  aware of the stage, to run after each deploy; `docs/RUNBOOK.md` section 3.3, the stages' steps
+  to run and correct. Still owed: O6 (the service-linked role) and the change set of the pool,
+  both in step m9's list.
 
 ### Step m9 — Cloud, stage `domain` (each command on the operator's explicit instruction)
 

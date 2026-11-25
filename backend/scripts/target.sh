@@ -5,7 +5,10 @@
 #   <stack name>  a deployed stack: ids from its CloudFormation outputs, your AWS credentials
 #
 # load_target sets POOL_ID, CLIENT_ID, ADMIN_USERNAME, API_URL, TABLE_NAME, COGNITO_URL and
-# DYNAMODB_URL (the last two empty for a stack: the AWS tools then use the real endpoints).
+# DYNAMODB_URL (the last two empty for a stack: the AWS tools then use the real endpoints), and
+# MAIL_STAGE, the stage of e-mail (off, domain or on; docs/EMAIL_ARCHITECTURE.md section 13.2): the
+# stack's parameter MailStage, or the local stack's MAIL_STAGE. A stack made before e-mail has no
+# such parameter, and MAIL_STAGE is then None; only the smoke test needs it, and checks it.
 #
 # Needs only what the project needs anyway (node, the AWS CLI, curl), so it runs unchanged on
 # macOS and Linux. JSON is read with node or with the AWS CLI's --query, not with jq.
@@ -29,8 +32,9 @@ load_target() {
     export AWS_ACCESS_KEY_ID=local AWS_SECRET_ACCESS_KEY=local AWS_REGION=eu-west-1
     unset AWS_PROFILE AWS_SESSION_TOKEN
     values=$(node -p 'const e = require("./env.local.json");
-      [e.AuthorizerFunction.USER_POOL_ID, e.AuthorizerFunction.CLIENT_ID, e.HelloFunction.MESSAGES_TABLE].join(" ")')
-    read -r POOL_ID CLIENT_ID TABLE_NAME <<< "$values"
+      [e.AuthorizerFunction.USER_POOL_ID, e.AuthorizerFunction.CLIENT_ID, e.HelloFunction.MESSAGES_TABLE,
+        e.Parameters.MAIL_STAGE].join(" ")')
+    read -r POOL_ID CLIENT_ID TABLE_NAME MAIL_STAGE <<< "$values"
     ADMIN_USERNAME="admin"
     API_URL=http://127.0.0.1:3000
     COGNITO_URL=http://localhost:9229
@@ -48,9 +52,10 @@ load_target() {
         Outputs[?OutputKey==`UserPoolClientId`].OutputValue | [0],
         Outputs[?OutputKey==`MessagesTableName`].OutputValue | [0],
         Outputs[?OutputKey==`ApiUrl`].OutputValue | [0],
-        Parameters[?ParameterKey==`AdminUsername`].ParameterValue | [0]]') ||
+        Parameters[?ParameterKey==`AdminUsername`].ParameterValue | [0],
+        Parameters[?ParameterKey==`MailStage`].ParameterValue | [0]]') ||
       die "cannot read stack $target in $AWS_REGION (stack name, region, AWS login?)."
-    read -r POOL_ID CLIENT_ID TABLE_NAME API_URL ADMIN_USERNAME <<< "$values"
+    read -r POOL_ID CLIENT_ID TABLE_NAME API_URL ADMIN_USERNAME MAIL_STAGE <<< "$values"
     COGNITO_URL=""
     DYNAMODB_URL=""
   fi
