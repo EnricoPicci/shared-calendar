@@ -2,7 +2,7 @@ import { ChangePasswordService } from '../../src/services/change-password.servic
 import type { ChangePasswordResult } from '../../src/services/change-password.types';
 import { SessionStore } from '../../src/services/session.store';
 import { UsersService } from '../../src/services/users.service';
-import { API, changePasswordConfig, current, newUser, outcome, PASSWORDS, signedIn, signIn } from './local';
+import { API, changePasswordConfig, current, newUser, outcome, PASSWORDS, setPermanentPassword, signedIn, signIn } from './local';
 
 // The change of one's own password of docs/FRONTEND_SERVICES.md section 14.9: ChangePasswordService
 // against the back end's local stack, straight at the Cognito emulator, as the page will do it
@@ -55,7 +55,7 @@ describe('change password', () => {
     const users = new UsersService(API, admin);
     const created = await outcome(users.createUserResult$, () => users.createUser(newUser(THROWAWAY)));
     if (created.status !== 'success') throw new Error(`could not create ${THROWAWAY}: ${JSON.stringify(created)}`);
-    firstPassword = created.user.password;
+    firstPassword = await setPermanentPassword(THROWAWAY);
     const signed = await signInAs(firstPassword);
     if (signed.result.status !== 'success') throw new Error(`${THROWAWAY} could not sign in`);
     user = signed.store;

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v10 (2026-11-25, `docs/EMAIL_PLAN.md` step m7): "Choose your password", the first sign-in with a temporary password, is section 15, checks 193 to 202. v9 (2026-11-25, `docs/EMAIL_PLAN.md` step m6): a mail asked for through the assistant's panel is section 14, checks 189 to 192. v8 (2026-11-25, `docs/EMAIL_PLAN.md` step m5): the settings' "Daily e-mail" is section 13, checks 181 to 188. v7 (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): the week's "E-mail…" dialog is section 12, checks 171 to 180; section 1 says what it needs. v6 (2026-11-25, `docs/EMAIL_PLAN.md` step m2): the four facts of a person and "My details" are section 11, checks 157 to 170; checks 3, 40, 53 and section 1 in line. v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
+| Status | v11 (2026-11-25, `docs/EMAIL_PLAN.md` step m8): a new User is invited, checks 56 to 60 rewritten, and section 16, checks 203 to 205. v10 (2026-11-25, `docs/EMAIL_PLAN.md` step m7): "Choose your password", the first sign-in with a temporary password, is section 15, checks 193 to 202. v9 (2026-11-25, `docs/EMAIL_PLAN.md` step m6): a mail asked for through the assistant's panel is section 14, checks 189 to 192. v8 (2026-11-25, `docs/EMAIL_PLAN.md` step m5): the settings' "Daily e-mail" is section 13, checks 181 to 188. v7 (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): the week's "E-mail…" dialog is section 12, checks 171 to 180; section 1 says what it needs. v6 (2026-11-25, `docs/EMAIL_PLAN.md` step m2): the four facts of a person and "My details" are section 11, checks 157 to 170; checks 3, 40, 53 and section 1 in line. v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
 | What it is | One list of checks that walks every screen of the front end and the assistant's panel in a browser, as a User and as the Administrator, against the local stack. **The check to repeat after a later change to the view layer** |
 | What it is not | A source of truth, and not an automated test. On any conflict `docs/FRONTEND_ARCHITECTURE.md` and the tests win, and this page is fixed. No end-to-end test tool is in the repository (`docs/FRONTEND_VIEW_PLAN.md` section 8, decision 6): a person follows the list by hand, or drives a browser with a script kept outside the repository |
 | Made from | The browser checks of `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 68, of `docs/CONVERSATIONAL_PLAN.md` step c12 and of `docs/CAPACITY_PLAN.md` step u5, in the order a person would follow, and `docs/SHARED_CALENDAR_SPEC.md` section 16.8 |
@@ -23,6 +23,7 @@
 | v9 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m6: **a mail through the assistant**, section 14, checks 189 to 192: the panel's proposal with the dates and the masked address, Confirm and the mail at the fake mail, Don't, against the fake Claude. No screen of the page changed. |
 | v8 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m5: **the daily e-mail**, section 13, checks 181 to 188: the settings' part "Daily e-mail", a save, a refused hour, the daily mail started by hand and its two files at the fake mail, "E-mail is not available yet." with the stage off, the phone width; the row of m5 in section 8. |
 | v10 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m7: **the first sign-in with a temporary password**, section 15, checks 193 to 202: an account made by `npm run test-user -w backend -- local`, "Choose your password" in the login's place, its hints, a too-weak password, Cancel, a good one signing in, the temporary password refused afterwards and the new one accepted, the phone width. The end of Cognito's 3 minutes cannot be walked locally (cognito-local never ends a challenge): check 202 is for the deployed page. No other check changed. |
+| v11 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m8: **the invitation**. Creating a User shows no password: checks 56 to 60 are the last look before sending, the answer "An invitation was sent to …", the state `invited` then `active` in the list, the first sign-in with the temporary password cognito-local prints, and "Resend invitation". Section 1 says how a User of the walk gets its first password; check 61 and the note on other browsers in section 7 in line; section 16, checks 203 to 205: "E-mail is not available yet." and the phone width; the row of m8 in section 8. |
 
 ---
 
@@ -31,7 +32,7 @@
 **What it needs.**
 
 - A local stack, fresh: `npm run local:down -w backend`, `npm run local:up -w backend`, in a
-  Codespace the iptables rule of `CLAUDE.md`, then `npm run local:api -w backend`.
+  Codespace the iptables rule of `docs/COMMANDS.md` section 3.3, then `npm run local:api -w backend`.
 - The seed: `npm run seed:local -w frontend`, once, **on a stack on which the back end's
   calendar journeys have not run**: they empty the local `calendar` table and leave data of
   their own in it, a type "Studio" among them, after which the seed does nothing. So the root
@@ -65,11 +66,19 @@
 - **Three more dates, for section 6.** *The three early days*: the 25th, the 26th and the 27th
   day from today, on which the fake's sentences read and book at 05:00.
 
+**A User the walk creates** gets no password on the page: the page sends an invitation. On the
+local stack cognito-local mails nothing and prints the temporary password in its log, in a box
+"Confirmation Code Delivery", on the line "Code" (6 characters, `docs/COMMANDS.md` section
+3.1): `docker logs shared-calendar-cognito-1 2>&1 | grep -A6 'Confirmation Code' | tail -7`
+shows the last one. The first sign-in with it asks for a password of the User's own
+(section 15): the walk's is `Walk-<tag>-User-2?`.
+
 **Before section 6**, as `admin`, after check 102:
 
 - in "Availability" create the type `walk-<tag> early` and, in "A single date", show each of
   the three early days and add the extra window 05:00 to 07:00 of that type;
-- in "Users" create `walk-<tag>-a` and note its password: the section is walked as this User,
+- in "Users" create `walk-<tag>-a` and sign it in once, choosing its password (below): the
+  section is walked as this User,
   **so that `alice` keeps her day's messages**;
 - the section sends **exactly ten messages** as that User, the ten of a day: one each at checks
   105, 106, 107, 111, 114, 116, 118 and 119 and two at check 115. The tenth is the one that
@@ -329,18 +338,26 @@ Sign out, sign in as `admin`.
     the words of the hint, which is shown once, in red; `[N]` no request.
 55. `[K]` Type `alice`, "Create user". → A failure in plain words under the field's box: a user
     with this username exists already. The field is not marked.
-56. `[K]` Type `walk-<tag>`, "Create user". → The dialog "User created": the username, a
-    password, "This password cannot be shown again. Give it to the user now." and one button.
-    Behind it the list has the new user.
-57. `[K]` Press the Escape key, once and then many times; press Enter; click outside the dialog.
-    → It stays open. One Tab reaches "I have noted the password".
-58. `[2]` In the second window sign in as `walk-<tag>` with the password shown. → The frame, with
-    that name and "User". Sign out there.
-59. `[K]` Press "I have noted the password". → The dialog closes. The password is nowhere: go to
-    "Week" and back to "Users", and it is not in the page nor in the address.
-60. `[S]` Create `walk-<tag>-s` and, with the password dialog open, end the session. → The
-    login; signed in again, no dialog and no password anywhere. (Delete that user afterwards.)
-61. `[K]` Create `walk-<tag>-b` and close its dialog. In "Week", next week, press a free slot. →
+56. `[K]` `[N]` Fill the four facts, type `walk-<tag>` and press "Create user". → A dialog "Send
+    an invitation" says "An invitation will be sent to walk-<tag>@example.com.", with "Back" and
+    "Confirm". Nothing is sent yet: no `POST /users`.
+57. `[K]` "Back". → The dialog closes, the form keeps what was typed, nothing is sent. "Create
+    user" again, then "Confirm". → One `POST /users`, answered 201 with the username and
+    `invited` and no password; the dialog says "An invitation was sent to
+    walk-<tag>@example.com.", "Back" and "Confirm" are gone, and one button "Close" has the
+    keyboard. Behind it the form is empty and the list has `walk-<tag>`, its state `invited`
+    and a button "Resend invitation".
+58. `[2]` In the second window sign in as `walk-<tag>` with the temporary password of
+    cognito-local's log (section 1). → "Choose your password" (check 193). Choose
+    `Walk-<tag>-User-2?`. → The frame, with that name and "User". Sign out there.
+59. `[K]` "Close", then "Week" and back to "Users". → The row of `walk-<tag>` says `active` and
+    has no "Resend invitation". No password anywhere in the page or the address.
+60. `[K]` Create `walk-<tag>-s` ("Confirm", "Close") and press "Resend invitation" on its row. →
+    The same dialog asks again for walk-<tag>-s@example.com. "Confirm". → On the local stack, in
+    the dialog, "Something went wrong on the server. Please try again in a moment.":
+    cognito-local cannot send an invitation again (`docs/EMAIL_ARCHITECTURE.md` section 14.1);
+    at the deployed page "An invitation was sent to …". "Close", and delete `walk-<tag>-s`.
+61. `[K]` Create `walk-<tag>-b` ("Confirm", "Close"). In "Week", next week, press a free slot. →
     "For" lists `alice`, `walk-<tag>` and `walk-<tag>-b`. Book the slot of Monday 09:00–10:00
     for `walk-<tag>-b`, and the slot of Wednesday 12:00–13:00 for `walk-<tag>`.
 62. `[K]` In "Users" press "Delete" on the row of `walk-<tag>-b`. → A dialog names the user,
@@ -602,8 +619,7 @@ The run of a script in a headless browser cannot say these; they are for a perso
 - **The night the clocks change** (two slots with the same local time, told apart by their
   offset): the seed has no availability at night and the dates are beyond the booking horizon.
   Covered by the tests of `frontend/tests/unit/logic/week.model.test.ts` only.
-- **Another browser than Chromium**: the Escape key on the password dialog (`closedby="none"`
-  is what holds in Chromium; elsewhere the refused `cancel` event), and where the keyboard is
+- **Another browser than Chromium**: the Escape key on a dialog, and where the keyboard is
   after a dialog closes.
 
 **The assistant with the real Claude.** A short list, for a person: what to try and what to
@@ -647,7 +663,7 @@ section 6 and the journeys run on the fake only.
 | 63 | The note; a change, also in a later week; a change refused; too late to change; giving up; the Administrator's change; signing out while moving | 14, 15, 17 to 21, 23, 25, 45, 97 |
 | 64 | The upcoming list; an empty list; the history and a period; the refusals of a period; the detail from a row; a note and a cancellation from the list; "Change" from the list; to the week and back; the tab; `#/appointments` as `admin`; signing out with the detail open | 28 to 39, 40, 98. "Ended" is in section 6 |
 | 65 | The values; the refusals; a value kept; "No limit"; a save that fails; `alice` and the address; a booking follows a setting; the limit met by a change; the values put back | 46 to 52, 38, 22, 26 |
-| 66 | The list; a username refused; one that exists; create and sign in; Escape and the password dialog; the password gone; the book dialog's list; a delete; a delete refused or unreachable; the tab; `alice` and the address; the keyboard | 53 to 65, 38, 98. "The tab shown again leaves an open dialog as it is" is said once, at 98 |
+| 66 | The list; a username refused; one that exists; create and sign in; the book dialog's list; a delete; a delete refused or unreachable; the tab; `alice` and the address; the keyboard | 53 to 65, 38, 98. "The tab shown again leaves an open dialog as it is" is said once, at 98 |
 | 67 | The lists; a name refused; create, rename, delete; a type in use; a pattern and its windows; fields in fault; an overlap; a change, 24:00; an ended pattern; a conflict and its end; a write that cannot reach the server; the tab; signing out with a dialog open; `alice` and the address; the phone; the keyboard | 66 to 81, 94, 95, 38 |
 | 68 | The date field; a date shown; refused dates; "this day only" put together and saved; discarded; overlaps; "not available"; the way back; an extra window; an appointment on the day; a write that cannot reach the server; a pattern changed while a date is on show; "Show" refused; signing out with the list open; the phone; the keyboard | 82 to 95 |
 | c12 | No panel at the login, the bar on every screen, no request before the first opening; a read with its progress line; moving between screens, a reload; a booking confirmed with the week on show; a dialog over the panel; a decline; a message that drops a proposal; each of the three sentences; a text with markup; another person finds nothing; the keyboard alone; the console | 103, 104, 121; 106; 108, 110; 111, 113; 112; 114; 115; 116, 118, 119; 107; 120; 104, 105, 109, 113, 114, 118; 122. What the browser's tools show a screen reader is check 117; the two points step c12 left (the count after a 503, "New conversation" after one) are in checks 116 and 118 |
@@ -658,11 +674,12 @@ section 6 and the journeys run on the fake only.
 | m5 | The settings' "Daily e-mail": a save, a value refused, the daily mail by hand at the hour set with its two files, "not available yet" with `MAIL_STAGE=off` | 181 to 188 |
 | m6 | The assistant's mail: the proposal with the two dates and the masked address, Confirm and the mail at the fake mail, Don't | 189 to 192 |
 | m7 | "Choose your password": an account made by the script, its temporary password leading to the screen, a too-weak password refused with the live checks, a good one signing in, the temporary one refused afterwards and the new one accepted, the 3 minutes over (at the deployed page), the phone width | 193 to 202 |
+| m8 | The invitation: the last look and Back, Confirm and the answer, `invited` then `active` after the first sign-in, "Resend invitation" and its failure on the local stack, "E-mail is not available yet.", the phone width | 56 to 60, 203 to 205 |
 | p3 | The hints while typing, the two new ones differing, a wrong current password, a change that succeeds, "Password changed" at the login, the old password refused, the new one accepted; as `alice` and as `admin`, at the two widths | 123 to 133 |
 
 Steps 60 to 68 are those of `docs/FRONTEND_VIEW_PLAN.md`; step c12 is of
 `docs/CONVERSATIONAL_PLAN.md`; step p3 of `docs/CHANGE_PASSWORD_PLAN.md`; step u5 of
-`docs/CAPACITY_PLAN.md`; steps m2, m4, m5, m6 and m7 of `docs/EMAIL_PLAN.md`.
+`docs/CAPACITY_PLAN.md`; steps m2, m4, m5, m6, m7 and m8 of `docs/EMAIL_PLAN.md`.
 
 Left out on purpose: "the screens of the earlier steps still work, in short" (`docs/FRONTEND_VIEW_PLAN.md`
 section 4), which was each step's own short walk and is this whole list.
@@ -962,3 +979,18 @@ anything, and the end of Cognito's 3 minutes is walked at the deployed page only
      sign in with the temporary password, wait more than 3 minutes on "Choose your password",
      then "Choose password" with a good one. → The sign-in form, the username in its field,
      "This took too long. Please sign in again."; the temporary password still works.
+
+## 16. The invitation when e-mail is off, and at a phone width
+
+Walked as `admin`, after section 15, or alone on any running stack. Check 203 needs the API
+restarted with `MAIL_STAGE` `off`, as check 186 does; it leaves nothing, since nothing is made.
+
+203. `[N]` With the API at `MAIL_STAGE` `off`: in "Users" fill the form for `walk-<tag>-off`,
+     "Create user", "Confirm". → In the dialog "E-mail is not available yet."; one `POST /users`
+     answered 503; the list has no `walk-<tag>-off`. "Close". On the row of an invited User,
+     "Resend invitation", "Confirm" → the same sentence.
+204. Set `MAIL_STAGE` back to `on` and restart the API. → "Create user" and "Confirm" invite
+     again (check 57). Delete what was made.
+205. → At 390 × 844 the rows with their state and "Resend invitation" wrap inside the list, the
+     dialog's sentence with a long address wraps inside the dialog, and the page does not scroll
+     sideways.

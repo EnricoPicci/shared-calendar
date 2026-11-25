@@ -17,7 +17,7 @@ import { CalendarSettingsService } from '../../src/services/calendar-settings.se
 import { SessionStore } from '../../src/services/session.store';
 import { UsersService } from '../../src/services/users.service';
 import { refuseRealClaude } from './claude';
-import { API, newUser, outcome, signedIn, signIn } from './local';
+import { API, newUser, outcome, setPermanentPassword, signedIn, signIn } from './local';
 
 // The assistant's journeys of docs/FRONTEND_SERVICES.md section 14.7: AssistantService against the
 // back end's local stack, with the fake Claude of that stack answering for Anthropic
@@ -136,8 +136,8 @@ async function open(username: string, typeName: string, days: number): Promise<{
   // the fake fix the day and the hour, so the block cannot move elsewhere.
   ok(await outcome(rules.createWindowResult$, () => rules.createWindow({ date: day, start: '05:00', end: '07:00', typeId })), `open 05:00 to 07:00 on ${day}`);
   const users = new UsersService(API, admin);
-  const password = ok(await outcome(users.createUserResult$, () => users.createUser(newUser(username))), `create ${username}`).user.password;
-  const signed = await signIn(username, password);
+  ok(await outcome(users.createUserResult$, () => users.createUser(newUser(username))), `create ${username}`);
+  const signed = await signIn(username, await setPermanentPassword(username));
   ok(signed.result, `${username} signs in`);
   stores.push(signed.store);
   return { day, typeId, user: signed.store };

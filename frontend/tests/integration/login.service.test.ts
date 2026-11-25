@@ -156,3 +156,75 @@ describe('first sign-in with a temporary password', () => {
     expect(chosen.result).toMatchObject({ status: 'success', username: FIRST, role: 'user' });
   });
 });
+
+// The invitation (docs/EMAIL_ARCHITECTURE.md sections 5.1 and 5.3): the Administrator creates a
+// User through UsersService and gets no password back; the User is `invited` in the list until the
+// first sign-in, then `active`. cognito-local prints the invitation's temporary password in its log
+// instead of mailing it, so the journey gives the account a temporary password of its own with
+// setTemporaryPassword. Then the resend's refusals: an active User (not_invited), an administrator
+// (cannot_edit_admin), an unknown username (user_not_found). Its success is not tried here:
+// cognito-local does not support the resend (docs/EMAIL_ARCHITECTURE.md section 14.1). It plays a
+// throw-away User of its own, `fe-invited`, removed before and after.
+//
+// Secrets: the passwords stay in constants and the session inside the service; no assertion
+// prints one.
+const INVITED = 'fe-invited';
+const INVITED_TEMPORARY = 'Fe-Invited-Temp-1!';
+const INVITED_CHOSEN = 'Fe-Invited-Chosen-2?';
+
+// Explained in simple words in docs/journeys/frontend/invitation.md.
+describe('the invitation', () => {
+  let admin: SessionStore;
+  let users: UsersService;
+  const stores: SessionStore[] = [];
+
+  async function removeInvited(): Promise<void> {
+    const result = await outcome(users.deleteUserResult$, () => users.deleteUser(INVITED));
+    if (result.status === 'failure' && result.reason !== 'user_not_found') throw new Error(`could not remove ${INVITED}: ${result.reason}`);
+  }
+
+  // The state of the account in the Administrator's list.
+  async function statusOf(username: string): Promise<string | undefined> {
+    const listed = await outcome(users.listUsersResult$, () => users.listUsers());
+    if (listed.status !== 'success') throw new Error(`could not list: ${listed.reason}`);
+    return listed.users.find((user) => user.username === username)?.status;
+  }
+
+  beforeAll(async () => {
+    admin = await signedIn('admin');
+    stores.push(admin);
+    users = new UsersService(API, admin);
+    await removeInvited();
+  });
+
+  afterAll(async () => {
+    await removeInvited();
+    for (const each of stores) each.clear(); // stops the expiry timers
+  });
+
+  it('1. the Administrator creates the User: the answer is the username and the state invited, no password, and the list shows it invited', async () => {
+    const created = await outcome(users.createUserResult$, () => users.createUser(newUser(INVITED)));
+    expect(created).toEqual({ status: 'success', user: { username: INVITED, status: 'invited' } });
+    expect(await statusOf(INVITED)).toBe('invited');
+  });
+
+  it('2. with a temporary password, the first sign-in asks for a new one; the one chosen signs the User in', async () => {
+    await setTemporaryPassword(INVITED, INVITED_TEMPORARY);
+    const store = new SessionStore();
+    stores.push(store);
+    const service = new LoginService(cognito(), store);
+    expect(await outcome(service.loginResult$, () => service.login(INVITED, INVITED_TEMPORARY))).toEqual({ status: 'new_password_required', username: INVITED });
+    expect(await outcome(service.loginResult$, () => service.choosePassword(INVITED_CHOSEN))).toMatchObject({ status: 'success', username: INVITED, role: 'user' });
+  });
+
+  it('3. after the first sign-in the list shows the User active', async () => {
+    expect(await statusOf(INVITED)).toBe('active');
+  });
+
+  it('4. the invitation is not sent again: to an active User (not_invited), to an administrator (cannot_edit_admin), to an unknown username (user_not_found)', async () => {
+    const resend = (username: string) => outcome(users.resendInvitationResult$, () => users.resendInvitation(username));
+    expect(await resend(INVITED)).toMatchObject({ status: 'failure', reason: 'not_invited' });
+    expect(await resend('admin')).toMatchObject({ status: 'failure', reason: 'cannot_edit_admin' });
+    expect(await resend('fe-nobody')).toMatchObject({ status: 'failure', reason: 'user_not_found' });
+  });
+});

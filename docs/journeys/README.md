@@ -107,6 +107,7 @@ The pages written so far. Which pages are still to come, and in which order, is 
 | [`frontend/mail.md`](frontend/mail.md) | `frontend/tests/integration/mail.test.ts`, `the mail of the calendar` |
 | [`frontend/mail-settings.md`](frontend/mail-settings.md) | `frontend/tests/integration/mail-settings.test.ts`, `the daily mail settings` |
 | [`frontend/first-sign-in.md`](frontend/first-sign-in.md) | `frontend/tests/integration/login.service.test.ts`, `first sign-in with a temporary password` |
+| [`frontend/invitation.md`](frontend/invitation.md) | `frontend/tests/integration/login.service.test.ts`, `the invitation` |
 
 ### Back end
 

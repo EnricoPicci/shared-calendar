@@ -34,7 +34,8 @@ Ideas used here, explained once for all journeys:
 
 The file's `beforeAll` signs in `admin`; what else it does concerns the blocks that use the
 calendar, not this one. The block's `beforeAll` creates `chat-lingua` again and
-signs it in (`newUser()`: `removeUserIfPresent()`, `POST /users` checked `201`, `signIn()`), then
+signs it in (`newUser()`: `removeUserIfPresent()`, `POST /users` checked `201`, `setPasswordOf()`,
+`signIn()`), then
 calls `DELETE /assistant/conversation` and checks `204`. A new account has no conversation, so the
 block does not depend on the block before it.
 
@@ -99,5 +100,5 @@ use with `messages` 3.
 | The language question | `askLanguage()` in `backend/src/lib/anthropic.ts` |
 | The line of the application | `timeLine()` in `backend/src/assistant/prompt.ts` |
 | The fake's part | `withApplicationLine()` in `backend/docker/fake-claude.mjs`; the texts and the languages in `backend/tests/integration/fake-claude/answers.json` |
-| Test helpers | in the file: `newUser()`, `say()`, `conversation()`, `startAgain()`; in `backend/tests/integration/setup.ts`: `api()`, `signIn()`, `removeUserIfPresent()` |
+| Test helpers | in the file: `newUser()`, `say()`, `conversation()`, `startAgain()`; in `backend/tests/integration/setup.ts`: `api()`, `setPasswordOf()`, `signIn()`, `removeUserIfPresent()` |
 | Constants | `HELLO`, `HELLO_ANSWER` |

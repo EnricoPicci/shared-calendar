@@ -46,11 +46,13 @@ uses.
 The block's `beforeAll` signs the Administrator in and removes `fe-first` if an earlier run left
 it (accepting `user_not_found`). Then it creates `fe-first` through `UsersService.createUser()`,
 with the four facts `newUser()` makes from the username (the e-mail `fe-first@example.com`). The
-API answers with a permanent password, which the block does not use: the helper
-`setTemporaryPassword()` of `frontend/tests/integration/local.ts` then gives the account the
-temporary password `Fe-First-Temp-1!`, with Cognito's `AdminSetUserPassword` and `Permanent:
-false`, as an invitation would. cognito-local takes that administrator's call unsigned. The
-account is now one that must choose its own password at its next sign-in.
+API answers the username and the state `invited`, and no password: cognito-local made the
+invitation's temporary password and printed it in its log, which the block does not read
+([a new User's password](../concepts.md#the-people-of-the-local-stack)). The helper
+`setTemporaryPassword()` of `frontend/tests/integration/local.ts` then gives the account a
+temporary password the block knows, `Fe-First-Temp-1!`, with Cognito's `AdminSetUserPassword` and
+`Permanent: false`. cognito-local takes that administrator's call unsigned. The account is still
+one that must choose its own password at its next sign-in, as after an invitation.
 
 ## Test 1: the challenge
 

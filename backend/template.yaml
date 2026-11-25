@@ -66,8 +66,8 @@ Parameters:
     AllowedValues: ['off', 'domain', 'on']
     Description: >
       Whether e-mail works in this stack (docs/EMAIL_ARCHITECTURE.md section 13.2). Only 'on' lets
-      the mail routes start the mailer; any other stage answers 503 mail_unavailable. Passed to the
-      mail routes as MAIL_STAGE.
+      the mail routes start the mailer, and POST /users and its resend send an invitation; any
+      other stage answers 503 mail_unavailable. Passed to those routes as MAIL_STAGE.
   MailDomain:
     Type: String
     Default: example.com
@@ -606,7 +606,11 @@ Resources:
                   - dynamodb:PutItem
                 Resource: !GetAtt MessagesTable.Arn
 
-  # POST /users: creates a user with its four facts and a permanent password in the "user" group.
+  # POST /users: creates a User with its four facts and no password, in the "user" group. Cognito
+  # makes a temporary password and e-mails it as the invitation (AdminCreateUser sends it, so no
+  # other permission is needed); the User chooses their own at the first sign-in
+  # (docs/EMAIL_ARCHITECTURE.md section 5.1). MAIL_STAGE is the stack's stage: anything but 'on'
+  # answers 503 mail_unavailable and creates nothing (docs/EMAIL_ARCHITECTURE.md section 13.2).
   # AdminDeleteUser is only used to roll back a half-created user.
   CreateUserFunction:
     Type: AWS::Serverless::Function
@@ -619,6 +623,7 @@ Resources:
         Variables:
           USER_POOL_ID: !Ref UserPool
           COGNITO_ENDPOINT: ''
+          MAIL_STAGE: !Ref MailStage
       Events:
         CreateUser:
           Type: HttpApi
@@ -674,7 +679,6 @@ Resources:
               - Effect: Allow
                 Action:
                   - cognito-idp:AdminCreateUser
-                  - cognito-idp:AdminSetUserPassword
                   - cognito-idp:AdminAddUserToGroup
                   - cognito-idp:AdminDeleteUser
                 Resource: !GetAtt UserPool.Arn
@@ -912,6 +916,84 @@ Resources:
                   - cognito-idp:AdminListGroupsForUser
                   - cognito-idp:AdminGetUser
                   - cognito-idp:AdminUpdateUserAttributes
+                Resource: !GetAtt UserPool.Arn
+
+  # POST /users/{username}/invitation (docs/EMAIL_ARCHITECTURE.md sections 5.3 and 9.1): the
+  # Administrator sends a User's invitation again. It reads the account's groups (an administrator
+  # is refused) and its state (only an account still waiting for its first sign-in is invited),
+  # then AdminCreateUser with RESEND makes a new temporary password and Cognito e-mails it.
+  # MAIL_STAGE is the stack's stage: anything but 'on' answers 503 mail_unavailable.
+  ResendInvitationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: resendInvitation.handler
+      Role: !GetAtt ResendInvitationRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref ResendInvitationLogGroup
+      Environment:
+        Variables:
+          USER_POOL_ID: !Ref UserPool
+          COGNITO_ENDPOINT: ''
+          MAIL_STAGE: !Ref MailStage
+      Events:
+        ResendInvitation:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: POST
+            Path: /users/{username}/invitation
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/resendInvitation.ts
+
+  ResendInvitationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-resendInvitation
+      RetentionInDays: 14
+
+  # The permissions of docs/EMAIL_ARCHITECTURE.md section 12.2 for the resend: the groups, the
+  # state, and AdminCreateUser for the RESEND itself, on the one pool.
+  ResendInvitationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ResendInvitationLogGroup}:log-stream:*
+        - PolicyName: resend-invitation
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminListGroupsForUser
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:AdminCreateUser
                 Resource: !GetAtt UserPool.Arn
 
   # GET /me (docs/EMAIL_ARCHITECTURE.md sections 4.2 and 9.1; the Administrator and Users): the

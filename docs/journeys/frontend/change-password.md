@@ -37,9 +37,10 @@ Ideas used here, explained once for all journeys:
 ## Before the block starts
 
 The block's `beforeAll` signs the Administrator in and removes `fe-password` if an earlier run
-left it (accepting `user_not_found`). Then it creates `fe-password` through `UsersService`, keeps
-the password the API generated (`firstPassword`), and signs `fe-password` in into a store of its
-own, `user`. Every test that changes the password uses that store: its session is the one the
+left it (accepting `user_not_found`). Then it creates `fe-password` through `UsersService`. The
+creation answers no password, so the block sets a permanent one straight in cognito-local
+(`setPermanentPassword()`, [a new User's password](../concepts.md#the-people-of-the-local-stack)),
+keeps it (`firstPassword`), and signs `fe-password` in into a store of its own, `user`. Every test that changes the password uses that store: its session is the one the
 change ends.
 
 Each call of the block makes a new `ChangePasswordService` with the local configuration,
@@ -121,4 +122,4 @@ it anew. So the block is repeated without a step by hand.
 | Signing in | `signIn()` of `frontend/tests/integration/local.ts` → `LoginService.login()` on `loginResult$` → Cognito's `InitiateAuth` |
 | The account | `UsersService.createUser()` on `createUserResult$` → `POST /users`; `deleteUser()` on `deleteUserResult$` → `DELETE /users/{username}` (helper `removeThrowaway()`) |
 | The local configuration | `changePasswordConfig()` of `frontend/tests/integration/local.ts` |
-| Helpers and constants | `change()`, `signInAs()`; `THROWAWAY` (`fe-password`), `NEW_PASSWORD` |
+| Helpers and constants | `change()`, `signInAs()`; `setPermanentPassword()` of `frontend/tests/integration/local.ts`; `THROWAWAY` (`fe-password`), `NEW_PASSWORD` |

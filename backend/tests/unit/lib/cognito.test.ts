@@ -4,11 +4,11 @@ import {
   AdminDeleteUserCommand,
   AdminGetUserCommand,
   AdminListGroupsForUserCommand,
-  AdminSetUserPasswordCommand,
   AdminUpdateUserAttributesCommand,
   AdminUserGlobalSignOutCommand,
   CognitoIdentityProviderClient,
   ListUsersInGroupCommand,
+  UnsupportedUserStateException,
   UsernameExistsException,
   UserNotFoundException,
   type UserStatusType,
@@ -28,7 +28,8 @@ import {
   listGroups,
   listPlainUsers,
   namesBySub,
-  setPermanentPassword,
+  NotInvitedError,
+  resendInvitation,
   updateProfile,
   UserExistsError,
   UserNotFoundError,
@@ -59,7 +60,7 @@ afterEach(() => {
 });
 
 describe('createUser', () => {
-  it('sends AdminCreateUser with MessageAction SUPPRESS and the four facts, the e-mail verified', async () => {
+  it('sends AdminCreateUser with no password and no MessageAction, the invitation by e-mail, the four facts, the e-mail verified', async () => {
     cognito.on(AdminCreateUserCommand).resolves({});
     await createUser('bob', FACTS);
     const calls = cognito.commandCalls(AdminCreateUserCommand);
@@ -67,7 +68,7 @@ describe('createUser', () => {
     expect(calls[0]!.args[0].input).toEqual({
       UserPoolId: POOL,
       Username: 'bob',
-      MessageAction: 'SUPPRESS',
+      DesiredDeliveryMediums: ['EMAIL'],
       UserAttributes: [...factAttributes(), { Name: 'email_verified', Value: 'true' }],
     });
   });
@@ -167,21 +168,35 @@ describe('asUserSummary and asMe', () => {
   });
 });
 
-describe('setPermanentPassword', () => {
-  it('sends AdminSetUserPassword with Permanent true', async () => {
-    cognito.on(AdminSetUserPasswordCommand).resolves({});
-    await setPermanentPassword('bob', 'Pass-Word-1234!x');
-    expect(cognito.commandCalls(AdminSetUserPasswordCommand)[0]!.args[0].input).toEqual({
+describe('resendInvitation', () => {
+  it('sends AdminCreateUser with MessageAction RESEND by e-mail, and nothing else', async () => {
+    cognito.on(AdminCreateUserCommand).resolves({});
+    await resendInvitation('bob');
+    expect(cognito.commandCalls(AdminCreateUserCommand)[0]!.args[0].input).toEqual({
       UserPoolId: POOL,
       Username: 'bob',
-      Password: 'Pass-Word-1234!x',
-      Permanent: true,
+      MessageAction: 'RESEND',
+      DesiredDeliveryMediums: ['EMAIL'],
     });
   });
 
   it('maps UserNotFoundException to UserNotFoundError', async () => {
-    cognito.on(AdminSetUserPasswordCommand).rejects(notFound());
-    await expect(setPermanentPassword('bob', 'x')).rejects.toBeInstanceOf(UserNotFoundError);
+    cognito.on(AdminCreateUserCommand).rejects(notFound());
+    await expect(resendInvitation('bob')).rejects.toBeInstanceOf(UserNotFoundError);
+  });
+
+  it('maps UnsupportedUserStateException, an account that has chosen its password, to NotInvitedError', async () => {
+    cognito.on(AdminCreateUserCommand).rejects(new UnsupportedUserStateException({ message: 'User is in an unsupported state', $metadata: {} }));
+    const err = await resendInvitation('bob').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(NotInvitedError);
+    expect((err as Error).name).toBe('NotInvitedError');
+    expect((err as Error).message).toBe('User bob is not waiting for its first sign-in');
+  });
+
+  it('rethrows any other error unchanged', async () => {
+    const other = Object.assign(new Error('Unsupported'), { name: 'UnsupportedError' });
+    cognito.on(AdminCreateUserCommand).rejects(other);
+    await expect(resendInvitation('bob')).rejects.toBe(other);
   });
 });
 

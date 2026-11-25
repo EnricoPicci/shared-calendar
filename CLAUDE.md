@@ -71,7 +71,10 @@ one that is fixed:
   what its route needs, scoped to the user pool and/or table it uses. The calendar's DynamoDB
   permissions are shared managed policies on the `calendar` table, attached per role
   (`docs/ARCHITECTURE.md` section 7.1).
-- Every password is set as permanent, no forced change. Mail goes only by the mailer, via SES.
+- A User's first password is temporary: Cognito makes it, e-mails it and forces its change at
+  the first sign-in; the API never sees or answers it. The Administrator's is set once as
+  permanent by `bootstrap-admin`. One exception: `test-user`, the operator's command, gives its
+  User a temporary one the operator types. Mail goes only through SES: Cognito's and the mailer's.
 - The API can never create an administrator, delete one, or set its password.
 - A password is changed only by its owner, at Cognito; the API has no route that changes one.
 - Role resolution: `admin` wins over `user`; a token in neither group gets 403.
@@ -151,7 +154,6 @@ npm run seed:local -w frontend                      # a week to look at, in the 
   integration tests run nothing and exit 0.
 - `DYNAMODB_PORT=8002` on this machine (port 8000 is taken): the same value for every command.
 - The local accounts: `admin` / `Admin-Local-Pass-1!` and `alice` / `Alice-Local-Pass-1!`.
-- The shell is zsh: `set -- $var` does not word-split. Pass arguments explicitly.
 
 What goes wrong most often:
 
@@ -163,9 +165,7 @@ What goes wrong most often:
   one local stack and nothing prevents it.
 - After `npm run build -w backend`, restart `local:api`. Always build through npm, never a raw
   `sam build`.
-- In a Codespace, after each start and before `local:api` (or the authorizer times out):
-  `sudo iptables-legacy -I FORWARD -i br-+ -o br-+ -j ACCEPT`.
-- Stop a background `dev` with `pkill -f 'node scripts/dev[.]mjs'`, alone in its command.
+- In a Codespace, and for the shell's own quirks: `docs/COMMANDS.md` sections 1 and 3.3.
 
 ## Folder map
 

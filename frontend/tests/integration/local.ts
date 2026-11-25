@@ -30,18 +30,35 @@ export function changePasswordConfig(): ChangePasswordConfig {
 
 export const PASSWORDS = { alice: 'Alice-Local-Pass-1!', admin: 'Admin-Local-Pass-1!' };
 
-// Gives an account a temporary password, as an invitation does (docs/EMAIL_ARCHITECTURE.md
-// section 14.1): AdminSetUserPassword with Permanent false, so that its next sign-in gets the
-// challenge NEW_PASSWORD_REQUIRED. cognito-local takes the administrator's calls unsigned, so a
-// plain request does it. The password goes into the body and nowhere else.
-export async function setTemporaryPassword(username: string, password: string): Promise<void> {
+// AdminSetUserPassword on cognito-local, which takes the administrator's calls unsigned, so a plain
+// request does it. The password goes into the body and nowhere else.
+async function setPassword(username: string, password: string, permanent: boolean): Promise<void> {
   const env = JSON.parse(readFileSync(ENV_FILE, 'utf8')) as { AuthorizerFunction: { USER_POOL_ID: string } };
   const response = await fetch(cognito().cognitoUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-amz-json-1.1', 'X-Amz-Target': 'AWSCognitoIdentityProviderService.AdminSetUserPassword' },
-    body: JSON.stringify({ UserPoolId: env.AuthorizerFunction.USER_POOL_ID, Username: username, Password: password, Permanent: false }),
+    body: JSON.stringify({ UserPoolId: env.AuthorizerFunction.USER_POOL_ID, Username: username, Password: password, Permanent: permanent }),
   });
-  if (response.status !== 200) throw new Error(`could not give ${username} a temporary password: ${response.status}`);
+  if (response.status !== 200) throw new Error(`could not give ${username} a password: ${response.status}`);
+}
+
+// Gives an account a temporary password, as an invitation does (docs/EMAIL_ARCHITECTURE.md
+// section 14.1): Permanent false, so that its next sign-in gets the challenge
+// NEW_PASSWORD_REQUIRED. The invitation's own temporary password is printed in cognito-local's
+// log, which a journey does not read.
+export async function setTemporaryPassword(username: string, password: string): Promise<void> {
+  await setPassword(username, password, false);
+}
+
+// The password the journeys give a User created through UsersService, a test value of the project.
+export const THROWAWAY_PASSWORD = 'Throwaway-Local-Pass-1!';
+
+// Sets the permanent password of an account just created through UsersService, as the User's own
+// first sign-in would end: the creation answers no password (docs/EMAIL_PLAN.md finding F1), and
+// the account becomes active. Returns the password, for signIn.
+export async function setPermanentPassword(username: string, password: string = THROWAWAY_PASSWORD): Promise<string> {
+  await setPassword(username, password, true);
+  return password;
 }
 
 // What "Create user" sends for a throw-away User of a journey: the username and four facts made

@@ -8,7 +8,7 @@ import { CONFIG, describeMethod, type MethodSpec } from './suite';
 // docs/FRONTEND_SERVICES.md section 13.8. A real SessionStore; fetch stubbed with real Responses;
 // every test subscribes first, then calls.
 
-const GENERATED = 'Gen3rated-Pass-word!';
+const INVITED = { username: 'carol', status: 'invited' };
 // A person's four facts, as the form holds them and as they are sent.
 const FACTS = { givenName: 'Carol', familyName: 'Conti', email: 'carol@example.com', address: 'Via Roma 1\n00100 Roma' };
 const newUser = (username: string) => ({ username, ...FACTS });
@@ -61,15 +61,15 @@ async function deleteOnce(answer: Response, username = 'carol') {
 }
 
 describe('UsersService.createUser', () => {
-  it('success: username and the generated password; states idle → pending carol → success', async () => {
-    const result = await createOnce(json(201, { username: 'carol', password: GENERATED }));
-    expect(result).toEqual({ status: 'success', user: { username: 'carol', password: GENERATED } });
+  it('success: the username and the state invited, no password; states idle → pending carol → success', async () => {
+    const result = await createOnce(json(201, INVITED));
+    expect(result).toEqual({ status: 'success', user: INVITED });
     expect(createStates).toEqual([{ status: 'idle' }, { status: 'pending', username: 'carol' }, result]);
     expect(createStates[2]).toBe(result);
   });
 
   it("request shape: one POST to apiUrl + '/users' with the bearer token and the JSON body", async () => {
-    await createOnce(json(201, { username: 'carol', password: GENERATED }));
+    await createOnce(json(201, INVITED));
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = call(fetchMock);
     expect(url).toBe('http://api.test/users');
@@ -79,7 +79,7 @@ describe('UsersService.createUser', () => {
   });
 
   it('the facts are sent as the shared rule makes them: trimmed, the e-mail lower-cased, the line ends of the address made one', async () => {
-    fetchMock.mockResolvedValueOnce(json(201, { username: 'carol', password: GENERATED }));
+    fetchMock.mockResolvedValueOnce(json(201, INVITED));
     service.createUser({ username: 'carol', givenName: ' Carol ', familyName: 'Conti ', email: ' Carol@Example.COM', address: ' Via Roma 1\r\n00100 Roma ' });
     await vi.waitFor(() => expect(created).toHaveLength(1));
     expect(JSON.parse(call(fetchMock)[1].body as string)).toEqual(newUser('carol'));
@@ -111,9 +111,23 @@ describe('UsersService.createUser', () => {
     expect(sessions.at(-1)).toBe(admin);
   });
 
+  it('e-mail not switched on: failure mail_unavailable with its message', async () => {
+    expect(await createOnce(json(503, { error: 'mail_unavailable', message: 'E-mail is not available yet' }))).toEqual({
+      status: 'failure',
+      reason: 'mail_unavailable',
+      message: 'E-mail is not available yet',
+    });
+  });
+
+  it('a password in the answer is not kept', async () => {
+    const result = await createOnce(json(201, { ...INVITED, password: 'Not-Kept-Anywhere-1!' }));
+    expect(JSON.stringify([result, createStates])).not.toContain('Not-Kept-Anywhere');
+  });
+
   it.each([
-    ['201 without password', () => json(201, { username: 'carol' })],
-    ['200 with both', () => json(200, { username: 'carol', password: GENERATED })],
+    ['201 without the state', () => json(201, { username: 'carol' })],
+    ['201 with another state', () => json(201, { username: 'carol', status: 'active' })],
+    ['200 with both', () => json(200, INVITED)],
     ['201 empty', () => new Response(null, { status: 201 })],
   ])('wrong body (%s): failure unexpected', async (_name, stub) => {
     expect(await createOnce(stub())).toMatchObject({ status: 'failure', reason: 'unexpected' });
@@ -126,14 +140,14 @@ describe('UsersService.createUser', () => {
       return new Promise<Response>(() => {});
     });
     service.createUser(newUser('dave'));
-    await createOnce(json(201, { username: 'carol', password: GENERATED }));
+    await createOnce(json(201, INVITED));
     expect(firstSignal?.aborted).toBe(true);
     expect(created).toHaveLength(1);
   });
 
   it('retry after failure: two results, the second a success', async () => {
     await createOnce(json(409, { error: 'user_exists', message: 'exists' }));
-    await createOnce(json(201, { username: 'carol', password: GENERATED }));
+    await createOnce(json(201, INVITED));
     expect(created.map((r) => r.status)).toEqual(['failure', 'success']);
   });
 });
@@ -201,21 +215,14 @@ describe('UsersService, both pairs', () => {
     service.createUser(newUser('dave'));
     await deleteOnce(new Response(null, { status: 204 }));
     expect(createSignal?.aborted).toBe(false);
-    answerCreate(json(201, { username: 'dave', password: GENERATED }));
+    answerCreate(json(201, { username: 'dave', status: 'invited' }));
     await vi.waitFor(() => expect(created).toHaveLength(1));
     expect(created[0]).toMatchObject({ status: 'success', user: { username: 'dave' } });
     expect(deleted).toEqual([{ status: 'success', username: 'carol' }]);
   });
 
-  it('password only where allowed: in the create success, not in the delete streams nor the store', async () => {
-    await createOnce(json(201, { username: 'carol', password: GENERATED }));
-    await deleteOnce(new Response(null, { status: 204 }));
-    expect(JSON.stringify(created)).toContain(GENERATED);
-    expect(JSON.stringify([deleted, deleteStates, sessions])).not.toContain(GENERATED);
-  });
-
   it('no leak: no state or result contains the token', async () => {
-    await createOnce(json(201, { username: 'carol', password: GENERATED }));
+    await createOnce(json(201, INVITED));
     await deleteOnce(json(404, { error: 'user_not_found', message: 'No user' }));
     expect(JSON.stringify([created, createStates, deleted, deleteStates])).not.toContain(admin.accessToken);
   });
@@ -288,3 +295,26 @@ const updateUser: MethodSpec<UsersService> = {
 };
 
 describeMethod((store) => new UsersService(CONFIG, store), updateUser, listUsers);
+
+// POST /users/{username}/invitation (docs/FRONTEND_SERVICES.md section 13.1): the invitation sent
+// again.
+const resendInvitation: MethodSpec<UsersService> = {
+  name: 'resendInvitation',
+  result$: (s) => s.resendInvitationResult$,
+  state$: (s) => s.resendInvitationState$,
+  call: (s) => s.resendInvitation('fe-calendar'),
+  pending: { status: 'pending', username: 'fe-calendar' },
+  request: { method: 'POST', path: '/users/fe-calendar/invitation' },
+  ok: () => json(202, { username: 'fe-calendar', status: 'invited' }),
+  success: { status: 'success', username: 'fe-calendar' },
+  wrong: [
+    ['202 without the state', () => json(202, { username: 'fe-calendar' })],
+    ['202 empty', () => new Response(null, { status: 202 })],
+    ['200', () => json(200, { username: 'fe-calendar', status: 'invited' })],
+  ],
+  codes: ['forbidden', 'invalid_request', 'user_not_found', 'not_invited', 'cannot_edit_admin', 'mail_unavailable', 'internal_error'],
+  notCodes: ['cannot_delete_admin', 'user_exists'],
+  invalid: [['a username that is not one', (s) => s.resendInvitation('../admin'), expect.stringContaining('3 to 32') as unknown as string]],
+};
+
+describeMethod((store) => new UsersService(CONFIG, store), resendInvitation, listUsers);

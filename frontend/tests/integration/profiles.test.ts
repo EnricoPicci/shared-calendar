@@ -1,7 +1,7 @@
 import { MeService } from '../../src/services/me.service';
 import { SessionStore } from '../../src/services/session.store';
 import { UsersService } from '../../src/services/users.service';
-import { API, newUser, outcome, signedIn, signIn } from './local';
+import { API, newUser, outcome, setPermanentPassword, signedIn, signIn } from './local';
 
 // The four facts of a person of docs/EMAIL_ARCHITECTURE.md section 4: UsersService and MeService
 // against the back end's local stack (docs/FRONTEND_SERVICES.md section 23). Runs only with
@@ -55,7 +55,7 @@ describe('profiles', () => {
     const users = new UsersService(API, admin);
     const created = await outcome(users.createUserResult$, () => users.createUser(newUser(THROWAWAY)));
     if (created.status !== 'success') throw new Error(`could not create ${THROWAWAY}: ${JSON.stringify(created)}`);
-    const signed = await signIn(THROWAWAY, created.user.password);
+    const signed = await signIn(THROWAWAY, await setPermanentPassword(THROWAWAY));
     stores.push(signed.store);
     user = signed.store;
     const listed = await outcome(users.listUsersResult$, () => users.listUsers());

@@ -42,9 +42,9 @@ sections 8 and 12.3). Paths are relative to `frontend/`.
 - A test helper that puts a screen's id before a selector scopes only the first part of a list
   of selectors (`#availability li, option` is every `<option>` of the page): count what a view
   left behind from the screen's element.
-- A generated password in a test is a made-up text, in the views' and the shell's tests only
-  (the logic's fixtures hold none, and no test takes a snapshot); "nowhere in the document" is
-  looked for in the whole `outerHTML`, in every field's value and in the address.
+- A password in a test is a made-up text, in the views' and the shell's tests only (the logic's
+  fixtures hold none, and no test takes a snapshot); "nowhere in the document" is looked for in
+  the whole `outerHTML`, in every field's value and in the address.
 
 ## What `happy-dom` does differently
 
@@ -57,10 +57,10 @@ What it cannot show is for the browser check.
   calls `close()` for the Escape key; since a click passes through a modal dialog there, a test
   can have both dialogs open, which a person cannot.
 - It has no `cancel` event, ignores `closedby` and `autofocus`, and sends `close` inside
-  `close()`: a test sends `cancel` itself to see it refused, and sends a `close` event itself
-  after an opening to stand for the browser's late one. That Escape does not close the password
-  dialog, and where the keyboard lands (on nothing, after a write that redrew the list), are
-  for the browser check.
+  `close()`: a test sends `cancel` itself to see what a dialog does with it, and sends a `close`
+  event itself after an opening to stand for the browser's late one. What the Escape key does,
+  and where the keyboard lands (on nothing, after a write that redrew the list), are for the
+  browser check.
 - A `disabled` button's `click()` does nothing there, as in a browser.
 - A native date field's `value` is set and read as `YYYY-MM-DD` and emptied by `form.reset()`;
   what can be typed into it is for the browser check, where it is typed as digits in the order

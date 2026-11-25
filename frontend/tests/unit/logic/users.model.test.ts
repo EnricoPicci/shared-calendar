@@ -1,16 +1,18 @@
 import { Username } from '@shared-calendar/shared';
-import { deleteQuestion, editTitle, NO_USERS, sameRow, USERNAME_HINT, userRows, usernameFor } from '../../../src/logic/users.model';
+import { deleteQuestion, editTitle, invitedAnswer, inviteQuestion, NO_USERS, sameRow, USERNAME_HINT, userRows, usernameFor } from '../../../src/logic/users.model';
 import { useFarBrowserZone } from './zone';
 
 const SCRIPT = '<script>window.hacked = true</script>';
 const FACTS = { givenName: 'Anna', familyName: 'Rossi', email: 'anna@example.com', address: 'Via Po 2\n10100 Torino' };
-const user = (username: string, facts = FACTS) => ({ username, createdAt: '2026-11-01T10:00:00.000Z', status: 'active' as const, ...facts });
-const row = (username: string, facts = FACTS) => ({
+const user = (username: string, facts = FACTS, status: 'invited' | 'active' = 'active') => ({ username, createdAt: '2026-11-01T10:00:00.000Z', status, ...facts });
+const row = (username: string, facts = FACTS, status: 'invited' | 'active' = 'active') => ({
   username,
   name: `${facts.givenName} ${facts.familyName}`,
   email: facts.email,
+  status,
   facts,
   editLabel: `Edit ${username}`,
+  resendLabel: status === 'invited' ? `Resend the invitation to ${username}` : null,
   deleteLabel: `Delete ${username}`,
 });
 
@@ -24,11 +26,18 @@ describe('the users screen\'s model', () => {
       expect(userRows([user('zoe'), user('alice')]).map((row) => row.username)).toEqual(['zoe', 'alice']);
     });
 
-    it('one user: one row, and nothing of the creation date or the state of the account in it', () => {
+    it('one user: one row, and nothing of the creation date in it', () => {
       const rows = userRows([user('alice')]);
       expect(rows).toHaveLength(1);
       expect(JSON.stringify(rows)).not.toContain('2026');
-      expect(JSON.stringify(rows)).not.toContain('active');
+    });
+
+    it('the state of each account; an invited User is offered "Resend invitation", an active one is not', () => {
+      const [invited, active] = userRows([user('newbie', FACTS, 'invited'), user('alice')]);
+      expect(invited).toEqual(row('newbie', FACTS, 'invited'));
+      expect(invited!.resendLabel).toBe('Resend the invitation to newbie');
+      expect(active!.status).toBe('active');
+      expect(active!.resendLabel).toBeNull();
     });
 
     it('the postal address is held for the Edit dialog only: it is not in the texts of the row', () => {
@@ -59,9 +68,15 @@ describe('the users screen\'s model', () => {
       ['another last name', user('alice', { ...FACTS, familyName: 'Russo' })],
       ['another e-mail', user('alice', { ...FACTS, email: 'a@example.com' })],
       ['another address', user('alice', { ...FACTS, address: 'Via Po 3' })],
+      ['another state', user('alice', FACTS, 'invited')],
     ])('%s: another row', (_name, other) => {
       expect(sameRow(a!, userRows([other])[0]!)).toBe(false);
     });
+  });
+
+  it('the invitation\'s question and answer name the address', () => {
+    expect(inviteQuestion('anna@example.com')).toBe('An invitation will be sent to anna@example.com.');
+    expect(invitedAnswer('anna@example.com')).toBe('An invitation was sent to anna@example.com.');
   });
 
   it('editTitle names the user', () => {

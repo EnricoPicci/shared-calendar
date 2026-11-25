@@ -4,13 +4,14 @@ import type { Session } from '../../src/services/login.types';
 import { RefreshService } from '../../src/services/refresh.service';
 import { SessionStore } from '../../src/services/session.store';
 import { UsersService } from '../../src/services/users.service';
-import { API, cognito, current, newUser, signedIn, signIn } from './local';
+import { API, cognito, current, newUser, setPermanentPassword, signedIn, signIn } from './local';
 
 // docs/FRONTEND_SERVICES.md section 14.2: the services against the back end's local stack, in
 // order. Every service gets its token from a real SessionStore that a real LoginService filled.
 // Runs only with RUN_INTEGRATION=1. The throw-away user `fe-journey` is removed before and after
-// (docs/FRONTEND_SERVICES.md section 8, decision 26). Its generated password stays in a variable;
-// assertions look at its presence only.
+// (docs/FRONTEND_SERVICES.md section 8, decision 26). The creation answers no password: the
+// journey sets one with setPermanentPassword, as the User's first sign-in would
+// (docs/EMAIL_PLAN.md finding F1). It stays in a variable; assertions look at its presence only.
 
 const THROWAWAY = 'fe-journey';
 
@@ -84,12 +85,11 @@ it('3. hello as admin: Hello World, the Administrator is speaking', async () => 
   expect(result).toMatchObject({ status: 'success', hello: { role: 'admin', message: 'Hello World, the Administrator is speaking' } });
 });
 
-it(`4. admin creates ${THROWAWAY}: success with a password`, async () => {
+it(`4. admin creates ${THROWAWAY}: success, invited, with no password; the journey sets one`, async () => {
   const result = await createUser(admin, THROWAWAY);
   if (result.status !== 'success') throw new Error(`expected success, got ${result.reason}`);
-  expect(result.user.username).toBe(THROWAWAY);
-  expect(result.user.password.length).toBeGreaterThanOrEqual(16);
-  throwawayPassword = result.user.password;
+  expect(result.user).toEqual({ username: THROWAWAY, status: 'invited' });
+  throwawayPassword = await setPermanentPassword(THROWAWAY);
 });
 
 it(`5. ${THROWAWAY} signs in with that password and says hello`, async () => {

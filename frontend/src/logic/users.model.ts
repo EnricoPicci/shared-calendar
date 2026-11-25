@@ -1,33 +1,65 @@
-import { Username, type UserSummary } from '@shared-calendar/shared';
+import { Username, type UserStatus, type UserSummary } from '@shared-calendar/shared';
 import type { ProfileFields } from './profile.model';
 
 // The users screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the list of users as the API
 // answers it (docs/SHARED_CALENDAR_SPEC.md section 10.1) turned into rows ready to draw, from
-// what the username field holds to the argument of UsersService.createUser or to why not, and
-// the words of the dialog that confirms a deletion. Pure.
+// what the username field holds to the argument of UsersService.createUser or to why not, the
+// words of the invitation's dialog and of the dialog that confirms a deletion. Pure.
 
-// A row of the list: the username, the first and last name, the e-mail; the four facts as the
-// Edit dialog is filled with them; the names a screen reader says for its two buttons, which tell
-// whom they edit and delete. The postal address is shown only in the Edit dialog
-// (docs/EMAIL_ARCHITECTURE.md section 11).
-export type UserRow = { username: string; name: string; email: string; facts: ProfileFields; editLabel: string; deleteLabel: string };
+// A row of the list: the username, the first and last name, the e-mail, the state of the account
+// (`invited` until the first sign-in, then `active`, docs/EMAIL_ARCHITECTURE.md section 5.3); the
+// four facts as the Edit dialog is filled with them; the names a screen reader says for its
+// buttons, which tell whom they edit, invite again and delete. `resendLabel` is null for an
+// active User, who is offered no "Resend invitation". The postal address is shown only in the
+// Edit dialog (docs/EMAIL_ARCHITECTURE.md section 11).
+export type UserRow = {
+  username: string;
+  name: string;
+  email: string;
+  status: UserStatus;
+  facts: ProfileFields;
+  editLabel: string;
+  resendLabel: string | null;
+  deleteLabel: string;
+};
 
 // The rows, in the order the server gives: sorted by username, never an administrator
-// (docs/SHARED_CALENDAR_SPEC.md section 10.1). The state of an account is not shown here.
+// (docs/SHARED_CALENDAR_SPEC.md section 10.1).
 export function userRows(users: readonly UserSummary[]): UserRow[] {
-  return users.map(({ username, givenName, familyName, email, address }) => ({
+  return users.map(({ username, status, givenName, familyName, email, address }) => ({
     username,
     name: `${givenName} ${familyName}`,
     email,
+    status,
     facts: { givenName, familyName, email, address },
     editLabel: `Edit ${username}`,
+    resendLabel: status === 'invited' ? `Resend the invitation to ${username}` : null,
     deleteLabel: `Delete ${username}`,
   }));
 }
 
 // Whether two rows show and hold the same.
 export function sameRow(a: UserRow, b: UserRow): boolean {
-  return a.username === b.username && a.facts.givenName === b.facts.givenName && a.facts.familyName === b.facts.familyName && a.facts.email === b.facts.email && a.facts.address === b.facts.address;
+  return (
+    a.username === b.username &&
+    a.status === b.status &&
+    a.facts.givenName === b.facts.givenName &&
+    a.facts.familyName === b.facts.familyName &&
+    a.facts.email === b.facts.email &&
+    a.facts.address === b.facts.address
+  );
+}
+
+// The last look before an invitation goes, from the create form or from "Resend invitation": the
+// address it goes to, which the Administrator typed and may have mistyped
+// (docs/EMAIL_ARCHITECTURE.md section 5.3.1).
+export function inviteQuestion(email: string): string {
+  return `An invitation will be sent to ${email}.`;
+}
+
+// The answer once the invitation went: the address again.
+export function invitedAnswer(email: string): string {
+  return `An invitation was sent to ${email}.`;
 }
 
 // The title of the Edit dialog: whose facts it changes.

@@ -1886,11 +1886,10 @@ describe('the navigation', () => {
 
   // The users, the Administrator's third screen (docs/FRONTEND_ARCHITECTURE.md section 6), with
   // the real UsersService of the session behind the stubbed fetch: the same one the week's book
-  // dialog asks for its list. The passwords here are made up for the stub's answers.
+  // dialog asks for its list.
   describe('the users, the Administrator\'s third screen', () => {
     const USERS_URL = 'http://api.test/users';
     const BEARER = 'Bearer access-token-admin';
-    const PASSWORD = 'Xk3-made.up_Pass!7';
     const usersOf = (...usernames: string[]) => json(200, { users: usernames.map((username) => summary(username)) });
     const calls = () => (fetchMock.mock.calls as [string, RequestInit][]).filter(([url]) => url.startsWith(CONFIG.apiUrl));
     const sent = () => calls().map(([url, init]) => `${init.method} ${url.slice(CONFIG.apiUrl.length)}`);
@@ -1899,7 +1898,8 @@ describe('the navigation', () => {
     const listed = (...usernames: string[]) => vi.waitFor(() => expect(names()).toEqual(usernames));
     const field = () => find<HTMLInputElement>('#users [name="username"]');
     const form = () => find<HTMLFormElement>('#users form.create');
-    const created = () => find<HTMLDialogElement>('#users dialog.created');
+    const invite = () => find<HTMLDialogElement>('#users dialog.invite');
+    const inviteText = (part: string) => find(`#users dialog.invite .${part}`).textContent;
     const remove = () => find<HTMLDialogElement>('#users dialog.delete');
     const current = () => links().map((a) => [a.textContent, a.getAttribute('aria-current')]);
     const fields = () => [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
@@ -1919,13 +1919,14 @@ describe('the navigation', () => {
       const facts = summary(username.trim());
       for (const name of ['givenName', 'familyName', 'email', 'address'] as const) find<HTMLInputElement>(`#users form.create [name="${name}"]`).value = facts[name];
     }
-    // Types a name and presses "Create user"; the server creates it and then lists `after`.
-    const create = async (username: string, after: string[], password = PASSWORD) => {
-      fetchMock.mockResolvedValueOnce(json(201, { username, password }));
+    // Types a name, presses "Create user" and "Confirm"; the server creates it and then lists `after`.
+    const create = async (username: string, after: string[]) => {
+      fetchMock.mockResolvedValueOnce(json(201, { username, status: 'invited' }));
       fetchMock.mockResolvedValueOnce(usersOf(...after));
       typeIn(username);
       submit(form());
-      await vi.waitFor(() => expect(created().open).toBe(true));
+      find('#users dialog.invite .submit').click();
+      await vi.waitFor(() => expect(inviteText('answer')).not.toBe(''));
       await listed(...after);
     };
     const becomesVisible = () => {
@@ -1984,35 +1985,43 @@ describe('the navigation', () => {
       expect(sent()).toEqual(['GET /users', 'GET /users']);
     });
 
-    it('a create: the POST with the username, the password shown once in its dialog, the field emptied, and the list read again', async () => {
+    it('a create: the last look at the address, "Confirm" sends the POST with the username, the dialog says where the invitation went, the field emptied, and the list read again', async () => {
       await onUsers('alice');
-      fetchMock.mockResolvedValueOnce(json(201, { username: 'carol', password: PASSWORD }));
-      fetchMock.mockResolvedValueOnce(usersOf('alice', 'carol'));
       typeIn(' carol ');
       submit(form());
-      expect(find<HTMLButtonElement>('#users .submit').disabled).toBe(true);
+      const carol = summary('carol');
+      expect(invite().open).toBe(true);
+      expect(inviteText('question')).toBe(`An invitation will be sent to ${carol.email}.`);
+      expect(sent()).toEqual(['GET /users']);
 
-      await vi.waitFor(() => expect(created().open).toBe(true));
+      fetchMock.mockResolvedValueOnce(json(201, { username: 'carol', status: 'invited' }));
+      fetchMock.mockResolvedValueOnce(usersOf('alice', 'carol'));
+      find('#users dialog.invite .submit').click();
+      expect(find<HTMLButtonElement>('#users dialog.invite .submit').disabled).toBe(true);
+      await vi.waitFor(() => expect(inviteText('answer')).toBe(`An invitation was sent to ${carol.email}.`));
       const [url, init] = calls()[1]!;
       expect([url, init.method, (init.headers as Record<string, string>).Authorization]).toEqual([USERS_URL, 'POST', BEARER]);
-      const carol = summary('carol');
       expect(JSON.parse(String(init.body))).toEqual({ username: 'carol', givenName: carol.givenName, familyName: carol.familyName, email: carol.email, address: carol.address });
-      expect([find('#users dialog.created .username').textContent, find('#users dialog.created .password').textContent]).toEqual(['carol', PASSWORD]);
       await listed('alice', 'carol');
       expect(sent()).toEqual(['GET /users', 'POST /users', 'GET /users']);
-      expect([field().value, find<HTMLButtonElement>('#users .submit').disabled]).toEqual(['', false]);
-      // The password is in the dialog and nowhere else; the address never held it.
-      expect(html().split(PASSWORD)).toHaveLength(2);
-      expect(fields().some((value) => value.includes(PASSWORD))).toBe(false);
-      expect(calls().some(([address]) => address.includes(PASSWORD))).toBe(false);
+      expect([field().value, find<HTMLButtonElement>('#users form.create .submit').disabled]).toEqual(['', false]);
 
-      find('#users dialog.created .understood').click();
-      expect(created().open).toBe(false);
-      expect(anywhere(PASSWORD)).toBe(false);
+      find('#users dialog.invite .done').click();
+      expect(invite().open).toBe(false);
       expect(names()).toEqual(['alice', 'carol']);
     });
 
-    it('a text that is not a username is refused under the field, with no request sent', async () => {
+    it('"Back" at the last look sends nothing and keeps what was typed', async () => {
+      await onUsers('alice');
+      typeIn('carol');
+      submit(form());
+      find('#users dialog.invite .back').click();
+      expect(invite().open).toBe(false);
+      expect(sent()).toEqual(['GET /users']);
+      expect(field().value).toBe('carol');
+    });
+
+    it('a text that is not a username is refused under the field, with no request sent and no dialog', async () => {
       await onUsers('alice');
       for (const text of ['Bob', 'ab', '', 'alice smith']) {
         field().value = text;
@@ -2022,24 +2031,47 @@ describe('the navigation', () => {
         expect(field().value, text).toBe(text);
       }
       expect(sent()).toEqual(['GET /users']);
-      expect(find<HTMLButtonElement>('#users .submit').disabled).toBe(false);
-      expect(created().open).toBe(false);
+      expect(find<HTMLButtonElement>('#users form.create .submit').disabled).toBe(false);
+      expect(invite().open).toBe(false);
     });
 
-    it('a username that exists: the server\'s refusal in plain words, the field not marked, what was typed kept, and the list read again', async () => {
+    it.each([
+      ['user_exists', 409, 'A user with this username exists already. Choose another username.'],
+      ['mail_unavailable', 503, 'E-mail is not available yet.'],
+    ] as const)('a create the server refuses with %s: the sentence in the dialog, still open, the field not marked, what was typed kept, and the list read again', async (code, status, sentence) => {
       await onUsers('alice');
-      fetchMock.mockResolvedValueOnce(json(409, { error: 'user_exists', message: 'User account already exists' }));
+      fetchMock.mockResolvedValueOnce(json(status, { error: code, message: 'the server\'s own words' }));
       fetchMock.mockResolvedValueOnce(usersOf('alice'));
       typeIn('alice');
       submit(form());
-      await vi.waitFor(() => expect(find('#users form.create .failure').textContent).toBe('A user with this username exists already. Choose another username.'));
+      find('#users dialog.invite .submit').click();
+      await vi.waitFor(() => expect(inviteText('error')).toBe(sentence));
       await vi.waitFor(() => expect(sent()).toEqual(['GET /users', 'POST /users', 'GET /users']));
-      expect([field().value, field().hasAttribute('aria-invalid'), created().open]).toEqual(['alice', false, false]);
-      expect(html()).not.toContain('already exists');
+      expect([field().value, field().hasAttribute('aria-invalid'), invite().open]).toEqual(['alice', false, true]);
+      expect(html()).not.toContain('own words');
 
-      // The next try, with another name, goes.
+      // Back, and the next try, with another name, goes.
+      find('#users dialog.invite .back').click();
       await create('carol', ['alice', 'carol']);
-      expect(find('#users form.create .failure').textContent).toBe('');
+      expect(inviteText('error')).toBe('');
+    });
+
+    it('"Resend invitation" on an invited User: the last look, then the POST of the invitation; refused, its sentence', async () => {
+      at('#/users');
+      fetchMock.mockResolvedValueOnce(json(200, { users: [summary('alice'), { ...summary('newbie'), status: 'invited' }] }));
+      mounted(ADMIN);
+      await listed('alice', 'newbie');
+      expect(find('#users .list li:nth-child(1) .ask-resend').hidden).toBe(true);
+      expect(find('#users .list li:nth-child(2) .status').textContent).toBe('invited');
+      find('#users .list li:nth-child(2) .ask-resend').click();
+      expect(inviteText('question')).toBe(`An invitation will be sent to ${summary('newbie').email}.`);
+
+      fetchMock.mockResolvedValueOnce(json(503, { error: 'mail_unavailable', message: 'E-mail is not available yet' }));
+      fetchMock.mockResolvedValueOnce(json(200, { users: [summary('alice'), { ...summary('newbie'), status: 'invited' }] }));
+      find('#users dialog.invite .submit').click();
+      await vi.waitFor(() => expect(inviteText('error')).toBe('E-mail is not available yet.'));
+      await vi.waitFor(() => expect(sent()).toEqual(['GET /users', 'POST /users/newbie/invitation', 'GET /users']));
+      expect((calls()[1]![1].headers as Record<string, string>).Authorization).toBe(BEARER);
     });
 
     it('a delete: the dialog names the user, "Keep" asks nothing, "Delete user" sends the DELETE, the dialog closes and the list is read again', async () => {
@@ -2083,27 +2115,26 @@ describe('the navigation', () => {
       expect(remove().open).toBe(true);
     });
 
-    it('with the password dialog open, the tab shown again reads the list again and leaves the dialog and its password as they are', async () => {
+    it('with the invitation\'s dialog open, the tab shown again reads the list again and leaves the dialog as it is', async () => {
       await onUsers('alice');
       await create('carol', ['alice', 'carol']);
       fetchMock.mockResolvedValueOnce(usersOf('alice', 'carol', 'dave'));
       becomesVisible();
       await listed('alice', 'carol', 'dave');
       expect(sent()).toEqual(['GET /users', 'POST /users', 'GET /users', 'GET /users']);
-      expect([created().open, find('#users dialog.created .password').textContent]).toEqual([true, PASSWORD]);
+      expect([invite().open, inviteText('answer')]).toEqual([true, `An invitation was sent to ${summary('carol').email}.`]);
     });
 
-    it('users, week, users: nothing left over or doubled, the password dialog not opened again, and the book dialog\'s list asked for at its opening, with the user just created', async () => {
+    it('users, week, users: nothing left over or doubled, the invitation\'s dialog not opened again, and the book dialog\'s list asked for at its opening, with the user just created', async () => {
       await onUsers('alice');
       await create('carol', ['alice', 'carol']);
-      find('#users dialog.created .understood').click();
+      find('#users dialog.invite .done').click();
 
       // The week: the users screen is left and emptied.
       fetchMock.mockResolvedValueOnce(json(200, adminWeek()));
       links()[0]!.click();
       await weekDrawn();
       expect([find('#users').hidden, names(), field().value]).toEqual([true, [], '']);
-      expect(anywhere(PASSWORD)).toBe(false);
       expect(anywhere('carol')).toBe(false);
 
       // The book dialog asks for its list itself, as before, and holds the new user.
@@ -2118,19 +2149,17 @@ describe('the navigation', () => {
       fetchMock.mockResolvedValueOnce(usersOf('alice', 'carol', 'dave'));
       links()[2]!.click();
       await listed('alice', 'carol', 'dave');
-      expect(created().open).toBe(false);
-      expect(anywhere(PASSWORD)).toBe(false);
+      expect(invite().open).toBe(false);
       expect(sent()).toEqual(['GET /users', 'POST /users', 'GET /users', 'GET /calendar?from=2026-11-16&to=2026-11-22', 'GET /users', 'GET /users']);
       expect(document.querySelectorAll('#app .nav a')).toHaveLength(6);
       expect(days()).toHaveLength(0);
 
-      // A new create on this visit shows its own password.
-      await create('erin', ['alice', 'carol', 'dave', 'erin'], 'Zq9-other.one_Pass?2');
-      expect(find('#users dialog.created .password').textContent).toBe('Zq9-other.one_Pass?2');
-      expect(anywhere(PASSWORD)).toBe(false);
+      // A new create on this visit says its own address.
+      await create('erin', ['alice', 'carol', 'dave', 'erin']);
+      expect(inviteText('answer')).toBe(`An invitation was sent to ${summary('erin').email}.`);
     });
 
-    it('signing out with the password dialog open leaves the password nowhere in the document; the next person sees nothing of the first, and the same Administrator again is not shown it', async () => {
+    it('signing out with the invitation\'s dialog open leaves its address nowhere in the document; the next person sees nothing of the first, and the same Administrator again is not shown it', async () => {
       at('#/users');
       const { store, signOut } = mounted();
       const before = html(); // the page at the login, before anyone signed in
@@ -2140,12 +2169,12 @@ describe('the navigation', () => {
       await create('carol', ['alice', 'bob', 'carol']);
       field().value = 'dave';
       find('#users .list li:nth-child(2) .ask-delete').click(); // the emulated page lets a click through a modal dialog
-      expect([created().open, remove().open]).toEqual([true, true]);
-      expect(anywhere(PASSWORD)).toBe(true);
+      expect([invite().open, remove().open]).toEqual([true, true]);
+      expect(anywhere(summary('carol').email)).toBe(true);
 
       signOut.click();
-      expect([created().open, remove().open]).toEqual([false, false]);
-      for (const gone of [PASSWORD, 'carol', 'bob', 'dave', 'alice', 'A username has', 'Delete bob']) expect(anywhere(gone), gone).toBe(false);
+      expect([invite().open, remove().open]).toEqual([false, false]);
+      for (const gone of ['carol', 'bob', 'dave', 'alice', 'A username has', 'Delete bob', 'An invitation']) expect(anywhere(gone), gone).toBe(false);
       expect(fields().every((value) => value === '')).toBe(true);
       expect(html()).toBe(before);
       expect(window.location.hash).toBe('#/users'); // signing out leaves the address
@@ -2158,7 +2187,7 @@ describe('the navigation', () => {
       await weekDrawn();
       expect(apiCalls().slice(asked)).toEqual([[WEEK_URL, 'Bearer access-token-alice']]);
       expect([find('#users').hidden, names()]).toEqual([true, []]);
-      for (const gone of [PASSWORD, 'carol', 'bob']) expect(anywhere(gone), gone).toBe(false);
+      for (const gone of ['carol', 'bob']) expect(anywhere(gone), gone).toBe(false);
 
       // The same Administrator again: a session of its own, whose service never created anyone.
       signOut.click();
@@ -2166,8 +2195,8 @@ describe('the navigation', () => {
       fetchMock.mockResolvedValueOnce(usersOf('alice', 'bob', 'carol'));
       store.set(ADMIN);
       await listed('alice', 'bob', 'carol');
-      expect(created().open).toBe(false);
-      expect(anywhere(PASSWORD)).toBe(false);
+      expect(invite().open).toBe(false);
+      expect(anywhere('An invitation')).toBe(false);
     });
   });
   // The availability, the first screen that uses two services at once, and a third for the

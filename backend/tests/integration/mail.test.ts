@@ -11,6 +11,7 @@ import {
   removeUserIfPresent,
   runMailer,
   setFactsOf,
+  setPasswordOf,
   signIn,
   subOf,
   waitForMails,
@@ -100,7 +101,7 @@ async function newUser(username: string): Promise<string> {
   await removeUserIfPresent(username);
   const created = await api('POST', '/users', adminToken, withFacts(username));
   expect(created.status).toBe(201);
-  return signIn(username, created.body?.password as string);
+  return signIn(username, await setPasswordOf(username));
 }
 
 // Books, as the person, the free slot of the journey's type at a place of the day (0 is the first).

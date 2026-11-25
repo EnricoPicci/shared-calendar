@@ -94,7 +94,9 @@ the scripts themselves win, and this document is fixed.
   and takes the answer, but checks neither the challenge's session (a made-up one gets tokens,
   so its 3 minutes never end) nor the pool's rule for the new password
   (`docs/EMAIL_ARCHITECTURE.md` section 14.1). A temporary password it sets itself is 6
-  characters, not by the pool's rule.
+  characters, not by the pool's rule. It mails no invitation: it prints the temporary password in
+  its log instead, in a box "Confirmation Code Delivery", on the line "Code"; and it does not
+  support sending an invitation again, which the API answers with 500.
 - The tables are plain `calendar`, `hello-messages`, `assistant` and `mail`; in the cloud they carry the
   stack's name (`shared-calendar-api-calendar`, `shared-calendar-api-hello-messages`; the
   assistant's table is in the template and not deployed yet).

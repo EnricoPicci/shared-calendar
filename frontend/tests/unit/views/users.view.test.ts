@@ -1,22 +1,19 @@
 import { BehaviorSubject } from 'rxjs';
 import { NO_REFUSALS, PROFILE_RULES } from '../../../src/logic/profile.model';
-import { deleteQuestion, editTitle, USERNAME_HINT, userRows, usernameFor } from '../../../src/logic/users.model';
-import type { EditState, UsersState } from '../../../src/logic/users.screen';
-import type { CreateUserState, DeleteUserState } from '../../../src/services/users.types';
+import { deleteQuestion, editTitle, invitedAnswer, inviteQuestion, USERNAME_HINT, userRows, usernameFor } from '../../../src/logic/users.model';
+import type { EditState, InviteState, UsersState } from '../../../src/logic/users.screen';
+import type { DeleteUserState } from '../../../src/services/users.types';
 import { mountUsers, type UsersDeps } from '../../../src/views/users.view';
 import { find, submit, useRealPage } from './page';
 
 // The DOM test of the users view (docs/FRONTEND_ARCHITECTURE.md section 8): the real
 // index.html, a fake UsersScreen whose stream the test controls, and the part of the
-// UsersService the view uses, with two state streams that keep their last value, as the real
-// ones do. What a username is and the words of a refusal are checked in the logic layer's
+// UsersService the view uses, with the delete's state stream, which keeps its last value, as the
+// real one does. What a username is and the words of a refusal are checked in the logic layer's
 // tests.
 
 const SCRIPT = '<script>window.hacked = true</script><b>bold</b>';
 const FAILURE = 'The server cannot be reached. Check the connection and try again.';
-// Made for this file: no server generated it.
-const PASSWORD = 'Xk3-made.up_Pass!7';
-const OTHER_PASSWORD = 'Zq9-other.one_Pass?2';
 
 // The field's object stays the same from one state to the next unless a test brings another:
 // another object is what tells the view to fill the field again.
@@ -29,38 +26,44 @@ const state = (over: Partial<UsersState> = {}): UsersState => ({
   rows: null,
   empty: null,
   field: FIELD,
-  creating: false,
   refusal: null,
   refusals: NO_REFUSALS,
-  failure: null,
-  created: null,
+  invite: null,
   edit: NO_EDIT,
   ...over,
 });
 // Each user's facts are made from the username, so that each row holds texts of its own.
 const factsOf = (username: string) => ({ givenName: `Given-${username}`, familyName: `Family-${username}`, email: `${username}@example.com`, address: `Street of ${username}\nTown` });
-const rows = (...usernames: string[]) => userRows(usernames.map((username) => ({ username, createdAt: '2026-11-01T10:00:00.000Z', status: 'active' as const, ...factsOf(username) })));
+// A User is invited when its username starts with "new", active otherwise.
+const rows = (...usernames: string[]) =>
+  userRows(usernames.map((username) => ({ username, createdAt: '2026-11-01T10:00:00.000Z', status: username.startsWith('new') ? ('invited' as const) : ('active' as const), ...factsOf(username) })));
 const TWO = rows('alice', 'bob');
 const listed = (over: Partial<UsersState> = {}) => state({ rows: TWO, ...over });
-const createdAs = (username: string, password = PASSWORD): CreateUserState => ({ status: 'success', user: { username, password } });
+// The invitation's dialog as the logic layer describes it: asking, sending, gone, failed.
+const ASKING: InviteState = { question: inviteQuestion('carol@example.com'), sending: false, answer: null, failure: null };
+const SENDING: InviteState = { ...ASKING, sending: true };
+const WENT: InviteState = { ...ASKING, answer: invitedAnswer('carol@example.com') };
+const FAILED: InviteState = { ...ASKING, failure: FAILURE };
 
-function mounted(first: UsersState = state(), create: CreateUserState = { status: 'idle' }, remove: DeleteUserState = { status: 'idle' }) {
+function mounted(first: UsersState = state(), remove: DeleteUserState = { status: 'idle' }) {
   const users$ = new BehaviorSubject<UsersState>(first);
-  const createUserState$ = new BehaviorSubject<CreateUserState>(create);
   const deleteUserState$ = new BehaviorSubject<DeleteUserState>(remove);
   const screen = {
     users$: users$.asObservable(),
     create: vi.fn<UsersDeps['screen']['create']>(),
     typed: vi.fn<UsersDeps['screen']['typed']>(),
     retry: vi.fn<UsersDeps['screen']['retry']>(),
+    resend: vi.fn<UsersDeps['screen']['resend']>(),
+    confirm: vi.fn<UsersDeps['screen']['confirm']>(),
+    closeInvite: vi.fn<UsersDeps['screen']['closeInvite']>(),
     editOpened: vi.fn<UsersDeps['screen']['editOpened']>(),
     editTyped: vi.fn<UsersDeps['screen']['editTyped']>(),
     save: vi.fn<UsersDeps['screen']['save']>(),
   };
-  const users = { createUserState$: createUserState$.asObservable(), deleteUser: vi.fn<UsersDeps['users']['deleteUser']>(), deleteUserState$: deleteUserState$.asObservable() };
+  const users = { deleteUser: vi.fn<UsersDeps['users']['deleteUser']>(), deleteUserState$: deleteUserState$.asObservable() };
   const root = find('#users');
   const subscription = mountUsers(root, { screen, users });
-  return { users$, createUserState$, deleteUserState$, screen, users, root, subscription };
+  return { users$, deleteUserState$, screen, users, root, subscription };
 }
 
 const one = <T extends HTMLElement = HTMLElement>(selector: string) => find<T>(`#users ${selector}`);
@@ -72,11 +75,15 @@ const names = () => items().map((item) => item.querySelector('.username')!.textC
 const rowOf = (username: string) => items().find((item) => item.querySelector('.username')!.textContent === username)!;
 const deleteOf = (username: string) => rowOf(username).querySelector<HTMLButtonElement>('.ask-delete')!;
 const editOf = (username: string) => rowOf(username).querySelector<HTMLButtonElement>('.ask-edit')!;
+const resendOf = (username: string) => rowOf(username).querySelector<HTMLButtonElement>('.ask-resend')!;
 const edit = () => one<HTMLDialogElement>('dialog.edit');
 const editField = (name: string) => one<HTMLInputElement | HTMLTextAreaElement>(`dialog.edit [name="${name}"]`);
 const editFields = () => ['givenName', 'familyName', 'email', 'address'].map((name) => editField(name).value);
 const createField = (name: string) => one<HTMLInputElement | HTMLTextAreaElement>(`form.create [name="${name}"]`);
-const created = () => one<HTMLDialogElement>('dialog.created');
+const invite = () => one<HTMLDialogElement>('dialog.invite');
+const inviteButton = (name: string) => one<HTMLButtonElement>(`dialog.invite .${name}`);
+// Which of the dialog's three buttons are offered, and whether "Confirm" is off.
+const offered = () => ['back', 'submit', 'done'].filter((name) => !inviteButton(name).hidden);
 const remove = () => one<HTMLDialogElement>('dialog.delete');
 const removeSubmit = () => one<HTMLButtonElement>('dialog.delete .submit');
 const html = () => document.documentElement.outerHTML;
@@ -103,7 +110,7 @@ describe('mountUsers', () => {
       expect(items()).toHaveLength(0);
       expect(form().hidden).toBe(false);
       expect(one('.field .hint').textContent).toBe(USERNAME_HINT);
-      expect([field().value, field().hasAttribute('aria-invalid'), refusal().textContent, one('.failure').textContent]).toEqual(['', false, '', '']);
+      expect([field().value, field().hasAttribute('aria-invalid'), refusal().textContent, invite().open]).toEqual(['', false, '', false]);
       expect(one<HTMLButtonElement>('.submit').disabled).toBe(false);
     });
 
@@ -122,16 +129,18 @@ describe('mountUsers', () => {
       expect([form().hidden, one<HTMLButtonElement>('.submit').disabled]).toEqual([false, false]);
     });
 
-    it('the list: one row per user, in the order given, each with the username, the name, the e-mail, and an "Edit" and a "Delete" that say whom; never the postal address', () => {
-      mounted(listed());
-      expect(names()).toEqual(['alice', 'bob']);
-      expect(items().map((item) => [item.querySelector('.name')!.textContent, item.querySelector('.email')!.textContent])).toEqual([
-        ['Given-alice Family-alice', 'alice@example.com'],
-        ['Given-bob Family-bob', 'bob@example.com'],
+    it('the list: one row per user, in the order given, each with the username, the name, the e-mail, the state, and an "Edit" and a "Delete" that say whom; never the postal address', () => {
+      mounted(listed({ rows: rows('alice', 'newbie') }));
+      expect(names()).toEqual(['alice', 'newbie']);
+      expect(items().map((item) => ['.name', '.email', '.status'].map((part) => item.querySelector(part)!.textContent))).toEqual([
+        ['Given-alice Family-alice', 'alice@example.com', 'active'],
+        ['Given-newbie Family-newbie', 'newbie@example.com', 'invited'],
       ]);
-      expect(items().map((item) => [...item.querySelectorAll('button')].map((button) => [button.textContent, button.getAttribute('aria-label')]))).toEqual([
+      expect(items().map((item) => item.classList.contains('is-invited'))).toEqual([false, true]);
+      const visible = (item: HTMLElement) => [...item.querySelectorAll('button')].filter((button) => !button.hidden);
+      expect(items().map((item) => visible(item).map((button) => [button.textContent, button.getAttribute('aria-label')]))).toEqual([
         [['Edit', 'Edit alice'], ['Delete', 'Delete alice']],
-        [['Edit', 'Edit bob'], ['Delete', 'Delete bob']],
+        [['Edit', 'Edit newbie'], ['Resend invitation', 'Resend the invitation to newbie'], ['Delete', 'Delete newbie']],
       ]);
       expect(one('.list').textContent).not.toContain('Street of');
       expect([one('.unread').hidden, one('.empty').hidden]).toEqual([true, true]);
@@ -143,30 +152,14 @@ describe('mountUsers', () => {
       expect(items()).toHaveLength(0);
     });
 
-    it('a create under way: "Create user" is disabled, and what is typed stays', () => {
+    it('a creation under way: "Create user" and "Confirm" are disabled, and what is typed stays', () => {
       const { users$ } = mounted(listed());
       field().value = 'carol';
-      users$.next(listed({ creating: true }));
-      expect(one<HTMLButtonElement>('.submit').disabled).toBe(true);
+      users$.next(listed({ invite: SENDING }));
+      expect([one<HTMLButtonElement>('form.create .submit').disabled, inviteButton('submit').disabled]).toEqual([true, true]);
       expect(field().value).toBe('carol');
-      users$.next(listed());
-      expect(one<HTMLButtonElement>('.submit').disabled).toBe(false);
-    });
-
-    it('a create that failed: why, announced, in the form, and the field not marked; gone when the stream says so', () => {
-      const { users$ } = mounted(listed({ failure: FAILURE }));
-      expect(one('.failure').textContent).toBe(FAILURE);
-      expect(one('.failure').getAttribute('role')).toBe('alert');
-      expect(one('.failure').closest('form')).toBe(form());
-      expect([field().hasAttribute('aria-invalid'), refusal().textContent]).toEqual([false, '']);
-      users$.next(listed());
-      expect(one('.failure').textContent).toBe('');
-    });
-
-    it('a create that succeeded changes nothing by its username alone: the dialog is the service\'s result\'s to open', () => {
-      mounted(listed({ created: 'carol' }));
-      expect(created().open).toBe(false);
-      expect(names()).toEqual(['alice', 'bob']);
+      users$.next(listed({ invite: FAILED }));
+      expect([one<HTMLButtonElement>('form.create .submit').disabled, inviteButton('submit').disabled]).toEqual([false, false]);
     });
   });
 
@@ -218,11 +211,11 @@ describe('mountUsers', () => {
     it('the field is emptied only when the stream brings another object for it', () => {
       const { users$ } = mounted(listed());
       field().value = 'carol';
-      users$.next(listed({ creating: true }));
-      users$.next(listed({ failure: FAILURE }));
+      users$.next(listed({ invite: SENDING }));
+      users$.next(listed({ invite: FAILED }));
       users$.next(listed({ rows: rows('alice') }));
       expect(field().value).toBe('carol');
-      users$.next(listed({ field: { ...FIELD }, created: 'carol' }));
+      users$.next(listed({ field: { ...FIELD }, invite: WENT }));
       expect(field().value).toBe('');
     });
 
@@ -235,132 +228,101 @@ describe('mountUsers', () => {
     });
   });
 
-  describe('the password dialog', () => {
-    it('a create this mount asked for succeeds: the dialog opens with the username and the password as text, and its sentence', () => {
-      const { createUserState$ } = mounted(listed());
+  describe('the invitation\'s dialog', () => {
+    it('opens when the logic layer asks: the address in its question, which describes it; "Back" and "Confirm" offered; no answer, no failure', () => {
+      const { users$, screen } = mounted(listed());
       ask('carol');
-      createUserState$.next({ status: 'pending', username: 'carol' });
-      expect(created().open).toBe(false);
-      createUserState$.next(createdAs('carol'));
-      expect(created().open).toBe(true);
-      expect(one('dialog.created .username').textContent).toBe('carol');
-      expect(one('dialog.created .password').textContent).toBe(PASSWORD);
-      expect(created().textContent).toContain('This password cannot be shown again. Give it to the user now.');
-      expect(document.getElementById(created().getAttribute('aria-labelledby')!)!.textContent).toBe('User created');
+      expect(invite().open).toBe(false); // the view opens nothing by itself
+      users$.next(listed({ invite: ASKING }));
+      expect(invite().open).toBe(true);
+      expect(one('dialog.invite .question').textContent).toBe('An invitation will be sent to carol@example.com.');
+      expect(document.getElementById(invite().getAttribute('aria-describedby')!)).toBe(one('dialog.invite .question'));
+      expect(document.getElementById(invite().getAttribute('aria-labelledby')!)!.textContent).toBe('Send an invitation');
+      expect([one('dialog.invite .answer').textContent, one('dialog.invite .error').textContent]).toEqual(['', '']);
+      expect(offered()).toEqual(['back', 'submit']);
+      expect(inviteButton('submit').disabled).toBe(false);
+      expect(screen.confirm).not.toHaveBeenCalled();
     });
 
-    it('the password is in one element, as its text, and nowhere else: no attribute, no field, no address, no title', () => {
-      const { createUserState$ } = mounted(listed());
-      ask('carol');
-      createUserState$.next(createdAs('carol'));
-      const holders = [...document.querySelectorAll('*')].filter((element) => element.children.length === 0 && element.textContent.includes(PASSWORD));
-      expect(holders).toEqual([one('dialog.created .password')]);
-      const attributes = [...document.querySelectorAll('*')].flatMap((element) => element.getAttributeNames().map((name) => element.getAttribute(name)!));
-      expect(attributes.filter((value) => value.includes(PASSWORD))).toEqual([]);
-      expect([...document.querySelectorAll<HTMLInputElement>('input, textarea, select')].filter((held) => held.value.includes(PASSWORD))).toEqual([]);
-      expect([window.location.href.includes(PASSWORD), document.title.includes(PASSWORD)]).toEqual([false, false]);
+    it('"Confirm" calls confirm(), once; "Back" calls closeInvite(); neither changes anything by itself', () => {
+      const { screen } = mounted(listed({ invite: ASKING }));
+      inviteButton('submit').click();
+      expect(screen.confirm).toHaveBeenCalledTimes(1);
+      expect(invite().open).toBe(true);
+      inviteButton('back').click();
+      expect(screen.closeInvite).toHaveBeenCalledTimes(1);
+      expect(invite().open).toBe(true);
     });
 
-    it('a username and a password containing <script> are shown as text', () => {
-      const { createUserState$ } = mounted(listed());
-      ask('carol');
-      createUserState$.next(createdAs(SCRIPT, SCRIPT));
-      for (const element of [one('dialog.created .username'), one('dialog.created .password')]) {
-        expect(element.textContent).toBe(SCRIPT);
-        expect(element.children).toHaveLength(0);
-      }
-      expect(document.querySelectorAll('#users script, #users b')).toHaveLength(0);
+    it('the Escape key tells the logic layer: the cancel event calls closeInvite(), and is not refused', () => {
+      const { screen } = mounted(listed({ invite: ASKING }));
+      const cancel = new Event('cancel', { cancelable: true });
+      invite().dispatchEvent(cancel);
+      expect(cancel.defaultPrevented).toBe(false);
+      expect(screen.closeInvite).toHaveBeenCalledTimes(1);
     });
 
-    it('a success that was already there at the mount, an earlier visit\'s, does not open it and reaches no element', () => {
-      const { createUserState$ } = mounted(listed(), createdAs('carol'));
-      expect(created().open).toBe(false);
-      expect(anywhere(PASSWORD)).toBe(false);
-      // Nor does a "Create user" the check refuses, after which the service says nothing new.
-      ask('Bob');
-      expect(created().open).toBe(false);
-      expect(anywhere(PASSWORD)).toBe(false);
-      // The next create's own success does.
-      createUserState$.next({ status: 'pending', username: 'dave' });
-      createUserState$.next(createdAs('dave', OTHER_PASSWORD));
-      expect(created().open).toBe(true);
-      expect(one('dialog.created .password').textContent).toBe(OTHER_PASSWORD);
-      expect(anywhere(PASSWORD)).toBe(false);
+    it('closes when the logic layer says so, and opens again at the next asking', () => {
+      const { users$ } = mounted(listed({ invite: ASKING }));
+      users$.next(listed());
+      expect(invite().open).toBe(false);
+      users$.next(listed({ invite: ASKING }));
+      expect(invite().open).toBe(true);
     });
 
-    it('a create that fails opens nothing', () => {
-      const { createUserState$ } = mounted(listed());
-      ask('alice');
-      createUserState$.next({ status: 'pending', username: 'alice' });
-      createUserState$.next({ status: 'failure', reason: 'user_exists', message: 'for a developer' });
-      expect(created().open).toBe(false);
-      expect(html()).not.toContain('for a developer');
+    it('a failure: its sentence, announced, the dialog still open with "Back" and "Confirm"', () => {
+      mounted(listed({ invite: FAILED }));
+      expect(one('dialog.invite .error').textContent).toBe(FAILURE);
+      expect(one('dialog.invite .error').getAttribute('role')).toBe('alert');
+      expect([invite().open, offered()]).toEqual([true, ['back', 'submit']]);
     });
 
-    it('the cancel event, which the Escape key sends, is refused: the dialog stays open with the password', () => {
-      const { createUserState$ } = mounted(listed());
-      ask('carol');
-      createUserState$.next(createdAs('carol'));
-      for (let press = 0; press < 5; press++) {
-        const cancel = new Event('cancel', { cancelable: true });
-        created().dispatchEvent(cancel);
-        expect(cancel.defaultPrevented).toBe(true);
-      }
-      expect(created().open).toBe(true);
-      expect(one('dialog.created .password').textContent).toBe(PASSWORD);
-      expect(created().getAttribute('closedby')).toBe('none');
+    it('the invitation went: where, as a status, in the question\'s place; "Close" alone, which has the keyboard and calls closeInvite()', () => {
+      const { users$, screen } = mounted(listed({ invite: ASKING }));
+      inviteButton('submit').focus();
+      users$.next(listed({ invite: SENDING }));
+      expect(one('dialog.invite .question').hidden).toBe(false);
+      users$.next(listed({ invite: WENT }));
+      expect(one('dialog.invite .question').hidden).toBe(true);
+      expect(one('dialog.invite .answer').textContent).toBe('An invitation was sent to carol@example.com.');
+      expect(one('dialog.invite .answer').getAttribute('role')).toBe('status');
+      expect(offered()).toEqual(['done']);
+      expect(document.activeElement).toBe(inviteButton('done'));
+      users$.next(listed({ invite: WENT, rows: rows('alice', 'bob', 'carol') }));
+      expect(document.activeElement).toBe(inviteButton('done'));
+      inviteButton('done').click();
+      expect(screen.closeInvite).toHaveBeenCalledTimes(1);
+      // Asked again afterwards, it offers "Back" and "Confirm" again.
+      users$.next(listed());
+      users$.next(listed({ invite: ASKING }));
+      expect(offered()).toEqual(['back', 'submit']);
     });
 
-    it('its button closes it, and after the close the password is nowhere in the document', () => {
-      const { createUserState$ } = mounted(listed());
-      ask('carol');
-      createUserState$.next(createdAs('carol'));
-      expect(anywhere(PASSWORD)).toBe(true);
-      one('dialog.created .understood').click();
-      expect(created().open).toBe(false);
-      expect(anywhere(PASSWORD)).toBe(false);
-      expect([one('dialog.created .username').textContent, one('dialog.created .password').textContent]).toEqual(['', '']);
+    it('a row\'s "Resend invitation" calls resend() with that row, and opens nothing by itself', () => {
+      const { users$, screen } = mounted(listed({ rows: rows('alice', 'newbie') }));
+      expect(resendOf('alice').hidden).toBe(true);
+      resendOf('newbie').click();
+      expect(screen.resend).toHaveBeenCalledTimes(1);
+      expect(screen.resend).toHaveBeenCalledWith(rows('newbie')[0]);
+      expect(invite().open).toBe(false);
+      users$.next(listed({ rows: rows('alice', 'newbie'), invite: ASKING }));
+      expect(invite().open).toBe(true);
     });
 
-    it('closed, it is not opened again by what the streams say next; the next create opens it with its own password only', () => {
-      const { createUserState$, users$ } = mounted(listed());
-      ask('carol');
-      createUserState$.next(createdAs('carol'));
-      one('dialog.created .understood').click();
-      users$.next(listed({ rows: rows('alice', 'bob', 'carol'), field: { ...FIELD }, created: 'carol' }));
-      users$.next(listed({ rows: rows('alice', 'bob', 'carol'), loading: true, created: 'carol' }));
-      expect(created().open).toBe(false);
-      expect(anywhere(PASSWORD)).toBe(false);
-
-      ask('dave');
-      createUserState$.next({ status: 'pending', username: 'dave' });
-      createUserState$.next(createdAs('dave', OTHER_PASSWORD));
-      expect(created().open).toBe(true);
-      expect([one('dialog.created .username').textContent, one('dialog.created .password').textContent]).toEqual(['dave', OTHER_PASSWORD]);
-      expect(anywhere(PASSWORD)).toBe(false);
-    });
-
-    it('a list that arrives behind the open dialog redraws the rows and leaves the dialog and its password as they are', () => {
-      const { createUserState$, users$ } = mounted(listed());
-      ask('carol');
-      createUserState$.next(createdAs('carol'));
-      users$.next(listed({ loading: true, field: { ...FIELD }, created: 'carol' }));
-      users$.next(listed({ rows: rows('alice', 'bob', 'carol'), created: 'carol' }));
+    it('a list that arrives behind the open dialog redraws the rows and leaves the dialog as it is', () => {
+      const { users$ } = mounted(listed({ invite: WENT }));
+      users$.next(listed({ invite: WENT, rows: rows('alice', 'bob', 'carol') }));
       expect(names()).toEqual(['alice', 'bob', 'carol']);
-      expect(created().open).toBe(true);
-      expect(one('dialog.created .password').textContent).toBe(PASSWORD);
+      expect([invite().open, one('dialog.invite .answer').textContent]).toEqual([true, WENT.answer]);
     });
 
-    it('after the view is left with the dialog open, it is closed and the password is nowhere in the document', () => {
+    it('after the view is left with the dialog open, it is closed and its texts are gone', () => {
       const before = html();
-      const { createUserState$, subscription } = mounted(listed());
-      ask('carol');
-      createUserState$.next(createdAs('carol'));
-      expect(anywhere(PASSWORD)).toBe(true);
+      const { subscription } = mounted(listed({ invite: WENT }));
       subscription.unsubscribe();
-      expect(created().open).toBe(false);
-      expect(anywhere(PASSWORD)).toBe(false);
-      expect(anywhere('carol')).toBe(false);
+      expect(invite().open).toBe(false);
+      expect(anywhere('carol@example.com')).toBe(false);
+      expect(offered()).toEqual(['back', 'submit']);
       expect(html()).toBe(before);
     });
   });
@@ -400,9 +362,9 @@ describe('mountUsers', () => {
     it('the four facts are emptied with the username when the stream brings another object for the form', () => {
       const { users$ } = mounted(listed());
       for (const name of ['givenName', 'familyName', 'email', 'address']) createField(name).value = 'x';
-      users$.next(listed({ creating: true }));
+      users$.next(listed({ invite: SENDING }));
       expect(createField('email').value).toBe('x');
-      users$.next(listed({ field: { ...FIELD }, created: 'carol' }));
+      users$.next(listed({ field: { ...FIELD }, invite: WENT }));
       expect(['givenName', 'familyName', 'email', 'address'].map((name) => createField(name).value)).toEqual(['', '', '', '']);
     });
   });
@@ -552,7 +514,7 @@ describe('mountUsers', () => {
     });
 
     it('a result of a delete this dialog did not ask for changes nothing in it: one that was there at the mount, one of an earlier opening', () => {
-      const { deleteUserState$ } = mounted(listed(), { status: 'idle' }, { status: 'failure', reason: 'network', message: 'for a developer' });
+      const { deleteUserState$ } = mounted(listed(), { status: 'failure', reason: 'network', message: 'for a developer' });
       deleteOf('bob').click();
       expect([remove().open, one('dialog.delete .error').textContent]).toEqual([true, '']);
       // Asked for, then closed while it was under way: its answer finds another opening.
@@ -611,8 +573,9 @@ describe('mountUsers', () => {
       const before = items();
       deleteOf('bob').focus();
       users$.next(listed({ loading: true }));
-      users$.next(listed({ creating: true, refusal: USERNAME_HINT }));
-      users$.next(listed({ failure: FAILURE }));
+      users$.next(listed({ refusal: USERNAME_HINT }));
+      users$.next(listed({ invite: FAILED }));
+      users$.next(listed());
       expect(items()).toEqual(before);
       expect(items().every((item, i) => item === before[i])).toBe(true);
       expect(document.activeElement).toBe(deleteOf('bob'));
@@ -629,14 +592,17 @@ describe('mountUsers', () => {
     });
   });
 
-  it('a username containing <script> is shown as text in its row, in its button\'s name and in the delete dialog; so are the sentences', () => {
-    mounted(state({ rows: rows(SCRIPT), failure: SCRIPT, refusal: SCRIPT, empty: SCRIPT, unread: SCRIPT }));
-    expect(names()).toEqual([SCRIPT]);
+  it('a username containing <script> is shown as text in its row, in its buttons\' names and in the delete dialog; so are the sentences', () => {
+    const odd = `new${SCRIPT}`;
+    mounted(state({ rows: rows(odd), invite: { question: SCRIPT, sending: false, answer: SCRIPT, failure: SCRIPT }, refusal: SCRIPT, empty: SCRIPT, unread: SCRIPT }));
+    expect(names()).toEqual([odd]);
     expect(items()[0]!.querySelector('.username')!.children).toHaveLength(0);
-    expect(deleteOf(SCRIPT).getAttribute('aria-label')).toBe(`Delete ${SCRIPT}`);
-    deleteOf(SCRIPT).click();
-    expect(one('dialog.delete .question').textContent).toBe(deleteQuestion(SCRIPT));
-    for (const element of [one('dialog.delete .question'), one('.failure'), refusal(), one('.empty'), one('.unread .error')]) {
+    expect(deleteOf(odd).getAttribute('aria-label')).toBe(`Delete ${odd}`);
+    expect(resendOf(odd).getAttribute('aria-label')).toBe(`Resend the invitation to ${odd}`);
+    deleteOf(odd).click();
+    expect(one('dialog.delete .question').textContent).toBe(deleteQuestion(odd));
+    const shown = ['dialog.delete .question', 'dialog.invite .question', 'dialog.invite .answer', 'dialog.invite .error', '.empty', '.unread .error'].map((selector) => one(selector));
+    for (const element of [...shown, refusal()]) {
       expect(element.textContent).toContain(SCRIPT);
       expect(element.children).toHaveLength(0);
     }
@@ -656,26 +622,34 @@ describe('mountUsers', () => {
   describe('leaving the view', () => {
     it('after unsubscribing nothing is left in the page, which is as index.html has it: no row, no name, both dialogs closed and empty, the field emptied and not in fault', () => {
       const before = html();
-      const { subscription, users$, createUserState$, deleteUserState$ } = mounted(listed({ loading: true, creating: true, failure: FAILURE, refusal: USERNAME_HINT, created: 'carol' }));
+      const { subscription, users$, deleteUserState$ } = mounted(listed({ rows: rows('alice', 'bob', 'newbie'), loading: true, invite: { ...WENT, failure: FAILURE }, refusal: USERNAME_HINT }));
       ask('carol');
-      createUserState$.next(createdAs('carol'));
       deleteOf('bob').click(); // the emulated page lets a click through a modal dialog
       removeSubmit().click();
       deleteUserState$.next({ status: 'pending', username: 'bob' });
       field().value = 'dave';
       createField('givenName').value = 'Anna';
       editOf('alice').click();
-      users$.next(listed({ refusals: { ...NO_REFUSALS, email: PROFILE_RULES.email }, edit: { ...NO_EDIT, saving: true, failure: FAILURE, refusals: { ...NO_REFUSALS, email: PROFILE_RULES.email } } }));
-      expect([created().open, remove().open, edit().open]).toEqual([true, true, true]);
+      users$.next(listed({ rows: rows('alice', 'bob', 'newbie'), invite: SENDING, refusals: { ...NO_REFUSALS, email: PROFILE_RULES.email }, edit: { ...NO_EDIT, saving: true, failure: FAILURE, refusals: { ...NO_REFUSALS, email: PROFILE_RULES.email } } }));
+      expect([invite().open, remove().open, edit().open]).toEqual([true, true, true]);
       expect(html()).not.toBe(before);
 
       subscription.unsubscribe();
       expect(items()).toHaveLength(0);
-      expect([created().open, remove().open, edit().open]).toEqual([false, false, false]);
+      expect([invite().open, remove().open, edit().open]).toEqual([false, false, false]);
       expect([field().value, field().hasAttribute('aria-invalid')]).toEqual(['', false]);
       expect(editFields()).toEqual(['', '', '', '']);
-      expect([one<HTMLButtonElement>('.submit').disabled, removeSubmit().disabled]).toEqual([false, false]);
-      for (const gone of ['alice', 'bob', 'carol', 'dave', 'Given-', 'Family-', 'Street of', 'Anna', PASSWORD, 'A username has', PROFILE_RULES.email]) expect(anywhere(gone), gone).toBe(false);
+      expect([one<HTMLButtonElement>('.submit').disabled, removeSubmit().disabled, inviteButton('submit').disabled]).toEqual([false, false, false]);
+      for (const gone of ['alice', 'bob', 'carol', 'dave', 'newbie', 'Given-', 'Family-', 'Street of', 'Anna', 'An invitation', 'A username has', PROFILE_RULES.email])
+        expect(anywhere(gone), gone).toBe(false);
+      expect(html()).toBe(before);
+    });
+
+    it('after unsubscribing with the invitation answered: the question and the buttons are as index.html has them', () => {
+      const before = html();
+      const { subscription } = mounted(listed({ invite: WENT }));
+      expect(one('dialog.invite .question').hidden).toBe(true);
+      subscription.unsubscribe();
       expect(html()).toBe(before);
     });
 
@@ -687,15 +661,13 @@ describe('mountUsers', () => {
       expect(html()).toBe(before);
     });
 
-    it('the streams are no longer heard: a success that arrives later opens nothing', () => {
-      const { users$, createUserState$, deleteUserState$, subscription } = mounted(listed());
+    it('the streams are no longer heard: a state that arrives later opens nothing', () => {
+      const { users$, deleteUserState$, subscription } = mounted(listed());
       ask('carol');
       subscription.unsubscribe();
-      expect([users$.observed, createUserState$.observed, deleteUserState$.observed]).toEqual([false, false, false]);
-      createUserState$.next(createdAs('carol'));
-      users$.next(listed({ failure: FAILURE }));
-      expect(created().open).toBe(false);
-      expect(anywhere(PASSWORD)).toBe(false);
+      expect([users$.observed, deleteUserState$.observed]).toEqual([false, false]);
+      users$.next(listed({ invite: WENT }));
+      expect(invite().open).toBe(false);
       expect(items()).toHaveLength(0);
     });
 
@@ -706,15 +678,13 @@ describe('mountUsers', () => {
       expect(root.hidden).toBe(true);
     });
 
-    it('mounted again on the same element, it listens to the new objects only: the first mount\'s create opens nothing in the second', () => {
+    it('mounted again on the same element, it listens to the new objects only', () => {
       const first = mounted(listed());
       ask('carol');
       first.subscription.unsubscribe();
-      // The service is the session's: its state, with the first mount's success, is still there.
-      const second = mounted(listed({ rows: rows('zoe') }), createdAs('carol'));
+      const second = mounted(listed({ rows: rows('zoe') }));
       expect(names()).toEqual(['zoe']);
-      expect(created().open).toBe(false);
-      expect(anywhere(PASSWORD)).toBe(false);
+      expect(invite().open).toBe(false);
       ask('dave');
       expect(first.screen.create).toHaveBeenCalledTimes(1);
       expect(second.screen.create).toHaveBeenCalledWith({ ...FIELD, username: 'dave' });

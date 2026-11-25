@@ -2,15 +2,12 @@ import {
   AdminAddUserToGroupCommand,
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
-  AdminSetUserPasswordCommand,
   CognitoIdentityProviderClient,
-  InvalidPasswordException,
   UsernameExistsException,
 } from '@aws-sdk/client-cognito-identity-provider';
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { mockClient } from 'aws-sdk-client-mock';
 import { handler } from '../../../src/handlers/createUser';
-import { PASSWORD_LENGTH } from '../../../src/lib/password';
 
 const cognito = mockClient(CognitoIdentityProviderClient);
 const POOL = 'eu-west-1_TEST';
@@ -33,16 +30,15 @@ const create = (username: string, extra: Record<string, unknown> = {}) => JSON.s
 const asAdmin = (body = create('bob')) => asCaller('admin', ['admin'], body);
 
 const exists = () => new UsernameExistsException({ message: 'User account already exists', $metadata: {} });
-const badPassword = () => new InvalidPasswordException({ message: 'Password does not conform to policy', $metadata: {} });
 
 let output: string[];
 beforeEach(() => {
   cognito.reset();
   cognito.on(AdminCreateUserCommand).resolves({});
-  cognito.on(AdminSetUserPasswordCommand).resolves({});
   cognito.on(AdminAddUserToGroupCommand).resolves({});
   cognito.on(AdminDeleteUserCommand).resolves({});
   vi.stubEnv('USER_POOL_ID', POOL);
+  vi.stubEnv('MAIL_STAGE', 'on');
   output = [];
   vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
     output.push(String(chunk));
@@ -61,20 +57,18 @@ const body = (response: Awaited<ReturnType<typeof handler>>) => JSON.parse(respo
 const sent = () => cognito.calls().map((call) => (call.args[0] as object).constructor.name);
 
 describe('createUser handler', () => {
-  it('creates the user with the four facts, sets a permanent password, adds the user group and returns the password', async () => {
+  it('creates the user with the four facts and no password, so Cognito e-mails the invitation, adds the user group and answers invited', async () => {
     const response = await handler(asAdmin());
 
     expect(response.statusCode).toBe(201);
     expect(response.headers).toEqual({ 'content-type': 'application/json' });
-    const result = body(response);
-    expect(result).toEqual({ username: 'bob', password: expect.any(String) });
-    expect(result.password).toHaveLength(PASSWORD_LENGTH);
+    expect(body(response)).toEqual({ username: 'bob', status: 'invited' });
 
-    expect(sent()).toEqual(['AdminCreateUserCommand', 'AdminSetUserPasswordCommand', 'AdminAddUserToGroupCommand']);
+    expect(sent()).toEqual(['AdminCreateUserCommand', 'AdminAddUserToGroupCommand']);
     expect(cognito.commandCalls(AdminCreateUserCommand)[0]!.args[0].input).toEqual({
       UserPoolId: POOL,
       Username: 'bob',
-      MessageAction: 'SUPPRESS',
+      DesiredDeliveryMediums: ['EMAIL'],
       UserAttributes: [
         { Name: 'given_name', Value: 'Bob' },
         { Name: 'family_name', Value: 'Bianchi' },
@@ -83,12 +77,6 @@ describe('createUser handler', () => {
         { Name: 'email_verified', Value: 'true' },
       ],
     });
-    expect(cognito.commandCalls(AdminSetUserPasswordCommand)[0]!.args[0].input).toEqual({
-      UserPoolId: POOL,
-      Username: 'bob',
-      Password: result.password,
-      Permanent: true,
-    });
     expect(cognito.commandCalls(AdminAddUserToGroupCommand)[0]!.args[0].input).toEqual({
       UserPoolId: POOL,
       Username: 'bob',
@@ -96,10 +84,19 @@ describe('createUser handler', () => {
     });
   });
 
-  it('generates a new password for every user', async () => {
-    const first = body(await handler(asAdmin()));
-    const second = body(await handler(asAdmin(create('carol'))));
-    expect(first.password).not.toBe(second.password);
+  it.each([['off'], ['domain'], [undefined]])('answers 503 mail_unavailable and creates nothing at stage %s', async (stage) => {
+    if (stage === undefined) vi.stubEnv('MAIL_STAGE', undefined);
+    else vi.stubEnv('MAIL_STAGE', stage);
+    const response = await handler(asAdmin());
+    expect(response.statusCode).toBe(503);
+    expect(body(response)).toEqual({ error: 'mail_unavailable', message: 'E-mail is not available yet' });
+    expect(cognito.calls()).toHaveLength(0);
+  });
+
+  it('answers 403 before the stage for a User, at stage off too', async () => {
+    vi.stubEnv('MAIL_STAGE', 'off');
+    const response = await handler(asCaller('alice', ['user'], create('bob')));
+    expect(response.statusCode).toBe(403);
   });
 
   it('accepts a base64-encoded body', async () => {
@@ -168,26 +165,13 @@ describe('createUser handler', () => {
     expect(sent()).toEqual(['AdminCreateUserCommand']);
   });
 
-  it('deletes the account and answers 500 when setting the password fails', async () => {
-    cognito.on(AdminSetUserPasswordCommand).rejects(badPassword());
-    const response = await handler(asAdmin());
-    expect(response.statusCode).toBe(500);
-    expect(body(response)).toEqual({ error: 'internal_error', message: 'Could not create the user' });
-    expect(sent()).toEqual(['AdminCreateUserCommand', 'AdminSetUserPasswordCommand', 'AdminDeleteUserCommand']);
-    expect(cognito.commandCalls(AdminDeleteUserCommand)[0]!.args[0].input).toEqual({ UserPoolId: POOL, Username: 'bob' });
-  });
-
   it('deletes the account and answers 500 when adding to the group fails', async () => {
     cognito.on(AdminAddUserToGroupCommand).rejects(new Error('Service unavailable'));
     const response = await handler(asAdmin());
     expect(response.statusCode).toBe(500);
     expect(body(response)).toEqual({ error: 'internal_error', message: 'Could not create the user' });
-    expect(sent()).toEqual([
-      'AdminCreateUserCommand',
-      'AdminSetUserPasswordCommand',
-      'AdminAddUserToGroupCommand',
-      'AdminDeleteUserCommand',
-    ]);
+    expect(sent()).toEqual(['AdminCreateUserCommand', 'AdminAddUserToGroupCommand', 'AdminDeleteUserCommand']);
+    expect(cognito.commandCalls(AdminDeleteUserCommand)[0]!.args[0].input).toEqual({ UserPoolId: POOL, Username: 'bob' });
   });
 
   it('still answers 500 when the rollback itself fails', async () => {
@@ -200,9 +184,8 @@ describe('createUser handler', () => {
 });
 
 describe('createUser handler logging', () => {
-  it('writes one info line naming caller and target, without the password', async () => {
-    const response = await handler(asAdmin());
-    const { password } = body(response);
+  it('writes one info line naming caller and target, without a fact', async () => {
+    await handler(asAdmin());
     expect(logLines()).toEqual([
       {
         timestamp: expect.any(String),
@@ -217,7 +200,6 @@ describe('createUser handler logging', () => {
         durationMs: expect.any(Number),
       },
     ]);
-    expect(output.join('')).not.toContain(password as string);
     for (const fact of Object.values(FACTS)) expect(output.join('')).not.toContain(JSON.stringify(fact).slice(1, -1));
   });
 
@@ -248,8 +230,16 @@ describe('createUser handler logging', () => {
     expect(logLines()).toEqual([expect.objectContaining({ level: 'info', target: 'bob', outcome: 'conflict', status: 409 })]);
   });
 
+  it('logs the stage refusal with the caller and no target', async () => {
+    vi.stubEnv('MAIL_STAGE', 'domain');
+    await handler(asAdmin());
+    const [line] = logLines();
+    expect(line).toEqual(expect.objectContaining({ level: 'error', username: 'admin', outcome: 'mail_unavailable', status: 503 }));
+    expect(line).not.toHaveProperty('target');
+  });
+
   it('logs a failure with a successful rollback at error level', async () => {
-    cognito.on(AdminSetUserPasswordCommand).rejects(badPassword());
+    cognito.on(AdminAddUserToGroupCommand).rejects(new Error('Service unavailable'));
     await handler(asAdmin());
     const [line] = logLines();
     expect(line).toEqual(
@@ -258,7 +248,7 @@ describe('createUser handler logging', () => {
         target: 'bob',
         outcome: 'error',
         status: 500,
-        reason: { name: 'InvalidPasswordException', message: 'Password does not conform to policy' },
+        reason: { name: 'Error', message: 'Service unavailable' },
         rollback: 'deleted',
       }),
     );

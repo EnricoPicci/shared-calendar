@@ -86,8 +86,6 @@ when those files are touched (`.claude/rules/frontend-views.md`).
 - A view never sees a token.
 - No dialog has a `close` handler. A result is shown only in the dialog that asked for it.
 - A teardown wipes what the view put in the page.
-- The generated password is in one element of `dialog.created` and nowhere else, and never
-  passes through the logic layer.
 - `src/logic/` has no DOM, gets "now" passed in, and reads dates and times through `shared/`'s
   helpers in the calendar's zone, never the machine's.
 - A new route's failure codes get their sentences in `src/logic/texts.ts` (`failureText`); the

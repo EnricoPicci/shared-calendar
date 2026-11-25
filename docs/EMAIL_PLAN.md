@@ -1,6 +1,9 @@
 # Shared Calendar: e-mail (implementation plan)
 
-**Version:** v9 (2026-11-25): step m7 done, its "As done" note written; the look at an expired
+**Version:** v10 (2026-11-25): step m8 cut into parts A (the invitation), B (the stages) and C
+(the smoke test and the documents), each with its check and its commit; `backend/src/lib/password.ts`
+removed, the smoke test making its own passwords (the Product Owner's decisions, with the brief of
+step m8). v9 (2026-11-25): step m7 done, its "As done" note written; the look at an expired
 session moved from step m7's check to step m9's, since cognito-local never ends a challenge. v8 (2026-11-25): the root `CLAUDE.md`'s password rule moved from step m7 to step
 m8, where the code makes it true; step m7's local script is `test-user` with its target `local`,
 step m8 adds `cloud` (the Product Owner's decisions, with the brief of step m7). v7 (2026-11-25): step m6 done, its "As done" note written; no step's content
@@ -869,6 +872,13 @@ Builds:
   the mailer's log line `sent`; at stage `domain` the `503`s and the Users made in Cognito.
 
 Documents: section 4's row m8.
+
+Built in three parts, each with its check, a review and its commit (the brief
+`prompts/mail-m08-invitation-implementation.md`): **A**, the invitation (`shared/`, the back
+end's code, the page, the journeys, the root `CLAUDE.md`'s rule); **B**, the stages
+(`template.yaml`, `samconfig.toml`, `test-user`'s target `cloud`); **C**, the smoke test and the
+documents. `backend/src/lib/password.ts` goes with the password of the creation; the smoke test
+makes its own passwords, checked against the pool's rule.
 
 **Check:** section 5.1, which here runs **most journey files** of both packages (F1), each alone;
 `npm run smoke -w backend -- local` once, since this step rewrites it; the screens: Users

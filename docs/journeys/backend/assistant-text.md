@@ -42,7 +42,8 @@ instead.
 
 **The block's `beforeAll`** (the helper `newUser()`) removes `chat-text` if an earlier run left it
 (`removeUserIfPresent()`, straight to cognito-local), creates it through `POST /users` as the
-Administrator (`201`) and signs it in with the password the answer carries. Then `chat-text` calls
+Administrator (`201`), sets its password straight in cognito-local (`setPasswordOf()`: the answer
+carries none) and signs it in with it. Then `chat-text` calls
 `DELETE /assistant/conversation` and the test checks `204`: there is nothing to end, and the route
 answers the same.
 
@@ -188,5 +189,5 @@ The blocks after this one play other accounts and never look at these items.
 | The line of the application | `timeLine()` in `backend/src/assistant/prompt.ts` (test 5) |
 | The table | `readConversation()`, `startConversation()`, `saveStep()`, `endConversation()` in `backend/src/lib/assistantDb.ts` |
 | Claude | `askLanguage()`, `askStep()` in `backend/src/lib/anthropic.ts`; the fake's script `backend/tests/integration/fake-claude/answers.json` |
-| Test helpers | in the file: `newUser()`, `say()`, `conversation()`, `startAgain()`, `none()`; in `backend/tests/integration/setup.ts`: `api()`, `signIn()`, `removeUserIfPresent()`, `subOf()`, `queryAssistantPartition()`, `localDailyMessageLimit()` |
+| Test helpers | in the file: `newUser()`, `say()`, `conversation()`, `startAgain()`, `none()`; in `backend/tests/integration/setup.ts`: `api()`, `setPasswordOf()`, `signIn()`, `removeUserIfPresent()`, `subOf()`, `queryAssistantPartition()`, `localDailyMessageLimit()` |
 | Constants | `HELLO`, `HELLO_ANSWER`, `LIMIT` |

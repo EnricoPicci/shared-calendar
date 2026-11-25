@@ -50,7 +50,8 @@ settings, makes its own types and books on a **Saturday**, where no block above 
 
 **The block's `beforeAll`** removes the four `cap-…` Users if an earlier run left them
 (`removeUserIfPresent()`, straight in cognito-local), creates each again through `POST /users`
-(`201`) and signs each in with the password of the answer.
+(`201`), sets each one's password straight in cognito-local (`setPasswordOf()`: the answer carries
+none) and signs each in with it.
 
 **The date.** `S` is the first Saturday on or after today + 8 days in `Europe/Rome`, counted with
 the shared date helpers. Both patterns are valid on `S` alone, so nothing else in the calendar
@@ -244,7 +245,7 @@ and need them empty of windows; this block leaves its Saturday so.
 | Change | `POST /calendar/appointments/{appointmentId}/change`: `backend/src/handlers/changeAppointment.ts`; `checkChange()` |
 | The view | `GET /calendar`: `calendarView()` in `backend/src/lib/calendarRules.ts` (`capacity`, `placesLeft`, the full slots for the Administrator, `busy`) |
 | People at their peak | `peopleIn()` in `shared/src/calendar/rules.ts` |
-| Test helpers | in the block: `S()`, `at()`, `book()`, `dayOf()`, `slotAt()`, `bookedAt()`; in `backend/tests/integration/setup.ts`: `api()`, `signIn()`, `removeUserIfPresent()`, `getCalendarItem()`, `queryCalendarPartition()` |
+| Test helpers | in the block: `S()`, `at()`, `book()`, `dayOf()`, `slotAt()`, `bookedAt()`; in `backend/tests/integration/setup.ts`: `api()`, `setPasswordOf()`, `signIn()`, `removeUserIfPresent()`, `getCalendarItem()`, `queryCalendarPartition()` |
 | Constants | `ZONE` (`Europe/Rome`), `SETTINGS`, `PEOPLE`; the state `tokens`, `types`, `patterns`, `appts`, `leftover` |
 
 ## Background: which test proves which rule

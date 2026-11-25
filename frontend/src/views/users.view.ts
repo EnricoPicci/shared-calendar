@@ -5,18 +5,19 @@ import type { UsernameField, UsersScreen } from '../logic/users.screen';
 import type { UsersService } from '../services/users.service';
 import { editDialog, profileForm } from './profile.parts';
 
-// What the users view uses: of the UsersScreen its stream, the create, the edit and the new try
-// after a read that failed; of the UsersService the state of a create, for the generated password
-// only, and the delete with its state, for the dialog that confirms it.
+// What the users view uses: of the UsersScreen its stream, the create, the invitation's dialog,
+// the edit and the new try after a read that failed; of the UsersService the delete with its
+// state, for the dialog that confirms it.
 export type UsersDeps = {
-  screen: Pick<UsersScreen, 'users$' | 'create' | 'typed' | 'retry' | 'editOpened' | 'editTyped' | 'save'>;
-  users: Pick<UsersService, 'createUserState$' | 'deleteUser' | 'deleteUserState$'>;
+  screen: Pick<UsersScreen, 'users$' | 'create' | 'typed' | 'retry' | 'resend' | 'confirm' | 'closeInvite' | 'editOpened' | 'editTyped' | 'save'>;
+  users: Pick<UsersService, 'deleteUser' | 'deleteUserState$'>;
 };
 
 // The users view (docs/FRONTEND_ARCHITECTURE.md sections 3 and 4): wires the element #users of
 // index.html. It draws the rows the logic layer hands over, sends the form's fields as text at
-// "Create user", shows once the password the server generated, opens the Edit dialog of a row,
-// and asks before a delete.
+// "Create user", shows the invitation's dialog the logic layer describes (the last look at the
+// address, then where the invitation went or why not), opens the Edit dialog of a row, and asks
+// before a delete.
 export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Subscription {
   // 1. Find the elements, once.
   const find = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
@@ -25,7 +26,6 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
   const facts = profileForm(form);
   const hint = find('.username-field .hint');
   const refusal = find('.username-field .refusal');
-  const failure = find('form.create .failure');
   const submit = find<HTMLButtonElement>('form.create .submit');
   const loading = find('.loading');
   const unread = find('.unread');
@@ -33,9 +33,13 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
   const empty = find('.empty');
   const list = find('.list');
   const rowTemplate = find<HTMLTemplateElement>('#tpl-user-row');
-  const created = find<HTMLDialogElement>('dialog.created');
-  const createdName = find('dialog.created .username');
-  const password = find('dialog.created .password');
+  const invite = find<HTMLDialogElement>('dialog.invite');
+  const inviteQuestion = find('dialog.invite .question');
+  const inviteAnswer = find('dialog.invite .answer');
+  const inviteError = find('dialog.invite .error');
+  const inviteBack = find<HTMLButtonElement>('dialog.invite .back');
+  const inviteSubmit = find<HTMLButtonElement>('dialog.invite .submit');
+  const inviteDone = find<HTMLButtonElement>('dialog.invite .done');
   const remove = find<HTMLDialogElement>('dialog.delete');
   const question = find('dialog.delete .question');
   const removeError = find('dialog.delete .error');
@@ -52,30 +56,20 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
   // What a username is, under the field: the logic layer's words, which are also its refusal.
   hint.textContent = USERNAME_HINT;
 
-  // 2. Pure view state (docs/FRONTEND_ARCHITECTURE.md section 3, rule 10): whether a create
-  // was asked for from this mount, which user the open delete dialog is about, and whether its
-  // delete was asked for since it opened. A result is shown only when it was asked for here:
-  // the state streams keep their last value, which may be an earlier mount's or opening's.
-  let createAsked = false;
+  // 2. Pure view state (docs/FRONTEND_ARCHITECTURE.md section 3, rule 10): which user the open
+  // delete dialog is about, and whether its delete was asked for since it opened. A result is
+  // shown only when it was asked for here: the state stream keeps its last value, which may be
+  // an earlier opening's.
   let deleting = '';
   let deleteAsked = false;
 
-  // 3. The password dialog. The generated password is in the page in one element, through
-  // textContent, from the moment the dialog opens to the moment it closes
-  // (docs/FRONTEND_SERVICES.md section 13.7).
-  const forget = () => {
-    createdName.textContent = '';
-    password.textContent = '';
-  };
-  // The Escape key must not close it: the password cannot be shown again. The attribute
-  // closedby="none" of the page is what holds; a browser that does not know it still asks
-  // first, with this event.
-  created.oncancel = (event) => event.preventDefault();
-  // Its button is the one way out, and takes the password out of the page at once.
-  find('dialog.created .understood').onclick = () => {
-    created.close();
-    forget();
-  };
+  // 3. The invitation's dialog: the logic layer says whether it is open and what it shows. Its
+  // three buttons and the Escape key only tell the logic layer; the Escape key closes it in the
+  // browser too, and the next state agrees.
+  inviteBack.onclick = () => screen.closeInvite();
+  inviteDone.onclick = () => screen.closeInvite();
+  inviteSubmit.onclick = () => screen.confirm();
+  invite.oncancel = () => screen.closeInvite();
 
   // 4. The delete dialog: opening is a pure view action, and it starts clean. Nothing is done
   // when it closes, by "Keep", by the Escape key or after a success: whom it was about is
@@ -102,6 +96,8 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
     item.querySelector('.username')!.textContent = row.username;
     item.querySelector('.name')!.textContent = row.name;
     item.querySelector('.email')!.textContent = row.email;
+    item.querySelector('.status')!.textContent = row.status;
+    item.classList.toggle('is-invited', row.status === 'invited');
     const editButton = item.querySelector<HTMLElement>('.ask-edit')!;
     editButton.setAttribute('aria-label', row.editLabel);
     editButton.onclick = () => {
@@ -109,6 +105,12 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
       editTitleText.textContent = editTitle(row.username);
       edit.open(row.facts);
     };
+    const resend = item.querySelector<HTMLElement>('.ask-resend')!;
+    resend.hidden = row.resendLabel === null;
+    if (row.resendLabel !== null) {
+      resend.setAttribute('aria-label', row.resendLabel);
+      resend.onclick = () => screen.resend(row);
+    }
     const button = item.querySelector<HTMLElement>('.ask-delete')!;
     button.setAttribute('aria-label', row.deleteLabel);
     button.onclick = () => openDelete(row);
@@ -127,7 +129,6 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
   form.oninput = () => screen.typed(typed());
   form.onsubmit = (event) => {
     event.preventDefault();
-    createAsked = true;
     screen.create(typed());
   };
   find('.retry').onclick = () => screen.retry();
@@ -154,20 +155,28 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
     refusal.textContent = state.refusal ?? '';
     if (state.refusal === null) field.removeAttribute('aria-invalid');
     else field.setAttribute('aria-invalid', 'true');
-    failure.textContent = state.failure ?? '';
-    submit.disabled = state.creating;
+    // The invitation's dialog: its texts, and which buttons it offers. "Confirm" is off while
+    // the call is under way; once it went, the answer takes the question's place and "Close"
+    // alone stays.
+    const look = state.invite;
+    inviteQuestion.textContent = look?.question ?? '';
+    inviteAnswer.textContent = look?.answer ?? '';
+    inviteError.textContent = look?.failure ?? '';
+    const went = look?.answer != null;
+    inviteQuestion.hidden = went;
+    inviteBack.hidden = went;
+    inviteSubmit.hidden = went;
+    // The keyboard was on a button that is now hidden: it goes to "Close", once.
+    if (went && inviteDone.hidden) {
+      inviteDone.hidden = false;
+      inviteDone.focus();
+    }
+    inviteDone.hidden = !went;
+    inviteSubmit.disabled = look?.sending ?? false;
+    submit.disabled = look?.sending ?? false;
+    if (look !== null && !invite.open) invite.showModal();
+    if (look === null && invite.open) invite.close();
   });
-  // A create this mount asked for succeeded: the username and the password are shown, once.
-  // The password comes from the service's own result and from nowhere else.
-  subscription.add(
-    users.createUserState$.subscribe((state) => {
-      if (!createAsked || state.status !== 'success') return;
-      createAsked = false;
-      createdName.textContent = state.user.username;
-      password.textContent = state.user.password;
-      created.showModal();
-    }),
-  );
   // A delete: its button is disabled while one is under way; the dialog that asked for it
   // closes on its success and shows its failure in plain words, staying open.
   subscription.add(
@@ -179,12 +188,11 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
     }),
   );
 
-  // 8. Leaving the view: the element stays in the page, only hidden, so the password, the
+  // 8. Leaving the view: the element stays in the page, only hidden, so the addresses, the
   // usernames and what was typed are removed before the next screen, or the next person
   // (docs/FRONTEND_ARCHITECTURE.md section 3, rule 9).
   subscription.add(() => {
-    created.close();
-    forget();
+    invite.close();
     remove.close();
     edit.clear();
     editTitleText.textContent = '';
@@ -193,8 +201,10 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
     list.replaceChildren();
     field.removeAttribute('aria-invalid');
     for (const hidden of [loading, unread, empty]) hidden.hidden = true;
-    for (const button of [submit, removeSubmit]) button.disabled = false;
-    for (const text of [hint, refusal, failure, unreadWhy, empty, question, removeError]) text.textContent = '';
+    for (const button of [submit, removeSubmit, inviteSubmit]) button.disabled = false;
+    for (const shown of [inviteQuestion, inviteBack, inviteSubmit]) shown.hidden = false;
+    inviteDone.hidden = true;
+    for (const text of [hint, refusal, unreadWhy, empty, question, removeError, inviteQuestion, inviteAnswer, inviteError]) text.textContent = '';
   });
   return subscription;
 }

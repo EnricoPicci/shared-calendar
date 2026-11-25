@@ -172,7 +172,6 @@ label.check { display: flex; align-items: center; gap: 0.4rem; }
 /* The users: the form that creates one, then the list, a row with its button */
 .create { display: grid; gap: 0.75rem; max-width: 26rem; margin-top: 0.75rem; }
 .create p { margin: 0; }
-.create .failure:empty { display: none; }
 .create .actions { justify-content: flex-start; }
 /* The refusal of the username says what the hint says: while it shows, the hint does not */
 .field:has(.refusal:not(:empty)) .hint { display: none; }
@@ -186,6 +185,11 @@ label.check { display: flex; align-items: center; gap: 0.4rem; }
 .user-row .username { flex: 1 1 6rem; }
 .user-row .name { flex: 1 1 8rem; overflow-wrap: break-word; color: #52606d; }
 .user-row .email { flex: 2 1 13rem; overflow-wrap: break-word; color: #52606d; }
+/* The state of the account: small, an invited User's in the colour of a link, as a thing to do */
+.user-row .status { flex: none; font-size: 0.8rem; font-weight: 600; color: #52606d; }
+.user-row.is-invited .status { color: #1d5fd1; }
+/* Where the invitation went, and the address in the question: an address wraps, never overflows */
+dialog .answer { overflow-wrap: anywhere; }
 /* A field of the four facts in fault, a textarea as an input */
 .field textarea[aria-invalid="true"] { border-color: #b3261e; }
 .create textarea, .profile textarea { resize: vertical; }
@@ -195,9 +199,6 @@ label.check { display: flex; align-items: center; gap: 0.4rem; }
 .me-screen dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .me-screen .about { font-size: 0.8rem; color: #52606d; }
 .me-screen > .actions { justify-content: flex-start; }
-/* The generated password: a fixed-width face, large enough to tell l from 1 and O from 0; one
-   click selects it whole, to be copied by hand */
-dialog .password { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 1.35rem; letter-spacing: 0.06em; user-select: all; }
 /* The heading that takes the keyboard when the password dialog opens shows no ring */
 dialog h3:focus { outline: none; }
 dialog .question { overflow-wrap: anywhere; }

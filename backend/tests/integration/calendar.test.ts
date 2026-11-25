@@ -8,6 +8,7 @@ import {
   queryCalendarPartition,
   removeUserIfPresent,
   resetCalendarTable,
+  setPasswordOf,
   signIn,
   withFacts,
 } from './setup';
@@ -727,7 +728,7 @@ describe('booking (route 17)', () => {
       await removeUserIfPresent(username);
       const res = await api('POST', '/users', adminToken, withFacts(username));
       expect(res.status).toBe(201);
-      const token = await signIn(username, res.body?.password as string);
+      const token = await signIn(username, await setPasswordOf(username));
       if (username === 'dave') daveToken = token;
       else erinToken = token;
     }
@@ -1055,7 +1056,7 @@ describe('listing, note and cancel (routes 16, 18, 19)', () => {
       await removeUserIfPresent(username);
       const res = await api('POST', '/users', adminToken, withFacts(username));
       expect(res.status).toBe(201);
-      const token = await signIn(username, res.body?.password as string);
+      const token = await signIn(username, await setPasswordOf(username));
       if (username === 'dave') daveToken = token;
       else erinToken = token;
     }
@@ -1321,7 +1322,7 @@ describe('change (route 20)', () => {
       await removeUserIfPresent(username);
       const res = await api('POST', '/users', adminToken, withFacts(username));
       expect(res.status).toBe(201);
-      const token = await signIn(username, res.body?.password as string);
+      const token = await signIn(username, await setPasswordOf(username));
       if (username === 'dave') daveToken = token;
       else erinToken = token;
     }
@@ -1544,7 +1545,7 @@ describe('users (route 21, deletion)', () => {
       await removeUserIfPresent(username);
       const res = await api('POST', '/users', adminToken, withFacts(username));
       expect(res.status).toBe(201);
-      const token = await signIn(username, res.body?.password as string);
+      const token = await signIn(username, await setPasswordOf(username));
       if (username === 'dave') daveToken = token;
       else erinToken = token;
     }
@@ -1719,7 +1720,7 @@ describe('the capacity of a type (AC-37 to AC-44)', () => {
       await removeUserIfPresent(username);
       const res = await api('POST', '/users', adminToken, withFacts(username));
       expect(res.status).toBe(201);
-      tokens[username] = await signIn(username, res.body?.password as string);
+      tokens[username] = await signIn(username, await setPasswordOf(username));
     }
   });
 

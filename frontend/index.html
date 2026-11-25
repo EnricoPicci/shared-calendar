@@ -334,7 +334,6 @@
               <label>Postal address <textarea name="address" rows="3" autocomplete="off"></textarea></label>
               <p class="error refusal" role="alert"></p>
             </div>
-            <p class="error failure" role="alert"></p>
             <div class="actions">
               <button class="primary submit">Create user</button>
             </div>
@@ -347,12 +346,14 @@
           <p class="empty" hidden></p>
           <ul class="list"></ul>
 
-          <!-- A row of the list: the username, the name and the e-mail, and two buttons, whose
-               names for a screen reader the script completes with the username -->
+          <!-- A row of the list: the username, the name, the e-mail and the state of the account
+               (invited or active), and its buttons, whose names for a screen reader the script
+               completes with the username. "Resend invitation" is shown for an invited User only. -->
           <template id="tpl-user-row">
             <li class="user-row">
-              <span class="username"></span> <span class="name"></span> <span class="email"></span>
-              <button type="button" class="ask-edit">Edit</button> <button type="button" class="danger ask-delete">Delete</button>
+              <span class="username"></span> <span class="name"></span> <span class="email"></span> <span class="status"></span>
+              <button type="button" class="ask-edit">Edit</button> <button type="button" class="ask-resend" hidden>Resend invitation</button>
+              <button type="button" class="danger ask-delete">Delete</button>
             </li>
           </template>
 
@@ -385,21 +386,20 @@
             </form>
           </dialog>
 
-          <!-- Shown once, after a user was created: the password the server generated. The
-               Escape key does not close it (closedby="none"), only its button does: the
-               password cannot be shown again. When it opens the keyboard is on its heading,
-               one Tab before the button, so that a key pressed by habit does not close it. -->
-          <dialog class="created" aria-labelledby="created-title" closedby="none">
-            <h3 id="created-title" tabindex="-1" autofocus>User created</h3>
-            <dl>
-              <dt>Username</dt>
-              <dd class="username"></dd>
-              <dt>Password</dt>
-              <dd class="password"></dd>
-            </dl>
-            <p>This password cannot be shown again. Give it to the user now.</p>
+          <!-- The last look before an invitation goes, from "Create user" or from a row's "Resend
+               invitation": the address it goes to. "Back" comes first: the keyboard is on it when
+               the dialog opens, and a screen reader then says the question, which describes the
+               dialog. Once the invitation went, the dialog says where, and "Close" is its one
+               button; a failure is said in it, and it stays open. -->
+          <dialog class="invite" aria-labelledby="invite-title" aria-describedby="invite-question">
+            <h3 id="invite-title">Send an invitation</h3>
+            <p class="question" id="invite-question"></p>
+            <p class="answer" role="status"></p>
+            <p class="error" role="alert"></p>
             <div class="actions">
-              <button type="button" class="primary understood">I have noted the password</button>
+              <button type="button" class="back">Back</button>
+              <button type="button" class="primary submit">Confirm</button>
+              <button type="button" class="primary done" hidden>Close</button>
             </div>
           </dialog>
 

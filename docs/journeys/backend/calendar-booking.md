@@ -61,8 +61,8 @@ it. It books on **Wednesdays**, which no block above touches, with its own types
 
 **The block's `beforeAll`** removes `dave` and `erin` if an earlier run left them
 (`removeUserIfPresent()`, straight to cognito-local), creates them again through `POST /users` as
-the Administrator (`201`), and signs each in with the password the answer carries. The tokens stay
-in variables.
+the Administrator (`201`), sets each one's password straight in cognito-local (`setPasswordOf()`:
+the answer carries none), and signs each in with it. The tokens stay in variables.
 
 **The two dates.** Everything happens on two Wednesdays, counted from the real today in
 `Europe/Rome` with the shared date helpers:
@@ -405,7 +405,7 @@ Thursdays.
 | The transaction | `bookAppointment()` and `withCalendarLock()` in `backend/src/lib/calendarDb.ts`; the event item from `appointmentEvent()` in `backend/src/lib/calendarEvents.ts` |
 | The Administrator's target | `getUserSub()` and `isPlainUser()` in `backend/src/lib/cognito.ts` (tests 6, 12) |
 | Availability writes | `PUT /calendar/overrides/{date}`, `PUT /calendar/patterns/{patternId}`, checked by `checkAvailabilityWrite()` (tests 13, 14) |
-| Test helpers | in the block: `W()`, `W2()`, `at()`, `plus()`, `book()`, `subOf()`, `setSettings()`, `pattern()`; in `backend/tests/integration/setup.ts`: `api()`, `signIn()`, `removeUserIfPresent()`, `resetCalendarTable()`, `getCalendarItem()`, `queryCalendarPartition()`, `putCalendarItem()`, `deleteCalendarItem()` |
+| Test helpers | in the block: `W()`, `W2()`, `at()`, `plus()`, `book()`, `subOf()`, `setSettings()`, `pattern()`; in `backend/tests/integration/setup.ts`: `api()`, `setPasswordOf()`, `signIn()`, `removeUserIfPresent()`, `resetCalendarTable()`, `getCalendarItem()`, `queryCalendarPartition()`, `putCalendarItem()`, `deleteCalendarItem()` |
 | Constants | `BOOKING_SETTINGS`, `ZONE` (`Europe/Rome`), `ULID` (the id pattern); the state `room`, `booked`, `patternId`, `leftover` |
 
 ## Background: which test proves which rule

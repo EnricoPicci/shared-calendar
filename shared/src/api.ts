@@ -46,11 +46,11 @@ export type ApiErrorCode =
   | 'assistant_budget_reached' // 503, the spending limit of the Anthropic account is reached
   // The codes of the users' facts and of e-mail, with the routes that answer each one
   // (docs/EMAIL_ARCHITECTURE.md section 9.1).
-  | 'cannot_edit_admin' // 403, the target is another administrator: their facts are their own
-  | 'not_invited' // 409, a new invitation for an account that has already chosen its password
+  | 'cannot_edit_admin' // 403, PUT /users/{username} for another administrator, whose facts are their own; POST /users/{username}/invitation for any administrator
+  | 'not_invited' // 409, POST /users/{username}/invitation for an account that has already chosen its password
   | 'no_email_address' // 409, the person asking for a mail has no e-mail address
   | 'mail_limit_reached' // 429, the person has asked for their mails of today
-  | 'mail_unavailable'; // 503, e-mail is not switched on in this stack
+  | 'mail_unavailable'; // 503, e-mail is not switched on in this stack: the mail routes, POST /users and POST /users/{username}/invitation
 
 // An appointment that an availability write would leave outside the availability
 // (docs/SHARED_CALENDAR_SPEC.md R-AV-03).
@@ -60,8 +60,10 @@ export type ApiErrorBody = { error: ApiErrorCode; message: string; conflicts?: A
 
 // 201 of POST /hello.
 export type HelloResponse = { messageId: string; role: Role; message: string; createdAt: string };
-// 201 of POST /users. The password is shown only in this response.
-export type CreateUserResponse = { username: string; password: string };
+// 201 of POST /users, and 202 of POST /users/{username}/invitation: the account is waiting for its
+// first sign-in. No password: Cognito makes the temporary one and e-mails it to the User
+// (docs/EMAIL_ARCHITECTURE.md section 5.1), so the API never sees it.
+export type CreateUserResponse = { username: string; status: 'invited' };
 
 // One account of GET /users (docs/SHARED_CALENDAR_SPEC.md section 10.1): the members of group
 // `user`, never an administrator, with their four facts and the state of their account

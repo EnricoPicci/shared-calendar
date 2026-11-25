@@ -41,9 +41,12 @@ left it, through `UsersService.deleteUser()`, accepting `user_not_found`.
 The Administrator calls `createUser(newUser('fe-profile'))`: the username and the facts of the
 helper `newUser()` of `frontend/tests/integration/local.ts` (Throw, Away fe-profile,
 `fe-profile@example.com`, an address on two lines). The test throws unless the result is a
-success, then signs `fe-profile` in with the generated password and keeps its store. Then
+success. The creation answers no password, so the test sets one straight in cognito-local
+(`setPermanentPassword()`, [a new User's password](../concepts.md#the-people-of-the-local-stack)),
+signs `fe-profile` in with it and keeps its store. Then
 `listUsers()`. The test checks that the row of `fe-profile` holds the same four facts and
-`status: 'active'`, and that no row is `admin`: the list holds plain Users only.
+`status: 'active'` (the password just set is permanent, so the account waits for no first
+sign-in), and that no row is `admin`: the list holds plain Users only.
 
 ## Test 2: a User reads their own
 
@@ -113,4 +116,4 @@ facts unsaved, which changes nothing, since it only writes them again. The `afte
 | Remove | `UsersService.deleteUser(username)` on `deleteUserResult$` → `DELETE /users/{username}` (helper `removeThrowaway()`) |
 | Read one's own | `MeService.getMe()` on `meResult$` → `GET /me` (`frontend/src/services/me.service.ts`) |
 | The rules of the facts | `CreateUserBody`, `UpdateUserBody` in `shared/src/user.ts` |
-| Helpers and constants | `newUser()`, `signIn()`, `signedIn()`, `outcome()` of `frontend/tests/integration/local.ts`; `me()`, `update()`; `THROWAWAY` (`fe-profile`), `ADMIN_FACTS`, `CHANGED` |
+| Helpers and constants | `newUser()`, `setPermanentPassword()`, `signIn()`, `signedIn()`, `outcome()` of `frontend/tests/integration/local.ts`; `me()`, `update()`; `THROWAWAY` (`fe-profile`), `ADMIN_FACTS`, `CHANGED` |

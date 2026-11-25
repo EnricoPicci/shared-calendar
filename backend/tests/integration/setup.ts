@@ -483,6 +483,20 @@ export function withFacts(username: string): { username: string } & ReturnType<t
   return { username, ...factsOf(username) };
 }
 
+// The password the journeys give a User created through POST /users, a test value of the project.
+// The route answers no password: Cognito makes a temporary one and e-mails it (cognito-local prints
+// it in its log), so a journey that signs in as the new User sets one itself, right after the
+// creation (docs/EMAIL_PLAN.md finding F1).
+export const THROWAWAY_PASSWORD = 'Throwaway-Local-Pass-1!';
+
+// Sets the permanent password of an account just created through POST /users, straight in
+// cognito-local, as the User's own first sign-in would end: the account becomes active. Returns the
+// password, for signIn.
+export async function setPasswordOf(username: string, password: string = THROWAWAY_PASSWORD): Promise<string> {
+  await cognito.send(new AdminSetUserPasswordCommand({ UserPoolId: localPool().userPoolId, Username: username, Password: password, Permanent: true }));
+  return password;
+}
+
 // Creates a second administrator, straight in cognito-local: the API can never create one
 // (docs/ARCHITECTURE.md section 6.1). The account is in the group `admin` only, its password set as
 // permanent, and holds no fact. Remove it with removeUserIfPresent.
@@ -495,7 +509,7 @@ export async function createSecondAdmin(username: string, password: string): Pro
 
 // Creates an account that is in neither group, straight in cognito-local: a state the API cannot
 // produce, since POST /users always puts the new user in the group `user`. The password is set as
-// permanent, as everywhere. Remove the account with removeUserIfPresent.
+// permanent, as setPasswordOf does. Remove the account with removeUserIfPresent.
 export async function createUserInNoGroup(username: string, password: string): Promise<void> {
   const UserPoolId = localPool().userPoolId;
   await cognito.send(new AdminCreateUserCommand({ UserPoolId, Username: username, MessageAction: 'SUPPRESS' }));

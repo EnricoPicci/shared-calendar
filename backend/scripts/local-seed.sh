@@ -235,8 +235,11 @@ ensure_user alice "$ALICE_PASSWORD" user "$(facts_of Alice Liddell alice@example
 # address and the dummy credentials in a section of its own, like CreateUserFunction.
 # DeleteUserFunction also declares the calendar variables (it cancels the deleted user's
 # appointments, docs/SHARED_CALENDAR_SPEC.md section 10.2) and gets the table and the endpoint from
-# "Parameters" too, beside its own section. ListUsersFunction, UpdateUserFunction and GetMeFunction
-# read or write Cognito only.
+# "Parameters" too, beside its own section. ListUsersFunction, UpdateUserFunction,
+# ResendInvitationFunction and GetMeFunction read or write Cognito only. CreateUserFunction and
+# ResendInvitationFunction also read the stage (MAIL_STAGE) from "Parameters": at 'on', the creation
+# sends cognito-local's invitation, printed in its log; the resend is refused by cognito-local
+# (docs/EMAIL_ARCHITECTURE.md section 14.1).
 # The three assistant functions that run tools (SendAssistantMessageFunction,
 # ContinueAssistantFunction, ConfirmProposalFunction) call Cognito too, through the code of
 # GET /users and of the booking route, when the Administrator lists the Users or books for one, and
@@ -369,6 +372,12 @@ EOF
     "AWS_SECRET_ACCESS_KEY": "local"
   },
   "UpdateUserFunction": {
+    "USER_POOL_ID": "$POOL_ID",
+    "COGNITO_ENDPOINT": "http://cognito:9229",
+    "AWS_ACCESS_KEY_ID": "local",
+    "AWS_SECRET_ACCESS_KEY": "local"
+  },
+  "ResendInvitationFunction": {
     "USER_POOL_ID": "$POOL_ID",
     "COGNITO_ENDPOINT": "http://cognito:9229",
     "AWS_ACCESS_KEY_ID": "local",

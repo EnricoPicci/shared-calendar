@@ -3,7 +3,7 @@ import { MailService } from '../../src/services/mail.service';
 import type { SendCalendarResult } from '../../src/services/mail.types';
 import { SessionStore } from '../../src/services/session.store';
 import { UsersService } from '../../src/services/users.service';
-import { API, newUser, outcome, signedIn, signIn } from './local';
+import { API, newUser, outcome, setPermanentPassword, signedIn, signIn } from './local';
 
 // The mail of a range of dates of docs/EMAIL_ARCHITECTURE.md section 6: MailService against the
 // back end's local stack (docs/FRONTEND_SERVICES.md section 24). Runs only with RUN_INTEGRATION=1,
@@ -16,7 +16,7 @@ import { API, newUser, outcome, signedIn, signIn } from './local';
 // of the day would outlive the run. The new account has no appointment, so its mail lists none,
 // whatever the calendar holds. Only the mails sent to `fe-mail`'s address are read and forgotten.
 //
-// Secrets: the generated password stays in a variable; no assertion prints it.
+// Secrets: the password stays in the helper and the store; no assertion prints it.
 
 const THROWAWAY = 'fe-mail';
 const ADDRESS = newUser(THROWAWAY).email;
@@ -65,7 +65,7 @@ describe('the mail of the calendar', () => {
     const users = new UsersService(API, admin);
     const created = await outcome(users.createUserResult$, () => users.createUser(newUser(THROWAWAY)));
     if (created.status !== 'success') throw new Error(`could not create ${THROWAWAY}: ${JSON.stringify(created)}`);
-    const signed = await signIn(THROWAWAY, created.user.password);
+    const signed = await signIn(THROWAWAY, await setPermanentPassword(THROWAWAY));
     stores.push(signed.store);
     user = signed.store;
     await forgetMails();

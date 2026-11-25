@@ -4,7 +4,7 @@
 |---|---|
 | Test file | `backend/tests/integration/journeys.test.ts` |
 | `describe` | `profiles` |
-| Tests | 1. "POST /users with the four facts creates the User; the answer is the username and the password only"<br>2. "POST /users without the facts, or with an e-mail that is not one, is 400 naming the fields"<br>3. "GET /users lists the User with the four facts as stored (trimmed, the e-mail lower-cased) and the state active"<br>4. "GET /me: the User reads their own facts; the Administrator reads theirs, those of the seed"<br>5. "PUT /users/profile-user as the Administrator replaces the four facts; the answer and the User's GET /me say the new ones"<br>6. "PUT /users/admin as the Administrator saves their own facts"<br>7. "PUT on a user that does not exist is 404 user_not_found; a body with a field too many is 400"<br>8. "PUT on another administrator is 403 cannot_edit_admin; that administrator's GET /me says no fact is held yet"<br>9. "PUT as a User, even on their own account, is 403 forbidden, and nothing changes" |
+| Tests | 1. "POST /users with the four facts creates the User; the answer is the username and the state invited only"<br>2. "POST /users without the facts, or with an e-mail that is not one, is 400 naming the fields"<br>3. "GET /users lists the User with the four facts as stored (trimmed, the e-mail lower-cased) and the state active"<br>4. "GET /me: the User reads their own facts; the Administrator reads theirs, those of the seed"<br>5. "PUT /users/profile-user as the Administrator replaces the four facts; the answer and the User's GET /me say the new ones"<br>6. "PUT /users/admin as the Administrator saves their own facts"<br>7. "PUT on a user that does not exist is 404 user_not_found; a body with a field too many is 400"<br>8. "PUT on another administrator is 403 cannot_edit_admin; that administrator's GET /me says no fact is held yet"<br>9. "PUT as a User, even on their own account, is 403 forbidden, and nothing changes" |
 | Runs against | the local stack: the API on port 3000 (`sam local`), cognito-local on port 9229 and DynamoDB Local on `DYNAMODB_PORT`, which this block does not touch (`RUN_INTEGRATION=1`) |
 
 Ideas used here, explained once for all journeys:
@@ -15,7 +15,8 @@ Ideas used here, explained once for all journeys:
 
 - `POST /users` needs the four facts and stores them as the shared rule makes them: trimmed, the
   e-mail lower-cased; `GET /users` answers them with the account's state (`docs/ARCHITECTURE.md`
-  section 4, `docs/EMAIL_ARCHITECTURE.md` section 4.1).
+  section 4, `docs/EMAIL_ARCHITECTURE.md` section 4.1). Its answer is the username and the state
+  `invited`, never a password nor the facts (`docs/EMAIL_ARCHITECTURE.md` section 5.1).
 - `GET /me` lets each person, of either role, read their own facts, `null` for a fact not held
   (`docs/EMAIL_ARCHITECTURE.md` section 4.3).
 - Only the Administrator changes facts with `PUT /users/{username}`: a User's, or their own, never
@@ -43,10 +44,11 @@ nothing of the calendar is touched.
 
 The Administrator sends `POST /users` with the username, the facts of `withFacts('profile-user')`,
 a first name with spaces around it (` Throw `) and the e-mail `Profile-User@Example.com`. The
-test checks that the answer is `201` and that its body holds exactly the keys `password` and
-`username`: the facts are not answered. It never compares the whole body, so a failure cannot
-print the password. Then `profile-user` signs in with that password; the token is kept for the
-later tests.
+test checks that the answer is `201` with exactly `{ username: 'profile-user', status: 'invited' }`:
+no password, and the facts are not answered. Cognito made a temporary password for the invitation,
+which the journey never sees, so the test sets one of its own, straight in cognito-local
+(`setPasswordOf()`, [a new User's password](../concepts.md#the-people-of-the-local-stack)). Then
+`profile-user` signs in with it; the token is kept for the later tests.
 
 ## Test 2: refused facts
 
@@ -64,7 +66,8 @@ The Administrator calls `GET /users`. The test checks that the answer is `200` a
 `profile-user` is exactly its username, a `createdAt`, `status: 'active'` and the facts of
 `factsOf('profile-user')` with the e-mail `profile-user@example.com`. So the server stored the
 first name trimmed (`Throw`) and the e-mail lower-cased. `active` is the state of an account whose
-password is set as permanent, which every account made by `POST /users` is.
+password is set as permanent: test 1 set it, as the User's first sign-in would. Before that the
+account was `invited`.
 
 ## Test 4: each one reads their own
 
@@ -132,5 +135,5 @@ the run be killed first, the next run's `beforeAll` removes them before anything
 | The routes | `POST /users` (`backend/src/handlers/createUser.ts`), `GET /users` (`listUsers.ts`), `PUT /users/{username}` (`updateUser.ts`), `GET /me` (`getMe.ts`) |
 | Cognito | `createUser`, `listPlainUsers`, `listGroups`, `getProfile`, `updateProfile`, `asUserSummary`, `asMe` in `backend/src/lib/cognito.ts` |
 | The rules of the facts | `CreateUserBody`, `UpdateUserBody`, `PROFILE_LIMITS` in `shared/src/user.ts` |
-| Helpers | `withFacts()`, `factsOf()`, `createSecondAdmin()`, `removeUserIfPresent()`, `signIn()`, `api()` in `backend/tests/integration/setup.ts` |
+| Helpers | `withFacts()`, `factsOf()`, `setPasswordOf()`, `createSecondAdmin()`, `removeUserIfPresent()`, `signIn()`, `api()` in `backend/tests/integration/setup.ts` |
 | Constants | `USER` (`profile-user`), `OTHER_ADMIN` (`profile-admin`), `OTHER_ADMIN_PASSWORD`, `ADMIN_FACTS`, `CHANGED` |

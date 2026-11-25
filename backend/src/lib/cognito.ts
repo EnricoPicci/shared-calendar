@@ -4,7 +4,6 @@ import {
   AdminDeleteUserCommand,
   AdminGetUserCommand,
   AdminListGroupsForUserCommand,
-  AdminSetUserPasswordCommand,
   AdminUpdateUserAttributesCommand,
   AdminUserGlobalSignOutCommand,
   type AttributeType,
@@ -19,6 +18,14 @@ export class UserExistsError extends Error {
   constructor(username: string) {
     super(`User ${username} already exists`);
     this.name = 'UserExistsError';
+  }
+}
+
+// An account that has already chosen its password: Cognito refuses to send it an invitation again.
+export class NotInvitedError extends Error {
+  constructor(username: string) {
+    super(`User ${username} is not waiting for its first sign-in`);
+    this.name = 'NotInvitedError';
   }
 }
 
@@ -41,12 +48,14 @@ function userPoolId(): string {
   return id;
 }
 
-// Turns the two Cognito errors the handlers react to into our own types; anything else
-// is rethrown unchanged and ends up as a 500.
+// Turns the three Cognito errors the handlers react to into our own types; anything else
+// is rethrown unchanged and ends up as a 500. UnsupportedUserStateException is real Cognito's
+// answer to a resend for an account that is no longer waiting for its first sign-in.
 function mapError(err: unknown, username: string): never {
   const name = (err as { name?: unknown } | null)?.name;
   if (name === 'UsernameExistsException') throw new UserExistsError(username);
   if (name === 'UserNotFoundException') throw new UserNotFoundError(username);
+  if (name === 'UnsupportedUserStateException') throw new NotInvitedError(username);
   throw err;
 }
 
@@ -105,15 +114,36 @@ function summaryOf(user: UserType): UserSummary {
   return { username: user.Username, createdAt: user.UserCreateDate.toISOString(), status: statusOf(user.UserStatus), ...facts };
 }
 
-// MessageAction SUPPRESS: Cognito sends no invitation; the handler sets a permanent password.
+// Creates the account with its four facts and no password (docs/EMAIL_ARCHITECTURE.md section
+// 5.1): Cognito makes a temporary password by the pool's rule, e-mails it in the invitation
+// (DesiredDeliveryMediums EMAIL) and leaves the account in FORCE_CHANGE_PASSWORD, so the person
+// chooses their own password at the first sign-in. The API never sees the temporary password.
 export async function createUser(username: string, profile: UserProfile): Promise<void> {
   await cognitoClient
     .send(
       new AdminCreateUserCommand({
         UserPoolId: userPoolId(),
         Username: username,
-        MessageAction: 'SUPPRESS',
+        DesiredDeliveryMediums: ['EMAIL'],
         UserAttributes: profileAttributes(profile),
+      }),
+    )
+    .catch((err: unknown) => mapError(err, username));
+}
+
+// Sends the invitation again (docs/EMAIL_ARCHITECTURE.md section 5.3): AdminCreateUser with
+// MessageAction RESEND makes a new temporary password and e-mails it to the address on file. An
+// account that has already chosen its password is NotInvitedError. cognito-local does not support
+// RESEND (docs/EMAIL_ARCHITECTURE.md section 14.1): locally this call fails, and its success is
+// proved by the unit tests and the smoke test in the cloud.
+export async function resendInvitation(username: string): Promise<void> {
+  await cognitoClient
+    .send(
+      new AdminCreateUserCommand({
+        UserPoolId: userPoolId(),
+        Username: username,
+        MessageAction: 'RESEND',
+        DesiredDeliveryMediums: ['EMAIL'],
       }),
     )
     .catch((err: unknown) => mapError(err, username));
@@ -150,20 +180,6 @@ export function asUserSummary(account: StoredAccount): UserSummary {
 /** A stored account as GET /me answers it, with the role the token gives. */
 export function asMe(account: StoredAccount, role: MeResponse['role']): MeResponse {
   return { username: account.username, role, givenName: account.givenName, familyName: account.familyName, email: account.email, address: account.address };
-}
-
-// Permanent: true, so the first sign-in has no password-change challenge.
-export async function setPermanentPassword(username: string, password: string): Promise<void> {
-  await cognitoClient
-    .send(
-      new AdminSetUserPasswordCommand({
-        UserPoolId: userPoolId(),
-        Username: username,
-        Password: password,
-        Permanent: true,
-      }),
-    )
-    .catch((err: unknown) => mapError(err, username));
 }
 
 // Only 'user' is accepted: the API must never be able to make an administrator.

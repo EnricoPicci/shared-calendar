@@ -111,7 +111,7 @@ describe('index.html', () => {
     it('a dialog that asks before an action is described by its question, which a screen reader says when it opens', () => {
       loadPage();
       const asking = [...document.querySelectorAll('dialog[aria-describedby]')];
-      expect(asking.map((dialog) => [dialog.parentElement!.id, dialog.className])).toEqual([['users', 'delete'], ['availability', 'delete']]);
+      expect(asking.map((dialog) => [dialog.parentElement!.id, dialog.className])).toEqual([['users', 'invite'], ['users', 'delete'], ['availability', 'delete']]);
       for (const dialog of asking) expect(document.getElementById(dialog.getAttribute('aria-describedby')!)).toBe(dialog.querySelector('.question'));
     });
 
@@ -126,9 +126,9 @@ describe('index.html', () => {
       expect(loading.map((element) => [element.getAttribute('role'), element.textContent, element.hidden])).toEqual(Array.from({ length: 8 }, () => ['status', 'Loading…', true]));
       // What else is news: "Password changed" at the login, the appointment being moved, the
       // list of Users being read for the book dialog, where a mail asked for goes,
-      // "Settings saved.", "E-mail is not available yet", "Daily e-mail saved.", and what the
-      // assistant answers.
-      expect(everywhere('[role="status"]:not(.loading)').map((element) => place(element) || place(element.parentElement!))).toEqual(['notice', 'moving', 'users-message', 'mail-sent', 'saved', 'unavailable', 'saved', 'news']);
+      // "Settings saved.", "E-mail is not available yet", "Daily e-mail saved.", where an
+      // invitation went, and what the assistant answers.
+      expect(everywhere('[role="status"]:not(.loading)').map((element) => place(element) || place(element.parentElement!))).toEqual(['notice', 'moving', 'users-message', 'mail-sent', 'saved', 'unavailable', 'saved', 'answer', 'news']);
     });
   });
 
@@ -155,18 +155,18 @@ describe('index.html', () => {
   it('the page has eleven dialogs, closed, each named by its heading: the book dialog, the mail\'s and the list of a group are the week\'s, three are the users\', three the availability\'s and one is "My details", outside the regions that are redrawn; the detail belongs to no screen', () => {
     loadPage();
     const dialogs = [...document.querySelectorAll<HTMLDialogElement>('dialog')];
-    expect(dialogs.map((dialog) => dialog.className)).toEqual(['book', 'mail', 'group', 'edit', 'created', 'delete', 'rename', 'change', 'delete', 'edit', 'detail']);
+    expect(dialogs.map((dialog) => dialog.className)).toEqual(['book', 'mail', 'group', 'edit', 'invite', 'delete', 'rename', 'change', 'delete', 'edit', 'detail']);
     for (const dialog of dialogs) {
       expect(dialog.open, dialog.className).toBe(false);
       expect(document.getElementById(dialog.getAttribute('aria-labelledby')!)!.tagName, dialog.className).toBe('H3');
     }
-    const [book, mail, group, edit, created, remove, rename, change, removeAvailability, editMe, detail] = dialogs as HTMLDialogElement[] as [HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement];
+    const [book, mail, group, edit, invite, remove, rename, change, removeAvailability, editMe, detail] = dialogs as HTMLDialogElement[] as [HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement, HTMLDialogElement];
     for (const dialog of [book, group, mail]) {
       expect(dialog.parentElement!.id, dialog.className).toBe('week');
       expect(dialog.closest('.week'), dialog.className).toBeNull();
     }
     expect(editMe.parentElement!.id).toBe('me');
-    for (const dialog of [created, remove, edit]) {
+    for (const dialog of [invite, remove, edit]) {
       expect(dialog.parentElement!.id, dialog.className).toBe('users');
       expect(dialog.closest('.list'), dialog.className).toBeNull();
     }
@@ -395,23 +395,26 @@ describe('index.html', () => {
     expect(box.closest('form')).toBe(form);
     expect([box.querySelector('.hint')!.textContent, box.querySelector('.hint')!.id]).toEqual(['', field.getAttribute('aria-describedby')]);
     expect([box.querySelector('.refusal')!.getAttribute('role'), box.querySelector('.refusal')!.textContent]).toEqual(['alert', '']);
-    expect([one('.failure').getAttribute('role'), one('.failure').textContent, one('.failure').closest('form')]).toEqual(['alert', '', form]);
-    expect([one('.submit').textContent, one('.retry').textContent]).toEqual(['Create user', 'Try again']);
+    // A creation's failure is said in the invitation's dialog, not in the form.
+    expect(form.querySelector('.failure')).toBeNull();
+    expect([one('form.create .submit').textContent, one('.retry').textContent]).toEqual(['Create user', 'Try again']);
     expect([one('.loading').hidden, one('.unread').hidden, one('.empty').hidden]).toEqual([true, true, true]);
     expect([one('.unread .error').getAttribute('role'), one('.empty').textContent]).toEqual(['alert', '']);
   });
 
-  it('a row of the users is the username, the name, the e-mail and two buttons of type "button", "Edit" and "Delete", and nothing in it can be typed in', () => {
+  it('a row of the users is the username, the name, the e-mail, the state and three buttons of type "button", "Edit", "Resend invitation" (hidden) and "Delete", and nothing in it can be typed in', () => {
     const row = pageAside().querySelector<HTMLTemplateElement>('#tpl-user-row')!.content.firstElementChild!;
     expect(row.tagName).toBe('LI');
-    expect([...row.children].map((part) => [part.tagName, part.className, part.textContent])).toEqual([
-      ['SPAN', 'username', ''],
-      ['SPAN', 'name', ''],
-      ['SPAN', 'email', ''],
-      ['BUTTON', 'ask-edit', 'Edit'],
-      ['BUTTON', 'danger ask-delete', 'Delete'],
+    expect([...row.children].map((part) => [part.tagName, part.className, part.textContent, part.hasAttribute('hidden')])).toEqual([
+      ['SPAN', 'username', '', false],
+      ['SPAN', 'name', '', false],
+      ['SPAN', 'email', '', false],
+      ['SPAN', 'status', '', false],
+      ['BUTTON', 'ask-edit', 'Edit', false],
+      ['BUTTON', 'ask-resend', 'Resend invitation', true],
+      ['BUTTON', 'danger ask-delete', 'Delete', false],
     ]);
-    // Whom they edit and delete is the script's to say.
+    // Whom they edit, invite again and delete is the script's to say.
     for (const button of row.querySelectorAll('button')) expect([button.getAttribute('type'), button.hasAttribute('aria-label')]).toEqual(['button', false]);
     expect(row.querySelectorAll('input, select, textarea, a')).toHaveLength(0);
   });
@@ -469,19 +472,20 @@ describe('index.html', () => {
     expect(one('.ask-edit').getAttribute('type')).toBe('button');
   });
 
-  it('the password dialog starts empty, cannot be closed by the Escape key, and has one button and no field; the keyboard lands on its heading', () => {
+  it('the invitation\'s dialog starts empty, with "Back" before "Confirm" and "Close" hidden, and nothing to type; no dialog of the page refuses the Escape key, and nothing is focused by the page itself', () => {
     loadPage();
-    const dialog = document.querySelector<HTMLDialogElement>('#users dialog.created')!;
-    expect(dialog.getAttribute('closedby')).toBe('none');
-    // The other dialogs of the page keep closing with Escape.
-    expect([...document.querySelectorAll('dialog[closedby]')]).toEqual([dialog]);
-    expect([...dialog.querySelectorAll('dd')].map((part) => [part.className, part.textContent])).toEqual([['username', ''], ['password', '']]);
-    expect(dialog.querySelector('p')!.textContent).toBe('This password cannot be shown again. Give it to the user now.');
-    expect([...dialog.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['I have noted the password']);
+    const dialog = document.querySelector<HTMLDialogElement>('#users dialog.invite')!;
+    expect(dialog.querySelector('h3')!.textContent).toBe('Send an invitation');
+    expect(['.question', '.answer', '.error'].map((part) => dialog.querySelector(part)!.textContent)).toEqual(['', '', '']);
+    expect([dialog.querySelector('.answer')!.getAttribute('role'), dialog.querySelector('.error')!.getAttribute('role')]).toEqual(['status', 'alert']);
+    expect([...dialog.querySelectorAll('button')].map((button) => [button.textContent, button.getAttribute('type'), button.hidden])).toEqual([
+      ['Back', 'button', false],
+      ['Confirm', 'button', false],
+      ['Close', 'button', true],
+    ]);
     expect(dialog.querySelectorAll('input, select, textarea, form, a')).toHaveLength(0);
-    const heading = dialog.querySelector('h3')!;
-    expect([heading.textContent, heading.getAttribute('tabindex'), heading.hasAttribute('autofocus')]).toEqual(['User created', '-1', true]);
-    expect(document.querySelectorAll('[autofocus]')).toHaveLength(1);
+    expect(document.querySelectorAll('dialog[closedby]')).toHaveLength(0);
+    expect(document.querySelectorAll('[autofocus]')).toHaveLength(0);
   });
 
   it('the delete dialog starts empty, with "Keep" before "Delete user", and nothing to type', () => {

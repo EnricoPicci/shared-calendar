@@ -1,11 +1,13 @@
-import { api, createSecondAdmin, factsOf, removeUserIfPresent, scanMessages, signIn, withFacts } from './setup';
+import { api, createSecondAdmin, factsOf, removeUserIfPresent, scanMessages, setPasswordOf, signIn, withFacts } from './setup';
 
 // The journeys of docs/ARCHITECTURE.md section 6, end to end through sam local, as numbered in the
 // table of docs/IMPLEMENTATION_PLAN.md step 9 (journeys 1 to 12). They run in order and share
 // tokens. carol is the throw-away user.
 //
 // Secrets: tokens and carol's password stay in variables. Assertions look at their presence
-// and length only, so a failure message never prints one.
+// and length only, so a failure message never prints one. POST /users answers no password: carol's
+// is set by setPasswordOf right after her creation, as her first sign-in would
+// (docs/EMAIL_PLAN.md finding F1).
 
 const ADMIN_PASSWORD = 'Admin-Local-Pass-1!';
 const ALICE_PASSWORD = 'Alice-Local-Pass-1!';
@@ -82,15 +84,11 @@ it('5. POST /users as alice is 403', async () => {
   expect(res.body).toMatchObject({ error: 'forbidden' });
 });
 
-it('6. POST /users as admin creates carol, who can sign in and say hello', async () => {
+it('6. POST /users as admin creates carol, invited and with no password in the answer; with her password set, she can sign in and say hello', async () => {
   const res = await api('POST', '/users', adminToken, withFacts('carol'));
   expect(res.status).toBe(201);
-  // Never compare the whole body: a failure would print the password.
-  expect(Object.keys(res.body ?? {}).sort()).toEqual(['password', 'username']);
-  expect(res.body?.username).toBe('carol');
-  expect(typeof res.body?.password).toBe('string');
-  carolPassword = res.body?.password as string;
-  expect(carolPassword.length).toBe(16);
+  expect(res.body).toEqual({ username: 'carol', status: 'invited' });
+  carolPassword = await setPasswordOf('carol');
 
   const carolToken = await signIn('carol', carolPassword);
   expect(carolToken.length).toBeGreaterThan(100);
@@ -176,12 +174,11 @@ describe('profiles', () => {
   beforeAll(removeBoth);
   afterAll(removeBoth);
 
-  it('POST /users with the four facts creates the User; the answer is the username and the password only', async () => {
+  it('POST /users with the four facts creates the User; the answer is the username and the state invited only', async () => {
     const res = await api('POST', '/users', adminToken, { ...withFacts(USER), givenName: ' Throw ', email: 'Profile-User@Example.com' });
     expect(res.status).toBe(201);
-    // Never compare the whole body: a failure would print the password.
-    expect(Object.keys(res.body ?? {}).sort()).toEqual(['password', 'username']);
-    userToken = await signIn(USER, res.body?.password as string);
+    expect(res.body).toEqual({ username: USER, status: 'invited' });
+    userToken = await signIn(USER, await setPasswordOf(USER));
   });
 
   it('POST /users without the facts, or with an e-mail that is not one, is 400 naming the fields', async () => {

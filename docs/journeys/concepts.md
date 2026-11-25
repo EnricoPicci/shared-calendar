@@ -19,6 +19,7 @@ Each section explains one idea in simple words and names the document that defin
 | `profile-user`, `profile-admin` | a throw-away User of the back end's profiles journey, and a second administrator made straight in cognito-local, with no fact | `backend/tests/integration/journeys.test.ts` |
 | `fe-profile` | a throw-away User of the front end's profiles journey | `frontend/tests/integration/profiles.test.ts` |
 | `fe-mail` | a throw-away User of the front end's mail journey, who asks for every mail of it | `frontend/tests/integration/mail.test.ts` |
+| `fe-invited` | a throw-away User of the front end's invitation journey: created through `UsersService`, it stays invited until its first sign-in | `frontend/tests/integration/login.service.test.ts` |
 | `fe-password` | a throw-away User of the front end's change of password journey, the only account whose password a journey changes | `frontend/tests/integration/change-password.test.ts` |
 | `chat-text`, `chat-lingua`, `chat-read`, `chat-book`, `chat-decline`, `chat-trouble`, `chat-note`, `chat-move`, `chat-cancel`, `chat-limit`, `chat-down`, `chat-notadmin`, `chat-full`, `chat-mark` | throw-away Users of the assistant's journeys, one per block | `backend/tests/integration/assistant.test.ts` |
 | `chat-rival` | a second throw-away User of one assistant journey, who books through the calendar's own route | `backend/tests/integration/assistant.test.ts` |
@@ -31,6 +32,19 @@ Each section explains one idea in simple words and names the document that defin
 
 Every test file removes its own throw-away Users before it starts and after it ends, so it can be
 run again after a failed run.
+
+**A new User's password.** `POST /users` answers `201 { username, status: 'invited' }` and no
+password: Cognito makes a temporary one and e-mails it as the invitation; cognito-local prints it
+in its log instead, and no journey reads that log (`docs/EMAIL_ARCHITECTURE.md` sections 5.1 and
+14.1). So a journey that signs a new User in first sets a permanent password itself, straight in
+cognito-local, right after the creation, as the User's own first sign-in would end:
+`setPasswordOf(username)` of `backend/tests/integration/setup.ts`, or
+`setPermanentPassword(username)` of `frontend/tests/integration/local.ts`. Both call Cognito's
+`AdminSetUserPassword` with `Permanent: true` and the password `THROWAWAY_PASSWORD` of their file,
+and return it for the sign-in. Until then `GET /users` lists the account as `invited`; afterwards
+as `active`. The journeys of the first sign-in give the account a temporary password of their own
+instead, with `setTemporaryPassword()` of `frontend/tests/integration/local.ts` (`Permanent:
+false`), so that it stays `invited` until it chooses one.
 
 ## The four facts of a person
 

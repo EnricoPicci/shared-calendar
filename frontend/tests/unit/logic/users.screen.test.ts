@@ -1,21 +1,36 @@
 import { ReplaySubject, Subject } from 'rxjs';
 import { NO_REFUSALS, PROFILE_RULES } from '../../../src/logic/profile.model';
-import { NO_USERS, USERNAME_HINT } from '../../../src/logic/users.model';
-import { UsersScreen, type CreateOutcome, type UpdateOutcome, type UsersCalls, type UsersState } from '../../../src/logic/users.screen';
+import { invitedAnswer, inviteQuestion, NO_USERS, USERNAME_HINT } from '../../../src/logic/users.model';
+import { UsersScreen, type CreateOutcome, type ResendOutcome, type UpdateOutcome, type UsersCalls, type UsersState } from '../../../src/logic/users.screen';
 import type { DeleteUserResult, ListUsersResult } from '../../../src/services/users.types';
 import { useFarBrowserZone } from './zone';
 
-// A fake UsersService: four result streams that replay their last value, as the real ones
-// do, and three spies. No network, no DOM. A create's success is given as the screen reads it,
-// with the username only: nothing in this file stands for a generated password.
+// A fake UsersService: five result streams that replay their last value, as the real ones
+// do, and four spies. No network, no DOM. A create's and a resend's success are given as the
+// screen reads them, with nothing else.
 
 const UNREACHABLE = 'The server cannot be reached. Check the connection and try again.';
 const FACTS = { givenName: 'Anna', familyName: 'Rossi', email: 'anna@example.com', address: 'Via Po 2\n10100 Torino' };
 const EMPTY = { givenName: '', familyName: '', email: '', address: '' };
 const NO_EDIT = { saving: false, refusals: NO_REFUSALS, failure: null, saved: null };
-const START: UsersState = { loading: false, unread: null, rows: null, empty: null, field: { username: '', ...EMPTY }, creating: false, refusal: null, refusals: NO_REFUSALS, failure: null, created: null, edit: NO_EDIT };
-const user = (username: string) => ({ username, createdAt: '2026-11-01T10:00:00.000Z', status: 'active' as const, ...FACTS });
-const row = (username: string) => ({ username, name: 'Anna Rossi', email: FACTS.email, facts: FACTS, editLabel: `Edit ${username}`, deleteLabel: `Delete ${username}` });
+const START: UsersState = { loading: false, unread: null, rows: null, empty: null, field: { username: '', ...EMPTY }, refusal: null, refusals: NO_REFUSALS, invite: null, edit: NO_EDIT };
+// A User is invited when its username starts with "new", active otherwise.
+const statusOf = (username: string) => (username.startsWith('new') ? ('invited' as const) : ('active' as const));
+const user = (username: string) => ({ username, createdAt: '2026-11-01T10:00:00.000Z', status: statusOf(username), ...FACTS });
+const row = (username: string) => ({
+  username,
+  name: 'Anna Rossi',
+  email: FACTS.email,
+  status: statusOf(username),
+  facts: FACTS,
+  editLabel: `Edit ${username}`,
+  resendLabel: statusOf(username) === 'invited' ? `Resend the invitation to ${username}` : null,
+  deleteLabel: `Delete ${username}`,
+});
+// The invitation's dialog as it opens, as it waits, and after its answer.
+const ASKING = { question: inviteQuestion(FACTS.email), sending: false, answer: null, failure: null };
+const SENDING = { ...ASKING, sending: true };
+const WENT = { ...ASKING, answer: invitedAnswer(FACTS.email) };
 // The create form with a username typed and four good facts; what the service is then given.
 const form = (username: string) => ({ username, ...FACTS });
 const sent = (username: string) => ({ username, ...FACTS });
@@ -25,17 +40,21 @@ function screenOf() {
   const createUserResult$ = new ReplaySubject<CreateOutcome>(1);
   const deleteUserResult$ = new ReplaySubject<DeleteUserResult>(1);
   const updateUserResult$ = new ReplaySubject<UpdateOutcome>(1);
+  const resendInvitationResult$ = new ReplaySubject<ResendOutcome>(1);
   const visible$ = new Subject<void>();
   const listUsers = vi.fn<UsersCalls['listUsers']>();
   const createUser = vi.fn<UsersCalls['createUser']>();
+  const resendInvitation = vi.fn<UsersCalls['resendInvitation']>();
   const updateUser = vi.fn<UsersCalls['updateUser']>();
   const screen = new UsersScreen(
     {
       listUsers,
       createUser,
+      resendInvitation,
       updateUser,
       listUsersResult$: listUsersResult$.asObservable(),
       createUserResult$: createUserResult$.asObservable(),
+      resendInvitationResult$: resendInvitationResult$.asObservable(),
       deleteUserResult$: deleteUserResult$.asObservable(),
       updateUserResult$: updateUserResult$.asObservable(),
     },
@@ -45,7 +64,14 @@ function screenOf() {
   screen.users$.subscribe((s) => states.push(s)); // the view subscribes first
   const listed = (...usernames: string[]) => listUsersResult$.next({ status: 'success', users: usernames.map(user) });
   const unread = (reason: 'network' | 'forbidden' | 'internal_error' = 'network') => listUsersResult$.next({ status: 'failure', reason, message: 'for a developer' });
-  const created = (username: string) => createUserResult$.next({ status: 'success', user: { username } });
+  const created = () => createUserResult$.next({ status: 'success' });
+  const resent = () => resendInvitationResult$.next({ status: 'success' });
+  const notResent = (reason: Extract<ResendOutcome, { status: 'failure' }>['reason']) => resendInvitationResult$.next({ status: 'failure', reason });
+  // "Create user" with good fields, then "Confirm".
+  const confirmed = (username: string) => {
+    screen.create(form(username));
+    screen.confirm();
+  };
   const notCreated = (reason: Extract<CreateOutcome, { status: 'failure' }>['reason']) => createUserResult$.next({ status: 'failure', reason });
   const deleted = (username: string) => deleteUserResult$.next({ status: 'success', username });
   const notDeleted = (reason: Extract<DeleteUserResult, { status: 'failure' }>['reason']) => deleteUserResult$.next({ status: 'failure', reason, message: 'for a developer' });
@@ -57,8 +83,29 @@ function screenOf() {
   };
   const updated = () => updateUserResult$.next({ status: 'success' });
   const notUpdated = (reason: Extract<UpdateOutcome, { status: 'failure' }>['reason']) => updateUserResult$.next({ status: 'failure', reason });
-  const streams = { listUsersResult$, createUserResult$, deleteUserResult$, updateUserResult$, visible$ };
-  return { screen, ...streams, listUsers, createUser, updateUser, updated, notUpdated, states, listed, unread, created, notCreated, deleted, notDeleted, shown, last: () => states.at(-1)! };
+  const streams = { listUsersResult$, createUserResult$, resendInvitationResult$, deleteUserResult$, updateUserResult$, visible$ };
+  return {
+    screen,
+    ...streams,
+    listUsers,
+    createUser,
+    resendInvitation,
+    updateUser,
+    updated,
+    notUpdated,
+    states,
+    listed,
+    unread,
+    created,
+    notCreated,
+    resent,
+    notResent,
+    confirmed,
+    deleted,
+    notDeleted,
+    shown,
+    last: () => states.at(-1)!,
+  };
 }
 
 describe('UsersScreen', () => {
@@ -66,23 +113,34 @@ describe('UsersScreen', () => {
 
   describe('before start()', () => {
     it('nothing is read, no stream is listened to, and the state is empty', () => {
-      const { listUsers, createUser, states, listUsersResult$, createUserResult$, deleteUserResult$, visible$ } = screenOf();
+      const { listUsers, createUser, states, listUsersResult$, createUserResult$, resendInvitationResult$, deleteUserResult$, visible$ } = screenOf();
       expect(listUsers).not.toHaveBeenCalled();
       expect(createUser).not.toHaveBeenCalled();
-      expect([listUsersResult$.observed, createUserResult$.observed, deleteUserResult$.observed, visible$.observed]).toEqual([false, false, false, false]);
+      expect([listUsersResult$.observed, createUserResult$.observed, resendInvitationResult$.observed, deleteUserResult$.observed, visible$.observed]).toEqual([
+        false,
+        false,
+        false,
+        false,
+        false,
+      ]);
       expect(states).toEqual([START]);
     });
 
-    it('create(), typed(), retry() and the Edit dialog\'s three do nothing', () => {
-      const { screen, listUsers, createUser, updateUser, states } = screenOf();
+    it('create(), typed(), retry(), the invitation\'s three and the Edit dialog\'s three do nothing', () => {
+      const { screen, listUsers, createUser, resendInvitation, updateUser, states } = screenOf();
       screen.create(form('carol'));
+      screen.confirm();
+      screen.resend(row('newbie'));
+      screen.closeInvite();
       screen.create(form('Bob'));
       screen.typed(form('carol'));
       screen.retry();
       screen.editOpened();
       screen.editTyped(FACTS);
       screen.save('alice', FACTS);
-      expect([listUsers.mock.calls.length, createUser.mock.calls.length, updateUser.mock.calls.length, states.length]).toEqual([0, 0, 0, 1]);
+      expect([listUsers.mock.calls.length, createUser.mock.calls.length, resendInvitation.mock.calls.length, updateUser.mock.calls.length, states.length]).toEqual([
+        0, 0, 0, 0, 1,
+      ]);
     });
   });
 
@@ -137,12 +195,12 @@ describe('UsersScreen', () => {
     });
 
     it('a failed read leaves the form usable: a create still goes', () => {
-      const { screen, createUser, unread, last } = screenOf();
+      const { screen, createUser, unread, confirmed, last } = screenOf();
       screen.start();
       unread();
-      screen.create(form('carol'));
+      confirmed('carol');
       expect(createUser).toHaveBeenCalledWith(sent('carol'));
-      expect(last()).toMatchObject({ creating: true, unread: UNREACHABLE });
+      expect(last()).toMatchObject({ invite: SENDING, unread: UNREACHABLE });
     });
 
     it('a list that was already answered before start() is not this start\'s: the read is made and waited for', () => {
@@ -176,143 +234,235 @@ describe('UsersScreen', () => {
     });
   });
 
-  describe('create(text)', () => {
-    it('a username: it goes to the service, once, and the screen says a create is under way; the list is not read yet', () => {
+  describe('create(text), the last look, and confirm()', () => {
+    it('good fields: nothing is sent yet; the invitation\'s dialog opens with the address the shared rule makes', () => {
       const { screen, createUser, listUsers, shown, last } = screenOf();
       shown('alice');
       const { rows, field } = last();
+      screen.create({ ...form('carol'), email: ' Anna@Example.com ' });
+      expect(createUser).not.toHaveBeenCalled();
+      expect(listUsers).toHaveBeenCalledTimes(1);
+      expect(last()).toEqual({ ...START, rows, invite: ASKING });
+      expect(last().field).toBe(field); // what was typed stays
+    });
+
+    it('confirm(): the user goes to the service, once, and the dialog says it is under way; a second press sends nothing', () => {
+      const { screen, createUser, listUsers, shown, last } = screenOf();
+      shown('alice');
       screen.create(form('carol'));
+      screen.confirm();
       expect(createUser).toHaveBeenCalledTimes(1);
       expect(createUser).toHaveBeenCalledWith(sent('carol'));
       expect(listUsers).toHaveBeenCalledTimes(1);
-      expect(last()).toEqual({ ...START, rows, creating: true });
-      expect(last().field).toBe(field); // what was typed stays while the call is under way
+      expect(last().invite).toEqual(SENDING);
+      screen.confirm();
+      expect(createUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('closeInvite() before confirm(): the dialog closes, nothing is sent, what was typed stays', () => {
+      const { screen, createUser, shown, last } = screenOf();
+      shown();
+      screen.create(form('carol'));
+      const { field } = last();
+      screen.closeInvite();
+      screen.confirm();
+      expect(createUser).not.toHaveBeenCalled();
+      expect(last().invite).toBeNull();
+      expect(last().field).toBe(field);
     });
 
     it('spaces around the name are removed before it is sent', () => {
       const { screen, createUser, shown } = screenOf();
       shown();
       screen.create(form(' carol '));
+      screen.confirm();
       expect(createUser).toHaveBeenCalledWith(sent('carol'));
     });
 
     it('"admin" passes the check: the server is the one to say that it exists', () => {
-      const { screen, createUser, shown } = screenOf();
+      const { createUser, shown, confirmed } = screenOf();
       shown();
-      screen.create(form('admin'));
+      confirmed('admin');
       expect(createUser).toHaveBeenCalledWith(sent('admin'));
     });
 
-    it.each(['', 'ab', 'Bob', 'alice smith', '-alice', 'a'.repeat(33)])('"%s" is refused by the check: the refusal, no call, the list kept and not read again', (text) => {
+    it.each(['', 'ab', 'Bob', 'alice smith', '-alice', 'a'.repeat(33)])('"%s" is refused by the check: the refusal, no dialog, no call, the list kept and not read again', (text) => {
       const { screen, createUser, listUsers, shown, states, last } = screenOf();
       shown('alice');
       const before = last();
       screen.create(form(text));
+      screen.confirm();
       expect(createUser).not.toHaveBeenCalled();
       expect(listUsers).toHaveBeenCalledTimes(1);
       expect(last()).toEqual({ ...before, refusal: USERNAME_HINT });
       expect(last().rows).toBe(before.rows);
       expect(last().field).toBe(before.field); // what was typed stays
-      expect(states.filter((s) => s.creating)).toHaveLength(0);
+      expect(states.filter((s) => s.invite !== null)).toHaveLength(0);
     });
 
-    it('the refusal goes at the next create that is sent; a refusal takes an earlier failure away', () => {
-      const { screen, shown, notCreated, last } = screenOf();
+    it('the refusal goes at the next create whose fields are good', () => {
+      const { screen, shown, last } = screenOf();
       shown();
       screen.create(form('Bob'));
       screen.create(form('bob'));
-      expect(last()).toMatchObject({ refusal: null, creating: true });
-      notCreated('user_exists');
-      expect(last().failure).not.toBeNull();
-      screen.create(form('Bob'));
-      expect(last()).toMatchObject({ refusal: USERNAME_HINT, failure: null });
+      expect(last()).toMatchObject({ refusal: null, invite: ASKING });
     });
 
-    it('a create that succeeds: its username in the stream, the field to empty, and the list read again', () => {
-      const { screen, listUsers, shown, created, listed, last } = screenOf();
+    it('a create that succeeds: where the invitation went, in the dialog; the field to empty, and the list read again', () => {
+      const { listUsers, shown, created, confirmed, listed, last } = screenOf();
       shown('alice');
       const { rows, field } = last();
-      screen.create(form('carol'));
-      created('carol');
-      expect(last()).toEqual({ ...START, rows, loading: true, created: 'carol' });
+      confirmed('newcarol');
+      created();
+      expect(last()).toEqual({ ...START, rows, loading: true, invite: WENT });
       expect(last().field).not.toBe(field); // another object: the view empties the field
       expect(last().field).toEqual({ username: '', ...EMPTY });
       expect(listUsers).toHaveBeenCalledTimes(2);
       const emptied = last().field;
-      listed('alice', 'carol');
-      expect(last()).toEqual({ ...START, rows: [row('alice'), row('carol')], created: 'carol' });
+      listed('alice', 'newcarol');
+      expect(last()).toEqual({ ...START, rows: [row('alice'), row('newcarol')], invite: WENT });
       expect(last().field).toBe(emptied); // the read fills nothing
     });
 
-    it('no state of the stream has a place for a password: a create is known by its username only', () => {
-      const { screen, shown, created, listed, states } = screenOf();
+    it('after the answer, confirm() sends nothing more and closeInvite() closes the dialog', () => {
+      const { screen, createUser, shown, created, confirmed, last } = screenOf();
+      shown();
+      confirmed('carol');
+      created();
+      screen.confirm();
+      expect(createUser).toHaveBeenCalledTimes(1);
+      screen.closeInvite();
+      expect(last().invite).toBeNull();
+    });
+
+    it('no state of the stream has a place for a password', () => {
+      const { shown, created, confirmed, listed, states } = screenOf();
       shown('alice');
-      screen.create(form('carol'));
-      created('carol');
+      confirmed('carol');
+      created();
       listed('alice', 'carol');
       const keys = new Set(states.flatMap((s) => Object.keys(s)));
-      expect([...keys].sort()).toEqual(['created', 'creating', 'edit', 'empty', 'failure', 'field', 'loading', 'refusal', 'refusals', 'rows', 'unread']);
+      expect([...keys].sort()).toEqual(['edit', 'empty', 'field', 'invite', 'loading', 'refusal', 'refusals', 'rows', 'unread']);
       expect(JSON.stringify(states)).not.toMatch(/password/i);
     });
 
     it.each([
+      ['mail_unavailable', 'E-mail is not available yet.'],
       ['user_exists', 'A user with this username exists already. Choose another username.'],
       ['network', UNREACHABLE],
       ['invalid_request', 'The request was not accepted. Check what you entered and try again.'],
       ['forbidden', 'Your account is not allowed to do this.'],
       ['internal_error', 'Something went wrong on the server. Please try again in a moment.'],
-    ] as const)('a create that fails with %s: its sentence, the field not marked and not emptied, the list read again all the same, and the next create can be made', (reason, sentence) => {
-      const { screen, createUser, listUsers, shown, notCreated, created, listed, last } = screenOf();
+    ] as const)('a create that fails with %s: its sentence in the dialog, which stays open, the field not emptied, the list read again all the same, and Confirm can be pressed again', (reason, sentence) => {
+      const { screen, createUser, listUsers, shown, notCreated, created, confirmed, listed, last } = screenOf();
       shown('alice');
       const { field } = last();
-      screen.create(form('alice'));
+      confirmed('alice');
       notCreated(reason);
-      expect(last()).toMatchObject({ creating: false, failure: sentence, refusal: null, created: null, loading: true });
+      expect(last()).toMatchObject({ invite: { ...ASKING, failure: sentence }, refusal: null, loading: true });
       expect(last().field).toBe(field);
       expect(listUsers).toHaveBeenCalledTimes(2);
       // The server had applied it: the list says so, and the failure stays said.
       listed('alice', 'carol');
-      expect(last()).toMatchObject({ rows: [row('alice'), row('carol')], failure: sentence });
+      expect(last()).toMatchObject({ rows: [row('alice'), row('carol')], invite: { failure: sentence } });
 
-      screen.create(form('dave'));
+      screen.confirm();
       expect(createUser).toHaveBeenCalledTimes(2);
-      expect(last()).toMatchObject({ creating: true, failure: null });
-      created('dave');
-      expect(last()).toMatchObject({ creating: false, failure: null, created: 'dave' });
+      expect(last().invite).toEqual(SENDING);
+      created();
+      expect(last().invite).toEqual(WENT);
     });
 
-    it('a second create while one is under way goes to the service, which keeps the last', () => {
-      const { screen, createUser, shown, created, last } = screenOf();
+    it('closed while the create is under way: the call goes on and the list is read at its answer, but the dialog does not open again', () => {
+      const { screen, listUsers, shown, created, confirmed, last } = screenOf();
       shown();
-      screen.create(form('carol'));
-      screen.create(form('dave'));
-      expect(createUser).toHaveBeenCalledTimes(2);
-      expect(createUser).toHaveBeenLastCalledWith(sent('dave'));
-      expect(last().creating).toBe(true);
-      created('dave');
-      expect(last()).toMatchObject({ creating: false, created: 'dave' });
-    });
-
-    it('"created" goes at the next create, sent or refused', () => {
-      const { screen, shown, created, last } = screenOf();
-      shown();
-      screen.create(form('carol'));
-      created('carol');
-      screen.create(form('Bob'));
-      expect(last().created).toBeNull();
-      screen.create(form('dave'));
-      created('dave');
-      screen.create(form('erin'));
-      expect(last().created).toBeNull();
+      confirmed('carol');
+      screen.closeInvite();
+      created();
+      expect(last().invite).toBeNull();
+      expect(last().field).toEqual({ username: '', ...EMPTY });
+      expect(listUsers).toHaveBeenCalledTimes(2);
     });
 
     it('a create answered before start() is not this start\'s: nothing is said and nothing read for it', () => {
       const { screen, listUsers, created, listed, last } = screenOf();
-      created('carol');
+      created();
       screen.start();
       listed('alice', 'carol');
       expect(listUsers).toHaveBeenCalledTimes(1);
       expect(last()).toEqual({ ...START, rows: [row('alice'), row('carol')] });
+    });
+  });
+
+  describe('resend(row): the invitation sent again', () => {
+    it('an invited User: the dialog opens with its address; confirm() sends the resend, once', () => {
+      const { screen, resendInvitation, createUser, shown, last } = screenOf();
+      shown('newbie');
+      screen.resend(row('newbie'));
+      expect(resendInvitation).not.toHaveBeenCalled();
+      expect(last().invite).toEqual(ASKING);
+      screen.confirm();
+      screen.confirm();
+      expect(resendInvitation).toHaveBeenCalledTimes(1);
+      expect(resendInvitation).toHaveBeenCalledWith('newbie');
+      expect(createUser).not.toHaveBeenCalled();
+      expect(last().invite).toEqual(SENDING);
+    });
+
+    it('an active User is offered no resend: nothing opens', () => {
+      const { screen, shown, last } = screenOf();
+      shown('alice');
+      screen.resend(row('alice'));
+      expect(last().invite).toBeNull();
+    });
+
+    it('a resend that succeeds: where it went, and the list read again', () => {
+      const { screen, listUsers, shown, resent, last } = screenOf();
+      shown('newbie');
+      screen.resend(row('newbie'));
+      screen.confirm();
+      resent();
+      expect(last().invite).toEqual(WENT);
+      expect(listUsers).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([
+      ['mail_unavailable', 'E-mail is not available yet.'],
+      ['not_invited', 'This user has already chosen a password: there is no invitation to send again.'],
+      ['user_not_found', 'This user no longer exists.'],
+      ['internal_error', 'Something went wrong on the server. Please try again in a moment.'],
+    ] as const)('a resend that fails with %s: its sentence in the dialog, and the list read again', (reason, sentence) => {
+      const { screen, listUsers, shown, notResent, last } = screenOf();
+      shown('newbie');
+      screen.resend(row('newbie'));
+      screen.confirm();
+      notResent(reason);
+      expect(last().invite).toEqual({ ...ASKING, failure: sentence });
+      expect(listUsers).toHaveBeenCalledTimes(2);
+    });
+
+    it('a create\'s answer is not shown in a resend\'s dialog, nor a resend\'s in a create\'s', () => {
+      const { screen, shown, created, resent, confirmed, last } = screenOf();
+      shown('newbie');
+      confirmed('carol');
+      screen.closeInvite();
+      screen.resend(row('newbie'));
+      screen.confirm();
+      created();
+      expect(last().invite).toEqual(SENDING);
+      resent();
+      expect(last().invite).toEqual(WENT);
+      screen.closeInvite();
+      confirmed('dave');
+      resent();
+      expect(last().invite).toEqual(SENDING);
+    });
+
+    it('a resend answered before start() is not this start\'s: nothing is read for it', () => {
+      const { screen, listUsers, resent } = screenOf();
+      resent();
+      screen.start();
+      expect(listUsers).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -322,7 +472,7 @@ describe('UsersScreen', () => {
       shown();
       screen.create({ ...form('Bob'), email: 'anna', address: '' });
       expect(createUser).not.toHaveBeenCalled();
-      expect(last()).toMatchObject({ refusal: USERNAME_HINT, refusals: { ...NO_REFUSALS, email: PROFILE_RULES.email, address: PROFILE_RULES.address }, creating: false });
+      expect(last()).toMatchObject({ refusal: USERNAME_HINT, refusals: { ...NO_REFUSALS, email: PROFILE_RULES.email, address: PROFILE_RULES.address }, invite: null });
     });
 
     it('a good username with one fact refused: nothing is sent, the username not refused', () => {
@@ -346,15 +496,16 @@ describe('UsersScreen', () => {
       shown();
       screen.create({ ...form('carol'), email: 'x' });
       screen.create({ username: 'carol', givenName: ' Anna ', familyName: 'Rossi', email: 'Anna@Example.com', address: 'Via Po 2\r\n10100 Torino' });
+      expect(last()).toMatchObject({ refusals: NO_REFUSALS, invite: ASKING });
+      screen.confirm();
       expect(createUser).toHaveBeenCalledWith(sent('carol'));
-      expect(last()).toMatchObject({ refusals: NO_REFUSALS, creating: true });
     });
 
     it('a create that succeeds empties the four facts too', () => {
-      const { screen, shown, created, last } = screenOf();
+      const { shown, created, confirmed, last } = screenOf();
       shown();
-      screen.create(form('carol'));
-      created('carol');
+      confirmed('carol');
+      created();
       expect(last().field).toEqual({ username: '', ...EMPTY });
     });
   });
@@ -476,15 +627,24 @@ describe('UsersScreen', () => {
 
   describe('after the subscription of start() ends', () => {
     it('everything is forgotten, no stream is heard, and nothing is read or created', () => {
-      const { screen, listUsersResult$, createUserResult$, deleteUserResult$, updateUserResult$, visible$, listUsers, createUser, shown, created, deleted, listed, last } = screenOf();
+      const { screen, listUsersResult$, createUserResult$, resendInvitationResult$, deleteUserResult$, updateUserResult$, visible$, listUsers, createUser, shown, created, deleted, listed, last } =
+        screenOf();
       const started = shown('alice');
-      screen.create(form('Bob'));
+      screen.create(form('carol'));
       started.unsubscribe();
       expect(last()).toEqual(START);
-      expect([listUsersResult$.observed, createUserResult$.observed, deleteUserResult$.observed, updateUserResult$.observed, visible$.observed]).toEqual([false, false, false, false, false]);
+      expect([listUsersResult$.observed, createUserResult$.observed, resendInvitationResult$.observed, deleteUserResult$.observed, updateUserResult$.observed, visible$.observed]).toEqual([
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+      ]);
       screen.create(form('carol'));
+      screen.confirm();
       screen.retry();
-      created('carol');
+      created();
       deleted('alice');
       visible$.next();
       listed('carol');
@@ -503,14 +663,14 @@ describe('UsersScreen', () => {
     });
 
     it('left while a create was under way, its late answer is not the next start\'s', () => {
-      const { screen, listUsers, shown, created, listed, last } = screenOf();
+      const { screen, listUsers, shown, created, confirmed, listed, last } = screenOf();
       const started = shown();
-      screen.create(form('carol'));
+      confirmed('carol');
       started.unsubscribe();
-      created('carol');
+      created();
       screen.start();
       listed('carol');
-      expect(last()).toMatchObject({ created: null, creating: false });
+      expect(last()).toMatchObject({ invite: null });
       expect(listUsers).toHaveBeenCalledTimes(2);
     });
   });

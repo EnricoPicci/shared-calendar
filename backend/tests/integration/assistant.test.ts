@@ -12,6 +12,7 @@ import {
   queryAssistantPartition,
   removeUserIfPresent,
   reportAssistantCosts,
+  setPasswordOf,
   setStoredPromptVersion,
   signIn,
   storedEntries,
@@ -57,7 +58,7 @@ async function newUser(username: string): Promise<string> {
   await removeUserIfPresent(username);
   const created = await api('POST', '/users', adminToken, withFacts(username));
   expect(created.status).toBe(201);
-  return signIn(username, created.body?.password as string);
+  return signIn(username, await setPasswordOf(username));
 }
 
 const say = (token: string, text: string) => api('POST', '/assistant/messages', token, { text });

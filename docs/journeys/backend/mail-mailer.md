@@ -46,7 +46,7 @@ The file's `beforeAll`, shared by both blocks of the file:
 3. As the Administrator, creates the type `mail journey` (`TYPE`) and a one-off window on `D`,
    20:00–23:00 local, under it: three one-hour slots.
 4. Creates `mail-bob` again (`newUser()`: removed first, then `POST /users` with the four facts
-   of `withFacts()`).
+   of `withFacts()`, then its password set with `setPasswordOf()`, and the sign-in).
 5. Books, each time the first slot of the journey's type the view still offers
    (`bookSlot()`), each appointment with the note `MARK` (`mail journey <milliseconds>`, the
    mark of this run):
@@ -167,5 +167,5 @@ history, which is why the checks look for `MARK`.
 | The address and the names | `getProfile()` and `namesBySub()` in `backend/src/lib/cognito.ts` |
 | The appointments | `listAppointments()` in `backend/src/lib/calendarDb.ts` |
 | The fake mail | `backend/docker/fake-mail.mjs` |
-| Test helpers | in the file: `removeFromCalendar()`, `newUser()`, `bookSlot()`, `rowsOf()`, `journeyRows()`, `rowOf()`; in `backend/tests/integration/setup.ts`: `api()`, `signIn()`, `subOf()`, `factsOf()`, `withFacts()`, `removeUserIfPresent()`, `runMailer()`, `waitForMails()`, `forgetMailsTo()` |
+| Test helpers | in the file: `removeFromCalendar()`, `newUser()`, `bookSlot()`, `rowsOf()`, `journeyRows()`, `rowOf()`; in `backend/tests/integration/setup.ts`: `api()`, `setPasswordOf()`, `signIn()`, `subOf()`, `factsOf()`, `withFacts()`, `removeUserIfPresent()`, `runMailer()`, `waitForMails()`, `forgetMailsTo()` |
 | Constants | `TYPE`, `DAYS_AHEAD`, `MARK`, `FROM`, `REPLY_TO` |

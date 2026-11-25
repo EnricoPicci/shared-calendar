@@ -3,8 +3,10 @@ import type { ApiFailure, TransportFailureReason } from './api';
 
 // The result and state types of UsersService (docs/FRONTEND_SERVICES.md section 13.3).
 
+// mail_unavailable: a stack where e-mail is not switched on creates nobody, since the invitation
+// could not be sent (docs/EMAIL_ARCHITECTURE.md section 13.2).
 export type CreateUserFailureReason =
-  | Extract<ApiErrorCode, 'forbidden' | 'invalid_json' | 'invalid_request' | 'user_exists' | 'internal_error'>
+  | Extract<ApiErrorCode, 'forbidden' | 'invalid_json' | 'invalid_request' | 'user_exists' | 'mail_unavailable' | 'internal_error'>
   | TransportFailureReason;
 // PUT /users/{username}: the four facts of a User, or the Administrator's own
 // (docs/EMAIL_ARCHITECTURE.md section 9.1).
@@ -17,8 +19,8 @@ export type DeleteUserFailureReason =
   | Extract<ApiErrorCode, 'forbidden' | 'invalid_request' | 'cannot_delete_admin' | 'user_not_found' | 'concurrent_update' | 'internal_error'>
   | TransportFailureReason;
 
-// The success carries the generated password: the one exception to docs/FRONTEND_SERVICES.md
-// section 2, rule 6 (docs/FRONTEND_SERVICES.md section 13.7).
+// The success names the account and its state, `invited`: no password, which Cognito e-mails to
+// the User (docs/EMAIL_ARCHITECTURE.md section 5.1).
 export type CreateUserResult =
   | { status: 'success'; user: CreateUserResponse }
   | { status: 'failure'; reason: CreateUserFailureReason; message: string };
@@ -36,3 +38,13 @@ type ListUsersCode = Extract<ApiErrorCode, 'forbidden' | 'internal_error'>;
 export type ListUsersFailureReason = ListUsersCode | TransportFailureReason;
 export type ListUsersResult = { status: 'success'; users: UserSummary[] } | ApiFailure<ListUsersCode>;
 export type ListUsersState = { status: 'idle' } | { status: 'pending' } | ListUsersResult;
+
+// POST /users/{username}/invitation: the invitation sent again (docs/EMAIL_ARCHITECTURE.md
+// sections 5.3 and 9.1). The success names the account the call was made for.
+type ResendInvitationCode = Extract<
+  ApiErrorCode,
+  'forbidden' | 'invalid_request' | 'user_not_found' | 'not_invited' | 'cannot_edit_admin' | 'mail_unavailable' | 'internal_error'
+>;
+export type ResendInvitationFailureReason = ResendInvitationCode | TransportFailureReason;
+export type ResendInvitationResult = { status: 'success'; username: string } | ApiFailure<ResendInvitationCode>;
+export type ResendInvitationState = { status: 'idle' } | { status: 'pending'; username: string } | ResendInvitationResult;
