@@ -1,0 +1,896 @@
+# Shared Calendar: e-mail (architecture proposal)
+
+| | |
+|---|---|
+| Status | A proposal under review: the decisions of sections 2.2 and 2.3 are confirmed by the Product Owner (2026-11-25); every open point is decided (section 21). Ready to become a plan. Nothing is built, nothing is planned yet |
+| Date | 2026-11-25 |
+| Brief | `prompts/mail-m01-integrate-mail-idea.md`, with the answers of the clarification round (section 2.2) |
+| Builds on | `docs/ARCHITECTURE.md` (sections 4, 5, 6.3, 7, 9, 10), `docs/SHARED_CALENDAR_SPEC.md` section 15 (e-mail notifications prepared), `docs/CONVERSATIONAL_ARCHITECTURE.md` sections 5.4 and 8 (proposals and tools) |
+| Would add to the stack | Amazon SES (one domain identity, one configuration set), one SNS topic, one DynamoDB table `mail`, one scheduled function `mailer`, five routes, one assistant tool |
+| Would change | The creation of a user (an invitation e-mail and a forced password change instead of a password shown to the Administrator); four new facts about every person (first name, last name, e-mail, address) |
+| What comes next | Once this document is final: `docs/EMAIL_PLAN.md`, the implementation plan, from section 20's outline |
+
+This document says how the shared calendar would send e-mail, what changes for the people who
+use it, what changes in the code and in the cloud, and what you, as Product Owner and operator,
+have to decide and do. Where it reverses a rule of `docs/ARCHITECTURE.md`, it says so (section
+17). Once finalized and implemented, its content is merged into `docs/ARCHITECTURE.md`, which
+then wins, as was done for the assistant.
+
+The facts about AWS were read on 2026-11-25 in AWS's documentation (section 22). The facts about
+the local Cognito emulator were tried that day on the local stack (section 14.1).
+
+---
+
+## 1. In short
+
+**What a person sees**
+
+1. **The Administrator creates a user** by typing a username, a first name, a last name, an
+   e-mail address and a postal address. The page no longer shows a password.
+2. **The new user receives an e-mail** with their username, a temporary password and the
+   page's address. At their first sign-in the page asks them to choose their own password
+   before anything else. The temporary password then stops working; unused, it expires after
+   7 days, and the Administrator can send a new invitation with one button.
+3. **Every morning** (at an hour the Administrator chooses, or never) the Administrator
+   receives an e-mail with two Excel files: the appointments of the next 7 days, and a backup
+   with every appointment from the first day of last month onwards.
+4. **On demand**, from a button on the week page or by asking the assistant, the Administrator
+   gets an Excel file of the whole calendar between two dates, and a User gets their own
+   appointments between two dates, as a list in the e-mail and as an Excel file. Each mail goes
+   only to the address of the person who asked. The assistant asks for a Confirm first.
+
+**How it works, in one paragraph**
+
+Cognito, which already holds the accounts, sends the invitation itself, through Amazon SES, the
+AWS e-mail service: the temporary password is made and sent by Cognito and never passes through
+our code, our logs or the Administrator's screen. Every other e-mail is sent by one new
+function, the **mailer**, which reads the calendar, builds the Excel files and hands the mail to
+SES. The routes and the assistant never send mail themselves: they check the request and start
+the mailer in the background, so a slow mail never holds up a page. A timer starts the mailer
+every hour; when the hour is the one the Administrator chose, it sends the daily mail, once.
+
+**What is new and needs care**, mostly outside the code:
+
+- **The domain must be proven** to SES with three DNS records, and the AWS account must be
+  taken out of SES's "sandbox" by a request to AWS (section 8). Until then no mail reaches an
+  ordinary address.
+- **Personal data grows**: names, an e-mail and a postal address for every person, and Excel
+  files with names sitting in a mailbox. The purpose of each fact goes into the privacy notice,
+  for the GDPR page that will come (section 12.3).
+- **Two rules of the design change** (section 17): the first password is now temporary and
+  e-mailed, and the system now sends e-mail. The creation route's answer changes shape, which
+  breaks an old client: the release is a new major version, v3.0.0.
+
+---
+
+## 2. What is asked, and what was decided
+
+### 2.1 The use cases
+
+| Id | Use case | Who | When |
+|---|---|---|---|
+| E1 | Invitation: a new user receives their username and a temporary password; they must choose their own password at the first sign-in | the new User, started by the Administrator's creation | at creation, and again on "resend" |
+| E2 | Daily mail to the Administrator: two Excel files, the next 7 days and the backup | the Administrator | every day at the chosen hour, if switched on |
+| E3 | The calendar on demand, to the Administrator: every appointment between two dates, as an Excel file | the Administrator | a button on the week page, or the assistant |
+| E4 | My appointments on demand, to a User: their own appointments between two dates, listed in the mail and as an Excel file | a User | a button on the week page, or the assistant |
+| E5 | The person's data: first name, last name, e-mail, postal address, typed by the Administrator | the Administrator | at creation, and when editing a user |
+| E6 | Notifications (booked, cancelled, changed, reminders) | both | later, sketched only (section 19) |
+
+### 2.2 The decisions of the clarification round (2026-11-25)
+
+| Id | Decision |
+|---|---|
+| M1 | The invitation carries a generated password, and the user must change it at the first sign-in |
+| M2 | The forced change is Cognito's own: the account is created in the state "must change password", Cognito refuses every token until the new password is set, and the temporary password expires |
+| M3 | A person's first name, last name, e-mail and postal address (free text, not checked) are all required at creation; only the Administrator edits them |
+| M4 | Mail is sent from an address of the calendar's domain with a **Reply-To** address the Administrator reads; the domain, the sender and the Reply-To are parameters, so that a later move to a domain that receives mail, or forwards it, is a change of parameters and DNS records, not of code |
+| M5 | Notifications are a later step, only sketched here |
+| M6 | The Excel files hold appointments only (no free slots, no opening hours) |
+| M7 | The daily mail holds two files: the next 7 days (fixed) and the backup, from the 1st of last month to the last future appointment. The Administrator switches it on or off and chooses the hour |
+| M8 | A User's mail: their appointments listed in the body, plus an Excel file of the same |
+| M9 | Through the assistant, a mail is a proposal with a Confirm button, as a calendar change is |
+| M10 | On-demand mails go only to the address of the person who asks; there is no recipient field |
+
+### 2.3 What this document proposed, confirmed by the Product Owner (2026-11-25)
+
+| Id | Proposal | Why |
+|---|---|---|
+| M11 | Cognito sends the invitation (its own template, through our SES), not our mailer | The temporary password is never seen by our code, our logs or the Administrator; "resend" is one Cognito call |
+| M12 | The Administrator's own e-mail, names and address are set by the bootstrap script and can be changed by the Administrator through the edit route on their own account | The daily mail needs the Administrator's address; the template must not hold it (public repository) |
+| M13 | A User can read their own data (`GET /me`), not change it | GDPR's right of access, and the future consent page needs it |
+| M14 | The hourly timer, not a timer set at the chosen hour | A fixed schedule in the template, no permission to change schedules; the hour is just a setting the mailer reads |
+| M15 | A new table `mail` for the mail settings and counters, not the `calendar` table | The calendar's contract, lock and tools stay untouched |
+| M16 | At most 5 on-demand mails per person per day, and at most 366 days in one request | Protects the sender's reputation at SES and the cost; enough for any real use |
+| M17 | The texts of the mails are in English, like the pages | The pages are English only (`docs/FRONTEND_ARCHITECTURE.md` section 12.4) |
+
+Also decided in review (2026-11-25): the postal address is kept for future features, such as
+printing invoices (O1, section 12.3); the Reply-To is today's alarm address, `AlertEmail` (O2,
+section 8.2); the release is the major version v3.0.0 (section 9.1).
+
+---
+
+## 3. The architecture
+
+```mermaid
+%%{init: {'theme': 'default'}}%%
+flowchart LR
+  subgraph all [The shared calendar with e-mail]
+    subgraph people [People]
+      ADM[Administrator]
+      USR[User]
+    end
+    subgraph api [API stack]
+      R[Routes:<br/>users, mail]
+      AS[Assistant<br/>confirmProposal]
+      T[Hourly timer]
+      M[mailer function]
+    end
+    subgraph data [Data]
+      COG[Cognito<br/>accounts and profiles]
+      CAL[(calendar table)]
+      MT[(mail table)]
+    end
+    subgraph aws [AWS mail]
+      SES[Amazon SES<br/>noreply at the domain]
+      SNS[SNS topic<br/>bounces]
+    end
+    ADM -- 1 --> R
+    USR -- 1 --> R
+    ADM -- 2 --> AS
+    R -- 3 start --> M
+    AS -- 3 --> M
+    T -- 4 --> M
+    M -- 5 reads --> CAL
+    M -- 5 reads --> COG
+    M -- 5 --> MT
+    M -- 6 --> SES
+    R -- 7 create --> COG
+    COG -- 8 invitation --> SES
+    SES -- 9 --> SNS
+    SES -- 10 mail --> ADM
+    SES -- 10 mail --> USR
+  end
+```
+
+| Arrow | What happens |
+|---|---|
+| 1 | A person uses the page: creating or editing a user, asking for a mail, changing the daily-mail settings |
+| 2 | A person asks the assistant for a mail; nothing is sent until they press Confirm |
+| 3 | The route, or the confirmed proposal, checks the request, counts it, and starts the mailer in the background (an asynchronous call: it answers at once) |
+| 4 | Every hour the timer starts the mailer; it sends the daily mail when the hour is the chosen one and today's has not gone yet |
+| 5 | The mailer reads the appointments, the people's names and addresses, and the mail settings |
+| 6 | The mailer builds the e-mail and its Excel files and hands it to SES |
+| 7 | Creating a user creates the Cognito account with the four facts, in the state "must change password" |
+| 8 | Cognito itself sends the invitation with the temporary password, through our SES identity |
+| 9 | A mail that bounces, or is marked as spam, is reported to an SNS topic, which e-mails the Reply-To address |
+| 10 | The mail arrives, from `noreply@<domain>`, with Reply-To the Administrator's address |
+
+### 3.1 The pieces, and why each
+
+| Piece | What it does | Why this one |
+|---|---|---|
+| **Amazon SES** in `eu-north-1` | Sends every mail | The AWS e-mail service; in `eu-north-1`, Cognito can only use SES identities of the same region ("In-Region only", section 22), which suits us; pennies a month (section 15) |
+| **SES domain identity** with Easy DKIM | Proves we may send as `…@<domain>` | Mail signed for the domain lands in inboxes, not in spam; the domain is a parameter |
+| **SES configuration set** + **SNS topic** | Reports bounces and complaints by e-mail to the Reply-To address | `noreply@` receives nothing, so without it a bounce would be lost |
+| **Cognito invitation** | Sends E1 | Cognito makes the temporary password, keeps it, expires it and resends it; our code never touches it |
+| **`mailer` function** | Sends E2, E3, E4 | One function holds the right to send mail and the Excel library; the routes stay small and fast |
+| **EventBridge Scheduler**, every hour | Starts the daily mail | Free at this volume; a fixed schedule (decision M14) |
+| **Table `mail`** | The daily-mail settings, the "sent today" mark, the per-person counters | Small, separate from the calendar (decision M15) |
+
+What is deliberately **not** used: SQS (Lambda's own asynchronous call has two retries and is
+enough at this volume), S3 (the files are attachments, never stored), SES receiving (not
+offered for this domain set-up yet, section 8.3), a template engine (the texts are a few
+functions in `shared/`).
+
+---
+
+## 4. The person's data
+
+### 4.1 Four new facts, kept in Cognito
+
+| Fact | Cognito attribute (standard) | Rule |
+|---|---|---|
+| First name | `given_name` | 1–100 characters after trimming |
+| Last name | `family_name` | 1–100 characters after trimming |
+| E-mail | `email`, with `email_verified` = `true` | a syntactically valid address, at most 254 characters, stored lower-cased; not unique (two people may share an address) |
+| Postal address | `address` | free text, 1–300 characters, multi-line allowed, never checked |
+
+Cognito stays the only store of people (`docs/ARCHITECTURE.md` section 5.1): no "users" table
+to keep in step, and deleting an account deletes its personal data with it. These are Cognito's
+standard attributes, so **the user pool's schema does not change** (the pool is never
+replaced). The rules live in `shared/` as one `zod` schema, `UserProfile`, used by the page, the
+routes and the tests.
+
+`email_verified` is set to `true` by our code because the Administrator typed the address:
+there is no verification code. The consequence is honest: a mistyped address means the
+invitation goes nowhere (or to a stranger); the Administrator corrects it and resends (section 5.3).
+
+### 4.2 Who may read and change them
+
+| Who | Read | Change |
+|---|---|---|
+| Administrator | every User's (`GET /users`), their own (`GET /me`) | every User's, and their own (`PUT /users/{username}`); never another administrator's |
+| User | their own (`GET /me`) | none: they ask the Administrator |
+| Assistant | the first name of the person speaking, for a greeting (optional, open point O4) | none |
+
+### 4.3 The accounts that exist today
+
+**They are deleted at the beginning of the implementation** (decision of 2026-11-25), so no
+facts are filled in by hand and every User has the four facts from the start. The Administrator
+deletes them with the existing route (`DELETE /users/{username}`, the Users page), which also
+cancels their future appointments (`cancelReason` `user_deleted`,
+`docs/SHARED_CALENDAR_SPEC.md` section 10.2). People who still need an account are created
+again once invitations work (step 10 of section 20), and receive one.
+
+Consequences: no account without facts exists, so `GET /users` never answers a missing fact;
+nothing ever needs to tell an "old" account from a new one; no existing User keeps a password
+that was never forced to change.
+
+The Administrator's account is not deleted. It gets its four facts from
+`npm run bootstrap-admin` on a new stack, or from "My details" on the existing one. Until its
+e-mail is set, a mail the Administrator asks for is refused with `409 no_email_address`, and the
+daily mail is skipped with a log line.
+
+---
+
+## 5. The invitation and the first sign-in
+
+### 5.1 The flow
+
+```mermaid
+%%{init: {'theme': 'default'}}%%
+sequenceDiagram
+    autonumber
+    box rgb(250, 250, 247)
+        actor A as Administrator
+        participant P as Page
+        participant F as createUser
+        participant C as Cognito
+        participant S as SES
+        actor U as New user
+    end
+    A->>P: username, names, e-mail, address
+    P->>F: POST /users
+    F->>C: AdminCreateUser with the four facts
+    Note over C,S: Cognito makes a temporary password
+    C->>S: the invitation, from noreply at the domain
+    C-->>F: account in state FORCE_CHANGE_PASSWORD
+    F->>C: add to group user
+    F-->>P: 201 username, status invited
+    S-->>U: e-mail: username, temporary password, page address
+    U->>P: signs in with the temporary password
+    P->>C: InitiateAuth
+    C-->>P: challenge NEW_PASSWORD_REQUIRED, no token
+    U->>P: chooses a password
+    P->>C: RespondToAuthChallenge with the new password
+    C-->>P: tokens: signed in
+```
+
+- **The route no longer sees a password.** `createUser` calls `AdminCreateUser` without
+  `MessageAction: SUPPRESS` and without a password, with `DesiredDeliveryMediums: EMAIL`.
+  Cognito generates the temporary password by the pool's password policy and sends it. The
+  answer becomes `201 { username, status: "invited" }`. The rollback stays: if the group step
+  fails, the account is deleted (the user has received an invitation that no longer works; the
+  page says "creation failed, nothing was kept").
+- **Cognito enforces the change.** An account in `FORCE_CHANGE_PASSWORD` gets no token until
+  the challenge is answered, so the authorizer, the routes and the assistant need no change.
+- **The temporary password expires** after `TemporaryPasswordValidityDays` = 7 (pool setting).
+  Used once, it is gone. So an old invitation lying in a mailbox opens nothing.
+- **The invitation's text** is the pool's `InviteMessageTemplate` (subject and HTML body, with
+  Cognito's two placeholders, the username and the temporary password, and the page's address),
+  set in `template.yaml` from the parameters. Its wording is in section 6.6.
+
+### 5.2 The page
+
+The sign-in today treats any challenge as an error (`frontend/src/services/cognito.ts`,
+reason `challenge`). It learns one: `NEW_PASSWORD_REQUIRED` leads to a screen "Choose your
+password" (the same rule and the same live checks as the change-password screen, from
+`shared/src/password.ts`), which answers the challenge with `RespondToAuthChallenge` and then
+signs the person in as usual. Cognito's challenge session lasts 3 minutes: past that, the screen
+says so and sends the person back to the sign-in.
+
+**The future GDPR page plugs in here.** The first sign-in becomes a short sequence of gates,
+each shown once: 1. choose your password (Cognito's, this document), 2. accept the privacy
+terms (later, the app's own). Unlike the first, the second must be enforced by the server too
+(a "consent version accepted" fact checked by the authorizer or by each route), because Cognito
+knows nothing of it; that design belongs to the GDPR requirement, not here. Nothing in this
+proposal makes it harder.
+
+### 5.3 Resend, and a wrong address
+
+`POST /users/{username}/invitation` (admin): for an account still in `FORCE_CHANGE_PASSWORD`,
+`AdminCreateUser` with `MessageAction: RESEND`, which makes a new temporary password and sends
+it to the address on file. An account that has already chosen its password answers
+`409 not_invited`.
+
+The users' list shows each User's state: **invited** (has not signed in yet) or **active**.
+
+### 5.3.1 A wrong e-mail address
+
+The Administrator types the address, so a wrong one is a typing mistake. What happens depends
+on the kind of mistake:
+
+| The address… | What happens | What the Administrator does |
+|---|---|---|
+| is not an address at all (`anna.rossi@`, `anna rossi@x.it`) | the form and the route refuse it (`400`, the rule of section 4.1); no account, no mail | corrects it in the form |
+| looks right but does not exist (`anna.rosi@gmail.com`, `…@gmial.com`) | the account is created and SES sends the invitation; the receiving server refuses it (a "bounce"); within minutes the bounce report arrives at the alarm address (section 8.4); SES puts that address on the account's suppression list, so it is not tried again; the User stays **invited** | reads the bounce report, edits the e-mail, presses "Resend invitation" |
+| exists but belongs to someone else | the stranger receives a username, a temporary password and the page's address, and could sign in and choose a password before the right person does | see below |
+
+The third case is the one to care about, since the stranger could take the account. What
+limits it:
+
+- the creation form shows the address once more before sending ("An invitation will be sent to
+  anna.rossi@gmail.com", with Confirm), and the answer repeats it;
+- the account can do little: a User sees free slots and their own appointments, and a new
+  account has none;
+- an unused temporary password expires after 7 days;
+- if the right person says "I received nothing", the Administrator looks at the state: still
+  **invited** means nobody used it, so correct and resend; **active** although they never
+  signed in means someone else did: delete the account and create it again with the right
+  address.
+
+Nothing in the system can tell a right address from someone else's; no verification code
+would help, since the code would go to the same wrong address. The confirmation step is the
+practical safeguard.
+
+### 5.4 The Administrator
+
+Unchanged: created by the deployment, its permanent password set once by
+`npm run bootstrap-admin`. The script also sets the Administrator's four facts (prompted, never
+in a file or an argument, as for the password today).
+
+---
+
+## 6. The calendar mails
+
+### 6.1 One sender: the mailer
+
+The mailer is one function with three ways in, all the same shape: "send mail of kind K for
+person P, range R".
+
+| Kind | Started by | Recipient | Content |
+|---|---|---|---|
+| `daily` | the hourly timer | every member of group `admin` that has an e-mail | two Excel files (section 6.3) |
+| `calendar` | `POST /mail/calendar` by the Administrator, or the assistant's confirmed proposal | the Administrator who asked | one Excel file, every appointment in the range |
+| `mine` | `POST /mail/calendar` by a User, or the assistant's confirmed proposal | the User who asked | the list in the body, and one Excel file, their appointments in the range |
+
+What the mailer receives in its event: the kind, the person's `sub`, username and role, the
+range, the request's id. **Never an address**: the mailer looks the address up in Cognito
+itself, so a mail can only go to the account's own address (decision M10).
+
+How it is started: the route calls Lambda's asynchronous invoke (`InvocationType: Event`) and
+answers `202` at once. Lambda retries a failed run twice; a run that still fails is logged and
+raises the mailer's error alarm (section 16). The person's page has already said "the e-mail is
+on its way": that is the honest promise, since SES itself delivers later.
+
+### 6.2 The daily mail, exactly once
+
+Every hour, at minute 0, the scheduler starts the mailer with `kind: daily`. The mailer:
+
+1. reads the mail settings: off → stops. The hour in the calendar's time zone
+   (`CalendarTimeZone`) is not the chosen one → stops;
+2. writes the mark `DAILY#<local date>` **only if it does not exist** (a conditional write): if
+   it exists, today's mail already went (or is going) → stops. This makes a timer that fires
+   twice, or a retry, harmless;
+3. builds and sends; records the outcome on the mark.
+
+If the run fails after the mark, Lambda's retries run with the same event and find the mark:
+the mark therefore holds a state (`sending`, `sent`, `failed`), and a retry may proceed only
+from `sending` older than 10 minutes or `failed`. The details are for the plan; the rule is "at
+most one daily mail a day, and a failure is retried and alarmed".
+
+A change of the hour takes effect the next day the hour comes round; switching it on after the
+hour has passed sends nothing until tomorrow. Daylight saving changes nothing: the hour is read
+in the calendar's zone.
+
+### 6.3 The Excel files
+
+One sheet per file, one row per appointment, sorted by start. Times are local to the calendar's
+time zone, as on the pages.
+
+| Column | From |
+|---|---|
+| Date | the appointment's local date |
+| Start, End | local times `HH:mm` |
+| Type | the type's current name, or the name at booking if the type was deleted |
+| Username | as stored on the appointment |
+| First name, Last name | from Cognito; empty for a deleted account |
+| Status | booked, cancelled |
+| Cancelled because | cancelled, changed, user deleted (cancelled ones only) |
+| Note | the appointment's note |
+| Booked at | the creation instant, local |
+
+The ranges:
+
+| File | Range | Statuses |
+|---|---|---|
+| Daily, "next 7 days" | today to today + 6, local dates | booked only |
+| Daily, backup | the 1st of last month to the last appointment there is (the reading stops at today + 366 days, beyond any booking horizon) | all |
+| On demand (Administrator or User) | the dates asked, at most 366 days | all, with their status |
+
+A User's file is the same with only their appointments (by `sub`) and without the name
+columns of others. The backup on 26 November 2026 covers 1 October 2026 onwards: no gap.
+
+The files are made in memory and attached; they are never stored. Size is no concern: a year
+of this calendar is a few thousand rows, well under a megabyte.
+
+**A library is needed** to write `.xlsx` (a zip of XML files). The candidates are `exceljs` and
+`write-excel-file`; the plan's first step picks one on licence, upkeep and the size it adds to
+the mailer's bundle. It is imported by one module, `backend/src/lib/excel.ts`, and bundled into
+the mailer only, as the Anthropic SDK is kept to its one module today.
+
+### 6.4 The appointments are read through the calendar's own code
+
+The mailer is a back-end function like the handlers, so it reads with
+`calendarDb.listAppointments` (the same range read as `GET /calendar/appointments`), with the
+calendar's read-only permission set. It never writes the calendar.
+
+### 6.5 Limits
+
+- At most 5 on-demand mails per person and local day (a counter `QUOTA#<sub>#<date>` in the
+  table `mail`, incremented by the route under a condition): beyond it `429 mail_limit_reached`.
+  The daily mail does not count.
+- A range of at most 366 days, `from` ≤ `to`: else `400 invalid_request`.
+- A person without an e-mail: `409 no_email_address`, before anything is counted.
+- Mail switched off in this stack (section 13, stage not `on`): `503 mail_unavailable`.
+
+### 6.6 The texts
+
+The texts are pure functions in `shared/src/mail/` (subject, plain-text body, HTML body), so
+the tests can check them and the assistant can quote them. English (decision M17). Examples:
+
+- Invitation. Subject "Your account on the shared calendar". Body: "Hello, an account was
+  created for you. Username: {username}. Temporary password: {password}. Sign in
+  at {page address}: you will be asked to choose your own password. The temporary password
+  works once and expires in 7 days. If you did not expect this e-mail, ignore it." (Cognito
+  fills the username and the password. The first name is not one of Cognito's placeholders:
+  greeting by name needs a Cognito trigger function, open point O3.)
+- Daily. Subject "Calendar: next 7 days and backup, {date}". Body: the count of appointments of
+  the next 7 days, the two file names, a line saying the backup covers from {date} onwards.
+- Mine. Subject "Your appointments, {from} to {to}". Body: one line per appointment ("Tue 1 Dec,
+  10:00–11:00, Visit, booked"), or "You have no appointments in this period."
+- Every mail ends with: "This is an automatic e-mail. Replies reach the calendar's
+  Administrator."
+
+---
+
+## 7. The assistant
+
+One new tool, `send_calendar_mail`, for both roles: a `from` and a `to` date. It is a tool of
+the kind "change" (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 8.2): Claude asking for it
+sends nothing and makes a proposal, worded by the server in the conversation's language:
+"Send your appointments from Tuesday 1 December to Monday 7 December 2026 to
+a•••@example.com?" (the Administrator: "Send the calendar from … to … to …?"), with
+**Confirm** and **Don't**.
+
+On Confirm, `confirmProposal` runs the route's own handler, `sendCalendarMail`, with the
+caller's identity, exactly as it runs a booking. The handler checks, counts and starts the
+mailer; the outcome ("on its way", or the reason it was refused) goes back to Claude, which
+words the answer.
+
+This keeps both rules intact: the assistant acts only through a route's handler and only after
+the person's button. The confirming function's role gains one permission: to start the mailer
+(section 12.2). The assistant itself never holds the right to send mail.
+
+Note on the root rule "the assistant changes the calendar only through `confirmProposal`": a
+mail does not change the calendar, but it is an act with an effect outside the system, so it
+follows the same path (decision M9). The rule's wording is widened in section 17.
+
+---
+
+## 8. Sending: the domain, the sender, bounces
+
+### 8.1 Proving the domain
+
+The stack creates an SES **domain identity** for the parameter `MailDomain`
+(`enricopiccinin.com` today) with **Easy DKIM**: SES gives three DNS records (CNAME) that the
+operator adds at the domain's DNS provider. Once SES sees them (minutes to a few hours) the
+domain is verified, and every mail is signed for it. Recommended in the same visit: a DMARC
+record (`_dmarc.<domain>`, TXT, `v=DMARC1; p=none;` at first), which mailbox providers
+increasingly expect. The stack's outputs list the exact records.
+
+### 8.2 From and Reply-To
+
+| Header | Value | Parameter |
+|---|---|---|
+| From | `Shared calendar <noreply@<MailDomain>>` | `MailDomain`, `MailFromLocalPart` (default `noreply`), `MailFromName` |
+| Reply-To | the address the Administrator reads: today's alarm address | `MailReplyTo`, empty by default, which means `AlertEmail` |
+
+The Reply-To is the stack's `AlertEmail`, which already receives the alarms and the budget
+alert (decision O2): no new address to pass at deploy. `MailReplyTo` exists only to point
+replies elsewhere later; when set it is a personal address and, like `AlertEmail`, is **never
+written in `samconfig.toml`** (public repository). The same address receives the bounce reports
+(section 8.4).
+
+### 8.3 Changing the domain, or receiving mail later
+
+- **Another domain**: change `MailDomain` and deploy. The stack creates the new identity (and
+  removes the old one); the operator adds the new DKIM records; mail is sent from the new domain
+  once verified. Two deploys (the stages of section 13) avoid a gap. The SES production access
+  belongs to the account and region, not the domain: it carries over.
+- **The domain can receive or forward mail**: set `MailFromLocalPart` to a real mailbox (for
+  example `calendar`) and `MailReplyTo` to the same address. No code changes. Receiving mail through SES itself is not proposed:
+  it needs an MX record and an inbound set-up of its own, and a mailbox at the domain's provider
+  is simpler.
+
+### 8.4 Bounces and complaints
+
+Mail sent through the configuration set reports bounces and complaints (and deliveries, if
+wanted) to an SNS topic, whose one subscriber is the Reply-To address (an e-mail subscription, which
+the operator confirms once by clicking the link AWS sends, as for the alarms today). Cognito's
+invitations name the same configuration set, so a mistyped address in an invitation comes back
+to the Administrator too. SES's account-level suppression list keeps the stack from mailing an
+address that bounced hard; an address put right later is removed from that list by the
+operator (a one-line AWS command in the runbook).
+
+### 8.5 The sandbox
+
+A new SES account is in the **sandbox** in each region: it can mail only verified addresses,
+200 a day. The operator asks AWS for **production access** once, in the SES console (use case:
+"transactional mail of a private booking application, about 10 recipients, invitation and
+calendar reports, no marketing; bounces and complaints handled through SNS"). AWS answers
+usually within a day. Until then, the operator can verify their own address and one test
+address, and try everything with them.
+
+---
+
+## 9. The API
+
+### 9.1 Routes, new and changed
+
+| Method & path | Role | Request | Success | New errors |
+|---|---|---|---|---|
+| `POST /users` (changed) | admin | `{ username, givenName, familyName, email, address }` | `201 { username, status: "invited" }`: **no password** | 400 for each field's rule |
+| `GET /users` (changed) | admin | | `200 { users }`, each `{ username, createdAt, givenName, familyName, email, address, status }`, `status` `invited` or `active` | |
+| `PUT /users/{username}` (new) | admin | `{ givenName, familyName, email, address }`, all four | `200` the user as in `GET /users` | 404 `user_not_found` · 403 `cannot_edit_admin` (another administrator) |
+| `POST /users/{username}/invitation` (new) | admin | | `202` | 404 `user_not_found` · 409 `not_invited` · 403 `cannot_edit_admin` |
+| `GET /me` (new) | admin or user | | `200 { username, role, givenName, familyName, email, address }` | |
+| `GET /mail/settings` (new) | admin | | `200 { dailyEnabled, dailyHour }` (defaults `true`, `7`) | 503 `mail_unavailable` |
+| `PUT /mail/settings` (new) | admin | `{ dailyEnabled: boolean, dailyHour: 0–23 }` | `200` the settings | 503 `mail_unavailable` |
+| `POST /mail/calendar` (new) | admin or user | `{ from, to }`, local dates | `202 { status: "queued" }` | 409 `no_email_address` · 429 `mail_limit_reached` · 503 `mail_unavailable` |
+
+The common errors (401, 403 `forbidden`, 400 `invalid_json`/`invalid_request`, 500
+`internal_error`) as today. The new codes start in `shared/src/api.ts` (root `CLAUDE.md`).
+
+**A breaking change**: an old page that reads `password` from the creation answer finds none.
+The page and the API are released together, as v3.0.0 (the project's rule on versions: a
+change that breaks a client takes the next major).
+
+Why `POST /mail/calendar` serves both roles with one shape: the role decides the content
+(`calendar` or `mine`), never the body, so a User cannot ask for the whole calendar.
+
+### 9.2 The authorizer, and the profile in the token
+
+Unchanged. The profile is never put into the token: it is read where needed (`GET /me`, the
+mailer), so a change of name or address is seen at once.
+
+---
+
+## 10. Data
+
+### 10.1 The table `mail`
+
+`<stack>-mail` in the cloud, `mail` locally. Key `PK` (S) and `SK` (S), like `calendar`.
+Provisioned 2 RCU / 2 WCU: the account's total becomes 21/19, still inside the always-free
+25/25. Deletion protection on, AWS-owned encryption, TTL on `expiresAt`.
+
+| Item | `PK` | `SK` | Attributes | Kept |
+|---|---|---|---|---|
+| Settings | `SETTINGS` | `SETTINGS` | `dailyEnabled`, `dailyHour`, `updatedAt`, `updatedBy` | always |
+| Daily mark | `DAILY` | `<local date>` | `state` (`sending`, `sent`, `failed`), `startedAt`, `finishedAt`, `sesMessageId`, `appointmentCount` | 400 days (TTL) |
+| Counter | `QUOTA#<sub>` | `<local date>` | `count` | 2 days (TTL) |
+
+The module that knows this layout is `backend/src/lib/mailDb.ts`, the only one, like
+`calendarDb.ts` for its table. No personal data is stored here: no address, no name.
+
+### 10.2 What is not stored
+
+The content of a mail and its attachments are never stored, in a table or in a log. The
+record of what was sent is the log line (section 16) and the SES message id.
+
+---
+
+## 11. The pages
+
+| Screen | Change |
+|---|---|
+| Sign-in | handles `NEW_PASSWORD_REQUIRED`: the screen "Choose your password" (section 5.2) |
+| Users (admin) | the creation form gains four fields and a last look at the address before sending (section 5.3.1); the password panel shown after creation is removed, replaced by "An invitation was sent to {email}"; the list shows the names, the e-mail and the state; an "Edit" dialog with the four facts; "Resend invitation" for an invited User |
+| Week (both roles) | a button "E-mail…" opens a dialog with two dates (default: the week shown) and a Send button; the answer "On its way to a•••@example.com" or the reason |
+| Settings (admin) | a section "Daily e-mail": on/off and the hour |
+| My details (both roles) | a small read-only screen with the person's four facts (`GET /me`), and for the Administrator an "Edit" button |
+| Assistant panel | nothing new: a mail proposal is shown like any proposal |
+
+New services in `frontend/src/services/` (`docs/FRONTEND_SERVICES.md` gains a section each):
+the challenge answer, users' profile and invitation, `me`, mail settings, mail request. The
+views follow `docs/FRONTEND_ARCHITECTURE.md` sections 3 and 4 (a dialog, a form).
+`docs/FRONTEND_WALK.md` gains the new screens.
+
+---
+
+## 12. Security and privacy
+
+### 12.1 What gets better, what gets riskier
+
+- **Better**: the Administrator never sees a User's password, and no password crosses our API,
+  our code or our logs (today the creation answer carries it). An unused invitation expires.
+- **Riskier**: whoever reads a new User's mailbox before the User does can take the account
+  (until the first sign-in or 7 days). Accepted: it is the usual way, and the window is short.
+- **Riskier**: Excel files with names and appointments sit in the Administrator's mailbox,
+  forever unless deleted. The backup is the point of E2, so this is accepted; it belongs in the
+  privacy notice (section 12.3).
+- **Abuse**: nobody can make the system mail a stranger: no route takes an address except the
+  Administrator's edit of a profile, and the on-demand mails go to the asker. The limits of
+  section 6.5 cap the volume.
+
+### 12.2 Permissions (one role per function, nothing wildcard)
+
+| Function | Gains |
+|---|---|
+| `mailer` (new) | `ses:SendEmail` on the domain identity and the configuration set; `CalendarReadPolicy`; the `mail` table read/write; Cognito `ListUsersInGroup` and `AdminGetUser` on the one pool |
+| `sendCalendarMail` (new route) | `lambda:InvokeFunction` on the mailer; Cognito `AdminGetUser` (has the person an address?); the `mail` table (counter) |
+| `confirmProposal` | `lambda:InvokeFunction` on the mailer, plus what `sendCalendarMail` needs |
+| `createUser` | unchanged actions (`AdminCreateUser` now also sends; same permission) |
+| `updateUser`, `resendInvitation`, `getMe` (new routes) | Cognito `AdminUpdateUserAttributes`, `AdminCreateUser` (resend), `AdminGetUser`, `AdminListGroupsForUser`, on the one pool |
+| `getMailSettings`, `updateMailSettings` (new routes) | the `mail` table, read or read/write |
+| Cognito itself | a service-linked role that Cognito creates when the pool is pointed at our SES (section 13) |
+
+Every new resource ARN is named; the SES actions are scoped to the identity's and the
+configuration set's ARNs.
+
+### 12.3 Personal data and the GDPR (not legal advice)
+
+- **New personal data**: first name, last name, e-mail, postal address, for every person. The
+  GDPR asks that each have a stated purpose ("data minimisation"). Names and e-mail serve E1 to
+  E4. The postal address is collected for future features such as printing invoices
+  (decision O1): the privacy notice must say so, and, until those features exist, it is only
+  stored and shown, never sent anywhere.
+- **Recipients**: AWS (SES, in `eu-north-1`, inside the EU) sends the mails; the mailbox
+  providers of the recipients receive them. No new outside company (unlike WhatsApp).
+- **Erasure**: deleting a User deletes their Cognito account and so their four facts; the
+  appointments keep the username only, as today; Excel files already mailed are outside the
+  system, in the Administrator's mailbox.
+- **Access**: `GET /me` shows a person what is held about them.
+- **The consent page** (future): section 5.2 says where it plugs in.
+
+### 12.4 Logs
+
+A new logging rule, added to the root `CLAUDE.md` (section 17): **logs never contain an e-mail
+address, a name, a postal address, a mail's text or an attachment**. The mailer logs the kind,
+the recipient's username, the range, the number of appointments, the SES message id, the
+outcome. The profile routes log the target's username and which facts changed, never their
+values.
+
+---
+
+## 13. Deployment
+
+### 13.1 New parameters
+
+| Parameter | Example | In `samconfig.toml`? |
+|---|---|---|
+| `MailStage` | `off`, `domain`, `on` | yes |
+| `MailDomain` | `enricopiccinin.com` | yes (public anyway: it is the page's domain) |
+| `MailFromLocalPart` | `noreply` | yes |
+| `MailFromName` | `Shared calendar` | yes |
+| `MailReplyTo` | empty: replies go to `AlertEmail` | yes while empty; a real address **never** (passed once, as `AlertEmail`) |
+| `PageAddress` | `https://calendar.enricopiccinin.com` | yes (the invitation's link) |
+
+### 13.2 In stages
+
+The pool cannot be pointed at an SES identity that is not verified yet, and verification waits
+for DNS. Hence a stage parameter:
+
+1. **`MailStage=off`** (the default): nothing of this document exists in the cloud; the new
+   routes answer `503 mail_unavailable`; profiles work. The code can ship this way.
+2. **`MailStage=domain`**: the stack creates the domain identity, the configuration set, the
+   SNS topic, the `mail` table. The operator adds the DKIM records, confirms the SNS
+   subscription, and asks for production access. Still no mail is sent.
+3. **`MailStage=on`**, once the domain is verified and the account out of the sandbox: the pool
+   sends through SES with its invitation template and 7-day validity, the creation route sends
+   invitations, the mailer and its timer exist, the routes work.
+
+Pointing the pool at SES (`EmailConfiguration` with `EmailSendingAccount: DEVELOPER`) makes
+Cognito create its service-linked role, which needs `iam:CreateServiceLinkedRole` in the
+deploying profile (to check for `shared-calendar-admin`, open point O6). It is an update of the
+pool, not a replacement; the plan confirms it with a change set before the deploy.
+
+### 13.3 The smoke test
+
+`npm run smoke` gains: create a throw-away User with the operator's own address (a parameter
+of the smoke run), see the invitation state, resend it, delete the User; ask a mail for
+`admin`; read the mailer's log line for `sent`. The mailbox is checked by the operator's eyes,
+as the quick look at the page is today.
+
+---
+
+## 14. Local development and testing
+
+### 14.1 Cognito locally (tried on 2026-11-25)
+
+On the local stack (`cognito-local` 5.3.0), with a throw-away user, deleted afterwards:
+
+| Tried | Result |
+|---|---|
+| `AdminCreateUser` with the four attributes, no password, `DesiredDeliveryMediums EMAIL` | Works; the attributes are kept; the "invitation" is printed in the container's log with a generated temporary password (6 characters, not by the pool's policy) |
+| Sign-in with the temporary password | `NEW_PASSWORD_REQUIRED` challenge, no token, the attributes in the challenge |
+| `RespondToAuthChallenge` with a new password | Tokens; the account becomes `CONFIRMED` |
+| `AdminCreateUser` with `MessageAction RESEND` | **Not supported** (`Unsupported`) |
+
+So the first sign-in can be tested end to end locally. The resend cannot: as for the global
+sign-out today, either the local stack takes a different path behind a flag that only
+`env.local.json` sets, or the route is only proved by the smoke test in the cloud (open point
+O5). The integration journeys get the temporary password without reading the container's log:
+they set one with `AdminSetUserPassword` (`Permanent: false`) through the test helpers.
+
+### 14.2 SES locally: a fake mail service
+
+A fifth service in the local Docker stack, `fake-mail`, in the manner of the fake Claude: a
+small Node server answering the one SES call the mailer makes (`SendEmail`), keeping each mail
+(headers, text, attachments' names and sizes, and the files) in memory, and showing them at
+`http://localhost:8025` for a person, and as JSON for the journeys. The mailer's SES client
+takes its endpoint from `SES_ENDPOINT`, empty in the cloud, as Cognito's and DynamoDB's do
+today. Ready-made emulators exist (for example `aws-ses-v2-local`); our own is proposed because
+it must accept attachments in the simple message form and stay as small as the fake Claude
+(open point O7).
+
+The hourly timer does not run locally; a script starts the mailer's daily run by hand, and the
+journeys call it with a fixed "now".
+
+### 14.3 Tests
+
+- `shared/`: the profile schema, the mail request schema, the texts.
+- Back end, unit, 100 % lines on `src/lib`: `mailDb.ts`, `excel.ts` (open the made file again
+  and read its rows), `ses.ts`, `lambdaInvoke.ts`; the handlers with mocks.
+- Back end, journeys: profiles and the first sign-in; a mail on demand for each role, read back
+  from the fake; the daily run twice in the same hour sends once; the limits.
+- Front end: the new services against the local stack; the new views by the rules of
+  `docs/FRONTEND_ARCHITECTURE.md` section 8; `docs/FRONTEND_WALK.md`.
+- The assistant: a fake-Claude answer that asks for `send_calendar_mail`, confirmed, read back
+  from the fake mail.
+
+---
+
+## 15. Cost
+
+| Item | Expected use (10 users, a month) | Cost |
+|---|---|---|
+| SES | ~30 daily mails + ~50 on demand + a few invitations, ~100 mails, < 50 MB | at the SES Essentials plan's 0.16 USD per 1 000 mails (new accounts since 2026-07-21), about 0.02 USD, plus pennies for data |
+| Lambda (mailer, hourly) | ~720 timer runs + ~80 sends | 0 (free tier) |
+| EventBridge Scheduler | ~720 invocations | 0 (free tier) |
+| SNS (bounce e-mails) | a handful | 0 |
+| DynamoDB `mail` | 2/2 provisioned | 0 (inside the 25/25) |
+| **Total** | | **a few US cents a month**, under the 1 USD budget |
+
+AWS changes SES's prices: the plan's first step reads the pricing page again.
+
+---
+
+## 16. Observability
+
+- One log line per mailer run: kind, recipient's username, range, appointment count, outcome,
+  SES message id, duration. No address, no content (section 12.4).
+- A new alarm: the mailer's `Errors` > 0 in an hour, to `AlertEmail`, like the authorizer's.
+- Bounces and complaints by e-mail to the Reply-To address, `AlertEmail` (section 8.4).
+- The daily marks in the `mail` table show at a glance which days' mails went.
+
+---
+
+## 17. What changes in the existing documents and rules
+
+| Where | Today | Becomes |
+|---|---|---|
+| Root `CLAUDE.md`, "Hard rules" | "Every password is set as permanent. There is no forced password change and no e-mail sending." | "A User's first password is temporary: Cognito makes it, e-mails it and forces its change at the first sign-in; the API never sees it or answers it. The Administrator's password is set once as permanent by the bootstrap. The system sends e-mail only through SES: Cognito's invitations and the mailer." |
+| Root `CLAUDE.md`, logs | tokens, passwords, the create-user answer's body, a conversation's text | adds: an e-mail address, a name, a postal address, a mail's text or attachment |
+| Root `CLAUDE.md`, the assistant | "changes the calendar only through `confirmProposal`" | "changes the calendar, or sends a mail, only through `confirmProposal`" |
+| `docs/ARCHITECTURE.md` | 1.2 (admin provisioning, password reset), 5.1 (attributes, `MessageAction=SUPPRESS`), 6.3 (create a user), 7.3 risk 7 ("no in-band delivery"), 7.4 option C, 10 ("No e-mail is sent"), 13 (the temporary-password alternative rejected) | rewritten from this document when merged; 13 records why the earlier rejection no longer holds (the change of password now exists in the page, and Cognito's challenge was tried locally) |
+| `docs/SHARED_CALENDAR_SPEC.md` section 15 | "the recipient's address will be the Cognito `email` attribute" | holds: this document provides it |
+| `docs/FRONTEND_SERVICES.md`, `docs/FRONTEND_ARCHITECTURE.md`, `docs/FRONTEND_WALK.md` | | new sections (section 11) |
+| `docs/RUNBOOK.md`, `docs/COMMANDS.md` | | the stages, DNS, production access, the suppression list, the fake mail |
+| `README.md` | | the versions: v3.0.0 |
+
+---
+
+## 18. Alternatives considered
+
+| Alternative | Why not |
+|---|---|
+| Our mailer sends the invitation, with a password our code generates | The password would pass through our code, an asynchronous event and possibly a log; resend means our own temporary-password logic. Its one advantage: the resend works locally. |
+| A flag "must change password" of our own instead of Cognito's state | Decided against (M2): the server would have to enforce it on every route, and nothing would expire the first password |
+| A timer set to the chosen hour | Changing it needs scheduler permissions and a role to pass; the hourly check is simpler and free |
+| A queue (SQS) between the routes and the mailer | Lambda's asynchronous invoke already queues and retries; one less resource |
+| A link to download the file (S3, a signed URL) instead of an attachment | A bucket, a lifetime, a link that works for whoever has it; attachments are small here |
+| CSV instead of Excel | Asked for Excel; CSV opens badly in Excel with accents and dates |
+| The settings of the daily mail in the calendar's `SETTINGS` item | Its route requires exactly four fields: adding two breaks the page and the assistant's tool |
+| Cognito's default e-mail (no SES) | 50 mails a day per account, sent from `no-reply@verificationemail.com`, and the mailer needs SES anyway |
+
+---
+
+## 19. Notifications later (sketch, decision M5)
+
+The calendar already writes an `EVENT` item in the same transaction as every booking, cancel,
+change and note (`docs/SHARED_CALENDAR_SPEC.md` section 15). With this document in place, the
+remaining pieces are small: a DynamoDB stream on `calendar` filtered to `PK = EVENT`, feeding
+the mailer a fourth kind, `event`; the address is now in Cognito; a deleted User's address must
+be copied before the deletion (`docs/SHARED_CALENDAR_SPEC.md` section 15.1 already says so); a per-person opt-out in the
+`mail` table; reminders as a second timer reading tomorrow's appointments. None changes the
+routes of this document.
+
+---
+
+## 20. Outline for the implementation plan
+
+Each step ends green (`npm run verify`) and is reviewed before the next. Nothing reaches the
+cloud before step 9.
+
+0. **The existing Users deleted** (operator, in the cloud, before any code; section 4.3). The
+   local seed creates `alice` with the four facts from then on.
+1. **The contract** in `shared/`: `UserProfile`, the changed and new bodies and answers, the
+   new error codes, the mail settings, the texts. Choose the Excel library; read SES's prices
+   again.
+2. **Profiles**: `POST /users` takes the four facts (still with a permanent password, so the
+   page keeps working), `PUT /users/{username}`, `GET /users` with the facts, `GET /me`; the
+   users screen and "My details". Bootstrap script asks the Administrator's facts.
+3. **The table `mail`, the fake mail, the mailer** with `excel.ts` and `ses.ts`; the kind
+   `calendar` and `mine` run by hand locally.
+4. **`POST /mail/calendar`** with its counter and limits; the week page's button.
+5. **The daily mail**: the settings routes, the settings section, the hourly run with its mark;
+   the timer in the template.
+6. **The assistant's tool** `send_calendar_mail`, its proposal and texts in both languages.
+7. **The first sign-in**: the page answers `NEW_PASSWORD_REQUIRED`; tested with accounts made
+   with a temporary password.
+8. **The invitation**: `createUser` lets Cognito send; the answer without password; resend; the
+   invitation template; the users screen's states. The template's stages (`off`, `domain`,
+   `on`) and the parameters.
+9. **Cloud, stage `domain`** (operator): deploy, DNS records, SNS confirmation, production
+   access request.
+10. **Cloud, stage `on`**: deploy, smoke test, the page released, the quick look by the
+    operator with a real invitation and a real daily mail; the Administrator's facts set; the
+    Users who need an account created again; documents merged; tag v3.0.0.
+
+---
+
+## 21. What you have to decide and do
+
+**Decided** (the open points, all settled on 2026-11-25):
+
+| Id | Question | Decision |
+|---|---|---|
+| O1 | The postal address: what is it for? | **Decided**: future features, such as printing invoices |
+| O2 | The Reply-To: the same address as `AlertEmail`, or another? | **Decided**: `AlertEmail` |
+| O3 | Should the invitation greet by first name? Cognito's template has no name placeholder; a "custom message" trigger function can add it | **Decided**: no, "Hello" is enough; one fewer function |
+| O4 | May the assistant greet a person by first name? | **Decided**: later; not part of this work |
+| O5 | The resend locally: a flag in `env.local.json`, or proved only in the cloud? | **Decided**: only in the cloud, by the smoke test, like the global sign-out's revocation |
+| O6 | Does the profile `shared-calendar-admin` allow `iam:CreateServiceLinkedRole`? | **Decided**: checked before step 10 |
+| O7 | Our own fake mail, or a ready-made emulator? | **Decided**: our own |
+| — | The decisions of section 2.3 (M11–M17) | **Confirmed** |
+
+**Do** (as operator, when the plan reaches them):
+
+1. Have access to the DNS of the domain (the same place as the page's CNAMEs,
+   `docs/CUSTOM_DOMAIN.md`): three DKIM records and one DMARC record.
+2. Request SES production access for `eu-north-1` (section 8.5).
+3. Confirm the SNS subscription mail that arrives at the alarm address.
+4. At the start: delete the existing Users (section 4.3). At step 10: set your own four facts, and create again the Users who still need an account.
+5. Update the privacy notice with the new data and the Excel files in your mailbox, ahead of the
+   GDPR work.
+
+---
+
+## 22. Sources (read on 2026-11-25)
+
+- Amazon Cognito, "Email settings for Amazon Cognito user pools":
+  https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-email.html (Europe
+  (Stockholm) is "In-Region only"; the sandbox; the service-linked role; the From and Reply-To).
+- Amazon SES, "Amazon SES now offers attachments in sending APIs" (April 2025):
+  https://aws.amazon.com/about-aws/whats-new/2025/04/amazon-ses-attachments-sending-apis/
+- Amazon SES API v2, `SendEmail` (`Content.Simple.Attachments`, `ReplyToAddresses`):
+  https://docs.aws.amazon.com/boto3/latest/reference/services/sesv2/client/send_email.html
+- Amazon SES pricing: https://aws.amazon.com/ses/pricing/ (the plans; Essentials 0.16 USD per
+  1 000 mails for new accounts from 2026-07-21).
+- AWS regional availability, checked through AWS's own catalogue: `AWS::SES::EmailIdentity`,
+  `AWS::SES::ConfigurationSet`, `AWS::SES::ConfigurationSetEventDestination`,
+  `AWS::Scheduler::Schedule` available in `eu-north-1`.
+- Not confirmed yet, for the plan's first steps: that pointing the existing pool at SES is an
+  update without replacement; Cognito's exact invitation placeholders and the template's size
+  limit; the Excel library's bundle size.
