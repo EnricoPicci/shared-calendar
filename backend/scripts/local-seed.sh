@@ -239,8 +239,10 @@ ensure_user alice "$ALICE_PASSWORD" user "$(facts_of Alice Liddell alice@example
 # read or write Cognito only.
 # The three assistant functions that run tools (SendAssistantMessageFunction,
 # ContinueAssistantFunction, ConfirmProposalFunction) call Cognito too, through the code of
-# GET /users and of the booking route, when the Administrator lists the Users or books for one:
-# each gets the same section, beside what "Parameters" gives it.
+# GET /users and of the booking route, when the Administrator lists the Users or books for one, and
+# through the code of GET /me and of the mail route, for a mail: each gets the same section, beside
+# what "Parameters" gives it. What the mail route reads besides (the stage, the table, the mailer's
+# name and the address of local:lambda) reaches them from "Parameters", as it reaches the route.
 # ASSISTANT_TABLE, like CALENDAR_TABLE, reaches every function that declares it in template.yaml:
 # an assistant function gets the table's local name by declaring the variable.
 #

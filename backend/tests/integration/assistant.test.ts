@@ -1,9 +1,13 @@
-import { addDays, ASSISTANT_LIMITS, assistantTexts, localDateOf, localTimeOf, weekdayOf } from '@shared-calendar/shared';
+import { addDays, ASSISTANT_LIMITS, assistantTexts, localDateOf, localTimeOf, maskAddress, weekdayOf } from '@shared-calendar/shared';
 import {
   api,
   assistantStepCost,
+  createSecondAdmin,
   createUserInNoGroup,
+  factsOf,
   forgetDailyUse,
+  forgetMailsTo,
+  mailsTo,
   localDailyMessageLimit,
   queryAssistantPartition,
   removeUserIfPresent,
@@ -13,6 +17,7 @@ import {
   storedEntries,
   subOf,
   type AssistantStepCost,
+  waitForMails,
   weighAssistant,
   withFacts,
 } from './setup';
@@ -1951,5 +1956,86 @@ describe('a type created with a capacity and edited through the assistant (3, 5.
     await proposeAndConfirm('fake: let the type of the capacity journey hold two people', summary);
     expect(await typeNamed()).toMatchObject({ name: TYPE, capacity: 2 });
     expect((await storedToolRequests(adminToken)).map((request) => request.name)).toEqual(['create_type', 'list_types', 'edit_type']);
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/assistant-mail.md.
+// Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
+describe('a mail asked for through the assistant (3, 5.4, 5.5)', () => {
+  const ASK = 'fake: e-mail me my appointments of the mail journey';
+  // A throw-away User, new at each run, so a new `sub` with all of the day's five mails, and a
+  // second administrator made in cognito-local without any fact, so without an address.
+  const USERNAME = 'chat-mail';
+  const NOBODY = 'chat-mail-nobody';
+  const NOBODY_PASSWORD = 'Nobody-Local-Pass-1!';
+  const ADDRESS = factsOf(USERNAME).email;
+  // The dates the fake asks for: {{date+7}} to {{date+13}} of its answer file.
+  let from: string;
+  let to: string;
+  let token: string;
+
+  const summary = () => assistantTexts('en').changes.sendCalendarMail({ from, to, kind: 'mine', address: maskAddress(ADDRESS) });
+  // A moment for a mail that should not come, since the mailer runs in the background.
+  const aMoment = () => new Promise((resolve) => setTimeout(resolve, 3000));
+
+  beforeAll(async () => {
+    from = await dayOfJourney(7);
+    to = await dayOfJourney(13);
+    token = await newUser(USERNAME);
+    await removeUserIfPresent(NOBODY);
+    await forgetMailsTo(ADDRESS);
+  });
+
+  afterAll(async () => {
+    await removeUserIfPresent(USERNAME);
+    await removeUserIfPresent(NOBODY);
+    await forgetMailsTo(ADDRESS);
+  });
+
+  it('a request for a mail: Claude asks for the tool, nothing is sent, and the proposal shows the two dates and the masked address', async () => {
+    const res = await say(token, ASK);
+    expect(res.status).toBe(200);
+    expect(summary()).toMatch(/^Send your appointments from \w+ \d+ \w+ \d{4} to \w+ \d+ \w+ \d{4} to c•••@example\.com\.$/);
+    expect(res.body).toMatchObject({ status: 'awaiting_confirmation', activity: null, proposal: proposalOf([summary()]) });
+    expect(JSON.stringify(res.body)).not.toContain(ADDRESS);
+    expect(await storedToolRequests(token)).toEqual([{ name: 'send_calendar_mail', input: { from, to } }]);
+    await aMoment();
+    expect(await mailsTo(ADDRESS)).toEqual([]);
+  });
+
+  it("confirm: Claude is told the mail is on its way, and one mail comes to the User's own address", async () => {
+    const proposalId = ((await conversation(token)).body?.proposal as { proposalId: string }).proposalId;
+    const res = await confirm(token, proposalId);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'idle', proposal: proposalOf([summary()], [['done', null]]) });
+    // The fake answers with the result of the change, word for word: what Claude was given.
+    const given = JSON.parse((res.body?.messages as { text: string }[])[0]!.text) as Record<string, unknown>;
+    expect(given).toEqual({ outcome: 'done', message: expect.stringContaining('on its way') });
+    expect(JSON.stringify(given)).not.toMatch(/@|•/);
+
+    const [mail, ...more] = await waitForMails(ADDRESS, 1);
+    expect(more).toEqual([]);
+    expect(mail!.to).toEqual([ADDRESS]);
+    expect(mail!.text).toContain('You have no appointments in this period.');
+    await forgetMailsTo(ADDRESS);
+  });
+
+  it("Don't: nothing is sent", async () => {
+    const asked = await say(token, ASK);
+    expect(asked.body).toMatchObject({ status: 'awaiting_confirmation', proposal: proposalOf([summary()]) });
+    const res = await decline(token, (asked.body?.proposal as { proposalId: string }).proposalId);
+    expect(res.body).toMatchObject({ status: 'idle', proposal: null, messages: [{ from: 'notice', text: 'Nothing was changed.' }] });
+    await aMoment();
+    expect(await mailsTo(ADDRESS)).toEqual([]);
+  });
+
+  it('an account without an address is told no_email_address at the proposal: nothing is proposed', async () => {
+    await createSecondAdmin(NOBODY, NOBODY_PASSWORD);
+    const nobody = await signIn(NOBODY, NOBODY_PASSWORD);
+    const { body } = await sayAndRead(nobody, ASK);
+    expect(body).toMatchObject({ status: 'idle', proposal: null });
+    // The fake answers with the result of the tool, word for word: what Claude was given.
+    const given = JSON.parse((body?.messages as { from: string; text: string }[]).at(-1)!.text) as Record<string, unknown>;
+    expect(given).toEqual({ error: 'no_email_address', message: expect.stringContaining('no e-mail address') });
   });
 });

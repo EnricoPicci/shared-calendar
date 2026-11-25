@@ -1,5 +1,5 @@
 import { weekdayOf } from '../calendar/time';
-import type { AppointmentSummary, AssistantSettingName, AssistantTexts, DayHours, HoursSummary, OverCapacity, PatternSummary, SettingChange, TypeEditSummary } from './texts';
+import type { AppointmentSummary, AssistantSettingName, AssistantTexts, DayHours, HoursSummary, MailSummary, OverCapacity, PatternSummary, SettingChange, TypeEditSummary } from './texts';
 
 const WEEKDAYS = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
 const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
@@ -66,6 +66,10 @@ const editedType = ({ name, newName, capacity, bookedAbove }: TypeEditSummary) =
   return `Modificare il tipo di appuntamento «${name}»: ${parts.join(', ')}.${kept}`;
 };
 
+// A mail on demand: what it holds, by the person's role, and its range, one date or two.
+const mailOf = ({ from, to, kind, address }: MailSummary) =>
+  `Inviare ${kind === 'calendar' ? 'il calendario' : 'i suoi appuntamenti'} ${from === to ? `di ${fullDate(from)}` : `da ${fullDate(from)} a ${fullDate(to)}`} all'indirizzo ${address}.`;
+
 // The fixed texts in Italian, key by key the ones of the English object. The person is addressed
 // with the formal "lei" throughout. The second button is not "Annulla": in a calendar that word
 // would read as cancelling the appointment.
@@ -114,6 +118,7 @@ export const ASSISTANT_TEXTS_IT: AssistantTexts = {
     deleteDateOverride: ({ date, now, then, extras }) => `Tornare agli orari settimanali per ${fullDate(date)}. ${dayNow(now)} ${dayThen(then)}${extraWindows(extras)}`,
     createOneOffWindow: ({ date, start, end, type }) => `Creare una finestra aggiuntiva per ${fullDate(date)}, dalle ${start} alle ${end} (${type}).`,
     deleteOneOffWindow: ({ date, start, end, type }) => `Eliminare la finestra aggiuntiva di ${fullDate(date)}, dalle ${start} alle ${end} (${type}).`,
+    sendCalendarMail: mailOf,
   },
   working: 'Ci sto lavorando…',
   reading: {
@@ -123,5 +128,6 @@ export const ASSISTANT_TEXTS_IT: AssistantTexts = {
     appointments: 'Sto guardando gli appuntamenti…',
     users: 'Sto guardando gli utenti…',
     patterns: 'Sto guardando gli orari settimanali…',
+    details: 'Sto guardando i suoi dati…',
   },
 };

@@ -1,4 +1,4 @@
-import { toInstant } from '@shared-calendar/shared';
+import { addDays, toInstant } from '@shared-calendar/shared';
 import { asked, askedInOrder, askedNothing, askedOnly, askedWith, either, noProposal, notBefore, outcomes, proposalStarts, proposes, readsDay, type Check } from './checks';
 import { weekdayName, written } from './dates';
 import { ANNA, BRUNO, POOL, type World } from './week';
@@ -16,6 +16,7 @@ export type Kind =
   | 'change'
   | 'blocking'
   | 'capacity'
+  | 'mail'
   | 'ambiguous'
   | 'web-pages'
   | 'other-role'
@@ -40,14 +41,14 @@ export type EvalRequest = {
 };
 
 // The tools a User is offered, and those that only read.
-const USER_TOOLS = ['get_settings', 'list_types', 'get_calendar', 'list_appointments', 'book_appointment', 'cancel_appointment', 'change_appointment', 'set_appointment_note'];
+const USER_TOOLS = ['get_settings', 'list_types', 'get_calendar', 'list_appointments', 'book_appointment', 'cancel_appointment', 'change_appointment', 'set_appointment_note', 'send_calendar_mail'];
 const READS = ['get_settings', 'list_types', 'get_calendar', 'list_appointments', 'list_users', 'list_patterns'];
 const DAY_READS = ['get_calendar', 'list_appointments'];
 
 export function evalRequests(world: World): EvalRequest[] {
   const { days, zone, types, patterns, appointments } = world;
   const [mon, tue, wed, thu, fri, sat, sun] = days.nextWeek;
-  const [mon2, tue2, wed2, thu2] = days.weekAfter;
+  const [mon2, tue2, wed2, thu2, , , sun2] = days.weekAfter;
   const at = (date: string, time: string) => toInstant(date, time, zone);
   const week = { from: mon, to: sun };
   const visit = (start: string, end: string) => ({ start, end, typeId: types.visit });
@@ -108,8 +109,7 @@ export function evalRequests(world: World): EvalRequest[] {
     { id: 'block-own-hours', kind: 'blocking', who: 'admin', language: 'en', messages: ['Block Wednesday of next week from 11:00 to 12:00.'], ends: 'proposal', checks: [hours(wed, visit('10:00', '11:00')), asked('get_calendar')], hand: 'P5. The day as it was: hours of its own, 10:00-12:00 eval Visit. Asked: 11:00-12:00.' },
     { id: 'block-no-hours', kind: 'blocking', who: 'admin', language: 'it', messages: ['Blocchi domenica della settimana prossima dalle 10:00 alle 12:00.'], ends: 'answer', checks: [noProposal(), asked('get_calendar')], hand: 'P5. The day as it was: no hours at all. Asked: 10:00-12:00. It should say there is nothing to block.' },
     // The block lies over an appointment. Claude may see it and propose nothing; asked again, it
-    // proposes, and the calendar refuses at the confirmation. Last of the list: it is the one
-    // request that confirms.
+    // proposes, and the calendar refuses at the confirmation, which this request makes.
     { id: 'block-over-appointment', kind: 'blocking', who: 'admin', language: 'it', messages: ['Blocchi martedì della settimana prossima dalle 9:00 alle 11:00.', 'Proponga comunque la modifica, anche se ci sono appuntamenti.'], ends: 'proposal', checks: [hours(tue, visit('11:00', '13:00'), lesson('15:00', '18:00')), outcomes('refused:availability_conflict')], confirm: ['set_date_override'], hand: `P5. The day as it was: 09:00-13:00 eval Visit with ${BRUNO} at 09:00, 15:00-18:00 eval Lesson. Asked: 09:00-11:00. After the refusal it should name the appointment in the way.` },
 
     // ── The capacity of a type ────────────────────────────────────────────────────────────────
@@ -131,6 +131,37 @@ export function evalRequests(world: World): EvalRequest[] {
       hand: 'The first answer should say the time is full and that it can be booked over the capacity if wanted.',
     },
     { id: 'capacity-busy', kind: 'capacity', who: 'admin', language: 'it', messages: [`Prenoti ${ANNA} per la ${POOL} ${written(wed2, 'it')} alle 15:00.`], ends: 'answer', checks: [noProposal()], hand: `${ANNA} already holds a place at 15:00: it should say so, and may offer to move that appointment.` },
+
+    // ── A mail on demand, to the person's own address ─────────────────────────────────────────
+    // A proposal of one mail, the two dates checked; the address is never an input. One request
+    // confirms, as eval-bruno, an account made new at each run with all of the day's five: the mail
+    // is queued and comes to eval-bruno@example.com at the fake mail. Two ask for two periods at
+    // once, side by side and with a gap: one mail from the first day to the last.
+    { id: 'mail-mine', kind: 'mail', who: 'anna', language: 'en', messages: ['E-mail me my appointments of next week.'], ends: 'proposal', checks: [proposes({ tool: 'send_calendar_mail', body: week }), askedOnly(...USER_TOOLS)] },
+    {
+      id: 'mail-miei',
+      kind: 'mail',
+      who: 'bruno',
+      language: 'it',
+      messages: ['Mi mandi per e-mail i miei appuntamenti della settimana prossima.'],
+      ends: 'proposal',
+      checks: [proposes({ tool: 'send_calendar_mail', body: week }), outcomes('done')],
+      confirm: ['send_calendar_mail'],
+      hand: `After the confirmation it should say the mail is on its way. One mail to ${BRUNO}@example.com at the fake mail (http://localhost:8025).`,
+    },
+    { id: 'mail-calendar', kind: 'mail', who: 'admin', language: 'en', messages: ['Send me the whole calendar of next week by e-mail.'], ends: 'proposal', checks: [proposes({ tool: 'send_calendar_mail', body: week })] },
+    { id: 'mail-calendario-giorno', kind: 'mail', who: 'admin', language: 'it', messages: [`Mi invii per e-mail il calendario di ${written(tue2, 'it')}.`], ends: 'proposal', checks: [proposes({ tool: 'send_calendar_mail', body: { from: tue2, to: tue2 } })] },
+    { id: 'mail-two-weeks', kind: 'mail', who: 'anna', language: 'en', messages: ['E-mail me my appointments of next week and of the week after.'], ends: 'proposal', checks: [proposes({ tool: 'send_calendar_mail', body: { from: mon, to: sun2 } })], hand: 'One mail over the two weeks; it may say so.' },
+    {
+      id: 'mail-con-intervallo',
+      kind: 'mail',
+      who: 'admin',
+      language: 'it',
+      messages: [`Mi mandi per e-mail il calendario della settimana prossima e quello della settimana che inizia ${written(addDays(mon, 21), 'it')}.`],
+      ends: 'proposal',
+      checks: [proposes({ tool: 'send_calendar_mail', body: { from: mon, to: addDays(mon, 27) } })],
+      hand: 'One mail from the first day to the last: it should say that the two weeks between are in it too.',
+    },
 
     // ── Ambiguity: a question, and no proposal ────────────────────────────────────────────────
     { id: 'ambiguous-something', kind: 'ambiguous', who: 'anna', language: 'en', messages: ['Book me something next week.'], ends: 'answer', checks: [noProposal(), askedOnly(...READS)], hand: 'It should ask which day and time, or offer the free times.' },

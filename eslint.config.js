@@ -72,8 +72,8 @@ export default tseslint.config(
             message: "The assistant's core reaches the calendar through a route's handler (backend/src/handlers), never through the calendar's own modules.",
           },
           {
-            regex: '(^|/)handlers/(bookAppointment|cancelAppointment|changeAppointment|updateAppointmentNote|createAvailabilityType|renameAvailabilityType|deleteAvailabilityType|createPattern|updatePattern|deletePattern|setOverride|deleteOverride|createOneOffWindow|deleteOneOffWindow|updateCalendarSettings|createUser|deleteUser)(\\.[jt]s)?$',
-            message: "A handler that changes the calendar is imported only by backend/src/assistant/tools/changeHandlers.ts: no function that reads free text or asks Claude may carry it.",
+            regex: '(^|/)handlers/(bookAppointment|cancelAppointment|changeAppointment|updateAppointmentNote|createAvailabilityType|renameAvailabilityType|deleteAvailabilityType|createPattern|updatePattern|deletePattern|setOverride|deleteOverride|createOneOffWindow|deleteOneOffWindow|updateCalendarSettings|sendCalendarMail|createUser|deleteUser)(\\.[jt]s)?$',
+            message: "A handler that changes the calendar or sends a mail is imported only by backend/src/assistant/tools/changeHandlers.ts: no function that reads free text or asks Claude may carry it.",
           },
           {
             regex: '(^|/)changeHandlers(\\.[jt]s)?$',
@@ -122,8 +122,8 @@ export default tseslint.config(
             message: "The assistant's core reaches the calendar through a route's handler (backend/src/handlers), never through the calendar's own modules.",
           },
           {
-            regex: '(^|/)handlers/(bookAppointment|cancelAppointment|changeAppointment|updateAppointmentNote|createAvailabilityType|renameAvailabilityType|deleteAvailabilityType|createPattern|updatePattern|deletePattern|setOverride|deleteOverride|createOneOffWindow|deleteOneOffWindow|updateCalendarSettings|createUser|deleteUser)(\\.[jt]s)?$',
-            message: "A handler that changes the calendar is imported only by backend/src/assistant/tools/changeHandlers.ts: no function that reads free text or asks Claude may carry it.",
+            regex: '(^|/)handlers/(bookAppointment|cancelAppointment|changeAppointment|updateAppointmentNote|createAvailabilityType|renameAvailabilityType|deleteAvailabilityType|createPattern|updatePattern|deletePattern|setOverride|deleteOverride|createOneOffWindow|deleteOneOffWindow|updateCalendarSettings|sendCalendarMail|createUser|deleteUser)(\\.[jt]s)?$',
+            message: "A handler that changes the calendar or sends a mail is imported only by backend/src/assistant/tools/changeHandlers.ts: no function that reads free text or asks Claude may carry it.",
           },
       ] }],
     },

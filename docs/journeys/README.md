@@ -136,6 +136,7 @@ The pages written so far. Which pages are still to come, and in which order, is 
 | [`backend/assistant-other-instructions.md`](backend/assistant-other-instructions.md) | `backend/tests/integration/assistant.test.ts`, `a conversation started under other instructions is over (4.3)` |
 | [`backend/assistant-places.md`](backend/assistant-places.md) | `backend/tests/integration/assistant.test.ts`, `the places of a type through the assistant (3, 5.5 rule 4, 7.3)` |
 | [`backend/assistant-type-capacity.md`](backend/assistant-type-capacity.md) | `backend/tests/integration/assistant.test.ts`, `a type created with a capacity and edited through the assistant (3, 5.4)` |
+| [`backend/assistant-mail.md`](backend/assistant-mail.md) | `backend/tests/integration/assistant.test.ts`, `a mail asked for through the assistant (3, 5.4, 5.5)` |
 | [`backend/mail-mailer.md`](backend/mail-mailer.md) | `backend/tests/integration/mail.test.ts`, `the mailer run by hand (6.1, 6.3)` |
 | [`backend/mail-route.md`](backend/mail-route.md) | `backend/tests/integration/mail.test.ts`, `POST /mail/calendar (6.5, 9.1)` |
 | [`backend/mail-daily.md`](backend/mail-daily.md) | `backend/tests/integration/mail.test.ts`, `the daily mail (6.2, 6.3, 9.1)` |

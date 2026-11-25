@@ -178,16 +178,17 @@ mailer as `local:lambda` names it); and sections of their own for `MailerFunctio
   `xhigh`, `max`; `local:up` refuses another value. Without them the template's model and the
   effort `low` are used, and a `local:up` without them is the way back.
 - **`npm run assistant:eval -w backend`: the evaluation with the real model**
-  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3). It plays 57 requests in English and
+  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3). It plays 63 requests in English and
   Italian against the local API and checks what Claude did. **It costs money at Anthropic**:
-  about 40 US cents and four minutes for the whole list on `claude-sonnet-5-5`, 3 cents on
+  about 50 US cents and four minutes for the whole list on `claude-sonnet-5-5`, 3 cents on
   `claude-haiku-5-5`. It is no part of `verify`. Run it before a deployment that changes the
   instructions (`backend/src/assistant/prompt.ts`), a tool or the model.
   - It needs: the real Claude wired; **a stack started afresh** (`local:down`, `local:up`), as
     it refuses a calendar that holds a type whose name does not start with "eval", so never
     after a gate on the same tables; `local:api` started through `tee` into
-    `/tmp/shared-calendar-local-api.log`, from which it reads the tokens of each step; the
-    same `DYNAMODB_PORT` as `local:up`.
+    `/tmp/shared-calendar-local-api.log`, from which it reads the tokens of each step;
+    `local:lambda` running, since one request confirms a mail, which comes to
+    `eval-bruno@example.com` at the fake mail; the same `DYNAMODB_PORT` as `local:up`.
   - `DYNAMODB_PORT=8002 npm run assistant:eval -w backend -- --ceiling 4 --out run.json --hand answers.txt`:
     `--ceiling` stops the run when it has cost that many US dollars (4 when not given),
     `--out` writes the run as JSON, `--hand` writes the answers a person must read; `--only`

@@ -15,6 +15,7 @@ import { listAppointments, listAppointmentsDefinition } from './listAppointments
 import { listPatterns, listPatternsDefinition } from './listPatterns';
 import { listTypes, listTypesDefinition } from './listTypes';
 import { listUsers, listUsersDefinition } from './listUsers';
+import { sendCalendarMail, sendCalendarMailDefinition } from './sendCalendarMail';
 import { setAppointmentNote, setAppointmentNoteDefinition } from './setAppointmentNote';
 import { setDateOverride, setDateOverrideDefinition } from './setDateOverride';
 import type { Tool, ToolDefinition } from './tool';
@@ -36,6 +37,7 @@ export const DEFINITIONS: readonly ToolDefinition[] = [
   cancelAppointmentDefinition,
   changeAppointmentDefinition,
   setAppointmentNoteDefinition,
+  sendCalendarMailDefinition,
   listUsersDefinition,
   listPatternsDefinition,
   updateSettingsDefinition,
@@ -62,6 +64,7 @@ export const TOOLS: readonly Tool[] = [
   cancelAppointment,
   changeAppointment,
   setAppointmentNote,
+  sendCalendarMail,
   listUsers,
   listPatterns,
   updateSettings,

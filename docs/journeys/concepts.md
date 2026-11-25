@@ -715,7 +715,11 @@ name of its type. For the other three, through the code of `GET /calendar/appoin
 appointment the id stands for, among the person's appointments that have not ended. For the
 Administrator's booking for a User, first through the code of `GET /users`: the username must
 be in the list. For a change of settings, through the code of `GET /calendar/settings`: the
-values as they are. Several
+values as they are. One more change tool, `send_calendar_mail`, offered to everybody, changes
+nothing in the calendar but sends a mail, an act with an effect outside the application, so it
+takes the same path: its facts are the person's own details, read through the code of `GET /me`,
+and its sentence shows the two dates and the address masked; on Confirm the server runs the code
+of `POST /mail/calendar`. Several
 changes asked for in one answer of Claude make one proposal, with one line in `actions` for
 each, five at most; if one of them cannot be proposed, none is. Then
 it saves a **proposal** and answers `status` `awaiting_confirmation`, with:

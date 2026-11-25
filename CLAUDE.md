@@ -65,8 +65,8 @@ one that is fixed:
 - Logs never contain tokens, passwords, the body of the create-user response, an e-mail
   address, a name, a postal address, a mail's text or attachment, or a text of a
   conversation with the assistant (a message, an answer, a tool's input or result).
-- The assistant changes the calendar only through `confirmProposal`, after the person's button,
-  and reaches it through a route's handler, never through `backend/src/lib/calendarDb.ts`.
+- The assistant changes the calendar, or sends a mail, only through `confirmProposal`, after the
+  person's button, and reaches it through a route's handler, never through `backend/src/lib/calendarDb.ts`.
 - IAM policies never use a wildcard action or resource. One role per function, granting only
   what its route needs, scoped to the user pool and/or table it uses. The calendar's DynamoDB
   permissions are shared managed policies on the `calendar` table, attached per role

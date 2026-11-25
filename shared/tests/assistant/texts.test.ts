@@ -75,6 +75,10 @@ const NO_PATTERN_HOURS = { date: DAY, now: { from: 'patterns' as const, windows:
 const BACK_TO_PATTERNS = { date: DAY, now: { from: 'own' as const, windows: [] }, then: { from: 'patterns' as const, windows: [MORNING, AFTERNOON] }, extras: [] };
 const BACK_TO_NOTHING = { date: DAY, now: { from: 'own' as const, windows: [LATE] }, then: { from: 'patterns' as const, windows: [] }, extras: [EXTRA] };
 const WINDOW = { date: DAY, ...EXTRA };
+// A mail on demand: a User's own appointments over a week, the Administrator's calendar, one day.
+const MAIL_MINE = { from: '2026-11-30', to: '2026-12-06', kind: 'mine' as const, address: 'a•••@example.com' };
+const MAIL_CALENDAR = { ...MAIL_MINE, kind: 'calendar' as const };
+const MAIL_ONE_DAY = { ...MAIL_MINE, to: '2026-11-30' };
 
 // The arguments each text that is a function is tried with: every number of changes a proposal
 // may hold, and each shape of a booking. A new function among the texts needs its entry here, or
@@ -96,6 +100,7 @@ const SAMPLES: Record<string, unknown[][]> = {
   'changes.deleteDateOverride': [[BACK_TO_PATTERNS], [BACK_TO_NOTHING]],
   'changes.createOneOffWindow': [[WINDOW]],
   'changes.deleteOneOffWindow': [[WINDOW]],
+  'changes.sendCalendarMail': [[MAIL_MINE], [MAIL_CALENDAR], [MAIL_ONE_DAY]],
 };
 
 // Every text of one language as `path -> the strings it gives`: a string as itself, a function
@@ -387,6 +392,17 @@ describe('assistantTexts', () => {
     expect(ASSISTANT_TEXTS_IT.changes.createOneOffWindow(WINDOW)).toBe('Creare una finestra aggiuntiva per martedì 24 novembre 2026, dalle 19:00 alle 20:00 (Phone call).');
     expect(ASSISTANT_TEXTS_EN.changes.deleteOneOffWindow(WINDOW)).toBe('Delete the extra window of Tuesday 24 November 2026, from 19:00 to 20:00 (Phone call).');
     expect(ASSISTANT_TEXTS_IT.changes.deleteOneOffWindow(WINDOW)).toBe('Eliminare la finestra aggiuntiva di martedì 24 novembre 2026, dalle 19:00 alle 20:00 (Phone call).');
+  });
+
+  it('a mail on demand names what it holds by the role, its dates in full, one date alone, and the masked address', () => {
+    const en = ASSISTANT_TEXTS_EN.changes.sendCalendarMail;
+    const it = ASSISTANT_TEXTS_IT.changes.sendCalendarMail;
+    expect(en(MAIL_MINE)).toBe('Send your appointments from Monday 30 November 2026 to Sunday 6 December 2026 to a•••@example.com.');
+    expect(en(MAIL_CALENDAR)).toBe('Send the calendar from Monday 30 November 2026 to Sunday 6 December 2026 to a•••@example.com.');
+    expect(en(MAIL_ONE_DAY)).toBe('Send your appointments of Monday 30 November 2026 to a•••@example.com.');
+    expect(it(MAIL_MINE)).toBe("Inviare i suoi appuntamenti da lunedì 30 novembre 2026 a domenica 6 dicembre 2026 all'indirizzo a•••@example.com.");
+    expect(it(MAIL_CALENDAR)).toBe("Inviare il calendario da lunedì 30 novembre 2026 a domenica 6 dicembre 2026 all'indirizzo a•••@example.com.");
+    expect(it(MAIL_ONE_DAY)).toBe("Inviare i suoi appuntamenti di lunedì 30 novembre 2026 all'indirizzo a•••@example.com.");
   });
 
   it('the longest sentence of a day (ten stretches of hours as it is, ten as it would become, ten extra windows, the longest names) stays under 2 000 characters', () => {

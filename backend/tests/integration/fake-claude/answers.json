@@ -10,7 +10,8 @@
     "The requests about the opening hours are the content blocks the real model sent, as the Administrator, in the trial of the step that built those tools. For \"block Saturday from 10:00 to 11:00\" it read the day (tool-get-calendar-saturday12, -day19), said \"I need the type id.\" and read the types (tool-list-types), then asked for the day's own hours with what was left of it (tool-override-saturday…-block-0500): here the date is the mark {{saturday+N}}, the first Saturday on or after the date N days ahead, a day on which the local calendar holds nothing but the journey's own hours; the hours are those the journey's pattern leaves around 05:00 to 06:00, and the id of the type is the mark {{id:types:NAME}}, which the fake replaces with the id of the type of that name in the list of types the request holds. For \"every Sunday from 10 to 12\" it asked for the pattern (tool-create-pattern-sunday: here a Sunday between two dates a week apart, so that the pattern opens one day) and for \"delete it\" for its deletion (tool-delete-pattern-of-journey), by the id it had from the creation; the journey's fake reads the list of patterns first (tool-list-patterns, written for the journey: the real model did not need it) and takes the id from it with {{id:patterns:NAME}}.",
     "The answer tool-get-calendar-month-six-times is written by hand, not recorded: six requests for the same 31 days in one answer, given again at every step of its sentence, which no model would send. It is how a journey fills a conversation to its bound with the largest results a User's tools give, and meets the limit of reads run for one answer. The sentence \"fake: what was the last result you were given?\" gets the last result of a tool that the request holds, or the words that there is none: a journey reads from it whether an earlier conversation was sent to Claude.",
     "One message is not a journey's: \"What are the calendar's settings right now?\" is the exchange of the smoke test (backend/scripts/smoke.sh), which needs it to be a read followed by a text, in English. In the cloud the real model answers the same sentence.",
-    "The requests about the capacity of a type (tool-get-calendar-day20, tool-book-capacity-…, tool-create-type-with-capacity, tool-edit-type-capacity) are written by hand for the journeys, in the shape of the recorded requests: no model was asked. Two bookings into one slot in one answer, the same User twice, a third User into a full slot without and with \"overbook\", and a type created with a capacity, then edited by its id, which {{id:types:NAME}} takes from the list of types read before."
+    "The requests about the capacity of a type (tool-get-calendar-day20, tool-book-capacity-…, tool-create-type-with-capacity, tool-edit-type-capacity) are written by hand for the journeys, in the shape of the recorded requests: no model was asked. Two bookings into one slot in one answer, the same User twice, a third User into a full slot without and with \"overbook\", and a type created with a capacity, then edited by its id, which {{id:types:NAME}} takes from the list of types read before.",
+    "The request for a mail (tool-send-mail-week) is written by hand for the journeys, in the shape of the recorded requests: no model was asked. It asks for the seven dates from {{date+7}} to {{date+13}}, for the person who asks, whoever it is: a User, or an Administrator without an address."
   ],
   "answers": {
     "not-scripted": {
@@ -1446,6 +1447,38 @@
           "output_tokens": 0
         }
       }
+    },
+    "tool-send-mail-week": {
+      "source": "fake",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_tool_send_mail_week",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "tool_use",
+            "id": "toolu_fake_tool_send_mail_week_0",
+            "name": "send_calendar_mail",
+            "input": {
+              "from": "{{date+7}}",
+              "to": "{{date+13}}"
+            },
+            "caller": {
+              "type": "direct"
+            }
+          }
+        ],
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
     }
   },
   "otherwise": "not-scripted",
@@ -1624,6 +1657,10 @@
     "fake: let the type of the capacity journey hold two people": [
       "tool-list-types",
       "tool-edit-type-capacity",
+      "text-last-tool-result"
+    ],
+    "fake: e-mail me my appointments of the mail journey": [
+      "tool-send-mail-week",
       "text-last-tool-result"
     ]
   }

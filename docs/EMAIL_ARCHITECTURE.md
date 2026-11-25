@@ -513,6 +513,31 @@ handler), so the proposal shows the masked address, and a person without one is 
 proposals, `sendAssistantMessage` and `continueAssistant`, gain `AdminGetUser` for it (section
 12.2).
 
+**A stage that is not `on` is refused at the proposal too** (decided by the Product Owner on
+2026-11-25): the tool's `confirmation.read` looks at `MAIL_STAGE` before it reads anything, and
+any value but `on` ends it with `mail_unavailable` and a sentence for Claude ("e-mail is not
+available yet"): nothing is proposed. So the two functions that make proposals receive
+`MAIL_STAGE` too. The route's own check at Confirm stays as it is.
+
+**The five a day are told after Confirm** (decided on 2026-11-25): the proposal does not read the
+day's count, so the functions that make proposals hold no right on the table `mail`; the route
+counts at Confirm, a sixth is refused there (`mail_limit_reached`), and Claude says the day's
+mails are used up.
+
+**Several periods asked at once are one mail over the whole span** (decided on 2026-11-25):
+"this week and next week", or two periods with a gap ("the first week of December and the first
+week of January"), are proposed as one mail from the first day to the last; with a gap, the
+gap's appointments are in the file too, and the proposal shows the real dates. The tool's
+description tells Claude so; a span over 366 days is refused by the schema and Claude asks for a
+shorter one. Two mail proposals never share one answer of Claude. The route and the mailer do
+not change.
+
+**As built** (`docs/EMAIL_PLAN.md` step m6): `backend/src/assistant/tools/sendCalendarMail.ts`,
+its sentence in `shared/src/assistant/` in both languages ("Send your appointments from Monday
+30 November 2026 to Sunday 6 December 2026 to a•••@example.com.", "Send the calendar …" for the
+Administrator, "… of Monday 30 November 2026 …" for one date). After Confirm Claude is told only
+that the mail is on its way, never the address, masked or not.
+
 This keeps both rules intact: the assistant acts only through a route's handler and only after
 the person's button. The confirming function's role gains the right to start the mailer
 (section 12.2). The assistant itself never holds the right to send mail.
@@ -681,8 +706,8 @@ views follow `docs/FRONTEND_ARCHITECTURE.md` sections 3 and 4 (a dialog, a form)
 |---|---|
 | `mailer` (new) | `ses:SendEmail` on the domain identity and the configuration set; `CalendarReadPolicy`; the `mail` table read/write; Cognito `ListUsersInGroup` and `AdminGetUser` on the one pool |
 | `sendCalendarMail` (new route) | `lambda:InvokeFunction` on the mailer; Cognito `AdminGetUser` (has the person an address?); the `mail` table (counter) |
-| `confirmProposal` | `lambda:InvokeFunction` on the mailer, plus what `sendCalendarMail` needs |
-| `sendAssistantMessage`, `continueAssistant` | Cognito `AdminGetUser` on the one pool: the tool's proposal reads the person's address through the handler of `GET /me` (section 7) |
+| `confirmProposal` | `lambda:InvokeFunction` on the mailer, plus what `sendCalendarMail` needs: `dynamodb:UpdateItem` on the table `mail` (the `AdminGetUser` it already held); the variables `MAIL_STAGE`, `MAIL_TABLE`, `MAILER_FUNCTION`, `LAMBDA_ENDPOINT` |
+| `sendAssistantMessage`, `continueAssistant` | Cognito `AdminGetUser` on the one pool: the tool's proposal reads the person's address through the handler of `GET /me` (section 7); the variable `MAIL_STAGE`, and nothing of the table `mail` or the mailer |
 | The hourly schedule (a role of its own) | assumable by `scheduler.amazonaws.com` only; `lambda:InvokeFunction` on the mailer alone |
 | `createUser` | unchanged actions (`AdminCreateUser` now also sends; same permission) |
 | `updateUser`, `resendInvitation`, `getMe` (new routes) | Cognito `AdminUpdateUserAttributes`, `AdminCreateUser` (resend), `AdminGetUser`, `AdminListGroupsForUser`, on the one pool |

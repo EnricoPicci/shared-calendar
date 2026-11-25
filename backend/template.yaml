@@ -2500,7 +2500,11 @@ Resources:
   # For the Administrator it also runs the code of GET /users, to list the Users and to check the
   # User an appointment is proposed for. That code asks Cognito for the members of the two groups,
   # so the function gets the user pool's id (USER_POOL_ID) and one permission on that pool,
-  # ListUsersInGroup, which only reads. It cannot read one account, create, change or delete one.
+  # ListUsersInGroup, which only reads.
+  # When Claude asks to send a mail (docs/EMAIL_ARCHITECTURE.md section 7), nothing is sent here:
+  # the proposal shows the person's own address, masked, so the function runs the code of GET /me,
+  # which reads the caller's one account (AdminGetUser, which only reads). It cannot create, change
+  # or delete an account. MAIL_STAGE is the stack's stage: anything but 'on' and no mail is proposed.
   # COGNITO_ENDPOINT is empty in the cloud: only the local stack fills it, with the emulator's address.
   SendAssistantMessageFunction:
     Type: AWS::Serverless::Function
@@ -2525,6 +2529,7 @@ Resources:
           ASSISTANT_EFFORT: ''
           USER_POOL_ID: !Ref UserPool
           COGNITO_ENDPOINT: ''
+          MAIL_STAGE: !Ref MailStage
       Events:
         SendAssistantMessage:
           Type: HttpApi
@@ -2592,14 +2597,23 @@ Resources:
                 Action:
                   - cognito-idp:ListUsersInGroup
                 Resource: !GetAtt UserPool.Arn
+        - PolicyName: read-own-details
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminGetUser
+                Resource: !GetAtt UserPool.Arn
 
   # POST /assistant/continue (Administrator and Users): the next step of the caller's conversation
   # when one is waiting, after Claude asked to read the calendar or could not be reached. It does
   # what the function above does after a message, without a new message: it asks Claude once and
   # runs the reads Claude asks for. So it is given exactly the same: 29 seconds, the assistant's
   # table to read and write, the calendar's table to read only, the one parameter that holds the
-  # Anthropic key, the user pool's id with the permission to list the members of its groups, and
-  # the variables that only the local stack fills.
+  # Anthropic key, the user pool's id with the permissions to list the members of its groups and to
+  # read the caller's own account (for the proposal of a mail), the stack's mail stage, and the
+  # variables that only the local stack fills.
   ContinueAssistantFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -2623,6 +2637,7 @@ Resources:
           ASSISTANT_EFFORT: ''
           USER_POOL_ID: !Ref UserPool
           COGNITO_ENDPOINT: ''
+          MAIL_STAGE: !Ref MailStage
       Events:
         ContinueAssistant:
           Type: HttpApi
@@ -2690,6 +2705,14 @@ Resources:
                 Action:
                   - cognito-idp:ListUsersInGroup
                 Resource: !GetAtt UserPool.Arn
+        - PolicyName: read-own-details
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminGetUser
+                Resource: !GetAtt UserPool.Arn
 
   # POST /assistant/proposals/{proposalId}/confirm (Administrator and Users): the person pressed
   # the button to confirm what the assistant proposed. This is the one function of the assistant
@@ -2707,7 +2730,13 @@ Resources:
   #   a date's own hours or an extra window deleted;
   # - reading one account of the user pool and its groups (AdminGetUser, AdminListGroupsForUser):
   #   the booking route checks with them that the User the Administrator books for exists and is
-  #   not an administrator. Both only read. The function cannot create, change or delete an account.
+  #   not an administrator, and the mail route reads with AdminGetUser whether the caller has an
+  #   address. Both only read. The function cannot create, change or delete an account;
+  # - for a confirmed mail, the code of POST /mail/calendar (docs/EMAIL_ARCHITECTURE.md section 7):
+  #   adding one to the person's count of the day in the mail table (UpdateItem, on that table
+  #   only) and starting the mailer in the background (lambda:InvokeFunction, on the mailer only).
+  #   It sends no mail itself: the mailer does. MAIL_STAGE, MAIL_TABLE and MAILER_FUNCTION are what
+  #   that route reads; LAMBDA_ENDPOINT is empty in the cloud, only the local stack fills it.
   ConfirmProposalFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -2731,6 +2760,10 @@ Resources:
           ASSISTANT_EFFORT: ''
           USER_POOL_ID: !Ref UserPool
           COGNITO_ENDPOINT: ''
+          MAIL_STAGE: !Ref MailStage
+          MAIL_TABLE: !Ref MailTable
+          MAILER_FUNCTION: !Ref MailerFunction
+          LAMBDA_ENDPOINT: ''
       Events:
         ConfirmProposal:
           Type: HttpApi
@@ -2810,6 +2843,22 @@ Resources:
                   - cognito-idp:AdminGetUser
                   - cognito-idp:AdminListGroupsForUser
                 Resource: !GetAtt UserPool.Arn
+        - PolicyName: count-mail
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt MailTable.Arn
+        - PolicyName: start-mailer
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt MailerFunction.Arn
 
   # POST /assistant/proposals/{proposalId}/decline (Administrator and Users): the person pressed
   # the button to decline. Nothing is changed and Claude is not asked: the function reads the

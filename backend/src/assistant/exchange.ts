@@ -328,7 +328,7 @@ export async function runStep(input: StepInput): Promise<CoreResult> {
                 asked.id,
                 proposed.tool,
                 'same_thing_twice',
-                unplaced ?? 'Another change asked for in the same answer is about the same thing (the same appointment, type, pattern, date or window): nothing was proposed. Ask for one change of it.',
+                unplaced ?? 'Another change asked for in the same answer is about the same thing (the same appointment, type, pattern, date or window, or a second mail): nothing was proposed. Ask for one change of it, or one mail from the first day to the last.',
               );
           answered.push({ result: refused.result });
           ran.push(refused.log);

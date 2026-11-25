@@ -614,7 +614,7 @@ describe('the tools and the roles (3, 7.4)', () => {
     db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: real(ALICE) }), messages: EARLIER });
     await exchange.sendMessage(ALICE, TEXT, NOW);
     const forUser = given();
-    expect(forUser.map((tool) => tool.name)).toEqual(['get_settings', 'list_types', 'get_calendar', 'list_appointments', 'book_appointment', 'cancel_appointment', 'change_appointment', 'set_appointment_note']);
+    expect(forUser.map((tool) => tool.name)).toEqual(['get_settings', 'list_types', 'get_calendar', 'list_appointments', 'book_appointment', 'cancel_appointment', 'change_appointment', 'set_appointment_note', 'send_calendar_mail']);
     expect(JSON.stringify(forUser)).not.toContain('list_users');
     expect(Object.keys(forUser[4]!.input_schema.properties)).not.toContain('username');
 
@@ -648,7 +648,7 @@ describe('the tools and the roles (3, 7.4)', () => {
     // The very words a made-up name gets: the list of the tools of a User, which names none of the Administrator's.
     expect(JSON.parse(results[0]!.content)).toEqual({
       error: 'unknown_tool',
-      message: 'There is no tool with this name. The tools are: get_settings, list_types, get_calendar, list_appointments, book_appointment, cancel_appointment, change_appointment, set_appointment_note.',
+      message: 'There is no tool with this name. The tools are: get_settings, list_types, get_calendar, list_appointments, book_appointment, cancel_appointment, change_appointment, set_appointment_note, send_calendar_mail.',
     });
     expect(result).toMatchObject({ ok: true, reply: { proposal: null }, log: { tools: [{ name, notRun: 'not_offered' }] } });
   });
@@ -909,6 +909,7 @@ describe('confirmProposal (POST /assistant/proposals/{proposalId}/confirm, 5.4, 
       cancel_appointment: (await import('../../../src/handlers/cancelAppointment')).handler,
       change_appointment: (await import('../../../src/handlers/changeAppointment')).handler,
       set_appointment_note: (await import('../../../src/handlers/updateAppointmentNote')).handler,
+      send_calendar_mail: (await import('../../../src/handlers/sendCalendarMail')).handler,
       update_settings: (await import('../../../src/handlers/updateCalendarSettings')).handler,
       create_type: (await import('../../../src/handlers/createAvailabilityType')).handler,
       edit_type: (await import('../../../src/handlers/renameAvailabilityType')).handler,

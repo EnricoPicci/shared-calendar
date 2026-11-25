@@ -1,6 +1,7 @@
 # Shared Calendar: e-mail (implementation plan)
 
-**Version:** v6 (2026-11-25): step m5 done, its "As done" note written; no step's content
+**Version:** v7 (2026-11-25): step m6 done, its "As done" note written; no step's content
+changed. v6 (2026-11-25): step m5 done, its "As done" note written; no step's content
 changed. v5 (2026-11-25): steps m3 and m4 done, their "As done" notes written; no step's
 content changed. v4 (2026-11-25): steps m1 and m2 done, their "As done" notes written; no step's
 content changed. v3 (2026-11-25): steps m1 and m2, and steps m3 and m4, built and reviewed as pairs,
@@ -673,6 +674,79 @@ Documents: section 4's row m6, with the root `CLAUDE.md`'s rule on `confirmPropo
 
 **Check:** section 5.1 (the new block alone); the evaluation's result; the panel: one mail
 proposal shown and confirmed, by a look.
+
+**As done (2026-11-25).** Root `typecheck`, `lint` and `test:unit` green, 100 % lines (shared
+577 tests, back end 1 993, front end 2 959). Brief `prompts/mail-m06-assistant-mail-tool-implementation.md`.
+
+- **Built as planned**: `backend/src/assistant/tools/sendCalendarMail.ts` (input
+  `MailCalendarBody`, kind of read `details`), its sentence `changes.sendCalendarMail` and the
+  type `MailSummary` in `shared/src/assistant/` in English and Italian, one line in `list.ts`,
+  one in `changeHandlers.ts`. `confirmation.read` in order: `MAIL_STAGE` (anything but `on` is
+  `mail_unavailable`, nothing read), the handler of `GET /me` (`no_email_address`,
+  `user_not_found`), then the call `POST /mail/calendar` with `{ from, to }` and the facts (the
+  dates, `calendar` or `mine` by the role, the address masked). `subjects: ['mail']`, so two
+  mails in one answer are `same_thing_twice`, whose message in `exchange.ts` now names a second
+  mail. `toModel` replaces the message of a change done: the mail is on its way, no address.
+  The day's five are not read at the proposal (decision 4).
+- **Permissions, and why** (`backend/template.yaml`): `SendAssistantMessage` and
+  `ContinueAssistant` gain `cognito-idp:AdminGetUser` on the one pool (statement
+  `read-own-details`: the proposal reads the person's own address through `GET /me`) and the
+  variable `MAIL_STAGE`; nothing on the table `mail`, no invoke. `ConfirmProposal` gains
+  `dynamodb:UpdateItem` on the table `mail` (`count-mail`: the route counts the day's five) and
+  `lambda:InvokeFunction` on the mailer alone (`start-mailer`: the route starts it), and the
+  variables `MAIL_STAGE`, `MAIL_TABLE`, `MAILER_FUNCTION`, `LAMBDA_ENDPOINT` (empty in the
+  cloud); the `AdminGetUser` the mail route needs it already held for the booking. Nothing of
+  SES: only the mailer sends. `eslint.config.js`: the two rules on change handlers name
+  `sendCalendarMail` too.
+- **Tests changed, and why.** New: `backend/tests/unit/assistant/tools/sendCalendarMail.test.ts`
+  (definition, schema, both roles' proposals, both languages, the stage refusal as a unit test
+  only, no address, 404 and 500, `toModel` without the address). `tools.test.ts` and
+  `proposals.test.ts`: the user's tool list, the `unknown_tool` list and `CHANGE_HANDLERS` gain
+  the tool. `shared/tests/assistant/texts.test.ts`: the six sentences. `backend/tests/eval/week.ts`
+  creates `eval-anna` and `eval-bruno` with the four facts: since step m2 `POST /users` requires
+  them, and the evaluation could not have started without it.
+- **Journey**: a new last block of `backend/tests/integration/assistant.test.ts`, "a mail asked
+  for through the assistant (3, 5.4, 5.5)", four tests, green alone (the proposal with the dates
+  and the masked address and no mail; Confirm, "on its way", one mail read back and forgotten for
+  that address only; Don't, no mail; a second administrator without facts, `no_email_address`
+  and no proposal), with a throw-away User `chat-mail`; the fake Claude's answer
+  `tool-send-mail-week` and its sentence in `answers.json`. Page
+  `docs/journeys/backend/assistant-mail.md` (skill `explain-journey`), listed in the README;
+  `docs/journeys/concepts.md`, "A proposal, and its two buttons", names the mail tool. No
+  existing journey's story changed.
+- **The paid evaluation**, once, `claude-sonnet-5-5` at effort `low`, 2026-11-25: **63 of 63
+  passed**, 122 steps, **47.10 US cents**. The six mail requests: `mail-mine` (anna, en, next
+  week), `mail-miei` (bruno, it, next week, **confirmed**: `done`, one mail to
+  `eval-bruno@example.com` at the fake mail, Claude's Italian closing words say it may take a few
+  minutes), `mail-calendar` (admin, en), `mail-calendario-giorno` (admin, it, one day),
+  `mail-two-weeks` (anna, en, two weeks side by side: one call 30 November to 13 December),
+  `mail-con-intervallo` (admin, it, two weeks with a gap: one call 30 November to 27 December),
+  each PASS. Read by hand: in the request with a gap Claude proposed at once without saying the
+  weeks between are included; the proposal shows the real dates, which decision 5 accepts.
+  **The instructions did not change.** The mark changes with the new tool, so the conversations
+  in progress end at the deploy.
+- **By hand**: the panel as `admin` against the fake Claude: "Send the calendar from Wednesday 2
+  December 2026 to Tuesday 8 December 2026 to a•••@example.com.", Confirm, "Done", Claude told
+  only that the mail is on its way; the mail "Calendar, Wed 2 Dec 2026 to Tue 8 Dec 2026" with
+  its file at http://localhost:8025. No screen of the page changed: the panel already shows
+  every proposal and the three refusals' sentences. New checks: `docs/FRONTEND_WALK.md` v9,
+  section 14, checks 189 to 192; the walk as a whole was not run.
+- **Documents**: `docs/CONVERSATIONAL_ARCHITECTURE.md` v22 (sections 3, 5.4, 5.5 rule 4, 8.2,
+  8.3, 11.3, 12.2, 12.3, the risks' row); `docs/ARCHITECTURE.md` (v16 row: section 4, "The
+  assistant's routes" with "A mail" and "The mail of a range of dates"; section 7.1, the roles and
+  the row "A change needs the person"); `docs/EMAIL_ARCHITECTURE.md` (section 7: the stage
+  refused at the proposal, the five told after Confirm, several periods one mail, as built;
+  section 12.2); `docs/COMMANDS.md` (the evaluation: 63 requests, about 50 cents,
+  `local:lambda`); `docs/FOLDER_STRUCTURE.md` (section 6).
+- **The CLAUDE.md files**: root, the rule widened to "The assistant changes the calendar, or
+  sends a mail, only through `confirmProposal`, …" (199 lines, no other line); `backend/CLAUDE.md`,
+  a change tool's file imports no handler that sends a mail either (197 lines).
+- **Not in this step, noticed**: `local:api` stalled twice at start-up with 37 functions under
+  `warm_containers = "EAGER"`, and a retry worked each time; `LAZY` is a possible fix, not made.
+
+**What step m7 finds ready**: every way to ask for a mail (the route, the week page, the
+assistant) sends only to the account's own address, read in Cognito, and is refused while
+`MAIL_STAGE` is not `on`; the facts of a person, `GET /me`, and the mailer on `local:lambda`.
 
 ### Step m7 — The first sign-in
 

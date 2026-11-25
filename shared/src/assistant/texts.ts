@@ -55,6 +55,7 @@ export type AssistantTexts = {
     deleteDateOverride: (change: DayChangeSummary) => string;
     createOneOffWindow: (window: WindowSummary) => string;
     deleteOneOffWindow: (window: WindowSummary) => string;
+    sendCalendarMail: (mail: MailSummary) => string;
   };
   // The line of progress of a step that has none of its own.
   working: string;
@@ -137,9 +138,16 @@ export type DayChangeSummary = { date: string; now: DayHours; then: DayHours; ex
 // An extra window of one date as a proposal names it.
 export type WindowSummary = HoursSummary & { date: string };
 
+// What the proposal of a mail on demand shows (docs/EMAIL_ARCHITECTURE.md section 7): the two local
+// dates of the range, both included; what the mail holds, which the person's role decides (the
+// whole calendar for the Administrator, `calendar`, their own appointments for a User, `mine`); and
+// the address of the person's account, masked by `maskAddress`, never whole.
+export type MailSummary = { from: string; to: string; kind: 'calendar' | 'mine'; address: string };
+
 // What a read tool of the assistant looks at: each kind has its own line of progress
-// (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.1).
-export const ASSISTANT_READ_KINDS = ['settings', 'types', 'calendar', 'appointments', 'users', 'patterns'] as const;
+// (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.1). `details` is the person's own account, which
+// the proposal of a mail reads for its address.
+export const ASSISTANT_READ_KINDS = ['settings', 'types', 'calendar', 'appointments', 'users', 'patterns', 'details'] as const;
 export type AssistantReadKind = (typeof ASSISTANT_READ_KINDS)[number];
 
 const TEXTS: Record<AssistantLanguage, AssistantTexts> = { en: ASSISTANT_TEXTS_EN, it: ASSISTANT_TEXTS_IT };

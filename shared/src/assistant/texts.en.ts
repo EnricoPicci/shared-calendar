@@ -1,5 +1,5 @@
 import { weekdayOf } from '../calendar/time';
-import type { AppointmentSummary, AssistantSettingName, AssistantTexts, DayHours, HoursSummary, OverCapacity, PatternSummary, SettingChange, TypeEditSummary } from './texts';
+import type { AppointmentSummary, AssistantSettingName, AssistantTexts, DayHours, HoursSummary, MailSummary, OverCapacity, PatternSummary, SettingChange, TypeEditSummary } from './texts';
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -64,6 +64,10 @@ const editedType = ({ name, newName, capacity, bookedAbove }: TypeEditSummary) =
   return `Change the appointment type "${name}": ${parts.join(', ')}.${kept}`;
 };
 
+// A mail on demand: what it holds, by the person's role, and its range, one date or two.
+const mailOf = ({ from, to, kind, address }: MailSummary) =>
+  `Send ${kind === 'calendar' ? 'the calendar' : 'your appointments'} ${from === to ? `of ${fullDate(from)}` : `from ${fullDate(from)} to ${fullDate(to)}`} to ${address}.`;
+
 // The fixed texts in English. The three sentences of `cannotAnswer` are those of
 // docs/CONVERSATIONAL_ARCHITECTURE.md section 6.1, word for word.
 export const ASSISTANT_TEXTS_EN: AssistantTexts = {
@@ -110,6 +114,7 @@ export const ASSISTANT_TEXTS_EN: AssistantTexts = {
     deleteDateOverride: ({ date, now, then, extras }) => `Go back to the weekly patterns on ${fullDate(date)}. ${dayNow(now)} ${dayThen(then)}${extraWindows(extras)}`,
     createOneOffWindow: ({ date, start, end, type }) => `Create an extra window on ${fullDate(date)}, from ${start} to ${end} (${type}).`,
     deleteOneOffWindow: ({ date, start, end, type }) => `Delete the extra window of ${fullDate(date)}, from ${start} to ${end} (${type}).`,
+    sendCalendarMail: mailOf,
   },
   working: 'Working…',
   reading: {
@@ -119,5 +124,6 @@ export const ASSISTANT_TEXTS_EN: AssistantTexts = {
     appointments: 'Looking at the appointments…',
     users: 'Looking at the users…',
     patterns: 'Looking at the weekly patterns…',
+    details: 'Looking at your details…',
   },
 };

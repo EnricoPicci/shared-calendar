@@ -127,7 +127,7 @@ the line.
   gets the facts through a read handler and answers them with the request to run; `summary`
   words them with a function of `shared/src/assistant/`, both languages) and `toModel`; then one
   line in `list.ts` and one in `changeHandlers.ts`. Its file imports no handler that changes
-  the calendar.
+  the calendar or sends a mail (`sendCalendarMail.ts`, a mail, reads `GET /me` and `MAIL_STAGE`).
 - The root rule on `confirmProposal`, in code: only `confirm.ts` runs a change, reached from
   `handlers/confirmProposal.ts` alone (`npm run lint` refuses any other import of it, of
   `changeHandlers.ts`, or of a change handler under `src/assistant`).

@@ -407,6 +407,10 @@ Step c08 of `docs/CONVERSATIONAL_PLAN.md` (2026-11-22) added the tools of the op
 the reads of the present patterns and of one day's hours, and `tools/result.ts` a refusal with
 its list of appointments made small.
 
+Step m6 of `docs/EMAIL_PLAN.md` (2026-11-25) added `tools/sendCalendarMail.ts`, the assistant's
+tool for a mail, with its sentence `sendCalendarMail` in `changes` (the type `MailSummary`) and
+the kind of read `details`.
+
 What stays out of `shared/`: the DynamoDB item shape (`MessageItem`), the authorizer context,
 the logger, the password generator (server-side secret handling), and everything that imports
 `aws-lambda` types or the AWS SDK.
