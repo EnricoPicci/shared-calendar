@@ -248,6 +248,24 @@ export async function namesBySub(): Promise<Map<string, { givenName: string; fam
   return names;
 }
 
+/** An administrator as the daily mail needs one: the username, and the e-mail or null when it has none. */
+export type AdminRecipient = { username: string; email: string | null };
+
+/**
+ * Every member of group `admin`, with its e-mail, for the daily mail (docs/EMAIL_ARCHITECTURE.md
+ * section 6.1), sorted by username so that the mails go in a fixed order. An administrator without
+ * an address is answered with `null`: the mailer skips it. A member without a username is a broken
+ * directory: an ordinary error.
+ */
+export async function adminRecipients(): Promise<AdminRecipient[]> {
+  return (await membersOf('admin'))
+    .map((member) => {
+      if (!member.Username) throw new Error('A member of group admin has no username');
+      return { username: member.Username, email: storedFacts(member.Attributes).email };
+    })
+    .sort((a, b) => (a.username < b.username ? -1 : a.username > b.username ? 1 : 0));
+}
+
 // Revokes the user's refresh tokens.
 //
 // SKIP_GLOBAL_SIGN_OUT exists only because the local Cognito emulator (cognito-local 5.3.0)

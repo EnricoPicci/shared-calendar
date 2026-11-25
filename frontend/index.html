@@ -243,6 +243,33 @@
               <button class="primary submit">Save</button>
             </div>
           </form>
+          <!-- The daily e-mail (src/views/settings.view.ts, mountDailyMail): read and saved apart
+               from the calendar's settings, so that a failure of one hides nothing of the other.
+               In a stack where e-mail is not on yet, .unavailable says so in place of the form. -->
+          <section class="daily-mail">
+            <h3>Daily e-mail</h3>
+            <span class="loading" role="status" hidden>Loading…</span>
+            <p class="unavailable" role="status" hidden></p>
+            <div class="unread" hidden>
+              <p class="error" role="alert"></p>
+              <button type="button" class="retry" aria-label="Try again to read the daily e-mail's settings">Try again</button>
+            </div>
+            <!-- novalidate: an hour that is not a whole hour is refused by the script, in words. -->
+            <form class="settings daily" novalidate hidden>
+              <label class="check"><input type="checkbox" name="dailyEnabled" /> Send the daily e-mail</label>
+              <div class="field">
+                <label>Hour <input name="dailyHour" inputmode="numeric" autocomplete="off" /></label>
+                <p class="range"></p>
+                <p class="error refusal" role="alert"></p>
+              </div>
+              <p class="about">Two Excel files: the appointments booked for the next 7 days, and a backup of every appointment from the first day of last month.</p>
+              <p class="error failure" role="alert"></p>
+              <p class="saved" role="status" hidden>Daily e-mail saved.</p>
+              <div class="actions">
+                <button class="primary submit">Save daily e-mail</button>
+              </div>
+            </form>
+          </section>
         </section>
 
         <!-- The users (src/views/users.view.ts), at the address #/users: a form that creates

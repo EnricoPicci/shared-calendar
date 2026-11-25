@@ -7,7 +7,8 @@ Description: >
   (docs/SHARED_CALENDAR_SPEC.md, being built in plan steps 41-59): its table, its shared
   permission sets, one function per calendar route, and GET /users; and the assistant
   (docs/CONVERSATIONAL_ARCHITECTURE.md, being built): its table and the functions of a conversation;
-  and e-mail (docs/EMAIL_ARCHITECTURE.md, being built): the mail table, the mailer and its route.
+  and e-mail (docs/EMAIL_ARCHITECTURE.md, being built): the mail table, the mailer, its routes and
+  its hourly timer.
 
 # Values given at deploy time: samconfig.toml holds all but AlertEmail, which the first deploy
 # passes on the command line (public repository) and CloudFormation then keeps.
@@ -2896,8 +2897,10 @@ Resources:
   # at 512 MB, peak 139 MB; at 256 MB it took 18.9 s. Hence 512 MB, and 30 s, five times the run.
   # MAIL_FROM is the sender as a mailbox shows it, "Shared calendar" <noreply@the domain>;
   # MAIL_REPLY_TO the address replies go to; MAIL_CONFIGURATION_SET the SES configuration set that
-  # reports bounces, named after the stack. SES_ENDPOINT, COGNITO_ENDPOINT and DYNAMODB_ENDPOINT are
-  # empty in the cloud: only the local stack fills them, with the emulators' addresses.
+  # reports bounces, named after the stack. MAIL_STAGE is the stack's stage: the daily mail sends
+  # nothing unless it is 'on'. MAIL_TABLE holds the daily mail's settings and its mark of each day.
+  # SES_ENDPOINT, COGNITO_ENDPOINT and DYNAMODB_ENDPOINT are empty in the cloud: only the local stack
+  # fills them, with the emulators' addresses.
   MailerFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -2917,7 +2920,16 @@ Resources:
           MAIL_FROM: !Sub '"${MailFromName}" <${MailFromLocalPart}@${MailDomain}>'
           MAIL_REPLY_TO: !If [HasMailReplyTo, !Ref MailReplyTo, !Ref AlertEmail]
           MAIL_CONFIGURATION_SET: !Sub ${AWS::StackName}-mail
+          MAIL_STAGE: !Ref MailStage
+          MAIL_TABLE: !Ref MailTable
           SES_ENDPOINT: ''
+          # Local development only, never set in the cloud. 'true' lets the daily run take its
+          # "now" from the event, so that the journeys and npm run mail:daily can run it at any
+          # hour (docs/EMAIL_ARCHITECTURE.md section 14.2); env.local.json sets it for the local
+          # stack. It is declared here, empty, because sam local only passes variables the
+          # template declares. Left empty, an event carrying a "now" is refused and the run reads
+          # the clock.
+          MAIL_ALLOW_NOW: ''
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
@@ -2941,10 +2953,12 @@ Resources:
 
   # What the mailer may do, and nothing more: read the calendar (the calendar's read-only set); read
   # one account (AdminGetUser: the asker's address) and the members of a group (ListUsersInGroup:
-  # the Users' names for the Administrator's file), on this user pool only; and send mail through
-  # SES, only as the stack's domain and only through the stack's configuration set: SES checks the
-  # sending identity and the configuration set against these two names. It cannot write the
-  # calendar or change an account.
+  # the Users' names for the Administrator's file, the administrators' addresses for the daily
+  # mail), on this user pool only; in the mail table only, read the daily mail's settings and the
+  # day's mark (GetItem), write the mark (PutItem) and record how the run ended on it (UpdateItem);
+  # and send mail through SES, only as the stack's domain and only through the stack's
+  # configuration set: SES checks the sending identity and the configuration set against these two
+  # names. It cannot write the calendar, delete an item of the mail table or change an account.
   MailerRole:
     Type: AWS::IAM::Role
     Properties:
@@ -2976,6 +2990,16 @@ Resources:
                   - cognito-idp:AdminGetUser
                   - cognito-idp:ListUsersInGroup
                 Resource: !GetAtt UserPool.Arn
+        - PolicyName: daily-mark
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                Resource: !GetAtt MailTable.Arn
         - PolicyName: send-mail
           PolicyDocument:
             Version: '2012-10-17'
@@ -3087,6 +3111,201 @@ Resources:
                   - lambda:InvokeFunction
                 Resource: !GetAtt MailerFunction.Arn
 
+  # GET /mail/settings (docs/EMAIL_ARCHITECTURE.md section 9.1, the Administrator only): the daily
+  # mail's settings, or the defaults until the first save. MAIL_STAGE is the stack's stage:
+  # anything but 'on' answers 503. CALENDAR_TIME_ZONE is read with the table's name, as the other
+  # mail functions do. DYNAMODB_ENDPOINT is empty in the cloud: only the local stack fills it.
+  GetMailSettingsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: getMailSettings.handler
+      Role: !GetAtt GetMailSettingsRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref GetMailSettingsLogGroup
+      Environment:
+        Variables:
+          MAIL_STAGE: !Ref MailStage
+          MAIL_TABLE: !Ref MailTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        GetMailSettings:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: GET
+            Path: /mail/settings
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/getMailSettings.ts
+
+  GetMailSettingsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-getMailSettings
+      RetentionInDays: 14
+
+  # What the route may do: read one item of the mail table (GetItem, the settings), nothing more.
+  GetMailSettingsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${GetMailSettingsLogGroup}:log-stream:*
+        - PolicyName: read-mail-settings
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                Resource: !GetAtt MailTable.Arn
+
+  # PUT /mail/settings (docs/EMAIL_ARCHITECTURE.md section 9.1, the Administrator only): saves the
+  # daily mail's settings, on or off and the hour. The variables are those of GET /mail/settings.
+  UpdateMailSettingsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: updateMailSettings.handler
+      Role: !GetAtt UpdateMailSettingsRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref UpdateMailSettingsLogGroup
+      Environment:
+        Variables:
+          MAIL_STAGE: !Ref MailStage
+          MAIL_TABLE: !Ref MailTable
+          CALENDAR_TIME_ZONE: !Ref CalendarTimeZone
+          DYNAMODB_ENDPOINT: ''
+      Events:
+        UpdateMailSettings:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: PUT
+            Path: /mail/settings
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        # The AWS SDK is CommonJS and calls require(), which an ES module lacks; give it one.
+        Banner:
+          - js=import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);
+        EntryPoints:
+          - src/handlers/updateMailSettings.ts
+
+  UpdateMailSettingsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-updateMailSettings
+      RetentionInDays: 14
+
+  # What the route may do: write one item of the mail table (PutItem, the settings), nothing more.
+  # It cannot read the daily marks or the counts, nor delete anything.
+  UpdateMailSettingsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${UpdateMailSettingsLogGroup}:log-stream:*
+        - PolicyName: write-mail-settings
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource: !GetAtt MailTable.Arn
+
+  # The hourly timer of the daily mail (docs/EMAIL_ARCHITECTURE.md decision M14): at minute 0 of
+  # every hour, in UTC, EventBridge Scheduler starts the mailer with the event {"kind":"daily"}, in
+  # the background (Lambda keeps the event and tries a failed run twice more). The mailer itself
+  # decides whether this hour is the chosen one in the calendar's time zone, so the schedule never
+  # changes, daylight saving included. No flexible window: the run starts at minute 0, not at some
+  # moment of the hour.
+  DailyMailSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Description: Starts the mailer every hour; it sends the daily mail at the hour the Administrator chose.
+      ScheduleExpression: cron(0 * * * ? *)
+      ScheduleExpressionTimezone: UTC
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      State: ENABLED
+      Target:
+        Arn: !GetAtt MailerFunction.Arn
+        RoleArn: !GetAtt DailyMailScheduleRole.Arn
+        Input: '{"kind":"daily"}'
+
+  # The timer's own role (docs/EMAIL_PLAN.md finding F4): only EventBridge Scheduler may take it,
+  # and only for a schedule of this AWS account; it may do one thing, start the mailer, and no other
+  # function.
+  DailyMailScheduleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: start-mailer
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - lambda:InvokeFunction
+                Resource: !GetAtt MailerFunction.Arn
+
   # ---------------------------------------------------------------------------
   # Error alarms (docs/ARCHITECTURE.md section 11)
   # ---------------------------------------------------------------------------
@@ -3118,6 +3337,29 @@ Resources:
       Threshold: 0
       ComparisonOperator: GreaterThanThreshold
       # No invocations means no data, which is normal here, not an alarm.
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopic
+
+  # Fires when a run of the mailer fails at least once in an hour (docs/EMAIL_ARCHITECTURE.md
+  # section 16): a mail on demand or the daily mail that SES or DynamoDB refused. Lambda counts each
+  # failed attempt, its own two retries included. A run that ends with a logged outcome (no
+  # address, not the hour, switched off) is no failure and fires nothing.
+  MailerErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: The mailer failed at least once in an hour.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref MailerFunction
+      Statistic: Sum
+      Period: 3600
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      # No run means no data, which is normal here, not an alarm.
       TreatMissingData: notBreaching
       AlarmActions:
         - !Ref AlarmTopic

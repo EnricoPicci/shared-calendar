@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v7 (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): the week's "E-mail…" dialog is section 12, checks 171 to 180; section 1 says what it needs. v6 (2026-11-25, `docs/EMAIL_PLAN.md` step m2): the four facts of a person and "My details" are section 11, checks 157 to 170; checks 3, 40, 53 and section 1 in line. v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
+| Status | v8 (2026-11-25, `docs/EMAIL_PLAN.md` step m5): the settings' "Daily e-mail" is section 13, checks 181 to 188. v7 (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): the week's "E-mail…" dialog is section 12, checks 171 to 180; section 1 says what it needs. v6 (2026-11-25, `docs/EMAIL_PLAN.md` step m2): the four facts of a person and "My details" are section 11, checks 157 to 170; checks 3, 40, 53 and section 1 in line. v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
 | What it is | One list of checks that walks every screen of the front end and the assistant's panel in a browser, as a User and as the Administrator, against the local stack. **The check to repeat after a later change to the view layer** |
 | What it is not | A source of truth, and not an automated test. On any conflict `docs/FRONTEND_ARCHITECTURE.md` and the tests win, and this page is fixed. No end-to-end test tool is in the repository (`docs/FRONTEND_VIEW_PLAN.md` section 8, decision 6): a person follows the list by hand, or drives a browser with a script kept outside the repository |
 | Made from | The browser checks of `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 68, of `docs/CONVERSATIONAL_PLAN.md` step c12 and of `docs/CAPACITY_PLAN.md` step u5, in the order a person would follow, and `docs/SHARED_CALENDAR_SPEC.md` section 16.8 |
@@ -20,6 +20,7 @@
 | v5 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u5: **the capacity of a type**, section 10, checks 134 to 156, with what they need and leave in its opening; the row of step u5 in section 8. Check 12: the Administrator's booking for `alice` makes `alice`'s attempt a `user_busy`, whose sentence it quotes. Check 41: the tab "Full" beside an appointment. Checks 66 and 70: "Edit" in the place of "Rename", and the capacity. Walked that day by a script in headless Chromium (Playwright 1.62), at 1280 × 800 and at 390 × 844, on a fresh, seeded local stack, as `admin`, `alice` and three Users of the run: every check of section 10 answered yes at both widths, and check 12 as written; at check 140 the tab "1 left" was seen on top and within reach, not pressed, and check 150 was seen on the screenshots, its tabs not pressed. The console held the known report of `zod` and the browser's own line for each answer 409 of checks 144, 145, 146 and 152. The rest of the walk was not run again. 156 checks. |
 | v6 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m2: **the four facts of a person**, section 11, checks 157 to 170: the users screen's form and its refusals, a row's name and e-mail, the Edit dialog, "My details" for both roles; the facts every user of the walk is given (section 1); checks 3 and 40 (the navigation's "My details") and 53 (a row) in line; the row of step m2 in section 8. Walked on the local stack that day at a desktop width: 157, 158, 160, 161, 163, 165, 166 as `admin` and 169 as `alice`; 159, 162, 164, 167, 168 and 170 not yet. |
 | v7 | 2026-11-25 | `docs/EMAIL_PLAN.md` steps m3 and m4: **the mail of two dates**, section 12, checks 171 to 180: the week's "E-mail…" dialog for both roles, a refused range, the address masked, the mail and its file at the fake mail, the limit of five a day, the phone width; section 1 gains `local:lambda` and the fake mail; the row of m4 in section 8. Section 11's checks 159, 162, 164, 167, 168 and 170 walked that day (168 at 606 px, the narrowest the browser of the walk allowed). |
+| v8 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m5: **the daily e-mail**, section 13, checks 181 to 188: the settings' part "Daily e-mail", a save, a refused hour, the daily mail started by hand and its two files at the fake mail, "E-mail is not available yet." with the stage off, the phone width; the row of m5 in section 8. |
 
 ---
 
@@ -51,7 +52,7 @@
   when no `ANTHROPIC_API_KEY` is given (`docs/COMMANDS.md` section 3.4), and the local limit of
   10 messages a person a day. Section 6 is never walked with the real Claude wired: its
   sentences mean something to the fake only. What is done with the real one is in section 7.
-- **For the mail (section 12): `npm run local:lambda -w backend`**, a third terminal beside
+- **For the mail (sections 12 and 13): `npm run local:lambda -w backend`**, a third terminal beside
   `local:api` and `dev`, which runs the mailer, and the fake mail of `local:up` at
   http://localhost:8025, which keeps what it sends (`docs/COMMANDS.md` section 3.5). A program
   that opens an `.xlsx` file. Each account may ask for five mails a local day; a fresh stack
@@ -652,11 +653,12 @@ section 6 and the journeys run on the fake only.
 | u5 | A type's capacity: created, refused, edited; the places left; a time full for Users, busy for a fourth, refused to a page read before; the Administrator's full slot as a tab, refused, "Book anyway", the offer hidden by a change; two and three side by side, four as one block and its list; `user_busy` named for the Administrator; the User's own time not offered | 134 to 156, 12, 41, 66, 70 |
 | m2 | The create form's facts and their live refusals; a row's name and e-mail; Edit, saved and cancelled; "My details" for the Administrator, with Edit, and for a User, without | 157 to 170 |
 | m4 | The week's "E-mail…" for `alice` and `admin`: the dates of the week on show, a range refused, the address masked, the mail and its file at the fake mail, the sixth of the day refused, the phone | 171 to 180 |
+| m5 | The settings' "Daily e-mail": a save, a value refused, the daily mail by hand at the hour set with its two files, "not available yet" with `MAIL_STAGE=off` | 181 to 188 |
 | p3 | The hints while typing, the two new ones differing, a wrong current password, a change that succeeds, "Password changed" at the login, the old password refused, the new one accepted; as `alice` and as `admin`, at the two widths | 123 to 133 |
 
 Steps 60 to 68 are those of `docs/FRONTEND_VIEW_PLAN.md`; step c12 is of
 `docs/CONVERSATIONAL_PLAN.md`; step p3 of `docs/CHANGE_PASSWORD_PLAN.md`; step u5 of
-`docs/CAPACITY_PLAN.md`; step m2 of `docs/EMAIL_PLAN.md`.
+`docs/CAPACITY_PLAN.md`; steps m2, m4 and m5 of `docs/EMAIL_PLAN.md`.
 
 Left out on purpose: "the screens of the earlier steps still work, in short" (`docs/FRONTEND_VIEW_PLAN.md`
 section 4), which was each step's own short walk and is this whole list.
@@ -859,3 +861,35 @@ today, `admin` four.
      names.
 180. → At 390 × 844 the dialog fits the screen, the two dates side by side, "On its way to …"
      breaks inside the line rather than running off, and the page does not scroll sideways.
+
+## 13. The daily e-mail
+
+Walked as `admin`, after section 12, with `local:lambda` running (section 1;
+`docs/EMAIL_ARCHITECTURE.md` sections 6.2 and 11). It leaves the mail settings as saved last,
+the daily mail in the fake mail until `local:down`, and today's daily mark in the table `mail`.
+Checks 186 and 187 need the API restarted with `MAIL_STAGE` `off` in `backend/env.local.json`
+then `on` again: do them last, or skip them in a short walk.
+
+181. `[K]` As `admin`, "Settings". → Under the calendar's settings, "Daily e-mail": "Send the
+     daily e-mail" ticked and "Hour" `07:00` (the defaults, if nobody saved), "A whole hour, from
+     00:00 to 23:00, in the calendar's time zone, Europe/Rome.", the sentence on the two files,
+     and "Save daily e-mail".
+182. `[K]` `[N]` Type `7:30` in "Hour", "Save daily e-mail". → "The hour must be a whole hour
+     from 00:00 to 23:00, such as 07:00." under it, marked; no request. `24` the same.
+183. `[K]` `[N]` Type the current hour in Rome, for example `15`, "Save daily e-mail". → One
+     `PUT /mail/settings` answered `200`, then one `GET /mail/settings`; "Daily e-mail saved.";
+     the field says `15:00`. An edit takes the sentence away. The calendar's settings above are
+     unchanged, and their "Save" sent nothing.
+184. In a terminal, `npm run mail:daily -w backend`. → `"outcome":"sent"`, `mailCount` 1 (one per
+     administrator with an address). At http://localhost:8025, the newest mail: "Calendar: next
+     7 days and backup, …" to `admin@example.com` with two files, `calendar-next-7-days-<today>.xlsx` (the booked
+     appointments of today and the next six days, with the names) and
+     `calendar-backup-from-<1st of last month>.xlsx` (every appointment from then, cancelled
+     ones too). Open both.
+185. Run it again. → `"outcome":"already_sent"`; no new mail.
+186. `[N]` With the API restarted at `MAIL_STAGE` `off`, "Settings". → The calendar's settings
+     as before; in place of the daily e-mail's fields, "E-mail is not available yet.", no "Try
+     again".
+187. Set `MAIL_STAGE` back to `on` and restart the API. → "Daily e-mail" has its fields again.
+188. → At 390 × 844 the part fits the screen under the calendar's settings, and the page does
+     not scroll sideways.

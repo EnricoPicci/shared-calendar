@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Being built, `docs/EMAIL_PLAN.md`. The decisions of sections 2.2 and 2.3 and every open point (section 21) are confirmed by the Product Owner (2026-11-25); the plan's decisions F1 to F5, F13 and F15 (its section 3), and the deletion of the existing Users moved to step 9, are written in here (2026-11-25) |
+| Status | Being built, `docs/EMAIL_PLAN.md`. The decisions of sections 2.2 and 2.3 and every open point (section 21) are confirmed by the Product Owner (2026-11-25); the plan's decisions F1 to F5, F13 and F15 (its section 3), and the deletion of the existing Users moved to step 9, are written in here (2026-11-25); step m5's decisions on the daily mail's retry and on several administrators are in section 6.2 |
 | Date | 2026-11-25 |
 | Brief | `prompts/mail-m01-integrate-mail-idea.md`, with the answers of the clarification round (section 2.2) |
 | Builds on | `docs/ARCHITECTURE.md` (sections 4, 5, 6.3, 7, 9, 10), `docs/SHARED_CALENDAR_SPEC.md` section 15 (e-mail notifications prepared), `docs/CONVERSATIONAL_ARCHITECTURE.md` sections 5.4 and 8 (proposals and tools) |
@@ -394,8 +394,24 @@ Every hour, at minute 0, the scheduler starts the mailer with `kind: daily`. The
 
 If the run fails after the mark, Lambda's retries run with the same event and find the mark:
 the mark therefore holds a state (`sending`, `sent`, `failed`), and a retry may proceed only
-from `sending` older than 10 minutes or `failed`. The details are for the plan; the rule is "at
-most one daily mail a day, and a failure is retried and alarmed".
+from `sending` older than 10 minutes or `failed`. The rule is "at most one daily mail a day, and
+a failure is retried and alarmed". Decided by the Product Owner on 2026-11-25 (`docs/EMAIL_PLAN.md`
+step m5):
+
+- **A failed daily mail is tried again later the same day.** At the chosen hour, and at any
+  later hour of the same local day, the run also goes ahead when the mark is `failed`, or
+  `sending` and older than 10 minutes. With no mark, only the chosen hour sends: a later hour
+  without a mark stops (`not_the_hour`). So when Lambda's own retries are spent, the next
+  hourly run takes the mark again, until midnight.
+- **Several administrators share one mark, and each gets a mail of their own.** On a partial
+  failure (one mail went, another did not) the mark becomes `failed` and the retry sends to all
+  again, so one may get the mail twice. This is accepted: the API cannot create a second
+  administrator, and a duplicate daily mail harms nobody. No code guards against it.
+- Nobody to send to (no administrator with an address) ends the mark `sent` with no mail, the
+  outcome `no_recipient`, logged as a warning: no retry would find an address.
+- The mark is taken with one conditional write and finished with another, the latter only
+  while the mark is still the run's own (`sending` since its `startedAt`), so a run that was
+  taken over cannot overwrite the newer run's outcome.
 
 A change of the hour takes effect the next day the hour comes round; switching it on after the
 hour has passed sends nothing until tomorrow. Daylight saving changes nothing: the hour is read
@@ -613,7 +629,7 @@ Provisioned 2 RCU / 2 WCU: the account's total becomes 21/19, still inside the a
 | Item | `PK` | `SK` | Attributes | Kept |
 |---|---|---|---|---|
 | Settings | `SETTINGS` | `SETTINGS` | `dailyEnabled`, `dailyHour`, `updatedAt`, `updatedBy` | always |
-| Daily mark | `DAILY` | `<local date>` | `state` (`sending`, `sent`, `failed`), `startedAt`, `finishedAt`, `sesMessageId`, `appointmentCount` | 400 days (TTL) |
+| Daily mark | `DAILY` | `<local date>` | `state` (`sending`, `sent`, `failed`), `startedAt`, `finishedAt`; when `sent` also `sesMessageIds` (one per administrator's mail), `appointmentCount` (the next 7 days' file), `backupCount` (the backup's) | 400 days after its latest write (TTL) |
 | Counter | `QUOTA#<sub>` | `<local date>` | `count` | 2 days (TTL) |
 
 The module that knows this layout is `backend/src/lib/mailDb.ts`, the only one, like

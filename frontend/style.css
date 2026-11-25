@@ -155,6 +155,10 @@ input[type="checkbox"] { width: auto; margin: 0; }
 label.check { display: flex; align-items: center; gap: 0.4rem; }
 .settings .saved { color: #1b6e3c; }
 .settings .actions { justify-content: flex-start; }
+/* The daily e-mail: a part of its own under the calendar's settings */
+.daily-mail { margin-top: 2rem; max-width: 26rem; }
+.daily-mail h3 { font-size: 1rem; }
+.daily-mail .unavailable { margin: 0.75rem 0 0; color: #52606d; }
 
 /* The users: the form that creates one, then the list, a row with its button */
 .create { display: grid; gap: 0.75rem; max-width: 26rem; margin-top: 0.75rem; }

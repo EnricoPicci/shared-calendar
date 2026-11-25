@@ -1,6 +1,7 @@
 # Shared Calendar: e-mail (implementation plan)
 
-**Version:** v5 (2026-11-25): steps m3 and m4 done, their "As done" notes written; no step's
+**Version:** v6 (2026-11-25): step m5 done, its "As done" note written; no step's content
+changed. v5 (2026-11-25): steps m3 and m4 done, their "As done" notes written; no step's
 content changed. v4 (2026-11-25): steps m1 and m2 done, their "As done" notes written; no step's
 content changed. v3 (2026-11-25): steps m1 and m2, and steps m3 and m4, built and reviewed as pairs,
 one brief, one check and one stop each (the Product Owner's decision); no step's content changes.
@@ -572,6 +573,77 @@ with two files; the same hour twice sends once; the wrong hour, or switched off,
 `failed` mark is retried. The front end: the settings service.
 
 **Check:** section 5.1; the screen: the settings' "Daily e-mail".
+
+**As done (2026-11-25).** Root `typecheck`, `lint` and `test:unit` green, 100 % lines (shared
+576 tests, back end 1 980, front end 2 959).
+
+- **Built as planned**: `getMailSettings.ts` and `updateMailSettings.ts`, each with its function
+  and role (role → stage → body); `mailDb.ts` gains the settings (read with the defaults, saved
+  with `updatedAt` and `updatedBy`) and the daily mark (`takeDailyMark`, `finishDailyMark`, one
+  conditional write each, `expiresAt` 400 days after the write); `mailerEvent.ts` the event
+  `DailyEvent`; `cognito.ts` `adminRecipients()`; the mailer's kind `daily`, with `MAIL_STAGE`
+  (anything but `on` ends at once, `mail_unavailable`) and `MAIL_ALLOW_NOW` (an event with `now`
+  is `invalid_event` without it). `template.yaml`: the two functions and routes, the schedule
+  `DailyMailSchedule` with `DailyMailScheduleRole`, the alarm `MailerErrorsAlarm`; the mailer's
+  role gains `GetItem`, `PutItem` and `UpdateItem` on the table `mail`. `npm run mail:daily`
+  (`scripts/mail-daily.sh`); `local-seed.sh` writes `MAIL_ALLOW_NOW` for the mailer alone. The
+  page: `MailSettingsService` (a service of its own), `daily-mail.model.ts`,
+  `daily-mail.screen.ts`, `mountDailyMail` in `settings.view.ts`, `DAILY_MAIL_TEXTS`, the part
+  `section.daily-mail` of `#settings`.
+- **The file names**: `calendar-next-7-days-<date>.xlsx` (the booked appointments of the date and
+  the six after it) and `calendar-backup-from-<1st of last month>.xlsx` (every status, read up to
+  the date + 366 days). The mail's text is `dailyMailText`.
+- **Decisions 4 and 5, as written** in `docs/EMAIL_ARCHITECTURE.md` section 6.2: a failed daily
+  mail is tried again later the same day (at the chosen hour and at any later hour of the same
+  local day, a mark `failed`, or `sending` older than 10 minutes, is taken again; with no mark
+  only the chosen hour sends); several administrators share one mark and each gets a mail of
+  their own, and on a partial failure the retry sends to all again, so one may get it twice,
+  accepted, with no code guarding against it.
+- **Beyond the plan**: nobody to send to ends the mark `sent` with no mail (outcome
+  `no_recipient`, logged as a warning); the mark keeps `sesMessageIds` (a list, one per mail) and
+  `backupCount` beside `appointmentCount` (`docs/EMAIL_ARCHITECTURE.md` section 10.1 updated);
+  the settings are one unconditional `PutItem`, the last save winning; finishing a mark is
+  conditional on the run's own `startedAt`, so a run taken over cannot overwrite the newer one.
+- **Tests changed, and why.** Front end: `page.test.ts` (58 fields, 72 places of a failure, eight
+  "Loading…", seven "Try again" with the daily e-mail's own name, the statuses `unavailable` and
+  a second `saved`; a new test of the part's markup), `shell.test.ts` (the settings screen also
+  sends `GET /mail/settings`: its tests count the calendar's requests apart; four new tests of
+  the part), `settings.view.test.ts` (a new `describe` for `mountDailyMail`). Back end:
+  `mailDb.test.ts`, `mailerEvent.test.ts`, `cognito.test.ts`, `mailer.test.ts` gain the new
+  functions' tests; nothing existing changed. New: `getMailSettings.test.ts`,
+  `updateMailSettings.test.ts`, `mail-settings.service.test.ts`, `daily-mail.model.test.ts`,
+  `daily-mail.screen.test.ts`.
+- **Journeys**, each file alone, green: the back end's `mail.test.ts`, every block (15 tests),
+  with the new block "the daily mail" (seven tests, on the seven dates before the file's day,
+  marks removed first and last, settings written back), page `docs/journeys/backend/mail-daily.md`;
+  the front end's new `mail-settings.test.ts` (three tests, settings written back), page
+  `docs/journeys/frontend/mail-settings.md`; the section "The daily mail in the journeys" of
+  `docs/journeys/concepts.md`. `setup.ts` gains `putMailItem`, `getMailItem`, `deleteMailItem`.
+- **By hand**: `npm run mail:daily -w backend -- 2026-11-25T06:00:00.000Z` (07:00 in Rome, the
+  hour of the settings) answered `sent`, one mail to `admin@example.com` at the fake mail with
+  both files, opened (the next 7 days: the headings only, nothing booked locally; the backup: the
+  journey's three cancelled rows); run again, `already_sent`. **Browser look** (local stack):
+  the part filled with the defaults and the zone; `7:30` refused under the hour with no request;
+  `18` saved, "Daily e-mail saved.", shown as `18:00`; with `MAIL_STAGE` `off` and the API
+  restarted, "E-mail is not available yet." in place of the fields and the calendar's settings
+  still there; set back to `on`. The new checks are `docs/FRONTEND_WALK.md` section 13; the walk
+  as a whole was not run.
+- **Documents**: `docs/ARCHITECTURE.md` (v16 row and status: sections 4, 5.5, 7.1, 8, 9.2, 11),
+  `docs/EMAIL_ARCHITECTURE.md` (sections 6.2 and 10.1), `docs/FRONTEND_SERVICES.md` v15
+  (section 25), `docs/FRONTEND_ARCHITECTURE.md` v26, `docs/FRONTEND_WALK.md` v8 (checks 181 to
+  188), `docs/COMMANDS.md` (section 3.5: `mail:daily`, `MAIL_ALLOW_NOW`, `MAIL_STAGE`).
+- **The CLAUDE.md files**: `backend/CLAUDE.md` was at 199 lines; its section "A new calendar
+  function" became one line under the calendar's handlers pointing at `docs/COMMANDS.md`
+  section 3.2, which already held its content, and the room went to the mail settings' handlers,
+  the mailer's kinds, `mailDb.ts`'s new items and `mail-daily.sh` (197 lines). `frontend/CLAUDE.md`:
+  `mail-settings`, `daily-mail.model.ts`, `daily-mail.screen.ts`, `mail-settings.test.ts`. The
+  root `CLAUDE.md` is unchanged.
+
+**What step m6 finds ready**: the mailer with its kinds `calendar`, `mine` and `daily`, and its
+event checked by `MailerEvent`; `lambdaInvoke.ts` to start it in the background; the count of five
+a day in `mailDb.ts`, as `POST /mail/calendar` uses it; `MAIL_STAGE` reaching the mailer. The
+assistant's tool `send_calendar_mail` goes through the route's handler, as the root rule on the
+assistant requires.
 
 ### Step m6 — The assistant's tool `send_calendar_mail`
 

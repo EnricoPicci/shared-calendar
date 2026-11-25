@@ -1,10 +1,13 @@
-import { addDays, localDateOf, localTimeOf, MAIL_LIMITS } from '@shared-calendar/shared';
+import { addDays, localDateOf, localTimeOf, MAIL_LIMITS, toInstant } from '@shared-calendar/shared';
 import readXlsxFile from 'read-excel-file/node';
 import {
   api,
   createSecondAdmin,
+  deleteMailItem,
   factsOf,
   forgetMailsTo,
+  getMailItem,
+  putMailItem,
   removeUserIfPresent,
   runMailer,
   setFactsOf,
@@ -28,6 +31,12 @@ import {
 // mark, never counted on the whole table: an earlier run of the same day left its own, cancelled.
 // At the end the appointments still booked are cancelled and the window and the type deleted;
 // before it starts, what an interrupted run left is removed the same way.
+//
+// The daily mail is run through `npm run local:lambda` with a fixed "now" in its event, which the
+// local mailer honours (MAIL_ALLOW_NOW): on the seven dates before the journey's day, each test on
+// dates of its own, so that the run's day mark never meets one of another test or of a run by hand
+// today. The marks of those dates are removed straight in DynamoDB Local before and after, and the
+// mail settings the block found are written back at its end.
 //
 // The counts of the mails on demand outlive a run, five a day for each `sub`: the route's block
 // asks with throw-away accounts only, removed before and after, so that a run repeated the same day
@@ -304,5 +313,122 @@ describe('POST /mail/calendar (6.5, 9.1)', () => {
     await createSecondAdmin('mail-nobody', BOSS_PASSWORD);
     const token = await signIn('mail-nobody', BOSS_PASSWORD);
     expect(await ask(token)).toEqual({ status: 409, body: { error: 'no_email_address', message: 'This account has no e-mail address' } });
+  });
+});
+
+// Explained in simple words in docs/journeys/backend/mail-daily.md.
+// Test names: section numbers are those of docs/EMAIL_ARCHITECTURE.md.
+describe('the daily mail (6.2, 6.3, 9.1)', () => {
+  const ADMIN = 'admin@example.com';
+  const HOUR = 7;
+  // The dates of this block: the seven before the journey's day, one or two per test.
+  const dates = () => Array.from({ length: 7 }, (_, i) => addDays(day, i - 7));
+  let found: { dailyEnabled: boolean; dailyHour: number };
+  // The instant of a local date and whole hour, in the calendar's zone, as the timer's "now".
+  const at = (date: string, hour: number, minutes = 0) =>
+    new Date(Date.parse(toInstant(date, `${String(hour).padStart(2, '0')}:00`, zone)) + minutes * 60_000).toISOString();
+  const runDaily = (date: string, hour: number) => runMailer({ kind: 'daily', now: at(date, hour) });
+  const removeMarks = async () => {
+    for (const date of dates()) await deleteMailItem('DAILY', date);
+  };
+  const putSettings = (body: unknown) => api('PUT', '/mail/settings', adminToken, body);
+  // A file of a mail, read back as this run's rows: the date, the start, the username, the status.
+  const fileRows = async (mail: FakeMail, file: number) => {
+    const sheets = await readXlsxFile(Buffer.from(mail.attachments[file]!.content, 'base64'));
+    return journeyRows(sheets[0]!.data as (string | null)[][]).map((r) => [r.Date, r.Start, r.Username, r.Status]);
+  };
+  const asRow = (a: Booked) => [day, localTimeOf(a.start, zone), a.username, a.status];
+  const byStart = (rows: unknown[][]) => [...rows].sort((a, b) => ((a[1] as string) < (b[1] as string) ? -1 : 1));
+
+  beforeAll(async () => {
+    const res = await api('GET', '/mail/settings', adminToken);
+    expect(res.status).toBe(200);
+    found = res.body as typeof found;
+    expect((await putSettings({ dailyEnabled: true, dailyHour: HOUR })).status).toBe(200);
+    await removeMarks();
+  });
+
+  beforeEach(async () => {
+    await forgetMailsTo(ADMIN);
+  });
+
+  afterAll(async () => {
+    await removeMarks();
+    expect((await putSettings(found)).status).toBe(200);
+    await forgetMailsTo(ADMIN);
+  });
+
+  it('GET and PUT /mail/settings: the Administrator reads and saves, a User is refused, an hour out of range is 400', async () => {
+    expect(await api('GET', '/mail/settings', adminToken)).toEqual({ status: 200, body: { dailyEnabled: true, dailyHour: HOUR } });
+    expect((await api('GET', '/mail/settings', aliceToken)).status).toBe(403);
+    expect((await api('PUT', '/mail/settings', aliceToken, { dailyEnabled: false, dailyHour: HOUR })).status).toBe(403);
+    expect(await putSettings({ dailyEnabled: true, dailyHour: 24 })).toEqual({ status: 400, body: { error: 'invalid_request', message: 'Invalid input: dailyHour' } });
+    expect(await api('GET', '/mail/settings', adminToken)).toEqual({ status: 200, body: { dailyEnabled: true, dailyHour: HOUR } });
+  });
+
+  it("at the chosen hour: one mail to admin's address with two files, the booked of the next 7 days and the backup of every status", async () => {
+    // The journey's day is the last of the next 7 days.
+    const date = addDays(day, -6);
+    const result = await runDaily(date, HOUR);
+    expect(result).toMatchObject({ outcome: 'sent', date, hour: HOUR, mailCount: 1 });
+
+    const [mail, ...more] = await waitForMails(ADMIN, 1);
+    expect(more).toEqual([]);
+    expect(mail!.to).toEqual([ADMIN]);
+    expect(mail!.subject).toMatch(/^Calendar: next 7 days and backup, /);
+    expect(mail!.attachments.map((a) => a.fileName)).toEqual([`calendar-next-7-days-${date}.xlsx`, expect.stringMatching(/^calendar-backup-from-\d{4}-\d{2}-01\.xlsx$/)]);
+    expect(await fileRows(mail!, 0)).toEqual(byStart([asRow(booked[0]!), asRow(booked[1]!)]));
+    expect(await fileRows(mail!, 1)).toEqual(byStart(booked.map(asRow)));
+    expect(await getMailItem('DAILY', date)).toMatchObject({ state: 'sent', startedAt: at(date, HOUR) });
+  });
+
+  it("a day whose next 7 days end before the journey's day: its rows only in the backup", async () => {
+    const date = addDays(day, -7);
+    expect(await runDaily(date, HOUR)).toMatchObject({ outcome: 'sent' });
+    const [mail] = await waitForMails(ADMIN, 1);
+    expect(await fileRows(mail!, 0)).toEqual([]);
+    expect(await fileRows(mail!, 1)).toEqual(byStart(booked.map(asRow)));
+  });
+
+  it('the same hour twice sends once', async () => {
+    const date = addDays(day, -5);
+    expect(await runDaily(date, HOUR)).toMatchObject({ outcome: 'sent' });
+    expect(await runDaily(date, HOUR)).toEqual({ outcome: 'already_sent', date, hour: HOUR });
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    expect(await waitForMails(ADMIN, 0)).toHaveLength(1);
+  });
+
+  it('an earlier hour, a later hour with no mark, or the mail switched off, send none', async () => {
+    const date = addDays(day, -4);
+    expect(await runDaily(date, HOUR - 1)).toEqual({ outcome: 'not_the_hour', date, hour: HOUR - 1 });
+    expect(await runDaily(date, HOUR + 1)).toEqual({ outcome: 'not_the_hour', date, hour: HOUR + 1 });
+    expect((await putSettings({ dailyEnabled: false, dailyHour: HOUR })).status).toBe(200);
+    try {
+      expect(await runDaily(date, HOUR)).toEqual({ outcome: 'switched_off', date, hour: HOUR });
+    } finally {
+      expect((await putSettings({ dailyEnabled: true, dailyHour: HOUR })).status).toBe(200);
+    }
+    expect(await waitForMails(ADMIN, 0)).toEqual([]);
+    expect(await getMailItem('DAILY', date)).toBeUndefined();
+  });
+
+  it('a mark left failed is taken again and sends, at the chosen hour and at a later hour of the same day', async () => {
+    const [first, second] = [addDays(day, -3), addDays(day, -2)];
+    for (const date of [first, second]) {
+      await putMailItem({ PK: 'DAILY', SK: date, state: 'failed', startedAt: at(date, HOUR), finishedAt: at(date, HOUR) });
+    }
+    expect(await runDaily(first, HOUR)).toMatchObject({ outcome: 'sent', date: first, hour: HOUR });
+    expect(await runDaily(second, HOUR + 2)).toMatchObject({ outcome: 'sent', date: second, hour: HOUR + 2 });
+    expect(await waitForMails(ADMIN, 2)).toHaveLength(2);
+    expect(await getMailItem('DAILY', second)).toMatchObject({ state: 'sent', startedAt: at(second, HOUR + 2) });
+  });
+
+  it('a mark sending younger than 10 minutes is not taken; older, at a later hour, it is', async () => {
+    const date = addDays(day, -1);
+    await putMailItem({ PK: 'DAILY', SK: date, state: 'sending', startedAt: at(date, HOUR, -5) });
+    expect(await runDaily(date, HOUR)).toEqual({ outcome: 'in_progress', date, hour: HOUR });
+    expect(await waitForMails(ADMIN, 0)).toEqual([]);
+    expect(await runDaily(date, HOUR + 1)).toMatchObject({ outcome: 'sent', hour: HOUR + 1 });
+    expect(await waitForMails(ADMIN, 1)).toHaveLength(1);
   });
 });

@@ -24,7 +24,8 @@
     "assistant-key": "bash scripts/assistant-key.sh",
     "assistant:eval": "bash scripts/assistant-eval.sh",
     "budget": "bash scripts/budget.sh",
-    "mail:send": "bash scripts/mail-send.sh"
+    "mail:send": "bash scripts/mail-send.sh",
+    "mail:daily": "bash scripts/mail-daily.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",

@@ -79,7 +79,7 @@ describe('index.html', () => {
 
     it('every field has its label: a <label> around it, with words of its own', () => {
       const fields = everywhere('input, select, textarea');
-      expect(fields).toHaveLength(56);
+      expect(fields).toHaveLength(58);
       for (const field of fields) {
         const label = field.closest('label');
         expect(label, field.getAttribute('name')!).not.toBeNull();
@@ -97,13 +97,14 @@ describe('index.html', () => {
         ['‹', 'Previous week'],
         ['›', 'Next week'],
         ['Try again', 'Try again to read the settings'],
+        ["Try again", "Try again to read the daily e-mail's settings"],
         ['Try again', 'Try again to read the users'],
         ['Try again', 'Try again to read the types'],
         ['Try again', 'Try again to read the weekly patterns'],
         ['Try again', 'Try again to read this date'],
         ['Try again', 'Try again to read your details'],
       ]);
-      expect(everywhere('.retry')).toHaveLength(6);
+      expect(everywhere('.retry')).toHaveLength(7);
     });
 
     it('a dialog that asks before an action is described by its question, which a screen reader says when it opens', () => {
@@ -117,15 +118,16 @@ describe('index.html', () => {
       const place = (element: Element) => [...element.classList].join('.');
       const alerts = everywhere('[role="alert"]');
       const failures = everywhere('.error');
-      expect(failures).toHaveLength(69);
+      expect(failures).toHaveLength(72);
       expect(alerts).toEqual(failures);
       for (const alert of alerts) expect(['P', alert.textContent], place(alert)).toEqual(['P', '']);
       const loading = everywhere('.loading');
-      expect(loading.map((element) => [element.getAttribute('role'), element.textContent, element.hidden])).toEqual(Array.from({ length: 7 }, () => ['status', 'Loading…', true]));
+      expect(loading.map((element) => [element.getAttribute('role'), element.textContent, element.hidden])).toEqual(Array.from({ length: 8 }, () => ['status', 'Loading…', true]));
       // What else is news: "Password changed" at the login, the appointment being moved, the
       // list of Users being read for the book dialog, where a mail asked for goes,
-      // "Settings saved.", and what the assistant answers.
-      expect(everywhere('[role="status"]:not(.loading)').map((element) => place(element) || place(element.parentElement!))).toEqual(['notice', 'moving', 'users-message', 'mail-sent', 'saved', 'news']);
+      // "Settings saved.", "E-mail is not available yet", "Daily e-mail saved.", and what the
+      // assistant answers.
+      expect(everywhere('[role="status"]:not(.loading)').map((element) => place(element) || place(element.parentElement!))).toEqual(['notice', 'moving', 'users-message', 'mail-sent', 'saved', 'unavailable', 'saved', 'news']);
     });
   });
 
@@ -317,6 +319,27 @@ describe('index.html', () => {
     expect([one('.saved').textContent, one('.saved').getAttribute('role'), one('.failure').getAttribute('role')]).toEqual(['Settings saved.', 'status', 'alert']);
     expect([one('.submit').textContent, one('.retry').textContent]).toEqual(['Save', 'Try again']);
     expect([one('.zone-name').textContent, one('.last-saved').textContent]).toEqual(['', '']);
+  });
+
+  it('the settings\' "Daily e-mail" is a part of its own after the form, hidden and empty: a switch and the hour, its range and its refusal; "not available yet" is the script\'s to say', () => {
+    loadPage();
+    const part = document.querySelector<HTMLElement>('#settings .daily-mail')!;
+    expect(part.previousElementSibling).toBe(document.querySelector('#settings form.settings'));
+    const one = <T extends HTMLElement = HTMLElement>(selector: string) => part.querySelector<T>(selector)!;
+    expect(one('h3').textContent).toBe('Daily e-mail');
+    const form = one<HTMLFormElement>('form.daily');
+    expect([form.hidden, form.noValidate]).toEqual([true, true]);
+    const fields = [...form.querySelectorAll<HTMLInputElement>('input, select, textarea')];
+    expect(fields.map((field) => [field.name, field.type, field.checked, field.value, field.closest('label')!.textContent.trim()])).toEqual([
+      ['dailyEnabled', 'checkbox', false, 'on', 'Send the daily e-mail'],
+      ['dailyHour', 'text', false, '', 'Hour'],
+    ]);
+    const hour = fields[1]!;
+    expect(['min', 'max', 'pattern', 'required', 'aria-invalid'].filter((name) => hour.hasAttribute(name))).toEqual([]);
+    expect([one('.range').textContent, one('.refusal').textContent, one('.refusal').getAttribute('role')]).toEqual(['', '', 'alert']);
+    expect([one('.loading').hidden, one('.unavailable').hidden, one('.unread').hidden, one('.saved').hidden]).toEqual([true, true, true, true]);
+    expect([one('.unavailable').textContent, one('.unavailable').getAttribute('role')]).toEqual(['', 'status']);
+    expect([one('.saved').textContent, one('.submit').textContent, one('.retry').textContent]).toEqual(['Daily e-mail saved.', 'Save daily e-mail', 'Try again']);
   });
 
   it('the login has a place for its notice, empty, read when the reader is free, before the form', () => {

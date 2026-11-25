@@ -493,6 +493,28 @@ The on-demand mails are counted per person (`sub`) and local day, five at most, 
 `mail` (`docs/EMAIL_ARCHITECTURE.md` section 6.5). The count outlives a run, so a journey that
 asks through the route uses accounts made for the run, whose `sub` is new.
 
+## The daily mail in the journeys
+
+Once a day, at the hour of the mail settings in the calendar's time zone, the mailer sends every
+administrator with an address one mail with two files (`docs/EMAIL_ARCHITECTURE.md` sections 6.2
+and 6.3). In the cloud an hourly timer starts it with the event `{ kind: 'daily' }`; locally
+nothing runs it on its own, so a journey invokes it with `runMailer()`, as `npm run mail:daily`
+does.
+
+- **A fixed "now".** The local mailer accepts a `now` in the event, because `env.local.json` sets
+  `MAIL_ALLOW_NOW` for it alone; in the cloud such an event is refused. A journey runs it at a
+  moment of its choice, on dates far ahead, so that its runs never meet a run of today.
+- **The day's mark.** The item `PK` `DAILY`, `SK` the local date, in the table `mail`, keeps the
+  day's run: `sending`, then `sent` or `failed`. It is what makes the mail go at most once a day:
+  each run takes it with one conditional write. At the chosen hour a run takes a missing mark; at
+  that hour or later the same day it also takes one that is `failed`, or `sending` for more than
+  10 minutes; otherwise it stops and says why (`already_sent`, `in_progress`, `not_the_hour`).
+  The journeys write a mark straight in DynamoDB Local to make a state only a failure would
+  leave (`putMailItem()`), read it (`getMailItem()`), and remove the marks of their dates first
+  and last (`deleteMailItem()`).
+- **The settings** (item `SETTINGS`): on or off, and the hour, 0 to 23. Until saved, the defaults
+  apply, on at 7. They are one for the whole calendar, so a journey writes back what it found.
+
 ## The front end's services in the journeys
 
 The front end's journeys (`frontend/tests/integration/`) reach the API only through the services

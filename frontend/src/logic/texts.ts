@@ -253,3 +253,13 @@ export const MAIL_TEXTS = {
   },
   sent: (address: string | null) => `On its way to ${address === null ? 'your e-mail address' : maskAddress(address)}`,
 } as const satisfies { what: Record<Role, string>; sent: (address: string | null) => string };
+
+// The words of the settings' "Daily e-mail" (docs/FRONTEND_ARCHITECTURE.md section 5.1): an hour
+// as the field shows it, "07:00"; under the field, what it takes, with the calendar's time zone
+// when it is known (docs/EMAIL_ARCHITECTURE.md section 6.2: the hour is the calendar's); and why
+// a typed hour is refused.
+export const DAILY_MAIL_TEXTS = {
+  hour: (hour: number) => `${pad(hour)}:00`,
+  range: (timeZone: string | null) => `A whole hour, from 00:00 to 23:00, in the calendar's time zone${timeZone === null ? '' : `, ${timeZone}`}.`,
+  refusal: 'The hour must be a whole hour from 00:00 to 23:00, such as 07:00.',
+} as const satisfies { hour: (hour: number) => string; range: (timeZone: string | null) => string; refusal: string };

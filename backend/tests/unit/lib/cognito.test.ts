@@ -16,6 +16,7 @@ import {
 import { mockClient } from 'aws-sdk-client-mock';
 import {
   addToGroup,
+  adminRecipients,
   asMe,
   asUserSummary,
   createUser,
@@ -461,5 +462,30 @@ describe('namesBySub', () => {
       ['s2', { givenName: '', familyName: 'Verdi' }],
     ]);
     expect(cognito.commandCalls(ListUsersInGroupCommand).map((c) => c.args[0].input.GroupName)).toEqual(['user', 'user']);
+  });
+});
+
+describe('adminRecipients', () => {
+  const admin = (username: string | undefined, email: string | null) => ({
+    Username: username,
+    Attributes: [{ Name: 'sub', Value: `sub-${String(username)}` }, ...(email === null ? [] : [{ Name: 'email', Value: email }])],
+  });
+
+  it('answers every member of group admin by username, following NextToken, with the e-mail or null', async () => {
+    cognito.on(ListUsersInGroupCommand, { UserPoolId: POOL, GroupName: 'admin', NextToken: undefined }).resolves({ Users: [admin('zeta', 'z@example.com')], NextToken: 'n2' });
+    cognito.on(ListUsersInGroupCommand, { UserPoolId: POOL, GroupName: 'admin', NextToken: 'n2' }).resolves({ Users: [admin('admin', null), admin('boss', 'b@example.com')] });
+
+    await expect(adminRecipients()).resolves.toEqual([
+      { username: 'admin', email: null },
+      { username: 'boss', email: 'b@example.com' },
+      { username: 'zeta', email: 'z@example.com' },
+    ]);
+  });
+
+  it('answers none for an empty group, and throws for a member without a username', async () => {
+    cognito.on(ListUsersInGroupCommand).resolves({});
+    await expect(adminRecipients()).resolves.toEqual([]);
+    cognito.on(ListUsersInGroupCommand).resolves({ Users: [admin(undefined, 'x@example.com'), admin('admin', null)] });
+    await expect(adminRecipients()).rejects.toThrow('A member of group admin has no username');
   });
 });

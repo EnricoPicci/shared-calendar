@@ -1540,7 +1540,12 @@ describe('the navigation', () => {
       updatedBy: { username: 'carol', role: 'admin' },
       ...over,
     });
-    const calls = () => (fetchMock.mock.calls as [string, RequestInit][]).filter(([url]) => url.startsWith(CONFIG.apiUrl));
+    const MAIL_SETTINGS_URL = 'http://api.test/mail/settings';
+    // The requests of the calendar's settings and the screens around them: the daily e-mail's
+    // part reads its own settings beside them, said in its own tests.
+    const ofMail = (url: string) => url === MAIL_SETTINGS_URL;
+    const calls = () => (fetchMock.mock.calls as [string, RequestInit][]).filter(([url]) => url.startsWith(CONFIG.apiUrl) && !ofMail(url));
+    const settingsCalls = () => apiCalls().filter(([url]) => !ofMail(url!));
     const at = (hash: string) => window.history.replaceState(null, '', `${window.location.pathname}${hash}`);
     const field = (name: string) => find<HTMLInputElement>(`#settings [name="${name}"]`);
     const form = () => find<HTMLFormElement>('#settings form.settings');
@@ -1555,7 +1560,7 @@ describe('the navigation', () => {
       return made;
     };
 
-    it('the Administrator on #/settings: the address stays, its link is the one marked, the one request is the settings with the person\'s token, and the form holds them', async () => {
+    it('the Administrator on #/settings: the address stays, its link is the one marked, the two requests are the settings and the daily e-mail\'s with the person\'s token, and the form holds them', async () => {
       at('#/settings');
       fetchMock.mockResolvedValueOnce(json(200, stored()));
       mounted(ADMIN);
@@ -1567,7 +1572,7 @@ describe('the navigation', () => {
       expect(form().hidden).toBe(true);
 
       await shown();
-      expect(apiCalls()).toEqual([[SETTINGS_URL, BEARER]]);
+      expect(apiCalls()).toEqual([[SETTINGS_URL, BEARER], [MAIL_SETTINGS_URL, BEARER]]);
       expect(calls()[0]![1].method).toBe('GET');
       expect(['cancellationNoticeHours', 'minBookingNoticeHours', 'bookingHorizonDays', 'maxFutureAppointmentsPerUser'].map((name) => field(name).value)).toEqual(['24', '0', '56', '']);
       expect([field('noLimit').checked, field('maxFutureAppointmentsPerUser').disabled]).toEqual([true, true]);
@@ -1604,7 +1609,7 @@ describe('the navigation', () => {
       find('#settings .retry').click();
       await shown();
       expect(find('#settings .unread').hidden).toBe(true);
-      expect(apiCalls().map(([address]) => address)).toEqual([SETTINGS_URL, SETTINGS_URL]);
+      expect(settingsCalls().map(([address]) => address)).toEqual([SETTINGS_URL, SETTINGS_URL]);
     });
 
     it('a save: the PUT with the four values, "Settings saved.", the form filled with the answer, and the settings read again', async () => {
@@ -1624,7 +1629,7 @@ describe('the navigation', () => {
       expect(JSON.parse(String(init.body))).toEqual({ cancellationNoticeHours: 48, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: 5 });
       expect(field('cancellationNoticeHours').value).toBe('48');
       expect(find<HTMLButtonElement>('#settings .submit').disabled).toBe(false);
-      await vi.waitFor(() => expect(apiCalls()).toHaveLength(3));
+      await vi.waitFor(() => expect(settingsCalls()).toHaveLength(3));
       expect([calls()[2]![0], calls()[2]![1].method]).toEqual([SETTINGS_URL, 'GET']);
       expect(find('#settings .last-saved').textContent).toBe('Last saved by admin on Thu 19 Nov, 17:00');
 
@@ -1653,7 +1658,7 @@ describe('the navigation', () => {
       expect(refusal('bookingHorizonDays')).toBe('Booking horizon must be a whole number from 1 to 365.');
       expect(refusal('minBookingNoticeHours')).toBe('Minimum booking notice must be a whole number from 0 to 720.');
       expect(field('bookingHorizonDays').getAttribute('aria-invalid')).toBe('true');
-      expect(apiCalls()).toHaveLength(1);
+      expect(settingsCalls()).toHaveLength(1);
       expect(find<HTMLButtonElement>('#settings .submit').disabled).toBe(false);
       expect(find('#settings .saved').hidden).toBe(true);
     });
@@ -1666,7 +1671,7 @@ describe('the navigation', () => {
       submit(form());
       await vi.waitFor(() => expect(find('#settings .failure').textContent).toBe('The calendar was being changed at the same moment. Please try again.'));
       await vi.waitFor(() => expect(find('#settings .last-saved').textContent).toBe('Last saved by dave on Thu 19 Nov, 17:30'));
-      expect(apiCalls()).toHaveLength(3);
+      expect(settingsCalls()).toHaveLength(3);
       expect(field('bookingHorizonDays').value).toBe('30');
       expect(find('#settings .saved').hidden).toBe(true);
       expect(html()).not.toContain('lock was held');
@@ -1711,7 +1716,7 @@ describe('the navigation', () => {
       await shown();
       expect([field('bookingHorizonDays').value, field('minBookingNoticeHours').value, field('noLimit').checked]).toEqual(['56', '0', true]);
       expect(document.querySelectorAll('#settings [aria-invalid]')).toHaveLength(0);
-      expect(apiCalls().map(([address]) => address)).toEqual([
+      expect(settingsCalls().map(([address]) => address)).toEqual([
         WEEK_URL,
         'http://api.test/calendar?from=2026-11-23&to=2026-11-29',
         SETTINGS_URL,
@@ -1744,7 +1749,7 @@ describe('the navigation', () => {
       expect(window.location.hash).toBe('#/settings'); // signing out leaves the address
 
       // A User: the address is not theirs. Their list reads the settings, then the list.
-      const asked = apiCalls().length;
+      const asked = settingsCalls().length;
       fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
       store.set(ALICE);
       expect(window.location.hash).toBe('#/week');
@@ -1753,13 +1758,83 @@ describe('the navigation', () => {
       fetchMock.mockResolvedValueOnce(json(200, { appointments: [] }));
       links()[1]!.click();
       await vi.waitFor(() => expect(find('#appointments .empty').hidden).toBe(false));
-      expect(apiCalls().slice(asked)).toEqual([
+      expect(settingsCalls().slice(asked)).toEqual([
         [WEEK_URL, 'Bearer access-token-alice'],
         [SETTINGS_URL, 'Bearer access-token-alice'],
         ['http://api.test/calendar/appointments?upcoming=true&status=booked', 'Bearer access-token-alice'],
       ]);
       expect([find('#settings').hidden, form().hidden]).toEqual([true, true]);
       expect(html()).not.toContain('carol');
+    });
+    // The daily e-mail, a part of the settings with a service of its own
+    // (docs/EMAIL_ARCHITECTURE.md section 11): read beside the calendar's settings, after them,
+    // and saved apart; "not available yet" in a stack where e-mail is not on; a failure of either
+    // read hides nothing of the other.
+    const daily = <T extends HTMLElement = HTMLElement>(selector: string) => find<T>(`#settings .daily-mail ${selector}`);
+    // Answers each request by its address: the calendar's settings and the daily e-mail's.
+    const answerBoth = (calendar: () => Response, mail: () => Response) =>
+      fetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+        if (url === SETTINGS_URL) return calendar();
+        if (url === MAIL_SETTINGS_URL) return init.method === 'PUT' ? json(200, JSON.parse(String(init.body))) : mail();
+        return unanswered();
+      });
+
+    it('the daily e-mail: its two fields filled from GET /mail/settings, the hour as 07:00 with the calendar\'s time zone; a save is a PUT of both, "Daily e-mail saved.", read again', async () => {
+      answerBoth(() => json(200, stored()), () => json(200, { dailyEnabled: true, dailyHour: 7 }));
+      at('#/settings');
+      mounted(ADMIN);
+      await vi.waitFor(() => expect(daily('form').hidden).toBe(false));
+      await shown();
+      expect([daily<HTMLInputElement>('[name="dailyEnabled"]').checked, daily<HTMLInputElement>('[name="dailyHour"]').value]).toEqual([true, '07:00']);
+      expect(daily('.range').textContent).toBe("A whole hour, from 00:00 to 23:00, in the calendar's time zone, Europe/Rome.");
+
+      daily<HTMLInputElement>('[name="dailyEnabled"]').click();
+      daily<HTMLInputElement>('[name="dailyHour"]').value = '18';
+      submit(daily<HTMLFormElement>('form'));
+      await vi.waitFor(() => expect(daily('.saved').hidden).toBe(false));
+      const put = calls().length; // the calendar's requests only
+      const mail = (fetchMock.mock.calls as [string, RequestInit][]).filter(([url]) => ofMail(url));
+      expect(mail.map(([, init]) => [init.method, (init.headers as Record<string, string>).Authorization])).toEqual([
+        ['GET', BEARER],
+        ['PUT', BEARER],
+        ['GET', BEARER],
+      ]);
+      expect(JSON.parse(String(mail[1]![1].body))).toEqual({ dailyEnabled: false, dailyHour: 18 });
+      expect(daily<HTMLInputElement>('[name="dailyHour"]').value).toBe('18:00');
+      expect(put).toBe(1); // the calendar's settings were not saved
+    });
+
+    it('the daily e-mail: an hour that is not a whole hour is refused under it, with no request sent', async () => {
+      answerBoth(() => json(200, stored()), () => json(200, { dailyEnabled: true, dailyHour: 7 }));
+      at('#/settings');
+      mounted(ADMIN);
+      await vi.waitFor(() => expect(daily('form').hidden).toBe(false));
+      daily<HTMLInputElement>('[name="dailyHour"]').value = '7:30';
+      submit(daily<HTMLFormElement>('form'));
+      expect(daily('.refusal').textContent).toBe('The hour must be a whole hour from 00:00 to 23:00, such as 07:00.');
+      expect(daily('[name="dailyHour"]').getAttribute('aria-invalid')).toBe('true');
+      expect((fetchMock.mock.calls as [string, RequestInit][]).filter(([url]) => ofMail(url))).toHaveLength(1);
+    });
+
+    it('503 mail_unavailable: the daily e-mail says "E-mail is not available yet" in place of its fields, and the calendar\'s settings are there', async () => {
+      answerBoth(() => json(200, stored()), () => json(503, { error: 'mail_unavailable', message: 'E-mail is not available yet' }));
+      at('#/settings');
+      mounted(ADMIN);
+      await shown();
+      await vi.waitFor(() => expect(daily('.unavailable').hidden).toBe(false));
+      expect(daily('.unavailable').textContent).toBe('E-mail is not available yet.');
+      expect([daily('form').hidden, daily('.unread').hidden, daily('.loading').hidden]).toEqual([true, true, true]);
+    });
+
+    it('a failed read of the calendar\'s settings hides nothing of the daily e-mail, said without a time zone', async () => {
+      answerBoth(() => json(500, { error: 'internal_error', message: 'x' }), () => json(200, { dailyEnabled: false, dailyHour: 6 }));
+      at('#/settings');
+      mounted(ADMIN);
+      await vi.waitFor(() => expect(find('#settings .unread').hidden).toBe(false));
+      await vi.waitFor(() => expect(daily('form').hidden).toBe(false));
+      expect(form().hidden).toBe(true);
+      expect(daily<HTMLInputElement>('[name="dailyHour"]').value).toBe('06:00');
+      expect(daily('.range').textContent).toBe("A whole hour, from 00:00 to 23:00, in the calendar's time zone.");
     });
   });
 

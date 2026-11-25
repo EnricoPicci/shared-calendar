@@ -141,10 +141,10 @@ else
   echo "table $ASSISTANT_TABLE: time to live switched on"
 fi
 
-# The table of e-mail (docs/EMAIL_ARCHITECTURE.md section 10.1): the counts of the mails on demand,
-# which delete themselves (time to live, as in template.yaml). As for the assistant's table,
-# DynamoDB Local may never delete an expired item, and nothing depends on it: a count is read by
-# its date.
+# The table of e-mail (docs/EMAIL_ARCHITECTURE.md section 10.1): the daily mail's settings, its mark
+# of each day and the counts of the mails on demand; the marks and the counts delete themselves
+# (time to live, as in template.yaml). As for the assistant's table, DynamoDB Local may never delete
+# an expired item, and nothing depends on it: a mark and a count are read by their date.
 if ddb describe-table --table-name "$MAIL_TABLE" >/dev/null 2>&1; then
   echo "table $MAIL_TABLE: exists"
 else
@@ -263,7 +263,11 @@ ensure_user alice "$ALICE_PASSWORD" user "$(facts_of Alice Liddell alice@example
 # `npm run local:lambda`, which serves the functions' invoke on the host's port 3001, reached from
 # a Lambda container at host.docker.internal (docs/EMAIL_PLAN.md finding F3), under the function's
 # name in template.yaml. The mailer and the mail route read Cognito too, each with a section of its
-# own below.
+# own below. The mailer's section also sets MAIL_ALLOW_NOW: the daily run takes its "now" from the
+# event, so that the journeys and npm run mail:daily can run it at any hour; the template declares it
+# empty, and in the cloud the run reads the clock. The routes of the mail settings read the table
+# only, and get all they need from "Parameters". Nothing seeds the daily mail's settings: until the
+# Administrator saves them, the defaults apply.
 #
 # The key is written by printf, a builtin of bash, and never through a here-document or a
 # command's argument: bash 3.2 keeps a here-document in a temporary file, and an argument shows in
@@ -395,6 +399,7 @@ EOF
   "MailerFunction": {
     "USER_POOL_ID": "$POOL_ID",
     "COGNITO_ENDPOINT": "http://cognito:9229",
+    "MAIL_ALLOW_NOW": "true",
     "AWS_ACCESS_KEY_ID": "local",
     "AWS_SECRET_ACCESS_KEY": "local"
   },

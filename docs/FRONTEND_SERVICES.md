@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v14 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): `MailService` asks for the mail of a range of dates (section 24). v13 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m1 and m2): the four facts of a person in `UsersService` (`createUser` with them, `updateUser`, section 13) and `MeService` (section 23). v12 — implemented (2026-11-24, brief `prompts/e14-step-u4-implementation.md`, `docs/CAPACITY_PLAN.md` step u4): the capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` v17, decisions D24 to D31) in the services: `AvailabilityTypesService.create` and `rename` take an optional `capacity` (section 16, decision 70); `AppointmentsService.book` and `change` pass `overbook` through and answer `user_busy` (section 19). v11 — implemented (2026-11-23, brief `prompts/e05-step-p3-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p3): `ChangePasswordService` says its success before it clears the store (section 22.4, decision 69), so that the shell reacts while the person is still signed in. v10 — implemented (2026-11-22, brief `prompts/e03-step-p2-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p2): `ChangePasswordService` (section 22), a person's change of their own password straight at Cognito, with `cognito.ts` making one request for any target of Cognito (section 10.1). v9 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 21), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v8 — implemented (2026-11-21, brief `prompts/95-step-71-implementation.md`, `docs/FRONTEND_DEPLOY_PLAN.md` step 71; the design reviewed before the code): `LogoutService` (section 20), `revokeToken` and `toRevokeOutcome` in `cognito.ts` (section 10.1), `reset()` on `LoginService` and `RefreshService`; proven against cognito-local, and at the deployed page as far as the revocation answered 200 (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; section 20.9 says what was seen and what was not). v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). |
-| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-21; v9 and v10 2026-11-22; v11 2026-11-23; v12 2026-11-24; v13 and v14 2026-11-25 |
+| Status | v15 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` step m5): `MailSettingsService` reads and saves the daily mail's settings (section 25). v14 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): `MailService` asks for the mail of a range of dates (section 24). v13 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m1 and m2): the four facts of a person in `UsersService` (`createUser` with them, `updateUser`, section 13) and `MeService` (section 23). v12 — implemented (2026-11-24, brief `prompts/e14-step-u4-implementation.md`, `docs/CAPACITY_PLAN.md` step u4): the capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` v17, decisions D24 to D31) in the services: `AvailabilityTypesService.create` and `rename` take an optional `capacity` (section 16, decision 70); `AppointmentsService.book` and `change` pass `overbook` through and answer `user_busy` (section 19). v11 — implemented (2026-11-23, brief `prompts/e05-step-p3-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p3): `ChangePasswordService` says its success before it clears the store (section 22.4, decision 69), so that the shell reacts while the person is still signed in. v10 — implemented (2026-11-22, brief `prompts/e03-step-p2-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p2): `ChangePasswordService` (section 22), a person's change of their own password straight at Cognito, with `cognito.ts` making one request for any target of Cognito (section 10.1). v9 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 21), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v8 — implemented (2026-11-21, brief `prompts/95-step-71-implementation.md`, `docs/FRONTEND_DEPLOY_PLAN.md` step 71; the design reviewed before the code): `LogoutService` (section 20), `revokeToken` and `toRevokeOutcome` in `cognito.ts` (section 10.1), `reset()` on `LoginService` and `RefreshService`; proven against cognito-local, and at the deployed page as far as the revocation answered 200 (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; section 20.9 says what was seen and what was not). v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). |
+| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-21; v9 and v10 2026-11-22; v11 2026-11-23; v12 2026-11-24; v13, v14 and v15 2026-11-25 |
 | Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows); since v7 the calendar view and the appointments; since v8 the sign-out; since v9 the conversation with the assistant; since v10 the change of one's own password; since v12 the capacity of a type |
 | Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), since v6 v12 (sections 3 and 4: the calendar routes as implemented); `docs/SHARED_CALENDAR_SPEC.md` v15 section 16 (v13 when v6 was written), and for v7 sections 8, 11.1 (routes 15–20), 11.2, 11.5, 11.6; for v8 `docs/FRONTEND_ARCHITECTURE.md` section 13.7 and section 11, decision 152 (the direction for logout as v14 had it; its v15 follows this design), and `docs/ARCHITECTURE.md` section 7.3; `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/`; for v9 `docs/CONVERSATIONAL_ARCHITECTURE.md` v14 (sections 4.4, 5.1 to 5.5, 6, 6.1 and 13) and `docs/ARCHITECTURE.md` section 4, "The assistant's routes"; for v10 `docs/ARCHITECTURE.md` v14 (sections 5.1, 6.9, 7.3 and 8) and `docs/CHANGE_PASSWORD_PLAN.md` |
 
@@ -28,6 +28,7 @@
 | v12 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u4 (brief `prompts/e14-step-u4-implementation.md`), from `docs/SHARED_CALENDAR_SPEC.md` v17 (decisions D24 to D31) and the back end as `docs/ARCHITECTURE.md` section 4 describes it. **`AvailabilityTypesService`**: `create(name, capacity?)` and `rename(typeId, name, capacity?)`, the methods keeping their names as the route keeps its path; a `capacity` left out is not sent, so a new type gets 1 and an edited one keeps its own, and today's callers work unchanged; `TypeBody` checks it before sending (0, 101 and 2.5 are `invalid_request`, no request); each `pending` carries the `capacity` given (sections 16.1, 16.3, 16.4, decision 70, decided by the Product Owner). The answer's `capacity` is passed through, not checked (section 16.5). **`AppointmentsService`**: `overbook` in `book` and `change` goes out as the caller gives it, absent staying absent; a User's `true` is the API's `403 forbidden`, already a reason; `user_busy` is a reason of both routes, between `outside_availability` and `slot_taken`, the server's order (sections 19.1, 19.3, 19.4). Unit tests (sections 16.8 and 19.8) and two journeys (section 14.4, blocks "types" and "appointments"). The status line's sentence that this document was not yet in line with the capacity is removed. |
 | v13 | 2026-11-25 | `docs/EMAIL_PLAN.md` steps m1 and m2 (brief `prompts/mail-m03-pair-m1-m2-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` section 4. **The four facts of a person**: `UsersService.createUser` takes the username and the four facts (`NewUser`), `updateUser(username, profile)` is its fourth pair (`PUT /users/{username}`), `listUsers` checks each User's facts (section 13); new section 23, `MeService.getMe()` (`GET /me`, both roles). |
 | v14 | 2026-11-25 | `docs/EMAIL_PLAN.md` steps m3 and m4 (brief `prompts/mail-m04-pair-m3-m4-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 6 and 9.1. New section 24, **`MailService.sendCalendar(range)`** (`POST /mail/calendar`, both roles): the range checked with the shared `MailCalendarBody` before any request, success only on `202 { status: "queued" }`. The address the page shows after it is read with `MeService` (section 23), never answered by the route. |
+| v15 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m5 (brief `prompts/mail-m05-daily-mail-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 6.2 and 9.1. New section 25, **`MailSettingsService`**: `getSettings()` (`GET /mail/settings`) and `updateSettings(settings)` (`PUT /mail/settings`), the Administrator's; the body checked with the shared `MailSettingsBody` before any request. A service of its own, not a part of `CalendarSettingsService` (the Product Owner's choice, 2026-11-25): the settings screen uses both. |
 
 ---
 
@@ -3859,3 +3860,68 @@ the mail of the week and one mail comes to its own address, its file named for t
 text saying it has no appointments; a reversed range and one of 367 days are refused before any
 request, and no mail comes; the sixth request of the day is `mail_limit_reached`, and five mails
 came.
+
+## 25. `MailSettingsService` (v15)
+
+### 25.1 The remote calls
+
+| Call | Request | Success | Errors (`docs/ARCHITECTURE.md` section 4) |
+|---|---|---|---|
+| `getSettings()` | `GET /mail/settings` | `200` `MailSettings` `{ dailyEnabled, dailyHour }` | 403 `forbidden`, 503 `mail_unavailable`, 500 `internal_error` |
+| `updateSettings(settings)` | `PUT /mail/settings`, body `MailSettingsBody` `{ dailyEnabled, dailyHour }` | `200` `MailSettings`, as saved | 403 `forbidden`, 503 `mail_unavailable`, 400 `invalid_json` / `invalid_request`, 500 `internal_error` |
+
+The Administrator's alone. The settings are one for the whole calendar: whether the daily mail
+goes, and its hour, a whole hour 0 to 23 in the calendar's time zone
+(`docs/EMAIL_ARCHITECTURE.md` section 6.2). Until the first save the route answers the defaults,
+on at 7. `503 mail_unavailable` is the stack's stage, not a failure of the call: the page says
+"E-mail is not available yet" in place of the fields.
+
+### 25.2 Configuration
+
+`ApiConfig = { apiUrl }` and the `SessionStore`. A service of its own, beside
+`CalendarSettingsService` (section 15), which the settings screen also uses (the Product Owner's
+choice, 2026-11-25). The shell makes one per person, for the screen's part "Daily e-mail".
+
+### 25.3 Types (`mail-settings.types.ts`)
+
+```ts
+type GetCode = Extract<ApiErrorCode, 'forbidden' | 'mail_unavailable' | 'internal_error'>;
+type UpdateCode = Extract<ApiErrorCode, 'forbidden' | 'invalid_json' | 'invalid_request' | 'mail_unavailable' | 'internal_error'>;
+export type MailSettingsResult = { status: 'success'; settings: MailSettings } | ApiFailure<GetCode>;
+export type MailSettingsState = { status: 'idle' } | { status: 'pending' } | MailSettingsResult;
+export type UpdateMailSettingsResult = { status: 'success'; settings: MailSettings } | ApiFailure<UpdateCode>;
+export type UpdateMailSettingsState = { status: 'idle' } | { status: 'pending'; settings: MailSettingsBody } | UpdateMailSettingsResult;
+```
+
+### 25.4 The class
+
+Two pairs, independent, in the shape of `CalendarSettingsService`: `settingsResult$` /
+`settingsState$` for the read, `updateResult$` / `updateState$` for the save. A call asked again
+cancels the one of its own pair under way, never the other's. `updateSettings` checks the body
+with `MailSettingsBody` first: a value it refuses (an hour of 24, 7.5, a switch that is not a
+boolean, another field) is `invalid_request` with the rule's message, and no request is sent.
+
+### 25.5 Mapping the answer
+
+| Answer | Both calls |
+|---|---|
+| `200` with a boolean `dailyEnabled` and a number `dailyHour` | `success` with the two values |
+| any other 2xx, or a `200` without them | `unexpected` |
+| an `error` code of the route | that code |
+| everything else | the transport rows of section 10.2 |
+
+### 25.6 Security notes
+
+Two values, nothing personal. Nothing is logged. No token passes beyond the `SessionStore`.
+
+### 25.7 Tests
+
+Unit (`mail-settings.service.test.ts`): the per-method suite of section 14.1 for each call
+(success, request shape, each route code, wrong answers; `session_rejected`, `not_signed_in`,
+network then success, cancel, late subscriber, no leak), the two pairs independent, and the
+bodies the shared rule refuses, each with no request.
+
+Integration (`mail-settings.test.ts`, one `describe`, against the local stack; page
+`docs/journeys/frontend/mail-settings.md`): the Administrator saves other values and reads them
+back; an hour of 24 is refused before any request and changes nothing; a User is `forbidden` on
+both. The file writes back the settings it found.

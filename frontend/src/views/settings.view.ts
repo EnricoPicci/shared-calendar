@@ -1,6 +1,9 @@
 import type { Subscription } from 'rxjs';
+import type { DailyFields } from '../logic/daily-mail.model';
+import type { DailyMailScreen } from '../logic/daily-mail.screen';
 import { SETTING_FIELDS, settingRange, type SettingsFields } from '../logic/settings.model';
 import type { SettingsScreen } from '../logic/settings.screen';
+import { DAILY_MAIL_TEXTS } from '../logic/texts';
 
 // What the view uses of the SettingsScreen: its stream, the save, the notice of an edit and
 // the new try after a read that failed.
@@ -105,6 +108,87 @@ export function mountSettings(root: HTMLElement, screen: SettingsDeps): Subscrip
       refusal.textContent = '';
       for (const attribute of ['min', 'max', 'step', 'aria-invalid']) input.removeAttribute(attribute);
     }
+  });
+  return subscription;
+}
+
+// What the daily e-mail's part uses of the DailyMailScreen: its stream, the save, the notice of an
+// edit and the new try after a read that failed.
+export type DailyMailDeps = Pick<DailyMailScreen, 'daily$' | 'save' | 'edited' | 'retry'>;
+
+// The settings' "Daily e-mail" (docs/FRONTEND_ARCHITECTURE.md sections 3 and 4): wires the element
+// .daily-mail inside #settings, a part of its own with its own form, mounted beside the settings
+// view so that a failure of one hides nothing of the other. It fills the switch and the hour with
+// what the logic layer hands over, sends them back at "Save daily e-mail", says under the hour why
+// it was refused, and says "E-mail is not available yet" in place of the form when that is so.
+export function mountDailyMail(root: HTMLElement, screen: DailyMailDeps): Subscription {
+  // 1. Find the elements, once, inside the part only: the settings form above has elements of the
+  // same classes.
+  const part = root.querySelector<HTMLElement>('.daily-mail')!;
+  const find = <T extends HTMLElement = HTMLElement>(selector: string) => part.querySelector<T>(selector)!;
+  const loading = find('.loading');
+  const unavailable = find('.unavailable');
+  const unread = find('.unread');
+  const unreadWhy = find('.unread .error');
+  const form = find<HTMLFormElement>('form.daily');
+  const enabled = find<HTMLInputElement>('[name="dailyEnabled"]');
+  const hour = find<HTMLInputElement>('[name="dailyHour"]');
+  const range = find('.range');
+  const refusal = find('.refusal');
+  const failure = find('.failure');
+  const saved = find('.saved');
+  const submit = find<HTMLButtonElement>('.submit');
+
+  // 2. The user's actions become calls. Without preventDefault the browser would send the form
+  // itself and load the page again. The hour goes as typed: the logic layer checks it.
+  form.onsubmit = (event) => {
+    event.preventDefault();
+    screen.save({ dailyEnabled: enabled.checked, dailyHour: hour.value });
+  };
+  // An edit, typed or switched: the checkbox says so itself too, for the documents in which a
+  // click on it sends no input event.
+  form.oninput = () => screen.edited();
+  enabled.onchange = () => screen.edited();
+  find('.retry').onclick = () => screen.retry();
+
+  // What the fields were last filled with: filled again only when the stream brings another
+  // object, so that an hour being typed is left alone by a notification that arrives meanwhile.
+  let filled: DailyFields | null = null;
+
+  // 3. The stream's notifications fill the elements.
+  const subscription = screen.daily$.subscribe((state) => {
+    loading.hidden = !state.loading;
+    unavailable.hidden = state.unavailable === null;
+    unavailable.textContent = state.unavailable ?? '';
+    unread.hidden = state.unread === null;
+    unreadWhy.textContent = state.unread ?? '';
+    form.hidden = state.fields === null;
+    if (state.fields !== filled) {
+      filled = state.fields;
+      enabled.checked = filled?.dailyEnabled ?? false;
+      hour.value = filled?.dailyHour ?? '';
+    }
+    range.textContent = DAILY_MAIL_TEXTS.range(state.timeZone);
+    refusal.textContent = state.refusal ?? '';
+    if (state.refusal === null) hour.removeAttribute('aria-invalid');
+    else hour.setAttribute('aria-invalid', 'true');
+    failure.textContent = state.failure ?? '';
+    saved.hidden = !state.saved;
+    submit.disabled = state.saving;
+  });
+
+  // 4. Leaving the view: the element stays in the page, only hidden, so what was read or typed is
+  // removed before the next person signs in (docs/FRONTEND_ARCHITECTURE.md section 3, rule 9).
+  subscription.add(() => {
+    form.reset();
+    form.hidden = true;
+    loading.hidden = true;
+    unavailable.hidden = true;
+    unread.hidden = true;
+    saved.hidden = true;
+    submit.disabled = false;
+    hour.removeAttribute('aria-invalid');
+    for (const text of [unavailable, unreadWhy, range, refusal, failure]) text.textContent = '';
   });
   return subscription;
 }

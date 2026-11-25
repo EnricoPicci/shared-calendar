@@ -22,7 +22,7 @@ Paths in this file are relative to `backend/`.
   `docs/IMPLEMENTATION_PLAN.md` step 9), `calendar.test.ts` (the calendar's journeys),
   `mail.test.ts` (the mail's, which also need `local:lambda` and the fake mail).
 - `scripts/`: shell scripts behind the npm scripts (`local-seed.sh`, `local-api.sh`,
-  `local-lambda.sh`, `mail-send.sh`, `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`,
+  `local-lambda.sh`, `mail-send.sh`, `mail-daily.sh`, `verify.sh`, `deploy.sh`, `bootstrap-admin.sh`, `smoke.sh`,
   `assistant-key.sh`, `assistant-eval.sh`, `budget.sh`, `check-sam.sh`; `target.sh`,
   `cognito.mjs` and `parameters.mjs` are helpers of those).
 - `docker/`: files for the local stack (`cognito-local-config.json`; `fake-claude.mjs`, the
@@ -96,11 +96,14 @@ Paths in this file are relative to `backend/`.
   sorted by code units, each with its state and four facts) and the facts: `createUser` takes
   them, `updateProfile` (`email_verified` true), `getProfile`, `asUserSummary`, `asMe`.
 - E-mail (`docs/ARCHITECTURE.md` sections 4 and 5.5): `mailDb.ts`, the only module that knows
-  the `mail` table (the day's count under a condition); `excel.ts`, the only file that imports
+  the `mail` table (the day's count, the mail settings, the daily mark, each write one
+  conditional write but the settings'; "now" passed in); `excel.ts`, the only file that imports
   `write-excel-file` (`npm run lint`); `ses.ts`, one mail through SESv2; `lambdaInvoke.ts`, the
   mailer started with an `Event` invoke; `mailerEvent.ts`, the mailer's event (never an address)
-  and the role's kind. Their handlers: `sendCalendarMail.ts` (`POST /mail/calendar`) and
-  `mailer.ts` (no route; the error's name only in its log, an SES message can quote an address).
+  and the role's kind. Their handlers: `sendCalendarMail.ts` (`POST /mail/calendar`),
+  `getMailSettings.ts` and `updateMailSettings.ts` (`/mail/settings`, admin), and `mailer.ts` (no
+  route; kinds `calendar`, `mine` and `daily`, the hourly timer's; the error's name only in its
+  log, an SES message can quote an address).
 - `http.ts`: `parseJsonBody` for bodies, `parseQuery` for query strings (the object a
   `.strict()` query schema checks).
 
@@ -158,13 +161,8 @@ handlers copy: claims → configuration check → role → path → body → `ca
   `calendarConfig()`, the `sub`, then `calendarDb.markUserDeleted` before the sign-out and
   delete; a failure there answers before any Cognito change (`409 concurrent_update` or `500`);
   logs `cancelledCount` and `lockAttempts`.
-
-## A new calendar function
-
-Declare `CALENDAR_TABLE`, `CALENDAR_TIME_ZONE` and `DYNAMODB_ENDPOINT` in `template.yaml`, with
-a role of its own (root `CLAUDE.md`, "Hard rules from the design"). It needs no line in
-`scripts/local-seed.sh` unless it also calls Cognito; never put `CALENDAR_TIME_ZONE` in
-`env.local.json`. The reasons and the existing exceptions: `docs/COMMANDS.md` section 3.2.
+- A new calendar function: its variables, and when it needs a line in `scripts/local-seed.sh`
+  (never `CALENDAR_TIME_ZONE`): `docs/COMMANDS.md` section 3.2.
 
 ## Writing the scripts
 

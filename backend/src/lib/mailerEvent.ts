@@ -1,4 +1,4 @@
-import { MailCalendarBody, Username } from '@shared-calendar/shared';
+import { Instant, MailCalendarBody, Username } from '@shared-calendar/shared';
 import { z } from 'zod';
 
 // What the mailer is started with (docs/EMAIL_ARCHITECTURE.md section 6.1): the kind, the person
@@ -26,4 +26,19 @@ export type MailerEvent = z.infer<typeof MailerEvent>;
 /** The kind of mail a role gets on demand: the role decides, never the request (docs/EMAIL_ARCHITECTURE.md section 9.1). */
 export function kindFor(role: MailerEvent['role']): MailerEvent['kind'] {
   return role === 'admin' ? 'calendar' : 'mine';
+}
+
+/**
+ * The daily run's event (docs/EMAIL_ARCHITECTURE.md section 6.2): `{ kind: "daily" }`, as the hourly
+ * timer sends it, with nothing about a person: the mailer finds the recipients itself. It may carry
+ * `now`, a whole minute as an instant, which the mailer honours only where MAIL_ALLOW_NOW is `true`
+ * (the local stack, for the journeys and `npm run mail:daily`, docs/EMAIL_ARCHITECTURE.md section
+ * 14.2); anywhere else an event with `now` is refused.
+ */
+export const DailyEvent = z.object({ kind: z.literal('daily'), now: Instant.optional() }).strict();
+export type DailyEvent = z.infer<typeof DailyEvent>;
+
+/** Whether an event asks for the daily run: its kind alone decides which schema checks it. */
+export function isDailyEvent(event: unknown): boolean {
+  return typeof event === 'object' && event !== null && (event as { kind?: unknown }).kind === 'daily';
 }

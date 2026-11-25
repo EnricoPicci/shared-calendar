@@ -276,6 +276,24 @@ mailer as `local:lambda` names it); and sections of their own for `MailerFunctio
   table `mail`. `admin` and `alice` keep their `sub` across `local:up`, so after five requests
   of a day by hand, wait for tomorrow or run `local:down` and `local:up` (the table is in
   memory).
+- **The daily mail by hand**: `npm run mail:daily -w backend -- [<instant>]`. The hourly timer
+  of the cloud does not run locally; this starts the mailer's daily run once through
+  `local:lambda`, waits and prints its result (`{"outcome": "sent", "mailCount": 1, …}`, or why
+  not: `switched_off`, `not_the_hour`, `already_sent`, …). Without an instant the run reads the
+  clock; with one, a whole minute in UTC such as `2026-12-01T06:00:00.000Z`, it runs as if it
+  were that moment. It sends only at the hour of the mail settings ("Settings", "Daily e-mail";
+  until saved, 07:00) in the calendar's time zone, at most once a local day: to send again the
+  same day, delete that day's mark (`PK` `DAILY`, `SK` the date) in the table `mail` at
+  http://localhost:8001. Nothing seeds the mail settings.
+- **`MAIL_ALLOW_NOW`**: `local:up` writes it `true` into `env.local.json` for the mailer alone,
+  so that the script and the journeys may give the daily run its "now". The template declares it
+  empty: in the cloud an event with a "now" is refused. A stack started before this variable
+  existed needs `local:up` again (tables and accounts are kept), then `local:api` and
+  `local:lambda` restarted.
+- **`MAIL_STAGE`**: `on` in `env.local.json` (under `Parameters`, so for every function that
+  declares it: the mailer and the mail's routes). To see the page's "E-mail is not available
+  yet.", change it to `off` there by hand, restart `local:api`, and set it back after, with
+  another restart; `local:up` also writes it `on` again.
 
 ## 4. The integration tests and the deploy gate
 

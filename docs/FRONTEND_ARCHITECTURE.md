@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v25 — the week's "E-mail…" dialog, for both roles (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4; sections 4, 5.1 and 6). v24 — the four facts of a person on the users screen, its Edit dialog, and the screen "My details" (2026-11-25, `docs/EMAIL_PLAN.md` steps m1 and m2; sections 4, 5.1 and 6). v23 — the assistant's panel says a refused change for the person's role (2026-11-24, `docs/CAPACITY_PLAN.md` step u6, section 6.1). v22 — **the capacity of a type on the screens** (2026-11-24, `docs/CAPACITY_PLAN.md` step u5, brief `prompts/e15-step-u5-implementation.md`): a slot's places, the Administrator's full slot and a slot under appointments as a tab beside them, the Administrator's overlapping appointments side by side or as one block with its list, "Book anyway" after `slot_taken`, the `user_busy` sentences that name the appointment in the way, a type's capacity in the form and in the dialog "Edit type" (sections 4, 5.1 and 11); walked against the local stack (`docs/FRONTEND_WALK.md` section 10). v21 — **the password screen built** (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3, brief `prompts/e05-step-p3-implementation.md`): a sixth screen, "Password", last for both roles (section 6), its logic in section 5.1, the login's "Password changed" and the reaction of the shell to a change (section 6), the bundle's fourth constant (section 12.1); walked against the local stack (`docs/FRONTEND_WALK.md` section 9). v20 — the view layer **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12, walked at step c13 on 2026-11-23); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`), **written** (`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21, brief `prompts/94-step-70-implementation.md`: the template, the deploy command and its gate) **and deployed** (step 72, 2026-11-21, brief `prompts/96-step-72-implementation.md`): the stack `shared-calendar-web` exists and the page is in use at the address of its output `PageUrl`; section 13 says what is built and deployed, with how each thing was seen. `docs/FRONTEND_DEPLOY_PLAN.md` is done (its step 73, 2026-11-21, brief `prompts/97-step-73-implementation.md`), **with checks at the deployed page still owed**: a refresh with the revoked token refused by the real Cognito, a session renewed after its fifteen minutes, "Sign out" with the network off, a reload and the console, and the rest of the walk with the phone width (the open items of `docs/RUNBOOK.md` section 5.5); **logout is built** (step 71, 2026-11-21, brief `prompts/95-step-71-implementation.md`: `docs/FRONTEND_SERVICES.md` v8, section 20; here sections 6 and 13.7), proven against the local stack, and at the deployed page as far as the revocation answered 200. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it. |
+| Status | v26 — the settings' section "Daily e-mail", the Administrator's (2026-11-25, `docs/EMAIL_PLAN.md` step m5; sections 4, 5.1 and 6). v25 — the week's "E-mail…" dialog, for both roles (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4; sections 4, 5.1 and 6). v24 — the four facts of a person on the users screen, its Edit dialog, and the screen "My details" (2026-11-25, `docs/EMAIL_PLAN.md` steps m1 and m2; sections 4, 5.1 and 6). v23 — the assistant's panel says a refused change for the person's role (2026-11-24, `docs/CAPACITY_PLAN.md` step u6, section 6.1). v22 — **the capacity of a type on the screens** (2026-11-24, `docs/CAPACITY_PLAN.md` step u5, brief `prompts/e15-step-u5-implementation.md`): a slot's places, the Administrator's full slot and a slot under appointments as a tab beside them, the Administrator's overlapping appointments side by side or as one block with its list, "Book anyway" after `slot_taken`, the `user_busy` sentences that name the appointment in the way, a type's capacity in the form and in the dialog "Edit type" (sections 4, 5.1 and 11); walked against the local stack (`docs/FRONTEND_WALK.md` section 10). v21 — **the password screen built** (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3, brief `prompts/e05-step-p3-implementation.md`): a sixth screen, "Password", last for both roles (section 6), its logic in section 5.1, the login's "Password changed" and the reaction of the shell to a change (section 6), the bundle's fourth constant (section 12.1); walked against the local stack (`docs/FRONTEND_WALK.md` section 9). v20 — the view layer **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12, walked at step c13 on 2026-11-23); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`), **written** (`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21, brief `prompts/94-step-70-implementation.md`: the template, the deploy command and its gate) **and deployed** (step 72, 2026-11-21, brief `prompts/96-step-72-implementation.md`): the stack `shared-calendar-web` exists and the page is in use at the address of its output `PageUrl`; section 13 says what is built and deployed, with how each thing was seen. `docs/FRONTEND_DEPLOY_PLAN.md` is done (its step 73, 2026-11-21, brief `prompts/97-step-73-implementation.md`), **with checks at the deployed page still owed**: a refresh with the revoked token refused by the real Cognito, a session renewed after its fifteen minutes, "Sign out" with the network off, a reload and the console, and the rest of the walk with the phone width (the open items of `docs/RUNBOOK.md` section 5.5); **logout is built** (step 71, 2026-11-21, brief `prompts/95-step-71-implementation.md`: `docs/FRONTEND_SERVICES.md` v8, section 20; here sections 6 and 13.7), proven against the local stack, and at the deployed page as far as the revocation answered 200. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it. |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders; and, since v13, how the page is hosted and deployed (section 13) |
 | Not in scope | Keeping the session across a reload, the size of the bundle, a domain of our own: open points of section 10, none of which blocked the deployment. The design of the logout service: it is `docs/FRONTEND_SERVICES.md` section 20; section 13.7 here keeps the direction and what follows from it for the page |
 | Depends on | `docs/FRONTEND_SERVICES.md` v9 (the services the views use, the sign-out and the assistant among them), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work of the views), `docs/FRONTEND_DEPLOY_PLAN.md` (the order of work of the hosting) |
@@ -39,6 +39,7 @@
 | v23 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u6 (brief `prompts/e16-step-u6-implementation.md`): the assistant's panel says a refused change for the person's role ("Failures in plain words", section 6.1, decision 194). |
 | v24 | 2026-11-25 | `docs/EMAIL_PLAN.md` steps m1 and m2 (brief `prompts/mail-m03-pair-m1-m2-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 4 and 9. Section 4: the users screen's form gains the four facts, each a field checked live; a row shows the name and the e-mail and has "Edit"; the Edit dialog of the four facts, shared with "My details" (`profile.parts.ts`). Section 5.1: `profile.model.ts`, `me.model.ts`, `me.screen.ts`; `UsersScreen` gains the facts and the edit. Section 6: a seventh entry, `#/me`, "My details", both roles, before "Password". |
 | v25 | 2026-11-25 | `docs/EMAIL_PLAN.md` steps m3 and m4 (brief `prompts/mail-m04-pair-m3-m4-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 6.5 and 9.1. Section 4: the week's "E-mail…" button and its dialog `dialog.mail`, two dates, the week on show by default, the address the mail goes to, masked. Section 5.1: `mail.screen.ts`; `texts.ts` gains `MAIL_TEXTS` and the sentence of a refused range; `WeekScreen.range()`. Section 6: the shell makes one `MailScreen` per person, with a `MeService` of its own. |
+| v26 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m5 (brief `prompts/mail-m05-daily-mail-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 6.2 and 11. Section 4: the settings screen gains a part "Daily e-mail" after its form, `section.daily-mail`, with a switch, the hour as `07:00` and the calendar's time zone beside it, its own Save, and "E-mail is not available yet." in place of its fields when the route answers `503 mail_unavailable`. Section 5.1: `daily-mail.model.ts`, `daily-mail.screen.ts`; `texts.ts` gains `DAILY_MAIL_TEXTS`. Section 6: the shell makes one `DailyMailScreen` per person, with a `MailSettingsService` of its own, mounted and started beside the settings. |
 | v22 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u5 (brief `prompts/e15-step-u5-implementation.md`), with the Product Owner's four decisions and one found in the walk: the capacity of a type on the screens. Section 4: the slot's template says its places; a slot that appointments overlap is a tab beside them; the group block and its list dialog, `dialog.group`; "Book anyway" in the book dialog; the types' form and the dialog "Edit type" gain the capacity. Section 5.1: `week.model.ts` (places, `full`, `tab`, `beside`, the columns and the groups), `booking.ts` (`overbook`, `inTheWay`, `refusalOf`), `availability.model.ts` (`TypeFields`, `typeFor`), `texts.ts` (`failureText` told who attempted), `Moving.who`, `WeekScreen.refusal`; the lanes paragraph widened to the Administrator's overlapping appointments; the Administrator's sentence of `user_busy`. Section 8: the table of where the keyboard is. Section 11: decisions 184 to 193. |
 | v20, note | 2026-11-23 | The branch `deploy-frontend` merged into `main`, where the assistant's panel had been written at the same time. The panel's two versions, first numbered v13 and v14, are v19 and v20, after the hosting's v13 to v18; its decisions, first numbered 138 to 153, are 159 to 174, after the hosting's 138 to 158; every reference to them was changed with them. The status row says both. No other text changed. |
 
@@ -533,6 +534,14 @@ of the availability). The markup of one field:
 - The loop that shows and clears the refusals is six lines of the stream's subscription; no
   helper that builds or updates nodes was written (section 7).
 
+**The settings' "Daily e-mail"** (`docs/EMAIL_PLAN.md` step m5: `section.daily-mail` after
+`form.settings` inside `#settings`, `mountDailyMail` in `frontend/src/views/settings.view.ts`).
+The pattern above, for a switch and one text field, the hour, with its own `.loading`, `.unread`
+with "Try again", `form.settings.daily` and "Daily e-mail saved.". One element more, `p.unavailable`
+(role `status`, empty in the page), which the script fills with "E-mail is not available yet."
+in place of the form. The view is scoped to the part, so the settings' view, which takes the
+first match of each selector, never reaches it.
+
 **A second field that is checked: the username** (`docs/FRONTEND_VIEW_PLAN.md` step 66: the
 users, `#users`, `frontend/src/views/users.view.ts`). The pattern above is used as it is, for
 one field:
@@ -913,11 +922,11 @@ Its rules:
 7. **Tested like the services**: unit tests with no network and no DOM, inside the 100 % line
    coverage of `frontend/src`.
 
-### 5.1 As built: twenty-four files
+### 5.1 As built: twenty-six files
 
 `frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` steps 61 to 68,
 `docs/CONVERSATIONAL_PLAN.md` step c12 for the assistant's two and `docs/CHANGE_PASSWORD_PLAN.md`
-step p3 for the password's two, `docs/EMAIL_PLAN.md` step m2 for the facts' three and step m4 for the mail's one), each with its test in
+step p3 for the password's two, `docs/EMAIL_PLAN.md` step m2 for the facts' three, step m4 for the mail's one and step m5 for the daily mail's two), each with its test in
 `frontend/tests/unit/logic/`:
 
 | File | What it holds |
@@ -946,6 +955,8 @@ step p3 for the password's two, `docs/EMAIL_PLAN.md` step m2 for the facts' thre
 | `me.model.ts` | Pure, for "My details": a `MeResponse` ready to show (`meDetails`: the role in words, a fact not held yet "Not set"), and the fields its Edit dialog opens with (`meFields`) |
 | `me.screen.ts` | The class `MeScreen`: the person's own facts read when the screen is shown and when the page becomes visible, `retry` after a read that failed, and for the Administrator only the Edit dialog's state and save through `UsersService.updateUser`, after which the facts are read again |
 | `mail.screen.ts` | The class `MailScreen`, for the week's "E-mail…" dialog: what the mail will hold, in the role's words; the request through `MailService` (`send`), nothing while one is under way; after its success the person's address read with `MeService.getMe()` and said masked (`MAIL_TEXTS.sent`); a failure in plain words (`failureText(reason, 'mail')`); `reset` when the dialog opens again, so that an answer no dialog waits for is not shown |
+| `daily-mail.model.ts` | Pure, for the settings' "Daily e-mail": what its two fields are filled with (`dailyFields`, the hour as `07:00`), and the hour typed checked (`dailyFor`: `7`, `07` or `07:00`, a whole hour 0 to 23, else the refusal of `DAILY_MAIL_TEXTS`) |
+| `daily-mail.screen.ts` | The class `DailyMailScreen`: the daily mail's settings read when the screen is shown, the save of the two fields checked before any call, the read after every save; `503 mail_unavailable` says "E-mail is not available yet." in place of the fields; the time zone heard from the calendar's settings, which it never asks for itself |
 
 **"Now" is passed in.** Nothing in `logic/` reads the clock by itself. `WeekScreen` receives a
 function `now: () => Date` through its constructor (the shell passes `() => new Date()`, a test a
@@ -1298,6 +1309,42 @@ export class SettingsScreen {
   there before its `start()`.
 - **Values typed and not saved are lost** at a change of screen and at signing out, with no
   question: the end of the subscription forgets everything, and the next `start()` reads.
+
+**The settings' "Daily e-mail"** (`docs/EMAIL_PLAN.md` step m5, `docs/EMAIL_ARCHITECTURE.md`
+section 11; the Administrator's). A part of the settings screen with a logic object and a view
+function of its own (`DailyMailScreen`, `mountDailyMail` in `settings.view.ts`), so that the
+calendar's settings and the mail's stand apart: a failure of one read hides nothing of the
+other, and each has its own Save.
+
+```ts
+export type DailyMailState = {
+  loading: boolean; unavailable: string | null; unread: string | null;
+  fields: DailyFields | null; timeZone: string | null;
+  saving: boolean; refusal: string | null; failure: string | null; saved: boolean;
+};
+
+export class DailyMailScreen {
+  readonly daily$: Observable<DailyMailState>;
+  // `mail`: the MailSettingsService's read and save; `calendar`: the calendar settings' results.
+  constructor(mail: DailyMailCalls, calendar: CalendarZone) { … }
+  start(): Subscription { … }            // reads the daily mail's settings
+  retry(): void { … }
+  save(fields: DailyFields): void { … }  // checks the hour; saves, or says why not
+  edited(): void { … }
+}
+```
+
+- **Two fields**: a switch, "Send the daily e-mail", and the hour, shown as `07:00`. The hour
+  typed is accepted as `7`, `07` or `07:00`, a whole hour from 0 to 23, spaces around it aside;
+  anything else is refused under the field in one sentence, with no request. Beside it, the
+  range and the calendar's time zone, read from what the settings screen reads (the screen's
+  `CalendarSettingsService`); until it is read, or when its read fails, the range says no zone.
+- **"E-mail is not available yet."** in place of the fields when a read or a save answers
+  `503 mail_unavailable`: the stack's stage, not a failure, so there is no "Try again".
+- Reading, saving, `saved`, the read after every save and the typed values kept after a
+  failure are as the calendar's settings above.
+- The assistant changes nothing of the mail settings, so the shell does not restart this part
+  on `changed$`.
 
 **The users screen** (`docs/FRONTEND_VIEW_PLAN.md` step 66; the Administrator's).
 
@@ -1993,7 +2040,9 @@ view; what differs is who mounts it and for how long.
   panel. Only the screen on show is started, so only it loads again; another one reads afresh
   when it is shown. The settings screen has no such stream (it reads once, when shown): its
   row of `SCREENS` ends its `start()` and starts it again on `changed$`, so the form is filled
-  with what the server holds, and values typed and not saved are lost, as on leaving.
+  with what the server holds, and values typed and not saved are lost, as on leaving. Its part
+  "Daily e-mail" (`DailyMailScreen`, section 5.1) is mounted and started in the same row, after
+  the settings, and not restarted: the assistant changes nothing of the mail.
 
 **The logic object** (`assistant.screen.ts`, with the pure `assistant.model.ts`) holds every
 rule, on one stream of one state, `assistant$`: `open`, `messages`, `progress`, `proposal`,
@@ -2602,7 +2651,8 @@ frontend/
 │   │                          # users.screen.ts, availability.model.ts, conflicts.ts,
 │   │                          # availability.screen.ts, date.model.ts, date.screen.ts,
 │   │                          # assistant.model.ts, assistant.screen.ts (the panel, section 6.1),
-│   │                          # password.model.ts, password.screen.ts
+│   │                          # password.model.ts, password.screen.ts, daily-mail.model.ts,
+│   │                          # daily-mail.screen.ts (the settings' "Daily e-mail")
 │   └── views/                 # shell.ts and one <name>.view.ts per view: login.view.ts, week.view.ts,
 │                              # appointments.view.ts, settings.view.ts, users.view.ts,
 │                              # availability.view.ts and date.view.ts, the two views of one screen,

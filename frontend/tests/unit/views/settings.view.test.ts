@@ -1,7 +1,8 @@
 import { BehaviorSubject } from 'rxjs';
 import { SETTING_FIELDS, settingsFor, type SettingsFields } from '../../../src/logic/settings.model';
+import type { DailyMailState } from '../../../src/logic/daily-mail.screen';
 import type { SettingsState } from '../../../src/logic/settings.screen';
-import { mountSettings, type SettingsDeps } from '../../../src/views/settings.view';
+import { mountDailyMail, mountSettings, type DailyMailDeps, type SettingsDeps } from '../../../src/views/settings.view';
 import { find, submit, useRealPage } from './page';
 
 // The DOM test of the settings view (docs/FRONTEND_ARCHITECTURE.md section 8): the real
@@ -307,5 +308,96 @@ describe('mountSettings', () => {
       expect(first.screen.save).not.toHaveBeenCalled();
       expect(second.screen.save).toHaveBeenCalledWith(NO_LIMIT);
     });
+  });
+});
+
+// The settings' "Daily e-mail": the same real page, a fake DailyMailScreen.
+describe('mountDailyMail', () => {
+  useRealPage();
+
+  const REFUSAL = 'The hour must be a whole hour from 00:00 to 23:00, such as 07:00.';
+  const DAILY = { dailyEnabled: true, dailyHour: '07:00' };
+  const dailyState = (over: Partial<DailyMailState> = {}): DailyMailState => ({
+    loading: false, unavailable: null, unread: null, fields: null, timeZone: null, saving: false, refusal: null, failure: null, saved: false, ...over,
+  });
+  const part = <T extends HTMLElement = HTMLElement>(selector: string) => find<T>(`#settings .daily-mail ${selector}`);
+  const enabled = () => part<HTMLInputElement>('[name="dailyEnabled"]');
+  const hour = () => part<HTMLInputElement>('[name="dailyHour"]');
+  const dailyForm = () => part<HTMLFormElement>('form.daily');
+  function shown(first: DailyMailState = dailyState()) {
+    const daily$ = new BehaviorSubject<DailyMailState>(first);
+    const screen = { daily$: daily$.asObservable(), save: vi.fn<DailyMailDeps['save']>(), edited: vi.fn<DailyMailDeps['edited']>(), retry: vi.fn<DailyMailDeps['retry']>() };
+    const subscription = mountDailyMail(find('#settings'), screen);
+    return { daily$, screen, subscription };
+  }
+
+  it('nothing yet: no form, no "Loading…", nothing said; the range without a zone', () => {
+    shown();
+    expect([dailyForm().hidden, part('.loading').hidden, part('.unavailable').hidden, part('.unread').hidden]).toEqual([true, true, true, true]);
+    expect(part('.range').textContent).toBe("A whole hour, from 00:00 to 23:00, in the calendar's time zone.");
+  });
+
+  it('reading: its own "Loading…", not the settings\' one', () => {
+    shown(dailyState({ loading: true }));
+    expect([part('.loading').hidden, find('#settings .toolbar .loading').hidden]).toEqual([false, true]);
+  });
+
+  it('not available yet: the sentence in place of the form, and no "Try again"', () => {
+    shown(dailyState({ unavailable: 'E-mail is not available yet.' }));
+    expect([part('.unavailable').hidden, part('.unavailable').textContent, dailyForm().hidden, part('.unread').hidden]).toEqual([false, 'E-mail is not available yet.', true, true]);
+  });
+
+  it('a read that failed: why, with "Try again", which calls retry()', () => {
+    const { screen } = shown(dailyState({ unread: FAILURE }));
+    expect([part('.unread').hidden, part('.unread .error').textContent]).toEqual([false, FAILURE]);
+    part('.retry').click();
+    expect(screen.retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('read: the switch and the hour filled, the range with the zone; filled again only for another object', () => {
+    const { daily$ } = shown(dailyState({ fields: DAILY, timeZone: 'Europe/Rome' }));
+    expect([dailyForm().hidden, enabled().checked, hour().value]).toEqual([false, true, '07:00']);
+    expect(part('.range').textContent).toBe("A whole hour, from 00:00 to 23:00, in the calendar's time zone, Europe/Rome.");
+    hour().value = '9';
+    daily$.next({ ...daily$.getValue(), saving: true });
+    expect(hour().value).toBe('9');
+    daily$.next(dailyState({ fields: { dailyEnabled: false, dailyHour: '18:00' } }));
+    expect([enabled().checked, hour().value]).toEqual([false, '18:00']);
+  });
+
+  it('"Save daily e-mail" sends what the fields hold, as typed; an edit or a switch says so', () => {
+    const { screen } = shown(dailyState({ fields: DAILY }));
+    enabled().click();
+    expect(screen.edited).toHaveBeenCalled();
+    screen.edited.mockClear();
+    hour().value = ' 6 ';
+    hour().dispatchEvent(new Event('input', { bubbles: true }));
+    expect(screen.edited).toHaveBeenCalledTimes(1);
+    submit(dailyForm());
+    expect(screen.save).toHaveBeenCalledWith({ dailyEnabled: false, dailyHour: ' 6 ' });
+  });
+
+  it('a refusal under the hour, marked; a failure; "saved"; the button off while saving', () => {
+    const { daily$ } = shown(dailyState({ fields: DAILY, refusal: REFUSAL, failure: FAILURE, saving: true }));
+    expect([part('.refusal').textContent, hour().getAttribute('aria-invalid'), part('.failure').textContent, part<HTMLButtonElement>('.submit').disabled]).toEqual([REFUSAL, 'true', FAILURE, true]);
+    daily$.next(dailyState({ fields: DAILY, saved: true }));
+    expect([part('.refusal').textContent, hour().hasAttribute('aria-invalid'), part('.saved').hidden, part<HTMLButtonElement>('.submit').disabled]).toEqual(['', false, false, false]);
+  });
+
+  it('a zone and the sentences containing <script> are shown as text', () => {
+    shown(dailyState({ fields: DAILY, timeZone: SCRIPT, failure: SCRIPT, refusal: SCRIPT, unavailable: SCRIPT }));
+    expect(part('.failure').textContent).toBe(SCRIPT);
+    expect(part('.range').textContent).toContain(SCRIPT);
+    expect(document.querySelectorAll('#settings script, #settings b')).toHaveLength(0);
+  });
+
+  it('nothing left in the page after unsubscribing, and the settings view beside it untouched', () => {
+    const before = find('#settings').outerHTML;
+    const { subscription } = shown(dailyState({ fields: DAILY, timeZone: 'Europe/Rome', refusal: REFUSAL, failure: FAILURE, saved: true, saving: true, unread: FAILURE, unavailable: 'x', loading: true }));
+    hour().value = '23';
+    subscription.unsubscribe();
+    expect(find('#settings').outerHTML).toBe(before);
+    expect([hour().value, enabled().checked]).toEqual(['', false]);
+    expect(html()).not.toContain('Europe/Rome');
   });
 });

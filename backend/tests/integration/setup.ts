@@ -573,3 +573,27 @@ export async function runMailer(event: MailerEventInput | Record<string, unknown
   if (!res.ok) throw new Error(`The mailer's run answered ${res.status}: ${text}`);
   return JSON.parse(text) as Record<string, unknown>;
 }
+
+/** An item of the local table `mail` (docs/EMAIL_ARCHITECTURE.md section 10.1). */
+export type MailItem = { PK: string; SK: string } & Record<string, unknown>;
+
+// Writes one item of the local table `mail` straight in DynamoDB Local, for a state the mailer
+// would leave only by failing: a daily mark `failed`, or `sending` from a run cut off. These three
+// helpers refuse anything but the local emulator, as the calendar's do.
+export async function putMailItem(item: MailItem): Promise<void> {
+  const client = await localCalendar();
+  await client.send(new PutCommand({ TableName: MAIL_TABLE, Item: item }));
+}
+
+// One item of the local table `mail`, read directly (consistent), or undefined.
+export async function getMailItem(PK: string, SK: string): Promise<MailItem | undefined> {
+  const client = await localCalendar();
+  const { Item } = await client.send(new GetCommand({ TableName: MAIL_TABLE, Key: { PK, SK }, ConsistentRead: true }));
+  return Item as MailItem | undefined;
+}
+
+// Deletes one item of the local table `mail`: a daily mark a journey made, on a date of its own.
+export async function deleteMailItem(PK: string, SK: string): Promise<void> {
+  const client = await localCalendar();
+  await client.send(new DeleteCommand({ TableName: MAIL_TABLE, Key: { PK, SK } }));
+}

@@ -5,6 +5,7 @@ import { AppointmentsScreen } from '../logic/appointments.screen';
 import { AssistantScreen } from '../logic/assistant.screen';
 import { AvailabilityScreen } from '../logic/availability.screen';
 import { DateScreen } from '../logic/date.screen';
+import { DailyMailScreen } from '../logic/daily-mail.screen';
 import { MailScreen } from '../logic/mail.screen';
 import { MeScreen } from '../logic/me.screen';
 import { PasswordScreen } from '../logic/password.screen';
@@ -23,6 +24,7 @@ import { ChangePasswordService } from '../services/change-password.service';
 import type { CognitoConfig } from '../services/cognito';
 import { LoginService } from '../services/login.service';
 import { LogoutService, type Resettable } from '../services/logout.service';
+import { MailSettingsService } from '../services/mail-settings.service';
 import { MailService } from '../services/mail.service';
 import { RefreshService } from '../services/refresh.service';
 import { SessionStore } from '../services/session.store';
@@ -36,7 +38,7 @@ import { mountDate } from './date.view';
 import { mountLogin, type LoginDeps } from './login.view';
 import { mountMe } from './me.view';
 import { mountPassword } from './password.view';
-import { mountSettings } from './settings.view';
+import { mountDailyMail, mountSettings } from './settings.view';
 import { mountUsers } from './users.view';
 import { mountWeek } from './week.view';
 
@@ -91,7 +93,8 @@ const ROLE_IN_WORDS: Record<Role, string> = { admin: 'Administrator', user: 'Use
 // services of the availability, whose view calls their deletes. `assistant` is the logic object
 // of the assistant's panel, which is no screen: it is mounted once for the session, beside
 // whichever screen is on show. `mail` is the logic object of the week's "E-mail…" dialog. `me`
-// is the logic object of "My details". `password` is the
+// is the logic object of "My details". `daily` is the logic object of the settings' "Daily e-mail".
+// `password` is the
 // logic object of the password screen, and `changes` the service it uses, whose success the
 // shell also hears.
 export type SessionObjects = {
@@ -99,6 +102,7 @@ export type SessionObjects = {
   week: WeekScreen;
   list: AppointmentsScreen;
   settings: SettingsScreen;
+  daily: DailyMailScreen;
   accounts: UsersScreen;
   availability: AvailabilityScreen;
   date: DateScreen;
@@ -136,6 +140,10 @@ function sessionObjects(config: ShellConfig, store: SessionStore, person: Person
   // The list screen hands an appointment to move over to the week screen.
   const list = new AppointmentsScreen(calendarSettings, appointments, week, person.role, now, again$);
   const settings = new SettingsScreen(calendarSettings);
+  // The settings' "Daily e-mail": the daily mail's settings through a service of their own, and
+  // the calendar's time zone from what the settings screen reads (docs/EMAIL_ARCHITECTURE.md
+  // section 11).
+  const daily = new DailyMailScreen(new MailSettingsService(config, store), calendarSettings);
   const accounts = new UsersScreen(users, again$);
   const types = new AvailabilityTypesService(config, store);
   const rules = new AvailabilityRulesService(config, store);
@@ -155,7 +163,7 @@ function sessionObjects(config: ShellConfig, store: SessionStore, person: Person
   // section 22).
   const changes = new ChangePasswordService({ cognitoUrl: config.cognitoUrl, skipGlobalSignOut: config.skipGlobalSignOut === true }, store);
   const password = new PasswordScreen(changes);
-  return { role: person.role, week, list, settings, accounts, availability, date, appointments, users, types, rules, assistant, mail, me, password, changes };
+  return { role: person.role, week, list, settings, daily, accounts, availability, date, appointments, users, types, rules, assistant, mail, me, password, changes };
 }
 
 // A screen of the application: its address (the URL's hash), its name in the navigation, the
@@ -210,10 +218,14 @@ export const SCREENS: readonly Screen[] = [
     element: '#settings',
     // The settings screen reads once, when it is shown, and has nothing to load again on. When
     // the assistant made a change while it is on show, it is started afresh: the form is filled
-    // with what the server holds, and values typed and not saved are gone, as on leaving.
-    show: (root, { settings, assistant }) => {
+    // with what the server holds, and values typed and not saved are gone, as on leaving. Its part
+    // "Daily e-mail" is mounted and started beside it, after it, so that it hears the time zone
+    // the settings read; the assistant changes nothing of the mail, so the part is not restarted.
+    show: (root, { settings, daily, assistant }) => {
       const subscription = mountSettings(root, settings);
+      subscription.add(mountDailyMail(root, daily));
       let started = settings.start();
+      subscription.add(daily.start());
       subscription.add(
         assistant.changed$.subscribe(() => {
           started.unsubscribe();
