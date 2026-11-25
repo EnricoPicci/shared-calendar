@@ -49,11 +49,12 @@ when those files are touched (`.claude/rules/frontend-views.md`).
   `SCREENS`); one `<name>.view.ts` per view, `mount<Name>(root, deps): Subscription`: `login`,
   `week`, `appointments`, `settings`, `users`, `availability` and `date` (two views of one
   screen), `assistant`, `password`; `detail.view.ts`, the dialog two views mount; `availability.parts.ts`, the
-  helpers the availability's two views share, with `mountConfirm`.
+  helpers the availability's two views share, with `mountConfirm`; `time.parts.ts`, the two
+  lists (hour, minute) of one time in a form.
 - `src/logic/`: pure models (`texts.ts`, `week.model.ts`, `booking.ts`,
   `appointment.detail.ts`, `appointments.model.ts`, `settings.model.ts`, `users.model.ts`,
   `availability.model.ts`, `conflicts.ts`, `date.model.ts`, `assistant.model.ts`,
-  `password.model.ts`) and one class
+  `password.model.ts`, `times.ts`) and one class
   per screen, and one for the panel, with one stream and `start()` (`week.screen.ts`,
   `appointments.screen.ts`, `settings.screen.ts`, `users.screen.ts`, `availability.screen.ts`,
   `date.screen.ts`, `assistant.screen.ts`, `password.screen.ts`).

@@ -8,7 +8,7 @@ import type { DateState } from '../../../src/logic/date.screen';
 import { mountConfirm } from '../../../src/views/availability.parts';
 import { mountDate, type DateDeps } from '../../../src/views/date.view';
 import { POOL, STUDIO } from '../logic/fixtures';
-import { find, loadPage, submit, useRealPage } from './page';
+import { choicesOf, choose, chooseTime, clock, find, loadPage, setTime, submit, timeIn, useRealPage } from './page';
 
 // The DOM test of the view of a single date (docs/FRONTEND_ARCHITECTURE.md section 8): the
 // real index.html, a fake DateScreen whose stream the test controls, and the real dialog that
@@ -111,14 +111,23 @@ const CHOOSE = 'form.choose';
 const ADD = 'form.add-draft';
 const WINDOW = 'form.add-window';
 const form = (selector: string) => one<HTMLFormElement>(selector);
-const field = (selector: string, name: string) => one<HTMLInputElement | HTMLSelectElement>(`${selector} [name="${name}"]`);
+// A start and an end are two lists each, an hour and a minute (src/views/time.parts.ts); the
+// helpers below read and set them as one `HH:mm` text, as the view hands them on.
+const isTime = (name: string) => name === 'start' || name === 'end';
+const lists = (selector: string, name: string): (HTMLInputElement | HTMLSelectElement)[] => (isTime(name) ? clock(form(selector), name) : [one<HTMLInputElement | HTMLSelectElement>(`${selector} [name="${name}"]`)]);
+const field = (selector: string, name: string) => lists(selector, name)[0]!;
 const refusalOf = (selector: string, name: string) => field(selector, name).closest('.field')!.querySelector('.refusal')!;
 const THREE = ['start', 'end', 'typeId'] as const;
-const held = (selector: string) => Object.fromEntries(THREE.map((name) => [name, field(selector, name).value])) as WindowFields;
+const held = (selector: string) => Object.fromEntries(THREE.map((name) => [name, isTime(name) ? timeIn(form(selector), name) : field(selector, name).value])) as WindowFields;
+// Fields set as a script sets them, with no event: a time set so sets nothing else.
 const set = (selector: string, values: Partial<WindowFields>) => {
-  for (const [name, value] of Object.entries(values)) field(selector, name).value = value;
+  for (const [name, value] of Object.entries(values)) {
+    if (isTime(name)) setTime(form(selector), name, value);
+    else field(selector, name).value = value;
+  }
 };
-const marked = (selector: string) => THREE.filter((name) => field(selector, name).getAttribute('aria-invalid') === 'true');
+// The fields marked in fault: a time is marked when both its lists are.
+const marked = (selector: string) => THREE.filter((name) => lists(selector, name).every((list) => list.getAttribute('aria-invalid') === 'true'));
 const options = (selector: string, name: string) => [...field(selector, name).querySelectorAll('option')].map((option) => [option.value, option.textContent]);
 const rows = (list: string) => all(`.${list} > li`).map((item) => [...item.querySelectorAll('span')].map((part) => part.textContent).join(' | '));
 const buttonsOf = (list: string) => all<HTMLButtonElement>(`.${list} > li button`);
@@ -137,9 +146,10 @@ describe('mountDate', () => {
     it('the lists of the two times get their choices in both forms that add a window; no call is made and the dialog is closed', () => {
       const { calls, NONE } = mounted(state({ choices: [] }));
       for (const selector of [ADD, WINDOW]) {
-        const starts = options(selector, 'start');
-        const ends = options(selector, 'end');
-        expect([starts.length, starts[0], starts.at(-1), ends.length, ends[0], ends.at(-1)]).toEqual([96, ['00:00', '00:00'], ['23:45', '23:45'], 96, ['00:15', '00:15'], ['24:00', '24:00']]);
+        const [startHour, startMinute] = clock(form(selector), 'start');
+        const [endHour] = clock(form(selector), 'end');
+        expect([choicesOf(startHour).length, choicesOf(startHour)[0], choicesOf(startHour).at(-1), choicesOf(endHour).length, choicesOf(endHour)[0], choicesOf(endHour).at(-1)]).toEqual([24, '00', '23', 25, '00', '24']);
+        expect(choicesOf(startMinute)).toEqual(['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55']);
         expect(options(selector, 'typeId')).toEqual([]);
         expect(held(selector)).toEqual({ start: '09:00', end: '10:00', typeId: '' });
       }
@@ -358,7 +368,8 @@ describe('mountDate', () => {
         const refusals = 'refusals' in made ? made.refusals : {};
         expect(Object.keys(refusals).length).toBeGreaterThan(0);
         for (const [name, sentence] of Object.entries(refusals)) {
-          const label = field(selector, name).closest('label')!.childNodes[0]!.textContent!.trim();
+          // A time's words are the name of its group of two lists.
+          const label = (isTime(name) ? field(selector, name).closest('fieldset')!.querySelector('legend')! : field(selector, name).closest('label')!.childNodes[0]!).textContent!.trim();
           expect(sentence === IN_FAULT_TOO ? OVERLAPS_DRAFT.includes(` ${label} `) : sentence.startsWith(label), `${name}: ${sentence}`).toBe(true);
         }
       }
@@ -452,6 +463,51 @@ describe('mountDate', () => {
       expect(held(WINDOW)).toEqual({ start: '18:00', end: '20:00', typeId: POOL });
       date$.next(showing(OWN, { windowFields: { ...STARTING_WINDOW } }));
       expect(held(WINDOW)).toEqual({ start: '09:00', end: '10:00', typeId: '' });
+    });
+  });
+
+  describe('the two times of the window forms: hours and minutes, the start setting the end', () => {
+    const PLACES = [
+      ['the form that adds a window to "this day only"', ADD],
+      ['the form that adds an extra window', WINDOW],
+    ] as const;
+    const value = (selector: string, name: 'start' | 'end') => timeIn(form(selector), name);
+
+    it.each(PLACES)('%s: a start chosen sets the end one hour later; chosen twice, sets it twice; an end chosen leaves the start', (_what, selector) => {
+      mounted(editing());
+      chooseTime(form(selector), 'start', '09:05');
+      expect([value(selector, 'start'), value(selector, 'end')]).toEqual(['09:05', '10:05']);
+      chooseTime(form(selector), 'start', '10:10');
+      expect([value(selector, 'start'), value(selector, 'end')]).toEqual(['10:10', '11:10']);
+      chooseTime(form(selector), 'end', '10:35');
+      expect([value(selector, 'start'), value(selector, 'end')]).toEqual(['10:10', '10:35']);
+    });
+
+    it.each(PLACES)('%s: a start at 23:30 sets the end at 24:00; the hour 24 has the minute 00 only', (_what, selector) => {
+      mounted(editing());
+      chooseTime(form(selector), 'start', '23:30');
+      expect([value(selector, 'end'), choicesOf(clock(form(selector), 'end')[1])]).toEqual(['24:00', ['00']]);
+      choose(clock(form(selector), 'end')[0], '23');
+      expect([value(selector, 'end'), choicesOf(clock(form(selector), 'end')[1]).length]).toEqual(['23:00', 12]);
+    });
+
+    it.each(PLACES)('%s: what is sent is each time as `HH:mm`', (_what, selector) => {
+      const { screen } = mounted(editing());
+      chooseTime(form(selector), 'start', '10:10');
+      chooseTime(form(selector), 'end', '10:15');
+      submit(form(selector));
+      const sent = selector === ADD ? screen.add.mock.lastCall![0] : screen.addWindow.mock.lastCall![0];
+      expect([sent.start, sent.end]).toEqual(['10:10', '10:15']);
+    });
+
+    it('a form put back by the stream after it added a window shows 09:00 and 10:00 as they are, whatever the end was', () => {
+      const { date$ } = mounted(editing());
+      for (const selector of [ADD, WINDOW]) {
+        chooseTime(form(selector), 'start', '18:00');
+        chooseTime(form(selector), 'end', '20:00');
+      }
+      date$.next(editing({ addFields: { ...STARTING_WINDOW }, windowFields: { ...STARTING_WINDOW } }));
+      for (const selector of [ADD, WINDOW]) expect([value(selector, 'start'), value(selector, 'end')], selector).toEqual(['09:00', '10:00']);
     });
   });
 
@@ -674,7 +730,7 @@ describe('mountDate', () => {
       expect(find('#availability').querySelectorAll('li, option')).toHaveLength(0);
       for (const gone of ['Studio', 'Piscina', 'alice', 'bob', 'Monday', '2026-12-24', 'Mon 23 Nov', 'appointments are in the way', '09:00', 'Delete the', FAILURE, DRAFT_OPEN, DRAFT_FULL, STUDIO, POOL, W1]) expect(anywhere(gone), gone).toBe(false);
       const fields = all<HTMLInputElement | HTMLSelectElement>('input, select, textarea');
-      expect([fields.length, fields.map((each) => each.value).join('')]).toEqual([7, '']);
+      expect([fields.length, fields.map((each) => each.value).join('')]).toEqual([11, '']);
       expect(find('#availability').querySelectorAll('[aria-invalid], :disabled')).toHaveLength(0);
       // The page is the one index.html has.
       expect(html()).toBe(untouched);
@@ -693,7 +749,7 @@ describe('mountDate', () => {
       one('.make-closed').click();
       first.subscription.unsubscribe();
       const { screen } = mounted(showing(OWN));
-      expect([dialog().open, rows('draft-rows'), rows('own-rows').length, options(ADD, 'start').length, held(WINDOW)]).toEqual([false, [], 2, 96, { start: '09:00', end: '10:00', typeId: '' }]);
+      expect([dialog().open, rows('draft-rows'), rows('own-rows').length, choicesOf(clock(form(ADD), 'start')[0]).length, held(WINDOW)]).toEqual([false, [], 2, 24, { start: '09:00', end: '10:00', typeId: '' }]);
       one('.back').click();
       inDialog('.submit').click();
       expect([screen.back.mock.calls.length, first.screen.back.mock.calls.length, first.screen.close.mock.calls.length]).toEqual([1, 0, 0]);

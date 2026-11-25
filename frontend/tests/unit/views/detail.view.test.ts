@@ -101,7 +101,7 @@ const WEEK: WeekModel = {
       windows: [],
       slots: [],
       busy: [],
-      appointments: SHOWN.map((appointmentId, i) => ({ top: `${i * 50}%`, height: '50%', time: '11:00–12:00', lane: 0, lanes: 1, appointmentId, who: 'You', typeName: 'Studio', note: '', colour: 2, beside: false })),
+      appointments: SHOWN.map((appointmentId, i) => ({ top: `${i * 50}%`, height: '50%', time: '11:00–12:00', lane: 0, lanes: 1, appointmentId, who: 'You', typeName: 'Studio', note: '', colour: 2, beside: false, short: false })),
       groups: [],
     },
   ],

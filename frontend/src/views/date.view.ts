@@ -1,8 +1,10 @@
 import type { Subscription } from 'rxjs';
-import { END_CHOICES, START_CHOICES, type Choice } from '../logic/availability.model';
+import type { Choice } from '../logic/availability.model';
 import { WINDOW_FIELDS, type DayModel, type DraftModel, type WindowFields, type WindowRow } from '../logic/date.model';
 import type { DateScreen } from '../logic/date.screen';
+import { LAST_TIME, WINDOW_HOURS } from '../logic/times';
 import { availabilityParts, type Confirm, type Tell } from './availability.parts';
+import { startSetsEnd } from './time.parts';
 
 // What the view of a single date uses: of the DateScreen its stream and its methods, and the
 // dialog that confirms, which the screen's other view opens too.
@@ -24,7 +26,7 @@ export function mountDate(root: HTMLElement, { screen, confirm }: DateDeps): Sub
   const { copy, choices, showConflicts, form } = availabilityParts(root);
   const forms = { choose: form('.one-date .choose', ['date']), add: form('.one-date .add-draft', WINDOW_FIELDS), window: form('.one-date .add-window', WINDOW_FIELDS) };
   const windowForms = [forms.add, forms.window];
-  const typeLists = windowForms.map(({ fields }) => fields[2]!.input);
+  const typeLists = windowForms.map(({ fields }) => fields[2]!.inputs[0]!);
   const loading = find('.loading');
   const unread = find('.unread');
   const why = find('.unread .error');
@@ -37,8 +39,13 @@ export function mountDate(root: HTMLElement, { screen, confirm }: DateDeps): Sub
   const save = find<HTMLButtonElement>('.save');
   const discard = find<HTMLButtonElement>('.discard');
 
-  // The local times a window may start and end at never change; the types follow the stream.
-  for (const { fields } of windowForms) [START_CHOICES, END_CHOICES].forEach((list, i) => choices(fields[i]!.input, list));
+  // The hours a window may start and end at never change; the types follow the stream. A
+  // start chosen by the person sets the end one hour later, up to 24:00.
+  for (const { times } of windowForms) {
+    times.start!.offer(WINDOW_HOURS.starts);
+    times.end!.offer(WINDOW_HOURS.ends);
+    startSetsEnd(times.start!, times.end!, () => LAST_TIME);
+  }
 
   // 2. Pure view state (docs/FRONTEND_ARCHITECTURE.md section 3, rule 10): what this view last
   // opened the dialog that confirms for, as the stream names it, and how to tell that opening
@@ -163,7 +170,7 @@ export function mountDate(root: HTMLElement, { screen, confirm }: DateDeps): Sub
       each.say(null);
       each.form.reset();
       each.submit.disabled = false;
-      for (const { input } of each.fields) if (input instanceof HTMLSelectElement) choices(input, []);
+      for (const { inputs } of each.fields) for (const input of inputs) if (input instanceof HTMLSelectElement) choices(input, []);
     }
     for (const element of [loading, unread, shown, draft]) element.hidden = true;
     for (const element of Object.values(offered)) element.hidden = false;

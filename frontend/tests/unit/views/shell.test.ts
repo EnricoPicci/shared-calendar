@@ -6,7 +6,7 @@ import type { LoginDeps } from '../../../src/views/login.view';
 import { mountShell, runShell, SCREENS, type Screen } from '../../../src/views/shell';
 import { appointment, STUDIO, view, winterWeek } from '../logic/fixtures';
 import { call, cognitoError, cognitoTokens, json, jwt, session } from '../services/fixtures';
-import { find, loadPage, submit, useRealPage } from './page';
+import { find, loadPage, setTime, submit, timeIn, useRealPage } from './page';
 
 // The DOM test of the shell (docs/FRONTEND_ARCHITECTURE.md sections 6 and 8): the real
 // index.html, the real SessionStore (memory only, no remote call), a fake LoginService, the real
@@ -2061,9 +2061,16 @@ describe('the navigation', () => {
     const typesListed = (...names: string[]) => vi.waitFor(() => expect(typeNames()).toEqual(names));
     const patternsListed = (...texts: string[]) => vi.waitFor(() => expect(rows()).toEqual(texts));
     const quiet = () => vi.waitFor(() => expect(one('.loading').hidden).toBe(true));
-    const field = (formOf: string, name: string) => one<HTMLInputElement | HTMLSelectElement>(`${formOf} [name="${name}"]`);
+    // A start and an end are two lists each, an hour and a minute: read and set as one `HH:mm`
+    // text, set as a script sets them, with no event.
+    const isTime = (name: string) => name === 'start' || name === 'end';
+    const field = (formOf: string, name: string) => one<HTMLInputElement | HTMLSelectElement>(`${formOf} [name="${isTime(name) ? `${name}-hour` : name}"]`);
+    const value = (formOf: string, name: string) => (isTime(name) ? timeIn(one(formOf), name) : field(formOf, name).value);
     const set = (formOf: string, values: Record<string, string>) => {
-      for (const [name, value] of Object.entries(values)) field(formOf, name).value = value;
+      for (const [name, text] of Object.entries(values)) {
+        if (isTime(name)) setTime(one(formOf), name, text);
+        else field(formOf, name).value = text;
+      }
     };
     const dialog = (name: 'rename' | 'change' | 'delete') => one<HTMLDialogElement>(`dialog.${name}`);
     const current = () => links().map((a) => [a.textContent, a.getAttribute('aria-current')]);
@@ -2265,7 +2272,7 @@ describe('the navigation', () => {
       await patternsListed(MONDAY, TUESDAY, 'Wednesday: 20:00 – 24:00 Piscina');
       expect(sent()).toEqual([...READS, 'POST /calendar/patterns', 'GET /calendar/patterns']);
       expect(bodyOf(3)).toEqual({ weekday: 3, start: '20:00', end: '24:00', typeId: POOL, validFrom: '2026-12-01', validUntil: '2026-12-31' });
-      expect(['weekday', 'start', 'end', 'typeId', 'validFrom', 'validUntil'].map((name) => field('form.create-pattern', name).value)).toEqual(['1', '09:00', '10:00', '', '2026-11-19', '']);
+      expect(['weekday', 'start', 'end', 'typeId', 'validFrom', 'validUntil'].map((name) => value('form.create-pattern', name))).toEqual(['1', '09:00', '10:00', '', '2026-11-19', '']);
       expect(one<HTMLButtonElement>('form.create-pattern .submit').disabled).toBe(false);
     });
 
@@ -2274,7 +2281,7 @@ describe('the navigation', () => {
       set('form.create-pattern', { start: '10:00', end: '10:00', validFrom: '', validUntil: '' });
       submit(one<HTMLFormElement>('form.create-pattern'));
       expect(all('form.create-pattern .refusal').map((refusal) => refusal.textContent)).toEqual(['', '', 'End must be later than Start.', 'Type must be chosen.', 'Valid from must be a date.', '']);
-      expect(all('form.create-pattern [aria-invalid="true"]').map((each) => (each as HTMLInputElement).name)).toEqual(['end', 'typeId', 'validFrom']);
+      expect(all('form.create-pattern [aria-invalid="true"]').map((each) => (each as HTMLInputElement).name)).toEqual(['end-hour', 'end-minute', 'typeId', 'validFrom']);
       expect(sent()).toEqual(READS);
 
       fetchMock.mockResolvedValueOnce(json(409, { error: 'availability_overlap', message: '2026-11-23: 09:00–13:00 overlaps 10:00–11:00' })).mockResolvedValueOnce(patternsOf());
@@ -2283,7 +2290,7 @@ describe('the navigation', () => {
       submit(one<HTMLFormElement>('form.create-pattern'));
       await vi.waitFor(() => expect(one('form.create-pattern .failure').textContent).toBe('Another window of the same day covers part of these hours, whatever its type. Choose other hours.'));
       await vi.waitFor(() => expect(sent()).toEqual([...READS, 'POST /calendar/patterns', 'GET /calendar/patterns']));
-      expect(Object.keys(chosen).map((name) => field('form.create-pattern', name).value)).toEqual(Object.values(chosen));
+      expect(Object.keys(chosen).map((name) => value('form.create-pattern', name))).toEqual(Object.values(chosen));
       expect([all('form.create-pattern [aria-invalid="true"]').length, html().includes('overlaps')]).toEqual([0, false]);
     });
 
@@ -2291,7 +2298,7 @@ describe('the navigation', () => {
       await onAvailability();
       one('.patterns .groups section:nth-child(2) .ask-change').click();
       expect(dialog('change').open).toBe(true);
-      expect(['weekday', 'start', 'end', 'typeId', 'validFrom', 'validUntil'].map((name) => field('dialog.change', name).value)).toEqual(['2', '15:00', '18:00', POOL, '2026-11-20', '']);
+      expect(['weekday', 'start', 'end', 'typeId', 'validFrom', 'validUntil'].map((name) => value('dialog.change', name))).toEqual(['2', '15:00', '18:00', POOL, '2026-11-20', '']);
 
       const changed = pattern(P2, { weekday: 2, start: '15:00', end: '19:00', typeId: POOL, validUntil: '2027-01-19' });
       fetchMock.mockResolvedValueOnce(json(200, changed)).mockResolvedValueOnce(patternsOf([PATTERNS[0]!, changed]));
@@ -2316,7 +2323,7 @@ describe('the navigation', () => {
       expect(all('dialog.change .conflicts-list li').map((row) => [...row.children].map((part) => part.textContent))).toEqual([['Mon 23 Nov', '09:00–10:00', 'alice']]);
       await vi.waitFor(() => expect(sent()).toEqual([...READS, `PUT /calendar/patterns/${P1}`, 'GET /calendar/patterns']));
       await quiet();
-      expect([dialog('change').open, field('dialog.change', 'end').value, anywhere('01M6APPT'), anywhere('would fall outside')]).toEqual([true, '09:30', false, false]);
+      expect([dialog('change').open, value('dialog.change', 'end'), anywhere('01M6APPT'), anywhere('would fall outside')]).toEqual([true, '09:30', false, false]);
       // Nothing of it in the form that creates.
       expect([one('form.create-pattern .failure').textContent, one('form.create-pattern .conflicts').hidden]).toEqual(['', true]);
     });
@@ -2349,7 +2356,7 @@ describe('the navigation', () => {
       await typesListed('Piscina', 'Studio', 'Zeta');
       await patternsListed(MONDAY);
       expect(sent()).toEqual([...READS, 'GET /calendar/types', 'GET /calendar/patterns']);
-      expect([dialog('change').open, field('dialog.change', 'weekday').value, field('dialog.change', 'typeId').value, field('dialog.change', 'start').value]).toEqual([true, '5', STUDIO, '15:00']);
+      expect([dialog('change').open, field('dialog.change', 'weekday').value, field('dialog.change', 'typeId').value, value('dialog.change', 'start')]).toEqual([true, '5', STUDIO, '15:00']);
     });
 
     it('availability, week, availability: nothing left over or doubled, everything read again, and what was typed and not sent is gone', async () => {
@@ -2555,7 +2562,7 @@ describe('the navigation', () => {
         await vi.waitFor(() => expect(lines('extra-rows')).toEqual(['18:00 – 20:00 Piscina']));
         expect([sent().slice(4), bodyOf(4)]).toEqual([['POST /calendar/windows', GET_DAY], { date: DATE, start: '18:00', end: '20:00', typeId: POOL }]);
         // The form is back on its starting values.
-        expect([field('.one-date form.add-window', 'start').value, field('.one-date form.add-window', 'typeId').value]).toEqual(['09:00', '']);
+        expect([value('.one-date form.add-window', 'start'), field('.one-date form.add-window', 'typeId').value]).toEqual(['09:00', '']);
 
         part('.extra-rows .ask-delete').click();
         expect(one('dialog.delete .question').textContent.startsWith('Delete the extra window 18:00 – 20:00 Piscina of Monday 23 November 2026?')).toBe(true);
@@ -2599,7 +2606,7 @@ describe('the navigation', () => {
         await quiet();
         expect(sent()).toEqual([...READS, GET_DAY, 'GET /calendar?from=2026-11-16&to=2026-11-22', ...READS]);
         expect([part('.shown').hidden, part('.draft').hidden, lines('draft-rows'), field('.one-date form.choose', 'date').value]).toEqual([true, true, [], '2026-11-19']);
-        expect([field('.one-date form.add-draft', 'start').querySelectorAll('option').length, field('.one-date form.add-window', 'typeId').querySelectorAll('option').length]).toEqual([96, 2]);
+        expect([field('.one-date form.add-draft', 'start').querySelectorAll('option').length, field('.one-date form.add-window', 'typeId').querySelectorAll('option').length]).toEqual([24, 2]);
       });
 
       it('signing out with a draft open and a conflicts list on show leaves nothing: the page as before anyone signed in; a User then asks for none of the routes of a date', async () => {

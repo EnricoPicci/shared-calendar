@@ -1,6 +1,8 @@
 # Shared Calendar: times on 5-minute steps, and "from" drives "to" (implementation plan)
 
-**Version:** v5 (2026-11-25): step s3 done, the assistant's words and two requests more in
+**Version:** v7 (2026-11-25): the pair s4 with s5 done, the page's times as an hour and a minute, a start that sets the end, and a short appointment drawn 15 minutes tall; looked at in a browser on the local stack. v6 (2026-11-25): the two points left to the pair s4 with s5 decided by the
+Product Owner before it starts, under F7 (more than three columns are one block, whatever the
+reason) and F8 (the two lists of a time in a group named "Start" or "End"). v5 (2026-11-25): step s3 done, the assistant's words and two requests more in
 its evaluation; **the paid run of the evaluation moved to step s6, part B**, on the code
 merged with the mail work (the Product Owner's decision). v4 (2026-11-25): steps s1 and s2 done, the first pair: the rule in the
 governing documents (`docs/SHARED_CALENDAR_SPEC.md` v19, `docs/ARCHITECTURE.md` v16 open) and
@@ -126,10 +128,14 @@ Decided by the Product Owner on 2026-11-25.
   week already draws appointments that overlap (`columnsOf` in
   `frontend/src/logic/week.model.ts`); each one's text says its true times. The proposal, the
   next block drawn on top, would have left a strip of 4 pixels of the short one, which the
-  minimum height was meant to avoid. What only a real overlap decides stays so: the people in
-  a slot, and "4 people" on the block that groups four or more. Step s5 says how a row of
-  short appointments one after the other is drawn when more than three would stand side by
-  side, and shows it to the Product Owner.
+  minimum height was meant to avoid. The people in a slot are counted on the real times, as
+  today. **Decided** (the Product Owner, 2026-11-25, before the pair s4 with s5): **more than
+  three columns are one block, whatever made them**, a real overlap or the drawn height of
+  short appointments, as the Administrator's week does today; the block opens the list of its
+  appointments, each with its true times. Known and accepted: the block counts the
+  appointments it holds, so in a rare case it says "4 people" of appointments that are not all
+  there at the same moment. The other choice, a block only for a real overlap, would have
+  drawn four or more narrow columns, hard to read and to press at the phone width.
 - **F8. Two short lists change the book dialog.** Today the dialog offers exactly the times
   of the slot's window: nothing outside it can be chosen. With a list of hours and a list of
   minutes, a pair outside the window can be put together (window 08:05 to 12:00, hour 08,
@@ -140,7 +146,14 @@ Decided by the Product Owner on 2026-11-25.
   server's to say (`docs/FRONTEND_SERVICES.md` section 8, decision 42). An end not after the
   start is refused by the shared schema before anything is sent, as today in the window forms.
   With the hour 24 the list of minutes holds only 00. S3's "the end of the window" is computed
-  from the window, not from a list.
+  from the window, not from a list. **Decided** (the Product Owner, 2026-11-25, before the
+  pair s4 with s5): **the words of the two lists.** The two lists of a time stand in a group
+  named "Start" or "End", a `<fieldset>` with its `<legend>`; each list is inside a `<label>`
+  whose words, "Hour" and "Minute", a screen reader says and the eye does not see; a colon
+  between them is hidden from the screen reader. On screen: `Start [09] : [05]`. The lists
+  are named `start-hour`, `start-minute`, `end-hour` and `end-minute`. The other choices, four
+  visible labels or the letters "h" and "min", made the forms wider or less clear when read
+  aloud.
 - **F9. A minor version.** A time valid today stays valid; a body, a route, a code and a
   field are as they were. The page of today works against the new API. The new page against
   the API of today would have its 5-minute times refused, so the API is deployed first, as
@@ -424,6 +437,40 @@ the merge; the paid run to make, with what to read by hand (part B).
 **Check:** `npm run typecheck` and `npm run test:unit`, so that step s5 starts from green.
 No stop: step s5 follows.
 
+**As done (2026-11-25).** Changes under `frontend/`, `docs/` and `.claude/rules/` only;
+nothing deployed, no `aws` command run. Brief `prompts/slot-s04-pair-s4-s5-implementation.md`.
+
+- *`frontend/src/logic/times.ts`, new:* the minutes of an hour on `TIME_STEP_MINUTES` (only 00
+  for the hour 24), a time taken apart and put together, the hours of a form of a window
+  (`WINDOW_HOURS`: starts 00 to 23, ends 00 to 24) and of the book dialog (`windowHours`, the
+  hours the window touches, F8), and `endFor`, the rule of S1 and S3: one hour later, never
+  past the last time allowed; a start at or after that last time gets one hour later, up to
+  24:00, so that the server's refusal is `outside_availability` and not an end before the
+  start. `availability.model.ts` lost `START_CHOICES`, `END_CHOICES` and its `GRID`;
+  `booking.ts` lost its `GRID`, and `timeChoice` gives the hours, the slot's times and the
+  window's end.
+- *`frontend/src/views/time.parts.ts`, new:* the two lists of one time in a form, found by
+  `<name>-hour` and `<name>-minute`, and `startSetsEnd`. Handlers are properties (`onchange`),
+  so a value set by the script sends nothing (S4). `availability.parts.ts`: a field with no
+  element of its name is a time; a refusal marks both its lists.
+- *`frontend/index.html`:* the ten times of the five places are each a `fieldset.clock` with a
+  legend and two lists inside labels whose words are for a screen reader only (`.unseen`).
+  The class is `clock`, not `time` as the brief's example had it: `.time` already holds a
+  block's text. `style.css`: the group on one row, the colon between, `.unseen`. The page
+  counts 52 fields, `#availability` 31.
+- *Unit tests:* `times.test.ts` (every pair of the window's lists through `WindowBody`, every
+  start's end within the lists), `time.parts.test.ts`, and the three views' tests with the
+  page's and the shell's: a start chosen twice sets the end twice, an end changed leaves the
+  start, 23:30 gives 24:00, the hour 24, 11:40 in a window to 12:00 gives 12:00, a pattern's
+  dialog and the book dialog open with their times as they are, 10:10–10:35 booked, a time
+  outside the window refused in the dialog's words.
+- *Documents:* `docs/FRONTEND_ARCHITECTURE.md` v24 (sections 4, 5.1 with twenty-one files,
+  7.1, decisions 37 and 92 restated, 195 to 200); `docs/FRONTEND_WALK.md` v6 (section 11,
+  checks 42, 43, 45, 76 and 86); the status lines of `docs/FRONTEND_SERVICES.md` and
+  `docs/SHARED_CALENDAR_SPEC.md`, whose row "Book dialog" of section 16.8 is no longer "not
+  built yet"; the open row of `docs/ARCHITECTURE.md`; `docs/FOLDER_STRUCTURE.md`,
+  `frontend/CLAUDE.md`, `.claude/rules/frontend-views.md` (the counts).
+
 ### Step s5 — The week: a short appointment (a pair with s4)
 
 - `frontend/src/logic/week.model.ts`: a block's height is at least 15 minutes' worth (S7);
@@ -439,6 +486,46 @@ changed; a look, in a browser on the local stack after `seed:local`, on a deskto
 phone width: the three places that choose a time, with "from" driving "to", and the week with
 a 5-minute, a 10-minute and a 15-minute appointment made there, alone and one after the other (side by side where a short one is followed at
 once).
+
+**As done (2026-11-25).**
+
+- *`frontend/src/logic/week.model.ts`:* `SHORTEST_DRAWN` (15); an appointment is placed by its
+  drawn span, at least 15 minutes from its start and never past the last hour shown (23:55 is
+  drawn 23:45 to 24:00). The columns and the chains take the drawn spans, for both roles, so
+  10:10–10:15 and 10:15–11:00 stand side by side; four columns or more become one group, the
+  Administrator's only, over the drawn span (v6, F7). A slot's tab and `beside` keep the true
+  times. An appointment drawn at that least height is marked `short`.
+- *Found in the look:* a 15-minute block is about 12 pixels tall, and its line of text, with
+  the block's padding, was cut in half. The class `short` (`week.view.ts`, `style.css`) takes
+  the padding off and sets the line to the letters' height: the time and the User can be read.
+  Beside another block, a short one's half width shows only "10:10–"; its detail and its name
+  for a screen reader say the whole time.
+- *Known, not changed:* a short block drawn taller than it is may cover up to ten minutes of
+  the top of the free slot that follows it, where the slot's time is written; the slot stays
+  pressable below. Not met in the look: the seed and the walk book short appointments in
+  slots already full.
+- *Unit tests:* 10:10–10:15 alone, followed at 10:15, at 10:25 and at 10:40; three 5-minute
+  blocks and a fourth; 15 minutes or more unchanged; 23:55; a User's week; four columns as a
+  group over the drawn span; the tab on the true times; Kolkata; the night the clocks go back;
+  the mark `short`.
+- *The look:* Chrome, against the local stack after `seed:local`, as `admin` and `alice`, at
+  1280 wide: the five places with two lists each; start sets end with the keyboard (08:05 →
+  09:05), an end changed leaving the start, 23:30 → 24:00 with only 00; a Sunday pattern
+  08:05–12:00 and its slots from 09:00; 10:10–10:35 booked from the dialog; 08:00 refused in
+  the dialog's words; 11:40 → 12:00; 09:00–09:05, 09:30–09:40, 10:10–10:15 beside 10:15–11:00,
+  11:00–11:15; `alice`'s week the same, "You". The browser's window could not be made narrower:
+  the phone width was looked at with the body held to 390 pixels and the style sheet's phone
+  rules applied by a script, the two lists fitting in every form and dialog; a real phone
+  width is still to be seen. The pattern and the appointments made stay in the local stack.
+  Screenshots in the session's scratchpad, not in the repository.
+- *Checked:* `npm run typecheck`, `npm run lint` and `npm run test:unit` green at the root
+  (544 tests in `shared/`, 1 843 in `backend/`, 2 775 in `frontend/`, 100 % line coverage
+  kept). No file under `frontend/src/services` or `frontend/tests/integration` changed, so the
+  front end's journeys were not run.
+
+**Step s6 finds ready:** the page and the server on 5-minute steps, unit tests green, the walk's
+section 11 to run whole at both widths in the full regression (a real phone width among them);
+the assistant's paid run (part B) still to make on the merged code.
 
 ### Step s6 — The release
 

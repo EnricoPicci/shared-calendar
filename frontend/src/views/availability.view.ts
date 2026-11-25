@@ -2,9 +2,7 @@ import type { Subscription } from 'rxjs';
 import {
   deletePatternQuestion,
   deleteTypeQuestion,
-  END_CHOICES,
   PATTERN_FIELDS,
-  START_CHOICES,
   TYPE_CAPACITY_HINT,
   TYPE_NAME_HINT,
   WEEKDAY_CHOICES,
@@ -17,11 +15,13 @@ import {
 } from '../logic/availability.model';
 import type { AskName, AvailabilityScreen } from '../logic/availability.screen';
 import { failureText } from '../logic/texts';
+import { LAST_TIME, WINDOW_HOURS } from '../logic/times';
 import type { AvailabilityRulesService } from '../services/availability-rules.service';
 import type { DeletePatternState } from '../services/availability-rules.types';
 import type { AvailabilityTypesService } from '../services/availability-types.service';
 import type { RemoveTypeState } from '../services/availability-types.types';
 import { availabilityParts, type Confirm, type Tell } from './availability.parts';
+import { startSetsEnd } from './time.parts';
 
 // What the availability view uses: of the AvailabilityScreen its stream, the four writes it
 // checks, the two new tries after a read that failed, and the appointments in the way of a
@@ -58,12 +58,18 @@ export function mountAvailability(root: HTMLElement, { screen, types, rules, con
   const nameHints = [...root.querySelectorAll('.name-hint')];
   const capacityHints = [...root.querySelectorAll('.capacity-hint')];
   const typeHints = [...root.querySelectorAll('.type-hint')];
-  const typeLists = [forms.patternCreate, forms.change].map(({ fields }) => fields[3]!.input);
+  const typeLists = [forms.patternCreate, forms.change].map(({ fields }) => fields[3]!.inputs[0]!);
   const dialogs = { rename: find<HTMLDialogElement>('dialog.rename'), change: find<HTMLDialogElement>('dialog.change') };
 
-  // The choices of the weekday and of the two times never change; those of the type follow
-  // the stream. What a name and a capacity are stands under their fields.
-  for (const { fields } of [forms.patternCreate, forms.change]) [WEEKDAY_CHOICES, START_CHOICES, END_CHOICES].forEach((list, i) => choices(fields[i]!.input, list));
+  // The choices of the weekday and of the hours of the two times never change; those of the
+  // type follow the stream. In both forms a start chosen by the person sets the end one hour
+  // later, up to 24:00. What a name and a capacity are stands under their fields.
+  for (const { fields, times } of [forms.patternCreate, forms.change]) {
+    choices(fields[0]!.inputs[0]!, WEEKDAY_CHOICES);
+    times.start!.offer(WINDOW_HOURS.starts);
+    times.end!.offer(WINDOW_HOURS.ends);
+    startSetsEnd(times.start!, times.end!, () => LAST_TIME);
+  }
   for (const hint of nameHints) hint.textContent = TYPE_NAME_HINT;
   for (const hint of capacityHints) hint.textContent = TYPE_CAPACITY_HINT;
 
@@ -205,7 +211,7 @@ export function mountAvailability(root: HTMLElement, { screen, types, rules, con
       forms[name].say(null);
       forms[name].form.reset();
       forms[name].submit.disabled = false;
-      for (const { input } of forms[name].fields) if (input instanceof HTMLSelectElement) choices(input, []);
+      for (const { inputs } of forms[name].fields) for (const input of inputs) if (input instanceof HTMLSelectElement) choices(input, []);
     }
     for (const list of [lists.types, lists.patterns]) {
       list.unread.hidden = list.empty.hidden = true;

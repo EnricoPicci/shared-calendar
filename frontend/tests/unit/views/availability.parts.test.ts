@@ -82,19 +82,37 @@ describe('the parts the two views of the availability share', () => {
       const choose = form('.one-date .choose', ['date']);
       choose.fill({ date: '2026-11-23' });
       choose.say({ refusals: { date: 'Choose a date.' }, failure: 'Not shown anywhere.', conflicts: LIST });
-      expect([choose.held(), choose.fields[0]!.refusal.textContent, choose.fields[0]!.input.getAttribute('aria-invalid')]).toEqual([{ date: '2026-11-23' }, 'Choose a date.', 'true']);
+      expect([choose.held(), choose.fields[0]!.refusal.textContent, choose.fields[0]!.inputs[0]!.getAttribute('aria-invalid')]).toEqual([{ date: '2026-11-23' }, 'Choose a date.', 'true']);
       expect(document.documentElement.outerHTML).not.toContain('Not shown anywhere.');
       choose.say(null);
-      expect([choose.fields[0]!.refusal.textContent, choose.fields[0]!.input.hasAttribute('aria-invalid')]).toEqual(['', false]);
+      expect([choose.fields[0]!.refusal.textContent, choose.fields[0]!.inputs[0]!.hasAttribute('aria-invalid')]).toEqual(['', false]);
     });
 
     it('a field named with an empty sentence is marked in fault and has no words under it; a field not named is not marked', () => {
       const { form } = availabilityParts(root());
       const add = form('.one-date .add-draft', ['start', 'end', 'typeId']);
       add.say({ refusals: { start: 'Start and End overlap.', end: '' }, failure: null, conflicts: null });
-      expect(add.fields.map(({ input, refusal }) => [input.getAttribute('aria-invalid'), refusal.textContent])).toEqual([['true', 'Start and End overlap.'], ['true', ''], [null, '']]);
+      // Both lists of a time are marked, and its sentence stands under its group.
+      expect(add.fields.map(({ inputs, refusal }) => [inputs.map((input) => input.getAttribute('aria-invalid')), refusal.textContent])).toEqual([
+        [['true', 'true'], 'Start and End overlap.'],
+        [['true', 'true'], ''],
+        [[null], ''],
+      ]);
+      expect(add.fields[0]!.refusal.closest('.field')!.querySelector('fieldset.clock')).toBe(add.fields[0]!.inputs[0]!.closest('fieldset'));
       add.say(null);
-      expect(add.fields.map(({ input }) => input.hasAttribute('aria-invalid'))).toEqual([false, false, false]);
+      expect(add.fields.flatMap(({ inputs }) => inputs.map((input) => input.hasAttribute('aria-invalid')))).toEqual([false, false, false, false, false]);
+    });
+
+    it('a time is two lists, an hour and a minute, held and filled as one `HH:mm` text', () => {
+      const { form } = availabilityParts(root());
+      const add = form('.one-date .add-draft', ['start', 'end', 'typeId']);
+      expect(add.fields.map(({ inputs }) => inputs.map((input) => input.name))).toEqual([['start-hour', 'start-minute'], ['end-hour', 'end-minute'], ['typeId']]);
+      expect(Object.keys(add.times)).toEqual(['start', 'end']);
+      add.times.start!.offer(['09', '10']);
+      add.times.end!.offer(['10', '24']);
+      add.fill({ start: '09:05', end: '24:00', typeId: '' });
+      expect(add.held()).toEqual({ start: '09:05', end: '24:00', typeId: '' });
+      expect([...add.times.end!.lists[1].options].map((option) => option.value)).toEqual(['00']);
     });
   });
 });

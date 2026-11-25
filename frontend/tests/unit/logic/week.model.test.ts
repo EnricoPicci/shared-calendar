@@ -75,7 +75,7 @@ describe('weekModel', () => {
 
     it('the User\'s own appointment says "You", with its type and its note', () => {
       expect(monday.appointments).toEqual([
-        { top: '30%', height: '10%', time: '11:00–12:00', ...FULL, appointmentId: 'appt-2026-11-16T10:00:00.000Z', who: 'You', typeName: 'Studio', note: 'First lesson', colour: colourOf(STUDIO), beside: false },
+        { top: '30%', height: '10%', time: '11:00–12:00', ...FULL, appointmentId: 'appt-2026-11-16T10:00:00.000Z', who: 'You', typeName: 'Studio', note: 'First lesson', colour: colourOf(STUDIO), beside: false, short: false },
       ]);
     });
 
@@ -524,6 +524,96 @@ describe('weekModel', () => {
       const day = dayOf(['a', 'b', 'c', 'd'].map((who) => at('09:00', '10:00', who)), 'user');
       expect(day.groups).toEqual([]);
       expect(day.appointments).toHaveLength(4);
+    });
+  });
+
+  describe('a short appointment: drawn at least 15 minutes tall, side by side with one that starts inside that height', () => {
+    // Monday 2026-11-16 in Rome, UTC+1: 10:10 local is 09:10Z. Times are written local here.
+    const local = (time: string) => {
+      const minutes = Number(time.slice(0, 2)) * 60 + Number(time.slice(3)) - 60;
+      return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+    };
+    const at = (from: string, to: string, username: string) =>
+      appointment({ appointmentId: `appt-${username}`, start: z(`2026-11-16T${local(from)}`), end: to === '24:00' ? z('2026-11-16T23:00') : z(`2026-11-16T${local(to)}`), date: '2026-11-16', username, typeId: POOL, typeName: 'Swimming Pool' });
+    const dayOf = (appointments: ReturnType<typeof at>[], role: 'admin' | 'user' = 'admin', over: Partial<CalendarView> = {}) => weekModel(view('2026-11-16', { appointments, ...over }), role).days[0]!;
+    const drawn = (day: ReturnType<typeof dayOf>) => day.appointments.map((a) => [a.who, a.time, a.top, a.height, a.lane, a.lanes]);
+    const shown = 600; // 08:00 to 18:00
+    const place = (from: number, tall: number) => [percent(from - 480, shown), percent(tall, shown)];
+
+    it('10:10–10:15 alone: 15 minutes tall, its text the true times, the whole width, marked short', () => {
+      const day = dayOf([at('10:10', '10:15', 'alice')]);
+      expect(drawn(day)).toEqual([['alice', '10:10–10:15', ...place(610, 15), 0, 1]]);
+      expect(day.appointments[0]!.short).toBe(true);
+    });
+
+    it('marked short: every appointment drawn at the least height, 15 minutes included; none longer', () => {
+      const day = dayOf([at('09:00', '09:05', 'a'), at('11:00', '11:15', 'b'), at('13:00', '13:20', 'c'), at('15:00', '16:00', 'd')]);
+      expect(day.appointments.map((a) => [a.who, a.short])).toEqual([['a', true], ['b', true], ['c', false], ['d', false]]);
+    });
+
+    it('followed at once by 10:15–11:00: the two side by side, the short one on the left, each its own height', () => {
+      expect(drawn(dayOf([at('10:15', '11:00', 'bob'), at('10:10', '10:15', 'alice')]))).toEqual([
+        ['bob', '10:15–11:00', ...place(615, 45), 1, 2],
+        ['alice', '10:10–10:15', ...place(610, 15), 0, 2],
+      ]);
+    });
+
+    it('followed at 10:25 or later: one column each', () => {
+      for (const next of ['10:25', '10:40']) {
+        expect(dayOf([at('10:10', '10:15', 'alice'), at(next, '11:00', 'bob')]).appointments.map((a) => [a.lane, a.lanes]), next).toEqual([[0, 1], [0, 1]]);
+      }
+    });
+
+    it('three of 5 minutes in a row are three columns; the fourth, at 10:15, is in the first again', () => {
+      const day = dayOf([at('10:00', '10:05', 'a'), at('10:05', '10:10', 'b'), at('10:10', '10:15', 'c'), at('10:15', '10:20', 'd')]);
+      expect(day.appointments.map((a) => [a.who, a.lane, a.lanes])).toEqual([['a', 0, 3], ['b', 1, 3], ['c', 2, 3], ['d', 0, 3]]);
+      expect(day.groups).toEqual([]);
+    });
+
+    it('an appointment of 15 minutes or longer is drawn as it is: alone, and followed at once, one column each', () => {
+      expect(drawn(dayOf([at('10:00', '10:15', 'alice')]))).toEqual([['alice', '10:00–10:15', ...place(600, 15), 0, 1]]);
+      expect(dayOf([at('10:00', '10:15', 'alice'), at('10:15', '10:30', 'bob')]).appointments.map((a) => [a.lane, a.lanes])).toEqual([[0, 1], [0, 1]]);
+    });
+
+    it('a short one at 23:55 does not pass the end of the day: drawn 23:45 to 24:00, its text 23:55–24:00', () => {
+      const day = dayOf([at('23:55', '24:00', 'alice')]);
+      // The hours shown widen to 24:00: 16 hours from 08:00.
+      expect(drawn(day)).toEqual([['alice', '23:55–24:00', percent(945, 960), percent(15, 960), 0, 1]]);
+    });
+
+    it('a User\'s short appointment is drawn 15 minutes tall too, and a User\'s two side by side', () => {
+      const day = dayOf([at('10:10', '10:15', 'alice'), at('10:15', '11:00', 'alice')], 'user');
+      expect(day.appointments.map((a) => [a.who, a.time, a.height, a.lane, a.lanes])).toEqual([
+        ['You', '10:10–10:15', percent(15, shown), 0, 2],
+        ['You', '10:15–11:00', percent(45, shown), 1, 2],
+      ]);
+      expect(day.groups).toEqual([]);
+    });
+
+    it('four columns made by drawn heights are one block in the Administrator\'s week, over their drawn span; its rows say the true times', () => {
+      const day = dayOf([at('10:00', '10:05', 'a'), at('10:05', '10:10', 'b'), at('10:10', '10:15', 'c'), at('10:10', '10:15', 'd')]);
+      expect(day.appointments).toEqual([]);
+      expect(day.groups.map((g) => [g.what, g.time, g.top, g.height, g.rows.map((row) => row.time)])).toEqual([
+        ['4 people · Swimming Pool', '10:00–10:15', ...place(600, 25), ['10:00–10:05', '10:05–10:10', '10:10–10:15', '10:10–10:15']],
+      ]);
+    });
+
+    it('a slot\'s tab follows the true times: the free slot after a short appointment is drawn whole, under the taller block\'s last minutes', () => {
+      const slot = { start: z('2026-11-16T10:00'), end: z('2026-11-16T11:00'), typeId: POOL, capacity: 1, placesLeft: 1 };
+      const day = weekModel(view('2026-11-16', { appointments: [at('10:50', '10:55', 'alice')] }, [{ date: '2026-11-16', slots: [slot] }]), 'admin').days[0]!;
+      expect([day.slots[0]!.tab, day.appointments[0]!.beside, day.appointments[0]!.height]).toEqual([null, false, percent(15, shown)]);
+    });
+
+    it('in a half-hour zone and on the night the clocks go back, the drawn height is of the clock', () => {
+      // Kolkata, UTC+5:30: 10:10–10:15 local is 04:40Z–04:45Z.
+      const kolkata = appointment({ start: z('2026-11-16T04:40'), end: z('2026-11-16T04:45'), date: '2026-11-16' });
+      const india = weekModel(view('2026-11-16', { timeZone: 'Asia/Kolkata', appointments: [kolkata] }), 'user').days[0]!;
+      expect([india.appointments[0]!.time, india.appointments[0]!.top, india.appointments[0]!.height]).toEqual(['10:10–10:15', percent(130, shown), percent(15, shown)]);
+      // 2027-10-31 in Rome: 02:10–02:15 +01:00 is 01:10Z–01:15Z, the second 02:10 of the night.
+      const late = appointment({ start: z('2027-10-31T01:10'), end: z('2027-10-31T01:15'), date: '2027-10-31' });
+      const night = weekModel(view('2027-10-25', { appointments: [late] }), 'user').days[6]!;
+      // The hours shown widen to 02:00–18:00.
+      expect([night.appointments[0]!.time, night.appointments[0]!.height]).toEqual(['02:10 +01:00 – 02:15 +01:00', percent(15, 960)]);
     });
   });
 

@@ -48,43 +48,50 @@ describe('booking', () => {
   });
 
   describe('timeChoice', () => {
-    const quarters = (from: string, count: number) => {
-      const start = Number(from.slice(0, 2)) * 60 + Number(from.slice(3));
-      return Array.from({ length: count }, (_, i) => `${String(Math.floor((start + i * 15) / 60)).padStart(2, '0')}:${String((start + i * 15) % 60).padStart(2, '0')}`);
-    };
+    const hours = (first: number, last: number) => Array.from({ length: last - first + 1 }, (_, i) => String(first + i).padStart(2, '0'));
 
-    it('a window 08:30–12:00: the starts 08:30 to 11:45, the ends 08:45 to 12:00, set to the slot\'s own', () => {
-      const choice = timeChoice(winter(), 'Europe/Rome');
-      expect(choice.starts).toEqual(quarters('08:30', 14));
-      expect(choice.ends).toEqual(quarters('08:45', 14));
-      expect([choice.starts[0], choice.starts.at(-1), choice.ends[0], choice.ends.at(-1)]).toEqual(['08:30', '11:45', '08:45', '12:00']);
-      expect([choice.start, choice.end]).toEqual(['10:00', '11:00']);
+    it('a window 08:30–12:00: the start hours 08 to 11, the end hours 08 to 12, set to the slot\'s own, the window\'s end the last', () => {
+      expect(timeChoice(winter(), 'Europe/Rome')).toEqual({ starts: hours(8, 11), ends: hours(8, 12), start: '10:00', end: '11:00', last: '12:00' });
     });
 
-    it('a window ending at 24:00: the last end is 24:00, the last start 23:45', () => {
+    it('a window 08:05–12:00: the hours it touches, the same', () => {
+      const slot = slotOf('2026-11-23', ['2026-11-23T07:05', '2026-11-23T11:00'], ['2026-11-23T08:00', '2026-11-23T09:00']);
+      expect(timeChoice(slot, 'Europe/Rome')).toEqual({ starts: hours(8, 11), ends: hours(8, 12), start: '09:00', end: '10:00', last: '12:00' });
+    });
+
+    it('a window 08:00–11:55: no start hour 11 is lost, and no end hour 12 is offered', () => {
+      const slot = slotOf('2026-11-23', ['2026-11-23T07:00', '2026-11-23T10:55'], ['2026-11-23T08:00', '2026-11-23T09:00']);
+      expect(timeChoice(slot, 'Europe/Rome')).toMatchObject({ starts: hours(8, 11), ends: hours(8, 11), last: '11:55' });
+    });
+
+    it('a window ending at 24:00: the end hours reach 24, the start hours 23, and the last is 24:00', () => {
       // 20:00–24:00 local, the slot 23:00–24:00.
       const slot = slotOf('2026-11-23', ['2026-11-23T19:00', '2026-11-23T23:00'], ['2026-11-23T22:00', '2026-11-23T23:00']);
-      const choice = timeChoice(slot, 'Europe/Rome');
-      expect([choice.starts[0], choice.starts.at(-1), choice.ends[0], choice.ends.at(-1)]).toEqual(['20:00', '23:45', '20:15', '24:00']);
-      expect([choice.start, choice.end]).toEqual(['23:00', '24:00']);
+      expect(timeChoice(slot, 'Europe/Rome')).toEqual({ starts: hours(20, 23), ends: hours(20, 24), start: '23:00', end: '24:00', last: '24:00' });
     });
 
     it('in summer and in a half-hour zone the times are the calendar\'s clock', () => {
       // Rome in summer (UTC+2): 09:00–12:00 local.
       const summer = slotOf('2027-07-05', ['2027-07-05T07:00', '2027-07-05T10:00'], ['2027-07-05T08:00', '2027-07-05T09:00']);
-      expect(timeChoice(summer, 'Europe/Rome')).toMatchObject({ start: '10:00', end: '11:00' });
-      expect(timeChoice(summer, 'Europe/Rome').starts[0]).toBe('09:00');
+      expect(timeChoice(summer, 'Europe/Rome')).toEqual({ starts: hours(9, 11), ends: hours(9, 12), start: '10:00', end: '11:00', last: '12:00' });
       // Kolkata (UTC+5:30): 09:00–11:00 local.
       const kolkata = slotOf('2026-11-23', ['2026-11-23T03:30', '2026-11-23T05:30'], ['2026-11-23T03:30', '2026-11-23T04:30'], 'Asia/Kolkata');
-      expect(timeChoice(kolkata, 'Asia/Kolkata')).toEqual({ starts: quarters('09:00', 8), ends: quarters('09:15', 8), start: '09:00', end: '10:00' });
+      expect(timeChoice(kolkata, 'Asia/Kolkata')).toEqual({ starts: hours(9, 10), ends: hours(9, 11), start: '09:00', end: '10:00', last: '11:00' });
     });
 
     it('on the night the clocks go back the repeated hour is there once: both slots at 02:00 open on 02:00–03:00', () => {
+      // The window 01:00 +02:00 to 04:00 +01:00, four real hours on three of the clock.
       const first = slotOf('2027-10-31', ['2027-10-30T23:00', '2027-10-31T03:00'], ['2027-10-31T00:00', '2027-10-31T01:00']);
       const second = slotOf('2027-10-31', ['2027-10-30T23:00', '2027-10-31T03:00'], ['2027-10-31T01:00', '2027-10-31T02:00']);
-      expect(timeChoice(first, 'Europe/Rome').starts).toEqual(quarters('01:00', 12));
+      expect(timeChoice(first, 'Europe/Rome')).toMatchObject({ starts: hours(1, 3), ends: hours(1, 4), last: '04:00' });
       expect(timeChoice(first, 'Europe/Rome')).toMatchObject({ start: '02:00', end: '02:00' });
       expect(timeChoice(second, 'Europe/Rome')).toMatchObject({ start: '02:00', end: '03:00' });
+    });
+
+    it('on the night the clocks go forward the hours are the clock\'s, the missing hour among them (a known limit)', () => {
+      // 2027-03-28 in Rome: 01:00–04:00 local, which is two real hours; 02:00 to 02:55 does not exist.
+      const slot = slotOf('2027-03-28', ['2027-03-28T00:00', '2027-03-28T02:00'], ['2027-03-28T01:00', '2027-03-28T02:00']);
+      expect(timeChoice(slot, 'Europe/Rome')).toEqual({ starts: hours(1, 3), ends: hours(1, 4), start: '03:00', end: '04:00', last: '04:00' });
     });
   });
 
@@ -157,6 +164,20 @@ describe('booking', () => {
         end: z('2026-11-23T09:45'),
         username: 'alice',
       });
+    });
+
+    it('5-minute times: 10:10–10:35 and 10:10–10:15 local, each a body the shared schema accepts', () => {
+      const slot = winter();
+      for (const [end, utc] of [['10:35', '09:35'], ['10:15', '09:15']] as const) {
+        const body = bookingFor(slot, 'Europe/Rome', 'admin', untouched(slot, 'Europe/Rome', { start: '10:10', end }));
+        expect(body).toEqual({ start: z('2026-11-23T09:10'), end: z(`2026-11-23T${utc}`), username: 'alice' });
+        expect(BookBody.safeParse(body).success).toBe(true);
+      }
+    });
+
+    it('a time outside the window is handed over as chosen: whether it is allowed is the server\'s to say', () => {
+      const slot = winter();
+      expect(bookingFor(slot, 'Europe/Rome', 'admin', untouched(slot, 'Europe/Rome', { start: '08:00', end: '09:00' }))).toMatchObject({ start: z('2026-11-23T07:00'), end: z('2026-11-23T08:00') });
     });
 
     it('only one of the two changed: both are taken from the form', () => {

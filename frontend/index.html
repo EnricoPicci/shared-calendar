@@ -78,8 +78,18 @@
                   <p class="users-message" role="status"></p>
                 </div>
                 <div class="times">
-                  <label>Start <select name="start"></select></label>
-                  <label>End <select name="end"></select></label>
+                  <fieldset class="clock">
+                    <legend>Start</legend>
+                    <label><span class="unseen">Hour</span> <select name="start-hour"></select></label>
+                    <span aria-hidden="true">:</span>
+                    <label><span class="unseen">Minute</span> <select name="start-minute"></select></label>
+                  </fieldset>
+                  <fieldset class="clock">
+                    <legend>End</legend>
+                    <label><span class="unseen">Hour</span> <select name="end-hour"></select></label>
+                    <span aria-hidden="true">:</span>
+                    <label><span class="unseen">Minute</span> <select name="end-minute"></select></label>
+                  </fieldset>
                 </div>
               </div>
               <label>Note <textarea name="note" rows="3" maxlength="500"></textarea></label>
@@ -340,11 +350,21 @@
                   <p class="error refusal" role="alert"></p>
                 </div>
                 <div class="field">
-                  <label>Start <select name="start"></select></label>
+                  <fieldset class="clock">
+                    <legend>Start</legend>
+                    <label><span class="unseen">Hour</span> <select name="start-hour"></select></label>
+                    <span aria-hidden="true">:</span>
+                    <label><span class="unseen">Minute</span> <select name="start-minute"></select></label>
+                  </fieldset>
                   <p class="error refusal" role="alert"></p>
                 </div>
                 <div class="field">
-                  <label>End <select name="end"></select></label>
+                  <fieldset class="clock">
+                    <legend>End</legend>
+                    <label><span class="unseen">Hour</span> <select name="end-hour"></select></label>
+                    <span aria-hidden="true">:</span>
+                    <label><span class="unseen">Minute</span> <select name="end-minute"></select></label>
+                  </fieldset>
                   <p class="error refusal" role="alert"></p>
                 </div>
                 <div class="field">
@@ -427,11 +447,21 @@
                 <form class="add-draft" novalidate>
                   <div class="window-fields">
                     <div class="field">
-                      <label>Start <select name="start"></select></label>
+                      <fieldset class="clock">
+                        <legend>Start</legend>
+                        <label><span class="unseen">Hour</span> <select name="start-hour"></select></label>
+                        <span aria-hidden="true">:</span>
+                        <label><span class="unseen">Minute</span> <select name="start-minute"></select></label>
+                      </fieldset>
                       <p class="error refusal" role="alert"></p>
                     </div>
                     <div class="field">
-                      <label>End <select name="end"></select></label>
+                      <fieldset class="clock">
+                        <legend>End</legend>
+                        <label><span class="unseen">Hour</span> <select name="end-hour"></select></label>
+                        <span aria-hidden="true">:</span>
+                        <label><span class="unseen">Minute</span> <select name="end-minute"></select></label>
+                      </fieldset>
                       <p class="error refusal" role="alert"></p>
                     </div>
                     <div class="field">
@@ -461,11 +491,21 @@
                 <form class="add-window" novalidate>
                   <div class="window-fields">
                     <div class="field">
-                      <label>Start <select name="start"></select></label>
+                      <fieldset class="clock">
+                        <legend>Start</legend>
+                        <label><span class="unseen">Hour</span> <select name="start-hour"></select></label>
+                        <span aria-hidden="true">:</span>
+                        <label><span class="unseen">Minute</span> <select name="start-minute"></select></label>
+                      </fieldset>
                       <p class="error refusal" role="alert"></p>
                     </div>
                     <div class="field">
-                      <label>End <select name="end"></select></label>
+                      <fieldset class="clock">
+                        <legend>End</legend>
+                        <label><span class="unseen">Hour</span> <select name="end-hour"></select></label>
+                        <span aria-hidden="true">:</span>
+                        <label><span class="unseen">Minute</span> <select name="end-minute"></select></label>
+                      </fieldset>
                       <p class="error refusal" role="alert"></p>
                     </div>
                     <div class="field">
@@ -553,11 +593,21 @@
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="field">
-                <label>Start <select name="start"></select></label>
+                <fieldset class="clock">
+                  <legend>Start</legend>
+                  <label><span class="unseen">Hour</span> <select name="start-hour"></select></label>
+                  <span aria-hidden="true">:</span>
+                  <label><span class="unseen">Minute</span> <select name="start-minute"></select></label>
+                </fieldset>
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="field">
-                <label>End <select name="end"></select></label>
+                <fieldset class="clock">
+                  <legend>End</legend>
+                  <label><span class="unseen">Hour</span> <select name="end-hour"></select></label>
+                  <span aria-hidden="true">:</span>
+                  <label><span class="unseen">Minute</span> <select name="end-minute"></select></label>
+                </fieldset>
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="field">

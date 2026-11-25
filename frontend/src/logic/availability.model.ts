@@ -80,17 +80,10 @@ export function deleteTypeQuestion(row: TypeRow): string {
 export type Choice = { value: string; label: string };
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const DAY_MINUTES = 24 * 60;
-const GRID = 15; // a window starts and ends on 15-minute steps (docs/SHARED_CALENDAR_SPEC.md section 6.2)
-const clock = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
-const steps = (from: number, to: number) => Array.from({ length: (to - from) / GRID + 1 }, (_, i) => clock(from + i * GRID)).map((time) => ({ value: time, label: time }));
 
-// The weekdays, Monday to Sunday, as the API numbers them: 1 to 7.
+// The weekdays, Monday to Sunday, as the API numbers them: 1 to 7. The two times of the form
+// are an hour and a minute each, offered by src/logic/times.ts.
 export const WEEKDAY_CHOICES: readonly Choice[] = WEEKDAYS.map((label, i) => ({ value: String(i + 1), label }));
-// The local times a window may start at, 00:00 to 23:45, and end at, 00:15 to 24:00: nothing
-// off the grid can be chosen.
-export const START_CHOICES: readonly Choice[] = steps(0, DAY_MINUTES - GRID);
-export const END_CHOICES: readonly Choice[] = steps(GRID, DAY_MINUTES);
 
 // The types to choose from, by name, in the server's order.
 export function typeChoices(types: readonly AvailabilityType[]): Choice[] {
@@ -137,7 +130,8 @@ export const TYPE_NOT_CHOSEN = 'Type must be chosen.';
 
 // From what the form holds to the body of a create or of a change, or to the refusals: one
 // sentence per field in fault, each naming its field in the words of its label, and every
-// field in fault said. The weekday and the two times come from lists that hold nothing wrong;
+// field in fault said. The weekday and the two times come from lists that hold nothing off the
+// step; an end not after its start is the one fault two times can have;
 // the shared schema, through the service, has the last word on the body
 // (docs/FRONTEND_SERVICES.md section 17.4).
 export function patternFor(fields: PatternFields): { pattern: PatternBody } | { refusals: Partial<Record<PatternField, string>> } {

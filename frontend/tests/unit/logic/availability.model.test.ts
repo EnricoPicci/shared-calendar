@@ -2,7 +2,6 @@ import { CALENDAR_LIMITS, PatternBody, TYPE_CAPACITY, TypeBody, type Availabilit
 import {
   deletePatternQuestion,
   deleteTypeQuestion,
-  END_CHOICES,
   NO_PATTERNS,
   NO_TYPE_YET,
   NO_TYPES,
@@ -10,7 +9,6 @@ import {
   patternFields,
   patternFor,
   patternGroups,
-  START_CHOICES,
   startingFields,
   STARTING_TYPE,
   TYPE_CAPACITY_HINT,
@@ -23,6 +21,7 @@ import {
   WEEKDAY_CHOICES,
   type PatternFields,
 } from '../../../src/logic/availability.model';
+import { minutesOf, timeOf, WINDOW_HOURS } from '../../../src/logic/times';
 import { POOL, STUDIO } from './fixtures';
 import { useFarBrowserZone } from './zone';
 
@@ -167,18 +166,22 @@ describe('availability.model', () => {
       expect(WEEKDAY_CHOICES.map(({ value, label }) => `${value} ${label}`)).toEqual(['1 Monday', '2 Tuesday', '3 Wednesday', '4 Thursday', '5 Friday', '6 Saturday', '7 Sunday']);
     });
 
-    it('a start is one of the 96 steps from 00:00 to 23:45, an end one of the 96 from 00:15 to 24:00', () => {
-      expect([START_CHOICES.length, START_CHOICES[0]!.value, START_CHOICES[1]!.value, START_CHOICES.at(-1)!.value]).toEqual([96, '00:00', '00:15', '23:45']);
-      expect([END_CHOICES.length, END_CHOICES[0]!.value, END_CHOICES.at(-2)!.value, END_CHOICES.at(-1)!.value]).toEqual([96, '00:15', '23:45', '24:00']);
-      for (const { value, label } of [...START_CHOICES, ...END_CHOICES]) expect(label).toBe(value);
-    });
-
-    it('every start with every later end is a body the shared schema accepts: nothing off the grid can be chosen', () => {
-      for (const start of START_CHOICES) {
-        const end = END_CHOICES.find((choice) => choice.value > start.value)!;
-        expect(PatternBody.safeParse({ weekday: 1, start: start.value, end: end.value, typeId: STUDIO, validFrom: TODAY, validUntil: null }).success, start.value).toBe(true);
-      }
-      for (const end of END_CHOICES) expect(PatternBody.safeParse({ weekday: 7, start: '00:00', end: end.value, typeId: STUDIO, validFrom: TODAY, validUntil: null }).success, end.value).toBe(true);
+    it('every pair of times the form\'s lists can hold is accepted, or refused for the order of the two times alone, never for the step', () => {
+      const all = (hours: readonly string[]) => hours.flatMap((hour) => minutesOf(hour).map((minute) => timeOf(hour, minute)));
+      const starts = all(WINDOW_HOURS.starts);
+      const ends = all(WINDOW_HOURS.ends);
+      expect([starts.length, starts[0], starts.at(-1), ends.length, ends[0], ends.at(-1)]).toEqual([288, '00:00', '23:55', 289, '00:00', '24:00']);
+      const fields = (start: string, end: string): PatternFields => ({ weekday: '1', start, end, typeId: STUDIO, validFrom: TODAY, validUntil: '' });
+      // What the model and the shared schema say of a pair: the model's refusal of the end, or
+      // the schema's verdict on the body.
+      const verdict = (start: string, end: string) => {
+        const checked = patternFor(fields(start, end));
+        return 'refusals' in checked ? Object.keys(checked.refusals) : PatternBody.safeParse(checked.pattern).success;
+      };
+      const pairs = [...starts.flatMap((start) => ['00:00', start, ends[ends.indexOf(start) + 1]!, '24:00'].map((end) => [start, end] as const)), ...ends.flatMap((end) => ['00:00', '23:55'].map((start) => [start, end] as const))];
+      for (const [start, end] of pairs) expect(verdict(start, end), `${start}–${end}`).toEqual(end > start ? true : ['end']);
+      // And the schema refuses exactly those the model refuses, for the order alone.
+      expect(PatternBody.safeParse({ weekday: 1, start: '10:05', end: '10:05', typeId: STUDIO, validFrom: TODAY, validUntil: null }).error!.issues.map((issue) => issue.path.join('.'))).toEqual(['end']);
     });
 
     it('the types to choose from: their ids as values, their names as labels, in the order given; a name with <script> as text', () => {

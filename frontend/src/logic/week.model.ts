@@ -40,6 +40,7 @@ export type AppointmentBlock = Placed & {
   note: string; // '' when there is none
   colour: number;
   beside: boolean; // a slot's tab stands beside it, and it leaves the tab room
+  short: boolean; // drawn at the least height, SHORTEST_DRAWN: room for one tight line of text
 };
 // Four or more of the Administrator's appointments that overlap, drawn as one block over their
 // whole span that opens the list of them (docs/SHARED_CALENDAR_SPEC.md section 16.8). `what`
@@ -75,6 +76,11 @@ const FIRST_HOUR = 8 * 60; // the hours always shown: 08:00 to 18:00
 const LAST_HOUR = 18 * 60;
 // The most of the Administrator's appointments drawn side by side; more become one block.
 const SIDE_BY_SIDE = 3;
+// The least an appointment is drawn tall, in minutes of the clock: 15 minutes are about 13
+// pixels, one line of its text and something to press; 5 minutes, the shortest appointment
+// (docs/SHARED_CALENDAR_SPEC.md decision D32), would be about 4. Its text keeps its true times
+// (docs/FRONTEND_ARCHITECTURE.md section 11, decision 199).
+const SHORTEST_DRAWN = 15;
 
 // The same colour for a type in every week: a number from its id.
 export function colourOf(typeId: string): number {
@@ -105,13 +111,23 @@ function spanOf(interval: Interval, date: string, zone: string): Span {
   return { from, to: Math.min(from + real, DAY_MINUTES) };
 }
 
-// The places of the blocks of one kind in one day. Blocks are chained while each starts before
-// the chain's last end on the clock; in a chain each takes, the earliest first, the leftmost
-// column free at its start, so a chain has as many columns as blocks at its peak. On every day
-// but one the clock is real time, so a chain is appointments that overlap ([start, end): two that
-// touch are not chained) and its peak is the people at once (docs/SHARED_CALENDAR_SPEC.md
-// R-SLOT-02). On the night the clocks go back two blocks an hour apart can share a place on the
-// clock: they are chained too, and stand side by side, the earlier on the left.
+// Where an appointment is drawn: never lower than SHORTEST_DRAWN, and never past `last`, the
+// end of the hours shown; one that would pass it is drawn ending there, starting earlier.
+function drawnSpan(span: Span, last: number): Span {
+  const to = Math.min(Math.max(span.to, span.from + SHORTEST_DRAWN), last);
+  return { from: Math.min(span.from, to - SHORTEST_DRAWN), to };
+}
+
+// The places of the blocks of one kind in one day, on the spans they are drawn on. Blocks are
+// chained while each starts before the chain's last end on the clock; in a chain each takes,
+// the earliest first, the leftmost column free at its start, so a chain has as many columns as
+// blocks at its peak. On every day but one the clock is real time and a block is drawn on its
+// own times, so a chain is appointments that overlap ([start, end): two that touch are not
+// chained) and its peak is the people at once (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02). An
+// appointment drawn taller than its time chains with one that starts inside that height, and
+// the two stand side by side: the peak is then of blocks, not of people. On the night the clocks
+// go back two blocks an hour apart can share a place on the clock: they are chained too, and
+// stand side by side, the earlier on the left.
 type Columned = Pick<Placed, 'lane' | 'lanes'> & { chain: number };
 function columnsOf(intervals: readonly Interval[], spans: readonly Span[]): Columned[] {
   const order = intervals.map((_, i) => i).sort((a, b) => spans[a]!.from - spans[b]!.from || Date.parse(intervals[a]!.start) - Date.parse(intervals[b]!.start));
@@ -177,11 +193,17 @@ export function weekModel(view: CalendarView, role: Role): WeekModel {
       // The day's windows with those that touch and share a type made one
       // (docs/SHARED_CALENDAR_SPEC.md section 6.6): a slot lies inside one of them.
       const merged = effectiveWindows(day.windows);
-      // The blocks of one kind, each placed among the others of that kind.
+      // The blocks of one kind, each placed among the others of that kind. Appointments are
+      // drawn at least SHORTEST_DRAWN tall; windows, slots and a User's busy times true to scale.
       const top = (span: Span) => `${((span.from - first) / (last - first)) * 100}%`;
       const height = (span: Span) => `${((span.to - span.from) / (last - first)) * 100}%`;
-      const placed = <T extends Interval>(intervals: readonly T[]): (T & Columned & Omit<Placed, 'lane' | 'lanes'>)[] => {
-        const daySpans = intervals.map((interval) => spanOf(interval, day.date, zone));
+      const drawn = (interval: Interval) => drawnSpan(spanOf(interval, day.date, zone), last);
+      const tall = (interval: Interval) => {
+        const span = drawn(interval);
+        return span.to - span.from;
+      };
+      const placed = <T extends Interval>(intervals: readonly T[], spanFor = (interval: Interval) => spanOf(interval, day.date, zone)): (T & Columned & Omit<Placed, 'lane' | 'lanes'>)[] => {
+        const daySpans = intervals.map(spanFor);
         const columns = columnsOf(intervals, daySpans);
         return intervals.map((interval, i) => ({
           ...interval,
@@ -192,18 +214,21 @@ export function weekModel(view: CalendarView, role: Role): WeekModel {
         }));
       };
       const place = ({ top, height, time, lane, lanes }: Placed): Placed => ({ top, height, time, lane, lanes });
-      // A slot and an appointment overlap on the clock, [from, to), as they are drawn.
+      // A slot and an appointment overlap on the clock, [from, to), on their true times: a slot's
+      // tab stands beside appointments that are there at the same time.
       const slotSpans = day.slots.map((s) => spanOf(s, day.date, zone));
       const appointmentSpans = day.appointments.map((a) => spanOf(a, day.date, zone));
       const overlaps = (span: Span, others: Span[]) => others.some((other) => span.from < other.to && other.from < span.to);
-      // The Administrator's appointments: a chain of more than three, at its peak, is one block.
-      const appointments = placed(day.appointments);
+      // The Administrator's appointments: a chain of more than three columns, at its peak, is one
+      // block, whether its appointments overlap or only their drawn heights do; a User's never
+      // has more than three, since a User's own appointments never overlap.
+      const appointments = placed(day.appointments, drawn);
       const grouped = (a: (typeof appointments)[number]) => role === 'admin' && a.lanes > SIDE_BY_SIDE;
       const chains = new Map<number, typeof appointments>();
       for (const a of appointments.filter(grouped)) chains.set(a.chain, [...(chains.get(a.chain) ?? []), a]);
       const groups = [...chains.values()].map((members): GroupBlock => {
         const byStart = [...members].sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
-        const spans = members.map((a) => spanOf(a, day.date, zone));
+        const spans = members.map(drawn);
         const span = { from: Math.min(...spans.map((s) => s.from)), to: Math.max(...spans.map((s) => s.to)) };
         const earliest = byStart[0]!;
         const end = members.map((a) => a.end).reduce((a, b) => (Date.parse(b) > Date.parse(a) ? b : a));
@@ -254,6 +279,7 @@ export function weekModel(view: CalendarView, role: Role): WeekModel {
             note: a.note ?? '',
             colour: colourOf(a.typeId),
             beside: overlaps(spanOf(a, day.date, zone), slotSpans),
+            short: tall(a) <= SHORTEST_DRAWN,
           })),
         groups,
       };
