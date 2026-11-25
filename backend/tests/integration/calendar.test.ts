@@ -1897,3 +1897,164 @@ describe('the capacity of a type (AC-37 to AC-44)', () => {
     expect(res.body).toMatchObject(values);
   });
 });
+
+// Explained in simple words in docs/journeys/backend/calendar-time-step.md.
+// Test names: R-… rules, decisions D… and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md
+// (scenarios in its section 18.3).
+describe('times on 5-minute steps (AC-45 to AC-48)', () => {
+  // The Administrator's times lie on 5-minute steps, a User's slot stays a whole hour
+  // (docs/SHARED_CALENDAR_SPEC.md decision D32). These journeys save their own settings first
+  // (restoring the leftover ones at the end), create a User and a type of their own, and work on
+  // S, the next Saturday at least 8 days ahead, which the journeys of the capacity left empty; the
+  // pattern is valid on S alone. In the scenarios of docs/SHARED_CALENDAR_SPEC.md section 18.3,
+  // step-alice plays alice. At the end every appointment of S is cancelled and the window, the
+  // pattern and the type deleted, so S is empty again: the assistant's journeys hold their own
+  // Saturdays empty.
+  const ZONE = 'Europe/Rome';
+  const today = () => localDateOf(new Date().toISOString(), ZONE);
+  const nextSaturday = (from: string) => {
+    let d = from;
+    while (weekdayOf(d) !== 6) d = addDays(d, 1);
+    return d;
+  };
+  const S = () => nextSaturday(addDays(today(), 8));
+  const at = (time: string) => toInstant(S(), time, ZONE);
+  const SETTINGS = { cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: null };
+  const USER = 'step-alice';
+  type ViewSlot = { start: string; end: string; placesLeft: number };
+  type ViewDay = { slots: ViewSlot[]; busy: unknown[]; windows: { start: string; end: string }[] };
+
+  let userToken: string;
+  let typeId: string;
+  let patternId: string;
+  let windowId: string;
+  let leftover: Record<string, unknown>;
+
+  const book = (token: string, body: Record<string, unknown>) => api('POST', '/calendar/appointments', token, body);
+  const dayOf = async (token: string): Promise<ViewDay> => {
+    const res = await api('GET', `/calendar?from=${S()}&to=${S()}`, token);
+    expect(res.status).toBe(200);
+    return (res.body?.days as ViewDay[])[0]!;
+  };
+  const bookedOnS = async () =>
+    (await queryCalendarPartition('APPT'))
+      .filter((a) => a.username === USER && a.status === 'booked')
+      .map((a) => [a.start, a.end])
+      .sort();
+
+  beforeAll(async () => {
+    await removeUserIfPresent(USER);
+    const res = await api('POST', '/users', adminToken, { username: USER });
+    expect(res.status).toBe(201);
+    userToken = await signIn(USER, res.body?.password as string);
+  });
+
+  afterAll(async () => {
+    await removeUserIfPresent(USER);
+  });
+
+  it('prepares the settings and the type; a pattern off the step (08:07) is 400, the pattern 08:05–12:00 on S is 201', async () => {
+    leftover = (await api('GET', '/calendar/settings', adminToken)).body!;
+    expect((await api('PUT', '/calendar/settings', adminToken, SETTINGS)).status).toBe(200);
+    const type = await api('POST', '/calendar/types', adminToken, { name: 'Step studio' });
+    expect(type.status).toBe(201);
+    typeId = type.body?.typeId as string;
+
+    const pattern = { weekday: 6, start: '08:05', end: '12:00', typeId, validFrom: S(), validUntil: S() };
+    const off = await api('POST', '/calendar/patterns', adminToken, { ...pattern, start: '08:07' });
+    expect(off.status).toBe(400);
+    expect(off.body).toMatchObject({ error: 'invalid_request' });
+    const created = await api('POST', '/calendar/patterns', adminToken, pattern);
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ start: '08:05', end: '12:00' });
+    patternId = created.body?.patternId as string;
+    expect(await getCalendarItem('PATTERN', patternId)).toMatchObject({ start: '08:05', end: '12:00' });
+  });
+
+  it('AC-45: step-alice sees the window 08:05–12:00 and the slots 09:00, 10:00 and 11:00: none starts at 08:05', async () => {
+    const day = await dayOf(userToken);
+    expect(day.windows).toMatchObject([{ start: at('08:05'), end: at('12:00') }]);
+    expect(day.slots.map((s) => [s.start, s.end])).toEqual([
+      [at('09:00'), at('10:00')],
+      [at('10:00'), at('11:00')],
+      [at('11:00'), at('12:00')],
+    ]);
+  });
+
+  it('a one-off window 13:05–14:10 is 201 and adds no slot; a window and a day’s own hours off the step are 400', async () => {
+    const added = await api('POST', '/calendar/windows', adminToken, { date: S(), start: '13:05', end: '14:10', typeId });
+    expect(added.status).toBe(201);
+    expect(added.body).toMatchObject({ start: '13:05', end: '14:10' });
+    windowId = added.body?.windowId as string;
+    const day = await dayOf(userToken);
+    expect(day.windows).toMatchObject([
+      { start: at('08:05'), end: at('12:00') },
+      { start: at('13:05'), end: at('14:10') },
+    ]);
+    expect(day.slots.map((s) => s.start)).toEqual([at('09:00'), at('10:00'), at('11:00')]);
+
+    const offWindow = await api('POST', '/calendar/windows', adminToken, { date: S(), start: '15:00', end: '16:02', typeId });
+    expect(offWindow.status).toBe(400);
+    expect(offWindow.body).toMatchObject({ error: 'invalid_request' });
+    const offOverride = await api('PUT', `/calendar/overrides/${S()}`, adminToken, { windows: [{ start: '08:05', end: '12:03', typeId }] });
+    expect(offOverride.status).toBe(400);
+    expect(offOverride.body).toMatchObject({ error: 'invalid_request' });
+  });
+
+  it('AC-46: the Administrator books step-alice 10:10–10:35: 201; the slot 10:00 has no place left, and step-alice is not offered it', async () => {
+    const res = await book(adminToken, { username: USER, start: at('10:10'), end: at('10:35') });
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ username: USER, start: at('10:10'), end: at('10:35') });
+    expect(await getCalendarItem('APPT', `${at('10:10')}#${res.body?.appointmentId}`)).toMatchObject({ start: at('10:10'), end: at('10:35') });
+    // The 25 minutes count one person in the hour that holds them (docs/SHARED_CALENDAR_SPEC.md
+    // R-SLOT-05).
+    const admin = await dayOf(adminToken);
+    expect(admin.slots.find((s) => s.start === at('10:00'))).toMatchObject({ placesLeft: 0 });
+    expect((await dayOf(userToken)).slots.map((s) => s.start)).toEqual([at('09:00'), at('11:00')]);
+  });
+
+  it('AC-47: five minutes are enough, 11:00–11:05: 201; so are 08:05–08:55, the open time in which no slot starts', async () => {
+    const shortest = await book(adminToken, { username: USER, start: at('11:00'), end: at('11:05') });
+    expect(shortest.status).toBe(201);
+    expect(shortest.body).toMatchObject({ start: at('11:00'), end: at('11:05') });
+    const early = await book(adminToken, { username: USER, start: at('08:05'), end: at('08:55') });
+    expect(early.status).toBe(201);
+    expect(early.body).toMatchObject({ start: at('08:05'), end: at('08:55') });
+    expect(await bookedOnS()).toEqual([
+      [at('08:05'), at('08:55')],
+      [at('10:10'), at('10:35')],
+      [at('11:00'), at('11:05')],
+    ]);
+  });
+
+  it('AC-48: the Administrator at 09:07, or until 09:52, is 400; step-alice at 09:10 is 400, not a whole hour; nothing is stored', async () => {
+    const offStart = await book(adminToken, { username: USER, start: at('09:07') });
+    expect(offStart.status).toBe(400);
+    expect(offStart.body).toEqual({ error: 'invalid_request', message: 'Invalid input: start must be on a 5-minute step' });
+    const offEnd = await book(adminToken, { username: USER, start: at('09:00'), end: at('09:52') });
+    expect(offEnd.status).toBe(400);
+    expect(offEnd.body).toEqual({ error: 'invalid_request', message: 'Invalid input: end must be on a 5-minute step' });
+    const user = await book(userToken, { start: at('09:10') });
+    expect(user.status).toBe(400);
+    expect(user.body).toEqual({ error: 'invalid_request', message: 'Invalid input: start must be a whole hour' });
+    expect(await bookedOnS()).toHaveLength(3);
+  });
+
+  it('leaves S empty: every appointment cancelled, the window, the pattern and the type deleted, the settings restored', async () => {
+    const listed = await api('GET', `/calendar/appointments?from=${S()}&to=${S()}`, adminToken);
+    const booked = listed.body?.appointments as { appointmentId: string }[];
+    expect(booked).toHaveLength(3);
+    for (const a of booked) expect((await api('POST', `/calendar/appointments/${a.appointmentId}/cancel`, adminToken)).status).toBe(200);
+    expect((await api('DELETE', `/calendar/windows/${windowId}`, adminToken)).status).toBe(204);
+    expect((await api('DELETE', `/calendar/patterns/${patternId}`, adminToken)).status).toBe(204);
+    expect((await api('DELETE', `/calendar/types/${typeId}`, adminToken)).status).toBe(204);
+    const day = await dayOf(adminToken);
+    expect(day).toMatchObject({ windows: [], slots: [], busy: [] });
+
+    const { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser } = leftover;
+    const values = { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser };
+    const res = await api('PUT', '/calendar/settings', adminToken, values);
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject(values);
+  });
+});

@@ -1,10 +1,11 @@
 import {
   CALENDAR_LIMITS,
+  TIME_STEP_MINUTES,
   addDays,
   cancellableUntil,
   definedWindows,
   effectiveWindows,
-  isOnQuarterGrid,
+  isOnTimeStep,
   isWholeLocalHour,
   localDateOf,
   overlaps,
@@ -325,14 +326,15 @@ const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
 // A slot and a User's appointment: 60 real minutes (docs/SHARED_CALENDAR_SPEC.md R-SLOT-01).
 const SLOT_MS = HOUR_MS;
-const QUARTER_MS = 15 * MINUTE_MS;
+// The Administrator's step, and the shortest custom appointment (docs/SHARED_CALENDAR_SPEC.md decision D32).
+const STEP_MS = TIME_STEP_MINUTES * MINUTE_MS;
 
 /**
  * docs/SHARED_CALENDAR_SPEC.md R-BOOK-02, the times for the caller's role, from the body alone (the
  * zone is the only other input): `400 invalid_request` before Cognito and the lock
  * (docs/SHARED_CALENDAR_SPEC.md section 8.2, step 3 of its order). A User's `start` is a
  * whole local hour and `end` absent or `start + 60 min`; the Administrator's `start` and `end` lie
- * on the local 15-minute grid, `end` defaults to `start + 60 min`, and lasts at least 15 minutes.
+ * on the local step of TIME_STEP_MINUTES, `end` defaults to `start + 60 min`, and lasts at least one step.
  * The schema has already checked the exact instant form and `end > start`. Answers the times to
  * book, `end` filled in.
  */
@@ -348,10 +350,10 @@ export function checkBookingTimes(
     if (end !== undefined && end !== hourLater) return refuse('invalid_request', 'Invalid input: end must be one hour after start');
     return { start, end: hourLater };
   }
-  if (!isOnQuarterGrid(start, zone)) return refuse('invalid_request', 'Invalid input: start must be on a 15-minute step');
+  if (!isOnTimeStep(start, zone)) return refuse('invalid_request', `Invalid input: start must be on a ${TIME_STEP_MINUTES}-minute step`);
   const until = end ?? hourLater;
-  if (!isOnQuarterGrid(until, zone)) return refuse('invalid_request', 'Invalid input: end must be on a 15-minute step');
-  if (Date.parse(until) - Date.parse(start) < QUARTER_MS) return refuse('invalid_request', 'Invalid input: an appointment lasts at least 15 minutes');
+  if (!isOnTimeStep(until, zone)) return refuse('invalid_request', `Invalid input: end must be on a ${TIME_STEP_MINUTES}-minute step`);
+  if (Date.parse(until) - Date.parse(start) < STEP_MS) return refuse('invalid_request', `Invalid input: an appointment lasts at least ${TIME_STEP_MINUTES} minutes`);
   return { start, end: until };
 }
 

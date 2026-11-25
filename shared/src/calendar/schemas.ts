@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Username } from '../username';
-import { CALENDAR_LIMITS, SETTINGS_RANGES, TYPE_CAPACITY } from './defaults';
+import { CALENDAR_LIMITS, SETTINGS_RANGES, TIME_STEP_MINUTES, TYPE_CAPACITY } from './defaults';
 import { addDays } from './time';
 
 // The primitive schemas of the calendar contract (docs/SHARED_CALENDAR_SPEC.md R-TIME-02,
@@ -24,8 +24,17 @@ export const LocalDate = z
   .refine((s) => isRealDate(Number(s.slice(0, 4)), Number(s.slice(5, 7)), Number(s.slice(8, 10))), 'not a real date');
 export type LocalDate = z.infer<typeof LocalDate>;
 
-/** A local time `HH:mm` on the 15-minute grid, `00:00`–`23:45`: a start. */
-export const LocalTime = z.string().regex(/^([01]\d|2[0-3]):(00|15|30|45)$/, 'expected HH:mm on the 15-minute grid');
+// The minutes of an hour that lie on the step: "00", "05" … "55".
+const STEP_MINUTES = Array.from({ length: 60 / TIME_STEP_MINUTES }, (_, i) => String(i * TIME_STEP_MINUTES).padStart(2, '0'));
+
+/**
+ * A local time `HH:mm` on the grid of TIME_STEP_MINUTES, `00:00`–`23:55`: a start
+ * (docs/SHARED_CALENDAR_SPEC.md decision D32). A regular expression, so that a schema built on it
+ * can be given to a reader as a pattern.
+ */
+export const LocalTime = z
+  .string()
+  .regex(new RegExp(`^([01]\\d|2[0-3]):(${STEP_MINUTES.join('|')})$`), `expected HH:mm on the ${TIME_STEP_MINUTES}-minute grid`);
 export type LocalTime = z.infer<typeof LocalTime>;
 
 /**
@@ -86,9 +95,9 @@ export type TypeName = z.infer<typeof TypeName>;
 // The schemas of docs/SHARED_CALENDAR_SPEC.md sections 11.2 and 11.4. Every object is .strict(): an
 // unknown field is a 400 (docs/SHARED_CALENDAR_SPEC.md section 11). A schema decides only what is
 // malformed by itself. It knows no time zone, no "now", no settings and no stored data, so these
-// are not here: the 15-minute and whole-hour grid of an instant and which one applies
-// (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02, checked per role in the handler with isOnQuarterGrid /
-// isWholeLocalHour from rules.ts); overlap among an override's windows (409 availability_overlap);
+// are not here: the Administrator's step and the whole-hour grid of an instant and which one
+// applies (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02, checked per role in the handler with
+// isOnTimeStep / isWholeLocalHour from rules.ts); overlap among an override's windows (409 availability_overlap);
 // date_in_past; an unknown typeId; count limits.
 //
 // The cross-field rules run only on an object whose fields are valid (`when`): a malformed field

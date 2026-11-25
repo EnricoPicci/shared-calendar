@@ -217,7 +217,7 @@ describe('setOverride handler', () => {
     { name: 'an unknown field in a window', raw: JSON.stringify({ windows: [{ ...w('09:00', '10:00'), note: 'x' }] }), code: 'invalid_request', fields: 'windows.0.note' },
     { name: 'a missing windows', raw: JSON.stringify({}), code: 'invalid_request', fields: 'windows' },
     { name: 'end before start', raw: JSON.stringify({ windows: [w('12:00', '09:00')] }), code: 'invalid_request', fields: 'windows.0.end' },
-    { name: 'a time off the grid', raw: JSON.stringify({ windows: [w('09:10', '10:00')] }), code: 'invalid_request', fields: 'windows.0.start' },
+    { name: 'a time off the grid', raw: JSON.stringify({ windows: [w('09:07', '10:00')] }), code: 'invalid_request', fields: 'windows.0.start' },
   ])('answers 400 $code and touches nothing for $name', async ({ raw, code, fields }) => {
     const response = await handler(eventAt(ROUTE, admin, { date: MONDAY }, raw));
     expect(response.statusCode).toBe(400);

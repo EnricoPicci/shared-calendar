@@ -173,6 +173,15 @@ describe('bookAppointment handler', () => {
       expect(cognito.commandCalls(AdminGetUserCommand)[0]!.args[0].input).toEqual({ UserPoolId: 'eu-north-1_TEST', Username: 'dave' });
     });
 
+    it('AC-46 and AC-47: 201 for dave 10:10–10:35 local, and for five minutes', async () => {
+      const custom = await post({ username: 'dave', start: '2026-11-16T09:10:00.000Z', end: '2026-11-16T09:35:00.000Z' }, admin);
+      expect(custom.statusCode).toBe(201);
+      expect(bodyOf(custom)).toEqual(expect.objectContaining({ start: '2026-11-16T09:10:00.000Z', end: '2026-11-16T09:35:00.000Z' }));
+      const shortest = await post({ username: 'dave', start: '2026-11-16T10:00:00.000Z', end: '2026-11-16T10:05:00.000Z' }, admin);
+      expect(shortest.statusCode).toBe(201);
+      expect(bodyOf(shortest)).toEqual(expect.objectContaining({ start: '2026-11-16T10:00:00.000Z', end: '2026-11-16T10:05:00.000Z' }));
+    });
+
     it('400 when username is absent, before Cognito', async () => {
       const response = await post({ start: START }, admin);
       expect(response.statusCode).toBe(400);
@@ -181,9 +190,9 @@ describe('bookAppointment handler', () => {
       expect(ddb.calls()).toHaveLength(0);
     });
 
-    it('400 for a start off the 15-minute grid, before Cognito', async () => {
-      const response = await post({ username: 'dave', start: '2026-11-16T08:10:00.000Z' }, admin);
-      expect(bodyOf(response)).toEqual({ error: 'invalid_request', message: 'Invalid input: start must be on a 15-minute step' });
+    it('400 for a start off the 5-minute grid, before Cognito', async () => {
+      const response = await post({ username: 'dave', start: '2026-11-16T08:07:00.000Z' }, admin);
+      expect(bodyOf(response)).toEqual({ error: 'invalid_request', message: 'Invalid input: start must be on a 5-minute step' });
       expect(cognito.calls()).toHaveLength(0);
     });
 

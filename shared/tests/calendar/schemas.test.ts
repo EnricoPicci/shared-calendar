@@ -52,7 +52,7 @@ describe('LocalDate', () => {
 });
 
 describe('LocalTime and LocalEndTime', () => {
-  it.each(['00:00', '08:15', '12:30', '23:45'])('both accept %s', (time) => {
+  it.each(['00:00', '00:05', '08:10', '08:15', '12:30', '23:45', '23:55'])('both accept %s', (time) => {
     expect(LocalTime.safeParse(time).success).toBe(true);
     expect(LocalEndTime.safeParse(time).success).toBe(true);
   });
@@ -63,7 +63,9 @@ describe('LocalTime and LocalEndTime', () => {
   });
 
   it.each([
-    ['off the 15-minute grid', '08:10'],
+    ['off the 5-minute grid', '08:07'],
+    ['one minute off the grid', '08:01'],
+    ['past 24:00, on the grid', '24:05'],
     ['past 24:00', '24:15'],
     ['hour 25', '25:00'],
     ['minute 60', '23:60'],
@@ -93,7 +95,7 @@ describe('Instant', () => {
     expect(Instant.safeParse(instant)).toEqual({ success: true, data: instant });
   });
 
-  it('does not check the 15-minute grid: that is a rule on local time (R-BOOK-02)', () => {
+  it('does not check the 5-minute grid: that is a rule on local time (R-BOOK-02)', () => {
     expect(Instant.safeParse('2026-11-16T08:07:00.000Z').success).toBe(true);
   });
 
@@ -288,7 +290,7 @@ describe('WindowBody', () => {
     ['end before start', { start: '12:00', end: '08:00', typeId: STUDIO }, ['end']],
     ['end equal to start', { start: '08:00', end: '08:00', typeId: STUDIO }, ['end']],
     ['24:00 as a start', { start: '24:00', end: '24:00', typeId: STUDIO }, ['start']],
-    ['off the 15-minute grid', { start: '08:10', end: '09:00', typeId: STUDIO }, ['start']],
+    ['off the 5-minute grid', { start: '08:07', end: '09:00', typeId: STUDIO }, ['start']],
     ['a typeId that is not a ULID', { start: '08:00', end: '09:00', typeId: 'studio' }, ['typeId']],
     ['no typeId', { start: '08:00', end: '09:00' }, ['typeId']],
     ['an unknown field', { start: '08:00', end: '09:00', typeId: STUDIO, date: '2026-11-16' }, ['(root)']],

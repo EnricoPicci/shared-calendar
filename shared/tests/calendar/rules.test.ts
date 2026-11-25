@@ -1,8 +1,9 @@
 import {
+  TIME_STEP_MINUTES,
   cancellableUntil,
   definedWindows,
   effectiveWindows,
-  isOnQuarterGrid,
+  isOnTimeStep,
   isWholeLocalHour,
   localDateOf,
   localTimeOf,
@@ -283,6 +284,23 @@ describe('slotsOf (R-SLOT-01)', () => {
   it('Asia/Kathmandu: a window starting at a quarter past finds the next whole local hour', () => {
     expect(slotsOf(windowOf('2026-11-16', '08:15', '10:00', KATHMANDU), KATHMANDU).map((s) => localTimeOf(s.start, KATHMANDU))).toEqual(['09:00']);
   });
+
+  it('D32: a window that opens at 08:05 gives the slots 09:00, 10:00 and 11:00, and none at 08:05', () => {
+    const slots = slotsOf(windowOf('2026-11-16', '08:05', '12:00', ROME), ROME);
+    expect(slots.map((s) => localTimeOf(s.start, ROME))).toEqual(['09:00', '10:00', '11:00']);
+    expect(slots.every((s) => Date.parse(s.end) - Date.parse(s.start) === 60 * 60_000)).toBe(true);
+  });
+
+  it('D32: a window that closes at 11:55 loses its last hour, and 10:10–10:50 holds no slot', () => {
+    expect(slotsOf(windowOf('2026-11-16', '08:00', '11:55', ROME), ROME).map((s) => localTimeOf(s.start, ROME))).toEqual(['08:00', '09:00', '10:00']);
+    expect(slotsOf(windowOf('2026-11-16', '10:10', '10:50', ROME), ROME)).toEqual([]);
+  });
+
+  it('D32, the night clocks go back: a window 01:05–03:55 gives the two slots at local 02:00', () => {
+    // 01:05 +02:00 is 23:05Z; 03:55 +01:00 is 02:55Z: the hours 02:00 (twice) lie inside, 01:00 and 03:00 do not.
+    const slots = slotsOf(windowOf('2026-10-25', '01:05', '03:55', ROME), ROME);
+    expect(slots.map((s) => s.start)).toEqual(['2026-10-25T00:00:00.000Z', '2026-10-25T01:00:00.000Z']);
+  });
 });
 
 // Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
@@ -324,6 +342,8 @@ describe('peopleIn (R-SLOT-02, D25)', () => {
     ['three nested', [at('09:00', '12:00'), at('10:00', '11:00'), at('10:15', '10:30')], 3],
     ['three in a row, each touching the next, and one across them', [at('10:00', '10:15'), at('10:15', '10:30'), at('10:30', '11:00'), at('09:30', '11:30')], 2],
     ['the same appointment twice (the caller passes what is counted)', [at('10:00', '11:00'), at('10:00', '11:00')], 2],
+    ['D32, three of 5 minutes that touch', [at('10:10', '10:15'), at('10:15', '10:20'), at('10:20', '10:25')], 1],
+    ['D32, 10:10–10:35 with 10:30–10:40: together for 5 minutes', [at('10:10', '10:35'), at('10:30', '10:40')], 2],
   ])('%s → %s', (_case, appointments, expected) => {
     expect(peopleIn(slot, appointments)).toBe(expected);
   });
@@ -346,20 +366,42 @@ describe('peopleIn (R-SLOT-02, D25)', () => {
 });
 
 // Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
-describe('isWholeLocalHour and isOnQuarterGrid (R-BOOK-02)', () => {
+describe('isWholeLocalHour and isOnTimeStep (R-BOOK-02)', () => {
   it.each([
     ['2026-11-16T08:00:00.000Z', ROME, true, true], // 09:00
     ['2026-11-16T08:15:00.000Z', ROME, false, true], // 09:15
     ['2026-11-16T08:45:00.000Z', ROME, false, true],
+    ['2026-11-16T08:05:00.000Z', ROME, false, true], // 09:05
+    ['2026-11-16T08:10:00.000Z', ROME, false, true],
+    ['2026-11-16T08:55:00.000Z', ROME, false, true],
     ['2026-11-16T08:07:00.000Z', ROME, false, false],
+    ['2026-11-16T08:01:00.000Z', ROME, false, false],
     ['2026-11-16T08:00:30.000Z', ROME, false, false], // a second: never on a grid
+    ['2026-11-16T08:05:30.000Z', ROME, false, false],
     ['2026-11-16T08:00:00.001Z', ROME, false, false],
     ['2026-11-16T03:15:00.000Z', KATHMANDU, true, true], // 09:00
     ['2026-11-16T03:00:00.000Z', KATHMANDU, false, true], // 08:45
     ['2026-11-16T03:30:00.000Z', 'Asia/Kolkata', true, true], // +05:30: 09:00
-  ])('%s in %s: whole hour %s, quarter %s', (instant, zone, whole, quarter) => {
+    ['2026-11-16T03:20:00.000Z', KATHMANDU, false, true], // +05:45: 09:05
+    ['2026-11-16T03:22:00.000Z', KATHMANDU, false, false], // 09:07
+    // The night clocks go back in Europe/Rome: local 02:05 and 02:55 come twice, an hour apart.
+    ['2026-10-25T00:05:00.000Z', ROME, false, true], // 02:05 +02:00
+    ['2026-10-25T01:05:00.000Z', ROME, false, true], // 02:05 +01:00
+    ['2026-10-25T00:55:00.000Z', ROME, false, true],
+    ['2026-10-25T01:55:00.000Z', ROME, false, true],
+    ['2026-10-25T01:00:00.000Z', ROME, true, true], // the second 02:00
+    // The night they go forward (2026-03-29): 01:55 is the last step before 03:00.
+    ['2026-03-29T00:55:00.000Z', ROME, false, true], // 01:55 +01:00
+    ['2026-03-29T01:05:00.000Z', ROME, false, true], // 03:05 +02:00
+    ['2026-03-29T01:07:00.000Z', ROME, false, false],
+  ])('%s in %s: whole hour %s, on the step %s', (instant, zone, whole, onStep) => {
     expect(isWholeLocalHour(instant, zone)).toBe(whole);
-    expect(isOnQuarterGrid(instant, zone)).toBe(quarter);
+    expect(isOnTimeStep(instant, zone)).toBe(onStep);
+  });
+
+  it('the step is 5 minutes and divides the hour, so every whole hour lies on it (D32)', () => {
+    expect(TIME_STEP_MINUTES).toBe(5);
+    expect(60 % TIME_STEP_MINUTES).toBe(0);
   });
 });
 

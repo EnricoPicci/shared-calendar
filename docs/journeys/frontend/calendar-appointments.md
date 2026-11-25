@@ -139,7 +139,7 @@ R-BOOK-07) unless it asks to go over them, which it does not do here. Nothing is
 
 `book(admin, { start: at('10:00'), end: at('10:30'), username: 'fe-calendar' })`. A User could not
 send this `end`: only the Administrator may book custom times inside a window
-(`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-08), on 15-minute local steps
+(`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-08), on 5-minute local steps
 (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-02). The test checks that the appointment has:
 
 - `username` `fe-calendar` and `end` 10:30;

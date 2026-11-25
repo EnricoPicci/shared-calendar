@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v21, implemented, merged and deployed: steps c00 to c16 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` sections 5.6 and 5.8). Where this document is merged into `docs/ARCHITECTURE.md` (its change log, v13), `docs/FRONTEND_SERVICES.md` or `docs/FRONTEND_ARCHITECTURE.md`, those documents win. This one stays as the assistant's design and the home of what only it holds: the instructions, the tools' four parts, the evaluation, the alternatives, a second channel (section 16) |
+| Status | v21, implemented, merged and deployed: steps c00 to c16 of `docs/CONVERSATIONAL_PLAN.md` done; the assistant runs in the stack `shared-calendar-api` (`docs/RUNBOOK.md` sections 5.6 and 5.8). Where this document is merged into `docs/ARCHITECTURE.md` (its change log, v13), `docs/FRONTEND_SERVICES.md` or `docs/FRONTEND_ARCHITECTURE.md`, those documents win. This one stays as the assistant's design and the home of what only it holds: the instructions, the tools' four parts, the evaluation, the alternatives, a second channel (section 16) **The time step becomes 5 minutes** (`docs/SHARED_CALENDAR_SPEC.md` decision D32): what the assistant is told about the quarter hour is changed in step s3 of `docs/SLOT_STEP_PLAN.md`; until then its instructions and tools are as this document says. |
 | Date | 2026-11-24 |
 | Brief | `prompts/a1-idea-for-conversational-interface.md` |
 | Adds to the stack | The Anthropic API (Claude), one DynamoDB table, one secret in AWS Systems Manager Parameter Store |

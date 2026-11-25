@@ -1,3 +1,4 @@
+import { TIME_STEP_MINUTES } from './defaults';
 import { localTimeOf, toInstant, weekdayOf } from './time';
 import type { DateOverride, OneOffWindow, Slot, WeeklyPattern, WindowSource } from './types';
 
@@ -170,11 +171,13 @@ export function isWholeLocalHour(instant: string, zone: string): boolean {
 }
 
 /**
- * Whether `instant` is on the local 15-minute grid of `zone`: the Administrator's times
- * (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02).
+ * Whether `instant` is on the step of the local clock of `zone`, every TIME_STEP_MINUTES from the
+ * whole hour: the Administrator's times (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02, decision D32).
+ * An instant with seconds is on no step.
  */
-export function isOnQuarterGrid(instant: string, zone: string): boolean {
-  return localMinute(instant, zone) % 15 === 0;
+export function isOnTimeStep(instant: string, zone: string): boolean {
+  const minute = localMinute(instant, zone);
+  return minute >= 0 && minute % TIME_STEP_MINUTES === 0;
 }
 
 /**

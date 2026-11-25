@@ -106,7 +106,7 @@ describe('book_appointment: what Claude is given (3, 8.2)', () => {
     for (const extra of [{ end: '11:00' }, { typeId: TYPE }, { username: 'bob' }]) {
       expect(input.safeParse({ date: '2026-11-24', time: '10:00', ...extra }).success).toBe(false);
     }
-    expect(input.safeParse({ date: '2026-11-24', time: '10:10' }).success).toBe(false);
+    expect(input.safeParse({ date: '2026-11-24', time: '10:07' }).success).toBe(false);
     expect(input.safeParse({ date: '24/11/2026', time: '10:00' }).success).toBe(false);
     expect(input.safeParse({ date: '2026-11-24' }).success).toBe(false);
     expect(input.safeParse({ date: '2026-11-24', time: '10:00', occurrence: 'third' }).success).toBe(false);

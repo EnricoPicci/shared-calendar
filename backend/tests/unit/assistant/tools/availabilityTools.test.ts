@@ -158,7 +158,7 @@ describe('create_pattern (3, 5.5 rule 2, 8.2)', () => {
   it.each([
     ['a weekday as a number', { weekday: 2 }],
     ['a weekday in Italian', { weekday: 'martedì' }],
-    ['a start off the quarter hour', { start: '09:10' }],
+    ['a start off the quarter hour', { start: '09:07' }],
     ['a start at 24:00', { start: '24:00' }],
     ['an end that is not after the start', { end: '09:00' }],
     ['the name of a type', { typeId: 'Visit' }],
@@ -532,7 +532,7 @@ describe('create_one_off_window (3, 5.5 rule 2)', () => {
     expect(input.safeParse(ASKED).success).toBe(true);
     expect(input.safeParse({ ...ASKED, end: '24:00' }).success).toBe(true);
     expect(input.safeParse({ ...ASKED, end: '19:00' }).success).toBe(false);
-    expect(input.safeParse({ ...ASKED, start: '19:05' }).success).toBe(false);
+    expect(input.safeParse({ ...ASKED, start: '19:07' }).success).toBe(false);
     expect(input.safeParse({ ...ASKED, weekday: 'Tuesday' }).success).toBe(false);
   });
 

@@ -38,3 +38,10 @@ export const SETTINGS_RANGES = {
 // the range; the default is applied by the handler, since an edit without a capacity keeps the
 // stored one (docs/SHARED_CALENDAR_SPEC.md section 11.4).
 export const TYPE_CAPACITY = { min: 1, max: 100, default: 1 } as const;
+
+// The step of the Administrator's times, in minutes of the local clock: a window and a custom
+// appointment start and end on it, and a custom appointment lasts at least one step
+// (docs/SHARED_CALENDAR_SPEC.md decision D32, R-BOOK-02). It divides the hour, so every whole
+// hour, a User's start, lies on it. LocalTime, isOnTimeStep, the server's check of a booking's
+// times and the page's lists of times all read it: the step is written here and nowhere else.
+export const TIME_STEP_MINUTES = 5;

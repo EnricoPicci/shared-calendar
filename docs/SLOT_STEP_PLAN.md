@@ -1,6 +1,10 @@
 # Shared Calendar: times on 5-minute steps, and "from" drives "to" (implementation plan)
 
-**Version:** v2 (2026-11-25): steps s1 with s2 and s4 with s5 are built as pairs, one brief,
+**Version:** v4 (2026-11-25): steps s1 and s2 done, the first pair: the rule in the
+governing documents (`docs/SHARED_CALENDAR_SPEC.md` v19, `docs/ARCHITECTURE.md` v16 open) and
+the step in `shared/` and the back end, the back end's journeys green. v3 (2026-11-25): the three proposals of planning, F1, F7 and F8, decided by the
+Product Owner; F7 changed: a short block and the one that follows it stand side by side. v2
+(2026-11-25): steps s1 with s2 and s4 with s5 are built as pairs, one brief,
 one check and one stop each (decided by the Product Owner); four stops instead of six. v1
 (2026-11-25): the plan, after the Product Owner's answers to eight questions (section 2). No
 step done.
@@ -73,9 +77,10 @@ Decided by the Product Owner on 2026-11-25.
   - `frontend/src/logic/availability.model.ts` (`GRID`, `START_CHOICES`, `END_CHOICES`) and
     `frontend/src/logic/booking.ts` (`GRID`, `timeChoice`).
 
-  **Proposed:** one constant for the step, in `shared/src/calendar/defaults.ts`, read by all of
-  them, and `isOnQuarterGrid` renamed after what it checks. Two copies of `GRID = 15` in the
-  front end and a third number in the back end are how a step ends up different in two places.
+  **Decided** (the Product Owner, 2026-11-25): the step is written once, the constant
+  `TIME_STEP_MINUTES` in `shared/src/calendar/defaults.ts`, read by all of them, and
+  `isOnQuarterGrid` is renamed `isOnTimeStep`. Two copies of `GRID = 15` in the front end and
+  a third number in the back end are how a step ends up different in two places.
 - **F2. Nothing to migrate.** Appointments are stored as instants, windows as local times
   `HH:mm`; no key, index or item of the `calendar` table is built on the step. Every stored
   time lies on the 15-minute grid, which is part of the 5-minute grid. Nothing is read through
@@ -113,14 +118,22 @@ Decided by the Product Owner on 2026-11-25.
   schema and must then be refused as "not a free slot" by `freeSlotAt`. Step s3 proves it.
 - **F7. The week has no minimum height for a block.** One hour is `3.25rem`; 15 minutes are
   about 13 pixels, 5 minutes about 4. **Decided** (S7): never lower than 15 minutes' worth.
-  A block drawn taller than its time may reach over the start of the next one; step s5 decides
-  what is drawn then (proposed: the next block is drawn on top from its own start, so the
-  short one keeps at least its true height visible) and shows it to the Product Owner.
+  A block drawn taller than its time may reach over the start of the next one: 10:10 to 10:15
+  is drawn down to 10:25, and another appointment may start at 10:15. **Decided** (the Product
+  Owner, 2026-11-25, changing the plan's proposal): the two stand **side by side**, as the
+  week already draws appointments that overlap (`columnsOf` in
+  `frontend/src/logic/week.model.ts`); each one's text says its true times. The proposal, the
+  next block drawn on top, would have left a strip of 4 pixels of the short one, which the
+  minimum height was meant to avoid. What only a real overlap decides stays so: the people in
+  a slot, and "4 people" on the block that groups four or more. Step s5 says how a row of
+  short appointments one after the other is drawn when more than three would stand side by
+  side, and shows it to the Product Owner.
 - **F8. Two short lists change the book dialog.** Today the dialog offers exactly the times
   of the slot's window: nothing outside it can be chosen. With a list of hours and a list of
   minutes, a pair outside the window can be put together (window 08:05 to 12:00, hour 08,
-  minute 00). **Proposed:** the hours are those the window touches; the minutes are all
-  twelve; a pair outside the window is refused by the server with `outside_availability`,
+  minute 00). **Decided** (the Product Owner, 2026-11-25): the hours are those the window
+  touches; the minutes are all twelve, whatever the hour; a pair outside the window is
+  refused by the server with `outside_availability`,
   which the dialog already says in plain words: whether a booking is allowed stays the
   server's to say (`docs/FRONTEND_SERVICES.md` section 8, decision 42). An end not after the
   start is refused by the shared schema before anything is sent, as today in the window forms.
@@ -198,11 +211,32 @@ brief, `prompts/slot-s02-…` onwards.
 - `docs/FRONTEND_SERVICES.md`, `docs/FRONTEND_ARCHITECTURE.md` and
   `docs/CONVERSATIONAL_ARCHITECTURE.md`: only a line each, "changed in step s3 / s4 of
   `docs/SLOT_STEP_PLAN.md`", so that no document says something false meanwhile.
-- The proposals of F1, F7 and F8 are put to the Product Owner at the start of the pair's
-  brief, before anything is written, and written as decided.
+- F1, F7 and F8 are decided (section 3): nothing to ask.
 
 **Check:** `npm run lint`; a changed diagram is rendered on a dark page
 (`.claude/rules/diagrams.md`). No stop: step s2 follows, and the review is of both.
+
+**As done (2026-11-25).** Documents only. Brief
+`prompts/slot-s02-pair-s1-s2-implementation.md`, which also records F1, F7 and F8 as decided.
+
+- *`docs/SHARED_CALENDAR_SPEC.md` v19.* **Decision D32, the time step**, in a table of its own
+  after D31: 5 minutes, the slot unchanged, nothing migrated, the step written once. D2 and
+  D12 restated and pointing at it; the glossary's "Local time"; the sentence of section 5 on
+  the rules of the local time; the row `start`, `end` of 6.2 (6.3 and 6.4 say "as for
+  patterns" and needed nothing); R-SLOT-01 keeps its words and gains the window 08:05–12:00,
+  the 55 minutes in which no slot starts, and 10:10–10:50 with no slot (F4); R-BOOK-02's
+  column of the Administrator; the comment of 11.4; section 12 (`isOnTimeStep`,
+  `TIME_STEP_MINUTES`); the row "Book dialog" of 16.8, which says how the page will offer a
+  time and that it is not built yet; 18.1; **AC-45 to AC-48** in 18.3 (the plan asked for two
+  scenarios; they are four rows: the window at 08:05, 10:10–10:35, five minutes, the two
+  refusals). The change log and the status line.
+- *`docs/ARCHITECTURE.md`.* The status line and the date; **a v16 row, open** (its number may
+  change at the merge with the mail work, section 6); in section 4 the row of `PatternBody`
+  and the paragraph on booking, which named the 15-minute grid. The rows of `BookBody` and
+  `ChangeBody` say "the role's grid" and stay as they are.
+- *The three other documents.* `docs/FRONTEND_SERVICES.md`, `docs/FRONTEND_ARCHITECTURE.md`
+  and `docs/CONVERSATIONAL_ARCHITECTURE.md`: one sentence at the end of the status line each.
+- *Checked:* `npm run lint` green. No diagram changed.
 
 ### Step s2 — The step in `shared/` and in the back end (a pair with s1)
 
@@ -228,6 +262,67 @@ steps the server accepts more than the page can ask, which harms nothing.
 **Check, for the pair, then the stop:** the short check; the back end's calendar journeys
 (`DYNAMODB_PORT=8002 RUN_INTEGRATION=1 npm run test:integration -w backend`, with `local:up`
 and `local:api` running, after `npm run build -w backend` and a restart of `local:api`).
+
+**As done (2026-11-25).** Changes under `shared/`, `backend/src/lib`, `backend/tests`,
+`docs/` and one test of the front end; nothing under `frontend/src` or `backend/src/assistant`,
+nothing deployed, no `aws` command run.
+
+- *`shared/src/calendar/defaults.ts`:* `TIME_STEP_MINUTES = 5`, the one place the step is
+  written (F1).
+- *`shared/src/calendar/schemas.ts`:* `LocalTime` accepts `00:00` to `23:55` on the step. It
+  stays a regular expression, built from the constant (the minutes `00|05|…|55`), and not a
+  check in code: the assistant's tools hand this schema to Claude, and only a regular
+  expression reaches Claude as a pattern. Its message says "5-minute". `LocalEndTime` follows:
+  `24:00` is still the only time past 23:55, `24:05` is refused.
+- *`shared/src/calendar/rules.ts`:* `isOnQuarterGrid` is `isOnTimeStep`, on the constant; an
+  instant with seconds is on no step. `slotsOf`, `peopleIn`, `effectiveWindows` and the time
+  helpers did not change (F3 holds).
+- *`backend/src/lib/calendarRules.ts`:* `checkBookingTimes` uses `isOnTimeStep`; the shortest
+  appointment is one step; the three messages are built from the constant ("start must be on
+  a 5-minute step", the same for `end`, "an appointment lasts at least 5 minutes"). No handler
+  names the step.
+- *Tests.* `shared/tests/calendar/`: `LocalTime` on 00:05, 08:10, 23:55, 08:07, 08:01, 24:05;
+  `slotsOf` on 08:05–12:00, on a window closing at 11:55, on 10:10–10:50 and on 01:05–03:55
+  of the night the clocks go back; `isOnTimeStep` on and off the step, in `Asia/Kathmandu`,
+  on 02:05 and 02:55 of the night the clocks go back (both occurrences) and around the hour
+  skipped in spring; `peopleIn` with 5-minute appointments. `backend/tests/unit/lib/`:
+  `checkBookingTimes` on AC-46, AC-47 and AC-48, an `end` left out from 10:10, the two 02:05
+  of the night the clocks go back, a User held to the whole hour. The handlers' tests: five
+  examples of a refusal moved off the 5-minute step (F6), and two accepted cases added (a
+  pattern 08:05–11:55; 10:10–10:35 and five minutes booked).
+- *Two files of the assistant's tests, the example time only* (as the brief allowed):
+  `backend/tests/unit/assistant/tools/availabilityTools.test.ts` (`09:10` and `19:05` became
+  `09:07` and `19:07`) and `bookAppointment.test.ts` (`10:10` became `10:07`). What the tools
+  tell Claude in words did not change.
+- *One test of the front end:* `frontend/tests/unit/services/availability-rules.service.test.ts`
+  quotes the schema's message and an off-step time; both follow.
+- *The journey:* `times on 5-minute steps (AC-45 to AC-48)` in
+  `backend/tests/integration/calendar.test.ts`, seven tests on the Saturday the capacity's
+  journey leaves empty, with a User of its own, `step-alice`; besides the four scenarios it
+  books 08:05–08:55, the open time in which no slot starts, and has a pattern, a one-off
+  window and a day's own hours off the step refused. Its page
+  `docs/journeys/backend/calendar-time-step.md`, listed in `docs/journeys/README.md`; the
+  words "15-minute" in `docs/journeys/backend/calendar-booking.md` and
+  `docs/journeys/frontend/calendar-appointments.md`.
+- *Found: the pattern of the assistant's tools changes already here.* The tools of the
+  opening hours and of a booking are built on `LocalTime`, so the pattern Claude is given for
+  a time now allows 5-minute times, while the words of `hoursInput` and of the instructions
+  still say "the quarter hour" until step s3. The mark of the instructions therefore changes
+  with this pair, not only with step s3. Nothing is deployed in between.
+- *Known gap, accepted:* the server accepts 5-minute times that the page cannot offer and the
+  assistant is not told about, until steps s3 to s5.
+- *Checked:* `npm run typecheck`, `npm run lint` and `npm run test:unit` green at the root
+  (544 tests in `shared/`, 1 836 in `backend/`, 2 705 in `frontend/`, 100 % line coverage
+  kept). `DYNAMODB_PORT=8002 RUN_INTEGRATION=1 npm run test:integration -w backend`, with
+  `local:up` and `local:api` started from this worktree on the new build: 3 files, 215 tests
+  passed, the seven of the new journey among them.
+
+**Step s3 finds ready:** `TIME_STEP_MINUTES` and a `LocalTime` that already accepts 5-minute
+times in the tools' schemas; to do there, the words (`prompt.ts`, `hoursInput`), the proof
+that `book_appointment` and `change_appointment` answer "not a free slot" for 10:10, and the
+evaluation. **The pair s4 with s5 finds ready:** `TIME_STEP_MINUTES` to build the lists of
+hours and minutes on, in place of the two `GRID` constants; the shared schemas the services
+check with accept 5-minute times, and the server books them.
 
 ### Step s3 — The assistant
 
@@ -279,8 +374,8 @@ No stop: step s5 follows.
 ### Step s5 — The week: a short appointment (a pair with s4)
 
 - `frontend/src/logic/week.model.ts`: a block's height is at least 15 minutes' worth (S7);
-  what is drawn when the next block starts inside that height, as decided at the start of
-  the first pair (F7).
+  a block that starts inside the drawn height of another stands side by side with it (F7),
+  while the people counted and the block of four or more follow the real times only.
   The block that groups four or more appointments and the lanes side by side follow the same
   rule.
 - Its unit tests; `docs/FRONTEND_ARCHITECTURE.md`; a check in `docs/FRONTEND_WALK.md` (an
@@ -289,7 +384,8 @@ No stop: step s5 follows.
 **Check, for the pair, then the stop:** the short check; the front end's journeys if one
 changed; a look, in a browser on the local stack after `seed:local`, on a desktop width and a
 phone width: the three places that choose a time, with "from" driving "to", and the week with
-a 5-minute, a 10-minute and a 15-minute appointment made there, alone and one after the other.
+a 5-minute, a 10-minute and a 15-minute appointment made there, alone and one after the other (side by side where a short one is followed at
+once).
 
 ### Step s6 — The release
 

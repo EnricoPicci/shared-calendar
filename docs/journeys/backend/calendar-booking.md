@@ -167,7 +167,7 @@ This check needs only the body, so it runs before the lock and reads nothing fro
 ## Test 6 (AC-14): the Administrator books `dave` a custom time on `W2`
 
 The Administrator books `{ username: 'dave', start: W2 09:15, end: W2 10:00 }`. A User could not:
-the Administrator may book any 15-minute steps inside a window (`docs/SHARED_CALENDAR_SPEC.md`
+the Administrator may book any 5-minute steps inside a window (`docs/SHARED_CALENDAR_SPEC.md`
 R-BOOK-08). It goes on `W2` because on `W` it would overlap `dave`'s 09:00–10:00. The test checks
 that:
 

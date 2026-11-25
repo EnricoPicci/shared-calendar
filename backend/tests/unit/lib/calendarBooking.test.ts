@@ -114,35 +114,58 @@ describe('checkBookingTimes (R-BOOK-02)', () => {
       expect(checkBookingTimes('2026-11-16T08:15:00.000Z', MON_1000, 'admin', ZONE)).toEqual({ start: '2026-11-16T08:15:00.000Z', end: MON_1000 });
     });
 
-    it('fills in end = start + 60 min, from any 15-minute step', () => {
+    it('AC-46: accepts 10:10–10:35 local', () => {
+      expect(checkBookingTimes('2026-11-16T09:10:00.000Z', '2026-11-16T09:35:00.000Z', 'admin', ZONE)).toEqual({
+        start: '2026-11-16T09:10:00.000Z',
+        end: '2026-11-16T09:35:00.000Z',
+      });
+    });
+
+    it('fills in end = start + 60 min, from any 5-minute step', () => {
       expect(checkBookingTimes('2026-11-16T08:45:00.000Z', undefined, 'admin', ZONE)).toEqual({
         start: '2026-11-16T08:45:00.000Z',
         end: '2026-11-16T09:45:00.000Z',
       });
-    });
-
-    it('accepts exactly 15 minutes', () => {
-      expect(checkBookingTimes(MON_0900, '2026-11-16T08:15:00.000Z', 'admin', ZONE)).toEqual({ start: MON_0900, end: '2026-11-16T08:15:00.000Z' });
-    });
-
-    it('refuses a start off the 15-minute grid', () => {
-      expect(checkBookingTimes('2026-11-16T08:10:00.000Z', undefined, 'admin', ZONE)).toEqual({
-        error: 'invalid_request',
-        message: 'Invalid input: start must be on a 15-minute step',
+      expect(checkBookingTimes('2026-11-16T09:10:00.000Z', undefined, 'admin', ZONE)).toEqual({
+        start: '2026-11-16T09:10:00.000Z',
+        end: '2026-11-16T10:10:00.000Z',
       });
     });
 
-    it('refuses an end off the 15-minute grid', () => {
-      expect(checkBookingTimes(MON_0900, '2026-11-16T08:50:00.000Z', 'admin', ZONE)).toEqual({
+    it('AC-47: accepts exactly 5 minutes, the shortest', () => {
+      expect(checkBookingTimes(MON_0900, '2026-11-16T08:05:00.000Z', 'admin', ZONE)).toEqual({ start: MON_0900, end: '2026-11-16T08:05:00.000Z' });
+    });
+
+    it('AC-48: refuses a start off the 5-minute grid', () => {
+      expect(checkBookingTimes('2026-11-16T09:07:00.000Z', undefined, 'admin', ZONE)).toEqual({
         error: 'invalid_request',
-        message: 'Invalid input: end must be on a 15-minute step',
+        message: 'Invalid input: start must be on a 5-minute step',
       });
     });
 
-    it('refuses less than 15 minutes (the schema already refuses an end not after start)', () => {
+    it('refuses an end off the 5-minute grid', () => {
+      expect(checkBookingTimes(MON_0900, '2026-11-16T08:52:00.000Z', 'admin', ZONE)).toEqual({
+        error: 'invalid_request',
+        message: 'Invalid input: end must be on a 5-minute step',
+      });
+    });
+
+    it('accepts both 02:05 starts of the night clocks go back', () => {
+      expect(checkBookingTimes('2026-10-25T00:05:00.000Z', '2026-10-25T00:10:00.000Z', 'admin', ZONE)).toEqual({ start: '2026-10-25T00:05:00.000Z', end: '2026-10-25T00:10:00.000Z' });
+      expect(checkBookingTimes('2026-10-25T01:05:00.000Z', undefined, 'admin', ZONE)).toEqual({ start: '2026-10-25T01:05:00.000Z', end: '2026-10-25T02:05:00.000Z' });
+    });
+
+    it('refuses less than 5 minutes (the schema already refuses an end not after start)', () => {
       expect(checkBookingTimes(MON_1000, MON_0900, 'admin', ZONE)).toEqual({
         error: 'invalid_request',
-        message: 'Invalid input: an appointment lasts at least 15 minutes',
+        message: 'Invalid input: an appointment lasts at least 5 minutes',
+      });
+    });
+
+    it('a User is still held to the whole hour: 10:10 is refused (AC-48)', () => {
+      expect(checkBookingTimes('2026-11-16T09:10:00.000Z', undefined, 'user', ZONE)).toEqual({
+        error: 'invalid_request',
+        message: 'Invalid input: start must be a whole hour',
       });
     });
   });

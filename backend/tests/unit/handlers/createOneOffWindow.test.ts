@@ -150,7 +150,7 @@ describe('createOneOffWindow handler', () => {
     { name: 'a missing date', raw: JSON.stringify({ ...AC08, date: undefined }), code: 'invalid_request', fields: 'date' },
     { name: 'an impossible date', raw: JSON.stringify({ ...AC08, date: '2026-02-30' }), code: 'invalid_request', fields: 'date' },
     { name: 'end before start', raw: JSON.stringify({ ...AC08, end: '11:00' }), code: 'invalid_request', fields: 'end' },
-    { name: 'a time off the grid', raw: JSON.stringify({ ...AC08, start: '12:05' }), code: 'invalid_request', fields: 'start' },
+    { name: 'a time off the grid', raw: JSON.stringify({ ...AC08, start: '12:07' }), code: 'invalid_request', fields: 'start' },
   ])('answers 400 $code and touches nothing for $name', async ({ raw, code, fields }) => {
     const response = await handler(eventAt(ROUTE, admin, undefined, raw));
     expect(response.statusCode).toBe(400);
