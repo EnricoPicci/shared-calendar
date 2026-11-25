@@ -8,7 +8,7 @@ import type { RemoveTypeState } from '../../../src/services/availability-types.t
 import { mountConfirm } from '../../../src/views/availability.parts';
 import { mountAvailability, type AvailabilityDeps } from '../../../src/views/availability.view';
 import { POOL, STUDIO } from '../logic/fixtures';
-import { find, loadPage, submit, useRealPage } from './page';
+import { choicesOf, choose, chooseTime, clock, find, loadPage, setTime, submit, timeIn, useRealPage } from './page';
 
 // The DOM test of the availability view (docs/FRONTEND_ARCHITECTURE.md section 8): the real
 // index.html, a fake AvailabilityScreen whose stream the test controls, and the parts of the
@@ -99,16 +99,26 @@ const RENAME = 'dialog.rename form';
 const CREATE_PATTERN = 'form.create-pattern';
 const CHANGE = 'dialog.change form';
 const form = (selector: string) => one<HTMLFormElement>(selector);
-const field = (selector: string, name: string) => one<HTMLInputElement | HTMLSelectElement>(`${selector} [name="${name}"]`);
+// A start and an end are two lists each, an hour and a minute (src/views/time.parts.ts); the
+// helpers below read and set them as one `HH:mm` text, as the view hands them on.
+const isTime = (name: string) => name === 'start' || name === 'end';
+const lists = (selector: string, name: string): (HTMLInputElement | HTMLSelectElement)[] => (isTime(name) ? clock(form(selector), name) : [one<HTMLInputElement | HTMLSelectElement>(`${selector} [name="${name}"]`)]);
+const field = (selector: string, name: string) => lists(selector, name)[0]!;
+const value = (selector: string, name: string) => (isTime(name) ? timeIn(form(selector), name) : field(selector, name).value);
 const refusalOf = (selector: string, name: string) => field(selector, name).closest('.field')!.querySelector('.refusal')!;
 const failureOf = (selector: string) => one(`${selector} .failure`);
 const submitOf = (selector: string) => one<HTMLButtonElement>(`${selector} .submit`);
 const SIX = ['weekday', 'start', 'end', 'typeId', 'validFrom', 'validUntil'] as const;
-const held = (selector: string) => Object.fromEntries(SIX.map((name) => [name, field(selector, name).value])) as PatternFields;
+const held = (selector: string) => Object.fromEntries(SIX.map((name) => [name, value(selector, name)])) as PatternFields;
+// Fields set as a script sets them, with no event: a time set so sets nothing else.
 const set = (selector: string, values: Partial<PatternFields>) => {
-  for (const [name, value] of Object.entries(values)) field(selector, name).value = value;
+  for (const [name, text] of Object.entries(values)) {
+    if (isTime(name)) setTime(form(selector), name, text);
+    else field(selector, name).value = text;
+  }
 };
-const marked = (selector: string) => SIX.filter((name) => field(selector, name).getAttribute('aria-invalid') === 'true');
+// The fields marked in fault: a time is marked when both its lists are.
+const marked = (selector: string) => SIX.filter((name) => lists(selector, name).every((list) => list.getAttribute('aria-invalid') === 'true'));
 // The conflicts list of a place, as texts: its sentence, then one line per row; null while hidden.
 const conflictsOf = (place: string) => {
   const box = one(`${place} .conflicts`);
@@ -136,9 +146,14 @@ describe('mountAvailability', () => {
       mounted(state());
       for (const selector of [CREATE_PATTERN, CHANGE]) {
         expect(options(selector, 'weekday')).toEqual([['1', 'Monday'], ['2', 'Tuesday'], ['3', 'Wednesday'], ['4', 'Thursday'], ['5', 'Friday'], ['6', 'Saturday'], ['7', 'Sunday']]);
-        const starts = options(selector, 'start');
-        const ends = options(selector, 'end');
-        expect([starts.length, starts[0], starts.at(-1), ends.length, ends[0], ends.at(-1)]).toEqual([96, ['00:00', '00:00'], ['23:45', '23:45'], 96, ['00:15', '00:15'], ['24:00', '24:00']]);
+        const [startHour, startMinute] = clock(form(selector), 'start');
+        const [endHour, endMinute] = clock(form(selector), 'end');
+        expect([choicesOf(startHour).length, choicesOf(startHour)[0], choicesOf(startHour).at(-1)]).toEqual([24, '00', '23']);
+        expect(choicesOf(startMinute)).toEqual(['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55']);
+        expect([...startMinute.options].map((option) => option.value)).toEqual(choicesOf(startMinute));
+        // The end's hours are those after the start's, up to 24 since the start is on the hour,
+        // and its one minute is the start's.
+        expect([choicesOf(endHour)[0], choicesOf(endHour).at(-1), choicesOf(endMinute)]).toEqual([String(Number(startHour.value) + 1).padStart(2, '0'), '24', ['00']]);
         expect(options(selector, 'typeId')).toEqual([]);
       }
       expect(all('.name-hint').map((hint) => hint.textContent)).toEqual([TYPE_NAME_HINT, TYPE_NAME_HINT]);
@@ -311,8 +326,9 @@ describe('mountAvailability', () => {
       const checked = patternFor({ weekday: '1', start: '10:00', end: '10:00', typeId: '', validFrom: '', validUntil: 'x' });
       const before = patternFor({ weekday: '1', start: '09:00', end: '10:00', typeId: STUDIO, validFrom: '2026-11-20', validUntil: '2026-11-19' });
       if (!('refusals' in checked) || !('refusals' in before)) throw new Error('accepted');
-      // The words of a label: its own text, before the field (a list's choices are text of the label too).
-      const label = (selector: string, name: string) => field(selector, name).closest('label')!.firstChild!.textContent!.trim();
+      // The words of a label: its own text, before the field (a list's choices are text of the
+      // label too); for a time, the name of its group of two lists.
+      const label = (selector: string, name: string) => (isTime(name) ? field(selector, name).closest('fieldset')!.querySelector('legend')!.textContent!.trim() : field(selector, name).closest('label')!.firstChild!.textContent!.trim());
       for (const [name, sentence] of [...Object.entries(checked.refusals), ...Object.entries(before.refusals)]) {
         expect(sentence.startsWith(`${label(CREATE_PATTERN, name)} `), sentence).toBe(true);
         expect(label(CHANGE, name)).toBe(label(CREATE_PATTERN, name));
@@ -436,11 +452,11 @@ describe('mountAvailability', () => {
       expect(html()).toBe(before);
     });
 
-    it('fields that would be refused go as they are: no type chosen, an end before the start, no date; the view checks nothing', () => {
+    it('fields that would be refused go as they are: no type chosen, no date; the view checks nothing', () => {
       const { screen } = mounted();
-      set(CREATE_PATTERN, { start: '10:00', end: '09:00', validFrom: '' });
+      set(CREATE_PATTERN, { start: '09:00', end: '12:00', validFrom: '' });
       submit(form(CREATE_PATTERN));
-      expect(screen.createPattern).toHaveBeenCalledWith({ weekday: '1', start: '10:00', end: '09:00', typeId: '', validFrom: '', validUntil: '' });
+      expect(screen.createPattern).toHaveBeenCalledWith({ weekday: '1', start: '09:00', end: '12:00', typeId: '', validFrom: '', validUntil: '' });
       expect(marked(CREATE_PATTERN)).toEqual([]);
     });
 
@@ -463,6 +479,115 @@ describe('mountAvailability', () => {
       expect([options(CREATE_PATTERN, 'typeId').length, field(CREATE_PATTERN, 'typeId').value]).toEqual([3, STUDIO]);
       availability$.next(listed({ choices: typeChoices([type(POOL, 'Piscina')]) }));
       expect([options(CREATE_PATTERN, 'typeId'), field(CREATE_PATTERN, 'typeId').value]).toEqual([[[POOL, 'Piscina']], '']);
+    });
+  });
+
+  describe('the two times of the pattern forms: hours and minutes, the end chosen as an hour (D33)', () => {
+    // Opens the dialog that changes the first pattern, Monday 09:00–13:00, when asked.
+    const ready = (selector: string) => {
+      const view = mounted();
+      if (selector === CHANGE) patternButton(0, '.ask-change').click();
+      return view;
+    };
+    // Opens the dialog that changes a pattern of the given times, the only one listed.
+    const openedOn = (start: string, end: string) => {
+      const view = mounted(listed({ groups: patternGroups([pattern(P1, { start, end })], TYPES, '2026-11-20') }));
+      patternButton(0, '.ask-change').click();
+      return view;
+    };
+    const endChoices = (selector: string) => clock(form(selector), 'end').map(choicesOf);
+    const PLACES = [
+      ['the form that creates a pattern', CREATE_PATTERN],
+      ['the dialog that changes one', CHANGE],
+    ] as const;
+
+    it.each(PLACES)('%s: a start chosen sets the end one hour later; chosen twice, sets it twice', (_what, selector) => {
+      ready(selector);
+      chooseTime(form(selector), 'start', '09:05');
+      expect([value(selector, 'start'), value(selector, 'end')]).toEqual(['09:05', '10:05']);
+      chooseTime(form(selector), 'start', '14:10');
+      expect([value(selector, 'start'), value(selector, 'end')]).toEqual(['14:10', '15:10']);
+    });
+
+    it.each(PLACES)('%s: a start 08:05 offers the end\'s hours 09 to 23 and one minute, 05; the end\'s hour 12 gives 12:05, the start kept', (_what, selector) => {
+      ready(selector);
+      chooseTime(form(selector), 'start', '08:05');
+      const [hours, minutes] = endChoices(selector);
+      expect([hours![0], hours!.at(-1), hours!.length, minutes, value(selector, 'end')]).toEqual(['09', '23', 15, ['05'], '09:05']);
+      choose(clock(form(selector), 'end')[0], '12');
+      expect([value(selector, 'start'), value(selector, 'end')]).toEqual(['08:05', '12:05']);
+    });
+
+    it.each(PLACES)('%s: a start 08:00 offers the end\'s hour 24; its minute changed to 05 takes it away', (_what, selector) => {
+      ready(selector);
+      chooseTime(form(selector), 'start', '08:00');
+      choose(clock(form(selector), 'end')[0], '24');
+      expect([endChoices(selector)[0]!.at(-1), value(selector, 'end')]).toEqual(['24', '24:00']);
+      choose(clock(form(selector), 'start')[1], '05');
+      expect([endChoices(selector)[0]!.at(-1), value(selector, 'end')]).toEqual(['23', '09:05']);
+    });
+
+    it.each(PLACES)('%s: the start\'s minute changed alone keeps the end\'s hour, with the new minute: 08:05–11:05 becomes 08:30–11:30', (_what, selector) => {
+      ready(selector);
+      chooseTime(form(selector), 'start', '08:05');
+      choose(clock(form(selector), 'end')[0], '11');
+      choose(clock(form(selector), 'start')[1], '30');
+      expect([value(selector, 'start'), value(selector, 'end'), endChoices(selector)[1]]).toEqual(['08:30', '11:30', ['30']]);
+    });
+
+    it.each(PLACES)('%s: the start\'s hour 23 offers the minute 00 only, and the end 24:00 alone', (_what, selector) => {
+      ready(selector);
+      chooseTime(form(selector), 'start', '10:30');
+      choose(clock(form(selector), 'start')[0], '23');
+      expect([choicesOf(clock(form(selector), 'start')[1]), value(selector, 'start'), endChoices(selector), value(selector, 'end')]).toEqual([['00'], '23:00', [['24'], ['00']], '24:00']);
+      choose(clock(form(selector), 'start')[0], '22');
+      expect(choicesOf(clock(form(selector), 'start')[1]).length).toBe(12);
+    });
+
+    it.each(PLACES)('%s: what is sent is each time as `HH:mm`', (_what, selector) => {
+      const { screen } = ready(selector);
+      chooseTime(form(selector), 'start', '08:05');
+      choose(clock(form(selector), 'end')[0], '11');
+      submit(form(selector));
+      const sent = selector === CHANGE ? screen.change.mock.lastCall![1] : screen.createPattern.mock.lastCall![0];
+      expect([sent.start, sent.end]).toEqual(['08:05', '11:05']);
+    });
+
+    it('the dialog that changes a pattern opens with its times as they are: nothing sets the end', () => {
+      ready(CHANGE);
+      expect([value(CHANGE, 'start'), value(CHANGE, 'end')]).toEqual(['09:00', '13:00']);
+    });
+
+    it('the dialog opened on 08:05–12:05 shows it as it is, the end\'s lists those of its start', () => {
+      openedOn('08:05', '12:05');
+      expect([value(CHANGE, 'start'), value(CHANGE, 'end'), endChoices(CHANGE)[0]![0], endChoices(CHANGE)[1]]).toEqual(['08:05', '12:05', '09', ['05']]);
+    });
+
+    it('the dialog opened on a window stored that is not whole hours, 08:30–09:45, shows 09:45 as it is; the save sends it and the model refuses it', () => {
+      const { screen } = openedOn('08:30', '09:45');
+      expect([value(CHANGE, 'start'), value(CHANGE, 'end'), endChoices(CHANGE)[1]]).toEqual(['08:30', '09:45', ['30', '45']]);
+      submit(form(CHANGE));
+      expect(patternFor(screen.change.mock.lastCall![1])).toEqual({ refusals: { end: 'End must be a whole number of hours after Start.' } });
+    });
+
+    it('the dialog opened on a window stored with a start after 23:00, 23:30–24:00, shows it as it is', () => {
+      openedOn('23:30', '24:00');
+      expect([value(CHANGE, 'start'), value(CHANGE, 'end')]).toEqual(['23:30', '24:00']);
+    });
+
+    it('the form put back by the stream after a create shows 09:00 and 10:00 as they are, whatever the end was', () => {
+      const { availability$ } = mounted();
+      chooseTime(form(CREATE_PATTERN), 'start', '20:00');
+      chooseTime(form(CREATE_PATTERN), 'end', '24:00');
+      availability$.next(listed({ patternFields: startingFields('2026-11-21'), patternCreate: ask({ done: true }) }));
+      expect([value(CREATE_PATTERN, 'start'), value(CREATE_PATTERN, 'end')]).toEqual(['09:00', '10:00']);
+    });
+
+    it('a refusal of the end marks both its lists and stands under its group; the start\'s lists are not marked', () => {
+      const { availability$ } = mounted();
+      availability$.next(listed({ patternCreate: ask({ refusals: { end: 'End must be later than Start.' } }) }));
+      expect([lists(CREATE_PATTERN, 'end').map((list) => list.getAttribute('aria-invalid')), lists(CREATE_PATTERN, 'start').map((list) => list.hasAttribute('aria-invalid'))]).toEqual([['true', 'true'], [false, false]]);
+      expect(refusalOf(CREATE_PATTERN, 'end').previousElementSibling!.matches('fieldset.clock')).toBe(true);
     });
   });
 
@@ -663,11 +788,11 @@ describe('mountAvailability', () => {
 
     it('refusals: beside their fields in the dialog, announced, the fields marked; the dialog stays open and the form that creates shows none of it', () => {
       const { availability$ } = opened();
-      set(CHANGE, { end: '14:00' });
+      set(CHANGE, { end: '16:00' });
       submit(form(CHANGE));
-      availability$.next(listed({ change: ask({ about: P2, refusals: { end: 'End must be later than Start.', validUntil: 'Valid until must not be before Valid from.' } }) }));
+      availability$.next(listed({ change: ask({ about: P2, refusals: { end: 'End must be a whole number of hours after Start.', validUntil: 'Valid until must not be before Valid from.' } }) }));
       expect(marked(CHANGE)).toEqual(['end', 'validUntil']);
-      expect([refusalOf(CHANGE, 'end').textContent, refusalOf(CHANGE, 'end').getAttribute('role'), dialog('change').open, field(CHANGE, 'end').value]).toEqual(['End must be later than Start.', 'alert', true, '14:00']);
+      expect([refusalOf(CHANGE, 'end').textContent, refusalOf(CHANGE, 'end').getAttribute('role'), dialog('change').open, value(CHANGE, 'end')]).toEqual(['End must be a whole number of hours after Start.', 'alert', true, '16:00']);
       expect(marked(CREATE_PATTERN)).toEqual([]);
       availability$.next(listed({ change: ask({ about: P2, busy: true }) }));
       expect([marked(CHANGE), submitOf(CHANGE).disabled]).toEqual([[], true]);
@@ -678,7 +803,7 @@ describe('mountAvailability', () => {
       set(CHANGE, { start: '09:00' });
       submit(form(CHANGE));
       availability$.next(listed({ change: ask({ about: P2, failure: FAILURE }) }));
-      expect([failureOf(CHANGE).textContent, failureOf(CHANGE).getAttribute('role'), dialog('change').open, field(CHANGE, 'start').value, submitOf(CHANGE).disabled]).toEqual([FAILURE, 'alert', true, '09:00', false]);
+      expect([failureOf(CHANGE).textContent, failureOf(CHANGE).getAttribute('role'), dialog('change').open, value(CHANGE, 'start'), submitOf(CHANGE).disabled]).toEqual([FAILURE, 'alert', true, '09:00', false]);
       expect(failureOf(CREATE_PATTERN).textContent).toBe('');
       submit(form(CHANGE));
       expect(screen.change).toHaveBeenCalledTimes(2);
@@ -1012,8 +1137,9 @@ describe('mountAvailability', () => {
       expect(all('li, option, .groups section')).toHaveLength(0);
       for (const gone of ['Studio', 'Piscina', 'alice', 'bob', 'Sala nuova', 'Mon 23 Nov', 'appointments are in the way', 'Monday', TYPE_NAME_HINT, FAILURE, 'Delete the', STUDIO, POOL, P2]) expect(anywhere(gone), gone).toBe(false);
       const fields = [...find('#availability').querySelectorAll<HTMLInputElement | HTMLSelectElement>('input, select, textarea')];
-      // The 16 fields of this view's four forms, and the 7 of the part about a single date.
-      expect([fields.length, fields.map((each) => each.value).join('')]).toEqual([23, '']);
+      // The 20 fields of this view's four forms, and the 11 of the part about a single date: a
+      // start and an end are two lists each.
+      expect([fields.length, fields.map((each) => each.value).join('')]).toEqual([31, '']);
       expect(all('[aria-invalid], :disabled')).toHaveLength(0);
       // The page is the one index.html has.
       expect(html()).toBe(untouched);

@@ -2,6 +2,7 @@ import { Subscription } from 'rxjs';
 import type { Choice } from '../logic/availability.model';
 import type { Ask } from '../logic/availability.screen';
 import type { ConflictList } from '../logic/conflicts';
+import { timeLists, type TimeLists } from './time.parts';
 
 // What the two views of the availability screen share (docs/FRONTEND_ARCHITECTURE.md
 // section 4): the look-up of a form whose fields are checked, the choices of a list, the
@@ -45,36 +46,55 @@ export function availabilityParts(root: HTMLElement) {
 
   // A form whose fields are checked, found once: the fields by their names, each with the
   // refusal of its .field, the failure, the conflicts list where the form has one, and the
-  // button.
+  // button. A field with no element of its name is a time, its two lists an hour and a minute
+  // (src/views/time.parts.ts); `times` holds those, by name. Towards the logic layer a time is
+  // one `HH:mm` text like any other field's.
+  const option = (text: string) => {
+    const element = copy('tpl-choice') as HTMLOptionElement;
+    element.value = element.textContent = text;
+    return element;
+  };
   const form = (selector: string, names: readonly string[]) => {
     const element = root.querySelector<HTMLFormElement>(selector)!;
+    const times: Record<string, TimeLists> = {};
     const fields = names.map((name) => {
-      const input = element.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${name}"]`)!;
-      return { name, input, refusal: input.closest('.field')!.querySelector('.refusal')! };
+      const input = element.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${name}"]`);
+      const time = input === null ? (times[name] = timeLists(element, name, option)) : null;
+      const inputs = time?.lists ?? [input!];
+      return {
+        name,
+        inputs,
+        read: () => time?.read() ?? input!.value,
+        write: (value: string) => (time ? time.write(value) : (input!.value = value)),
+        refusal: inputs[0]!.closest('.field')!.querySelector('.refusal')!,
+      };
     });
     const failure = element.querySelector('.failure');
     const conflicts = element.querySelector<HTMLElement>('.conflicts');
     return {
       form: element,
       fields,
+      times,
       submit: element.querySelector<HTMLButtonElement>('.submit')!,
       // What the form holds, as text.
-      held: () => Object.fromEntries(fields.map(({ name, input }) => [name, input.value])),
+      held: () => Object.fromEntries(fields.map(({ name, read }) => [name, read()])),
       // The form filled with given values.
       fill: (values: Record<string, string>) => {
-        for (const { name, input } of fields) input.value = values[name]!;
+        for (const { name, write } of fields) write(values[name]!);
       },
       // What a write says, in the form: each field in fault marked for a screen reader and for
-      // the style sheet, its sentence under it; the failure; the appointments in the way. A
-      // field named with an empty sentence is marked and has no words under it: the sentence
-      // of another field names it. With no outcome, nothing of it: the form of a dialog that
-      // opens.
+      // the style sheet, both lists of a time alike, its sentence under it; the failure; the
+      // appointments in the way. A field named with an empty sentence is marked and has no
+      // words under it: the sentence of another field names it. With no outcome, nothing of
+      // it: the form of a dialog that opens.
       say: (said: Said | null) => {
-        for (const { name, input, refusal } of fields) {
+        for (const { name, inputs, refusal } of fields) {
           const why = said?.refusals[name];
           refusal.textContent = why ?? '';
-          if (why === undefined) input.removeAttribute('aria-invalid');
-          else input.setAttribute('aria-invalid', 'true');
+          for (const input of inputs) {
+            if (why === undefined) input.removeAttribute('aria-invalid');
+            else input.setAttribute('aria-invalid', 'true');
+          }
         }
         if (failure) failure.textContent = said?.failure ?? '';
         if (conflicts) showConflicts(conflicts, said?.conflicts ?? null);

@@ -2,7 +2,8 @@ import { CALENDAR_LIMITS, PatternBody, TYPE_CAPACITY, TypeBody, type Availabilit
 import {
   deletePatternQuestion,
   deleteTypeQuestion,
-  END_CHOICES,
+  END_NOT_LATER,
+  END_NOT_WHOLE_HOURS,
   NO_PATTERNS,
   NO_TYPE_YET,
   NO_TYPES,
@@ -10,7 +11,6 @@ import {
   patternFields,
   patternFor,
   patternGroups,
-  START_CHOICES,
   startingFields,
   STARTING_TYPE,
   TYPE_CAPACITY_HINT,
@@ -23,6 +23,7 @@ import {
   WEEKDAY_CHOICES,
   type PatternFields,
 } from '../../../src/logic/availability.model';
+import { startMinutesOf, timeOf, WINDOW_STARTS, windowEnds } from '../../../src/logic/times';
 import { POOL, STUDIO } from './fixtures';
 import { useFarBrowserZone } from './zone';
 
@@ -45,7 +46,7 @@ const pattern = (over: Partial<WeeklyPattern> = {}): WeeklyPattern => ({
 const TODAY = '2026-11-20';
 const FIELDS: PatternFields = { weekday: '3', start: '09:00', end: '13:00', typeId: STUDIO, validFrom: '2026-11-20', validUntil: '' };
 
-// Test names: section numbers and R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
+// Test names: section numbers, R-… rules and D… decisions are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('availability.model', () => {
   useFarBrowserZone();
 
@@ -167,18 +168,19 @@ describe('availability.model', () => {
       expect(WEEKDAY_CHOICES.map(({ value, label }) => `${value} ${label}`)).toEqual(['1 Monday', '2 Tuesday', '3 Wednesday', '4 Thursday', '5 Friday', '6 Saturday', '7 Sunday']);
     });
 
-    it('a start is one of the 96 steps from 00:00 to 23:45, an end one of the 96 from 00:15 to 24:00', () => {
-      expect([START_CHOICES.length, START_CHOICES[0]!.value, START_CHOICES[1]!.value, START_CHOICES.at(-1)!.value]).toEqual([96, '00:00', '00:15', '23:45']);
-      expect([END_CHOICES.length, END_CHOICES[0]!.value, END_CHOICES.at(-2)!.value, END_CHOICES.at(-1)!.value]).toEqual([96, '00:15', '23:45', '24:00']);
-      for (const { value, label } of [...START_CHOICES, ...END_CHOICES]) expect(label).toBe(value);
-    });
-
-    it('every start with every later end is a body the shared schema accepts: nothing off the grid can be chosen', () => {
-      for (const start of START_CHOICES) {
-        const end = END_CHOICES.find((choice) => choice.value > start.value)!;
-        expect(PatternBody.safeParse({ weekday: 1, start: start.value, end: end.value, typeId: STUDIO, validFrom: TODAY, validUntil: null }).success, start.value).toBe(true);
+    it('every pair of times the form\'s lists can hold is accepted, by the model and by the shared schema', () => {
+      const starts = WINDOW_STARTS.flatMap((hour) => startMinutesOf(hour).map((minute) => timeOf(hour, minute)));
+      const fields = (start: string, end: string): PatternFields => ({ weekday: '1', start, end, typeId: STUDIO, validFrom: TODAY, validUntil: '' });
+      let pairs = 0;
+      for (const start of starts) {
+        const { hours, minute } = windowEnds(start);
+        for (const end of hours.map((hour) => timeOf(hour, minute))) {
+          const checked = patternFor(fields(start, end));
+          if (!('pattern' in checked) || !PatternBody.safeParse(checked.pattern).success) throw new Error(`${start}–${end}`);
+          pairs += 1;
+        }
       }
-      for (const end of END_CHOICES) expect(PatternBody.safeParse({ weekday: 7, start: '00:00', end: end.value, typeId: STUDIO, validFrom: TODAY, validUntil: null }).success, end.value).toBe(true);
+      expect(pairs).toBeGreaterThan(3000);
     });
 
     it('the types to choose from: their ids as values, their names as labels, in the order given; a name with <script> as text', () => {
@@ -209,7 +211,7 @@ describe('availability.model', () => {
     it.each([
       pattern(),
       pattern({ weekday: 7, start: '00:00', end: '24:00', typeId: POOL, validFrom: '2020-01-01', validUntil: '2020-01-01' }),
-      pattern({ weekday: 4, start: '22:15', end: '23:45', validUntil: '2030-12-31' }),
+      pattern({ weekday: 4, start: '22:15', end: '23:15', validUntil: '2030-12-31' }),
     ])('the fields of pattern %# sent back unchanged make the same body', (existing) => {
       const { weekday, start, end, typeId, validFrom, validUntil } = existing;
       expect(patternFor(patternFields(existing))).toEqual({ pattern: { weekday, start, end, typeId, validFrom, validUntil } });
@@ -240,7 +242,7 @@ describe('availability.model', () => {
     it('with an end of validity; the same day as the start of validity is allowed; an end at 24:00; a start in the past', () => {
       expect(accepted({ ...FIELDS, validUntil: '2027-01-19' }).validUntil).toBe('2027-01-19');
       expect(accepted({ ...FIELDS, validUntil: '2026-11-20' }).validUntil).toBe('2026-11-20');
-      expect(accepted({ ...FIELDS, start: '23:45', end: '24:00' }).end).toBe('24:00');
+      expect(accepted({ ...FIELDS, start: '23:00', end: '24:00' }).end).toBe('24:00');
       // "Today" is not a rule here (docs/SHARED_CALENDAR_SPEC.md R-PAT-03).
       expect(accepted({ ...FIELDS, validFrom: '2019-01-01', validUntil: '2019-12-31' }).validFrom).toBe('2019-01-01');
     });
@@ -251,6 +253,19 @@ describe('availability.model', () => {
       ['00:15 after a start at 23:45', '23:45', '00:15'],
     ])('an end %s is refused, the End field alone', (_what, start, end) => {
       expect(refusals({ start, end })).toEqual({ end: 'End must be later than Start.' });
+    });
+
+    it('D33: an end that is not a whole number of hours after the start, 09:05–10:30, is refused, the End field alone', () => {
+      expect(refusals({ start: '09:05', end: '10:30' })).toEqual({ end: 'End must be a whole number of hours after Start.' });
+      expect(refusals({ start: '08:30', end: '09:45' })).toEqual({ end: END_NOT_WHOLE_HOURS });
+    });
+
+    it('D33: an end before the start that is not whole hours either is said once, for the order', () => {
+      expect(refusals({ start: '10:30', end: '09:05' })).toEqual({ end: END_NOT_LATER });
+    });
+
+    it('D33: whole hours from any 5-minute start are accepted: 09:05–11:05, 08:00–24:00', () => {
+      expect([accepted({ ...FIELDS, start: '09:05', end: '11:05' }).end, accepted({ ...FIELDS, start: '08:00', end: '24:00' }).end]).toEqual(['11:05', '24:00']);
     });
 
     it('no type chosen is refused, the Type field alone', () => {

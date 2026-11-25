@@ -55,3 +55,45 @@ export function submit(form: HTMLFormElement): { prevented: boolean } {
   form.dispatchEvent(event);
   return { prevented: event.defaultPrevented };
 }
+
+// A choice in a list, as a person makes it: the value, then the `change` event, which a value
+// set by a script never sends.
+export function choose(select: HTMLSelectElement, value: string): void {
+  select.value = value;
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+// The two lists of a time inside `scope`, named `<name>-hour` and `<name>-minute`.
+export function clock(scope: Element, name: string): [HTMLSelectElement, HTMLSelectElement] {
+  const list = (part: string) => {
+    const select = scope.querySelector<HTMLSelectElement>(`[name="${name}-${part}"]`);
+    if (select === null) throw new Error(`no list "${name}-${part}" there`);
+    return select;
+  };
+  return [list('hour'), list('minute')];
+}
+
+// A time chosen by a person: its hour, then its minute, each a choice of its own.
+export function chooseTime(scope: Element, name: string, time: string): void {
+  const [hour, minute] = clock(scope, name);
+  choose(hour, time.slice(0, 2));
+  choose(minute, time.slice(3, 5));
+}
+
+// What the two lists of a time hold, as "HH:mm", or "" while one holds nothing.
+export function timeIn(scope: Element, name: string): string {
+  const [hour, minute] = clock(scope, name);
+  return hour.value === '' || minute.value === '' ? '' : `${hour.value}:${minute.value}`;
+}
+
+// The two lists of a time set as a script sets them: no event.
+export function setTime(scope: Element, name: string, time: string): void {
+  const [hour, minute] = clock(scope, name);
+  hour.value = time.slice(0, 2);
+  minute.value = time.slice(3, 5);
+}
+
+// The texts of the choices of a list.
+export function choicesOf(select: HTMLSelectElement): string[] {
+  return [...select.options].map((option) => option.textContent);
+}

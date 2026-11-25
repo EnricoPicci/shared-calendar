@@ -1,7 +1,7 @@
 import { LocalDate, Ulid, type PatternSummary, type WeeklyPattern } from '@shared-calendar/shared';
 import { z } from 'zod';
 import { patternInput, UNTIL_NOT_BEFORE_FROM, untilNotBeforeFrom } from './createPattern';
-import { END_AFTER_START, endsAfterStart, patternById, patternSubject, patternSummaryOf, presentPatterns, presentTypes } from './facts';
+import { END_AFTER_START, endsAfterStart, lastsWholeHoursOf, WHOLE_HOURS, patternById, patternSubject, patternSummaryOf, presentPatterns, presentTypes } from './facts';
 import { patternForModel, WEEKDAY_NAMES } from './result';
 import type { ChangeTool, Tool, ToolDefinition } from './tool';
 
@@ -23,6 +23,7 @@ const Input = z
   })
   .strict()
   .refine(endsAfterStart, END_AFTER_START)
+  .refine(lastsWholeHoursOf, WHOLE_HOURS)
   .refine(untilNotBeforeFrom, UNTIL_NOT_BEFORE_FROM);
 type Input = z.infer<typeof Input>;
 

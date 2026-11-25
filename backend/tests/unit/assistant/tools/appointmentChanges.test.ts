@@ -277,7 +277,9 @@ describe('change_appointment: the facts, the words and the result (5.5 rule 2, 8
   it.each([
     ['a slot that is not free', '10:00'],
     ['a time outside the open hours', '15:00'],
+    ['a time on the 5-minute step that is no whole hour, inside the open hours', '09:10'],
   ])('no proposal for %s: Claude is told there is no free slot', async (_what, time) => {
+    expect(changeAppointmentDefinition.input('user').safeParse({ appointmentId: TUESDAY, date: '2026-11-26', time }).success).toBe(true);
     const result = await read({ appointmentId: TUESDAY, date: '2026-11-26', time });
     expect(result).toMatchObject({ ok: false, error: 'no_free_slot' });
     expect(result.ok === false && result.message).toContain('get_calendar');

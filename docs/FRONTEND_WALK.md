@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v11 (2026-11-25, `docs/EMAIL_PLAN.md` step m8): a new User is invited, checks 56 to 60 rewritten, and section 16, checks 203 to 205. v10 (2026-11-25, `docs/EMAIL_PLAN.md` step m7): "Choose your password", the first sign-in with a temporary password, is section 15, checks 193 to 202. v9 (2026-11-25, `docs/EMAIL_PLAN.md` step m6): a mail asked for through the assistant's panel is section 14, checks 189 to 192. v8 (2026-11-25, `docs/EMAIL_PLAN.md` step m5): the settings' "Daily e-mail" is section 13, checks 181 to 188. v7 (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): the week's "E-mail…" dialog is section 12, checks 171 to 180; section 1 says what it needs. v6 (2026-11-25, `docs/EMAIL_PLAN.md` step m2): the four facts of a person and "My details" are section 11, checks 157 to 170; checks 3, 40, 53 and section 1 in line. v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
+| Status | v15 (2026-11-25, `docs/EMAIL_PLAN.md` step m8): a new User is invited, checks 56 to 60 rewritten, and section 17, checks 217 to 219. v14 (2026-11-25, `docs/EMAIL_PLAN.md` step m7): "Choose your password", the first sign-in with a temporary password, is section 16, checks 207 to 216. v13 (2026-11-25, `docs/EMAIL_PLAN.md` step m6): a mail asked for through the assistant's panel is section 15, checks 203 to 206. v12 (2026-11-25, `docs/EMAIL_PLAN.md` step m5): the settings' "Daily e-mail" is section 14, checks 195 to 202. v11 (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): the week's "E-mail…" dialog is section 13, checks 185 to 194; section 1 says what it needs. v10 (2026-11-25, `docs/EMAIL_PLAN.md` step m2): the four facts of a person and "My details" are section 12, checks 171 to 184; checks 3, 40, 53 and section 1 in line. v9 (2026-11-25, `docs/WINDOW_HOURS_PLAN.md` step w5): the walk kept to the change before the release of `v2.5.0`, 28 checks, every one yes after a fix found by check 167, which now says "10:10 alice"; still 170 checks. v8 (2026-11-25, `docs/WINDOW_HOURS_PLAN.md` step w4): the end of a window chosen as an hour; checks 73, 86, 87, 157 to 168 and 170 rewritten, the last on a Sunday pattern 08:05–12:05; still 170 checks. v7 (2026-11-25, `docs/SLOT_STEP_PLAN.md` step s6): walked whole at 1280 × 800 and at 390 × 844 in headless Chromium against the local stack, every check yes after one fix of the style sheet (its change log); checks 102 and 169 corrected. v6 (2026-11-25, `docs/SLOT_STEP_PLAN.md` steps s4 and s5): times on 5-minute steps are section 11, checks 157 to 170, looked at against the local stack that day (its change log); checks 42, 43, 45, 76 and 86 in line. v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
 | What it is | One list of checks that walks every screen of the front end and the assistant's panel in a browser, as a User and as the Administrator, against the local stack. **The check to repeat after a later change to the view layer** |
 | What it is not | A source of truth, and not an automated test. On any conflict `docs/FRONTEND_ARCHITECTURE.md` and the tests win, and this page is fixed. No end-to-end test tool is in the repository (`docs/FRONTEND_VIEW_PLAN.md` section 8, decision 6): a person follows the list by hand, or drives a browser with a script kept outside the repository |
 | Made from | The browser checks of `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 68, of `docs/CONVERSATIONAL_PLAN.md` step c12 and of `docs/CAPACITY_PLAN.md` step u5, in the order a person would follow, and `docs/SHARED_CALENDAR_SPEC.md` section 16.8 |
@@ -18,12 +18,17 @@
 | v4 | 2026-11-23 | `docs/CHANGE_PASSWORD_PLAN.md` step p3: **the password screen**, section 9, checks 123 to 133, as `alice` and as `admin`, with what they need and leave in its opening; it is walked last, after section 6, since it changes both local passwords, and puts them back itself. Checks 3 and 40: "Password" is last in each role's navigation. The row of step p3 in section 8. No earlier check changed its number. 133 checks. |
 | v3, note | 2026-11-23 | The branch `deploy-frontend` merged into `main`: the panel's version, first numbered v2, is v3, after the sign-out's v2. Walked on the merged page that day by a script in headless Chromium, at a desktop and a phone width, against the local stack with the fake Claude, as `alice`: checks 3, 4 (one `RevokeToken`, answered 200) and 103 to 105, then "Sign out" while the panel waited for an answer (the login at once, the panel gone, no `continue` sent after it, the conversation read again at the next sign-in); all yes. The console held `zod`'s `eval` probe only. The rest of the walk was not run again. |
 | v5 | 2026-11-24 | `docs/CAPACITY_PLAN.md` step u5: **the capacity of a type**, section 10, checks 134 to 156, with what they need and leave in its opening; the row of step u5 in section 8. Check 12: the Administrator's booking for `alice` makes `alice`'s attempt a `user_busy`, whose sentence it quotes. Check 41: the tab "Full" beside an appointment. Checks 66 and 70: "Edit" in the place of "Rename", and the capacity. Walked that day by a script in headless Chromium (Playwright 1.62), at 1280 × 800 and at 390 × 844, on a fresh, seeded local stack, as `admin`, `alice` and three Users of the run: every check of section 10 answered yes at both widths, and check 12 as written; at check 140 the tab "1 left" was seen on top and within reach, not pressed, and check 150 was seen on the screenshots, its tabs not pressed. The console held the known report of `zod` and the browser's own line for each answer 409 of checks 144, 145, 146 and 152. The rest of the walk was not run again. 156 checks. |
-| v6 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m2: **the four facts of a person**, section 11, checks 157 to 170: the users screen's form and its refusals, a row's name and e-mail, the Edit dialog, "My details" for both roles; the facts every user of the walk is given (section 1); checks 3 and 40 (the navigation's "My details") and 53 (a row) in line; the row of step m2 in section 8. Walked on the local stack that day at a desktop width: 157, 158, 160, 161, 163, 165, 166 as `admin` and 169 as `alice`; 159, 162, 164, 167, 168 and 170 not yet. |
-| v7 | 2026-11-25 | `docs/EMAIL_PLAN.md` steps m3 and m4: **the mail of two dates**, section 12, checks 171 to 180: the week's "E-mail…" dialog for both roles, a refused range, the address masked, the mail and its file at the fake mail, the limit of five a day, the phone width; section 1 gains `local:lambda` and the fake mail; the row of m4 in section 8. Section 11's checks 159, 162, 164, 167, 168 and 170 walked that day (168 at 606 px, the narrowest the browser of the walk allowed). |
-| v9 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m6: **a mail through the assistant**, section 14, checks 189 to 192: the panel's proposal with the dates and the masked address, Confirm and the mail at the fake mail, Don't, against the fake Claude. No screen of the page changed. |
-| v8 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m5: **the daily e-mail**, section 13, checks 181 to 188: the settings' part "Daily e-mail", a save, a refused hour, the daily mail started by hand and its two files at the fake mail, "E-mail is not available yet." with the stage off, the phone width; the row of m5 in section 8. |
-| v10 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m7: **the first sign-in with a temporary password**, section 15, checks 193 to 202: an account made by `npm run test-user -w backend -- local`, "Choose your password" in the login's place, its hints, a too-weak password, Cancel, a good one signing in, the temporary password refused afterwards and the new one accepted, the phone width. The end of Cognito's 3 minutes cannot be walked locally (cognito-local never ends a challenge): check 202 is for the deployed page. No other check changed. |
-| v11 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m8: **the invitation**. Creating a User shows no password: checks 56 to 60 are the last look before sending, the answer "An invitation was sent to …", the state `invited` then `active` in the list, the first sign-in with the temporary password cognito-local prints, and "Resend invitation". Section 1 says how a User of the walk gets its first password; check 61 and the note on other browsers in section 7 in line; section 16, checks 203 to 205: "E-mail is not available yet." and the phone width; the row of m8 in section 8. |
+| v6 | 2026-11-25 | `docs/SLOT_STEP_PLAN.md` steps s4 and s5: **times on 5-minute steps**, section 11, checks 157 to 170, with what they need and leave in its opening; the row of steps s4 and s5 in section 8. Checks 42, 43 and 45: each time an hour and a minute, the custom times on 5-minute steps. Check 76: the hour 24 with only 00. Check 86: a start chosen sets the end. Looked at that day in Chrome against the local stack after `seed:local`, as `admin` and `alice`, at 1280 wide: checks 157 to 168 answered yes, 163 to 168 on the Sundays 29 November and 6 December 2026; not done in the browser: the end's hour 23 of check 159 (a unit test of the views holds it) and the cancelling of check 164. The browser's window could not be made narrower, so check 169 was looked at with the page's body held to 390 pixels and the style sheet's phone rules applied by a script: the forms' two lists fit two to a row, the dialogs at 358 pixels hold their four lists, nothing scrolls sideways; a real phone width is still to be seen. Check 170 was not done: the pattern and the appointments stay in the local stack until it is restarted. The rest of the walk was not run again. 170 checks. |
+| v7 | 2026-11-25 | `docs/SLOT_STEP_PLAN.md` step s6, the full regression before the release of `v2.4.0`. **Walked whole** by a script kept outside the repository, in headless Chromium 151 (Playwright 1.62), on a fresh, seeded local stack with the fake Claude, as `alice`, `admin` and the Users of each run: at 1280 × 800 every check yes; at 390 × 844 every check yes, the `[=]` checks and check 109 left out as the marks allow, check 164 yes when section 11 was walked again (the first pass read the week before it was drawn again). The `[S]` checks ended the session with Playwright's clock. **Found at 390 × 844, a defect, fixed:** in the box "This day only" the four lists of the times were 47 pixels wide and showed "0" for "09"; `frontend/style.css` gives the fields of a date's window at least 9rem, the type taking a row of its own on a phone (76 pixels a list). After the fix, sections 4 and 11 were walked again at both widths: every check yes, check 41 aside at the phone width, where a User left by the first of those two partial runs stood in the week (a script's leftover; check 41 was yes in the whole run). **Checks corrected:** 102, which now cancels `walk-<tag> listed` (left booked by check 33, it took next week's Wednesday 10:00 from a run at the other width), and 169, which asks that each list show its whole value. After each run the stack held the seed's data only. 170 checks. |
+| v8 | 2026-11-25 | `docs/WINDOW_HOURS_PLAN.md` step w4: **the end of a window chosen as an hour** (`docs/SHARED_CALENDAR_SPEC.md` decision D33; `docs/FRONTEND_ARCHITECTURE.md` section 11, decisions 201 and 202). Section 11 rewritten, the numbers kept: 157 says the end's minute is the start's, shown and not a choice; 158 and 159 the end's lists after the start's hour and minute, and the start's hour 23; 160 to 168 and 170 on a Sunday pattern 08:05–12:05, whose slots are 08:05, 09:05, 10:05 and 11:05, and 168 gains `alice` booking 11:05, the one slot left free. Check 87: 12:00 to 14:00, which still overlaps. Checks 73 and 86 no longer ask for an end not later than the start, which the lists cannot hold. The row of step w4 in section 8. No check added: 170 checks. Looked at in Chrome at 1280 × 800 against a fresh, seeded local stack, as `admin` and `alice`: 158, 159, 160, 163 and 168 yes; 168 without the five appointments of check 166, so `alice` saw the four slots and booked 11:05; the pattern and that booking removed afterwards. |
+| v9 | 2026-11-25 | `docs/WINDOW_HOURS_PLAN.md` step w5, part C: **the walk kept to the change**, by a script kept outside the repository, in headless Chromium 151 (Playwright), on a fresh, seeded local stack with the fake Claude, as `alice` and `admin`. At 1280 × 800: 9, 42, 43, 45, 71, 73, 74, 76, 83, 85, 86, 87, 90, 91, 157 to 168 and 170, with check 166 done in full, so that 168 was walked as written; at 390 × 844, in a viewport that wide, 169. **Check 167 said no**: the 5-minute block at half the width beside 10:15–11:05 showed "10:10–" alone, its end and "alice" cut, as the screenshots of the run of `v2.4.0` show too, which marked it yes without looking at the words. Fixed in the same step (`docs/FRONTEND_ARCHITECTURE.md` section 11, decision 203): such a block says "10:10 alice"; check 167 rewritten to say so, and walked again: yes. The other 27 yes on the first run. Sections 3 and 4 ran whole in the same script, their other checks yes too. Not walked, as `docs/WINDOW_HOURS_PLAN.md` step w5 says: sections 2, 3 (but 9), 5 to 10 and the rest of 4, which hold no window form, no date and no book dialog. Seen beside it, not a check: at 1280 wide the half-width 10:15–11:05 wraps onto three lines and the foot of "alice" is cut by a pixel or two. |
+| v10 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m2: **the four facts of a person**, section 12, checks 171 to 184: the users screen's form and its refusals, a row's name and e-mail, the Edit dialog, "My details" for both roles; the facts every user of the walk is given (section 1); checks 3 and 40 (the navigation's "My details") and 53 (a row) in line; the row of step m2 in section 8. Walked on the local stack that day at a desktop width: 157, 158, 160, 161, 163, 165, 166 as `admin` and 169 as `alice`; 159, 162, 164, 167, 168 and 170 not yet. |
+| v11 | 2026-11-25 | `docs/EMAIL_PLAN.md` steps m3 and m4: **the mail of two dates**, section 13, checks 185 to 194: the week's "E-mail…" dialog for both roles, a refused range, the address masked, the mail and its file at the fake mail, the limit of five a day, the phone width; section 1 gains `local:lambda` and the fake mail; the row of m4 in section 8. Section 12's checks 173, 176, 178, 181, 182 and 184 walked that day (168 at 606 px, the narrowest the browser of the walk allowed). |
+| v12 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m5: **the daily e-mail**, section 14, checks 195 to 202: the settings' part "Daily e-mail", a save, a refused hour, the daily mail started by hand and its two files at the fake mail, "E-mail is not available yet." with the stage off, the phone width; the row of m5 in section 8. |
+| v13 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m6: **a mail through the assistant**, section 15, checks 203 to 206: the panel's proposal with the dates and the masked address, Confirm and the mail at the fake mail, Don't, against the fake Claude. No screen of the page changed. |
+| v14 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m7: **the first sign-in with a temporary password**, section 16, checks 207 to 216: an account made by `npm run test-user -w backend -- local`, "Choose your password" in the login's place, its hints, a too-weak password, Cancel, a good one signing in, the temporary password refused afterwards and the new one accepted, the phone width. The end of Cognito's 3 minutes cannot be walked locally (cognito-local never ends a challenge): check 216 is for the deployed page. No other check changed. |
+| v15 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m8: **the invitation**. Creating a User shows no password: checks 56 to 60 are the last look before sending, the answer "An invitation was sent to …", the state `invited` then `active` in the list, the first sign-in with the temporary password cognito-local prints, and "Resend invitation". Section 1 says how a User of the walk gets its first password; check 61 and the note on other browsers in section 7 in line; section 17, checks 217 to 219: "E-mail is not available yet." and the phone width; the row of m8 in section 8. |
+| v15, note | 2026-11-25 | The branch `slot-5min` merged into `main`, where the e-mail work had been written at the same time. Its versions v6 to v9 and section 11, checks 157 to 170, are released (tags `v2.4.0` and `v2.5.0`) and keep their numbers; the e-mail's versions, first numbered v6 to v11, are v10 to v15, its sections 11 to 16 are 12 to 17 and its checks 157 to 205 are 171 to 219; every reference to them was changed with them. Section 8 holds the rows of both. 219 checks. No other text changed. |
 
 ---
 
@@ -55,7 +60,7 @@
   when no `ANTHROPIC_API_KEY` is given (`docs/COMMANDS.md` section 3.4), and the local limit of
   10 messages a person a day. Section 6 is never walked with the real Claude wired: its
   sentences mean something to the fake only. What is done with the real one is in section 7.
-- **For the mail (sections 12 and 13): `npm run local:lambda -w backend`**, a third terminal beside
+- **For the mail (sections 13 and 14): `npm run local:lambda -w backend`**, a third terminal beside
   `local:api` and `dev`, which runs the mailer, and the fake mail of `local:up` at
   http://localhost:8025, which keeps what it sends (`docs/COMMANDS.md` section 3.5). A program
   that opens an `.xlsx` file. Each account may ask for five mails a local day; a fresh stack
@@ -71,7 +76,7 @@ local stack cognito-local mails nothing and prints the temporary password in its
 "Confirmation Code Delivery", on the line "Code" (6 characters, `docs/COMMANDS.md` section
 3.1): `docker logs shared-calendar-cognito-1 2>&1 | grep -A6 'Confirmation Code' | tail -7`
 shows the last one. The first sign-in with it asks for a password of the User's own
-(section 15): the walk's is `Walk-<tag>-User-2?`.
+(section 16): the walk's is `Walk-<tag>-User-2?`.
 
 **Before section 6**, as `admin`, after check 102:
 
@@ -299,16 +304,18 @@ Sign out, sign in as `admin`.
 41. → Every appointment carries its User's name: `alice`'s say "alice", none says "You". At the
     right of each, a narrow tab "Full", the slot its appointment fills (check 150).
 42. `[K]` Press the free slot of Monday 09:00–10:00. → The dialog has "For", a list that holds
-    `alice`, and "Start" and "End", two lists of times a quarter of an hour apart, set to 09:00
-    and 10:00. Choose `alice`, type the note `walk-<tag> admin`, "Book". → The appointment is
+    `alice`, and "Start" and "End", each two lists, an hour and a minute 5 minutes apart, set
+    to 09:00 and 10:00. Choose `alice`, type the note `walk-<tag> admin`, "Book". → The appointment is
     there, with "alice".
-43. `[K]` Press the free slot of Monday 10:00–11:00, set "Start" to 10:15 and "End" to 10:45,
-    choose `alice`, note `walk-<tag> custom`, "Book". → An appointment 10:15–10:45 of `alice`.
+43. `[K]` Press the free slot of Monday 10:00–11:00, set "Start" to 10:10 (→ "End" 11:10) and
+    "End" to 10:40, choose `alice`, note `walk-<tag> custom`, "Book". → An appointment
+    10:10–10:40 of `alice`.
 44. `[K]` Open the appointment of check 42. → No sentence about until when; "Change" and "Cancel
     appointment" are there. Press "Cancel appointment". → It is gone.
 45. `[K]` Open the appointment of check 43, "Change", press the free slot of Monday 12:00–13:00.
-    → The confirmation has "Start" and "End" and no "For". Set them to 12:15 and 12:45,
-    "Change". → The appointment is at 12:15–12:45, still `alice`'s. Then cancel it.
+    → The confirmation has "Start" and "End", each an hour and a minute, and no "For". Set them
+    to 12:05 and 12:50, "Change". → The appointment is at 12:05–12:50, still `alice`'s. Then
+    cancel it.
 
 **The settings.**
 
@@ -349,7 +356,7 @@ Sign out, sign in as `admin`.
     keyboard. Behind it the form is empty and the list has `walk-<tag>`, its state `invited`
     and a button "Resend invitation".
 58. `[2]` In the second window sign in as `walk-<tag>` with the temporary password of
-    cognito-local's log (section 1). → "Choose your password" (check 193). Choose
+    cognito-local's log (section 1). → "Choose your password" (check 207). Choose
     `Walk-<tag>-User-2?`. → The frame, with that name and "User". Sign out there.
 59. `[K]` "Close", then "Week" and back to "Users". → The row of `walk-<tag>` says `active` and
     has no "Resend invitation". No password anywhere in the page or the address.
@@ -391,15 +398,14 @@ Sign out, sign in as `admin`.
     "Create pattern". → Under "Sunday": "05:00 – 07:00", the type, "from" today's date.
 72. Press "Week", then "›". → With no reload of the page: Sunday has a window 05:00–07:00 of the
     new type with two free slots, the hours start at 05:00, and the legend names the type.
-73. `[=]` In "Availability", "Create pattern" with "End" not later than "Start", no type chosen,
-    "Valid from" emptied, then with "Valid until" before "Valid from". → Each field in fault is
+73. `[=]` In "Availability", "Create pattern" with no type chosen and "Valid from" emptied, then with "Valid until" before "Valid from". → Each field in fault is
     marked and has its sentence under it, `[N]` with no request.
 74. `[K]` Create a second Sunday pattern, 06:00 to 08:00, same type. → Refused by the server,
     under the fields: another window of the same day covers part of these hours.
 75. `[K]` Press "Delete" on the type `walk-<tag> two`, then "Confirm". → The dialog "Please
     confirm" asked with the type's name; refused in it: the type is in use. "Keep".
-76. `[K]` Press "Change" on the Sunday pattern. → A dialog with its six fields filled. Set "End"
-    to 24:00, "Change". → The row says "05:00 – 24:00". Change it back to 07:00.
+76. `[K]` Press "Change" on the Sunday pattern. → A dialog with its fields filled, the two times
+    as they are. Set "End" to the hour 24 (its minute list holds only 00), "Change". → The row says "05:00 – 24:00". Change it back to 07:00.
 77. `[K]` Create a pattern on Sunday, 01:00 to 02:00, same type, valid from 1 to 31 January of
     this year. → It is listed, with the word "ended" and a quieter look. Press its "Delete",
     "Confirm". → Gone.
@@ -428,10 +434,10 @@ Sign out, sign in as `admin`.
     Show the walk's date again.
 85. `[K]` Press "This day only…". → A box "This day only" with one row, "09:00 – 13:00" Studio
     and "Remove"; the day's own buttons are no longer shown.
-86. `[K]` In the box: "Add" with "End" not later than "Start" and no type. → Both said under
-    their fields. Then add 14:00 to 15:00 of `walk-<tag> two`. → A second row, in the order of
+86. `[K]` In the box: "Add" with no type. → Said under its field. Then choose 14 as the start's hour (→ "End" 15:00) and add 14:00 to 15:00 of
+    `walk-<tag> two`. → A second row, in the order of
     the hours; the form is back on 09:00, 10:00 and no type.
-87. `[K]` Add 12:00 to 14:30, Studio. → Refused: **"Start" and "End" both have a red border, and
+87. `[K]` Add 12:00 to 14:00, Studio. → Refused: **"Start" and "End" both have a red border, and
     the sentence ("Start and End overlap another window of this day. Choose other hours.")
     stands once, under "Start"**. Then add 13:00 to 14:00, Studio, which only touches. →
     Accepted.
@@ -486,9 +492,11 @@ Sign out, sign in as `admin`.
      browser's back button does not come back to `#/nonsense`.
 101. Reload the page. → The login: a reload signs out (`docs/FRONTEND_ARCHITECTURE.md` section
      10, open point O3).
-102. As `admin`, in "Users", `[K]` delete `walk-<tag>` (and any other user of the run). → Gone;
-     its appointment of Wednesday is gone from the week. The users, the types, the patterns and
-     the settings are those the walk found.
+102. As `alice`, cancel `walk-<tag> listed` (check 33), which would otherwise stay booked and
+     take next week's Wednesday 10:00 from a run at the other width. As `admin`, in "Users",
+     `[K]` delete `walk-<tag>` (and any other user of the run). → Gone; its appointment of
+     Wednesday is gone from the week. The users, the types, the patterns and the settings are
+     those the walk found, and `alice`'s upcoming appointments are the seed's.
 
 ## 6. The assistant's panel
 
@@ -669,18 +677,21 @@ section 6 and the journeys run on the fake only.
 | 68 | The date field; a date shown; refused dates; "this day only" put together and saved; discarded; overlaps; "not available"; the way back; an extra window; an appointment on the day; a write that cannot reach the server; a pattern changed while a date is on show; "Show" refused; signing out with the list open; the phone; the keyboard | 82 to 95 |
 | c12 | No panel at the login, the bar on every screen, no request before the first opening; a read with its progress line; moving between screens, a reload; a booking confirmed with the week on show; a dialog over the panel; a decline; a message that drops a proposal; each of the three sentences; a text with markup; another person finds nothing; the keyboard alone; the console | 103, 104, 121; 106; 108, 110; 111, 113; 112; 114; 115; 116, 118, 119; 107; 120; 104, 105, 109, 113, 114, 118; 122. What the browser's tools show a screen reader is check 117; the two points step c12 left (the count after a 503, "New conversation" after one) are in checks 116 and 118 |
 
+| w5 | A short appointment beside another says its start and its User, "10:10 alice", whole | 167 |
+| w4 | The end of a window chosen as an hour, its minute the start's; the start's hour 23 with 00 only; a change of the start's minute keeps the end's hour; a pattern 08:05–12:05 and its four slots from 08:05; `alice` books 11:05; an overlap of whole hours | 157 to 168, 170, 73, 86, 87 |
+| s4, s5 | Each time an hour and a minute in the five places; a start sets the end, an end leaves the start; 23:30 gives 24:00, the hour 24 with 00 only; a form filled shows its times as they are; a pattern from 08:05 and its first slot at 09:00; 10:10–10:35 from the dialog; a time outside the window refused; 5- and 10-minute appointments, one beside the next; `alice`'s week; the keyboard; the two widths | 157 to 170, 42, 43, 45, 76, 86 |
 | u5 | A type's capacity: created, refused, edited; the places left; a time full for Users, busy for a fourth, refused to a page read before; the Administrator's full slot as a tab, refused, "Book anyway", the offer hidden by a change; two and three side by side, four as one block and its list; `user_busy` named for the Administrator; the User's own time not offered | 134 to 156, 12, 41, 66, 70 |
-| m2 | The create form's facts and their live refusals; a row's name and e-mail; Edit, saved and cancelled; "My details" for the Administrator, with Edit, and for a User, without | 157 to 170 |
-| m4 | The week's "E-mail…" for `alice` and `admin`: the dates of the week on show, a range refused, the address masked, the mail and its file at the fake mail, the sixth of the day refused, the phone | 171 to 180 |
-| m5 | The settings' "Daily e-mail": a save, a value refused, the daily mail by hand at the hour set with its two files, "not available yet" with `MAIL_STAGE=off` | 181 to 188 |
-| m6 | The assistant's mail: the proposal with the two dates and the masked address, Confirm and the mail at the fake mail, Don't | 189 to 192 |
-| m7 | "Choose your password": an account made by the script, its temporary password leading to the screen, a too-weak password refused with the live checks, a good one signing in, the temporary one refused afterwards and the new one accepted, the 3 minutes over (at the deployed page), the phone width | 193 to 202 |
-| m8 | The invitation: the last look and Back, Confirm and the answer, `invited` then `active` after the first sign-in, "Resend invitation" and its failure on the local stack, "E-mail is not available yet.", the phone width | 56 to 60, 203 to 205 |
+| m2 | The create form's facts and their live refusals; a row's name and e-mail; Edit, saved and cancelled; "My details" for the Administrator, with Edit, and for a User, without | 171 to 184 |
+| m4 | The week's "E-mail…" for `alice` and `admin`: the dates of the week on show, a range refused, the address masked, the mail and its file at the fake mail, the sixth of the day refused, the phone | 185 to 194 |
+| m5 | The settings' "Daily e-mail": a save, a value refused, the daily mail by hand at the hour set with its two files, "not available yet" with `MAIL_STAGE=off` | 195 to 202 |
+| m6 | The assistant's mail: the proposal with the two dates and the masked address, Confirm and the mail at the fake mail, Don't | 203 to 206 |
+| m7 | "Choose your password": an account made by the script, its temporary password leading to the screen, a too-weak password refused with the live checks, a good one signing in, the temporary one refused afterwards and the new one accepted, the 3 minutes over (at the deployed page), the phone width | 207 to 216 |
+| m8 | The invitation: the last look and Back, Confirm and the answer, `invited` then `active` after the first sign-in, "Resend invitation" and its failure on the local stack, "E-mail is not available yet.", the phone width | 56 to 60, 217 to 219 |
 | p3 | The hints while typing, the two new ones differing, a wrong current password, a change that succeeds, "Password changed" at the login, the old password refused, the new one accepted; as `alice` and as `admin`, at the two widths | 123 to 133 |
 
 Steps 60 to 68 are those of `docs/FRONTEND_VIEW_PLAN.md`; step c12 is of
 `docs/CONVERSATIONAL_PLAN.md`; step p3 of `docs/CHANGE_PASSWORD_PLAN.md`; step u5 of
-`docs/CAPACITY_PLAN.md`; steps m2, m4, m5, m6, m7 and m8 of `docs/EMAIL_PLAN.md`.
+`docs/CAPACITY_PLAN.md`; steps s4 and s5 of `docs/SLOT_STEP_PLAN.md`; steps m2, m4, m5, m6, m7 and m8 of `docs/EMAIL_PLAN.md`.
 
 Left out on purpose: "the screens of the earlier steps still work, in short" (`docs/FRONTEND_VIEW_PLAN.md`
 section 4), which was each step's own short walk and is this whole list.
@@ -814,184 +825,244 @@ its own, with its own tag, on the Sunday after.
      with them); as `alice` cancel `walk-<tag> one` and `walk-<tag> two`; in "Availability"
      delete the pattern of check 137, then the type. → The type is gone from the list.
 
-## 11. The four facts of a person, and "My details"
+## 11. Times on 5-minute steps
 
-Walked as `admin`, then `alice`, after section 10 (`docs/EMAIL_ARCHITECTURE.md` section 4). It
+Walked as `admin` and `alice`, in **next week's Sunday**, which the seed leaves without
+windows (`docs/SHARED_CALENDAR_SPEC.md` decisions D32 and D33; `docs/FRONTEND_ARCHITECTURE.md`
+section 11, decisions 195 to 202). **What it needs**: nothing more than section 1. **What it
+leaves**: nothing, after check 170. A run at the other width is a run of its own, on the Sunday
+after.
+
+**The two lists.** As `admin`, in "Availability".
+
+157. `[K]` The pattern's form. → "Start" and "End" are each two lists side by side with a colon
+     between them, the hour and the minute; Tab goes from the start's hour to its minute, then
+     to the end's hour and minute. A screen reader names them "Hour" and "Minute" in the group
+     "Start" or "End". The start's minutes are 00 to 55, five apart; the end's minute list holds
+     one value, the start's minute: it is shown and is not a choice.
+158. `[K]` Choose the start's hour 08, then its minute 05. → "End" is 09:05; its hours are 09 to
+     23, its minute 05 alone. Choose the end's hour 12. → "End" is 12:05, "Start" stays 08:05.
+     Choose the start's minute 30. → "End" is 12:30: the end keeps its hour.
+159. `[K]` Choose the start's hour 23. → Its minute list holds only 00; "End" is 24:00, its hour
+     list holding only 24. Choose "Start" 08:00. → The end's hours reach 24.
+160. `[K]` Create a pattern on Sunday, 08:05 to 12:05, Studio, valid from today. → The row
+     "08:05 – 12:05 Studio"; the form back on 09:00 to 10:00.
+161. `[K]` Its "Change". → The dialog with 08:05 and 12:05 as they are. Choose the start's hour
+     10. → "End" is 11:05. "Close".
+162. `[K]` Show next week's Sunday, "This day only…". In the box's form choose the start's hour
+     14. → "End" is 15:00. In "Extra windows" choose "Start" 16:40. → "End" is 17:40, its minute
+     40 alone. "Discard".
+
+**The book dialog.** In "Week", next week.
+
+163. → Sunday has a Studio window 08:05–12:05 with four slots: 08:05–09:05, 09:05–10:05,
+     10:05–11:05 and 11:05–12:05.
+164. `[K]` Press the slot 10:05–11:05. → "Start" 10:05 and "End" 11:05; the start's hours are
+     08 to 12, the end's 08 to 12, each minute list 00 to 55. Choose "Start" 10:10. → "End"
+     11:10. Choose "End" 10:35, `alice`, "Book". → An appointment 10:10–10:35 of `alice`,
+     and the slot a tab "Full" beside it. Open it: "10:10–10:35"; cancel it.
+165. `[K]` Press the slot 09:05–10:05, choose "Start" 08:00, before the window. → "End" 09:00.
+     "Book". → "This time is not within the hours open for booking. Please choose another
+     time."; the dialog stays open. Choose "Start" 11:40. → "End" 12:05, the window's end.
+     "Close".
+
+**Short appointments.**
+
+166. `[K]` For `alice`: 08:05–08:10 from the slot 08:05–09:05, 09:05–09:20 and 09:30–09:40 from
+     the slot 09:05–10:05, 10:10–10:15 and 10:15–11:05 from the slot 10:05–11:05. The slot
+     11:05–12:05 stays free.
+167. → The four short ones are as tall as a quarter of an hour, their time and "alice" readable
+     on one line, whole; 10:10–10:15 and 10:15–11:05 stand side by side, each half the width,
+     and the short one, too narrow for both its times, says "10:10 alice"; the others the whole
+     width, leaving the tab "Full" its room. Press 10:10. → Its detail says "10:10–10:15".
+     "Close".
+168. As `alice`, next week. → The same five, "You", drawn the same; Sunday offers one slot,
+     11:05–12:05, the one left free. `[K]` Book it. → An appointment 11:05–12:05, "You", and no
+     slot of Sunday is offered any more.
+169. → At both widths: at 390 × 844 the two lists of a time fit beside each other in every
+     form and dialog, each showing its whole value ("09", not "0"), and the page does not
+     scroll sideways.
+170. Clean up as `admin`: cancel the five appointments of check 166 and `alice`'s 11:05 of check
+     168, delete the pattern of check 160. → Sunday is empty again.
+
+## 12. The four facts of a person, and "My details"
+
+Walked as `admin`, then `alice`, after section 11 (`docs/EMAIL_ARCHITECTURE.md` section 4). It
 leaves nothing behind: the user it creates is deleted at its end, and `admin`'s facts are put
 back as found.
 
-157. `[K]` As `admin`, in "Users". → The form: "Username", "First name", "Last name", "E-mail",
+171. `[K]` As `admin`, in "Users". → The form: "Username", "First name", "Last name", "E-mail",
      "Postal address" (a box of several lines), then "Create user".
-158. `[K]` `[N]` Type `walk-<tag>-e` and nothing else, "Create user". → A refusal under each of
+172. `[K]` `[N]` Type `walk-<tag>-e` and nothing else, "Create user". → A refusal under each of
      the four facts, in red, every field in fault marked; no request.
-159. `[K]` Type an e-mail without "@". → Its refusal stays. Complete it. → It goes as the last key
+173. `[K]` Type an e-mail without "@". → Its refusal stays. Complete it. → It goes as the last key
      is typed; the other refusals stay until their own field is right.
-160. `[K]` Fill the four facts (section 1) and "Create user". → The password dialog; behind it the
+174. `[K]` Fill the four facts (section 1) and "Create user". → The password dialog; behind it the
      row `walk-<tag>-e` with "Walk <tag>-e" and its e-mail, and the five fields empty. Close it.
-161. `[K]` Press "Edit" on that row. → A dialog "Edit walk-<tag>-e", the four facts filled from
+175. `[K]` Press "Edit" on that row. → A dialog "Edit walk-<tag>-e", the four facts filled from
      the row, the keyboard on the first field.
-162. `[K]` Empty the first name, "Save". → Refused under the field; the dialog stays open. Type it
+176. `[K]` Empty the first name, "Save". → Refused under the field; the dialog stays open. Type it
      again: the refusal goes.
-163. `[K]` `[N]` Change the last name to `Verdi`, "Save". → One `PUT /users/walk-<tag>-e`; the
+177. `[K]` `[N]` Change the last name to `Verdi`, "Save". → One `PUT /users/walk-<tag>-e`; the
      dialog closes; the row says "Walk Verdi".
-164. `[K]` "Edit" again, change a field, then "Cancel"; then again and the Escape key. → Nothing
+178. `[K]` "Edit" again, change a field, then "Cancel"; then again and the Escape key. → Nothing
      saved; the row as it was.
-165. `[K]` Press "My details". → "My details": Username `admin`, Role "Administrator", the four
+179. `[K]` Press "My details". → "My details": Username `admin`, Role "Administrator", the four
      facts of the seed, the address on its two lines; the button "Edit".
-166. `[K]` "Edit". → "Edit my details", filled; the browser may offer its own address there.
+180. `[K]` "Edit". → "Edit my details", filled; the browser may offer its own address there.
      Empty the first name, "Save". → Refused. "Cancel".
-167. `[K]` `[N]` "Edit", change the first name, "Save". → One `PUT /users/admin`, then one
+181. `[K]` `[N]` "Edit", change the first name, "Save". → One `PUT /users/admin`, then one
      `GET /me`; the details show the change. Put it back the same way.
-168. → At 390 × 844 the rows wrap rather than run off, an e-mail breaks inside the row, and the
+182. → At 390 × 844 the rows wrap rather than run off, an e-mail breaks inside the row, and the
      page does not scroll sideways. Delete `walk-<tag>-e`.
-169. `[K]` Sign out, sign in as `alice`, press "My details". → Her username, "User", her four
+183. `[K]` Sign out, sign in as `alice`, press "My details". → Her username, "User", her four
      facts; no "Edit"; the sentence "To change your details, ask the Administrator."
-170. `[=]` The address `#/users`, typed by hand as `alice`. → The week.
+184. `[=]` The address `#/users`, typed by hand as `alice`. → The week.
 
-## 12. The mail of two dates
+## 13. The mail of two dates
 
-Walked as `alice`, then `admin`, after section 11, with `local:lambda` running (section 1;
+Walked as `alice`, then `admin`, after section 12, with `local:lambda` running (section 1;
 `docs/EMAIL_ARCHITECTURE.md` sections 6.5 and 9.1). It leaves the mails in the fake mail, until
 `local:down`, and the day's counts of the two accounts in the table `mail`: `alice` has none left
 today, `admin` four.
 
-171. `[K]` As `alice`, on the week. → After "Next", the button "E-mail…". Press it. → The dialog
+185. `[K]` As `alice`, on the week. → After "Next", the button "E-mail…". Press it. → The dialog
      "E-mail the appointments", "Your appointments between the two dates, as an Excel file, to
      your own e-mail address.", "From" and "To" side by side with the Monday and the Sunday of
      the week on show, then "Close" and "Send"; the keyboard in the dialog.
-172. `[K]` "Close", "Next", "E-mail…". → The dates of the next week.
-173. `[K]` `[N]` Put "From" after "To", "Send". → "Choose two dates, the first not after the
+186. `[K]` "Close", "Next", "E-mail…". → The dates of the next week.
+187. `[K]` `[N]` Put "From" after "To", "Send". → "Choose two dates, the first not after the
      second, at most 366 days in all."; no request.
-174. `[K]` `[N]` Put the week's dates back, "Send". → One `POST /mail/calendar` answered `202`,
+188. `[K]` `[N]` Put the week's dates back, "Send". → One `POST /mail/calendar` answered `202`,
      then one `GET /me`; "Send" disabled until then; the dialog stays open and says "On its way
      to a•••@example.com".
-175. Open http://localhost:8025. → On top, a mail "Your appointments, …" to `alice@example.com`,
+189. Open http://localhost:8025. → On top, a mail "Your appointments, …" to `alice@example.com`,
      with the file `my-appointments-<from>-to-<to>.xlsx`. Download it and open it. → One sheet,
      "Appointments": the headings `Date`, `Start`, `End`, `Type`, `Username`, `Status`,
      `Cancelled because`, `Note`, `Booked at`, no names; one row per appointment of `alice` in
      the week, cancelled ones too, and nobody else's.
-176. `[K]` Back in the page: "Close", "E-mail…". → Nothing of before: the sentence of what the
+190. `[K]` Back in the page: "Close", "E-mail…". → Nothing of before: the sentence of what the
      mail holds, the dates of the week, no "On its way", no failure.
-177. `[K]` "Send" four times more, each after its answer. → "On its way…" each time. A sixth. →
+191. `[K]` "Send" four times more, each after its answer. → "On its way…" each time. A sixth. →
      "You have asked for as many e-mails as a day allows. Please try again tomorrow."; the fake
      mail has five mails for `alice`, not six.
-178. `[K]` Sign out, sign in as `admin`, "E-mail…". → "The whole calendar between the two dates,
+192. `[K]` Sign out, sign in as `admin`, "E-mail…". → "The whole calendar between the two dates,
      as an Excel file, to your own e-mail address." "Send". → "On its way to a•••@example.com".
-179. At http://localhost:8025, the newest mail. → "Calendar, …" to `admin@example.com`, the
+193. At http://localhost:8025, the newest mail. → "Calendar, …" to `admin@example.com`, the
      file `calendar-<from>-to-<to>.xlsx`; opened, its headings have `First name` and `Last name`
      after `Username`, and its rows are every person's appointments of the week, with their
      names.
-180. → At 390 × 844 the dialog fits the screen, the two dates side by side, "On its way to …"
+194. → At 390 × 844 the dialog fits the screen, the two dates side by side, "On its way to …"
      breaks inside the line rather than running off, and the page does not scroll sideways.
 
-## 13. The daily e-mail
+## 14. The daily e-mail
 
-Walked as `admin`, after section 12, with `local:lambda` running (section 1;
+Walked as `admin`, after section 13, with `local:lambda` running (section 1;
 `docs/EMAIL_ARCHITECTURE.md` sections 6.2 and 11). It leaves the mail settings as saved last,
 the daily mail in the fake mail until `local:down`, and today's daily mark in the table `mail`.
-Checks 186 and 187 need the API restarted with `MAIL_STAGE` `off` in `backend/env.local.json`
+Checks 200 and 201 need the API restarted with `MAIL_STAGE` `off` in `backend/env.local.json`
 then `on` again: do them last, or skip them in a short walk.
 
-181. `[K]` As `admin`, "Settings". → Under the calendar's settings, "Daily e-mail": "Send the
+195. `[K]` As `admin`, "Settings". → Under the calendar's settings, "Daily e-mail": "Send the
      daily e-mail" ticked and "Hour" `07:00` (the defaults, if nobody saved), "A whole hour, from
      00:00 to 23:00, in the calendar's time zone, Europe/Rome.", the sentence on the two files,
      and "Save daily e-mail".
-182. `[K]` `[N]` Type `7:30` in "Hour", "Save daily e-mail". → "The hour must be a whole hour
+196. `[K]` `[N]` Type `7:30` in "Hour", "Save daily e-mail". → "The hour must be a whole hour
      from 00:00 to 23:00, such as 07:00." under it, marked; no request. `24` the same.
-183. `[K]` `[N]` Type the current hour in Rome, for example `15`, "Save daily e-mail". → One
+197. `[K]` `[N]` Type the current hour in Rome, for example `15`, "Save daily e-mail". → One
      `PUT /mail/settings` answered `200`, then one `GET /mail/settings`; "Daily e-mail saved.";
      the field says `15:00`. An edit takes the sentence away. The calendar's settings above are
      unchanged, and their "Save" sent nothing.
-184. In a terminal, `npm run mail:daily -w backend`. → `"outcome":"sent"`, `mailCount` 1 (one per
+198. In a terminal, `npm run mail:daily -w backend`. → `"outcome":"sent"`, `mailCount` 1 (one per
      administrator with an address). At http://localhost:8025, the newest mail: "Calendar: next
      7 days and backup, …" to `admin@example.com` with two files, `calendar-next-7-days-<today>.xlsx` (the booked
      appointments of today and the next six days, with the names) and
      `calendar-backup-from-<1st of last month>.xlsx` (every appointment from then, cancelled
      ones too). Open both.
-185. Run it again. → `"outcome":"already_sent"`; no new mail.
-186. `[N]` With the API restarted at `MAIL_STAGE` `off`, "Settings". → The calendar's settings
+199. Run it again. → `"outcome":"already_sent"`; no new mail.
+200. `[N]` With the API restarted at `MAIL_STAGE` `off`, "Settings". → The calendar's settings
      as before; in place of the daily e-mail's fields, "E-mail is not available yet.", no "Try
      again".
-187. Set `MAIL_STAGE` back to `on` and restart the API. → "Daily e-mail" has its fields again.
-188. → At 390 × 844 the part fits the screen under the calendar's settings, and the page does
+201. Set `MAIL_STAGE` back to `on` and restart the API. → "Daily e-mail" has its fields again.
+202. → At 390 × 844 the part fits the screen under the calendar's settings, and the page does
      not scroll sideways.
 
-## 14. A mail through the assistant
+## 15. A mail through the assistant
 
-Walked as `admin`, after section 13, with the fake Claude and `local:lambda` running (section 1;
-`docs/EMAIL_ARCHITECTURE.md` section 7). `alice` has no mail left today after section 12, so
+Walked as `admin`, after section 14, with the fake Claude and `local:lambda` running (section 1;
+`docs/EMAIL_ARCHITECTURE.md` section 7). `alice` has no mail left today after section 13, so
 `admin` asks: one of its four left. It leaves one more mail to `admin@example.com` in the fake
 mail and the day's count of `admin` at two.
 
-189. `[K]` As `admin`, open the panel and send `fake: e-mail me my appointments of the mail
+203. `[K]` As `admin`, open the panel and send `fake: e-mail me my appointments of the mail
      journey`. → "Looking at your details…" while it works, then the block "Make this change?"
      with the line "Send the calendar from …day 7 days ahead… to …day 13 days ahead… to
      a•••@example.com.", the dates with the weekday in full, and "Confirm" and "Don't". The whole
      address is nowhere in the panel. Nothing new at http://localhost:8025.
-190. `[K]` `[N]` "Confirm". → One `POST /assistant/proposals/<id>/confirm` answered `200`; the
+204. `[K]` `[N]` "Confirm". → One `POST /assistant/proposals/<id>/confirm` answered `200`; the
      line says "Done" and the assistant's closing words say the mail is on its way, with no
      address. Within seconds, at http://localhost:8025, a mail "Calendar, …" to
      `admin@example.com` with the file `calendar-<from>-to-<to>.xlsx` of those dates.
-191. `[K]` Send the same sentence again, then "Don't". → "Nothing was changed."; no new mail at
+205. `[K]` Send the same sentence again, then "Don't". → "Nothing was changed."; no new mail at
      the fake mail.
-192. → At 390 × 844 the proposal's line breaks inside the panel, the masked address with it,
+206. → At 390 × 844 the proposal's line breaks inside the panel, the masked address with it,
      and the page does not scroll sideways.
 
-## 15. The first sign-in: "Choose your password"
+## 16. The first sign-in: "Choose your password"
 
-Walked as a User of its own, after section 14, or alone on any running stack: it needs only
+Walked as a User of its own, after section 15, or alone on any running stack: it needs only
 `local:up`, `local:api` and the page. It makes one User with a temporary password through
 `npm run test-user -w backend -- local walk-<tag>-first` (the e-mail
 `walk-<tag>-first@example.com`, the name "Test User walk-<tag>-first", an address made up; the
 temporary password typed twice, `Walk-<tag>-Temp-1!`), and leaves nothing: the User is deleted
-in the Users page at the end (check 200). The new password: `Walk-<tag>-First-2?`.
+in the Users page at the end (check 214). The new password: `Walk-<tag>-First-2?`.
 
 cognito-local checks neither the challenge's session nor the pool's rule for the new password
 (`docs/EMAIL_ARCHITECTURE.md` section 14.1): the page checks the rule itself before it sends
-anything, and the end of Cognito's 3 minutes is walked at the deployed page only (check 202).
+anything, and the end of Cognito's 3 minutes is walked at the deployed page only (check 216).
 
-193. `[K]` Sign in as `walk-<tag>-first` with the temporary password. → In place of the sign-in
+207. `[K]` Sign in as `walk-<tag>-first` with the temporary password. → In place of the sign-in
      form, "Choose your password", "You signed in as walk-<tag>-first with a temporary password.
      Choose your own password to go on.", the keyboard in "New password". Under it the five
      conditions of the password screen (check 123); under "New password again" "Type the new
      password once more."; "Choose password" out of use; "Cancel". No frame, no header, no
      panel. In the Network panel one request to `/cognito/`, `InitiateAuth`, answered 200.
-194. `[K]` In "New password" type `walk`, then go on to `Walk-<tag>-First-2?` one character at a
+208. `[K]` In "New password" type `walk`, then go on to `Walk-<tag>-First-2?` one character at a
      time. → Each condition goes from the list as soon as it is met. In "New password again"
      the new password with its last character missing → "The two new passwords are not the
      same."; whole, the sentence goes and "Choose password" can be pressed.
-195. `[K]` "Cancel". → The sign-in form again, the username still in its field, the password field
+209. `[K]` "Cancel". → The sign-in form again, the username still in its field, the password field
      empty, the keyboard in it, no sentence; nothing sent to `/cognito/`. Sign in again with the
      temporary password. → "Choose your password" again, both fields empty.
-196. `[N]` Type `Weak-1` in both fields and press Enter in the second. → Nothing is sent: the
+210. `[N]` Type `Weak-1` in both fields and press Enter in the second. → Nothing is sent: the
      conditions it misses stay under "New password" and the button stays out of use.
-197. `[K]` `[N]` The new password twice, "Choose password". → One request to `/cognito/`,
+211. `[K]` `[N]` The new password twice, "Choose password". → One request to `/cognito/`,
      `RespondToAuthChallenge`, answered 200; the frame, the header says `walk-<tag>-first` and
      "User", the address ends in `#/week`. Neither password, nor the session, is anywhere in the
      page or the address.
-198. `[K]` "Sign out", then sign in with the temporary password. → "The username or the password
+212. `[K]` "Sign out", then sign in with the temporary password. → "The username or the password
      is not correct."; no "Choose your password".
-199. `[K]` Sign in with the new password. → The frame, as in check 197. Sign out.
-200. Sign in as `admin`, "Users": `walk-<tag>-first` is in the list. Delete it. Sign out.
-201. → At 390 × 844, with a new account made by the script (checks 193, 194): the card takes the
+213. `[K]` Sign in with the new password. → The frame, as in check 211. Sign out.
+214. Sign in as `admin`, "Users": `walk-<tag>-first` is in the list. Delete it. Sign out.
+215. → At 390 × 844, with a new account made by the script (checks 207, 208): the card takes the
      width, the list of conditions and the two buttons wrap inside it, and the page does not
-     scroll sideways. Delete the account afterwards (check 200).
-202. At the deployed page only (`docs/EMAIL_PLAN.md` step m9, with the operator's test User):
+     scroll sideways. Delete the account afterwards (check 214).
+216. At the deployed page only (`docs/EMAIL_PLAN.md` step m9, with the operator's test User):
      sign in with the temporary password, wait more than 3 minutes on "Choose your password",
      then "Choose password" with a good one. → The sign-in form, the username in its field,
      "This took too long. Please sign in again."; the temporary password still works.
 
-## 16. The invitation when e-mail is off, and at a phone width
+## 17. The invitation when e-mail is off, and at a phone width
 
-Walked as `admin`, after section 15, or alone on any running stack. Check 203 needs the API
-restarted with `MAIL_STAGE` `off`, as check 186 does; it leaves nothing, since nothing is made.
+Walked as `admin`, after section 16, or alone on any running stack. Check 217 needs the API
+restarted with `MAIL_STAGE` `off`, as check 200 does; it leaves nothing, since nothing is made.
 
-203. `[N]` With the API at `MAIL_STAGE` `off`: in "Users" fill the form for `walk-<tag>-off`,
+217. `[N]` With the API at `MAIL_STAGE` `off`: in "Users" fill the form for `walk-<tag>-off`,
      "Create user", "Confirm". → In the dialog "E-mail is not available yet."; one `POST /users`
      answered 503; the list has no `walk-<tag>-off`. "Back". On the row of an invited User,
      "Resend invitation", "Confirm" → the same sentence.
-204. Set `MAIL_STAGE` back to `on` and restart the API. → "Create user" and "Confirm" invite
+218. Set `MAIL_STAGE` back to `on` and restart the API. → "Create user" and "Confirm" invite
      again (check 57). Delete what was made.
-205. → At 390 × 844 the rows with their state and "Resend invitation" wrap inside the list, the
+219. → At 390 × 844 the rows with their state and "Resend invitation" wrap inside the list, the
      dialog's sentence with a long address wraps inside the dialog, and the page does not scroll
      sideways.

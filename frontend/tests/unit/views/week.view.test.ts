@@ -8,7 +8,7 @@ import type { WeekState } from '../../../src/logic/week.screen';
 import type { BookState, CancelState, ChangeState, UpdateNoteState } from '../../../src/services/appointments.types';
 import type { ListUsersState } from '../../../src/services/users.types';
 import { mountWeek, type WeekDeps } from '../../../src/views/week.view';
-import { find, submit, useRealPage } from './page';
+import { choicesOf, choose, chooseTime, clock, find, submit, timeIn, useRealPage } from './page';
 
 // The DOM test of the week view (docs/FRONTEND_ARCHITECTURE.md section 8): the real index.html,
 // and a fake WeekScreen, a fake AppointmentsService and a fake UsersService whose streams the
@@ -69,7 +69,7 @@ const WEEK: WeekModel = {
         slot(at('60%', '10%', '02:00 +01:00 – 03:00 +01:00', 1, 2), 5),
       ],
       busy: [at('10%', '10%', '09:00–10:00')],
-      appointments: [{ ...at('30%', '12.5%', '11:00–12:15'), appointmentId: APPOINTMENT, who: 'You', typeName: 'Studio', note: 'First lesson', colour: 2, beside: false }],
+      appointments: [{ ...at('30%', '12.5%', '11:00–12:15'), appointmentId: APPOINTMENT, who: 'You', typeName: 'Studio', note: 'First lesson', colour: 2, beside: false, short: false, shown: '11:00–12:15' }],
     }),
     day('2026-11-17', 'Tue 17 Nov', { today: true }),
     ...['Wed 18 Nov', 'Thu 19 Nov', 'Fri 20 Nov', 'Sat 21 Nov', 'Sun 22 Nov'].map((label, i) => day(`2026-11-${18 + i}`, label)),
@@ -83,7 +83,7 @@ const OTHER: WeekModel = {
   legend: [{ name: 'Piscina', colour: 1 }],
   days: [
     day('2026-11-23', 'Mon 23 Nov', {
-      appointments: [{ ...at('0%', '50%', '06:00–07:00'), appointmentId: OTHER_APPOINTMENT, who: 'bob', typeName: 'Piscina', note: '', colour: 1, beside: false }],
+      appointments: [{ ...at('0%', '50%', '06:00–07:00'), appointmentId: OTHER_APPOINTMENT, who: 'bob', typeName: 'Piscina', note: '', colour: 1, beside: false, short: false, shown: '06:00–07:00' }],
     }),
   ],
 };
@@ -318,7 +318,7 @@ describe('mountWeek', () => {
           windows: [{ ...at('0%', '10%', SCRIPT), typeName: SCRIPT, colour: 0 }],
           slots: [slot(at('0%', '10%', SCRIPT), 0)],
           busy: [at('0%', '10%', SCRIPT)],
-          appointments: [{ ...at('0%', '10%', SCRIPT), appointmentId: APPOINTMENT, who: SCRIPT, typeName: SCRIPT, note: SCRIPT, colour: 0, beside: false }],
+          appointments: [{ ...at('0%', '10%', SCRIPT), appointmentId: APPOINTMENT, who: SCRIPT, typeName: SCRIPT, note: SCRIPT, colour: 0, beside: false, short: false, shown: SCRIPT }],
         }),
       ],
     };
@@ -359,6 +359,7 @@ describe('mountWeek', () => {
   });
 
   // The two dialogs of the week and what is in them.
+  const MINUTES = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
   const book = () => find<HTMLDialogElement>('#week dialog.book');
   const bookForm = () => find<HTMLFormElement>('#week dialog.book form');
   const note = () => find<HTMLTextAreaElement>('#week dialog.book [name="note"]');
@@ -367,6 +368,9 @@ describe('mountWeek', () => {
   const select = (name: string) => find<HTMLSelectElement>(`#week dialog.book [name="${name}"]`);
   const options = (name: string) => [...select(name).options].map((option) => option.value);
   const usersMessage = () => find('#week dialog.book .users-message');
+  // The Administrator's two times, an hour and a minute each, read as one `HH:mm` text.
+  const time = (name: 'start' | 'end') => timeIn(bookForm(), name);
+  const times = () => [time('start'), time('end')];
   const detail = () => find<HTMLDialogElement>('dialog.detail');
   const detailError = () => find('dialog.detail .error');
   const cancelButton = () => find<HTMLButtonElement>('dialog.detail .cancel');
@@ -406,7 +410,7 @@ describe('mountWeek', () => {
       const { users } = mounted(state({ week: WEEK }));
       find('#week .slot').click();
       expect(find('#week dialog.book .choices').hidden).toBe(true);
-      expect([options('username'), options('start'), options('end')]).toEqual([[], [], []]);
+      expect([options('username'), options('start-hour'), options('start-minute'), options('end-hour'), options('end-minute')]).toEqual([[], [], [], [], []]);
       expect(users.listUsers).not.toHaveBeenCalled();
     });
 
@@ -604,12 +608,49 @@ describe('mountWeek', () => {
       expect(users.listUsers).toHaveBeenCalledTimes(2);
     });
 
-    it('the times are every quarter of the slot\'s window, set to the slot\'s own', () => {
+    it('the hours are those the slot\'s window 08:00–12:00 touches, the minutes all twelve; the times open as the slot\'s own', () => {
       opened();
-      expect(options('start')).toHaveLength(16);
-      expect([options('start')[0], options('start').at(-1)]).toEqual(['08:00', '11:45']);
-      expect([options('end')[0], options('end').at(-1)]).toEqual(['08:15', '12:00']);
-      expect([select('start').value, select('end').value]).toEqual(['08:00', '09:00']);
+      const [startHour, startMinute] = clock(bookForm(), 'start');
+      const [endHour, endMinute] = clock(bookForm(), 'end');
+      expect([choicesOf(startHour), choicesOf(endHour)]).toEqual([['08', '09', '10', '11'], ['08', '09', '10', '11', '12']]);
+      expect([choicesOf(startMinute), choicesOf(endMinute)]).toEqual([MINUTES, MINUTES]);
+      expect(times()).toEqual(['08:00', '09:00']);
+    });
+
+    it('a start chosen sets the end one hour later; chosen twice, sets it twice; the end chosen leaves the start', () => {
+      opened();
+      chooseTime(bookForm(), 'start', '10:10');
+      expect(times()).toEqual(['10:10', '11:10']);
+      chooseTime(bookForm(), 'start', '09:05');
+      expect(times()).toEqual(['09:05', '10:05']);
+      chooseTime(bookForm(), 'end', '09:30');
+      expect(times()).toEqual(['09:05', '09:30']);
+    });
+
+    it('a start whose hour later is past the window sets the end at the window\'s end: 11:40 gives 12:00', () => {
+      opened();
+      chooseTime(bookForm(), 'start', '11:40');
+      expect(times()).toEqual(['11:40', '12:00']);
+    });
+
+    it('"Book" with 10:10–10:35, chosen as a person does: the start first, then the end', () => {
+      const { listUsersState$, appointments } = opened();
+      listUsersState$.next(ALICE_AND_BOB);
+      chooseTime(bookForm(), 'start', '10:10');
+      chooseTime(bookForm(), 'end', '10:35');
+      submit(bookForm());
+      expect(appointments.book).toHaveBeenCalledWith({ start: '2026-11-16T09:10:00.000Z', end: '2026-11-16T09:35:00.000Z', username: 'alice' });
+    });
+
+    it('a time outside the window can be put together: it is sent, and the server\'s refusal is said in the dialog\'s words', () => {
+      const { listUsersState$, bookState$, appointments } = opened();
+      listUsersState$.next(ALICE_AND_BOB);
+      chooseTime(bookForm(), 'end', '12:30');
+      submit(bookForm());
+      expect(appointments.book).toHaveBeenCalledWith({ start: '2026-11-16T07:00:00.000Z', end: '2026-11-16T11:30:00.000Z', username: 'alice' });
+      bookState$.next({ status: 'pending', booking: appointments.book.mock.lastCall![0] });
+      bookState$.next({ status: 'failure', reason: 'outside_availability', message: 'x' });
+      expect([bookError().textContent, book().open, times()]).toEqual(['This time is not within the hours open for booking. Please choose another time.', true, ['08:00', '12:30']]);
     });
 
     it('before the list arrives and while it loads: no choice, "Book" disabled, and loading says so', () => {
@@ -672,8 +713,8 @@ describe('mountWeek', () => {
     it('"Book" with a custom start and end: the two times of the slot\'s day in the calendar\'s zone', () => {
       const { listUsersState$, appointments } = opened();
       listUsersState$.next(ALICE_AND_BOB);
-      select('start').value = '10:15';
-      select('end').value = '10:45';
+      chooseTime(bookForm(), 'start', '10:15');
+      chooseTime(bookForm(), 'end', '10:45');
       submit(bookForm());
       expect(appointments.book).toHaveBeenCalledWith({ start: '2026-11-16T09:15:00.000Z', end: '2026-11-16T09:45:00.000Z', username: 'alice' });
     });
@@ -681,15 +722,15 @@ describe('mountWeek', () => {
     it('an end not after the start goes to the service, whose refusal is shown in plain words with the dialog open', () => {
       const { listUsersState$, bookState$, appointments } = opened();
       listUsersState$.next(ALICE_AND_BOB);
-      select('start').value = '11:00';
-      select('end').value = '10:00';
+      chooseTime(bookForm(), 'start', '11:00');
+      chooseTime(bookForm(), 'end', '10:00');
       submit(bookForm());
       expect(appointments.book).toHaveBeenCalledWith({ start: '2026-11-16T10:00:00.000Z', end: '2026-11-16T09:00:00.000Z', username: 'alice' });
       bookState$.next({ status: 'pending', booking: appointments.book.mock.lastCall![0] });
       bookState$.next({ status: 'failure', reason: 'invalid_request', message: 'end: end must be after start' });
       expect(bookError().textContent).toBe('The request was not accepted. Check what you entered and try again.');
       expect(book().open).toBe(true);
-      expect([select('start').value, select('end').value]).toEqual(['11:00', '10:00']);
+      expect(times()).toEqual(['11:00', '10:00']);
     });
 
     it('a booking under way and a list still loading both keep "Book" disabled', () => {
@@ -705,12 +746,12 @@ describe('mountWeek', () => {
       const { listUsersState$ } = opened();
       listUsersState$.next(ALICE_AND_BOB);
       select('username').value = 'bob';
-      select('start').value = '10:15';
+      chooseTime(bookForm(), 'start', '10:15');
       note().value = 'For Bob';
       book().close();
 
       find('#week .slot').click();
-      expect([select('start').value, select('end').value]).toEqual(['08:00', '09:00']);
+      expect(times()).toEqual(['08:00', '09:00']);
       expect(note().value).toBe('');
       listUsersState$.next(ALICE_AND_BOB);
       expect(select('username').value).toBe('alice');
@@ -759,7 +800,7 @@ describe('mountWeek', () => {
   it('a note and a username containing <script> are shown as text in both dialogs', () => {
     const week: WeekModel = { ...WEEK, days: [day('2026-11-16', 'Mon 16 Nov', {
       slots: [slot(at('0%', '10%', SCRIPT), 0, { day: SCRIPT, typeName: SCRIPT })],
-      appointments: [{ ...at('0%', '10%', '11:00–12:15'), appointmentId: APPOINTMENT, who: SCRIPT, typeName: SCRIPT, note: SCRIPT, colour: 0, beside: false }],
+      appointments: [{ ...at('0%', '10%', '11:00–12:15'), appointmentId: APPOINTMENT, who: SCRIPT, typeName: SCRIPT, note: SCRIPT, colour: 0, beside: false, short: false, shown: '11:00–12:15' }],
     })] };
     const scripted: AppointmentDetail = { ...DETAIL, when: SCRIPT, typeName: SCRIPT, who: SCRIPT, note: SCRIPT, booked: SCRIPT, hint: SCRIPT };
     const { listUsersState$ } = mounted(state({ week }), 'admin', [scripted]);
@@ -940,7 +981,7 @@ describe('mountWeek', () => {
   const TWO: WeekModel = {
     ...WEEK,
     days: [
-      { ...WEEK.days[0]!, appointments: [...WEEK.days[0]!.appointments, { ...at('70%', '10%', '15:00–16:00'), appointmentId: OTHER_APPOINTMENT, who: 'You', typeName: 'Swimming Pool', note: '', colour: 5, beside: false }] },
+      { ...WEEK.days[0]!, appointments: [...WEEK.days[0]!.appointments, { ...at('70%', '10%', '15:00–16:00'), appointmentId: OTHER_APPOINTMENT, who: 'You', typeName: 'Swimming Pool', note: '', colour: 5, beside: false, short: false, shown: '15:00–16:00' }] },
       ...WEEK.days.slice(1),
     ],
   };
@@ -1225,8 +1266,8 @@ describe('mountWeek', () => {
         expect(find('#week dialog.book .user').hidden).toBe(true);
         expect(users.listUsers).not.toHaveBeenCalled();
         expect(options('username')).toEqual([]);
-        expect(options('start')).toHaveLength(16);
-        expect([select('start').value, select('end').value]).toEqual(['08:00', '09:00']);
+        expect(options('start-hour')).toHaveLength(4);
+        expect(times()).toEqual(['08:00', '09:00']);
         // "Change" does not wait for a list that is never asked for.
         expect(bookSubmit().disabled).toBe(false);
       });
@@ -1243,8 +1284,8 @@ describe('mountWeek', () => {
       it('"Change" with a custom start and end: the two times of the slot\'s day in the calendar\'s zone', () => {
         const { appointments } = moving('admin', WEEK, FOR_ALICE);
         find('#week .slot').click();
-        select('start').value = '10:15';
-        select('end').value = '10:45';
+        chooseTime(bookForm(), 'start', '10:15');
+        chooseTime(bookForm(), 'end', '10:45');
         note().value = '';
         submit(bookForm());
         expect(appointments.change).toHaveBeenCalledWith(APPOINTMENT, { start: '2026-11-16T09:15:00.000Z', end: '2026-11-16T09:45:00.000Z', note: '' });
@@ -1473,9 +1514,9 @@ describe('mountWeek', () => {
             slot(at('10%', '10%', '09:00–10:00'), 5, { places: 'Full', full: true, start: '2026-11-16T08:00:00.000Z', end: '2026-11-16T09:00:00.000Z' }),
           ],
           appointments: [
-            { ...at('30%', '10%', '11:00–12:00', 0, 3), appointmentId: 'appt-x', who: 'erin', typeName: 'Swimming Pool', note: '', colour: 5, beside: false },
-            { ...at('30%', '10%', '11:00–12:00', 1, 3), appointmentId: 'appt-y', who: 'fred', typeName: 'Swimming Pool', note: '', colour: 5, beside: false },
-            { ...at('30%', '10%', '11:00–12:00', 2, 3), appointmentId: 'appt-z', who: 'gina', typeName: 'Swimming Pool', note: '', colour: 5, beside: false },
+            { ...at('30%', '10%', '11:00–12:00', 0, 3), appointmentId: 'appt-x', who: 'erin', typeName: 'Swimming Pool', note: '', colour: 5, beside: false, short: false, shown: '11:00–12:00' },
+            { ...at('30%', '10%', '11:00–12:00', 1, 3), appointmentId: 'appt-y', who: 'fred', typeName: 'Swimming Pool', note: '', colour: 5, beside: false, short: false, shown: '11:00–12:00' },
+            { ...at('30%', '10%', '11:00–12:00', 2, 3), appointmentId: 'appt-z', who: 'gina', typeName: 'Swimming Pool', note: '', colour: 5, beside: false, short: false, shown: '11:00–12:00' },
           ],
           groups: [GROUP],
         }),
@@ -1537,6 +1578,19 @@ describe('mountWeek', () => {
         expect([...slots(), ...all('.appointment')].some((element) => element.classList.contains('tab') || element.classList.contains('beside'))).toBe(false);
       });
 
+      it('an appointment drawn at the least height is marked short, for the style sheet; the others are not', () => {
+        const shortOne: WeekModel = { ...CAPACITY, days: [{ ...CAPACITY.days[0]!, appointments: CAPACITY.days[0]!.appointments.map((a, i) => ({ ...a, short: i === 0 })) }] };
+        mounted(state({ week: shortOne }), 'admin');
+        expect(all('.appointment').map((button) => button.classList.contains('short'))).toEqual([true, false, false, false]);
+      });
+
+      it('a block draws the time it is given to show, its start alone, and is named with its whole time', () => {
+        const narrow: WeekModel = { ...CAPACITY, days: [{ ...CAPACITY.days[0]!, appointments: CAPACITY.days[0]!.appointments.map((a, i) => ({ ...a, short: i === 0, shown: i === 0 ? '11:00' : a.shown })) }] };
+        mounted(state({ week: narrow }), 'admin');
+        const first = all('.appointment')[0]!;
+        expect([first.querySelector('.time')!.textContent, first.getAttribute('aria-label')]).toEqual(['11:00', `Mon 16 Nov 11:00–12:00 ${CAPACITY.days[0]!.appointments[0]!.who}`]);
+      });
+
       it('a slot of capacity one says "free", as the page always did', () => {
         mounted(state({ week: WEEK }));
         expect(slots()[0]!.textContent).toBe('08:00–09:00 free');
@@ -1573,7 +1627,7 @@ describe('mountWeek', () => {
         const { bookState$ } = asked();
         for (const change of [
           () => find('#week dialog.book [name="note"]').dispatchEvent(new Event('input', { bubbles: true })),
-          () => find('#week dialog.book [name="start"]').dispatchEvent(new Event('change', { bubbles: true })),
+          () => choose(clock(bookForm(), 'start')[1], '05'),
           () => find('#week dialog.book [name="username"]').dispatchEvent(new Event('change', { bubbles: true })),
         ]) {
           bookState$.next(taken);

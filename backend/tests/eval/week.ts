@@ -1,5 +1,5 @@
 import { addDays, DEFAULT_SETTINGS, localDateOf, toInstant, weekdayOf } from '@shared-calendar/shared';
-import { api, signIn, withFacts } from '../integration/setup';
+import { api, setPasswordOf, signIn, withFacts } from '../integration/setup';
 import { daysFrom, type Days } from './dates';
 
 // The known week of the evaluation (docs/CONVERSATIONAL_ARCHITECTURE.md section 12.3): what the
@@ -154,9 +154,11 @@ export async function seedWeek(admin: string): Promise<World> {
   const tokens = { admin, anna: '', bruno: '' };
   for (const [who, username] of [['anna', ANNA], ['bruno', BRUNO]] as const) {
     // With the four facts POST /users asks for: an address at example.com, which the fake mail
-    // holds when the evaluation confirms a mail.
-    const created = await must('POST', '/users', admin, withFacts(username), 201);
-    tokens[who] = await signIn(username, created.password as string);
+    // holds when the evaluation confirms a mail. The answer holds no password (Cognito makes a
+    // temporary one), so the account is given a permanent one straight in cognito-local, as the
+    // journeys do.
+    await must('POST', '/users', admin, withFacts(username), 201);
+    tokens[who] = await signIn(username, await setPasswordOf(username));
   }
 
   const visit = (await must('POST', '/calendar/types', admin, { name: VISIT }, 201)).typeId as string;

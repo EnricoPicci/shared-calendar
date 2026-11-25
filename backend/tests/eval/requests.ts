@@ -162,6 +162,27 @@ export function evalRequests(world: World): EvalRequest[] {
       checks: [proposes({ tool: 'send_calendar_mail', body: { from: mon, to: addDays(mon, 27) } })],
       hand: 'One mail from the first day to the last: it should say that the two weeks between are in it too.',
     },
+    // ── Hours on 5-minute steps, windows of whole hours ───────────────────────────────────────
+    // The opening hours lie on 5-minute steps (docs/SHARED_CALENDAR_SPEC.md decision D32): a time
+    // such as 14:05 must come out as asked, not moved to a quarter hour. A window lasts a whole
+    // number of hours (docs/SHARED_CALENDAR_SPEC.md decision D33): a block that leaves pieces not
+    // whole hours is widened, said and asked first; hours asked that are not whole are explained,
+    // and nothing is proposed until the person chooses. The Sunday has no hours and the Tuesday
+    // of the week after no appointment, so nothing stands in the way.
+    { id: 'step-pattern-new', kind: 'change', who: 'admin', language: 'en', messages: [`Open eval Lesson every Sunday from 14:05 to 17:05, from ${written(sun, 'en')} on.`], ends: 'proposal', checks: [proposes({ tool: 'create_pattern', body: { weekday: 7, start: '14:05', end: '17:05', typeId: types.lesson, validFrom: sun, validUntil: null } })] },
+    // The first answer must say the widened times and propose nothing; the second message accepts.
+    {
+      id: 'step-block',
+      kind: 'blocking',
+      who: 'admin',
+      language: 'it',
+      messages: [`Blocchi ${written(tue2, 'it')} dalle 10:10 alle 10:35.`, 'Va bene, proceda.'],
+      ends: 'proposal',
+      checks: [hours(tue2, visit('09:00', '10:00'), visit('11:00', '13:00'), lesson('15:00', '18:00')), notBefore(1, 'set_date_override', {}), asked('get_calendar')],
+      hand: 'The day as it was: 09:00-13:00 eval Visit, 15:00-18:00 eval Lesson. Asked: 10:10-10:35. The first answer should say that the hours left must be whole hours, that it will block 10:00-11:00 leaving 09:00-10:00 and 11:00-13:00, and ask.',
+    },
+    { id: 'hours-not-whole', kind: 'change', who: 'admin', language: 'en', messages: ['Open eval Visit every Tuesday from 09:05 to 12:00.'], ends: 'answer', checks: [noProposal()], hand: 'It should say that a window lasts whole hours and suggest the nearest inside and around: 09:05-11:05 or 09:05-12:05 (or a start moved to 09:00), then wait for the choice.' },
+    { id: 'hours-not-whole-it', kind: 'change', who: 'admin', language: 'it', messages: [`Aggiunga una finestra aggiuntiva per eval Visit ${written(sun, 'it')} dalle 10:10 alle 11:40.`], ends: 'answer', checks: [noProposal()], hand: 'It should say that a window lasts whole hours and suggest the nearest inside and around: 10:10-11:10 or 10:10-12:10 (or 09:40-11:40), then wait for the choice.' },
 
     // ── Ambiguity: a question, and no proposal ────────────────────────────────────────────────
     { id: 'ambiguous-something', kind: 'ambiguous', who: 'anna', language: 'en', messages: ['Book me something next week.'], ends: 'answer', checks: [noProposal(), askedOnly(...READS)], hand: 'It should ask which day and time, or offer the free times.' },

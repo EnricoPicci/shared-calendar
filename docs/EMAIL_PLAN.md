@@ -1,6 +1,9 @@
 # Shared Calendar: e-mail (implementation plan)
 
-**Version:** v11 (2026-11-25): step m8 done, its "As done" note written; no step's content
+**Version:** v12 (2026-11-25): the branch `slot-5min` (times on 5-minute steps and windows of
+whole hours, released as `v2.4.0` and `v2.5.0`) merged into `main` before step m9; the note
+before step m9 says what the plan now builds on; the references to the documents' renumbered
+versions, decisions, walk checks and record section followed. v11 (2026-11-25): step m8 done, its "As done" note written; no step's content
 changed. v10 (2026-11-25): step m8 cut into parts A (the invitation), B (the stages) and C
 (the smoke test and the documents), each with its check and its commit; `backend/src/lib/password.ts`
 removed, the smoke test making its own passwords (the Product Owner's decisions, with the brief of
@@ -180,7 +183,7 @@ m1 writes them into it, before any code depends on them.
 - **F12. The deploy gate's stamp lasts 30 minutes and names the commit** (`scripts/deploy-gate.sh`),
   so step m10's deploys need their own `verify`, whatever ran in step m9 (section 5.2).
 - **F13. The page goes with the API in step m9.** **Decided** (the Product Owner, 2026-11-25): the
-  v2.3 page treats the challenge `NEW_PASSWORD_REQUIRED` as a failed sign-in, so with it the
+  deployed page (v2.5.0) treats the challenge `NEW_PASSWORD_REQUIRED` as a failed sign-in, so with it the
   operator's test User (F15) could not sign in during the days between steps m9 and m10. Both are
   deployed in step m9, at stage `domain`. The new page must therefore say `503 mail_unavailable`
   plainly wherever mail is reached ("E-mail is not available yet"): the creation of a User, the
@@ -221,8 +224,8 @@ breaks it**, not later.
 | m6 | **Root `CLAUDE.md`: "changes the calendar, or sends a mail, only through `confirmProposal`"**. `docs/CONVERSATIONAL_ARCHITECTURE.md` (the tool, its proposal, the evaluation's requests, a version row); `docs/FRONTEND_WALK.md` if the panel's check gains a mail proposal |
 | m7 | `docs/FRONTEND_SERVICES.md` (the sign-in's challenge), `docs/FRONTEND_ARCHITECTURE.md` and `docs/FRONTEND_WALK.md` (the screen "Choose your password") |
 | m8 | **Root `CLAUDE.md`: the hard rule's password part** becomes "A User's first password is temporary: Cognito makes it, e-mails it and forces its change at the first sign-in; the API never sees it or answers it. The Administrator's password is set once as permanent by the bootstrap" (the creation without a password is what makes it true), with F15's exception for the operator's test User. `docs/ARCHITECTURE.md` sections 1.2, 5.1, 6.3, 7.3, 7.4, 10 and 13 rewritten from `docs/EMAIL_ARCHITECTURE.md` (its section 17), with the stages and parameters; `docs/RUNBOOK.md` section 6 and a draft of the stages' steps; the three front-end documents (the users screen's invitation); every changed journey's page |
-| m9 | `docs/RUNBOOK.md`: the stage `domain`, the DNS records, the production access, the suppression list; section 5.9, the deployment record, opened |
-| m10 | `docs/EMAIL_ARCHITECTURE.md` a record (status line); `docs/ARCHITECTURE.md` v16 closed; `docs/SHARED_CALENDAR_SPEC.md` section 15's sentence on the address confirmed; `docs/CONVERSATIONAL_ARCHITECTURE.md` status line (deployed); `docs/RUNBOOK.md` section 5.9 closed; `README.md` "Versions": v3.0.0; root `CLAUDE.md`: `docs/EMAIL_PLAN.md` among the records of finished work |
+| m9 | `docs/RUNBOOK.md`: the stage `domain`, the DNS records, the production access, the suppression list; section 5.11, the deployment record, opened |
+| m10 | `docs/EMAIL_ARCHITECTURE.md` a record (status line); `docs/ARCHITECTURE.md` v18 closed; `docs/SHARED_CALENDAR_SPEC.md` section 15's sentence on the address confirmed; `docs/CONVERSATIONAL_ARCHITECTURE.md` status line (deployed); `docs/RUNBOOK.md` section 5.11 closed; `README.md` "Versions": v3.0.0; root `CLAUDE.md`: `docs/EMAIL_PLAN.md` among the records of finished work |
 
 ## 5. The acceptance check
 
@@ -318,7 +321,7 @@ decisions of section 3 and the facts of its section 22, confirmed that day: **th
 is `write-excel-file`** (MIT, kept up, 76 KB added to a bundle against 1 MB for `exceljs`, measured with
 esbuild in a scratch folder outside the repository, a file written and read back; the Product
 Owner's choice), not installed until step m3; SES's prices, Cognito's placeholders and limits
-read in AWS's documentation; F10 recorded. `docs/ARCHITECTURE.md` has its v16 row, open. Root
+read in AWS's documentation; F10 recorded. `docs/ARCHITECTURE.md` has its v18 row, open. Root
 `CLAUDE.md`, "Where the truth lives", lists `docs/EMAIL_ARCHITECTURE.md` with this plan; to make
 room, the line of `docs/RENAME_PLAN.md` moved to `docs/FOLDER_STRUCTURE.md` section 8, and the
 line of `docs/FRONTEND_ARCHITECTURE.md` lost its list of section numbers (the Product Owner's
@@ -405,12 +408,12 @@ back end 1 884, front end 2 839).
 - **Browser look** (local stack, desktop width): as `admin`, the form's fields and refusals, a
   create, the row's name and e-mail, Edit saved and the list updated, "My details" with Edit, a
   refusal and Cancel; as `alice`, "My details" read-only with its sentence and no "Users". The
-  walk's new checks are `docs/FRONTEND_WALK.md` section 11; six of them, and the phone width,
+  walk's new checks are `docs/FRONTEND_WALK.md` section 12; six of them, and the phone width,
   not yet walked.
 - **Documents**: root `CLAUDE.md`'s logging rule (199 lines); `docs/ARCHITECTURE.md` sections 4,
-  5.1, 7.1, 8, 11 and v16; `docs/SHARED_CALENDAR_SPEC.md` v19 (section 10.1, route 21);
+  5.1, 7.1, 8, 11 and v18; `docs/SHARED_CALENDAR_SPEC.md` v21 (section 10.1, route 21);
   `docs/FRONTEND_SERVICES.md` v13 (section 13, new section 23); `docs/FRONTEND_ARCHITECTURE.md`
-  v24 (sections 4, 5.1, 6); `docs/FRONTEND_WALK.md` v6; `docs/FOLDER_STRUCTURE.md`;
+  v27 (sections 4, 5.1, 6); `docs/FRONTEND_WALK.md` v10; `docs/FOLDER_STRUCTURE.md`;
   `docs/COMMANDS.md`; `backend/CLAUDE.md`, `frontend/CLAUDE.md`.
 
 **What pair m3/m4 finds ready**: the mail's contract in `shared/src/mail/` (settings, the body of
@@ -545,13 +548,13 @@ lines (shared 576 tests, back end 1 927, front end 2 881).
   journeys" of `docs/journeys/concepts.md`.
 - **Browser look** (local stack): the dialog for `alice` and for `admin`, the address masked, a
   reversed range refused; the mails at http://localhost:8025 and the `.xlsx` opened (sheet
-  "Appointments", its headings and rows). Section 11's six checks left by step m2 (159, 162,
-  164, 167, 168, 170) walked and passed; the phone width at 606 px only, the narrowest the
+  "Appointments", its headings and rows). Section 12's six checks left by step m2 (173, 176,
+  178, 181, 182, 184) walked and passed; the phone width at 606 px only, the narrowest the
   browser allowed: the rows wrap, an e-mail breaks, nothing scrolls sideways. The new checks are
-  `docs/FRONTEND_WALK.md` section 12; the walk as a whole was not run.
-- **Documents**: `docs/ARCHITECTURE.md` (v16: sections 4, 5.5, 7.1, 8, 9.2, 10, 11),
-  `docs/FRONTEND_SERVICES.md` v14 (section 24), `docs/FRONTEND_ARCHITECTURE.md` v25,
-  `docs/FRONTEND_WALK.md` v7, `docs/COMMANDS.md` (section 3.5), `docs/FOLDER_STRUCTURE.md`,
+  `docs/FRONTEND_WALK.md` section 13; the walk as a whole was not run.
+- **Documents**: `docs/ARCHITECTURE.md` (v18: sections 4, 5.5, 7.1, 8, 9.2, 10, 11),
+  `docs/FRONTEND_SERVICES.md` v14 (section 24), `docs/FRONTEND_ARCHITECTURE.md` v28,
+  `docs/FRONTEND_WALK.md` v11, `docs/COMMANDS.md` (section 3.5), `docs/FOLDER_STRUCTURE.md`,
   `docs/EMAIL_ARCHITECTURE.md` (the counter's key as built); `frontend/CLAUDE.md`.
 
 **What step m5 finds ready**: the table `mail` and `mailDb.ts`, to which the settings and the
@@ -634,12 +637,12 @@ with two files; the same hour twice sends once; the wrong hour, or switched off,
   the part filled with the defaults and the zone; `7:30` refused under the hour with no request;
   `18` saved, "Daily e-mail saved.", shown as `18:00`; with `MAIL_STAGE` `off` and the API
   restarted, "E-mail is not available yet." in place of the fields and the calendar's settings
-  still there; set back to `on`. The new checks are `docs/FRONTEND_WALK.md` section 13; the walk
+  still there; set back to `on`. The new checks are `docs/FRONTEND_WALK.md` section 14; the walk
   as a whole was not run.
-- **Documents**: `docs/ARCHITECTURE.md` (v16 row and status: sections 4, 5.5, 7.1, 8, 9.2, 11),
+- **Documents**: `docs/ARCHITECTURE.md` (v18 row and status: sections 4, 5.5, 7.1, 8, 9.2, 11),
   `docs/EMAIL_ARCHITECTURE.md` (sections 6.2 and 10.1), `docs/FRONTEND_SERVICES.md` v15
-  (section 25), `docs/FRONTEND_ARCHITECTURE.md` v26, `docs/FRONTEND_WALK.md` v8 (checks 181 to
-  188), `docs/COMMANDS.md` (section 3.5: `mail:daily`, `MAIL_ALLOW_NOW`, `MAIL_STAGE`).
+  (section 25), `docs/FRONTEND_ARCHITECTURE.md` v29, `docs/FRONTEND_WALK.md` v12 (checks 195 to
+  202), `docs/COMMANDS.md` (section 3.5: `mail:daily`, `MAIL_ALLOW_NOW`, `MAIL_STAGE`).
 - **The CLAUDE.md files**: `backend/CLAUDE.md` was at 199 lines; its section "A new calendar
   function" became one line under the calendar's handlers pointing at `docs/COMMANDS.md`
   section 3.2, which already held its content, and the room went to the mail settings' handlers,
@@ -736,10 +739,10 @@ proposal shown and confirmed, by a look.
   December 2026 to Tuesday 8 December 2026 to a•••@example.com.", Confirm, "Done", Claude told
   only that the mail is on its way; the mail "Calendar, Wed 2 Dec 2026 to Tue 8 Dec 2026" with
   its file at http://localhost:8025. No screen of the page changed: the panel already shows
-  every proposal and the three refusals' sentences. New checks: `docs/FRONTEND_WALK.md` v9,
-  section 14, checks 189 to 192; the walk as a whole was not run.
-- **Documents**: `docs/CONVERSATIONAL_ARCHITECTURE.md` v22 (sections 3, 5.4, 5.5 rule 4, 8.2,
-  8.3, 11.3, 12.2, 12.3, the risks' row); `docs/ARCHITECTURE.md` (v16 row: section 4, "The
+  every proposal and the three refusals' sentences. New checks: `docs/FRONTEND_WALK.md` v13,
+  section 15, checks 203 to 206; the walk as a whole was not run.
+- **Documents**: `docs/CONVERSATIONAL_ARCHITECTURE.md` v24 (sections 3, 5.4, 5.5 rule 4, 8.2,
+  8.3, 11.3, 12.2, 12.3, the risks' row); `docs/ARCHITECTURE.md` (v18 row: section 4, "The
   assistant's routes" with "A mail" and "The mail of a range of dates"; section 7.1, the roles and
   the row "A change needs the person"); `docs/EMAIL_ARCHITECTURE.md` (section 7: the stage
   refused at the proposal, the five told after Confirm, several periods one mail, as built;
@@ -793,7 +796,7 @@ a row; the whole of `login.service.test.ts` green, 9. Brief
   `docs/EMAIL_ARCHITECTURE.md` section 14.1 corrected. So the page checks the rule itself before
   sending (as "Password" does), and the end of the 3 minutes (real Cognito's
   `NotAuthorizedException`, also read: `ExpiredCodeException`) is proved by unit tests only; its
-  look is in step m9's check and `docs/FRONTEND_WALK.md` check 202. Real Cognito was not tried.
+  look is in step m9's check and `docs/FRONTEND_WALK.md` check 216. Real Cognito was not tried.
 - **Built.** `cognito.ts`: `respondToNewPassword`, `toSignInOutcome` (the challenge apart from any
   other, which stays `challenge`), `toChallengeOutcome`. `LoginService`: the result and state
   `new_password_required` (the username only, with a refusal after a failed try), the state
@@ -820,7 +823,7 @@ a row; the whole of `login.service.test.ts` green, 9. Brief
   failure after the creation deletes the account. Tried: each refusal; a first run failed, the
   AWS CLI's short form splitting the address at its comma (now JSON); then the account made
   (`FORCE_CHANGE_PASSWORD`, group `user`, the four facts), a second run refused.
-- **The look** (`docs/FRONTEND_WALK.md` checks 193 to 201), with the script's account: the
+- **The look** (`docs/FRONTEND_WALK.md` checks 207 to 215), with the script's account: the
   challenge leads to "Choose your password", the focus in the field; `weak` shrinks the list
   live and the button stays off; Cancel goes back with the username kept, the password wiped; at
   390 × 844, a repeat that differs is said live, a good password signs in as the User; after the
@@ -919,7 +922,7 @@ lines.
   temporary password by `setTemporaryPassword`, "Choose your password" answered, `active`; the
   resend's `409`, `403` for `admin`, `404`), with its page `docs/journeys/frontend/invitation.md`;
   the changed pages refreshed with the skill `explain-journey`. Each changed file green, run
-  alone. The walk: `docs/FRONTEND_WALK.md` checks 56 to 60 and 203 to 205, at both widths.
+  alone. The walk: `docs/FRONTEND_WALK.md` checks 56 to 60 and 217 to 219, at both widths.
   Found, not caused by this step: the back end's `calendar.test.ts` leaves `bookingHorizonDays`
   at 30 while `mail.test.ts` books 45 days ahead, so their order matters.
 - **The stages (B).** `PageAddress`; the conditions `MailDomainStage` and `MailOn`; at `domain`
@@ -958,7 +961,7 @@ lines.
   61 lines, 58 PASS and 3 SKIP (the two of `GlobalSignOut`, the resend's success); the mail
   reached the fake mail after 5 s; every User and the calendar's items removed. The stages
   `off` and `domain`, and the mailer's log line, run only against a stack (step m9).
-- **The documents (C).** `docs/ARCHITECTURE.md`: the status line and v16's row; F4; sections
+- **The documents (C).** `docs/ARCHITECTURE.md`: the status line and v18's row; F4; sections
   1.2, 3, 4 (`POST /users`, the new resend route, the conventions), 5.1, 6.2, 6.3 (a new diagram
   and the resend), 7.1, 7.3, 7.4, 8, 8.1, 9.2 (`PageAddress`, the stages' table), 9.3 (the smoke
   test's stages, invitation and mail), 10, 13 (why the rejection of v2 no longer holds) and 14.
@@ -966,8 +969,8 @@ lines.
   section 3.3 for steps m9 and m10, section 6 rewritten (a new User's invitation, a lost
   password). `docs/COMMANDS.md`: `test-user cloud`, the smoke test's stages and address, the
   journeys' helpers. `docs/FRONTEND_SERVICES.md` and `docs/FRONTEND_ARCHITECTURE.md`: the users
-  screen's invitation, states and resend (v17 and v28). `docs/FRONTEND_WALK.md`: checks 55 and
-  203 corrected to the page as built (the `409` said in the dialog; "Back" after a failure).
+  screen's invitation, states and resend (v17 and v31). `docs/FRONTEND_WALK.md`: checks 55 and
+  217 corrected to the page as built (the `409` said in the dialog; "Back" after a failure).
   `docs/FOLDER_STRUCTURE.md`: the generator gone, the
   users' dialogs. `backend/CLAUDE.md`: `cognito.ts`'s line.
 - **Two mismatches with `docs/EMAIL_ARCHITECTURE.md`, found in C and fixed** (the Product
@@ -986,6 +989,22 @@ lines.
   to run and correct. Still owed: O6 (the service-linked role) and the change set of the pool,
   both in step m9's list.
 
+**The merge with `slot-5min` (2026-11-25), before step m9.** The code of steps m1 to m8 now
+holds the two plans released from that branch: times on 5-minute steps (`docs/SLOT_STEP_PLAN.md`)
+and windows of whole hours (`docs/WINDOW_HOURS_PLAN.md`). What is released kept its numbers; this
+work's took the next: `docs/ARCHITECTURE.md` v18 (was v16), `docs/SHARED_CALENDAR_SPEC.md` v21
+(was v19), `docs/CONVERSATIONAL_ARCHITECTURE.md` v24 (was v22), `docs/FRONTEND_ARCHITECTURE.md`
+v27 to v31 and decisions 204 to 216 (were v24 to v28 and 195 to 207), `docs/FRONTEND_WALK.md`
+v10 to v15, sections 12 to 17 and checks 171 to 219 (were v6 to v11, 11 to 16 and 157 to 205),
+and this work's deployment record is `docs/RUNBOOK.md` section 5.11. The smoke test has 65
+checks at `on` and 62 at `off` and `domain` (the calendar journey's four more). Checked on the
+merged code: the root `verify`, the front end's journeys (101), the local smoke test (62 PASS,
+3 SKIP), the walk where the two features meet, and the paid evaluation, 67 of 67, 53.00 US cents
+(`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3), which stands for the run owed before step
+m9 unless the assistant changes again. Three tests of this work were fixed on the way: the
+evaluation's accounts (`backend/tests/eval/week.ts`) and `mail.test.ts`'s settings, left behind
+by step m8, and `calendar.test.ts`'s new block, written for the old `POST /users`.
+
 ### Step m9 — Cloud, stage `domain` (each command on the operator's explicit instruction)
 
 Before anything reaches the cloud:
@@ -999,7 +1018,7 @@ Before anything reaches the cloud:
    resource a replacement (F10).
 4. **Operator: the existing Users deleted**, the last thing before the deploy (moved here from
    the start of the work, decided by the Product Owner on 2026-11-25). In the deployed page, still
-   v2.3, as the Administrator: the Users screen, "Delete" on every User
+   v2.5.0, as the Administrator: the Users screen, "Delete" on every User
    (`DELETE /users/{username}`). No script, no `aws` command. Before deleting, the operator
    notes, outside the system, who will need an account again (name, e-mail, postal address) and
    their future appointments, if they are to be booked again by hand in step m10. What each
@@ -1045,7 +1064,7 @@ Documents: section 4's row m9.
 operator reports the records added, the subscription confirmed, the request sent, the test User
 signed in with its own password; and, with a second test User, "Choose your password" left open
 more than 3 minutes says "This took too long. Please sign in again." and leads back to the
-sign-in, the username kept (`docs/FRONTEND_WALK.md` check 202).
+sign-in, the username kept (`docs/FRONTEND_WALK.md` check 216).
 
 ### Step m10 — Cloud, stage `on`, and the release v3.0.0 (each command on the operator's explicit instruction)
 

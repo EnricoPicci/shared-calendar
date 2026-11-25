@@ -67,7 +67,7 @@ const createPattern: MethodSpec<S> = {
   notCodes: ['pattern_not_found', 'date_in_past'],
   invalid: [
     ['end before start', (s) => s.createPattern({ ...PATTERN, start: '12:00', end: '08:00' }), 'end: end must be after start'],
-    ['off the 15-minute grid', (s) => s.createPattern({ ...PATTERN, start: '08:10' }), 'start: expected HH:mm on the 15-minute grid'],
+    ['off the 5-minute grid', (s) => s.createPattern({ ...PATTERN, start: '08:07' }), 'start: expected HH:mm on the 5-minute grid'],
     ['weekday 8', (s) => s.createPattern({ ...PATTERN, weekday: 8 }), 'weekday: Too big: expected number to be <=7'],
     ['validUntil before validFrom', (s) => s.createPattern({ ...PATTERN, validUntil: '2027-01-03' }), 'validUntil: validUntil must not be before validFrom'],
     ['an unknown field', (s) => s.createPattern({ ...PATTERN, note: 'x' } as never), 'Unrecognized key: "note"'],
@@ -206,8 +206,8 @@ const createWindow: MethodSpec<S> = {
   notCodes: ['availability_conflict', 'window_not_found'],
   invalid: [
     // The union's first branch.
-    ['end 24:15', (s) => s.createWindow({ ...WINDOW, end: '24:15' }), 'end: expected HH:mm on the 15-minute grid'],
-    ['start 24:00', (s) => s.createWindow({ ...WINDOW, start: '24:00' }), 'start: expected HH:mm on the 15-minute grid'],
+    ['end 24:15', (s) => s.createWindow({ ...WINDOW, end: '24:15' }), 'end: expected HH:mm on the 5-minute grid'],
+    ['start 24:00', (s) => s.createWindow({ ...WINDOW, start: '24:00' }), 'start: expected HH:mm on the 5-minute grid'],
     ['typeId missing', (s) => s.createWindow({ ...WINDOW, typeId: undefined } as never), 'typeId: Invalid input: expected string, received undefined'],
   ],
 };

@@ -51,11 +51,12 @@ when those files are touched (`.claude/rules/frontend-views.md`).
   `week`, `appointments`, `settings`, `users`, `availability` and `date` (two views of one
   screen), `assistant`, `me`, `password`, `choose-password` (beside the login, on `#login`); `detail.view.ts`, the dialog two views mount; `availability.parts.ts`, the
   helpers the availability's two views share, with `mountConfirm`; `profile.parts.ts`, the four
-  facts' fields and the Edit dialog, shared by the users view and `me`.
+  facts' fields and the Edit dialog, shared by the users view and `me`; `time.parts.ts`, the two
+  lists (hour, minute) of one time in a form.
 - `src/logic/`: pure models (`texts.ts`, `week.model.ts`, `booking.ts`,
   `appointment.detail.ts`, `appointments.model.ts`, `settings.model.ts`, `users.model.ts`,
   `availability.model.ts`, `conflicts.ts`, `date.model.ts`, `assistant.model.ts`,
-  `password.model.ts`, `profile.model.ts`, `me.model.ts`, `daily-mail.model.ts`) and one class
+  `password.model.ts`, `profile.model.ts`, `me.model.ts`, `daily-mail.model.ts`, `times.ts`) and one class
   per screen, and one for the panel, with one stream and `start()` (`week.screen.ts`,
   `appointments.screen.ts`, `settings.screen.ts`, `users.screen.ts`, `availability.screen.ts`,
   `date.screen.ts`, `assistant.screen.ts`, `password.screen.ts`, `me.screen.ts`;

@@ -136,6 +136,12 @@ describe('checkChange (8.4, R-CHG-01)', () => {
       expect(change(at('11:30'), at('12:30'), { caller: ADMIN })).toEqual(refused('outside_availability'));
     });
 
+    it('D33: a User moves to 09:05 in a window 09:05–11:05, a slot; not to 09:10 inside it', () => {
+      const nine05 = state({ overrides: [{ date: '2026-11-16', windows: [{ start: '09:05', end: '11:05', typeId: STUDIO }] }], appointments: [] });
+      expect(change(at('09:05'), at('10:05'), { state: nine05 })).toEqual({ window: { start: at('09:05'), end: at('11:05'), typeId: STUDIO } });
+      expect(change(at('09:10'), at('10:10'), { state: nine05 })).toEqual(refused('outside_availability'));
+    });
+
     it('the new one takes the type of its own window, which may differ from the old one’s', () => {
       const pool = { ...ac04, patternId: 'P2', weekday: 2, typeId: POOL };
       const tuesday = (t: string) => at(t, '2026-11-17');

@@ -28,8 +28,8 @@ import type { SessionStore } from './session.store';
 // The appointments (docs/FRONTEND_SERVICES.md section 19), docs/SHARED_CALENDAR_SPEC.md section
 // 11.1, routes 16–20: list, book, cancel, change and edit the note, for both roles. One pair of
 // streams per method, each independent of the others. What depends on the caller's role (a User's
-// whole hours, the Administrator's `username`) and what only the server knows (notice, horizon,
-// availability, ownership) is the API's to answer (docs/FRONTEND_SERVICES.md section 8,
+// start, which must be the start of a slot, the Administrator's `username`) and what only the
+// server knows (notice, horizon, availability and its slots, ownership) is the API's to answer (docs/FRONTEND_SERVICES.md section 8,
 // decision 42).
 
 // Each route's error codes as docs/ARCHITECTURE.md section 4 lists them.

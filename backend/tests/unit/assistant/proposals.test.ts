@@ -1358,15 +1358,15 @@ describe('the log lines of a proposal (10.1)', () => {
     const MADE = '01JD000000000000000000W2ND';
     const DAY = '2026-11-24';
     const window = (start: string, end: string, source: string, sourceId: string) => ({ start: `${DAY}T${start}:00.000Z`, end: `${DAY}T${end}:00.000Z`, typeId: VISIT, typeName: 'Visit', source, sourceId });
-    // Wall-clock 09:00-12:00 and 16:00-19:00 from the patterns, and the extra window 14:00-15:00: an hour ahead of UTC.
-    const view = { timeZone: 'Europe/Rome', from: DAY, to: DAY, generatedAt: NOW, days: [{ date: DAY, weekday: 2, hasOverride: false, slots: [], busy: [], windows: [window('08:00', '11:00', 'pattern', 'p1'), window('13:00', '14:00', 'one_off', EXTRA), window('15:00', '18:00', 'pattern', 'p2')] }], appointments: [] };
+    // Wall-clock 09:00-12:00 and 16:00-19:00 from the patterns, and the extra window 14:00-16:00: an hour ahead of UTC.
+    const view = { timeZone: 'Europe/Rome', from: DAY, to: DAY, generatedAt: NOW, days: [{ date: DAY, weekday: 2, hasOverride: false, slots: [], busy: [], windows: [window('08:00', '11:00', 'pattern', 'p1'), window('13:00', '15:00', 'one_off', EXTRA), window('15:00', '18:00', 'pattern', 'p2')] }], appointments: [] };
     const LEFT = [
       { start: '09:00', end: '12:00', typeId: VISIT },
       { start: '17:00', end: '19:00', typeId: VISIT },
     ];
     const OVERRIDE = use('toolu_override', 'set_date_override', { date: DAY, windows: LEFT });
     const DELETE = use('toolu_delete', 'delete_one_off_window', { date: DAY, windowId: EXTRA });
-    const CREATE = use('toolu_create', 'create_one_off_window', { date: DAY, start: '14:00', end: '14:30', typeId: VISIT });
+    const CREATE = use('toolu_create', 'create_one_off_window', { date: DAY, start: '14:00', end: '15:00', typeId: VISIT });
     const forbidden = ['roberta', 'Visit', VISIT, EXTRA, MADE, '2026-11-2', '09:00', '14:00', '17:00', 'novembre', 'orari', 'finestra', '01JD0000000000000000APPT', CLAUDE_SAID, TEXT];
     const clean = (log: unknown) => {
       for (const text of forbidden) expect(JSON.stringify(log)).not.toContain(text);
@@ -1392,9 +1392,9 @@ describe('the log lines of a proposal (10.1)', () => {
       const stored = steps()[0]?.proposal as Proposal;
       expect(stored.changes.map((change) => change.summary)).toEqual([
         "Impostare gli orari di martedì 24 novembre 2026, solo per questo giorno. Com'è ora (dagli orari settimanali): 09:00–12:00 (Visit), 16:00–19:00 (Visit). " +
-          'Come diventerebbe: 09:00–12:00 (Visit), 17:00–19:00 (Visit). La finestra aggiuntiva 14:00–15:00 (Visit) di questo giorno non cambia.',
-        'Eliminare la finestra aggiuntiva di martedì 24 novembre 2026, dalle 14:00 alle 15:00 (Visit).',
-        'Creare una finestra aggiuntiva per martedì 24 novembre 2026, dalle 14:00 alle 14:30 (Visit).',
+          'Come diventerebbe: 09:00–12:00 (Visit), 17:00–19:00 (Visit). La finestra aggiuntiva 14:00–16:00 (Visit) di questo giorno non cambia.',
+        'Eliminare la finestra aggiuntiva di martedì 24 novembre 2026, dalle 14:00 alle 16:00 (Visit).',
+        'Creare una finestra aggiuntiva per martedì 24 novembre 2026, dalle 14:00 alle 15:00 (Visit).',
       ]);
       const NAMES = ['set_date_override', 'delete_one_off_window', 'create_one_off_window'];
       expect(proposed).toMatchObject({ ok: true, reply: { status: 'awaiting_confirmation', proposal: { question: 'Conferma queste 3 modifiche?' } } });
@@ -1411,13 +1411,13 @@ describe('the log lines of a proposal (10.1)', () => {
       ];
       const set = vi.fn(() => routeAnswer({ error: 'availability_conflict', message: '2 appointments would fall outside the availability', conflicts }, 409));
       const remove = vi.fn(() => Promise.resolve({ statusCode: 204 }));
-      const create = vi.fn(() => routeAnswer({ windowId: MADE, date: DAY, start: '14:00', end: '14:30', typeId: VISIT, createdAt: NOW }, 201));
+      const create = vi.fn(() => routeAnswer({ windowId: MADE, date: DAY, start: '14:00', end: '15:00', typeId: VISIT, createdAt: NOW }, 201));
       const confirmed = await confirm.confirmProposal(ADMIN, stored.proposalId, NOW, REQUEST, undefined, { set_date_override: set, delete_one_off_window: remove, create_one_off_window: create });
 
       // Each route was sent exactly what the proposal stored, in the order asked.
       expect(set.mock.calls[0]).toMatchObject([{ routeKey: 'PUT /calendar/overrides/{date}', pathParameters: { date: DAY }, body: JSON.stringify({ windows: LEFT }) }]);
       expect(remove.mock.calls[0]).toMatchObject([{ routeKey: 'DELETE /calendar/windows/{windowId}', pathParameters: { windowId: EXTRA } }]);
-      expect(create.mock.calls[0]).toMatchObject([{ routeKey: 'POST /calendar/windows', body: JSON.stringify({ date: DAY, start: '14:00', end: '14:30', typeId: VISIT }) }]);
+      expect(create.mock.calls[0]).toMatchObject([{ routeKey: 'POST /calendar/windows', body: JSON.stringify({ date: DAY, start: '14:00', end: '15:00', typeId: VISIT }) }]);
 
       const settled = steps().at(1)!;
       expect((settled.proposal as Proposal).changes.map((change) => [change.tool, change.outcome, change.error])).toEqual([
@@ -1439,7 +1439,7 @@ describe('the log lines of a proposal (10.1)', () => {
         ],
       });
       expect(JSON.parse(results[1]!.content)).toMatchObject({ outcome: 'done', deleted: true });
-      expect(JSON.parse(results[2]!.content)).toMatchObject({ outcome: 'done', window: { id: MADE, date: DAY, start: '14:00', end: '14:30' } });
+      expect(JSON.parse(results[2]!.content)).toMatchObject({ outcome: 'done', window: { id: MADE, date: DAY, start: '14:00', end: '15:00' } });
       expect(confirmed.log).toMatchObject({
         proposalId: stored.proposalId,
         changes: [
@@ -1484,7 +1484,7 @@ describe('the log lines of a proposal (10.1)', () => {
       expect(await ask(use('a', 'update_pattern', { patternId: PATTERN, ...pattern, end: '13:00' }), use('b', 'delete_pattern', { patternId: PATTERN }))).toEqual(refused('update_pattern', 'delete_pattern'));
       expect(await ask(OVERRIDE, use('b', 'delete_date_override', { date: DAY }))).toEqual(refused('set_date_override', 'delete_date_override'));
       expect(await ask(DELETE, use('b', 'delete_one_off_window', { date: DAY, windowId: EXTRA }))).toEqual(refused('delete_one_off_window', 'delete_one_off_window'));
-      expect(await ask(CREATE, use('b', 'create_one_off_window', { date: DAY, start: '14:00', end: '14:30', typeId: VISIT }))).toEqual(refused('create_one_off_window', 'create_one_off_window'));
+      expect(await ask(CREATE, use('b', 'create_one_off_window', { date: DAY, start: '14:00', end: '15:00', typeId: VISIT }))).toEqual(refused('create_one_off_window', 'create_one_off_window'));
       const fresh = { ...pattern, weekday: 'Friday' };
       expect(await ask(use('a', 'create_pattern', fresh), use('b', 'create_pattern', fresh))).toEqual(refused('create_pattern', 'create_pattern'));
       expect(steps()[0]).toMatchObject({ status: 'working', proposal: null });

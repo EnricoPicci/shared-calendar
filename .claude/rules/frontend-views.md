@@ -98,8 +98,9 @@ What it cannot show is for the browser check.
   `mountConfirm(find('#availability'))`, hand it to the mount function and add its subscription
   to the view's, as the shell does; what neither view can see alone (an opening made after
   another is the only one told) is in `availability.parts.test.ts`.
-- A count of the fields of `#availability` counts the screen's three parts (23: the 16 of the
-  first view's four forms and the 7 of a single date).
+- A count of the fields of `#availability` counts the screen's three parts (31: the 20 of the
+  first view's four forms and the 11 of a single date; a time is two lists, an hour and a
+  minute).
 - The view's test of a single date builds its states with the logic layer's own `dayModel`,
   `draftModel` and `conflictList`, and runs the dialog's cases once per kind (`describe.each`).
 

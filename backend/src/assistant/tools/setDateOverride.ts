@@ -1,6 +1,6 @@
 import { CALENDAR_LIMITS, LocalDate, overlaps, type DateOverride, type DayChangeSummary, type HoursSummary } from '@shared-calendar/shared';
 import { z } from 'zod';
-import { END_AFTER_START, endsAfterStart, hoursInput, hoursOf, namedHours, overrideSubject, presentDay, presentTypes } from './facts';
+import { END_AFTER_START, endsAfterStart, lastsWholeHoursOf, WHOLE_HOURS, hoursInput, hoursOf, namedHours, overrideSubject, presentDay, presentTypes } from './facts';
 import type { ChangeTool, Tool, ToolDefinition } from './tool';
 
 // The tool for PUT /calendar/overrides/{date} (docs/CONVERSATIONAL_ARCHITECTURE.md section 3): the
@@ -20,7 +20,7 @@ const Input = z
   .object({
     date: LocalDate.describe("The date whose hours are set, a date of the calendar's time zone as YYYY-MM-DD, today or later."),
     windows: z
-      .array(z.object(hoursInput).strict().refine(endsAfterStart, END_AFTER_START))
+      .array(z.object(hoursInput).strict().refine(endsAfterStart, END_AFTER_START).refine(lastsWholeHoursOf, WHOLE_HOURS))
       .max(CALENDAR_LIMITS.overrideWindowsPerDate)
       .describe('All the hours the date will have in the place of the weekly patterns, at most 10 stretches that do not overlap. An empty list closes the day.'),
   })

@@ -4,7 +4,7 @@
 |---|---|
 | Test file | `frontend/tests/integration/calendar.test.ts` |
 | `describe` | `appointments` |
-| Tests | 1. "book, slot taken, book for fe-calendar, note, change, upcoming, cancel"<br>2. "fe-calendar over its own appointment: user_busy; its overbook: forbidden; the Administrator's overbook: booked"<br>3. "fe-calendar starts off the whole hour: the API answers invalid_request (the service sends it)"<br>4. "fe-calendar lists fe-calendar-b's appointments: forbidden"<br>5. "cancel an unknown appointment: appointment_not_found"<br>6. "a note of 501 characters: invalid_request with the field, no request sent" |
+| Tests | 1. "book, slot taken, book for fe-calendar, note, change, upcoming, cancel"<br>2. "fe-calendar over its own appointment: user_busy; its overbook: forbidden; the Administrator's overbook: booked"<br>3. "fe-calendar starts off a slot: 08:17, off the step, invalid_request; 08:15, on the step but no slot, outside_availability (the service sends both)"<br>4. "fe-calendar lists fe-calendar-b's appointments: forbidden"<br>5. "cancel an unknown appointment: appointment_not_found"<br>6. "a note of 501 characters: invalid_request with the field, no request sent" |
 | Runs against | the local stack: the API on port 3000, cognito-local on port 9229 (`RUN_INTEGRATION=1`) |
 
 Ideas used here, explained once for all journeys:
@@ -32,9 +32,12 @@ Ideas used here, explained once for all journeys:
   `docs/SHARED_CALENDAR_SPEC.md` R-BOOK-12); only the Administrator may book a full slot, by
   sending `overbook: true`, and a User who sends it gets `403 forbidden` with nothing written
   (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-13). The service passes `overbook` on as it is given.
+- A User's start must lie on the 5-minute step (`400 invalid_request`) and be the start of a slot
+  of a window, the hours counted from the window's start (`409 outside_availability`,
+  `docs/SHARED_CALENDAR_SPEC.md` R-BOOK-02, R-BOOK-06 and decision D33).
 - The service refuses a note of more than 500 characters itself, without a request, but sends a
-  User's booking off the whole hour and lets the API refuse it (`docs/FRONTEND_SERVICES.md`
-  section 8, decision 42).
+  User's booking that is not a slot's start and lets the API refuse it
+  (`docs/FRONTEND_SERVICES.md` section 8, decision 42).
 
 ## Who takes part
 
@@ -44,7 +47,7 @@ Ideas used here, explained once for all journeys:
 - **The Administrator** (`admin`): tries to book a taken slot, books for `fe-calendar` with a
   custom end, lists `fe-calendar`'s appointments and cancels one; in test 2 it books a full slot
   for `fe-calendar-b` over the capacity, then cancels that booking. It also prepares and removes the
-  day (`bookableDate()`, `release()`).
+  day of tests 1, 2 and 3 (`bookableDate()`, `release()`).
 - **`fe-calendar-b`**: a second plain User created by the test file. It never signs in. Here it is
   only a name: the User of the booking the Administrator is refused in test 1, the User of the
   booking the Administrator forces in test 2, and the User whose appointments `fe-calendar` may
@@ -139,7 +142,7 @@ R-BOOK-07) unless it asks to go over them, which it does not do here. Nothing is
 
 `book(admin, { start: at('10:00'), end: at('10:30'), username: 'fe-calendar' })`. A User could not
 send this `end`: only the Administrator may book custom times inside a window
-(`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-08), on 15-minute local steps
+(`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-08), on 5-minute local steps
 (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-02). The test checks that the appointment has:
 
 - `username` `fe-calendar` and `end` 10:30;
@@ -184,7 +187,7 @@ The day now looks like this:
 | 08:00–09:00 | the old appointment, `cancelled` (`changed`): the slot is free again |
 | 09:00–10:00 | `changed.booked`, `fe-calendar`'s, with the note |
 | 10:00–10:30 | `forUser`, `fe-calendar`'s, booked by the Administrator |
-| 10:30–11:00 | free, but no User slot: a slot is a whole hour, and 10:00–11:00 is partly taken |
+| 10:30–11:00 | free, but no User slot: a User's slots are the hours counted from the window's start, 08:00, and the slot 10:00–11:00 is partly taken |
 | 11:00–12:00 | free |
 
 ### 8. The lists
@@ -311,16 +314,29 @@ calendar allows it because the Administrator said so.
 The Administrator cancels the forced appointment, `fe-calendar` cancels `mine` (the helper
 `cancel()`, which must succeed each time), and `release()` deletes the pattern and the type.
 
-## Test 3: a booking off the whole hour
+## Test 3: a booking that is not a slot's start
 
-`fe-calendar` books 08:15 on the first date of the band. The service's schema accepts 08:15 (an
-instant with zero seconds), so the service sends it, and the API refuses it: a User books whole
-local hours only (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-02). The test checks the failure
-`invalid_request` and that `fetch` was called **exactly once**: the API decided, not the service.
-The service does not check the whole hour although it knows the caller is a User, because a second
-copy of a role rule in the front end could drift from the server's (`docs/FRONTEND_SERVICES.md`
-section 8, decision 42). The server checks the times before it reads the calendar, so the date
-needs no window.
+`bookableDate('Off a slot')` as in test 1: the type `fe-calendar Off a slot` and a window
+08:00–12:00 on the first free date of the band. A User's slots there are the hours counted from the
+window's start: 08:00, 09:00, 10:00 and 11:00 ([windows and slots](../concepts.md#windows-and-slots),
+`docs/SHARED_CALENDAR_SPEC.md` R-SLOT-01).
+
+Then a spy on `fetch` counts the requests, and `fe-calendar` books twice through the helper:
+
+1. **08:17.** The test checks the failure `invalid_request`: a start must lie on the 5-minute
+   local step (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-02). The server checks the times before it
+   reads the calendar.
+2. **08:15.** It lies on the step, inside the window, but it is not a slot's start. The test checks
+   the failure `outside_availability`: the server finds the window under the lock and sees that
+   08:15 is none of its slots (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-06). A start outside every
+   window gets the same answer.
+
+The test checks that `fetch` was called **exactly twice**: the service's schema accepts both
+instants (zero seconds), so it sends both, and the API decided each time. The service checks
+neither the step nor the slot although it knows the caller is a User, because a second copy of a
+role rule in the front end could drift from the server's, and only the server knows the windows
+(`docs/FRONTEND_SERVICES.md` section 8, decision 42). The spy is removed whatever happened (a
+`finally`); then `release()` deletes the pattern and the type. Nothing was written.
 
 ## Test 4: listing someone else's appointments
 
@@ -344,8 +360,8 @@ request leaves (the helper `noRequest()`). So the unknown id never reaches the s
 
 ## What the block leaves
 
-Nothing booked, no type and no pattern: tests 1 and 2 cancel everything and `release()` removes
-the pattern and the type of each. The block's `afterAll` writes the settings back to the values it read and
+Nothing booked, no type and no pattern: tests 1 and 2 cancel everything, test 3 books nothing, and
+`release()` removes the pattern and the type of each of the three. The block's `afterAll` writes the settings back to the values it read and
 removes `fe-calendar-settings.local.json`. On `D` this block's three cancelled appointments stay
 as history, all of them `fe-calendar`'s (next to whatever the "calendar view" block and earlier
 runs left there):
@@ -375,9 +391,9 @@ appointment could block.
 ## If the block fails halfway
 
 - **The later tests still run.** vitest does not stop a block at its first failure. Tests 2 to 6
-  need nothing from test 1, and tests 3 to 6 nothing from test 2.
-- **A failed check in test 1 or test 2 skips the rest of it**, the cancels and `release()`
-  included. The booked appointments, the type and the pattern then stay until the end of the file.
+  need nothing from test 1, tests 3 to 6 nothing from test 2, and tests 4 to 6 nothing from test 3.
+- **A failed check in test 1, 2 or 3 skips the rest of it**, the cancels and `release()`
+  included (in test 3 the spy is still removed, by its `finally`). The booked appointments, the type and the pattern then stay until the end of the file.
   The tests and the block after it still work: each takes another free date, since that one still
   has a window. A booked appointment of `fe-calendar` left by test 1 does not reach test 2's
   checks either: they look only at `E`.

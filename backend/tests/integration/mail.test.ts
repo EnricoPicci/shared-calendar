@@ -31,7 +31,9 @@ import {
 // carries a note with a mark of this run. A file's rows are compared with those three, found by the
 // mark, never counted on the whole table: an earlier run of the same day left its own, cancelled.
 // At the end the appointments still booked are cancelled and the window and the type deleted;
-// before it starts, what an interrupted run left is removed the same way.
+// before it starts, what an interrupted run left is removed the same way. The calendar settings
+// are saved first, a horizon that reaches the journey's day, no notice and no limit, since another
+// file may leave a shorter horizon or a limit; the settings found are written back at the end.
 //
 // The daily mail is run through `npm run local:lambda` with a fixed "now" in its event, which the
 // local mailer honours (MAIL_ALLOW_NOW): on the seven dates before the journey's day, each test on
@@ -51,6 +53,8 @@ const ALICE_PASSWORD = 'Alice-Local-Pass-1!';
 const BOSS_PASSWORD = 'Boss-Local-Pass-1!';
 const TYPE = 'mail journey';
 const DAYS_AHEAD = 45;
+// The calendar settings the journey books under: the horizon reaches DAYS_AHEAD, no notice, no limit.
+const SETTINGS = { cancellationNoticeHours: 24, minBookingNoticeHours: 0, bookingHorizonDays: 56, maxFutureAppointmentsPerUser: null };
 // The mark of this run in each appointment's note.
 const MARK = `mail journey ${Date.now()}`;
 // What env.local.json gives the mailer (scripts/local-seed.sh, scripts/local-api.sh): the sender at
@@ -64,6 +68,8 @@ let adminToken: string;
 let aliceToken: string;
 let zone: string;
 let day: string;
+// The calendar settings found before the journey, written back at its end.
+let leftover: Record<string, unknown> | undefined;
 // The journey's type.
 let typeId: string;
 // The journey's three appointments: alice's booked one, the throw-away User's, alice's cancelled one.
@@ -145,7 +151,11 @@ function rowOf(a: Booked, more: Record<string, string | null> = {}): Record<stri
 beforeAll(async () => {
   adminToken = await signIn('admin', ADMIN_PASSWORD);
   aliceToken = await signIn('alice', ALICE_PASSWORD);
-  zone = (await api('GET', '/calendar/settings', adminToken)).body?.timeZone as string;
+  const found = (await api('GET', '/calendar/settings', adminToken)).body!;
+  zone = found.timeZone as string;
+  const { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser } = found;
+  leftover = { cancellationNoticeHours, minBookingNoticeHours, bookingHorizonDays, maxFutureAppointmentsPerUser };
+  expect((await api('PUT', '/calendar/settings', adminToken, SETTINGS)).status).toBe(200);
   day = addDays(localDateOf(new Date().toISOString(), zone), DAYS_AHEAD);
   await removeFromCalendar();
 
@@ -167,6 +177,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await removeFromCalendar();
   await removeUserIfPresent('mail-bob');
+  if (leftover) expect((await api('PUT', '/calendar/settings', adminToken, leftover)).status).toBe(200);
 });
 
 // Explained in simple words in docs/journeys/backend/mail-mailer.md.

@@ -81,7 +81,7 @@ describe('updatePattern handler', () => {
 
   it('answers 409 availability_overlap when the new window overlaps another pattern', async () => {
     onPartition('PATTERN', [patternItem(P1), patternItem(P2, { start: '13:00', end: '14:00' })]);
-    const response = await handler(asAdmin(P1, JSON.stringify({ ...AC04, end: '13:30' })));
+    const response = await handler(asAdmin(P1, JSON.stringify({ ...AC04, end: '14:00' })));
     expect(response.statusCode).toBe(409);
     expect(body(response).error).toBe('availability_overlap');
   });

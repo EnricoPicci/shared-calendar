@@ -124,8 +124,10 @@ takes the next minor version; the major version changes when a client would brea
 | `v2.1.0` | `f29e732` | The assistant, a conversation about the calendar in English or Italian (`docs/CONVERSATIONAL_PLAN.md`) | `docs/RUNBOOK.md` section 5.6 |
 | `v2.2.0` | `72215ae` | The change of one's own password (`docs/CHANGE_PASSWORD_PLAN.md`) | `docs/RUNBOOK.md` section 5.7 |
 | `v2.3.0` | `a8b3a2b` | The capacity of a type, several people in one slot (`docs/CAPACITY_PLAN.md`) | `docs/RUNBOOK.md` section 5.8 |
+| `v2.4.0` | the record's commit after `259e0d6`, whose code was deployed | Times on 5-minute steps (`docs/SLOT_STEP_PLAN.md`), released from the branch `slot-5min` | `docs/RUNBOOK.md` section 5.9 |
+| `v2.5.0` | the record's commit after `2dfd39c`, whose code was deployed | Windows of whole hours (`docs/WINDOW_HOURS_PLAN.md`), released from the branch `slot-5min` | `docs/RUNBOOK.md` section 5.10 |
 
-`git checkout v2.3.0` gives the code as it was released; `git tag -n1` lists the tags with
+`git checkout v2.5.0` gives the code as it was released; `git tag -n1` lists the tags with
 their one-line message.
 
 ## Commands
@@ -140,7 +142,7 @@ in `backend/` (from inside `backend/`, drop `-w backend` and the `--` before arg
 | `npm run local:api -w backend` | Builds the functions and serves the API on `http://127.0.0.1:3000` (foreground; wait for `Running on http://127.0.0.1:3000`) |
 | `DYNAMODB_PORT=8002 npm run verify -w backend` | The deploy gate: typecheck, lint, audit, template lint, unit tests (of `backend` and `shared`), integration tests against the running local stack. On success writes `backend/.verify-ok` |
 | `npm run deploy -w backend` | Refuses unless `backend/.verify-ok` is younger than 30 minutes, names the current commit and says `clean`, and the tree is still clean. Then `sam build` and `sam deploy` (asks to confirm the change set). Uses your real AWS login |
-| `npm run smoke -w backend -- shared-calendar-api` | After every deploy of the API: creates a throw-away user, runs the journeys against the real API, books a throw-away type of capacity 2 over its places with two more throw-away users, changes that user's own password at Cognito, deletes the users; 49 checks. Prompts for the admin password. `npm run smoke -w backend -- local` runs the same against the local stack, where the two checks of the sign-out everywhere say `SKIP` |
+| `npm run smoke -w backend -- shared-calendar-api` | After every deploy of the API: creates a throw-away user, runs the journeys against the real API, sees a window not whole hours refused, books the slot of a window 03:05–04:05, books a custom time on the 5-minute step and sees one off the step refused, books a throw-away type of capacity 2 over its places with two more throw-away users, changes that user's own password at Cognito, deletes the users; at the stage of e-mail `on` it also checks an invitation and a mail: 65 checks, 62 at `off` and `domain`. Prompts for the admin password. `npm run smoke -w backend -- local` runs the same against the local stack, where the two checks of the sign-out everywhere say `SKIP` |
 | `npm run deploy -w frontend` | Releases the page: behind the same gate as the back end's deploy, it runs the front end's own checks, reads the API's address and the app client from the stack `shared-calendar-api`, deploys the hosting's stack `shared-calendar-web` (asks to confirm a change set only when a resource of the hosting changes), builds, uploads the four files and ends with four checks against the page's address, PASS or FAIL each. Uses your real AWS login. `npm run deploy -w frontend -- --dry-run` goes as far as the build, says what it would do and changes nothing. The procedure, and the order of the two deployments: `docs/RUNBOOK.md` section 2, step 6 |
 | `npm run local:down -w backend` | Stops the Docker stack. The table is in memory and is lost; Cognito data survives in `backend/.cognito/` |
 

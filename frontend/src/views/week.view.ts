@@ -5,9 +5,11 @@ import type { MailScreen } from '../logic/mail.screen';
 import { bookingFor, bookingText, changeFor, timeChoice, userChoice, type Asked } from '../logic/booking';
 import type { AppointmentBlock, BusyBlock, DayModel, GroupBlock, Placed, SlotBlock, WeekModel, WindowBlock } from '../logic/week.model';
 import type { WeekScreen } from '../logic/week.screen';
+import { LAST_TIME } from '../logic/times';
 import type { AppointmentsService } from '../services/appointments.service';
 import type { UsersService } from '../services/users.service';
 import { mountDetail } from './detail.view';
+import { startSetsEnd, timeLists } from './time.parts';
 
 // What the week view uses: of the WeekScreen its stream, the three changes of week, the detail
 // of an appointment, the start and the end of an appointment's move to another time, and what
@@ -66,8 +68,6 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, mail
   const bookChoices = find('dialog.book .choices');
   const bookUser = find('dialog.book [name="username"]');
   const bookUsersMessage = find('dialog.book .users-message');
-  const bookStart = find<HTMLSelectElement>('dialog.book [name="start"]');
-  const bookEnd = find<HTMLSelectElement>('dialog.book [name="end"]');
   const bookError = find('dialog.book .error');
   const bookSubmit = find<HTMLButtonElement>('dialog.book .submit');
   const anyway = find('dialog.book .anyway');
@@ -155,12 +155,15 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, mail
     element.onclick = () => openBook(block, timeZone);
     return element;
   };
-  const appointmentFor = (block: AppointmentBlock) => {
+  // A screen reader is told the whole time, also when the block shows its start alone.
+  const appointmentFor = (block: AppointmentBlock, dayLabel: string) => {
     const element = place('tpl-appointment', block, block.colour);
-    element.querySelector('.time')!.textContent = block.time;
+    element.querySelector('.time')!.textContent = block.shown;
+    element.setAttribute('aria-label', [dayLabel, block.time, block.who, block.note].filter((text) => text !== '').join(' '));
     element.querySelector('.who')!.textContent = block.who;
     element.querySelector('.note')!.textContent = block.note;
     element.classList.toggle('beside', block.beside);
+    element.classList.toggle('short', block.short);
     element.onclick = () => detail.open(block.appointmentId);
     return element;
   };
@@ -183,13 +186,13 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, mail
       ...day.windows.map(windowFor),
       ...day.busy.map(busyFor),
       ...day.slots.map((slot) => slotFor(slot, model.timeZone)),
-      ...day.appointments.map(appointmentFor),
+      ...day.appointments.map((block) => appointmentFor(block, day.label)),
       ...day.groups.map(groupFor),
     );
-    // An appointment and a group show their time, and their day is the column they stand in: a
-    // screen reader, which reaches a button without its column, is told the day first. A slot
-    // has its name already.
-    for (const button of body.querySelectorAll('button:not(.slot)')) button.setAttribute('aria-label', `${day.label} ${button.textContent.trim()}`);
+    // A group shows its time, and its day is the column it stands in: a screen reader, which
+    // reaches a button without its column, is told the day first. A slot and an appointment have
+    // their names already.
+    for (const button of body.querySelectorAll('button:not([aria-label])')) button.setAttribute('aria-label', `${day.label} ${button.textContent.trim()}`);
     return element;
   };
   const itemFor = (id: string, text: string, colour?: number) => {
@@ -214,7 +217,15 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, mail
   // 4. The book dialog. Opening it is a pure view action; at every opening it shows nothing of
   // the time before: the form is reset and the failure emptied.
   // The choices of a list of the book dialog: one <option> per text.
-  const choices = (select: HTMLElement, texts: readonly string[]) => select.replaceChildren(...texts.map((text) => itemFor('tpl-option', text)));
+  const option = (text: string) => itemFor('tpl-option', text);
+  const choices = (select: HTMLElement, texts: readonly string[]) => select.replaceChildren(...texts.map(option));
+  // The Administrator's two times, an hour and a minute each. A start chosen by the person sets
+  // the end one hour later, never past `last`, the end of the window that holds the slot of the
+  // opening.
+  const bookStart = timeLists(bookForm, 'start', option);
+  const bookEnd = timeLists(bookForm, 'end', option);
+  let last = LAST_TIME;
+  startSetsEnd(bookStart, bookEnd, () => last);
 
   // The book dialog in one of its two modes: the fixed texts of both are in the page, and the
   // ones of the other mode are hidden.
@@ -236,12 +247,14 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, mail
     bookOld.textContent = moving?.when ?? '';
     bookNote.value = moving?.note ?? '';
     if (role === 'admin') {
-      // The times the Administrator may choose, set to the slot's own.
+      // The hours the Administrator may choose, those the slot's window touches, and the two
+      // times set to the slot's own, as they are: set by the script, they set nothing else.
       const times = timeChoice(slot, timeZone);
-      choices(bookStart, times.starts);
-      choices(bookEnd, times.ends);
-      bookStart.value = times.start;
-      bookEnd.value = times.end;
+      bookStart.offer(times.starts);
+      bookEnd.offer(times.ends);
+      bookStart.write(times.start);
+      bookEnd.write(times.end);
+      last = times.last;
     }
     // Open before the list is asked for: its states are applied only while the dialog is open.
     book.showModal();
@@ -298,7 +311,7 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, mail
     event.preventDefault();
     const data = new FormData(bookForm);
     const field = (name: string) => String(data.get(name) ?? '');
-    send({ ...booking!, fields: { note: field('note'), username: field('username'), start: field('start'), end: field('end') } }, false);
+    send({ ...booking!, fields: { note: field('note'), username: field('username'), start: bookStart.read(), end: bookEnd.read() } }, false);
   };
   // "Book anyway" sends the request that was refused again, over the capacity. It is offered for
   // that request only: anything changed in the dialog hides it.
@@ -414,7 +427,7 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, mail
     bookForm.reset();
     bookMode(false);
     anyway.hidden = true;
-    for (const list of [bookUser, bookStart, bookEnd, groupPeople]) list.replaceChildren();
+    for (const list of [bookUser, ...bookStart.lists, ...bookEnd.lists, groupPeople]) list.replaceChildren();
     for (const text of [bannerWhat, bookWhat, bookOld, bookUsersMessage, bookError, groupWhat, groupWhen, mailWhat, mailSent, mailError]) text.textContent = '';
     bookChoices.hidden = true;
     mailForm.reset();

@@ -324,14 +324,18 @@ User cannot tell them apart. The rules treat them differently:
 A window is the time the Administrator opened. A slot is what a User can book in it
 (`docs/SHARED_CALENDAR_SPEC.md` section 7, R-SLOT-01):
 
-- a slot lasts 60 minutes and starts on a whole local hour (`hh:00`);
+- a window lasts a whole number of hours, from any 5-minute start: 09:05–11:05 may be saved,
+  09:05–10:30 is `400 invalid_request` (`docs/SHARED_CALENDAR_SPEC.md` decision D33);
+- a slot lasts 60 minutes and starts at the window's start or a whole number of hours after it;
 - it lies entirely inside one window and has that window's type;
-- a window 08:00–12:00 gives the slots 08:00, 09:00, 10:00 and 11:00; a window 08:30–12:00 gives
-  09:00, 10:00 and 11:00.
+- a window 08:00–12:00 gives the slots 08:00, 09:00, 10:00 and 11:00; a window 09:05–11:05 gives
+  09:05 and 10:05.
 
 Adjacent windows of the same type are merged into one **effective window** before the slots are
-counted (`docs/SHARED_CALENDAR_SPEC.md` section 6.6). `08:00–10:30 Studio` and `10:30–12:00 Studio`
-form `08:00–12:00 Studio`, which offers the slot 10:00–11:00 across the joint.
+counted (`docs/SHARED_CALENDAR_SPEC.md` section 6.6), and the slots run on from the start of the
+merged window: `09:05–10:05 Studio` and `10:05–12:05 Studio` form `09:05–12:05 Studio`, with the
+slots 09:05, 10:05 and 11:05. A User's start on the 5-minute step that is not a slot is
+`409 outside_availability`, the same answer as a time outside every window (R-BOOK-06).
 
 ### Places in a slot
 

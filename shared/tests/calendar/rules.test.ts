@@ -1,9 +1,10 @@
 import {
+  TIME_STEP_MINUTES,
   cancellableUntil,
   definedWindows,
   effectiveWindows,
-  isOnQuarterGrid,
-  isWholeLocalHour,
+  isOnTimeStep,
+  lastsWholeHours,
   localDateOf,
   localTimeOf,
   overlaps,
@@ -15,8 +16,8 @@ import {
   type PatternInput,
 } from '../../src/index';
 
-// docs/SHARED_CALENDAR_SPEC.md sections 6.5, 6.6 and 7, R-BOOK-02, R-CAN-03, and the acceptance
-// scenarios AC-04, AC-07, AC-08 and AC-35 of its section 18.3, at the level of the pure functions.
+// docs/SHARED_CALENDAR_SPEC.md sections 6.5, 6.6 and 7, R-BOOK-02, R-CAN-03, decision D33, and the
+// acceptance scenarios AC-04, AC-07, AC-08, AC-35, AC-45, AC-50 and AC-52 of its section 18.3, at the level of the pure functions.
 // Every expectation is a fixed UTC string, so the tests also run under TZ=America/New_York and
 // TZ=Asia/Kathmandu.
 
@@ -36,7 +37,7 @@ function effectiveOf(date: string, patterns: PatternInput[], override: OverrideI
   return effectiveWindows(toInstantWindows(date, definedWindows(date, patterns, override, oneOffs), zone));
 }
 function slotStartsOf(date: string, patterns: PatternInput[], override: OverrideInput | null, oneOffs: OneOffInput[], zone = ROME) {
-  return effectiveOf(date, patterns, override, oneOffs, zone).flatMap((w) => slotsOf(w, zone).map((s) => s.start));
+  return effectiveOf(date, patterns, override, oneOffs, zone).flatMap((w) => slotsOf(w).map((s) => s.start));
 }
 // Element `i` of a list, failing the test when it is missing (the compiler's noUncheckedIndexedAccess).
 function nth<T>(list: readonly T[], i = 0): T {
@@ -163,15 +164,10 @@ describe('effectiveWindows (6.6)', () => {
     expect(localTimeOf(nth(effective).end, ROME)).toBe('13:00');
   });
 
-  it('6.6 example: 08:00–10:30 and 10:30–12:00 Studio form one window, which offers 10:00', () => {
-    const override = { date: '2026-11-16', windows: [{ start: '08:00', end: '10:30', typeId: STUDIO }] };
-    const oneOff: OneOffInput = { windowId: W1, date: '2026-11-16', start: '10:30', end: '12:00', typeId: STUDIO };
-    expect(slotStartsOf('2026-11-16', [], override, [oneOff])).toEqual([
-      '2026-11-16T07:00:00.000Z',
-      '2026-11-16T08:00:00.000Z',
-      '2026-11-16T09:00:00.000Z', // 10:00 local: exists only because the windows merged
-      '2026-11-16T10:00:00.000Z',
-    ]);
+  it('6.6 example: 08:00–10:00 and 10:00–12:00 Studio form one window 08:00–12:00', () => {
+    const override = { date: '2026-11-16', windows: [{ start: '08:00', end: '10:00', typeId: STUDIO }] };
+    const oneOff: OneOffInput = { windowId: W1, date: '2026-11-16', start: '10:00', end: '12:00', typeId: STUDIO };
+    expect(effectiveOf('2026-11-16', [], override, [oneOff])).toEqual([{ start: '2026-11-16T07:00:00.000Z', end: '2026-11-16T11:00:00.000Z', typeId: STUDIO }]);
   });
 
   it('merges a chain of three, in any input order', () => {
@@ -226,7 +222,7 @@ describe('effectiveWindows (6.6)', () => {
 // its section 18.3).
 describe('slotsOf (R-SLOT-01)', () => {
   it('AC-04: the window 08:00–12:00 on 2026-11-16 gives the slots 07, 08, 09, 10Z', () => {
-    expect(slotsOf(windowOf('2026-11-16', '08:00', '12:00'), ROME)).toEqual(
+    expect(slotsOf(windowOf('2026-11-16', '08:00', '12:00'))).toEqual(
       ['07', '08', '09', '10'].map((h) => ({ start: `2026-11-16T${h}:00:00.000Z`, end: `2026-11-16T${String(Number(h) + 1).padStart(2, '0')}:00:00.000Z`, typeId: STUDIO })),
     );
   });
@@ -238,23 +234,39 @@ describe('slotsOf (R-SLOT-01)', () => {
     expect(starts.map((s) => localTimeOf(s, ROME))).toEqual(['08:00', '09:00', '10:00', '11:00', '12:00']);
   });
 
-  it('08:30–12:00 gives 09:00, 10:00 and 11:00 local', () => {
-    expect(slotsOf(windowOf('2026-11-16', '08:30', '12:00'), ROME).map((s) => localTimeOf(s.start, ROME))).toEqual(['09:00', '10:00', '11:00']);
+  it('D33: 09:05–11:05 gives 09:05 and 10:05 local, each 60 real minutes', () => {
+    expect(slotsOf(windowOf('2026-11-16', '09:05', '11:05'))).toEqual([
+      { start: '2026-11-16T08:05:00.000Z', end: '2026-11-16T09:05:00.000Z', typeId: STUDIO },
+      { start: '2026-11-16T09:05:00.000Z', end: '2026-11-16T10:05:00.000Z', typeId: STUDIO },
+    ]);
   });
 
-  it('08:00–08:45 gives none', () => {
-    expect(slotsOf(windowOf('2026-11-16', '08:00', '08:45'), ROME)).toEqual([]);
+  it('AC-45: the pattern 08:05–12:05 gives 08:05, 09:05, 10:05 and 11:05 local', () => {
+    const pattern = { ...MONDAY_STUDIO, start: '08:05', end: '12:05' };
+    expect(slotStartsOf('2026-11-16', [pattern], null, []).map((s) => localTimeOf(s, ROME))).toEqual(['08:05', '09:05', '10:05', '11:05']);
+  });
+
+  it('AC-50: joined windows 09:05–10:05 and 10:05–12:05 give 09:05, 10:05 and 11:05, from the joined start', () => {
+    const override = { date: '2026-11-16', windows: [{ start: '09:05', end: '10:05', typeId: STUDIO }] };
+    const oneOff: OneOffInput = { windowId: W1, date: '2026-11-16', start: '10:05', end: '12:05', typeId: STUDIO };
+    expect(effectiveOf('2026-11-16', [], override, [oneOff])).toHaveLength(1);
+    expect(slotStartsOf('2026-11-16', [], override, [oneOff]).map((s) => localTimeOf(s, ROME))).toEqual(['09:05', '10:05', '11:05']);
+  });
+
+  it('a window stored before the rule, not whole hours, keeps what fits: 08:30–12:00 gives 08:30, 09:30 and 10:30; 08:00–08:45 none', () => {
+    expect(slotsOf(windowOf('2026-11-16', '08:30', '12:00')).map((s) => localTimeOf(s.start, ROME))).toEqual(['08:30', '09:30', '10:30']);
+    expect(slotsOf(windowOf('2026-11-16', '08:00', '08:45'))).toEqual([]);
   });
 
   it('a window ending at 24:00: its last slot is 23:00–24:00', () => {
-    const slots = slotsOf(windowOf('2026-11-16', '22:00', '24:00'), ROME);
+    const slots = slotsOf(windowOf('2026-11-16', '22:00', '24:00'));
     expect(slots.at(-1)).toEqual({ start: '2026-11-16T22:00:00.000Z', end: '2026-11-16T23:00:00.000Z', typeId: STUDIO });
     expect(localDateOf(nth(slots, 1).end, ROME)).toBe('2026-11-17'); // ends at midnight
     expect(slots).toHaveLength(2);
   });
 
   it('AC-35, spring forward (2027-03-28): 01:00–04:00 gives two slots, local 01:00 (ending at 03:00) and 03:00', () => {
-    const slots = slotsOf(windowOf('2027-03-28', '01:00', '04:00'), ROME);
+    const slots = slotsOf(windowOf('2027-03-28', '01:00', '04:00'));
     expect(slots).toEqual([
       { start: '2027-03-28T00:00:00.000Z', end: '2027-03-28T01:00:00.000Z', typeId: STUDIO },
       { start: '2027-03-28T01:00:00.000Z', end: '2027-03-28T02:00:00.000Z', typeId: STUDIO },
@@ -263,7 +275,7 @@ describe('slotsOf (R-SLOT-01)', () => {
   });
 
   it('fall back (2026-10-25): 01:00–04:00 holds four real hours and gives four slots, two at local 02:00', () => {
-    const slots = slotsOf(windowOf('2026-10-25', '01:00', '04:00'), ROME);
+    const slots = slotsOf(windowOf('2026-10-25', '01:00', '04:00'));
     expect(slots.map((s) => s.start)).toEqual([
       '2026-10-24T23:00:00.000Z', // 01:00 +02:00
       '2026-10-25T00:00:00.000Z', // 02:00 +02:00 (summer time)
@@ -276,12 +288,25 @@ describe('slotsOf (R-SLOT-01)', () => {
   });
 
   it('Asia/Kathmandu (+05:45): a whole local hour is not a whole UTC hour', () => {
-    const slots = slotsOf(windowOf('2026-11-16', '08:00', '12:00', KATHMANDU), KATHMANDU);
+    const slots = slotsOf(windowOf('2026-11-16', '08:00', '12:00', KATHMANDU));
     expect(slots.map((s) => s.start)).toEqual(['2026-11-16T02:15:00.000Z', '2026-11-16T03:15:00.000Z', '2026-11-16T04:15:00.000Z', '2026-11-16T05:15:00.000Z']);
   });
 
-  it('Asia/Kathmandu: a window starting at a quarter past finds the next whole local hour', () => {
-    expect(slotsOf(windowOf('2026-11-16', '08:15', '10:00', KATHMANDU), KATHMANDU).map((s) => localTimeOf(s.start, KATHMANDU))).toEqual(['09:00']);
+  it('AC-52, spring forward (2027-03-28): 01:05–04:05 holds two real hours and gives 01:05 (ending at 03:05) and 03:05', () => {
+    const slots = slotsOf(windowOf('2027-03-28', '01:05', '04:05'));
+    expect(slots.map((s) => s.start)).toEqual(['2027-03-28T00:05:00.000Z', '2027-03-28T01:05:00.000Z']);
+    expect(slots.map((s) => `${localTimeOf(s.start, ROME)}–${localTimeOf(s.end, ROME)}`)).toEqual(['01:05–03:05', '03:05–04:05']);
+  });
+
+  it('AC-52, fall back (2026-10-25): 01:05–04:05 holds four real hours and gives four slots, two at local 02:05', () => {
+    const slots = slotsOf(windowOf('2026-10-25', '01:05', '04:05'));
+    expect(slots.map((s) => s.start)).toEqual([
+      '2026-10-24T23:05:00.000Z', // 01:05 +02:00
+      '2026-10-25T00:05:00.000Z', // 02:05 +02:00 (summer time)
+      '2026-10-25T01:05:00.000Z', // 02:05 +01:00 (winter time): another real hour
+      '2026-10-25T02:05:00.000Z', // 03:05 +01:00
+    ]);
+    expect(slots.map((s) => localTimeOf(s.start, ROME))).toEqual(['01:05', '02:05', '02:05', '03:05']);
   });
 });
 
@@ -324,6 +349,8 @@ describe('peopleIn (R-SLOT-02, D25)', () => {
     ['three nested', [at('09:00', '12:00'), at('10:00', '11:00'), at('10:15', '10:30')], 3],
     ['three in a row, each touching the next, and one across them', [at('10:00', '10:15'), at('10:15', '10:30'), at('10:30', '11:00'), at('09:30', '11:30')], 2],
     ['the same appointment twice (the caller passes what is counted)', [at('10:00', '11:00'), at('10:00', '11:00')], 2],
+    ['D32, three of 5 minutes that touch', [at('10:10', '10:15'), at('10:15', '10:20'), at('10:20', '10:25')], 1],
+    ['D32, 10:10–10:35 with 10:30–10:40: together for 5 minutes', [at('10:10', '10:35'), at('10:30', '10:40')], 2],
   ])('%s → %s', (_case, appointments, expected) => {
     expect(peopleIn(slot, appointments)).toBe(expected);
   });
@@ -345,21 +372,60 @@ describe('peopleIn (R-SLOT-02, D25)', () => {
   });
 });
 
-// Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
-describe('isWholeLocalHour and isOnQuarterGrid (R-BOOK-02)', () => {
+// Test names: D… decisions are those of docs/SHARED_CALENDAR_SPEC.md.
+describe('lastsWholeHours (D33)', () => {
   it.each([
-    ['2026-11-16T08:00:00.000Z', ROME, true, true], // 09:00
-    ['2026-11-16T08:15:00.000Z', ROME, false, true], // 09:15
-    ['2026-11-16T08:45:00.000Z', ROME, false, true],
-    ['2026-11-16T08:07:00.000Z', ROME, false, false],
-    ['2026-11-16T08:00:30.000Z', ROME, false, false], // a second: never on a grid
-    ['2026-11-16T08:00:00.001Z', ROME, false, false],
-    ['2026-11-16T03:15:00.000Z', KATHMANDU, true, true], // 09:00
-    ['2026-11-16T03:00:00.000Z', KATHMANDU, false, true], // 08:45
-    ['2026-11-16T03:30:00.000Z', 'Asia/Kolkata', true, true], // +05:30: 09:00
-  ])('%s in %s: whole hour %s, quarter %s', (instant, zone, whole, quarter) => {
-    expect(isWholeLocalHour(instant, zone)).toBe(whole);
-    expect(isOnQuarterGrid(instant, zone)).toBe(quarter);
+    ['09:05', '11:05', true],
+    ['09:05', '10:05', true],
+    ['23:00', '24:00', true],
+    ['08:00', '24:00', true],
+    ['00:00', '24:00', true],
+    ['09:05', '10:30', false],
+    ['09:05', '09:05', false],
+    ['11:05', '09:05', false],
+    ['23:05', '24:00', false],
+    ['23:30', '24:00', false],
+  ])('%s–%s → %s', (start, end, expected) => {
+    expect(lastsWholeHours(start, end)).toBe(expected);
+  });
+});
+
+// Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
+describe('isOnTimeStep (R-BOOK-02)', () => {
+  it.each([
+    ['2026-11-16T08:00:00.000Z', ROME, true], // 09:00
+    ['2026-11-16T08:15:00.000Z', ROME, true], // 09:15
+    ['2026-11-16T08:45:00.000Z', ROME, true],
+    ['2026-11-16T08:05:00.000Z', ROME, true], // 09:05
+    ['2026-11-16T08:10:00.000Z', ROME, true],
+    ['2026-11-16T08:55:00.000Z', ROME, true],
+    ['2026-11-16T08:07:00.000Z', ROME, false],
+    ['2026-11-16T08:01:00.000Z', ROME, false],
+    ['2026-11-16T08:00:30.000Z', ROME, false], // a second: never on a grid
+    ['2026-11-16T08:05:30.000Z', ROME, false],
+    ['2026-11-16T08:00:00.001Z', ROME, false],
+    ['2026-11-16T03:15:00.000Z', KATHMANDU, true], // 09:00
+    ['2026-11-16T03:00:00.000Z', KATHMANDU, true], // 08:45
+    ['2026-11-16T03:30:00.000Z', 'Asia/Kolkata', true], // +05:30: 09:00
+    ['2026-11-16T03:20:00.000Z', KATHMANDU, true], // +05:45: 09:05
+    ['2026-11-16T03:22:00.000Z', KATHMANDU, false], // 09:07
+    // The night clocks go back in Europe/Rome: local 02:05 and 02:55 come twice, an hour apart.
+    ['2026-10-25T00:05:00.000Z', ROME, true], // 02:05 +02:00
+    ['2026-10-25T01:05:00.000Z', ROME, true], // 02:05 +01:00
+    ['2026-10-25T00:55:00.000Z', ROME, true],
+    ['2026-10-25T01:55:00.000Z', ROME, true],
+    ['2026-10-25T01:00:00.000Z', ROME, true], // the second 02:00
+    // The night they go forward (2026-03-29): 01:55 is the last step before 03:00.
+    ['2026-03-29T00:55:00.000Z', ROME, true], // 01:55 +01:00
+    ['2026-03-29T01:05:00.000Z', ROME, true], // 03:05 +02:00
+    ['2026-03-29T01:07:00.000Z', ROME, false],
+  ])('%s in %s: on the step %s', (instant, zone, onStep) => {
+    expect(isOnTimeStep(instant, zone)).toBe(onStep);
+  });
+
+  it('the step is 5 minutes and divides the hour, so every whole hour lies on it (D32)', () => {
+    expect(TIME_STEP_MINUTES).toBe(5);
+    expect(60 % TIME_STEP_MINUTES).toBe(0);
   });
 });
 

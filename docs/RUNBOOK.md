@@ -90,10 +90,10 @@ both fit into its 30 minutes; otherwise run it again before the second.
    refuses, and the change set and its prompt would go to the file instead of the screen.
 5. `npm run smoke -w backend -- shared-calendar-api` (asks for the admin password, and at
    `MailStage` `on` for your own e-mail address, for the invitation's check; `-w backend` is
-   needed, the root has no `smoke` script): every line must say PASS. At `on`, 61 lines (11 Hello
-   World and Users checks, 9 calendar checks: section 2.1; 19 of the capacity of a type: section
+   needed, the root has no `smoke` script): every line must say PASS. At `on`, 65 lines (11 Hello
+   World and Users checks, 13 calendar checks: section 2.1; 19 of the capacity of a type: section
    2.3; 7 of the assistant: section 3.2; 7 of the change of password: section 2.2; 6 of the
-   invitation and 2 of the mail: section 2.4); at `off` or `domain`, 58 (section 2.4). At `on`
+   invitation and 2 of the mail: section 2.4); at `off` or `domain`, 62 (section 2.4). At `on`
    one invitation reaches your mailbox: look that it came. Once the assistant is
    deployed the smoke test needs its key (section 3.2), and its exchange costs about a US cent
    at Anthropic. `script -q -c "…" /tmp/smoke.txt` works here too; the
@@ -158,28 +158,32 @@ starting with `calendar:`:
 | Line | Checks |
 |---|---|
 | `GET /calendar/settings -> 200 (zone …, cancellation notice … h)` | the settings and the zone can be read |
-| `03:00-04:00 <zone> free on <date>` | one calendar view (31 days from 50 days ahead) has a date where that hour holds no window, no active appointment and fewer than 10 one-off windows |
+| `03:00-04:05 <zone> free on <date>` | one calendar view (31 days from 50 days ahead) has a date where 03:00–04:05 holds no window and no active appointment, with fewer than 10 one-off windows: the calendar journey's window 03:05–04:05 and the capacity journey's hour 03:00–04:00 (section 2.3) |
 | `POST /calendar/types smoke-<epoch> -> 201` | a type of its own |
-| `POST /calendar/windows <date> 03:00-04:00 -> 201` | a one-off window of that type |
-| `book <date> 03:00 for smoke-<epoch> -> 201, booked, 60 min, type …` | the Administrator books for the user, with a note |
+| `POST /calendar/windows <date> 03:05-03:50 -> 400 invalid_request, nothing written` | a window that is not a whole number of hours is refused (`docs/SHARED_CALENDAR_SPEC.md` decision D33), and the date then shows no window of the type |
+| `POST /calendar/windows <date> 03:05-04:05 -> 201` | a one-off window of that type, of one whole hour from a start that is not on the hour |
+| `book <date> 03:05 for smoke-<epoch> -> 201, booked, 60 min, type …` | the Administrator books for the user, with a note, the window's one slot, counted from its start (`docs/SHARED_CALENDAR_SPEC.md` R-SLOT-01) |
 | `upcoming as smoke-<epoch> -> the appointment` | the user sees exactly it, with its note and `cancellableUntil` |
 | `cancel as smoke-<epoch> -> 200, cancelled (cancelReason cancelled)` | the user cancels |
+| `book <date> 03:10-03:35 for smoke-<epoch> -> 201, the times on the 5-minute step read back` | the Administrator books custom times on the 5-minute step in the same window (`docs/SHARED_CALENDAR_SPEC.md` decision D32, R-BOOK-02); the answer holds exactly those two instants |
+| `cancel 03:10-03:35 as the Administrator -> 200, cancelled` | the Administrator cancels it |
+| `book <date> 03:07-03:35 for smoke-<epoch> -> 400 invalid_request, nothing written` | a start off the step is refused, and the user's appointments, cancelled ones included, hold none at 03:07 |
 | `DELETE /calendar/windows/<id> -> 204`, `DELETE /calendar/types/<id> -> 204` | its window and type are removed |
 
 **What stays in the `calendar` table, by design** (history, like the smoke rows in
-`hello-messages`): per run, one cancelled appointment with username and type name
-`smoke-<epoch>` at 03:00 local about 50 days ahead, its pointer, its `appointment.booked` and
-`appointment.cancelled` events, and the `DELETEDUSER` marker that journey 11 writes for the user.
+`hello-messages`): per run, two cancelled appointments with username and type name
+`smoke-<epoch>` about 50 days ahead, 03:05–04:05 and 03:10–03:35 local, their pointers, their
+`appointment.booked` and `appointment.cancelled` events, and the `DELETEDUSER` marker that journey 11 writes for the user.
 No type and no window stay. A cancelled appointment blocks nothing. Besides these, the table holds
 one `LOCK` item from the first calendar write on (the calendar lock, one item for the whole
-table); its `version` goes up by one per locked write, 7 for this journey and 12 for the
-capacity journey (section 2.3), so 19 per smoke run on an otherwise unused calendar. No `SETTINGS` item appears: the smoke test only reads the settings, and until an
+table); its `version` goes up by one per locked write, 9 for this journey and 12 for the
+capacity journey (section 2.3), so 21 per smoke run on an otherwise unused calendar. No `SETTINGS` item appears: the smoke test only reads the settings, and until an
 Administrator saves them the API answers the defaults.
 
 **When the calendar journey fails:**
 
-- `no free 03:00-04:00 … from … to …`: the real calendar has availability or appointments at
-  03:00 on every one of those 31 days. Nothing was created. Check the calendar view for that
+- `no free 03:00-04:05 … from … to …`: the real calendar has availability or appointments
+  between 03:00 and 04:05 on every one of those 31 days. Nothing was created. Check the calendar view for that
   range; the test never moves anyone's availability. A run on another day searches other dates.
 - `no usable date: cancellationNoticeHours … h …`: every date searched was too soon for the user
   to cancel. With the spec's ranges (at most 720 h) this cannot happen; if it does, the settings
@@ -187,6 +191,12 @@ Administrator saves them the API answers the defaults.
 - `POST /calendar/types … -> 409 limit_reached`: 20 types exist; nothing was created.
 - a `409` on the window or the booking (`availability_overlap`, `slot_taken`, …): someone wrote at
   03:00 on that date between the read and the write. Rerun.
+- `POST /calendar/windows … 03:05-03:50 -> 201`: the API deployed does not hold windows to whole
+  hours (`docs/SHARED_CALENDAR_SPEC.md` decision D33); the window made is deleted by the clean-up.
+  Stop before releasing the page (`docs/WINDOW_HOURS_PLAN.md` step w5).
+- `book … 03:10-03:35 … -> 400 invalid_request`, or `… 03:07-03:35 … -> 201`: the API deployed
+  is not on the 5-minute step of `docs/SHARED_CALENDAR_SPEC.md` decision D32. A booking made is
+  cancelled by the clean-up; stop before releasing the page (`docs/SLOT_STEP_PLAN.md` F9).
 - any other failure: the `cleanup:` lines that follow say what was removed. A `CLEANUP FAILED:`
   line names the appointment, window or type id left behind: cancel the appointment as the
   Administrator (`POST /calendar/appointments/<id>/cancel`), then delete the window
@@ -351,7 +361,7 @@ Plan step 11 has the full list; in short:
    status is `FORCE_CHANGE_PASSWORD` and the smoke test cannot sign in.
 4. The assistant's key, `npm run assistant-key -w backend -- shared-calendar-api`, after
    Anthropic's side is ready (section 3.2). Then `npm run smoke -w backend -- shared-calendar-api`:
-   at `MailStage` `off`, 58 PASS (sections 2.1 to 2.4 and 3.2); without the key, the assistant's
+   at `MailStage` `off`, 62 PASS (sections 2.1 to 2.4 and 3.2); without the key, the assistant's
    one FAIL. E-mail's stages follow in section 3.3. On a new
    stack the calendar is empty, so the first date searched is free.
 5. `npm run budget -w backend -- shared-calendar-api --dry-run`, then
@@ -558,7 +568,7 @@ left out, so replies and bounce reports go to `AlertEmail`. No e-mail address go
    decides what becomes of them (step m9 deletes them in the page, the last thing before the
    deploy, after noting who needs an account again).
 
-**At `domain`**, after the deploy and its smoke test (58 PASS, `off`'s count):
+**At `domain`**, after the deploy and its smoke test (62 PASS, `off`'s count):
 
 - The stack's outputs `MailDkimRecord1` to `3`: at the domain's DNS provider (the same place as
   the page's records, `docs/CUSTOM_DOMAIN.md`), add each as a CNAME, its name and its value; and
@@ -575,7 +585,7 @@ left out, so replies and bounce reports go to `AlertEmail`. No e-mail address go
   typed), then sign in on the page and choose a password. Delete it in the Users screen when done.
 
 **At `on`**, once SES shows the domain verified and the account out of the sandbox: the deploy,
-the smoke test (61 PASS, section 2.4) and its invitation in your mailbox; a User created in the
+the smoke test (65 PASS, section 2.4) and its invitation in your mailbox; a User created in the
 page with your own address, its invitation, its first sign-in; a mail on demand from the week
 page; the next morning, the daily mail. A bounce report, should one come, reaches the Reply-To
 mailbox: correct the User's address in the Users screen and "Resend invitation".
@@ -1058,6 +1068,171 @@ nobody was told beforehand. The commits were not pushed before, during or after 
 - **What stays**, by design: the smoke test's history (sections 2.1 and 2.3); of the quick look,
   the deleted user's `DELETEDUSER` marker. No type, window or user made for the release is left.
 - **Cost:** AWS within the free tier; at Anthropic the smoke test's one exchange, about a US cent.
+
+### 5.9 Times on 5-minute steps (`docs/SLOT_STEP_PLAN.md` step s6, 2026-11-25)
+
+The API deployed to `shared-calendar-api` and the page released to `shared-calendar-web`, from
+the branch `slot-5min`, not from `main`: its base holds no code of the mail work, which is on
+`main` and must not reach the cloud before its own release (`docs/SLOT_STEP_PLAN.md` section 6).
+Times on 5-minute steps (`docs/SHARED_CALENDAR_SPEC.md` decision D32). Who did what, as in 5.8:
+the operator ran the API's deployment and the smoke test in a terminal inside `script -q`, typed
+`y` and the admin password, and looked at the deployed page by hand from a short list; the
+session ran the gates, the page's release, read-only `aws` commands and curl without
+credentials, and saw no password and no token. Nothing was pushed.
+
+- **The smoke test locally first**, with its three new lines (section 2.1): 50 PASS and the 2
+  SKIP of `GlobalSignOut`, 52 lines.
+- **The gate:** root `DYNAMODB_PORT=8002 npm run verify` PASSED on the clean tree at `259e0d6`.
+- **Deployment of the API**, `npm run deploy -w backend` at `259e0d6`. A first attempt stopped
+  before reaching AWS with `CreateOAuth2Token … authorization grant is invalid`: the terminal
+  had no `AWS_PROFILE`, so SAM took the machine's default profile, whose sign-in had expired.
+  Run again as `AWS_PROFILE=shared-calendar-admin script -q /tmp/deploy.txt npm run deploy -w
+  backend` (section 1, item 3). **Change set: 31 Modify, all with replacement `False`, no Add,
+  no Remove, no Replace**, read back with `describe-change-set` before the operator's `y`: 30
+  functions with `Code` their only change, and `HttpApi`, its `Body` "Dynamic", as in 5.8.
+  `UPDATE_COMPLETE` at 14:24 UTC. The mark of the assistant's instructions changed with this
+  code, so every conversation in progress ended.
+- **The smoke test**, `npm run smoke -w backend -- shared-calendar-api` at `259e0d6`, inside
+  `script -q`: **52 PASS**, throw-away user `smoke-1795616753`, the calendar journey on
+  2027-01-14 (Europe/Rome), with 03:10–03:35 booked and cancelled by the Administrator and
+  03:07 refused, nothing written.
+- **The log search** of section 2.1, over the stack's 32 log groups from ten minutes before the
+  run, read as raw events with `aws logs filter-log-events` (Logs Insights had not indexed the
+  run yet and scanned 0 records), 237 events in 18 groups: 0 for the note, for `eyJ`, for
+  `ChangePassword`, `GlobalSignOut` and `REFRESH_TOKEN`, for `"password"` and for the
+  assistant's sentence; the control search for the user's name matched 29 events in 12 groups.
+- **The gate again** on the same clean tree at `259e0d6`, then **the release**,
+  `npm run deploy -w frontend`: SAM `No changes to deploy` for `shared-calendar-web`; the build
+  `index.html` 40 835 bytes (6 991 gzipped), `style.css` 24 998 (7 089), `app.js` 615 263
+  (139 593); the four uploads, `index.html` last; the invalidation of `/*` on `E2V5GRRPLMET12`
+  waited for; the four checks PASS. Read back with curl: the served `app.js` is byte for byte
+  the build.
+- **The quick look at the deployed page** (operator, by hand, as the Administrator and as a
+  User), seven yes: the type `look-step` and the user `look-user` created; a window 09:05–11:00
+  of `look-step` saved under "This day only" on 2026-12-03, each time list showing its whole
+  value; that day offering the User one slot, 10:00; the book dialog, Start 10:10 setting End
+  11:10 and End changed to 10:15 leaving Start alone, booked for `look-user`; the 10:10–10:15
+  block short and readable; the appointment cancelled; the window, the user and the type
+  deleted. A first try with the windows 09:05–10:05 and 11:10–12:00 offered the User no slot,
+  as `docs/SHARED_CALENDAR_SPEC.md` R-SLOT-01 says (no whole local hour fits in either); the
+  Product Owner then asked for a new rule, a User's hour starting on any 5-minute step, which
+  is planned apart and not part of this release.
+- **No way back without care.** Once a window at 09:05 or an appointment at 10:10 is stored, the
+  API of `v2.3.0` still reads it, but its page cannot show that time in its lists. Before any
+  roll-back to `v2.3.0`, look for times off the quarter hour first: patterns, date overrides
+  and one-off windows whose `start` or `end` is not on 00, 15, 30 or 45, and booked
+  appointments whose start or end is not; while there are none, the roll-back is safe. The
+  smoke test's own 03:10–03:35 is cancelled and needs no care.
+- **What stays**, by design: the smoke test's history (sections 2.1 and 2.3, two cancelled
+  appointments of its calendar journey); of the quick look, the deleted user's `DELETEDUSER`
+  marker and the cancelled 10:10–10:15.
+- **Cost:** AWS within the free tier; at Anthropic the smoke test's one exchange, about a US
+  cent, and the paid evaluation before the deployment, 46.59 US cents (`docs/SLOT_STEP_PLAN.md`
+  step s6).
+
+### 5.10 Windows of whole hours (`docs/WINDOW_HOURS_PLAN.md` step w5, 2026-11-25)
+
+A window lasts a whole number of hours, and a User's slots are counted from the window's start
+(`docs/SHARED_CALENDAR_SPEC.md` decision D33). The API of this release refuses to save a window
+that is not whole hours, so every such window still stored is deleted (or changed to whole hours)
+**before** the API is deployed (`docs/WINDOW_HOURS_PLAN.md` decisions Q3, Q5 and Q7).
+
+**The check, read-only.** It reads the stack's `calendar` table straight, so it needs no token and
+sees every pattern, ended or not, and the date overrides and one-off windows from today. It prints
+one line per window whose start and end minutes differ (`24:00` counting as `00`), with the type's
+name, or `none`. Run it in a terminal set up as section 1 says (`AWS_PROFILE` set):
+
+```bash
+T=shared-calendar-api-calendar
+R=eu-north-1
+TODAY=$(TZ=Europe/Rome date +%F)
+q() { aws dynamodb query --region "$R" --table-name "$T" --output json --key-condition-expression "$1" --expression-attribute-values "$2"; }
+{
+  echo '{"types":'; q "PK = :p" '{":p":{"S":"TYPE"}}'
+  echo ',"pattern":'; q "PK = :p" '{":p":{"S":"PATTERN"}}'
+  echo ',"override":'; q "PK = :p AND SK >= :d" "{\":p\":{\"S\":\"OVERRIDE\"},\":d\":{\"S\":\"$TODAY\"}}"
+  echo ',"window":'; q "PK = :p AND SK >= :d" "{\":p\":{\"S\":\"WINDOW\"},\":d\":{\"S\":\"$TODAY\"}}"
+  echo '}'
+} | node -e '
+let s = ""; process.stdin.on("data", (c) => (s += c)).on("end", () => {
+  const all = JSON.parse(s);
+  const v = (x) => (x === undefined || x.NULL ? null : x.S ?? x.N);
+  const names = new Map(all.types.Items.map((i) => [v(i.SK), v(i.name)]));
+  const type = (i) => `${names.get(v(i.typeId)) ?? "unknown type"} (${v(i.typeId)})`;
+  // Whole hours: the same minutes, 24:00 counting as 00 (docs/SHARED_CALENDAR_SPEC.md decision D33).
+  const minute = (t) => (t === "24:00" ? "00" : t.slice(3, 5));
+  const bad = (w) => minute(v(w.start)) !== minute(v(w.end));
+  const days = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const out = [];
+  for (const i of all.pattern.Items) if (bad(i)) out.push(`pattern ${v(i.SK)}: ${days[v(i.weekday)]} ${v(i.start)}-${v(i.end)}, ${type(i)}, valid ${v(i.validFrom)} to ${v(i.validUntil) ?? "no end"}`);
+  for (const i of all.override.Items) for (const w of i.windows.L.map((x) => x.M)) if (bad(w)) out.push(`this day only ${v(i.SK)}: ${v(w.start)}-${v(w.end)}, ${type(w)}`);
+  for (const i of all.window.Items) if (bad(i)) out.push(`extra window ${v(i.SK).split("#")[1]}: ${v(i.date)} ${v(i.start)}-${v(i.end)}, ${type(i)}`);
+  console.log(`read: ${all.pattern.Items.length} patterns, ${all.override.Items.length} dates with their own windows, ${all.window.Items.length} extra windows (from today)`);
+  console.log(out.length ? out.join("\n") : "none");
+});'
+```
+
+A window listed is deleted by the Administrator on the page ("Availability": a pattern's row
+"Delete"; a date's "This day only" or "Extra windows"). A delete refused with `409
+availability_conflict` holds a booked appointment: change the window to whole hours that keep it,
+or move the appointment first (`docs/WINDOW_HOURS_PLAN.md` F6). Then run the check again: it must
+print `none`.
+
+- **The first run**, at `e302668`: 3 patterns, 1 date with its own windows and 3
+  one-off windows read; two listed, neither holding a booked appointment: the pattern Monday
+  13:00–14:45 of `piscina`, valid from 2026-11-22 with no end, and the one-off window 2026-12-03
+  11:10–12:00 of `look-step`, left by the quick look of section 5.9.
+- **What the Product Owner did**, by hand on the page of `v2.4.0`: the pattern of `piscina`
+  changed to Monday 13:00–15:00, so Mondays keep it, widened to two whole hours; the one-off
+  window of `look-step` deleted.
+- **The second run**: 3 patterns, 1 date with its own windows and 2 one-off windows read;
+  `none`. Run once more just before the deploy, at `2dfd39c`: `none`.
+
+**The release**, from the branch `slot-5min`, not from `main`, as in 5.9
+(`docs/WINDOW_HOURS_PLAN.md` section 6). Who did what, as in 5.9: the operator changed the
+windows on the page, ran the API's deployment and the smoke test in a terminal inside `script -q`,
+typed `y` and the admin password, and looked at the deployed page by hand from a short list; the
+session ran the check, the gates, the page's release, read-only `aws` commands and curl without
+credentials, and saw no password and no token. Nothing was pushed.
+
+- **The smoke test locally first**, with its new window and line (section 2.1): 51 PASS and the 2
+  SKIP of `GlobalSignOut`, 53 lines.
+- **The gate:** root `DYNAMODB_PORT=8002 npm run verify` PASSED on the clean tree at `2dfd39c`.
+- **Deployment of the API**, `AWS_PROFILE=shared-calendar-admin script -q /tmp/deploy.txt npm run
+  deploy -w backend` at `2dfd39c`. **Change set: 31 Modify, all with replacement `False`, no Add,
+  no Remove, no Replace**, read back with `describe-change-set` before the operator's `y`: 30
+  functions with `Code` their only change, and `HttpApi`, its `Body`, as in 5.9.
+  `UPDATE_COMPLETE`. The mark of the assistant's instructions changed with this code, so every
+  conversation in progress ended.
+- **The smoke test**, `npm run smoke -w backend -- shared-calendar-api` at `2dfd39c`, inside
+  `script -q`: **53 PASS**, throw-away user `smoke-1795635643`, the calendar journey on
+  2027-01-14 (Europe/Rome), the window 03:05–03:50 refused `400 invalid_request` with nothing
+  written, the window 03:05–04:05 and its slot 03:05 booked, listed and cancelled.
+- **The log search** of section 2.1, over the stack's 32 log groups from ten minutes before the
+  run, read as raw events with `aws logs filter-log-events`, 248 events in 18 groups: 0 for the
+  note, for `eyJ`, for `ChangePassword`, `GlobalSignOut` and `REFRESH_TOKEN`, for `"password"`
+  and for the assistant's sentence; the control search for the user's name matched 29 events in
+  12 groups.
+- **The release of the page**, `npm run deploy -w frontend` within the gate's 30 minutes: SAM
+  `No changes to deploy` for `shared-calendar-web`; the build `index.html` 40 835 bytes (6 991
+  gzipped), `style.css` 25 382 (7 197), `app.js` 616 291 (140 027); the four uploads,
+  `index.html` last; the invalidation of `/*` on `E2V5GRRPLMET12` waited for; the four checks
+  PASS. Read back with curl: the served `app.js` is byte for byte the build.
+- **The quick look at the deployed page** (operator, by hand, as the Administrator and as a
+  User), five yes: the type `look-hours` and the user `look-user` created; on 2026-12-13 an
+  extra window 09:05–11:05 of `look-hours` saved, the end's minute list holding 05 alone;
+  09:05–10:30 not possible to enter; as `look-user`, that Sunday offering 09:05–10:05 and
+  10:05–11:05; the window, the user and the type deleted.
+- **The way back** (`docs/WINDOW_HOURS_PLAN.md` F12). A roll-back to `v2.4.0` is possible at any
+  time: its API accepts every window of whole hours, and its slots come back on the whole local
+  hour, so a window 09:05–11:05 would offer a User one slot, 10:00, again. The windows changed
+  or deleted before this release do not come back.
+- **What stays**, by design: the smoke test's history (sections 2.1 and 2.3); of the quick look,
+  the deleted user's `DELETEDUSER` marker. The types `look-step` and `look-cap` of the looks of
+  5.8 and 5.9 are still in the calendar, with no window: they block nothing.
+- **Cost:** AWS within the free tier; at Anthropic the smoke test's one exchange, about a US
+  cent, and the paid evaluation before the deployment, 48.93 US cents
+  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3).
 
 ## 6. A person's password: what to tell them
 

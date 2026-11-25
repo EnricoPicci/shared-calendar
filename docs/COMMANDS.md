@@ -189,7 +189,7 @@ mailer as `local:lambda` names it); and sections of their own for `MailerFunctio
   `xhigh`, `max`; `local:up` refuses another value. Without them the template's model and the
   effort `low` are used, and a `local:up` without them is the way back.
 - **`npm run assistant:eval -w backend`: the evaluation with the real model**
-  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3). It plays 63 requests in English and
+  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3). It plays 67 requests in English and
   Italian against the local API and checks what Claude did. **It costs money at Anthropic**:
   about 50 US cents and four minutes for the whole list on `claude-sonnet-5-5`, 3 cents on
   `claude-haiku-5-5`. It is no part of `verify`. Run it before a deployment that changes the
@@ -530,7 +530,7 @@ Every command of this section that names a stack acts on a real AWS account. `CL
   makes one User straight in Cognito (`local`: cognito-local; `cloud`: the stack of
   `backend/samconfig.toml`, your AWS login; **it changes the cloud**), in group `user`, with a
   **temporary** password, so that its first sign-in shows "Choose your password"
-  (`docs/EMAIL_ARCHITECTURE.md` section 5.4, `docs/FRONTEND_WALK.md` section 15). It is the one
+  (`docs/EMAIL_ARCHITECTURE.md` section 5.4, `docs/FRONTEND_WALK.md` section 16). It is the one
   User whose first password the operator chooses, the exception the root `CLAUDE.md`'s password
   rule names. The name and the address are made up from the username ("Test User <username>",
   an address in Rome); the e-mail is `<username>@example.com` locally and, for `cloud`, your own,
@@ -550,9 +550,11 @@ Every command of this section that names a stack acts on a real AWS account. `CL
   Journeys 3, 4, 6 and 11 of
   `docs/IMPLEMENTATION_PLAN.md` step 9 with a throw-away `smoke-<epoch>` user and, before the
   last, the calendar journey of `docs/SHARED_CALENDAR_SPEC.md` section 18.4 (a type
-  `smoke-<epoch>` and a one-off window on the first free 03:00–04:00 from 50 days ahead, booked
-  for the user, listed and cancelled by it, then window and type deleted; settings never
-  changed), then on that date and hour the capacity journey (`docs/RUNBOOK.md` section 2.3: two
+  `smoke-<epoch>`, a one-off window 03:05–03:50 refused `400 invalid_request` (not whole hours),
+  and the one-off window 03:05–04:05 on the first date whose 03:00–04:05 is free from 50 days
+  ahead, its slot 03:05 booked for the user, listed and cancelled by it; in that window 03:10–03:35 booked for the user by the
+  Administrator and cancelled, and a start at 03:07, off the 5-minute step, refused
+  `400 invalid_request`; then window and type deleted; settings never changed), then on that date, 03:00–04:00, the capacity journey (`docs/RUNBOOK.md` section 2.3: two
   more throw-away users `smoke-<epoch>-b` and `-c`, a type `smoke-cap-<epoch>` of capacity 2 and
   its window; a User's own `overbook: true` refused `403` with nothing written; two people booked
   into the slot, full in the Administrator's view and busy in the third's; the third refused
@@ -567,8 +569,8 @@ Every command of this section that names a stack acts on a real AWS account. `CL
   the invitation (a User `smoke-<epoch>-i` with an address asked for at the start, your own, never
   printed: `invited` in the list, the resend `202`, its refusals `409` and `403`, the User
   deleted) and a mail on demand for the Administrator (`202`, then the mailer's log line `sent`
-  in its log group, read-only), at `off` and `domain` their two `503`s. 61 checks at `on`, 58 at
-  `off` and `domain`, PASS/FAIL each (`docs/RUNBOOK.md` section 2, step 5). Locally the two checks of
+  in its log group, read-only), at `off` and `domain` their two `503`s. 65 checks at `on`, 62 at
+  `off` and `domain`, PASS/FAIL each, 13 of them the calendar's (`docs/RUNBOOK.md` section 2, step 5). Locally the two checks of
   `GlobalSignOut` and the resend's success print `SKIP` (cognito-local has neither), the address
   of the invitation is made up, the mail is looked for in the fake mail instead of the mailer's
   log (which `local:lambda` prints), so `local:lambda` must run; the last line counts the

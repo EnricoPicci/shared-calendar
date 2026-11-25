@@ -2,8 +2,8 @@
 # Post-deploy smoke test (docs/ARCHITECTURE.md section 9.3): docs/IMPLEMENTATION_PLAN.md step 9,
 # journeys 3, 4, 6 and 11, with a throw-away user smoke-<timestamp>, and between journeys 3 and 11
 # the calendar journey of docs/SHARED_CALENDAR_SPEC.md section 18.4, then the invitation and a mail
-# (docs/EMAIL_ARCHITECTURE.md section 13.3). Prints PASS, FAIL or SKIP per check; exits 1 if any
-# check failed.
+# (docs/EMAIL_ARCHITECTURE.md section 13.3). Prints PASS, FAIL or SKIP per check (65 checks at the
+# stage 'on', locally 3 of them SKIP; 62 at 'off' and 'domain'); exits 1 if any check failed.
 #
 #   npm run smoke <stack-name>   the deployed stack, your AWS login (run after every deploy)
 #   npm run smoke local          the local stack (local:up, local:api and local:lambda; pass DYNAMODB_PORT)
@@ -51,14 +51,22 @@
 #
 # The calendar journey works whatever the real calendar holds, and never changes the settings
 # or anything it did not create: it reads the settings and the calendar view, picks the first
-# date from 50 days ahead whose 03:00-04:00 (local, the calendar's zone) is free, creates the type
-# smoke-<timestamp> and a one-off window there, books it for the throw-away user with a note, lists
-# it as that user (upcoming) and cancels it as that user, then deletes the window and the type.
-# Only the API is used; no calendar answer body is ever printed (status and error code only).
+# date from 50 days ahead whose 03:00-04:05 (local, the calendar's zone) is free, creates the type
+# smoke-<timestamp>, sees a one-off window 03:05-03:50 refused 400 invalid_request with nothing
+# written, since a window lasts a whole number of hours (docs/SHARED_CALENDAR_SPEC.md decision D33),
+# then creates the one-off window 03:05-04:05, books its slot 03:05, counted from the window's
+# start, for the throw-away user with a note, lists it as that user (upcoming) and cancels it as that
+# user. In the same window the Administrator then
+# books the custom times 03:10-03:35 for the user, on the 5-minute step of
+# docs/SHARED_CALENDAR_SPEC.md decision D32, reads both times back and cancels it, and the start
+# 03:07, off the step, is refused 400 invalid_request with nothing written. Then it deletes the
+# window and the type. Only the API is used; no calendar answer body is ever printed (status and
+# error code only).
 #
 # Right after it, the capacity journey (docs/SHARED_CALENDAR_SPEC.md decisions D24 to D31), 16
-# checks, each line starting "capacity:", on the same date and in the same hour, which the calendar
-# journey found free of any window and active appointment and left so (its cancelled appointment
+# checks, each line starting "capacity:", on the same date, in the hour 03:00-04:00, which the
+# calendar journey found free of any window and active appointment, with the five minutes after
+# it, and left so (its cancelled appointment
 # blocks nothing), so its window overlaps no real one. It creates two more throw-away users,
 # smoke-<timestamp>-b and smoke-<timestamp>-c, as the throw-away user is made, and the type
 # smoke-cap-<timestamp> of capacity 2 with a one-off window 03:00-04:00. smoke-<timestamp>-c sending
@@ -108,7 +116,8 @@
 # API (straight in Cognito if the API fails), the invitation's User removed the same way, and the
 # throw-away user is deleted. What stays, by
 # design, as history: the user's message row, and in the calendar table the calendar journey's
-# cancelled appointment (username and type name smoke-<timestamp>), the capacity journey's three
+# two cancelled appointments, 03:05-04:05 and 03:10-03:35 (username and type name
+# smoke-<timestamp>), the capacity journey's three
 # cancelled appointments (type name smoke-cap-<timestamp>), the pointer and the booked and
 # cancelled events of each, and the deleted-user markers of the four users, which the deletion
 # through DELETE /users/{username} (docs/IMPLEMENTATION_PLAN.md step 9, journey 11) writes.
@@ -153,11 +162,13 @@ fail() {
 # answer has not been read yet (cal_pending: type, window or appointment), which clean-up looks up.
 cal_type_id=""
 cal_window_id=""
+cal_win_start="" # the instant of the calendar journey's window start, local 03:05
 cal_appt_id=""
 cal_booked=false
 cal_pending=""
 cal_date=""
 cal_start=""
+cal_appt_start="" # the start of the booking sent last, which clean-up looks up when unanswered
 cal_cleanup_failed=false
 cal_done=false # the calendar journey ended with its window and type deleted
 # The capacity journey's names, and what it created and has not removed yet: the type and window
@@ -243,8 +254,10 @@ error_code() {
 # BODY (stdin; never printed, only what a mode returns is written):
 #   plan              settings answer -> "<zone> <notice h> <from> <to> <earliest start>": the
 #                     31 days searched, from today + 50 (or the earliest usable date if later)
-#   pick <zone> <earliest>   calendar view -> "<date> <start> <end>" of the first date whose
-#                     03:00-04:00 is free, or "none" / "notice" (every date too soon to cancel)
+#   pick <zone> <earliest>   calendar view -> "<date> <start> <end>", the instants of 03:00 and
+#                     04:00 of the first date whose 03:00-04:05 is free (the capacity journey's
+#                     hour and the calendar journey's window 03:05-04:05), or "none" / "notice"
+#                     (every date too soon to cancel)
 #   test <code> [args]   exit 0 if the JavaScript body <code> returns true for b (answer), a (args)
 #   get <code> [args]    writes the string <code> returns (an id, never the answer itself)
 # The time helpers are shared/src/calendar/time.ts itself (Node 22 runs it, stripping its types),
@@ -281,15 +294,15 @@ import(pathToFileURL(path.resolve("../shared/src/calendar/time.ts")).href).then(
     let usable = 0;
     for (const day of b.days || []) {
       const start = t.toInstant(day.date, "03:00", zone), end = t.toInstant(day.date, "04:00", zone);
-      const s = Date.parse(start), e = Date.parse(end);
+      const s = Date.parse(start), e = Date.parse(end), free = e + 5 * 60000;
       // A DST day where 03:00 does not exist or 03:00-04:00 is not 60 real minutes: skipped.
       if (t.localTimeOf(start, zone) !== "03:00" || t.localDateOf(start, zone) !== day.date || e - s !== HOUR) continue;
       if (s < Date.parse(earliest)) continue;
       usable++;
       const windows = day.windows || [];
-      if (windows.some((w) => overlaps(s, e, w))) continue;
+      if (windows.some((w) => overlaps(s, free, w))) continue;
       if (windows.filter((w) => w.source === "one_off").length >= 10) continue;
-      if ((b.appointments || []).some((x) => overlaps(s, e, x))) continue;
+      if ((b.appointments || []).some((x) => overlaps(s, free, x))) continue;
       return out([day.date, start, end].join(" "));
     }
     out(usable === 0 ? "notice" : "none");
@@ -297,6 +310,11 @@ import(pathToFileURL(path.resolve("../shared/src/calendar/time.ts")).href).then(
 }).catch(() => process.exit(1));
 '
 cal() { printf '%s' "$BODY" | node --disable-warning=ExperimentalWarning -e "$CAL_JS" "$@"; }
+
+# minutes_after <instant> <minutes>: the instant that many real minutes later, in the API's form.
+minutes_after() {
+  node -e 'process.stdout.write(new Date(Date.parse(process.argv[1]) + Number(process.argv[2]) * 60000).toISOString())' "$1" "$2"
+}
 
 # hello_message_id <role> <message>: the messageId of the /hello answer in BODY if it has that
 # role and message, otherwise nothing.
@@ -333,13 +351,13 @@ calendar_resolve_pending() {
     window)
       api GET "/calendar?from=$cal_date&to=$cal_date" "$admin_token"
       [[ "$STATUS" == 200 ]] &&
-        id=$(cal get 'const w = (b.days || []).flatMap((d) => d.windows || []).find((y) => y.source === "one_off" && y.typeId === a[0] && y.start === a[1]); return w ? w.sourceId : "";' "$cal_type_id" "$cal_start") || id=""
+        id=$(cal get 'const w = (b.days || []).flatMap((d) => d.windows || []).find((y) => y.source === "one_off" && y.typeId === a[0] && y.start === a[1]); return w ? w.sourceId : "";' "$cal_type_id" "$cal_win_start") || id=""
       [[ -n "$id" ]] && cal_window_id=$id
       ;;
     appointment)
       api GET "/calendar/appointments?upcoming=true&username=$SMOKE_USER" "$admin_token"
       [[ "$STATUS" == 200 ]] &&
-        id=$(cal get 'const x = (b.appointments || []).find((y) => y.start === a[0]); return x ? x.appointmentId : "";' "$cal_start") || id=""
+        id=$(cal get 'const x = (b.appointments || []).find((y) => y.start === a[0]); return x ? x.appointmentId : "";' "$cal_appt_start") || id=""
       [[ -n "$id" ]] && cal_appt_id=$id && cal_booked=true
       ;;
   esac
@@ -369,7 +387,7 @@ calendar_cleanup() {
     if [[ "$STATUS" == 204 ]]; then
       echo "cleanup: one-off window $cal_window_id deleted"
     else
-      cleanup_failed "one-off window $cal_window_id ($cal_date 03:00-04:00)"
+      cleanup_failed "one-off window $cal_window_id ($cal_date 03:05-04:05)"
     fi
     cal_window_id=""
   fi
@@ -420,12 +438,18 @@ calendar_journey() {
       return 0
       ;;
     none)
-      fail "calendar: no free 03:00-04:00 $zone from $from to $to; the calendar journey is skipped"
+      fail "calendar: no free 03:00-04:05 $zone from $from to $to; the calendar journey is skipped"
       return 0
       ;;
   esac
   read -r cal_date cal_start cal_end <<< "$pick"
-  pass "calendar: 03:00-04:00 $zone free on $cal_date"
+  pass "calendar: 03:00-04:05 $zone free on $cal_date"
+  # The window 03:05-04:05 and its one slot, the hour from the window's start
+  # (docs/SHARED_CALENDAR_SPEC.md R-SLOT-01). cal pick keeps only an hour 03:00-04:00 of 60 real
+  # minutes, so local 03:05 is 03:00 plus 5 minutes.
+  local win_end
+  cal_win_start=$(minutes_after "$cal_start" 5)
+  win_end=$(minutes_after "$cal_start" 65)
 
   cal_pending="type"
   api POST /calendar/types "$admin_token" "{\"name\": \"$SMOKE_USER\"}"
@@ -438,22 +462,43 @@ calendar_journey() {
     return 0
   fi
 
+  # A window that is not a whole number of hours, 45 minutes, is refused before anything is
+  # written (docs/SHARED_CALENDAR_SPEC.md decision D33); a window made by mistake is the one the
+  # clean-up deletes.
+  local short_status short_code
   cal_pending="window"
   api POST /calendar/windows "$admin_token" \
-    "{\"date\": \"$cal_date\", \"start\": \"03:00\", \"end\": \"04:00\", \"typeId\": \"$cal_type_id\"}"
-  [[ "$STATUS" == 000 ]] || cal_pending=""
-  [[ "$STATUS" == 201 ]] && cal_window_id=$(field windowId)
-  if [[ -n "$cal_window_id" ]] &&
-    cal test 'return b.date === a[0] && b.start === "03:00" && b.end === "04:00" && b.typeId === a[1];' "$cal_date" "$cal_type_id"; then
-    pass "calendar: POST /calendar/windows $cal_date 03:00-04:00 -> 201"
+    "{\"date\": \"$cal_date\", \"start\": \"03:05\", \"end\": \"03:50\", \"typeId\": \"$cal_type_id\"}"
+  short_status=$STATUS
+  short_code=$(error_code)
+  [[ "$short_status" == 000 ]] || cal_pending=""
+  [[ "$short_status" == 201 ]] && cal_window_id=$(field windowId)
+  api GET "/calendar?from=$cal_date&to=$cal_date" "$admin_token"
+  if [[ "$short_status" == 400 && "$short_code" == invalid_request && "$STATUS" == 200 ]] &&
+    cal test 'return !(b.days || []).flatMap((d) => d.windows || []).some((w) => w.typeId === a[0]);' "$cal_type_id"; then
+    pass "calendar: POST /calendar/windows $cal_date 03:05-03:50 -> 400 invalid_request, nothing written"
   else
-    cal_fail "POST /calendar/windows $cal_date 03:00-04:00 -> $STATUS $(error_code)"
+    cal_fail "POST /calendar/windows $cal_date 03:05-03:50 -> $short_status $short_code, expected 400 invalid_request (the day: $STATUS)"
     return 0
   fi
 
+  cal_pending="window"
+  api POST /calendar/windows "$admin_token" \
+    "{\"date\": \"$cal_date\", \"start\": \"03:05\", \"end\": \"04:05\", \"typeId\": \"$cal_type_id\"}"
+  [[ "$STATUS" == 000 ]] || cal_pending=""
+  [[ "$STATUS" == 201 ]] && cal_window_id=$(field windowId)
+  if [[ -n "$cal_window_id" ]] &&
+    cal test 'return b.date === a[0] && b.start === "03:05" && b.end === "04:05" && b.typeId === a[1];' "$cal_date" "$cal_type_id"; then
+    pass "calendar: POST /calendar/windows $cal_date 03:05-04:05 -> 201"
+  else
+    cal_fail "POST /calendar/windows $cal_date 03:05-04:05 -> $STATUS $(error_code)"
+    return 0
+  fi
+
+  cal_appt_start=$cal_win_start
   cal_pending="appointment"
   api POST /calendar/appointments "$admin_token" \
-    "{\"username\": \"$SMOKE_USER\", \"start\": \"$cal_start\", \"note\": \"$SMOKE_NOTE\"}"
+    "{\"username\": \"$SMOKE_USER\", \"start\": \"$cal_win_start\", \"note\": \"$SMOKE_NOTE\"}"
   [[ "$STATUS" == 000 ]] || cal_pending=""
   if [[ "$STATUS" == 201 ]]; then
     cal_appt_id=$(field appointmentId)
@@ -461,17 +506,17 @@ calendar_journey() {
   fi
   if [[ "$cal_booked" == true ]] &&
     cal test 'return b.status === "booked" && b.username === a[0] && b.start === a[1] && b.end === a[2] && b.typeId === a[3] && b.typeName === a[0] && b.note === a[4];' \
-      "$SMOKE_USER" "$cal_start" "$cal_end" "$cal_type_id" "$SMOKE_NOTE"; then
-    pass "calendar: book $cal_date 03:00 for $SMOKE_USER -> 201, booked, 60 min, type $SMOKE_USER"
+      "$SMOKE_USER" "$cal_win_start" "$win_end" "$cal_type_id" "$SMOKE_NOTE"; then
+    pass "calendar: book $cal_date 03:05 for $SMOKE_USER -> 201, booked, 60 min, type $SMOKE_USER"
   else
-    cal_fail "book $cal_date 03:00 for $SMOKE_USER -> $STATUS $(error_code)"
+    cal_fail "book $cal_date 03:05 for $SMOKE_USER -> $STATUS $(error_code)"
     return 0
   fi
 
   api GET "/calendar/appointments?upcoming=true" "$user_token"
   if [[ "$STATUS" == 200 ]] &&
     cal test 'const l = b.appointments || [], x = l[0]; return l.length === 1 && x.appointmentId === a[0] && x.start === a[1] && x.end === a[2] && x.typeId === a[3] && x.status === "booked" && x.note === a[4] && typeof x.cancellableUntil === "string";' \
-      "$cal_appt_id" "$cal_start" "$cal_end" "$cal_type_id" "$SMOKE_NOTE"; then
+      "$cal_appt_id" "$cal_win_start" "$win_end" "$cal_type_id" "$SMOKE_NOTE"; then
     pass "calendar: upcoming as $SMOKE_USER -> the appointment"
   else
     cal_fail "upcoming as $SMOKE_USER -> $STATUS $(error_code)"
@@ -485,6 +530,63 @@ calendar_journey() {
     pass "calendar: cancel as $SMOKE_USER -> 200, cancelled (cancelReason cancelled)"
   else
     cal_fail "cancel as $SMOKE_USER -> $status $(error_code)"
+    return 0
+  fi
+
+  # The Administrator's custom times on the 5-minute step (docs/SHARED_CALENDAR_SPEC.md decision
+  # D32 and R-BOOK-02), in the same window: 03:10-03:35 is booked for the user, the answer gives
+  # back exactly those two instants, and the Administrator cancels it; then 03:07-03:35, a start
+  # off the step, is refused 400 invalid_request before anything is written. cal pick keeps only
+  # an hour of 60 real minutes, so local 03:10 is the hour's start plus 10 minutes.
+  local step_start step_end off_start code
+  step_start=$(minutes_after "$cal_start" 10)
+  step_end=$(minutes_after "$cal_start" 35)
+  off_start=$(minutes_after "$cal_start" 7)
+  cal_appt_start=$step_start
+  cal_pending="appointment"
+  api POST /calendar/appointments "$admin_token" \
+    "{\"username\": \"$SMOKE_USER\", \"start\": \"$step_start\", \"end\": \"$step_end\"}"
+  [[ "$STATUS" == 000 ]] || cal_pending=""
+  if [[ "$STATUS" == 201 ]]; then
+    cal_appt_id=$(field appointmentId)
+    [[ -n "$cal_appt_id" ]] && cal_booked=true
+  fi
+  if [[ "$cal_booked" == true ]] &&
+    cal test 'return b.status === "booked" && b.username === a[0] && b.start === a[1] && b.end === a[2] && b.typeId === a[3];' \
+      "$SMOKE_USER" "$step_start" "$step_end" "$cal_type_id"; then
+    pass "calendar: book $cal_date 03:10-03:35 for $SMOKE_USER -> 201, the times on the 5-minute step read back"
+  else
+    cal_fail "book $cal_date 03:10-03:35 for $SMOKE_USER -> $STATUS $(error_code)"
+    return 0
+  fi
+
+  api POST "/calendar/appointments/$cal_appt_id/cancel" "$admin_token"
+  status=$STATUS
+  if [[ "$status" == 200 ]] && cal test 'return b.status === "cancelled";'; then cal_booked=false; fi
+  if [[ "$status" == 200 && "$cal_booked" == false ]]; then
+    pass "calendar: cancel 03:10-03:35 as the Administrator -> 200, cancelled"
+  else
+    cal_fail "cancel 03:10-03:35 as the Administrator -> $status $(error_code)"
+    return 0
+  fi
+
+  cal_appt_start=$off_start
+  cal_pending="appointment"
+  api POST /calendar/appointments "$admin_token" \
+    "{\"username\": \"$SMOKE_USER\", \"start\": \"$off_start\", \"end\": \"$step_end\"}"
+  status=$STATUS
+  code=$(error_code)
+  [[ "$status" == 000 ]] || cal_pending=""
+  if [[ "$status" == 201 ]]; then
+    cal_appt_id=$(field appointmentId)
+    [[ -n "$cal_appt_id" ]] && cal_booked=true
+  fi
+  api GET "/calendar/appointments?upcoming=true&status=all&username=$SMOKE_USER" "$admin_token"
+  if [[ "$status" == 400 && "$code" == invalid_request && "$STATUS" == 200 ]] &&
+    cal test 'return !(b.appointments || []).some((x) => x.start === a[0]);' "$off_start"; then
+    pass "calendar: book $cal_date 03:07-03:35 for $SMOKE_USER -> 400 invalid_request, nothing written"
+  else
+    cal_fail "book $cal_date 03:07-03:35 for $SMOKE_USER -> $status $code, expected 400 invalid_request (its appointments: $STATUS)"
     return 0
   fi
 

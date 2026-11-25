@@ -31,8 +31,18 @@ describe('the fixed instructions (7.3)', () => {
     ['only what there is a tool for is offered', 'Offer only what you have a tool for'],
     ['a type in use cannot be deleted', 'an appointment type cannot be deleted while opening hours or appointments still use it'],
     ['open hours of one date cannot overlap', 'two stretches of open hours on the same date cannot overlap'],
+    ['the hours lie on 5-minute steps', 'Hours are on 5-minute steps: 10:05, 10:10 and so on.'],
+    ['a window lasts whole hours from any 5-minute start (D33 of docs/SHARED_CALENDAR_SPEC.md)', 'Every window of the opening hours lasts a whole number of hours from its start'],
+    ['hours not whole are explained, the nearest whole hours inside and around suggested, the tool called after the choice', 'suggest the nearest whole hours inside the times asked and those that cover them (for 09:05 to 12:00: 09:05 to 11:05, or 09:05 to 12:05), and call the tool only after the person has chosen'],
+    ['no window starts after 23:00, and what to suggest instead', 'no window can start after 23:00'],
+    ['a block is widened until every piece left is whole hours, each keeping its window\'s start or end', 'blocking 10:10 to 10:35 inside 09:00 to 13:00 blocks 10:00 to 11:00, leaving 09:00 to 10:00 and 11:00 to 13:00'],
+    ['the person is asked only when the block had to be widened', 'When the blocked time had to be widened, say which times you will block and which stay open, and ask before calling the tool; when it did not, call it at once.'],
   ])('say that %s', (_what, words) => {
     expect(INSTRUCTIONS).toContain(words);
+  });
+
+  it('no longer speak of the quarter hour (D32 of docs/SHARED_CALENDAR_SPEC.md)', () => {
+    expect(INSTRUCTIONS).not.toMatch(/quarter/i);
   });
 
   it('hold no stopgap paragraph: nothing is done from the web pages "for the time being" or "not yet"', () => {

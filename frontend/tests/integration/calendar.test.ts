@@ -645,15 +645,20 @@ describe('appointments', () => {
     await release(bookable);
   });
 
-  it(`${USER} starts off the whole hour: the API answers invalid_request (the service sends it)`, async () => {
+  // A User's start must be on the 5-minute step, else 400 before anything is read; on the step, it
+  // must also be the start of a slot of a window, which only the server knows, under the lock
+  // (docs/SHARED_CALENDAR_SPEC.md R-BOOK-06). The window 08:00–12:00 has its slots on the hour.
+  it(`${USER} starts off a slot: 08:17, off the step, invalid_request; 08:15, on the step but no slot, outside_availability (the service sends both)`, async () => {
+    const bookable = await bookableDate('Off a slot');
     const spy = vi.spyOn(globalThis, 'fetch');
     try {
-      const start = toInstant(addDays(today, BAND_OFFSET), '08:15', zone);
-      expect(await book(user, { start })).toMatchObject({ status: 'failure', reason: 'invalid_request' });
-      expect(spy).toHaveBeenCalledTimes(1);
+      expect(await book(user, { start: bookable.at('08:17') })).toMatchObject({ status: 'failure', reason: 'invalid_request' });
+      expect(await book(user, { start: bookable.at('08:15') })).toMatchObject({ status: 'failure', reason: 'outside_availability' });
+      expect(spy).toHaveBeenCalledTimes(2);
     } finally {
       spy.mockRestore();
     }
+    await release(bookable);
   });
 
   it(`${USER} lists ${USER_B}'s appointments: forbidden`, async () => {

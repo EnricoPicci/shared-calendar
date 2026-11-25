@@ -68,12 +68,15 @@ const MON_1000 = '2026-11-16T09:00:00.000Z';
 const MON_1100 = '2026-11-16T10:00:00.000Z';
 const MON_1200 = '2026-11-16T11:00:00.000Z';
 const MON_1300 = '2026-11-16T12:00:00.000Z';
+const MON_0930_END = '2026-11-16T09:30:00.000Z';
+const MON_0905 = '2026-11-16T08:05:00.000Z';
+const MON_1005 = '2026-11-16T09:05:00.000Z';
 
 // Test names: R-… rules and AC-… scenarios are those of docs/SHARED_CALENDAR_SPEC.md (scenarios in
 // its section 18.3).
 describe('checkBookingTimes (R-BOOK-02)', () => {
   describe('a User', () => {
-    it('accepts a whole local hour and fills in end = start + 60 min', () => {
+    it('accepts a start on the 5-minute step and fills in end = start + 60 min', () => {
       expect(checkBookingTimes(MON_0900, undefined, 'user', ZONE)).toEqual({ start: MON_0900, end: MON_1000 });
     });
 
@@ -81,10 +84,15 @@ describe('checkBookingTimes (R-BOOK-02)', () => {
       expect(checkBookingTimes(MON_0900, MON_1000, 'user', ZONE)).toEqual({ start: MON_0900, end: MON_1000 });
     });
 
-    it('AC-13: refuses 09:30 local (not a whole hour)', () => {
-      expect(checkBookingTimes('2026-11-16T08:30:00.000Z', undefined, 'user', ZONE)).toEqual({
+    it('AC-13, AC-51: accepts 09:30 and 09:05 local, on the step: whether each is a slot is checkBooking’s', () => {
+      expect(checkBookingTimes('2026-11-16T08:30:00.000Z', undefined, 'user', ZONE)).toEqual({ start: '2026-11-16T08:30:00.000Z', end: MON_0930_END });
+      expect(checkBookingTimes(MON_0905, undefined, 'user', ZONE)).toEqual({ start: MON_0905, end: MON_1005 });
+    });
+
+    it('refuses 09:07 local, off the 5-minute step', () => {
+      expect(checkBookingTimes('2026-11-16T08:07:00.000Z', undefined, 'user', ZONE)).toEqual({
         error: 'invalid_request',
-        message: 'Invalid input: start must be a whole hour',
+        message: 'Invalid input: start must be on a 5-minute step',
       });
     });
 
@@ -93,14 +101,6 @@ describe('checkBookingTimes (R-BOOK-02)', () => {
       ['two hours', MON_1100],
     ])('refuses an end other than start + 60 min (%s)', (_name, end) => {
       expect(checkBookingTimes(MON_0900, end, 'user', ZONE)).toEqual({ error: 'invalid_request', message: 'Invalid input: end must be one hour after start' });
-    });
-
-    it('follows the local clock, not UTC: Asia/Kathmandu (+05:45) 09:00 local is 03:15Z', () => {
-      expect(checkBookingTimes('2026-11-16T03:15:00.000Z', undefined, 'user', 'Asia/Kathmandu')).toEqual({
-        start: '2026-11-16T03:15:00.000Z',
-        end: '2026-11-16T04:15:00.000Z',
-      });
-      expect(checkBookingTimes(MON_0900, undefined, 'user', 'Asia/Kathmandu')).toEqual(refused('invalid_request'));
     });
 
     it('accepts both 02:00 starts of the night clocks go back, each one real hour long', () => {
@@ -114,36 +114,56 @@ describe('checkBookingTimes (R-BOOK-02)', () => {
       expect(checkBookingTimes('2026-11-16T08:15:00.000Z', MON_1000, 'admin', ZONE)).toEqual({ start: '2026-11-16T08:15:00.000Z', end: MON_1000 });
     });
 
-    it('fills in end = start + 60 min, from any 15-minute step', () => {
+    it('AC-46: accepts 10:10–10:35 local', () => {
+      expect(checkBookingTimes('2026-11-16T09:10:00.000Z', '2026-11-16T09:35:00.000Z', 'admin', ZONE)).toEqual({
+        start: '2026-11-16T09:10:00.000Z',
+        end: '2026-11-16T09:35:00.000Z',
+      });
+    });
+
+    it('fills in end = start + 60 min, from any 5-minute step', () => {
       expect(checkBookingTimes('2026-11-16T08:45:00.000Z', undefined, 'admin', ZONE)).toEqual({
         start: '2026-11-16T08:45:00.000Z',
         end: '2026-11-16T09:45:00.000Z',
       });
-    });
-
-    it('accepts exactly 15 minutes', () => {
-      expect(checkBookingTimes(MON_0900, '2026-11-16T08:15:00.000Z', 'admin', ZONE)).toEqual({ start: MON_0900, end: '2026-11-16T08:15:00.000Z' });
-    });
-
-    it('refuses a start off the 15-minute grid', () => {
-      expect(checkBookingTimes('2026-11-16T08:10:00.000Z', undefined, 'admin', ZONE)).toEqual({
-        error: 'invalid_request',
-        message: 'Invalid input: start must be on a 15-minute step',
+      expect(checkBookingTimes('2026-11-16T09:10:00.000Z', undefined, 'admin', ZONE)).toEqual({
+        start: '2026-11-16T09:10:00.000Z',
+        end: '2026-11-16T10:10:00.000Z',
       });
     });
 
-    it('refuses an end off the 15-minute grid', () => {
-      expect(checkBookingTimes(MON_0900, '2026-11-16T08:50:00.000Z', 'admin', ZONE)).toEqual({
+    it('AC-47: accepts exactly 5 minutes, the shortest', () => {
+      expect(checkBookingTimes(MON_0900, '2026-11-16T08:05:00.000Z', 'admin', ZONE)).toEqual({ start: MON_0900, end: '2026-11-16T08:05:00.000Z' });
+    });
+
+    it('AC-48: refuses a start off the 5-minute grid', () => {
+      expect(checkBookingTimes('2026-11-16T09:07:00.000Z', undefined, 'admin', ZONE)).toEqual({
         error: 'invalid_request',
-        message: 'Invalid input: end must be on a 15-minute step',
+        message: 'Invalid input: start must be on a 5-minute step',
       });
     });
 
-    it('refuses less than 15 minutes (the schema already refuses an end not after start)', () => {
+    it('refuses an end off the 5-minute grid', () => {
+      expect(checkBookingTimes(MON_0900, '2026-11-16T08:52:00.000Z', 'admin', ZONE)).toEqual({
+        error: 'invalid_request',
+        message: 'Invalid input: end must be on a 5-minute step',
+      });
+    });
+
+    it('accepts both 02:05 starts of the night clocks go back', () => {
+      expect(checkBookingTimes('2026-10-25T00:05:00.000Z', '2026-10-25T00:10:00.000Z', 'admin', ZONE)).toEqual({ start: '2026-10-25T00:05:00.000Z', end: '2026-10-25T00:10:00.000Z' });
+      expect(checkBookingTimes('2026-10-25T01:05:00.000Z', undefined, 'admin', ZONE)).toEqual({ start: '2026-10-25T01:05:00.000Z', end: '2026-10-25T02:05:00.000Z' });
+    });
+
+    it('refuses less than 5 minutes (the schema already refuses an end not after start)', () => {
       expect(checkBookingTimes(MON_1000, MON_0900, 'admin', ZONE)).toEqual({
         error: 'invalid_request',
-        message: 'Invalid input: an appointment lasts at least 15 minutes',
+        message: 'Invalid input: an appointment lasts at least 5 minutes',
       });
+    });
+
+    it('AC-48: a User’s 10:10 is on the step, so it passes here (checkBooking refuses it)', () => {
+      expect(checkBookingTimes('2026-11-16T09:10:00.000Z', undefined, 'user', ZONE)).toEqual({ start: '2026-11-16T09:10:00.000Z', end: '2026-11-16T10:10:00.000Z' });
     });
   });
 });
@@ -177,6 +197,33 @@ describe('checkBooking (R-BOOK-03..09)', () => {
 
     it('AC-16: alice books 12:00 local, outside the window: outside_availability', () => {
       expect(book(MON_1200, MON_1300)).toEqual({ error: 'outside_availability', message: 'The time is not inside the availability' });
+    });
+
+    it('AC-13: alice books 09:30 local, inside the window but not a slot: outside_availability', () => {
+      expect(book('2026-11-16T08:30:00.000Z', MON_0930_END)).toEqual({ error: 'outside_availability', message: 'The time is not inside the availability' });
+    });
+
+    it('AC-48: alice books 10:10 local, on the step but not a slot: outside_availability', () => {
+      expect(book('2026-11-16T09:10:00.000Z', '2026-11-16T10:10:00.000Z')).toEqual(refused('outside_availability'));
+    });
+
+    describe('AC-51: the window 09:05–11:05 (D33), whose slots are 09:05 and 10:05', () => {
+      const nine05 = state({ patterns: [{ ...ac04, start: '09:05', end: '11:05' }] });
+      const window = studio(MON_0905, '2026-11-16T10:05:00.000Z');
+      it('alice books 09:05 and 10:05', () => {
+        expect(book(MON_0905, MON_1005, { state: nine05 })).toEqual(window);
+        expect(book(MON_1005, '2026-11-16T10:05:00.000Z', { state: nine05 })).toEqual(window);
+      });
+      it.each([
+        ['09:00, before the window', MON_0900],
+        ['09:10, inside it', '2026-11-16T08:10:00.000Z'],
+      ])('alice books %s: outside_availability', (_name, start) => {
+        const end = new Date(Date.parse(start) + 3_600_000).toISOString();
+        expect(book(start, end, { state: nine05 })).toEqual(refused('outside_availability'));
+      });
+      it('the Administrator books 09:10–10:10 for alice: any custom time inside the window', () => {
+        expect(book('2026-11-16T08:10:00.000Z', '2026-11-16T09:10:00.000Z', { role: 'admin', state: nine05 })).toEqual(window);
+      });
     });
 
     describe('AC-17: horizon 7, now 2026-11-10', () => {

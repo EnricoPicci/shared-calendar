@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | v16 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; implemented (plan steps 41–59). v17 — the capacity of a type (decisions D24 to D31): several people in one slot; implemented and deployed (`docs/CAPACITY_PLAN.md` steps u1–u7, 2026-11-24; `docs/RUNBOOK.md` section 5.8). v18 — status only |
-| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10, v11, v12 and v13 2026-11-14; v14 and v15 2026-11-15; v16 2026-11-16; v17 2026-11-24; v19 2026-11-25 |
+| Status | v16 — specification, agreed with the Product Owner (2026-11-10); assumptions confirmed; implemented (plan steps 41–59). v17 — the capacity of a type (decisions D24 to D31): several people in one slot; implemented and deployed (`docs/CAPACITY_PLAN.md` steps u1–u7, 2026-11-24; `docs/RUNBOOK.md` section 5.8). v18 — status only. v19 — times on 5-minute steps (decision D32): the server's rules are built (`docs/SLOT_STEP_PLAN.md` steps s1 and s2) and the assistant is told the 5-minute step (step s3); the page offers each time as an hour and a minute on the 5-minute step and draws a short appointment at least 15 minutes tall (steps s4 and s5); implemented and deployed (step s6, 2026-11-25; `docs/RUNBOOK.md` section 5.9). v20 — windows of whole hours, a User's slots counted from the window's start (decision D33): specified; built: the server's part (`docs/WINDOW_HOURS_PLAN.md` steps w1 and w2), the assistant's (step w3) and the page's (step w4); deployed (`docs/WINDOW_HOURS_PLAN.md` step w5, `docs/RUNBOOK.md` section 5.10) |
+| Date | 2026-11-10; v3 to v6 2026-11-12; v7 and v8 2026-11-13; v9, v10, v11, v12 and v13 2026-11-14; v14 and v15 2026-11-15; v16 2026-11-16; v17 2026-11-24; v19, v20 and v21 2026-11-25 |
 | Brief | `prompts/40-create-shared-calendar-spec.md` |
 | Depends on | `docs/ARCHITECTURE.md` v11, `docs/FRONTEND_SERVICES.md` v5, `docs/FOLDER_STRUCTURE.md` v1 |
 | Audience | The architect who updates `docs/ARCHITECTURE.md` and `docs/IMPLEMENTATION_PLAN.md`, and the developers who implement the steps |
@@ -30,7 +30,9 @@
 | v16 | 2026-11-16 | Brief 71 (`docs/RENAME_PLAN.md`, plan step 56): the table's physical name in the cloud follows the stack, `<stack>-calendar`; locally it stays `calendar` (13.1). The plan's calendar steps run 41–59. |
 | v17 | 2026-11-24 | Brief `prompts/e11-step-u1-implementation.md` (`docs/CAPACITY_PLAN.md` step u1), decided by the Product Owner on 2026-11-24. **The capacity of a type**: a type holds 1 to 100 people at the same time, default 1 (D24 to D31, 6.1, R-TYPE-05). The people in an interval are counted at their peak; a slot is free while they are fewer than the capacity, and says its places left (glossary, R-SLOT-02 to R-SLOT-05, 11.6). A User never holds two appointments at the same time, `409 user_busy` (R-BOOK-12). The Administrator goes over the capacity only with `overbook: true` (R-BOOK-07, R-BOOK-13, R-CHG-01, the order of the checks in 8.2 and 8.4). `busy` is the time that is full (R-SLOT-06); the Administrator's slots include the full ones (11.6, R-VIEW-01). `capacity` optional in the type's bodies (11.1, 11.4); `capacity` on the `TYPE` item, absent = 1 (13.2). Group appointments no longer out of scope as several Users each with their own appointment (1.3). The views' needs (16.8), privacy (17), unit tests (18.1), AC-37 to AC-44 (18.3). The 11.6 example gains `capacity` and `placesLeft` on each slot and keeps every other value. AC-15 answers `user_busy`, since the 09:15 it overlaps is alice's own (found at `docs/CAPACITY_PLAN.md` step u3). Not built yet. |
 | v18 | 2026-11-24 | Brief `prompts/e17-step-u7-implementation.md` (`docs/CAPACITY_PLAN.md` step u7). Status only: the capacity of a type (decisions D24 to D31) is built and deployed to `shared-calendar-api` and `shared-calendar-web`, and proven there by the smoke test's capacity journey (`docs/RUNBOOK.md` sections 2.3 and 5.8); the marks "not built yet" of section 3, the `TYPE` item, the slots and the booking checks removed. No rule changes. |
-| v19 | 2026-11-25 | Brief `prompts/mail-m03-pair-m1-m2-implementation.md` (`docs/EMAIL_PLAN.md` steps m1 and m2). `GET /users` (section 10.1, route 21 of section 11.1) answers each User's state and four facts, first name, last name, e-mail and postal address (`docs/EMAIL_ARCHITECTURE.md` section 4); nothing of the calendar changes. |
+| v19 | 2026-11-25 | Brief `prompts/slot-s02-pair-s1-s2-implementation.md` (`docs/SLOT_STEP_PLAN.md` steps s1 and s2), decided by the Product Owner on 2026-11-25. **Times on 5-minute steps**: the Administrator's windows and custom appointment times start and end on 5-minute steps instead of 15, and a custom appointment lasts at least 5 minutes (D32; D2, D12, the glossary, section 5, 6.2, R-BOOK-02, 11.4). The slot does not change: a whole local hour, 60 real minutes; R-SLOT-01 gains the example of a window that opens at 08:05. No route, field or error code changes, and nothing stored is migrated. The book dialog's row of 16.8 says how the page will offer a time. Section 12 (`isOnTimeStep`, `TIME_STEP_MINUTES`), 18.1, AC-45 to AC-48 in 18.3. In step s6 (brief `prompts/slot-s05-step-s6-release.md`) the smoke test of 18.4 gains three lines: 03:10–03:35 booked and cancelled by the Administrator, 03:07 refused. |
+| v20 | 2026-11-25 | Brief `prompts/slot-s07-pair-w1-w2-implementation.md` (`docs/WINDOW_HOURS_PLAN.md` steps w1 and w2), decided by the Product Owner on 2026-11-25. **Windows of whole hours**: a window of a pattern, of an override and a one-off window lasts a whole number of hours on the local clock, from any 5-minute start, so no window starts after 23:00 (D33, the glossary, R-TIME-02, 6.2, 11.4); a User's slots are the hours counted from the start of the effective window, 60 real minutes each (R-SLOT-01, R-TIME-03, 6.6); a User's start on the 5-minute step that is not a slot is `409 outside_availability`, under the lock (R-BOOK-02, R-BOOK-06, the order of the checks in 8.2 and 8.4). R-TIME-02's local time corrected to the 5-minute step, left from D32; R-AV-01's example of the night clocks go forward made whole hours. No route, field or error code changes; nothing stored is migrated by code (D33). Section 12 (`lastsWholeHours`, `isWholeLocalHour` gone), 16.8, 18.1, AC-09 (its window made whole hours), AC-13 and AC-48 (a User's start not a slot), AC-45 rewritten, AC-49 to AC-52. |
+| v21 | 2026-11-25 | Brief `prompts/mail-m03-pair-m1-m2-implementation.md` (`docs/EMAIL_PLAN.md` steps m1 and m2). `GET /users` (section 10.1, route 21 of section 11.1) answers each User's state and four facts, first name, last name, e-mail and postal address (`docs/EMAIL_ARCHITECTURE.md` section 4); nothing of the calendar changes. |
 
 ---
 
@@ -92,18 +94,18 @@ specification into them.
 | **User** | An account in group `user` (and not in `admin`: "admin wins"). |
 | **Calendar time zone** | The one IANA time zone (e.g. `Europe/Rome`) in which every local date and time of the calendar is meant. |
 | **Local date** | A calendar date in the calendar time zone, `YYYY-MM-DD`. |
-| **Local time** | A wall-clock time in the calendar time zone, `HH:mm`, in 15-minute steps. |
+| **Local time** | A wall-clock time in the calendar time zone, `HH:mm`, in 5-minute steps (D32). |
 | **Instant** | An absolute point in time, ISO-8601 UTC with milliseconds and `Z`, e.g. `2026-11-16T07:00:00.000Z`. |
 | **Availability type** | A named kind of availability, usually a place: "Studio", "Swimming Pool". |
 | **Capacity** | How many people a type holds at the same time: 1 to 100, default 1 (D24). |
 | **People in an interval** | The most active appointments that overlap at one instant of the interval: their peak, not their sum (D25, R-SLOT-02). |
 | **Places left** | A slot's capacity minus the people in it, never below 0. |
-| **Window** | An interval of one local date, `[start, end)` in local time, with a type: "Monday 16 Nov 2026, 08:00–12:00, Studio". |
+| **Window** | An interval of one local date, `[start, end)` in local time, with a type, lasting a whole number of hours from any 5-minute start (D33): "Monday 16 Nov 2026, 08:00–12:00, Studio", or 09:05–11:05. |
 | **Weekly pattern** | A rule that yields one window on a given weekday, every week, within a validity period. |
 | **Date override** | For one local date, an explicit list of windows that **replaces** that date's pattern windows (an empty list means "not available that day"). |
 | **One-off window** | A window defined for one specific date, **in addition to** the pattern or override windows. |
 | **Effective windows** | A date's windows once patterns, override and one-offs have been combined, with adjacent windows of the same type merged (section 6.6). |
-| **Slot** | A whole local hour `[hh:00, hh:00 + 60 min)` lying inside one effective window. |
+| **Slot** | An hour `[s, s + 60 min)` lying inside one effective window, `s` the window's start or a whole number of real hours after it (R-SLOT-01, D33): the window 09:05–11:05 has the slots 09:05 and 10:05. |
 | **Free slot** | A slot with a place left: the people in it are fewer than its type's capacity (R-SLOT-02). |
 | **Appointment** | A booking between one User and the Administrator: a start, an end, a type, an optional note, and a status (`booked` or `cancelled`). |
 | **Active appointment** | An appointment with status `booked`. |
@@ -122,17 +124,17 @@ notifications will be added as a future feature, so no decision may make them ha
 | # | Topic | Decision |
 |---|---|---|
 | D1 | Time zone | One IANA time zone for the whole calendar, set as a deployment parameter. Instants are stored in UTC. Patterns are in local wall-clock time, so they stay right across daylight-saving changes. |
-| D2 | Granularity | Windows and the Administrator's custom appointment times use 15-minute steps. Users only book whole hours. |
+| D2 | Granularity | Windows and the Administrator's custom appointment times use 5-minute steps (D32); a window lasts whole hours (D33). Users only book the hours counted from a window's start (D33). |
 | D3 | Availability types | A catalogue the Administrator manages (create, rename, delete). Each type has a name and a capacity (D24). A type that is still in use cannot be deleted. |
 | D4 | Patterns | Weekly only: weekday, start, end, type, "valid from" and optional "valid until". |
 | D5 | Overrides | Per date: an explicit list of windows that replaces the pattern windows of that date; an empty list = not available. The pattern itself is unchanged. Date-range closure: not in v1. |
 | D6 | Overlaps | No two windows of the same date may overlap, whatever their source or type. |
 | D7 | Editing availability with existing appointments | Rejected with the list of affected appointments. The Administrator cancels or moves them first. |
-| D8 | Slots | A whole hour fully inside one window, with a place left: with the default capacity of 1, overlapping no active appointment (D24, D25). No break between appointments. |
+| D8 | Slots | An hour fully inside one window, counted from the window's start (D33), with a place left: with the default capacity of 1, overlapping no active appointment (D24, D25). No break between appointments. |
 | D9 | Visibility | A User sees free slots (with type) and their own appointments; others' appointments are "not free" where they fill a time (D29), without names. The Administrator sees everything. |
 | D10 | Booking window | Settings: minimum booking notice (default 0 h) and booking horizon (default 8 weeks). The Administrator is exempt. |
 | D11 | Limit per User | Setting "max future appointments per User", default unlimited. The Administrator is exempt. |
-| D12 | Administrator's custom times | Inside one window, no overlap, 15-minute steps, at least 15 minutes. |
+| D12 | Administrator's custom times | Inside one window, no overlap, 5-minute steps, at least 5 minutes (D32). |
 | D13 | Note | Optional free text, at most 500 characters, visible to and editable by both parties. |
 | D14 | Users list | New `GET /users`, Administrator only. |
 | D15 | Cancellation notice | One global setting in hours, before the start, default 24. Within it, a User can neither cancel nor change. |
@@ -160,6 +162,21 @@ same day.
 | D30 | The Administrator's full slots | Shown to the Administrator with no place left, so that a full slot can be booked over its capacity. A User never gets a full slot. |
 | D31 | A forced booking is not marked | Nothing is stored about a booking over the capacity: `createdBy` already says the Administrator made it, and "over the capacity" is a fact of one moment, since the capacity can change afterwards (D28). The event of section 15.2 is unchanged. |
 
+Decision D32, the time step, was taken by the Product Owner on 2026-11-25
+(`docs/SLOT_STEP_PLAN.md` sections 2 and 3). It restates D2 and D12, which first said 15 minutes.
+
+| # | Topic | Decision |
+|---|---|---|
+| D32 | The time step | The Administrator's times (the start and the end of a weekly pattern, of a window of a date override, of a one-off window and of a custom appointment) lie on 5-minute steps of the local clock, so that a window may open at 09:05 and an appointment run 10:10–10:35; a custom appointment lasts at least one step, 5 minutes. The slot does not change (R-SLOT-01): a User books slots of 60 real minutes, which D33 counts from the start of the window. Every time stored before lies on a quarter hour, which is on the 5-minute step too: nothing is migrated. The step is written once, `TIME_STEP_MINUTES` in `shared/src/calendar/defaults.ts`, for the server and the page. |
+
+Decision D33, windows of whole hours, was taken by the Product Owner on 2026-11-25
+(`docs/WINDOW_HOURS_PLAN.md` sections 2 and 3), after the release of D32 showed that a window
+09:05–10:05 offered a User no slot. It restates R-SLOT-01 and D32's sentence on the slot.
+
+| # | Topic | Decision |
+|---|---|---|
+| D33 | Windows of whole hours | A window (of a weekly pattern, of a date override, a one-off window) lasts a whole number of hours on the local clock, from any 5-minute start: 09:05–11:05 yes, 09:05–10:30 no; anything else is `400 invalid_request` naming the field `end`, as every refusal of a schema names its field (the shared schema's own message, "end must be a whole number of hours after start", is what the page and the assistant's tools read). A User's slots are the hours counted from the start of the effective window, 60 real minutes each: 09:05–11:05 gives 09:05 and 10:05. Windows of one type that touch are joined, as before (6.6), and the slots are counted from the start of the joined window. On the nights the clocks change, the window is whole hours on the local clock and its slots are 60 real minutes each from its start, as many as fit (R-SLOT-01). A block taken out of a window is widened until every piece left is whole hours (the assistant says which times it will use and asks first). A User's start on the 5-minute step that is not a slot is `409 outside_availability`, decided under the lock; before the lock a User's start is held to the 5-minute step only, like the Administrator's. The slot keeps its 60 real minutes. Windows already stored that are not whole hours are not changed by code: a read-only check lists those in the cloud, and the operator deletes them before the release. |
+
 ---
 
 ## 4. Actors and permissions
@@ -176,7 +193,7 @@ neither group gets `403 forbidden` on every calendar route.
 | Manage weekly patterns, date overrides, one-off windows | yes | no |
 | See the calendar (windows, free slots) for a date range | yes, with the source of every window | yes, without sources |
 | See appointments | all, with the User's name | own only; others' count in a slot's places left, and a full time appears as an anonymous "busy" interval |
-| Book | for any User; any free slot or custom times inside one window; no notice, horizon or limit; over the capacity with `overbook` (R-BOOK-13) | for themself only; whole-hour free slots; notice, horizon and limit apply; never over the capacity |
+| Book | for any User; any free slot or custom times inside one window; no notice, horizon or limit; over the capacity with `overbook` (R-BOOK-13) | for themself only; free slots, counted from a window's start (R-SLOT-01); notice, horizon and limit apply; never over the capacity |
 | Cancel | any active appointment not yet ended | own active appointment, only with enough notice |
 | Change | any active appointment not yet ended | own, with notice on the old one and booking rules on the new one |
 | Edit the note | any active appointment not yet ended | own active appointment not yet ended |
@@ -200,12 +217,12 @@ The API exposes it in the settings (section 9) and in every calendar view respon
 | Kind | Format | Used for |
 |---|---|---|
 | Local date | `YYYY-MM-DD`, a real calendar date | pattern validity, overrides, one-off windows, query ranges |
-| Local time | `HH:mm`, minutes in `00, 15, 30, 45`; `24:00` allowed as an **end** only | window start/end |
+| Local time | `HH:mm`, minutes on 5-minute steps (`00, 05, … 55`, D32); `24:00` allowed as an **end** only | window start/end |
 | Weekday | integer `1` (Monday) … `7` (Sunday), ISO 8601 | patterns |
 | Instant | ISO-8601 UTC, `YYYY-MM-DDTHH:mm:ss.sssZ` | appointments, computed windows and slots, audit timestamps |
 
-An appointment is stored and exchanged as instants. The 15-minute and whole-hour rules apply
-to the **local** time of those instants, so they hold for any zone, including the rare zones whose
+An appointment is stored and exchanged as instants. The 5-minute rule applies to the **local**
+time of those instants, so they hold for any zone, including the rare zones whose
 UTC offset is not a whole hour.
 
 **R-TIME-03 — Converting local to UTC.** A local date + local time becomes an instant in the
@@ -215,8 +232,8 @@ calendar time zone with the "compatible" rule (the one JavaScript's Temporal use
 - a local time that occurs twice (when clocks go back) takes the **earlier** occurrence.
 
 Durations are always measured in real elapsed minutes. A slot is therefore exactly 60 real
-minutes. On the night clocks go forward, a window 01:00–04:00 holds two real hours and the slots
-01:00–03:00 (60 real minutes, ending at local 03:00) and 03:00–04:00. Availability at night is
+minutes. On the night clocks go forward, a window 01:05–04:05 holds two real hours and the slots
+01:05–03:05 (60 real minutes, ending at local 03:05) and 03:05–04:05 (R-SLOT-01, D33). Availability at night is
 not a realistic case, but the rule makes the code total.
 
 **R-TIME-04 — "Today" and "now".** "Now" is the Lambda's clock. "Today" is the local date of now
@@ -271,7 +288,7 @@ fall-back day, and a zone with a non-whole-hour offset.
 |---|---|
 | `patternId` | ULID, generated by the server |
 | `weekday` | 1–7 |
-| `start`, `end` | local times, `start < end`, same day (`end` may be `24:00`) |
+| `start`, `end` | local times, on 5-minute steps (D32), same day (`end` may be `24:00`); `end` is `start` plus a whole number of hours on the local clock, the same minutes (`24:00` counting as minute `00`): 09:05–11:05 yes, 09:05–10:30 no (D33). So no window starts after 23:00: 23:05 has no end of whole hours on its date |
 | `typeId` | an existing type |
 | `validFrom` | local date; the first date the pattern can apply |
 | `validUntil` | local date or `null` (no end); when set, `validUntil ≥ validFrom`; inclusive |
@@ -336,7 +353,7 @@ defined(D) = base(D) ∪ oneOffWindows(D)
 **R-AV-01 — No overlap (D6).** The defined windows of a date never overlap: for any two windows
 `[s1, e1)` and `[s2, e2)`, either `e1 ≤ s2` or `e2 ≤ s1`. Touching windows (`12:00` end, `12:00`
 start) are allowed, also with different types. Windows are compared as the local times that define
-them (`HH:mm` of one date), not as instants: on the night clocks go forward, `02:00–02:30` and
+them (`HH:mm` of one date), not as instants: on the night clocks go forward, `02:00–03:00` and
 `03:00–04:00` do not overlap, although both start at the same instant. Two patterns overlap only if
 their windows overlap and they share at least one date: the same weekday, inside both validity
 periods. Every write that could create an overlap is
@@ -358,8 +375,10 @@ past, nor set or deleted once their date is past (`409 date_in_past`).
 
 The **effective windows** of D are the defined windows of D, converted to instants (R-TIME-03),
 sorted by start, with **adjacent windows of the same type merged** (end of one = start of the
-next). Example: `08:00–10:30 Studio` and `10:30–12:00 Studio` (from a pattern and a one-off window)
-form one effective window `08:00–12:00 Studio`, which offers the slot 10:00–11:00.
+next). Example: `08:00–10:00 Studio` and `10:00–12:00 Studio` (from a pattern and a one-off window)
+form one effective window `08:00–12:00 Studio`. Likewise `09:05–10:05 Studio` and
+`10:05–12:05 Studio` form `09:05–12:05 Studio`, whose slots are counted from its start: 09:05, 10:05
+and 11:05 (R-SLOT-01, D33).
 
 Effective windows are computed on every request, never stored. This is cheap: there are at most
 50 patterns, and a date has at most 10 + 10 windows.
@@ -397,17 +416,26 @@ feet.
 ## 7. Slots
 
 **R-SLOT-01 — Definition.** A slot is an interval `[s, s + 60 min)` where:
-1. the local time of `s` is a whole hour (`hh:00`);
-2. the interval lies entirely inside one effective window;
+1. `s` is the start of an effective window, or a whole number of real hours (60 real minutes
+   each) after it (D33);
+2. the interval lies entirely inside that effective window;
 3. its type is that window's type.
 
-A window 08:30–12:00 yields the slots 09:00, 10:00 and 11:00. A window 08:00–08:45 yields none.
+A window 08:05–11:05 yields the slots 08:05, 09:05 and 10:05; a window 08:00–12:00 yields 08:00,
+09:00, 10:00 and 11:00. Windows that touch are joined first (6.6), so the slots run on from the
+start of the joined window. The Administrator may still book any custom times inside a window
+(R-BOOK-08). A window stored before D33 that is not whole hours (one dated in the past, which can
+no longer be changed) yields as many slots as fit from its start: 08:30–12:00 yields 08:30, 09:30
+and 10:30.
 
-On the night clocks go back, the repeated local hour gives two slots with the same local start, one
-real hour apart, one per UTC offset. In `Europe/Rome` on 2026-10-25, a window 01:00–04:00 holds four
-real hours and gives four slots: 01:00 (+02:00), 02:00 (+02:00), 02:00 (+01:00) and 03:00 (+01:00).
-Each lasts 60 real minutes, and all of them are free and bookable like any other slot. An instant
-names each slot without ambiguity.
+Real minutes count, not the hours of the clock. On the night clocks go forward in `Europe/Rome`
+(2027-03-28), a window 01:05–04:05 holds two real hours and gives two slots: 01:05 (ending at local
+03:05) and 03:05. On the night clocks go back (2026-10-25), the repeated local hour gives two slots
+with the same local start, one real hour apart, one per UTC offset: a window 01:05–04:05 holds four
+real hours and gives four slots, 01:05 (+02:00), 02:05 (+02:00), 02:05 (+01:00) and 03:05 (+01:00);
+a window 01:00–04:00 likewise gives 01:00, 02:00 twice and 03:00. Each lasts 60 real minutes, and
+all of them are free and bookable like any other slot. An instant names each slot without
+ambiguity.
 
 
 **R-SLOT-02 — Free.** The *people in* an interval are the most active appointments that overlap
@@ -498,11 +526,11 @@ Request: `{ start, end?, username?, note?, overbook? }` (section 11.7).
 | Rule | User | Administrator | Error if broken |
 |---|---|---|---|
 | **R-BOOK-01** `username`: the User the appointment is for | must be absent or equal to the caller | required; must be an existing account in group `user` and not in `admin` | `400 invalid_request` (admin, absent) · `404 user_not_found` (admin, unknown) · `409 target_not_user` (admin, target not a plain User: an Administrator, or in no group) · `403 forbidden` (User naming someone else) |
-| **R-BOOK-02** Times | `start` a whole local hour; `end` absent or `start + 60 min` | `start` and `end` on 15-minute local steps; `end` defaults to `start + 60 min` (then `start` may be any 15-minute step); `end − start ≥ 15 min` | `400 invalid_request` |
+| **R-BOOK-02** Times | `start` on a 5-minute local step (D32); `end` absent or `start + 60 min`; whether `start` is a slot is R-BOOK-06's | `start` and `end` on 5-minute local steps (D32); `end` defaults to `start + 60 min` (then `start` may be any 5-minute step); `end − start ≥ 5 min` | `400 invalid_request` |
 | **R-BOOK-03** In the future | `start > now` | `start > now` | `409 booking_in_past` |
 | **R-BOOK-04** Minimum notice | `start − now ≥ minBookingNoticeHours` | exempt | `409 booking_notice_too_short` |
 | **R-BOOK-05** Horizon | `localDateOf(start) ≤ today + bookingHorizonDays` | exempt | `409 booking_beyond_horizon` |
-| **R-BOOK-06** Inside availability | inside one effective window; the appointment takes that window's type | same | `409 outside_availability` |
+| **R-BOOK-06** Inside availability | inside one effective window, and `start` the start of one of that window's slots (R-SLOT-01, D33); the appointment takes that window's type | inside one effective window; the appointment takes that window's type | `409 outside_availability` |
 | **R-BOOK-07** Places | the people in `[start, end)` (R-SLOT-02) are fewer than the capacity of the window's type (R-BOOK-06) | same, unless `overbook` is `true` (R-BOOK-13) | `409 slot_taken` |
 | **R-BOOK-08** Custom times | — (forbidden by R-BOOK-02) | allowed, subject to R-BOOK-06/07/12 (D12) | — |
 | **R-BOOK-09** Limit | the User's active appointments with `start > now`, **before** this booking, are fewer than `maxFutureAppointmentsPerUser` (when not `null`) | exempt | `409 appointment_limit_reached` |
@@ -524,7 +552,9 @@ always gets the same error:
 4. the Administrator's target through Cognito (R-BOOK-01: `404 user_not_found`, `409
    target_not_user`), before the calendar lock: its answer does not depend on the calendar, so a
    lock retry does not repeat it;
-5. inside the locked attempt, on the data read in it: R-BOOK-03, 04, 05, 06, 12, 07, 09;
+5. inside the locked attempt, on the data read in it: R-BOOK-03, 04, 05, 06, 12, 07, 09; for a
+   User, R-BOOK-06 includes that `start` is a slot of the window found, so a start on the step that
+   is not a slot and a start outside every window get the same `409 outside_availability`;
 6. R-BOOK-10, as a condition of the booking transaction itself (13.4): a cancellation on that item
    answers `404 user_not_found` without a retry.
 
@@ -593,7 +623,8 @@ What the booking rules mean in a change (v11):
   User. R-BOOK-08 is applied by R-BOOK-02, as in a booking.
 - R-BOOK-02: as in a booking for the caller's role; the Administrator's `end` absent is
   `start + 60 min`, not the old appointment's duration.
-- R-BOOK-06: the new appointment takes the type of the window it lies in, which may differ from the
+- R-BOOK-06: for a User, the new start is a slot of the window it lies in, as in a booking. The
+  new appointment takes the type of the window it lies in, which may differ from the
   old one's; `typeNameAtBooking` is that type's name at the time of the change.
 - R-BOOK-10: checked on the old appointment's `userId`. A change by the Administrator of an
   appointment whose User has been deleted (still `booked` only if the deletion stopped before its
@@ -616,7 +647,8 @@ The checks run in this order, and the first that fails decides (v11):
 5. inside the locked attempt, on the data read in it, the old appointment as in 8.3: R-CAN-01 /
    R-PERM-01 (`404 appointment_not_found`), R-CAN-02 (`409 appointment_not_active`), for a User
    R-CAN-03 (`403 cancellation_notice_too_short`, "Too late to change this appointment");
-6. then the new one: R-BOOK-03, 04, 05, 06, 12, 07, 09, with the adjustments of R-CHG-01;
+6. then the new one: R-BOOK-03, 04, 05, 06 (for a User, a slot's start), 12, 07, 09, with the
+   adjustments of R-CHG-01;
 7. R-BOOK-10, as a condition of the change transaction on the old appointment's `userId` (`404
    user_not_found`, without a retry).
 
@@ -697,7 +729,7 @@ event is therefore a real change.
 `GET /users`, Administrator only. It returns the members of group `user` that are not in group
 `admin`, sorted by username: `{ "users": [ { "username": "alice", "createdAt": "…", "status":
 "active", "givenName": "Alice", "familyName": "Liddell", "email": "alice@example.com", "address":
-"…" } ] }` (v19: each User's state, `invited` or `active`, and four facts, whose rules are
+"…" } ] }` (v21: each User's state, `invited` or `active`, and four facts, whose rules are
 `docs/EMAIL_ARCHITECTURE.md` section 4.1; a listed User that lacks one makes the answer `500`). It
 is needed for the "book for a User" choice and for the users screen. It reads Cognito (`ListUsersInGroup` for both groups,
 following pagination); there is still no users table (architecture section 13). Usernames are
@@ -802,7 +834,7 @@ are validated the same way.
 | 18 | `PATCH /calendar/appointments/{appointmentId}` | admin, owner | `{ note }` | `200` `Appointment` | 400 · 404 `appointment_not_found` · 409 `appointment_not_active`, `concurrent_update` |
 | 19 | `POST /calendar/appointments/{appointmentId}/cancel` | admin, owner | — | `200` `Appointment` | 400 · 403 `cancellation_notice_too_short` · 404 `appointment_not_found` · 409 `appointment_not_active`, `concurrent_update` |
 | 20 | `POST /calendar/appointments/{appointmentId}/change` | admin, owner | `ChangeBody` | `201` `{ cancelled, booked }` | 400 · 403 `cancellation_notice_too_short` · 404 `appointment_not_found`, `user_not_found` · 409 `appointment_not_active`, `booking_in_past`, `booking_notice_too_short`, `booking_beyond_horizon`, `outside_availability`, `user_busy`, `slot_taken`, `appointment_limit_reached`, `concurrent_update` (v11; in the order of 8.4) |
-| 21 | `GET /users` | admin | — | `200` `{ users: UserSummary[] }`, each `{ username, createdAt, status, givenName, familyName, email, address }` (v19) | — |
+| 21 | `GET /users` | admin | — | `200` `{ users: UserSummary[] }`, each `{ username, createdAt, status, givenName, familyName, email, address }` (v21) | — |
 
 ¹ Deleting a pattern cannot create an overlap. The code is listed only because the shared
 availability-write helper can answer it; in practice it never does.
@@ -878,7 +910,9 @@ export type ApiErrorBody = { error: ApiErrorCode; message: string; conflicts?: A
 ### 11.4 Request bodies
 
 ```ts
-// Local time on the 15-minute grid; "24:00" is accepted as an end only.
+// Local time on the 5-minute grid (D32); "24:00" is accepted as an end only.
+// In the three window bodies, end is start plus a whole number of hours: the same minutes,
+// "24:00" counting as minute 00 (D33).
 type LocalTime = string;   // "08:00"
 type LocalDate = string;   // "2026-11-16"
 
@@ -1024,7 +1058,7 @@ and is therefore `busy`, and alice's own hour is left out of `busy` (D29).
 
 ### 11.7 Examples
 
-Book as a User (whole hour, `end` omitted):
+Book as a User (a slot's start, `end` omitted):
 
 ```http
 POST /calendar/appointments
@@ -1059,10 +1093,10 @@ Following "a new error code or response field starts in `shared/src/api.ts`" (CL
 |---|---|
 | `shared/src/api.ts` | The new `ApiErrorCode` values (11.3), `AppointmentConflict`, the `conflicts` field of `ApiErrorBody`, `UserSummary`, `ListUsersResponse` |
 | `shared/src/calendar/types.ts` | The response types of 11.5 and 11.6, `Actor`, `CalendarEventType` (section 15) |
-| `shared/src/calendar/schemas.ts` | `zod` schemas: `LocalDate`, `LocalTime`, `LocalEndTime`, `Weekday`, `Instant`, `Ulid`, `Note`, `TypeName`, and the bodies and queries of 11.2 and 11.4 (`.strict()`), with cross-field rules (`start < end`, `validFrom ≤ validUntil`, range spans) |
+| `shared/src/calendar/schemas.ts` | `zod` schemas: `LocalDate`, `LocalTime`, `LocalEndTime`, `Weekday`, `Instant`, `Ulid`, `Note`, `TypeName`, and the bodies and queries of 11.2 and 11.4 (`.strict()`), with cross-field rules (`start < end`, a window of whole hours, `validFrom ≤ validUntil`, range spans) |
 | `shared/src/calendar/time.ts` | The time helpers of R-TIME-06 |
-| `shared/src/calendar/rules.ts` | Pure functions both sides use: `definedWindows(date, patterns, override, oneOffs)`, `effectiveWindows`, `slotsOf(window)`, `overlaps(a, b)`, `peopleIn(interval, appointments)` (the people in an interval, R-SLOT-02), `isWholeLocalHour`, `isOnQuarterGrid`, `cancellableUntil(appointment, settings)` |
-| `shared/src/calendar/defaults.ts` | The default settings and the limits (20 types, 50 patterns, 10 windows per date, 500-character note, 31/92-day ranges), the range and default of a type's capacity (1–100, default 1) |
+| `shared/src/calendar/rules.ts` | Pure functions both sides use: `definedWindows(date, patterns, override, oneOffs)`, `effectiveWindows`, `slotsOf(window)`, `overlaps(a, b)`, `peopleIn(interval, appointments)` (the people in an interval, R-SLOT-02), `isOnTimeStep` (the 5-minute step of an instant, R-BOOK-02), `lastsWholeHours(start, end)` (a window of whole hours, D33, used by the three window bodies of `schemas.ts`), `cancellableUntil(appointment, settings)` |
+| `shared/src/calendar/defaults.ts` | The default settings and the limits (20 types, 50 patterns, 10 windows per date, 500-character note, 31/92-day ranges), the range and default of a type's capacity (1–100, default 1), the time step `TIME_STEP_MINUTES` (5, D32) |
 | `shared/src/index.ts` | re-exports them |
 
 `shared/` keeps its 100 % line coverage. The rules functions are where most of the edge cases
@@ -1458,10 +1492,10 @@ A new journeys file, `frontend/tests/integration/calendar.test.ts`, against the 
 | View | Who | Needs |
 |---|---|---|
 | Week calendar | both | Seven days from `GET /calendar`: windows coloured by type, free slots clickable, own appointments (User) or all appointments with names (Administrator), busy blocks (User). A slot whose type has a capacity above 1 says its places left ("2 of 3 places left"); the Administrator's full slots are drawn apart and can be clicked to book over the capacity (D30). In the Administrator's week, appointments that overlap are drawn side by side, one block each, up to three; four or more are one block ("4 people · Swimming Pool") that opens the list of them, each one opening its detail. Navigation by week. Times shown in the calendar time zone, labelled with it, whatever the browser's zone. On the night clocks go back, two slots or appointments can show the same local time an hour apart: the view must tell them apart, for example by showing the UTC offset ("02:00 +02:00", "02:00 +01:00"). |
-| Book dialog | both | Slot or (Administrator) custom start/end on a 15-minute grid, User picker (`GET /users`, Administrator), note. For the Administrator, a `slot_taken` answer asks "Book anyway?" and sends the same request with `overbook: true`; the same in a change (R-BOOK-13). `user_busy` is said in plain words, with no such offer. |
+| Book dialog | both | Slot or (Administrator) custom start/end on the 5-minute grid (D32), each time chosen as an hour and a minute, a chosen start setting the end one hour later and a changed end leaving the start alone (`docs/SLOT_STEP_PLAN.md` section 2, decisions S1 to S5, and its finding F8), User picker (`GET /users`, Administrator), note. For the Administrator, a `slot_taken` answer asks "Book anyway?" and sends the same request with `overbook: true`; the same in a change (R-BOOK-13). `user_busy` is said in plain words, with no such offer. |
 | Appointment detail | both | Fields of 11.5; actions cancel, change, edit note, enabled according to the rules (`cancellableUntil`, status, end); the reason of a failure in plain words. |
 | My appointments | User | `GET /calendar/appointments?upcoming=true`; history with `status=all` and a range. |
-| Availability management | Administrator | Types list with each type's capacity, set at creation and edit; patterns list grouped by weekday; per-date override editor ("this day only…", "not available"); one-off windows; the conflicts list when a change is refused. |
+| Availability management | Administrator | Types list with each type's capacity, set at creation and edit; patterns list grouped by weekday; per-date override editor ("this day only…", "not available"); one-off windows; the conflicts list when a change is refused. In every window form the end is chosen as an hour only, its minute that of the start, and a start chosen sets the end one hour later; a window not whole hours is refused before it is sent (D33; `docs/WINDOW_HOURS_PLAN.md` findings F3 and F4); the start's hour 23 offers the minute 00 only, and a change of the start's minute alone keeps the end's hour. |
 | Settings | Administrator | The four settings, with their defaults and ranges. |
 
 The **CORS gap** (`FRONTEND_SERVICES.md` 10.3) applied to the new routes too. The front-end
@@ -1493,10 +1527,14 @@ route through its own address (`docs/FRONTEND_ARCHITECTURE.md` section 13.3).
 
 - `shared/`: time helpers (DST forward/back, non-whole-hour offset, `24:00`), schemas (every
   bound), `definedWindows` (pattern validity edges, override replaces, one-off adds), merging,
-  `slotsOf` (08:30 start, 08:45 window, DST day), overlap edges (touching is not overlapping), the
+  `slotsOf` (counted from the window's start: 09:05–11:05, joined windows, a leftover 08:30–12:00,
+  01:05–04:05 on both DST nights), `lastsWholeHours` and the three window bodies (09:05–11:05,
+  09:05–10:30, 23:00–24:00, 23:05–24:00), the 5-minute step of an instant
+  (on it, off it, the nights the clocks change, a zone whose offset is not a whole hour), overlap edges (touching is not overlapping), the
   people in an interval (D25: touching appointments are not present together, the peak of
   overlapping custom times, the night clocks go back).
-- `backend/src/lib`: `calendarRules` for every rule id of sections 6–10, with a fixed "now";
+- `backend/src/lib`: `calendarRules` for every rule id of sections 6–10, with a fixed "now"
+  (a User's start on the step and a slot, on the step and not a slot, off the step);
   `calendarDb` with `aws-sdk-client-mock`, including the lock retry (cancelled twice, then success;
   three times → `concurrent_update`) and transaction shapes; `cognito.ts` additions.
 - Handlers: role, validation, mapping of each rule failure to its status and code, log line
@@ -1537,11 +1575,11 @@ into DynamoDB Local, as the existing journeys already read the table directly.
 | AC-06 | AC-04 | admin sets override 2026-11-16 `[09:00–12:00 Studio]` | 200. That day has one window 08:00Z–11:00Z; the other Mondays are unchanged |
 | AC-07 | AC-04 | admin sets override 2026-11-23 `[]` | that Monday has no windows |
 | AC-08 | AC-04 | admin creates a one-off window 2026-11-16 12:00–13:00 Studio | merged effective window 08:00–13:00 local; slot 12:00 offered |
-| AC-09 | AC-04 | admin creates a one-off window 2026-11-16 11:00–12:30 | 409 `availability_overlap` |
+| AC-09 | AC-04 | admin creates a one-off window 2026-11-16 11:00–13:00 | 409 `availability_overlap` |
 | AC-10 | AC-04 | alice books 2026-11-16 09:00 local | 201, `end` = +60 min, type Studio, event `appointment.booked` written |
 | AC-11 | AC-10 | bob books the same slot | 409 `slot_taken` |
 | AC-12 | AC-10 | bob's view of that day | 09:00 not in `slots`, one `busy` interval, no alice data anywhere |
-| AC-13 | AC-04 | alice books 09:30 local | 400 `invalid_request` (not a whole hour) |
+| AC-13 | AC-04 | alice books 09:30 local | 409 `outside_availability`: on the 5-minute step, but not a slot of the window (R-BOOK-06, D33) |
 | AC-14 | AC-04 | admin books alice 09:15–10:00 local | 201 |
 | AC-15 | AC-14 | alice books 09:00 local | 409 `user_busy`: the hour overlaps her own 09:15–10:00 in part (R-BOOK-12 comes before R-BOOK-07); to move it she changes that appointment (8.4) |
 | AC-16 | AC-04 | alice books 12:00 local (outside the window) | 409 `outside_availability` |
@@ -1573,6 +1611,14 @@ into DynamoDB Local, as the existing journeys already read the table directly.
 | AC-42 | Pool with capacity 2; admin books alice 14:00–14:30 and bob 14:30–15:00 local | carol books 14:00 | 201 (never two people at one instant); then dan books 14:00: 409 `slot_taken` |
 | AC-43 | AC-38 | admin edits Pool to capacity 1 | 200; the three appointments stay `booked`; the admin's slot 13:00Z has `placesLeft` 0, 14:00Z has 1 |
 | AC-44 | — | admin creates a type without `capacity`, then renames it sending only `name` | 201 with `capacity` 1, then 200 with `capacity` 1; after an edit to capacity 3, a rename with `name` only keeps 3 |
+| AC-45 | Pattern Mon 08:05–12:05 Studio from 2026-11-01, no end | User views 2026-11-16 (Mon) at now 2026-11-10 | window 07:05Z–11:05Z, slots 07:05Z, 08:05Z, 09:05Z, 10:05Z: counted from the window's start (R-SLOT-01, D33) |
+| AC-46 | AC-04 | admin books alice 10:10–10:35 local | 201 |
+| AC-47 | AC-04 | admin books alice 11:00–11:05 local | 201: five minutes, the shortest appointment (R-BOOK-02) |
+| AC-48 | AC-04 | admin books alice 10:07 local; alice books 10:10 local | 400 `invalid_request` for the first, off the 5-minute step; 409 `outside_availability` for the second, on the step but not a slot (R-BOOK-06, D33) |
+| AC-49 | Type Studio | admin creates a pattern, sets an override and creates a one-off window, each 09:05–10:30 | 400 `invalid_request` for each, naming `end` (`windows.0.end` for the override); nothing stored (D33) |
+| AC-50 | Override 2026-11-16 `[09:05–10:05 Studio]` and a one-off window 10:05–12:05 Studio | User views 2026-11-16 | one effective window 09:05–12:05 local; slots 09:05, 10:05 and 11:05 local (6.6, R-SLOT-01) |
+| AC-51 | Pattern Mon 09:05–11:05 Studio | alice books 2026-11-16 09:05 local; alice books 09:00 and 09:10 | 201, `end` 10:05 local; 409 `outside_availability` for both of the others (R-BOOK-06) |
+| AC-52 | Pattern Sun 01:05–04:05 Studio | views of 2027-03-28 (clocks go forward) and 2026-10-25 (clocks go back) | slots 01:05 and 03:05 local; then 01:05, 02:05 (+02:00), 02:05 (+01:00) and 03:05 local, each 60 real minutes (R-SLOT-01). Proven by the unit tests only: the local stack cannot move its clock |
 
 ### 18.4 Smoke test (local and cloud)
 
@@ -1589,27 +1635,35 @@ status and the error code only, since an answer may hold a note).
    earliest start's date if that is later (never, with the ranges of section 9: 720 h is 30 days).
    One `GET /calendar` as the admin covers the 31 days from there, forward. A date is taken when
    03:00 local exists, is a whole hour and 03:00–04:00 lasts 60 real minutes (a DST day where it
-   does not is skipped), starts no earlier than the earliest start, and that hour overlaps none of
-   the date's `windows` (every source) and none of the view's `appointments` (all active ones, for
-   the Administrator), with fewer than 10 one-off windows on the date. None found: a FAIL line
+   does not is skipped), starts no earlier than the earliest start, and 03:00–04:05 overlaps none
+   of the date's `windows` (every source) and none of the view's `appointments` (all active ones,
+   for the Administrator), with fewer than 10 one-off windows on the date: the journey's window is
+   03:05–04:05, and the capacity journey of `docs/RUNBOOK.md` section 2.3 uses 03:00–04:00 there
+   after it. None found: a FAIL line
    naming the range (or, when every date was too soon, the setting and the earliest start) and no
    calendar journey. Something created between the read and the writes answers 409: FAIL with
    its code, clean-up, no retry.
-3. **The journey, one check line each** (19 checks with Hello World's 10; the assistant's exchange of `docs/ARCHITECTURE.md` section 9.3 adds 7): the settings read; the
-   free hour found; as the admin, create the type `smoke-<epoch>` (the User's epoch), create the
-   one-off window 03:00–04:00 on the date, book it for the User (`username`, `start`, no `end`,
+3. **The journey, one check line each** (23 checks with Hello World's 10; the assistant's exchange of `docs/ARCHITECTURE.md` section 9.3 adds 7): the settings read; the
+   free hour found; as the admin, create the type `smoke-<epoch>` (the User's epoch), send the
+   one-off window 03:05–03:50, not whole hours (D33): `400 invalid_request`, and the date shows no
+   window of the type; create the one-off window 03:05–04:05 on the date, book its one slot, 03:05
+   (R-SLOT-01), for the User (`username`, `start`, no `end`,
    and the note `smoke-test note <epoch>, must never reach a log`; the answer is `booked`, 60
    minutes, that type, that note); as the User, `upcoming` holds exactly that appointment (id,
    start, end, type, `booked`, note, a `cancellableUntil`), then cancel it (`cancelled`,
-   `cancelReason` `cancelled`); as the admin, delete the window, then the type (R-TYPE-03: the
-   cancelled appointment does not block it). The script never prints the note.
+   `cancelReason` `cancelled`); as the admin, in the same window, book the custom times
+   03:10–03:35 for the User (`username`, `start`, `end`; the answer `booked` with exactly those
+   two instants, D32 and R-BOOK-02), cancel it, and send 03:07–03:35, whose start is off the
+   step: `400 invalid_request`, and the User's appointments (`status=all`) hold none at 03:07;
+   then delete the window, then the type (R-TYPE-03: the cancelled appointments do not block
+   it). The script never prints the note. The journey has 13 lines.
 4. **Clean-up.** After a failed calendar check, and on every exit (Ctrl-C included), the script
    cancels the appointment if still booked, then deletes the window and the type, through the API
    as the admin, before the User is deleted; a write whose answer was not read is looked up first.
    It does not rely on the User's deletion (10.2), which the exit path does directly in Cognito.
    A clean-up call that fails prints the ids to remove by hand, never a body, and the exit is 1.
-5. **History.** The appointment (cancelled, by the User or by the admin's clean-up), its pointer,
-   its two events and, after the User's deletion through the API, the deleted-user marker stay, as
+5. **History.** The two appointments, 03:05–04:05 and 03:10–03:35 (cancelled, by the User, by
+   the admin or by the admin's clean-up), their pointers, their two events each and, after the User's deletion through the API, the deleted-user marker stay, as
    the smoke test's messages do. They carry the username and type name `smoke-<epoch>`.
 
 AC-36 is checked on top of it: locally by searching `local:api`'s output for every journey's note

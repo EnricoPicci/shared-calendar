@@ -20,6 +20,12 @@ button.danger { background: #fff; border-color: #b3261e; color: #b3261e; }
 button:focus-visible, a:focus-visible { outline: 2px solid #1d5fd1; outline-offset: 2px; }
 input, select, textarea { padding: 0.45rem; border: 1px solid #b6c0cc; border-radius: 6px; width: 100%; box-sizing: border-box; }
 label { display: grid; gap: 0.25rem; font-size: 0.85rem; color: #52606d; }
+/* A time is two short lists, its hour and its minute, side by side with a colon between them,
+   under the group's name, which stands where a field's label stands. The words "Hour" and
+   "Minute" are for a screen reader only. */
+fieldset.clock { margin: 0; padding: 0; border: 0; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; column-gap: 0.3rem; }
+fieldset.clock legend { padding: 0; margin-bottom: 0.25rem; font-size: 0.85rem; color: #52606d; }
+fieldset.clock label { min-width: 0; }
 .error { color: #b3261e; margin: 0; min-height: 1.2em; overflow-wrap: anywhere; }
 
 /* The login */
@@ -126,6 +132,14 @@ button.block.beside.lane-1-of-2 { left: calc((100% - var(--room)) / 2); width: c
 button.block.beside.lane-0-of-3 { width: calc((100% - var(--room)) / 3 - 4px); }
 button.block.beside.lane-1-of-3 { left: calc((100% - var(--room)) / 3); width: calc((100% - var(--room)) / 3 - 4px); }
 button.block.beside.lane-2-of-3 { left: calc((100% - var(--room)) * 2 / 3); width: calc((100% - var(--room)) / 3 - 4px); }
+/* An appointment drawn at the least height, 15 minutes' worth (about 12 pixels): no padding
+   above and below, and a line exactly as tall as its letters, so that its time and its User
+   can still be read. */
+button.block.short { padding-block: 0; line-height: 1; }
+/* A short appointment that shares its width shows its start and its User on its one line: less
+   padding at the sides, and a name too long for what is left ends in "…". */
+button.block.short:not(.lane-0-of-1) { flex-wrap: nowrap; padding-inline: 0.2rem; }
+button.block.short:not(.lane-0-of-1) .who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 button.block:hover { filter: brightness(0.95); }
 button.block:focus-visible { outline-offset: 1px; z-index: 1; }
 
@@ -271,7 +285,9 @@ dialog .question { overflow-wrap: anywhere; }
 .draft { padding: 0.75rem; border: 1px solid #1d5fd1; border-radius: 6px; background: #e8f0fd; }
 .add-draft, .add-window { display: grid; gap: 0.5rem; }
 .add-draft .failure:empty, .add-window .failure:empty { display: none; }
-.window-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); gap: 0.75rem; align-items: start; }
+/* Start, End and Type of a date's window: a field never narrower than a time's two lists need to
+   show their values, so on a phone the type goes to a row of its own */
+.window-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem; align-items: start; }
 
 /* The dialogs: as wide as a phone allows, scrolling inside when taller than the screen */
 dialog { width: min(24rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); box-sizing: border-box; overflow-y: auto; border: 0; border-radius: 10px; padding: 1.25rem; box-shadow: 0 8px 30px #0004; color: inherit; }
@@ -331,8 +347,9 @@ dialog .person { display: flex; flex-wrap: wrap; gap: 0 0.75rem; width: 100%; te
 .message .text, .proposal .asks, .proposed { white-space: pre-wrap; overflow-wrap: anywhere; }
 .message.from-person { justify-self: end; border-color: #1d5fd1; background: #e8f0fd; }
 .message.from-notice { justify-self: center; border-style: dashed; background: none; font-style: italic; }
-/* For a screen reader only: the same words are in the conversation */
-.talk .news { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* For a screen reader only: the same words are in the conversation; and the words of the two
+   lists of a time */
+.talk .news, .unseen { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .proposal { display: grid; gap: 0.5rem; padding: 0.6rem 0.75rem; border: 1px solid #1d5fd1; border-radius: 6px; background: #e8f0fd; }
 .proposal .asks { font-weight: 600; }
 .changes { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }

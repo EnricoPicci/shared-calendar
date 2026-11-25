@@ -1,4 +1,4 @@
-import { CALENDAR_LIMITS, LocalDate, TYPE_CAPACITY, TypeName, type AvailabilityType, type PatternBody, type WeeklyPattern } from '@shared-calendar/shared';
+import { CALENDAR_LIMITS, lastsWholeHours, LocalDate, TYPE_CAPACITY, TypeName, type AvailabilityType, type PatternBody, type WeeklyPattern } from '@shared-calendar/shared';
 import { longDateText } from './texts';
 
 // The availability screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the availability types
@@ -80,17 +80,10 @@ export function deleteTypeQuestion(row: TypeRow): string {
 export type Choice = { value: string; label: string };
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const DAY_MINUTES = 24 * 60;
-const GRID = 15; // a window starts and ends on 15-minute steps (docs/SHARED_CALENDAR_SPEC.md section 6.2)
-const clock = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
-const steps = (from: number, to: number) => Array.from({ length: (to - from) / GRID + 1 }, (_, i) => clock(from + i * GRID)).map((time) => ({ value: time, label: time }));
 
-// The weekdays, Monday to Sunday, as the API numbers them: 1 to 7.
+// The weekdays, Monday to Sunday, as the API numbers them: 1 to 7. The two times of the form
+// are an hour and a minute each, offered by src/logic/times.ts.
 export const WEEKDAY_CHOICES: readonly Choice[] = WEEKDAYS.map((label, i) => ({ value: String(i + 1), label }));
-// The local times a window may start at, 00:00 to 23:45, and end at, 00:15 to 24:00: nothing
-// off the grid can be chosen.
-export const START_CHOICES: readonly Choice[] = steps(0, DAY_MINUTES - GRID);
-export const END_CHOICES: readonly Choice[] = steps(GRID, DAY_MINUTES);
 
 // The types to choose from, by name, in the server's order.
 export function typeChoices(types: readonly AvailabilityType[]): Choice[] {
@@ -130,20 +123,33 @@ export function patternFields(pattern: PatternBody): PatternFields {
 
 const isDate = (text: string) => LocalDate.safeParse(text).success;
 
-// The two refusals of a window's fields, which a pattern, a window of one date's own and an
-// extra window share: each starts with the words of its field's label.
+// The refusals of a window's fields, which a pattern, a window of one date's own and an extra
+// window share: each starts with the words of its field's label. A window lasts a whole number
+// of hours (docs/SHARED_CALENDAR_SPEC.md decision D33): the end's lists offer nothing else, but
+// a window stored before the rule can still be opened in a form.
 export const END_NOT_LATER = 'End must be later than Start.';
+export const END_NOT_WHOLE_HOURS = 'End must be a whole number of hours after Start.';
 export const TYPE_NOT_CHOSEN = 'Type must be chosen.';
+
+// The refusal of a window's two times, or none: an end not after its start (two times of one
+// day, written alike: the later one is the greater text, "24:00" included), and only when it is
+// after it, an end that is not a whole number of hours later (lastsWholeHours of shared/), so
+// one sentence is said.
+export function endRefusal(start: string, end: string): string | undefined {
+  if (end <= start) return END_NOT_LATER;
+  return lastsWholeHours(start, end) ? undefined : END_NOT_WHOLE_HOURS;
+}
 
 // From what the form holds to the body of a create or of a change, or to the refusals: one
 // sentence per field in fault, each naming its field in the words of its label, and every
-// field in fault said. The weekday and the two times come from lists that hold nothing wrong;
-// the shared schema, through the service, has the last word on the body
+// field in fault said. The weekday and the two times come from lists that hold nothing off the
+// step; an end not after its start, or not a whole number of hours after it, is the one fault
+// two times can have; the shared schema, through the service, has the last word on the body
 // (docs/FRONTEND_SERVICES.md section 17.4).
 export function patternFor(fields: PatternFields): { pattern: PatternBody } | { refusals: Partial<Record<PatternField, string>> } {
   const refusals: Partial<Record<PatternField, string>> = {};
-  // Two times of one day, written alike: the later one is the greater text, "24:00" included.
-  if (fields.end <= fields.start) refusals.end = END_NOT_LATER;
+  const end = endRefusal(fields.start, fields.end);
+  if (end !== undefined) refusals.end = end;
   if (fields.typeId === '') refusals.typeId = TYPE_NOT_CHOSEN;
   if (!isDate(fields.validFrom)) refusals.validFrom = 'Valid from must be a date.';
   if (fields.validUntil !== '') {

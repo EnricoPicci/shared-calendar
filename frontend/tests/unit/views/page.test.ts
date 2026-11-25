@@ -71,8 +71,9 @@ describe('index.html', () => {
   // reader says of a field, of a button and of a dialog that asks.
   describe('without a mouse', () => {
     // The words of a label, without those of the field it holds (a list's choices are in the
-    // label's text).
-    const words = (label: Element) => [...label.childNodes].filter((node) => node.nodeType === 3).map((node) => node.textContent).join('').trim();
+    // label's text): its own text and the text of its other elements, such as the words "Hour"
+    // and "Minute" that only a screen reader says.
+    const words = (label: Element) => [...label.childNodes].filter((node) => !(node instanceof Element && node.matches('input, select, textarea'))).map((node) => node.textContent).join('').trim();
     const everywhere = (selector: string) => {
       const page = pageAside();
       return [...page.querySelectorAll<HTMLElement>(selector), ...[...page.querySelectorAll('template')].flatMap((template) => [...template.content.querySelectorAll<HTMLElement>(selector)])];
@@ -80,7 +81,8 @@ describe('index.html', () => {
 
     it('every field has its label: a <label> around it, with words of its own', () => {
       const fields = everywhere('input, select, textarea');
-      expect(fields).toHaveLength(60);
+      // A start and an end are two lists each, an hour and a minute: five places, ten lists more.
+      expect(fields).toHaveLength(70);
       for (const field of fields) {
         const label = field.closest('label');
         expect(label, field.getAttribute('name')!).not.toBeNull();
@@ -88,6 +90,26 @@ describe('index.html', () => {
         // One field per label: the words are of this field only.
         expect(label!.querySelectorAll('input, select, textarea'), field.getAttribute('name')!).toHaveLength(1);
       }
+    });
+
+    it('every time is a group named by its legend, "Start" or "End", of two lists whose words "Hour" and "Minute" only a screen reader says, the colon between them hidden from it', () => {
+      const groups = everywhere('fieldset.clock');
+      // The pattern's two forms, the two window forms of a date and the book dialog.
+      expect(groups).toHaveLength(10);
+      for (const group of groups) {
+        const legend = group.querySelector('legend')!.textContent;
+        expect(['Start', 'End'], legend).toContain(legend);
+        const name = legend.toLowerCase();
+        expect([...group.querySelectorAll('select')].map((list) => [list.name, words(list.closest('label')!), list.closest('label')!.querySelector('.unseen')!.textContent])).toEqual([
+          [`${name}-hour`, 'Hour', 'Hour'],
+          [`${name}-minute`, 'Minute', 'Minute'],
+        ]);
+        const colon = [...group.children].find((part) => part.textContent === ':')!;
+        expect([colon.tagName, colon.getAttribute('aria-hidden')]).toEqual(['SPAN', 'true']);
+        expect(group.querySelectorAll('input, select, textarea')).toHaveLength(2);
+      }
+      // The class that hides words from the eye is used for those words only.
+      expect(everywhere('.unseen').map((part) => part.textContent).sort()).toEqual([...Array(10).fill('Hour'), ...Array(10).fill('Minute')].sort());
     });
 
     it('every button has words, or a name for a screen reader; the two arrows of the week and every "Try again" say what they act on', () => {
@@ -235,7 +257,7 @@ describe('index.html', () => {
     expect([...document.querySelectorAll<HTMLElement>('dialog.book .in-booking')].some((element) => element.hidden)).toBe(false);
     // The choice of User is a booking's only.
     expect(document.querySelector('dialog.book [name="username"]')!.closest('.in-booking')).not.toBeNull();
-    expect(document.querySelector('dialog.book [name="start"]')!.closest('.in-booking')).toBeNull();
+    expect(document.querySelector('dialog.book [name="start-hour"]')!.closest('.in-booking')).toBeNull();
   });
 
   it('the banner of a move starts hidden and empty, outside the region that is redrawn, with its fixed words and its button', () => {
@@ -283,10 +305,11 @@ describe('index.html', () => {
     expect(row.querySelectorAll('input, select, textarea')).toHaveLength(0);
   });
 
-  it('the two lists of times of the book dialog are labelled "Start" and "End"; the lines of a change above them say "From:" and "To:"', () => {
+  it('the two times of the book dialog are named "Start" and "End", two lists each; the lines of a change above them say "From:" and "To:"', () => {
     loadPage();
-    const label = (name: string) => document.querySelector(`dialog.book [name="${name}"]`)!.closest('label')!.textContent.trim();
-    expect([label('start'), label('end')]).toEqual(['Start', 'End']);
+    const group = (name: string) => document.querySelector(`dialog.book [name="${name}-hour"]`)!.closest('fieldset')!;
+    expect([group('start').querySelector('legend')!.textContent, group('end').querySelector('legend')!.textContent]).toEqual(['Start', 'End']);
+    expect([...document.querySelectorAll<HTMLSelectElement>('dialog.book .times select')].map((list) => list.name)).toEqual(['start-hour', 'start-minute', 'end-hour', 'end-minute']);
     expect(document.querySelector('dialog.book .old')!.parentElement!.textContent).toBe('From: ');
     expect(document.querySelector('dialog.book .what')!.parentElement!.textContent).toBe('To: ');
   });
@@ -499,10 +522,14 @@ describe('index.html', () => {
   describe('the availability', () => {
     const one = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector<T>(`#availability ${selector}`.trim())!;
     const all = <T extends HTMLElement = HTMLElement>(selector: string) => [...document.querySelectorAll<T>(`#availability ${selector}`)];
+    // A time is two lists, whose labels say "Hour" and "Minute" to a screen reader; its group's
+    // legend says "Start" or "End" (the test "every time is a group" above).
     const SIX = [
       ['weekday', 'SELECT', 'Weekday'],
-      ['start', 'SELECT', 'Start'],
-      ['end', 'SELECT', 'End'],
+      ['start-hour', 'SELECT', 'Hour'],
+      ['start-minute', 'SELECT', 'Minute'],
+      ['end-hour', 'SELECT', 'Hour'],
+      ['end-minute', 'SELECT', 'Minute'],
       ['typeId', 'SELECT', 'Type'],
       ['validFrom', 'INPUT', 'Valid from'],
       ['validUntil', 'INPUT', 'Valid until'],
@@ -556,7 +583,8 @@ describe('index.html', () => {
       expect(fields.map((field) => [field.name, field.tagName, field.closest('label')!.textContent.trim()])).toEqual(SIX);
       for (const field of fields) {
         const box = field.closest('.field')!;
-        expect(box.querySelectorAll('input, select'), field.name).toHaveLength(1);
+        // A time's two lists share its field, its refusal under its group.
+        expect(box.querySelectorAll('input, select'), field.name).toHaveLength(field.closest('fieldset.clock') ? 2 : 1);
         expect([box.querySelector('.refusal')!.getAttribute('role'), box.querySelector('.refusal')!.textContent], field.name).toEqual(['alert', '']);
         expect([field.children.length, field.value, field.hasAttribute('aria-invalid'), field.hasAttribute('required')], field.name).toEqual([0, '', false, false]);
         if (field instanceof HTMLInputElement) expect(field.type, field.name).toBe('date');
@@ -646,10 +674,17 @@ describe('index.html', () => {
         loadPage();
         const form = part<HTMLFormElement>(selector);
         const fields = [...form.querySelectorAll<HTMLSelectElement>('input, select, textarea')];
-        expect(fields.map((field) => [field.name, field.tagName, field.closest('label')!.textContent.trim()])).toEqual([['start', 'SELECT', 'Start'], ['end', 'SELECT', 'End'], ['typeId', 'SELECT', 'Type']]);
+        expect(fields.map((field) => [field.name, field.tagName, field.closest('label')!.textContent.trim()])).toEqual([
+          ['start-hour', 'SELECT', 'Hour'],
+          ['start-minute', 'SELECT', 'Minute'],
+          ['end-hour', 'SELECT', 'Hour'],
+          ['end-minute', 'SELECT', 'Minute'],
+          ['typeId', 'SELECT', 'Type'],
+        ]);
+        expect([...form.querySelectorAll('legend')].map((legend) => legend.textContent)).toEqual(['Start', 'End']);
         for (const field of fields) {
           const box = field.closest('.field')!;
-          expect(box.querySelectorAll('input, select'), field.name).toHaveLength(1);
+          expect(box.querySelectorAll('input, select'), field.name).toHaveLength(field.closest('fieldset.clock') ? 2 : 1);
           expect([box.querySelector('.refusal')!.getAttribute('role'), box.querySelector('.refusal')!.textContent, field.children.length, field.hasAttribute('aria-invalid')], field.name).toEqual(['alert', '', 0, false]);
         }
         expect([form.noValidate, form.querySelector('.failure')!.getAttribute('role'), form.querySelector('.failure')!.textContent, form.querySelector('.submit')!.textContent]).toEqual([true, 'alert', '', action]);

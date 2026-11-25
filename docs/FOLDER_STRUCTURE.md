@@ -133,7 +133,8 @@ stays at the root.
 │   │   │                        # date.screen.ts, assistant.model.ts, assistant.screen.ts,
 │   │   │                        # password.model.ts, password.screen.ts, profile.model.ts,
 │   │   │                        # me.model.ts, me.screen.ts, mail.screen.ts,
-│   │   │                        # choose-password.screen.ts
+│   │   │                        # choose-password.screen.ts, times.ts (a time as
+│   │   │                        # two lists, an hour and a minute)
 │   │   └── views/               # shell.ts (with the table of screens) and one <name>.view.ts per
 │   │                            # view: login.view.ts, week.view.ts, appointments.view.ts,
 │   │                            # settings.view.ts, users.view.ts, availability.view.ts and
@@ -142,7 +143,8 @@ stays at the root.
 │   │                            # dialog that two views mount; assistant.view.ts, the
 │   │                            # assistant's panel, at the bottom of every screen;
 │   │                            # password.view.ts, the change of one's own password;
-│   │                            # choose-password.view.ts, the first sign-in's new password
+│   │                            # choose-password.view.ts, the first sign-in's new password;
+│   │                            # time.parts.ts, the two lists of a time in a form
 │   ├── tests/
 │   │   ├── unit/                # mirrors src/ (plus services/fixtures.ts, logic/zone.ts and
 │   │   │                        # logic/fixtures.ts, views/page.ts); integration/claude.test.ts,
@@ -535,6 +537,11 @@ headless browser is not in the repository, and no end-to-end test tool is.
   `src/views/shell.ts`, the bundle's fourth constant (`scripts/bundle.mjs`, `scripts/dev.mjs`,
   `src/main.ts`) and its test, `tests/unit/scripts/bundle.test.ts`. No new script and no new
   dependency.
+- **Times on 5-minute steps, since 2026-11-25** (`docs/SLOT_STEP_PLAN.md` steps s4 and s5):
+  `src/logic/times.ts`, a time as two lists, an hour and a minute, with the end a start sets;
+  `src/views/time.parts.ts`, the two lists of one time in a form, used by the availability's
+  two views and the week's book dialog; their tests `tests/unit/logic/times.test.ts` and
+  `tests/unit/views/time.parts.test.ts`. No new script and no new dependency.
 - **"Choose your password", since 2026-11-25** (`docs/EMAIL_PLAN.md` step m7): the first sign-in
   with a temporary password. `src/logic/choose-password.screen.ts` and
   `src/views/choose-password.view.ts` (its element `section.first-password` inside `#login`);

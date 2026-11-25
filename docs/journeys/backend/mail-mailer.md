@@ -38,9 +38,13 @@ Ideas used here, explained once for all journeys:
 
 The file's `beforeAll`, shared by both blocks of the file:
 
-1. Signs in `admin` and `alice`, reads the calendar's time zone (`GET /calendar/settings`) and
-   takes the journey's day `D`: today plus 45 days (`DAYS_AHEAD`), inside the booking horizon
-   and far from the days other journeys use.
+1. Signs in `admin` and `alice`, reads the calendar settings (`GET /calendar/settings`): the time
+   zone, and the four values it keeps as `leftover`. Then saves its own (`SETTINGS`, with
+   `PUT /calendar/settings`): a booking horizon of 56 days, no booking notice, no limit of
+   appointments, 24 hours' notice to cancel. Another file may have left a shorter horizon (the
+   calendar journeys leave 30 days) or a limit, and the bookings below would find no slot. It
+   takes the journey's day `D`: today plus 45 days (`DAYS_AHEAD`), inside that horizon and far
+   from the days other journeys use.
 2. Removes what an earlier, interrupted run left (`removeFromCalendar()`, see "If the block
    fails halfway").
 3. As the Administrator, creates the type `mail journey` (`TYPE`) and a one-off window on `D`,
@@ -142,8 +146,9 @@ not know, the kind that goes with the role) before it reads anything.
 
 - **The fake mail**: nothing for `admin@example.com` and `alice@example.com` (test 3 sends none,
   and each test starts by forgetting them).
-- **The calendar**: the three appointments of the file's `beforeAll`, as they were; the block
-  changes nothing. The next block uses them.
+- **The calendar**: the three appointments of the file's `beforeAll`, as they were, and its
+  settings, which the file's `afterAll` writes back; the block changes nothing. The next block
+  uses them.
 - **Cognito**: `mail-bob` as the `beforeAll` made it.
 
 ## If the block fails halfway
@@ -153,7 +158,8 @@ one before (each forgets the mails first). The file's `afterAll` runs whatever h
 removes what the file made in the calendar (`removeFromCalendar()`: as the Administrator, it
 cancels every appointment of the type `mail journey` still booked from today to 56 days ahead,
 deletes the type's one-off windows found in the view, two reads of at most 31 days, and deletes
-the type) and removes `mail-bob` straight in cognito-local (`removeUserIfPresent()`). The next
+the type), removes `mail-bob` straight in cognito-local (`removeUserIfPresent()`), and writes back the
+calendar settings it found (`leftover`, with `PUT /calendar/settings`). The next
 run's `beforeAll` does the same removal first. The cancelled appointments stay in the table as
 history, which is why the checks look for `MARK`.
 

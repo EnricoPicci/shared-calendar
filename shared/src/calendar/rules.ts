@@ -1,8 +1,9 @@
+import { TIME_STEP_MINUTES } from './defaults';
 import { localTimeOf, toInstant, weekdayOf } from './time';
 import type { DateOverride, OneOffWindow, Slot, WeeklyPattern, WindowSource } from './types';
 
 // The pure calendar rules both sides use (docs/SHARED_CALENDAR_SPEC.md sections 6.5, 6.6 and 7,
-// R-BOOK-02, R-CAN-03 and section 12). Plain data in, plain data out: no clock (`now` and the zone
+// R-BOOK-02, R-CAN-03, decision D33 and section 12). Plain data in, plain data out: no clock (`now` and the zone
 // are arguments), no I/O. The inputs are the fields the API returns, so a stored item with extra
 // attributes (PK, SK, createdAt, …) can be passed as it is. Inputs are assumed valid (the schemas
 // checked them on the way in). The back end decides with these; the front end only validates before
@@ -68,8 +69,8 @@ export function definedWindows(
  * Windows of `date` in local times, as instants in `zone` (docs/SHARED_CALENDAR_SPEC.md R-TIME-03),
  * sorted by start. They are what the calendar view shows, not merged (docs/SHARED_CALENDAR_SPEC.md
  * section 11.6), and the input of effectiveWindows. On the night clocks go forward, a window that
- * starts in the skipped hour and ends at or just after it holds no real time (02:30–03:00 becomes
- * 01:30Z–01:00Z); effectiveWindows drops it.
+ * lies in the skipped hour holds no real time (02:05–03:05 becomes 01:05Z–01:05Z);
+ * effectiveWindows drops it.
  */
 export function toInstantWindows(date: string, windows: readonly SourcedWindow[], zone: string): SourcedWindow[] {
   return windows
@@ -94,28 +95,40 @@ export function effectiveWindows(windows: readonly { start: string; end: string;
 }
 
 /**
- * The slots of one effective window (docs/SHARED_CALENDAR_SPEC.md R-SLOT-01): every
- * `[s, s + 60 real minutes)` inside it whose start is a whole hour on the local clock of `zone`.
- * Whether a slot is free or bookable is decided elsewhere (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02,
- * R-SLOT-03, R-SLOT-04). Around a clock change the local hours are followed, not UTC's: on the
- * night clocks go forward the window 01:00–04:00 gives 01:00 (ending at local 03:00) and 03:00; on
- * the night they go back it gives four slots, two of them at local 02:00 (one per offset).
+ * The slots of one effective window (docs/SHARED_CALENDAR_SPEC.md R-SLOT-01, decision D33): from
+ * the window's start, one `[s, s + 60 real minutes)` after the other, as many as fit inside it.
+ * 09:05–11:05 gives 09:05 and 10:05; a window stored before the rule that is not whole hours keeps
+ * what fits (08:30–12:00 gives 08:30, 09:30 and 10:30). Real minutes are counted, not the hours of
+ * the clock: on the night clocks go forward the window 01:05–04:05 gives 01:05 (ending at local
+ * 03:05) and 03:05; on the night they go back it gives four slots, two of them at local 02:05 (one
+ * per offset). Whether a slot is free or bookable is decided elsewhere
+ * (docs/SHARED_CALENDAR_SPEC.md R-SLOT-02, R-SLOT-03, R-SLOT-04). The zone is not needed: the
+ * window is already in instants.
  */
-export function slotsOf(window: EffectiveWindow, zone: string): SlotTimes[] {
+export function slotsOf(window: EffectiveWindow): SlotTimes[] {
   const slots: SlotTimes[] = [];
   const end = Date.parse(window.end);
-  let s = Date.parse(window.start);
-  while (s + SLOT_MS <= end) {
-    const minute = Number(localTimeOf(new Date(s).toISOString(), zone).slice(3, 5));
-    if (minute === 0) {
-      slots.push({ start: new Date(s).toISOString(), end: new Date(s + SLOT_MS).toISOString(), typeId: window.typeId });
-      s += SLOT_MS;
-    } else {
-      // To the next whole local hour. A clock change on the way is caught by the next check.
-      s += (60 - minute) * MINUTE_MS;
-    }
+  for (let s = Date.parse(window.start); s + SLOT_MS <= end; s += SLOT_MS) {
+    slots.push({ start: new Date(s).toISOString(), end: new Date(s + SLOT_MS).toISOString(), typeId: window.typeId });
   }
   return slots;
+}
+
+// A local time `HH:mm` in minutes from the start of its date; `24:00` is 1440.
+function minutesOf(time: string): number {
+  return Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+}
+
+/**
+ * Whether the window `start`–`end`, two local times of one date, lasts a whole number of hours on
+ * the local clock (docs/SHARED_CALENDAR_SPEC.md decision D33, section 6.2): `end` after `start`,
+ * with the same minutes, `24:00` counting as minute 00. 09:05–11:05 and 08:00–24:00 yes,
+ * 09:05–10:30 no; a start after 23:00 has no such end on its date (23:05–24:00 no). The times are
+ * assumed well formed; the schemas check them first.
+ */
+export function lastsWholeHours(start: string, end: string): boolean {
+  const length = minutesOf(end) - minutesOf(start);
+  return length > 0 && length % 60 === 0;
 }
 
 /**
@@ -155,26 +168,14 @@ export function peopleIn(interval: { start: string; end: string }, appointments:
   return peak;
 }
 
-// The minute of the local clock of `zone` at `instant`, or -1 when the instant has seconds.
-function localMinute(instant: string, zone: string): number {
-  if (Date.parse(instant) % MINUTE_MS !== 0) return -1;
-  return Number(localTimeOf(instant, zone).slice(3, 5));
-}
-
 /**
- * Whether `instant` is a whole hour (`hh:00`) on the local clock of `zone`: a User's start
- * (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02).
+ * Whether `instant` is on the step of the local clock of `zone`, every TIME_STEP_MINUTES from the
+ * whole hour: the times of both roles (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02, decision D32).
+ * An instant with seconds is on no step.
  */
-export function isWholeLocalHour(instant: string, zone: string): boolean {
-  return localMinute(instant, zone) === 0;
-}
-
-/**
- * Whether `instant` is on the local 15-minute grid of `zone`: the Administrator's times
- * (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02).
- */
-export function isOnQuarterGrid(instant: string, zone: string): boolean {
-  return localMinute(instant, zone) % 15 === 0;
+export function isOnTimeStep(instant: string, zone: string): boolean {
+  if (Date.parse(instant) % MINUTE_MS !== 0) return false;
+  return Number(localTimeOf(instant, zone).slice(3, 5)) % TIME_STEP_MINUTES === 0;
 }
 
 /**

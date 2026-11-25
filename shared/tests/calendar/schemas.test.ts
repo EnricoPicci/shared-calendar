@@ -28,7 +28,7 @@ import type { z } from 'zod';
 
 // Every bound of the primitive schemas, then of the request bodies and the path and query
 // parameters built on them (docs/SHARED_CALENDAR_SPEC.md R-TIME-02, section 6.1, R-BOOK-11,
-// sections 11.2 and 11.4).
+// sections 11.2 and 11.4, and the windows of whole hours of its decision D33).
 
 describe('LocalDate', () => {
   it.each(['2026-11-12', '2028-02-29', '2000-02-29', '2026-12-31', '2027-01-01', '2026-04-30'])('accepts %s', (date) => {
@@ -52,7 +52,7 @@ describe('LocalDate', () => {
 });
 
 describe('LocalTime and LocalEndTime', () => {
-  it.each(['00:00', '08:15', '12:30', '23:45'])('both accept %s', (time) => {
+  it.each(['00:00', '00:05', '08:10', '08:15', '12:30', '23:45', '23:55'])('both accept %s', (time) => {
     expect(LocalTime.safeParse(time).success).toBe(true);
     expect(LocalEndTime.safeParse(time).success).toBe(true);
   });
@@ -63,7 +63,9 @@ describe('LocalTime and LocalEndTime', () => {
   });
 
   it.each([
-    ['off the 15-minute grid', '08:10'],
+    ['off the 5-minute grid', '08:07'],
+    ['one minute off the grid', '08:01'],
+    ['past 24:00, on the grid', '24:05'],
     ['past 24:00', '24:15'],
     ['hour 25', '25:00'],
     ['minute 60', '23:60'],
@@ -93,7 +95,7 @@ describe('Instant', () => {
     expect(Instant.safeParse(instant)).toEqual({ success: true, data: instant });
   });
 
-  it('does not check the 15-minute grid: that is a rule on local time (R-BOOK-02)', () => {
+  it('does not check the 5-minute grid: that is a rule on local time (R-BOOK-02)', () => {
     expect(Instant.safeParse('2026-11-16T08:07:00.000Z').success).toBe(true);
   });
 
@@ -273,11 +275,55 @@ describe('TypeBody', () => {
   });
 });
 
+// The three window bodies hold a window to whole hours (docs/SHARED_CALENDAR_SPEC.md decision D33):
+// the same cases for each, and the refusal on `end` with its own message.
+const WHOLE_HOURS = 'end must be a whole number of hours after start';
+const wholeHourCases = [
+  ['09:05', '11:05', true],
+  ['08:00', '24:00', true],
+  ['23:00', '24:00', true],
+  ['09:05', '10:30', false],
+  ['23:05', '24:00', false],
+] as const;
+// The messages of a rejection, by path.
+function messagesOf(schema: z.ZodType, value: unknown): Record<string, string[]> {
+  const result = schema.safeParse(value);
+  const messages: Record<string, string[]> = {};
+  for (const issue of result.error?.issues ?? []) (messages[issue.path.join('.') || '(root)'] ??= []).push(issue.message);
+  return messages;
+}
+
+// Test names: D… decisions are those of docs/SHARED_CALENDAR_SPEC.md.
+describe('the window bodies: whole hours (D33)', () => {
+  const bodies = [
+    ['WindowBody', WindowBody, (start: string, end: string) => ({ start, end, typeId: STUDIO })],
+    ['PatternBody', PatternBody, (start: string, end: string) => ({ weekday: 1, start, end, typeId: STUDIO, validFrom: '2026-11-01', validUntil: null })],
+    ['OneOffWindowBody', OneOffWindowBody, (start: string, end: string) => ({ date: '2026-11-09', start, end, typeId: STUDIO })],
+  ] as const;
+
+  describe.each(bodies)('%s', (_name, schema, body) => {
+    it.each(wholeHourCases)('%s–%s: accepted %s', (start, end, accepted) => {
+      if (accepted) expect(schema.safeParse(body(start, end))).toEqual({ success: true, data: body(start, end) });
+      else expect(messagesOf(schema, body(start, end))).toEqual({ end: [WHOLE_HOURS] });
+    });
+
+    it('an end not after the start is said once, by the order check', () => {
+      expect(messagesOf(schema, body('10:05', '09:05'))).toEqual({ end: ['end must be after start'] });
+    });
+  });
+
+  it('OverrideBody: a window not whole hours is refused on its own end', () => {
+    expect(messagesOf(OverrideBody, { windows: [{ start: '09:00', end: '10:00', typeId: STUDIO }, { start: '11:05', end: '12:30', typeId: STUDIO }] })).toEqual({
+      'windows.1.end': [WHOLE_HOURS],
+    });
+  });
+});
+
 describe('WindowBody', () => {
   it.each([
     ['08:00', '12:00'],
-    ['00:00', '00:15'],
-    ['23:45', '24:00'],
+    ['00:00', '01:00'],
+    ['23:00', '24:00'],
     ['00:00', '24:00'],
   ])('accepts %s–%s', (start, end) => {
     const body = { start, end, typeId: STUDIO };
@@ -288,7 +334,7 @@ describe('WindowBody', () => {
     ['end before start', { start: '12:00', end: '08:00', typeId: STUDIO }, ['end']],
     ['end equal to start', { start: '08:00', end: '08:00', typeId: STUDIO }, ['end']],
     ['24:00 as a start', { start: '24:00', end: '24:00', typeId: STUDIO }, ['start']],
-    ['off the 15-minute grid', { start: '08:10', end: '09:00', typeId: STUDIO }, ['start']],
+    ['off the 5-minute grid', { start: '08:07', end: '09:00', typeId: STUDIO }, ['start']],
     ['a typeId that is not a ULID', { start: '08:00', end: '09:00', typeId: 'studio' }, ['typeId']],
     ['no typeId', { start: '08:00', end: '09:00' }, ['typeId']],
     ['an unknown field', { start: '08:00', end: '09:00', typeId: STUDIO, date: '2026-11-16' }, ['(root)']],
@@ -328,7 +374,7 @@ describe('PatternBody', () => {
 
 // Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('OverrideBody', () => {
-  const window = (hour: number) => ({ start: `${String(hour).padStart(2, '0')}:00`, end: `${String(hour).padStart(2, '0')}:30`, typeId: STUDIO });
+  const window = (hour: number) => ({ start: `${String(hour).padStart(2, '0')}:00`, end: `${String(hour + 1).padStart(2, '0')}:00`, typeId: STUDIO });
   const windows = (count: number) => Array.from({ length: count }, (_, i) => window(i + 8));
 
   it.each([0, 1, 10])('accepts %i windows', (count) => {

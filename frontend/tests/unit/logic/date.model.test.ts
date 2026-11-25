@@ -49,7 +49,7 @@ const lines = (rows: { time: string; typeName: string }[]) => rows.map((row) => 
 const fields = (start: string, end: string, typeId = STUDIO): WindowFields => ({ start, end, typeId });
 const window = (start: string, end: string, typeId = STUDIO): WindowBody => ({ start, end, typeId });
 
-// Test names: R-… rules are those of docs/SHARED_CALENDAR_SPEC.md.
+// Test names: R-… rules and D… decisions are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('date.model', () => {
   useFarBrowserZone();
 
@@ -254,10 +254,16 @@ describe('date.model', () => {
       expect(draftAdd(DRAFT, fields('18:00', '19:00', ''))).toEqual({ refusals: { typeId: 'Type must be chosen.' } });
     });
 
+    it('D33: a window that is not whole hours, 09:05–10:30, is refused under "End", before the overlap and the limit; an end before the start is said once', () => {
+      expect(draftAdd(DRAFT, fields('09:05', '10:30'))).toEqual({ refusals: { end: 'End must be a whole number of hours after Start.' } });
+      expect(draftAdd(DRAFT, fields('10:30', '09:05'))).toEqual({ refusals: { end: 'End must be later than Start.' } });
+      expect(OverrideBody.safeParse({ windows: [fields('09:05', '10:30')] }).success).toBe(false);
+    });
+
     it('a window that overlaps one of the list is refused, whatever its type (R-AV-01): "Start" and "End" are both in fault, and the sentence, which names both, is said once, under "Start"', () => {
       const refused = { refusals: { start: OVERLAPS_DRAFT, end: '' } };
       expect([IN_FAULT_TOO, OVERLAPS_DRAFT.startsWith('Start and End ')]).toEqual(['', true]);
-      for (const [start, end] of [['11:00', '13:00'], ['08:00', '09:15'], ['10:00', '11:00'], ['08:00', '17:00'], ['15:45', '24:00']] as const) {
+      for (const [start, end] of [['11:00', '13:00'], ['08:00', '10:00'], ['10:00', '11:00'], ['08:00', '17:00'], ['15:00', '24:00']] as const) {
         expect(draftAdd(DRAFT, fields(start, end)), `${start}–${end}`).toEqual(refused);
         expect(draftAdd(DRAFT, fields(start, end, POOL)), `${start}–${end} Piscina`).toEqual(refused);
       }
@@ -303,6 +309,12 @@ describe('date.model', () => {
       expect(windowFor(MONDAY, fields('18:00', '18:00', ''))).toEqual({ refusals: { end: 'End must be later than Start.', typeId: 'Type must be chosen.' } });
       expect(OneOffWindowBody.safeParse({ date: MONDAY, ...fields('18:00', '17:45') }).success).toBe(false);
       expect(OneOffWindowBody.safeParse({ date: MONDAY, ...fields('18:00', '19:00', '') }).success).toBe(false);
+    });
+
+    it('D33: a window that is not whole hours, 09:05–10:30, is refused under "End"; whole hours from 09:05 are accepted; the schema agrees', () => {
+      expect(windowFor(MONDAY, fields('09:05', '10:30'))).toEqual({ refusals: { end: 'End must be a whole number of hours after Start.' } });
+      expect(windowFor(MONDAY, fields('09:05', '11:05'))).toEqual({ window: { date: MONDAY, start: '09:05', end: '11:05', typeId: STUDIO } });
+      expect(OneOffWindowBody.safeParse({ date: MONDAY, ...fields('09:05', '10:30') }).success).toBe(false);
     });
   });
 

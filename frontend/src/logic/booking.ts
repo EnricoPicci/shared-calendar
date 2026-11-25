@@ -2,6 +2,7 @@ import { localDateOf, localTimeOf, toInstant, type Appointment, type BookBody, t
 import type { ListUsersState } from '../services/users.types';
 import type { Moving } from './appointment.detail';
 import { failureText, offsetChangesOn, rangeText } from './texts';
+import { clockOf, DAY_MINUTES, minuteOfClock, windowHours, type TimeHours } from './times';
 import type { SlotBlock } from './week.model';
 
 // The book dialog's logic (docs/FRONTEND_ARCHITECTURE.md section 5): what is being booked in
@@ -11,39 +12,34 @@ import type { SlotBlock } from './week.model';
 // one. Pure. Whether a booking or a change is allowed is the server's to say
 // (docs/FRONTEND_SERVICES.md section 8, decision 42): nothing is checked here.
 
-const DAY_MINUTES = 24 * 60;
-const GRID = 15; // the Administrator's times are on 15-minute steps (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02)
-
 // "Mon 23 Nov, 10:00–11:00 · Studio": the slot's day, time and type.
 export function bookingText(slot: SlotBlock): string {
   return `${slot.day}, ${slot.time} · ${slot.typeName}`;
 }
 
-// The local times, `HH:mm`, the Administrator may choose from, and the two that are chosen when
-// the dialog opens: the slot's own.
-export type TimeChoice = { starts: string[]; ends: string[]; start: string; end: string };
+// What the Administrator's two times offer: the hours of a start and of an end (each hour with
+// the minutes of src/logic/times.ts), the two times chosen when the dialog opens, which are the
+// slot's own, and `last`, the end of the window that holds the slot, which a chosen start never
+// pushes the end past (docs/SHARED_CALENDAR_SPEC.md R-BOOK-08).
+export type TimeChoice = TimeHours & { start: string; end: string; last: string };
 
 // Minutes on the clock of the slot's day at `instant`; midnight at the end of the day is 24:00.
 function minuteOf(instant: string, date: string, zone: string): number {
   if (localDateOf(instant, zone) > date) return DAY_MINUTES;
-  const time = localTimeOf(instant, zone);
-  return Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+  return minuteOfClock(localTimeOf(instant, zone));
 }
-const clock = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(2, '0')}`;
 
-// Every 15-minute step on the clock from the start to the end of the window that holds the
-// slot: a start may be any but the last, an end any but the first. A window 08:30–12:00 gives
-// the starts 08:30 … 11:45 and the ends 08:45 … 12:00.
+// The hours the window that holds the slot touches (windowHours of src/logic/times.ts): a
+// window 08:05–12:00 gives the starts 08 to 11 and the ends 08 to 12.
 export function timeChoice(slot: SlotBlock, zone: string): TimeChoice {
   const date = localDateOf(slot.start, zone);
   const from = minuteOf(slot.window.start, date, zone);
   const to = minuteOf(slot.window.end, date, zone);
-  const steps = Array.from({ length: Math.max(0, (to - from) / GRID) + 1 }, (_, i) => clock(from + i * GRID));
   return {
-    starts: steps.slice(0, -1),
-    ends: steps.slice(1),
-    start: clock(minuteOf(slot.start, date, zone)),
-    end: clock(minuteOf(slot.end, date, zone)),
+    ...windowHours(from, to),
+    start: clockOf(minuteOf(slot.start, date, zone)),
+    end: clockOf(minuteOf(slot.end, date, zone)),
+    last: clockOf(to),
   };
 }
 
