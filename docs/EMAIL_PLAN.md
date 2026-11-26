@@ -1,6 +1,8 @@
 # Shared Calendar: e-mail (implementation plan)
 
-**Version:** v12 (2026-11-25): the branch `slot-5min` (times on 5-minute steps and windows of
+**Version:** v13 (2026-11-26): step m9 done, its "As done" note written; the daily mail's hour
+moved from step m9 to step m10, since its routes answer `503` at the stage `domain`
+(`docs/EMAIL_ARCHITECTURE.md` section 9.1). v12 (2026-11-25): the branch `slot-5min` (times on 5-minute steps and windows of
 whole hours, released as `v2.4.0` and `v2.5.0`) merged into `main` before step m9; the note
 before step m9 says what the plan now builds on; the references to the documents' renumbered
 versions, decisions, walk checks and record section followed. v11 (2026-11-25): step m8 done, its "As done" note written; no step's content
@@ -1039,8 +1041,8 @@ the new page (F13).
 
 Then, **Operator**, on the deployed page and in the terminal:
 
-- in "My details", the Administrator's four facts (M12), and the daily mail's hour in the
-  settings (both work at stage `domain`; nothing is sent yet);
+- in "My details", the Administrator's four facts (M12); the daily mail's hour waits for step
+  m10, since `GET` and `PUT /mail/settings` answer `503 mail_unavailable` at the stage `domain`;
 - **the test User** (F15): `npm run test-user -w backend -- cloud <username>`, the e-mail and the
   temporary password typed by the operator; signing in on the deployed page, the screen "Choose
   your password", a password chosen; the User's side tried: the week, a booking, a cancellation,
@@ -1066,6 +1068,27 @@ signed in with its own password; and, with a second test User, "Choose your pass
 more than 3 minutes says "This took too long. Please sign in again." and leads back to the
 sign-in, the username kept (`docs/FRONTEND_WALK.md` check 216).
 
+**As done (2026-11-25 and 2026-11-26).** The record is `docs/RUNBOOK.md` section 5.11; in short:
+
+- **The regression** on `b7c71c1` all green but `docs/FRONTEND_WALK.md` check 209, a field given
+  the keyboard while its form was hidden, fixed in `ab19f6e` with its unit test (and check 132's
+  sentence corrected).
+- **Read-only:** the region, yes; O6, `allowed` (`docs/EMAIL_ARCHITECTURE.md` section 21 answers
+  it). The change set at `on`: the pool "Modify", no re-creation, no replacement, nothing removed;
+  deleted, never executed.
+- **The Users deleted**; `MailStage=domain` committed as `e756e17` and pushed; the deploy (66
+  changes, no replacement, no removal), the smoke test 62 PASS, the logs clean but the expected
+  503s, the page released with its four checks PASS.
+- **The operator:** "My details"; the test User and check 216 yes; the four DNS records, the
+  domain verified within the hour; the bounces' subscription confirmed; production access asked,
+  then AWS's questions answered in its support case, the answer pending.
+- **Three findings, the documents corrected:** the daily mail's hour cannot be set at `domain`
+  (its routes answer 503, as the architecture says), moved to step m10; the 5xx alarm goes off at
+  `domain` for each expected 503 of an e-mail route; the console's form for production access has
+  no use case, which AWS asks for in a support case. `docs/RUNBOOK.md` section 3.3 says how.
+
+Step m10 waits for AWS's production access.
+
 ### Step m10 — Cloud, stage `on`, and the release v3.0.0 (each command on the operator's explicit instruction)
 
 Starts only when SES shows the domain verified and the account out of the sandbox (read-only
@@ -1075,8 +1098,8 @@ checks).
    `npm run deploy -w backend`. The pool now sends through SES.
 2. `npm run deploy -w frontend` only if the page changed after step m9 (the gate again if the
    commit changed).
-3. **Operator:** the test User's "E-mail…", its mail and Excel file arriving in the operator's
-   mailbox.
+3. **Operator:** the daily mail's hour in "Settings"; the test User's "E-mail…", its mail and
+   Excel file arriving in the operator's mailbox.
 4. The smoke test against the cloud: PASS, including the invitation to the operator's address.
 5. **Operator, the look at the deployed page with real mails:** the smoke's invitation arrived
    (from `noreply@<domain>`, Reply-To the alarm address, not in spam); a throw-away User created
@@ -1097,11 +1120,12 @@ PASS in the cloud, the operator's look all yes; this plan marked finished.
 | m1, m6 | Review the decisions of the step (the Excel library; the evaluation's cost) | The review |
 | m6 | Start the local stack with the real Anthropic key for the paid evaluation, put the fake back | Own terminal |
 | m9 | Delete every User, just before the deploy; note who needs an account again, and their future appointments | The deployed page |
-| m9 | The Administrator's four facts; the daily mail's hour | The deployed page |
+| m9 | The Administrator's four facts | The deployed page |
 | m9 | Type the test User's e-mail and temporary password (F15); its first sign-in, its own password chosen; the User's side tried | Own terminal, the deployed page |
 | m9 | Three DKIM records and one DMARC record | The domain's DNS provider |
 | m9 | Confirm the bounce topic's subscription | The alarm mailbox |
 | m9 | Request SES production access | The SES console |
+| m10 | The daily mail's hour | The deployed page |
 | m10 | The test User's "E-mail…" | The deployed page, own mailbox |
 | m10 | The look with real mails; the Users invited again | The deployed page, own mailbox |
 | m10 | The privacy notice updated with the new data and the Excel files (`docs/EMAIL_ARCHITECTURE.md` section 12.3) | Outside the system |

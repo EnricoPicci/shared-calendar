@@ -603,8 +603,9 @@ operator (a one-line AWS command in the runbook).
 A new SES account is in the **sandbox** in each region: it can mail only verified addresses,
 200 a day. The operator asks AWS for **production access** once, in the SES console (use case:
 "transactional mail of a private booking application, about 10 recipients, invitation and
-calendar reports, no marketing; bounces and complaints handled through SNS"). AWS answers
-usually within a day. Until then, the operator can verify their own address and one test
+calendar reports, no marketing; bounces and complaints handled through SNS"). The console's form
+takes only the mail type and the website: AWS asks for the use case by mail, in a support case,
+and the operator answers there (`docs/RUNBOOK.md` section 3.3). AWS answers usually within a day. Until then, the operator can verify their own address and one test
 address, and try everything with them.
 
 ---
@@ -779,8 +780,9 @@ for DNS. Hence a stage parameter:
 
 Pointing the pool at SES (`EmailConfiguration` with `EmailSendingAccount: DEVELOPER`) makes
 Cognito create its service-linked role, which needs `iam:CreateServiceLinkedRole` in the
-deploying profile (to check for `shared-calendar-admin`, open point O6). It is an update of the
-pool, not a replacement; the plan confirms it with a change set before the deploy.
+deploying profile: `shared-calendar-admin` has it (open point O6, answered). It is an update of
+the pool, not a replacement: a change set at `on`, read and never executed, shows the pool
+"Modify", each of its changes needing no re-creation (`docs/RUNBOOK.md` section 5.11).
 
 ### 13.3 The smoke test
 
@@ -974,7 +976,7 @@ to m10) and says each step's check. Nothing reaches the cloud before step 9.
 | O3 | Should the invitation greet by first name? Cognito's template has no name placeholder; a "custom message" trigger function can add it | **Decided**: no, "Hello" is enough; one fewer function |
 | O4 | May the assistant greet a person by first name? | **Decided**: later; not part of this work |
 | O5 | The resend locally: a flag in `env.local.json`, or proved only in the cloud? | **Decided**: only in the cloud, by the smoke test, like the global sign-out's revocation |
-| O6 | Does the profile `shared-calendar-admin` allow `iam:CreateServiceLinkedRole`? | **Decided**: checked before step 10 |
+| O6 | Does the profile `shared-calendar-admin` allow `iam:CreateServiceLinkedRole`? | **Answered** (2026-11-25, `docs/EMAIL_PLAN.md` step m9): yes, a policy simulation on its role, for Cognito's e-mail role, answers `allowed` (`docs/RUNBOOK.md` section 3.3) |
 | O7 | Our own fake mail, or a ready-made emulator? | **Decided**: our own |
 | — | The decisions of section 2.3 (M11–M17) | **Confirmed** |
 

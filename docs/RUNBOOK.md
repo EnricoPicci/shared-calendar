@@ -549,7 +549,7 @@ other route.
 A key that leaked is deleted in the Console at once, without waiting: the assistant then
 answers `503` (`key_refused`) until step 2 is done and ten minutes have passed.
 
-### 3.3 E-mail: the stages (a draft, run and corrected in `docs/EMAIL_PLAN.md` steps m9 and m10)
+### 3.3 E-mail: the stages (`domain` run in `docs/EMAIL_PLAN.md` step m9; `on` is a draft, run and corrected in its step m10)
 
 E-mail is switched on in two deploys, because SES must first prove the domain, which waits for
 DNS, and lift the sandbox, which waits for AWS (`docs/ARCHITECTURE.md` section 9.2,
@@ -560,33 +560,67 @@ left out, so replies and bounce reports go to `AlertEmail`. No e-mail address go
 
 **Before the deploy at `domain`** (read-only checks):
 
-1. The deploying profile may create Cognito's service-linked role (`iam:CreateServiceLinkedRole`),
-   which `EmailConfiguration` needs at `on`: a policy simulation, which changes nothing.
-2. A change set with `MailStage=on`, created, read and deleted, never executed: the user pool
-   must show "Modify", never "Replacement", and nothing else a replacement.
-3. The Users that exist were created with a permanent password and no invitation: the plan
-   decides what becomes of them (step m9 deletes them in the page, the last thing before the
-   deploy, after noting who needs an account again).
+1. The region: the user pool may send through SES in its own region. AWS's Cognito guide on
+   e-mail settings lists Europe (Stockholm) as "In-Region only", with SES in Europe (Stockholm).
+2. The deploying profile may create Cognito's service-linked role (`iam:CreateServiceLinkedRole`),
+   which `EmailConfiguration` needs at `on`: `aws iam simulate-principal-policy` on the SSO role of
+   `shared-calendar-admin`, for the role `AWSServiceRoleForAmazonCognitoIdpEmailService` with the
+   context key `iam:AWSServiceName=email.cognito-idp.amazonaws.com`. It must answer `allowed`.
+3. A change set with `MailStage=on`, never executed: after `npm run build -w backend`,
+   `sam deploy --no-execute-changeset --parameter-overrides '…'` from `backend/`, the override
+   repeating every name of the `samconfig.toml` line (the trap that line's comment describes) with
+   `MailStage="on"`; read with `aws cloudformation describe-change-set`, then deleted with
+   `aws cloudformation delete-change-set`. The user pool must show "Modify" with every detail
+   `RequiresRecreation` `Never`; nothing a replacement, nothing removed.
+4. The Users that exist were created with a permanent password and no invitation: they are
+   deleted in the page, the last thing before the deploy, after noting who needs an account again
+   (`docs/EMAIL_PLAN.md` step m9).
 
-**At `domain`**, after the deploy and its smoke test (62 PASS, `off`'s count):
+**The deploy at `domain`** and its smoke test: 62 PASS, `off`'s count. The new routes' `503
+mail_unavailable` are 5xx answers, so **the API's 5xx alarm goes off at this stage for every
+expected 503**: the smoke test's, and each time the page opens "Settings" (`GET /mail/settings`)
+or someone presses "E-mail…" (`POST /mail/calendar`). It turns OK again by itself within minutes.
+Before taking one for a fault, look at the access log: `status` 503 on those routes, nothing else
+of 5xx (section 5.11 has the search).
 
-- The stack's outputs `MailDkimRecord1` to `3`: at the domain's DNS provider (the same place as
-  the page's records, `docs/CUSTOM_DOMAIN.md`), add each as a CNAME, its name and its value; and
-  the DMARC record, TXT `_dmarc.<domain>`, `v=DMARC1; p=none;`. SES verifies the domain by itself,
-  in minutes to hours (SES console, `eu-north-1`, Identities).
-- In the Reply-To mailbox (the alarm address unless `MailReplyTo` was given): "Confirm
-  subscription" in AWS's mail for the bounces' topic.
-- In the SES console: request production access, with the use case of
-  `docs/EMAIL_ARCHITECTURE.md` section 8.5. Until it is granted SES writes only to verified
-  addresses and to the mailbox simulator.
-- In the page, as the Administrator: "My details" (the four facts) and the daily mail's hour.
-- The operator's test User, the one way to try the User's side while `POST /users` answers `503`:
-  `npm run test-user -w backend -- cloud <username>` (your own address and a temporary password,
-  typed), then sign in on the page and choose a password. Delete it in the Users screen when done.
+**At `domain`**, the operator's steps:
+
+- **At the domain's DNS provider** (the same place as the page's records, `docs/CUSTOM_DOMAIN.md`):
+  the stack's outputs `MailDkimRecord1` to `3`, each a CNAME of its name and its value; and the
+  DMARC record, TXT `_dmarc`, `v=DMARC1; p=none;`. GoDaddy, like most providers, adds the domain
+  to the name by itself: type only the part before `.<domain>` (`<selector>._domainkey`, `_dmarc`).
+  GoDaddy's two name servers can answer differently for some minutes. SES verified the domain by
+  itself within the hour (`aws sesv2 get-email-identity --email-identity <domain>`:
+  `VerificationStatus` `SUCCESS`, DKIM `SUCCESS`).
+- **In the alarm mailbox:** "Confirm subscription" in AWS's mail for the bounces' topic. Checked
+  with `aws sns list-subscriptions-by-topic` on the topic (the stack's resource `MailBounceTopic`):
+  a confirmed subscription shows an ARN, an unconfirmed one `PendingConfirmation`.
+- **In the SES console, production access.** Sign in through the access portal as the Identity
+  Center user, account "Identity Delegated Admin", role AdministratorAccess, region **Europe
+  (Stockholm)**: SES, Account dashboard, "Request production access". If the console offers "Get
+  started", do not follow it: that wizard makes its own identities, and the stack has made the one
+  needed. The form asks the mail type (Transactional) and the website's address, and has no field
+  for the use case: AWS answers by mail at once that it needs more information (the review shows
+  `DENIED` meanwhile, `aws sesv2 get-account`), and the answer goes in a reply to that support
+  case in the Support Center, covering what the mail asks: the address, the mail's kinds, the
+  volume, where the recipients come from, how bounces and complaints are handled (the bounces'
+  topic and the account's suppression list, which stays on), and a sample (the invitation's text,
+  `backend/template.yaml`, `InviteMessageTemplate`). The use case of
+  `docs/EMAIL_ARCHITECTURE.md` section 8.5 is the summary. Until access is granted SES writes only
+  to verified addresses and to the mailbox simulator.
+- **In the page, as the Administrator:** "My details" (the four facts). The daily mail's hour
+  cannot be set yet: `GET` and `PUT /mail/settings` answer `503 mail_unavailable` at any stage but
+  `on`, and "Settings" says "E-mail is not available yet" in its place; it is set at `on`.
+- **The operator's test User**, the one way to try the User's side while `POST /users` answers
+  `503`: `npm run test-user -w backend -- cloud <username>` (your own address and a temporary
+  password, typed), then sign in on the page and choose a password; the week, a booking, a
+  cancellation, the assistant, and "E-mail…", which says "E-mail is not available yet". A second
+  one tries the 3 minutes of "Choose your password" (`docs/FRONTEND_WALK.md` check 216). Delete
+  them in the Users screen when done.
 
 **At `on`**, once SES shows the domain verified and the account out of the sandbox: the deploy,
-the smoke test (65 PASS, section 2.4) and its invitation in your mailbox; a User created in the
-page with your own address, its invitation, its first sign-in; a mail on demand from the week
+the smoke test (65 PASS, section 2.4) and its invitation in your mailbox; the daily mail's hour
+in "Settings"; a User created in the page with your own address, its invitation, its first sign-in; a mail on demand from the week
 page; the next morning, the daily mail. A bounce report, should one come, reaches the Reply-To
 mailbox: correct the User's address in the Users screen and "Resend invitation".
 
@@ -1233,6 +1267,66 @@ credentials, and saw no password and no token. Nothing was pushed.
 - **Cost:** AWS within the free tier; at Anthropic the smoke test's one exchange, about a US
   cent, and the paid evaluation before the deployment, 48.93 US cents
   (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3).
+
+### 5.11 E-mail (`docs/EMAIL_PLAN.md` steps m9 and m10, opened 2026-11-25)
+
+**Stage `domain` (step m9).** The API at `e756e17` (`MailStage=domain`), on `main` after the merge
+of `slot-5min`, pushed before the deploy. Who did what: the operator deleted the Users and did
+the steps of section 3.3 on the page, at the DNS provider, in the mailbox and in the console, and
+ran the two deploys and the smoke test in a terminal inside `script -q`, typing `y` and the admin
+password; the session ran the regression and the gates, read-only `aws` commands, and, at the
+operator's request in the session, the build and the change set at `on` with its deletion. The
+session saw no password and no token.
+
+- **The regression, on `b7c71c1`:** root `verify` PASSED (back end 2058 unit tests and 245
+  journeys, shared 632, front end 3164); the front end's journeys, 101; the local smoke test, 62
+  PASS and 3 SKIP; `docs/FRONTEND_WALK.md` at 1280 × 800 and 390 × 844, every check yes but one,
+  check 209: after "Cancel" on "Choose your password" the password field had no keyboard, because
+  it was given the focus while its form was still hidden. Fixed in `ab19f6e`, with a unit test.
+  Section 7, a person's own look, was not walked.
+- **Read-only, before:** the region, yes (section 3.3, check 1); `iam:CreateServiceLinkedRole`,
+  `allowed` (check 2), the role itself not there yet.
+- **The change set at `on`, never executed:** 76 changes, 36 Add and 40 Modify, every one
+  Replacement `False`, no Remove. The pool Modify on `AdminCreateUserConfig`,
+  `EmailConfiguration` and `Policies`, each `RequiresRecreation` `Never`; the tables, the
+  Administrator and the pool's client unchanged. Deleted after reading.
+- **The Users deleted** in the page of `v2.5.0`; the pool then held `admin` alone.
+- **The deploy**, 2026-11-25 at 22:55 UTC, after `verify` PASSED at `e756e17`: 66 changes, 30 Add
+  (the SES identity, its configuration set and bounce destination, the bounces' topic and its
+  policy, the table `mail`, six functions with their roles, log groups and permissions) and 36
+  Modify (31 functions, 4 roles, `HttpApi`), every one Replacement `False`, no Remove; the pool
+  untouched at this stage. `UPDATE_COMPLETE`, `MailStage` `domain`, the outputs
+  `MailDkimRecord1` to `3` added.
+- **The smoke test in the cloud:** 62 PASS, no FAIL, no SKIP; its e-mail lines answered `503
+  mail_unavailable`, nothing made.
+- **The logs**, from the deploy on: 38 log groups, 259 events. The words of an error only in the
+  five expected `503 mail_unavailable` of the smoke test (`createUser` 3, `resendInvitation` 1,
+  `sendCalendarMail` 1); the access log's 5xx all `503` of those routes, no authorizer or
+  integration error. Searched by field (`level`, `status`, `route`), never the whole message.
+- **The page**, after `verify` PASSED again at `e756e17`: the hosting stack had no change, the four
+  checks PASS, the served `app.js` byte for byte the built one.
+- **The operator, 2026-11-26.** "My details" saved. The daily mail's hour could not be set: at
+  `domain` its routes answer 503, as `docs/EMAIL_ARCHITECTURE.md` section 9.1 says, so section
+  3.3 and the plan were corrected; it is set at `on`. The test User (`test-user cloud`): signed
+  in, a password chosen; then the week said "The server cannot be reached" once, with no request
+  of that User in the access log, and worked after a reload; no cause found, not seen again. The
+  week, a booking, a cancellation, the assistant, and "E-mail…" ("E-mail is not available yet")
+  as expected. A second test User: check 216 yes. Both kept for now.
+- **DNS** at GoDaddy, the names without the domain: one of its two name servers had the four
+  records at once, the other some minutes later. SES: the domain `SUCCESS`, DKIM `SUCCESS`,
+  within the hour.
+- **The bounces' topic:** its one e-mail subscription confirmed (read with
+  `list-subscriptions-by-topic`, the address not printed).
+- **The 5xx alarm** went to ALARM and back to OK by itself three times (2026-11-26 at about 05:34,
+  10:27 and 10:45 UTC), each from the expected 503 of an e-mail route: the page's "Settings" and
+  "E-mail…", and the operator's tries of `POST /users` (section 3.3).
+- **Production access:** the form had no field for the use case; AWS answered at once asking for
+  the details (the review `DENIED` meanwhile), and the operator replied in the support case
+  (section 3.3). Waiting for AWS's answer.
+- **Owed to step m10:** production access granted; the daily mail's hour; the two test Users
+  deleted when no longer needed.
+- **Cost:** AWS within the free tier; nothing at Anthropic but the smoke test's one exchange,
+  about a US cent.
 
 ## 6. A person's password: what to tell them
 
