@@ -1,13 +1,12 @@
 import {
   ASSISTANT_LIMITS,
   assistantTexts,
-  DEFAULT_ASSISTANT_LANGUAGE,
-  type AssistantLanguage,
   type AssistantMessage,
   type AssistantProposal,
   type AssistantProposalAction,
   type AssistantReply,
   type AssistantStatus,
+  type Language,
   type Role,
 } from '@shared-calendar/shared';
 import type {
@@ -118,8 +117,8 @@ export function remainingText(texts: PageTexts, left: number): string {
 }
 
 // The sentence for the day's limit, also said when a reply counts no message left.
-export function dayLimitText(language: AssistantLanguage | null): string {
-  return assistantTexts(language ?? DEFAULT_ASSISTANT_LANGUAGE).cannotAnswer.assistant_limit_reached;
+export function dayLimitText(language: Language): string {
+  return assistantTexts(language).cannotAnswer.assistant_limit_reached;
 }
 
 // What the panel does about a call that failed.
@@ -136,9 +135,10 @@ const plain = (say: string): Trouble => ({ say, then: 'nothing', stop: 'no', mad
 
 // The three reasons for which the assistant cannot answer without anything being wrong with
 // the request (docs/CONVERSATIONAL_ARCHITECTURE.md section 6.1): the sentence of shared/, in the
-// conversation's language, and in English while there is no conversation.
-const cannotAnswer = (code: 'assistant_limit_reached' | 'assistant_budget_reached' | 'assistant_unavailable', language: AssistantLanguage | null) =>
-  assistantTexts(language ?? DEFAULT_ASSISTANT_LANGUAGE).cannotAnswer[code];
+// conversation's language, and in the page's while there is no conversation: the caller hands in
+// the one that holds (docs/MULTILANGUAGE_ARCHITECTURE.md section 9).
+const cannotAnswer = (code: 'assistant_limit_reached' | 'assistant_budget_reached' | 'assistant_unavailable', language: Language) =>
+  assistantTexts(language).cannotAnswer[code];
 
 // Each function below is one `switch` over the closed list of reasons of its call, with no
 // default: a code added to a route and not named here does not compile.
@@ -156,7 +156,7 @@ export function loadTrouble(texts: PageTexts, reason: AssistantLoadFailureReason
   }
 }
 
-export function sendTrouble(texts: PageTexts, reason: AssistantSendFailureReason, language: AssistantLanguage | null): Trouble {
+export function sendTrouble(texts: PageTexts, reason: AssistantSendFailureReason, language: Language): Trouble {
   switch (reason) {
     case 'assistant_limit_reached':
       return { ...plain(cannotAnswer(reason, language)), stop: 'day' };
@@ -168,7 +168,7 @@ export function sendTrouble(texts: PageTexts, reason: AssistantSendFailureReason
     case 'assistant_unavailable':
       return { ...plain(cannotAnswer(reason, language)), then: 'read' };
     case 'conversation_full':
-      return { ...plain(assistantTexts(language ?? DEFAULT_ASSISTANT_LANGUAGE).conversationFull), stop: 'full' };
+      return { ...plain(assistantTexts(language).conversationFull), stop: 'full' };
     // A step of the conversation waits, or a confirmation is under way: the conversation is
     // read again and the step that waits is asked for.
     case 'assistant_busy':
@@ -187,7 +187,7 @@ export function sendTrouble(texts: PageTexts, reason: AssistantSendFailureReason
   }
 }
 
-export function continueTrouble(texts: PageTexts, reason: AssistantContinueFailureReason, language: AssistantLanguage | null): Trouble {
+export function continueTrouble(texts: PageTexts, reason: AssistantContinueFailureReason, language: Language): Trouble {
   switch (reason) {
     case 'assistant_budget_reached':
     case 'assistant_unavailable':
@@ -206,7 +206,7 @@ export function continueTrouble(texts: PageTexts, reason: AssistantContinueFailu
   }
 }
 
-export function confirmTrouble(texts: PageTexts, reason: AssistantConfirmFailureReason, language: AssistantLanguage | null): Trouble {
+export function confirmTrouble(texts: PageTexts, reason: AssistantConfirmFailureReason, language: Language): Trouble {
   switch (reason) {
     // The changes were made and saved, and only the closing words are missing
     // (docs/CONVERSATIONAL_ARCHITECTURE.md section 6.1): the conversation is read again to show

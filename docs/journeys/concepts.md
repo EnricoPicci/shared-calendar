@@ -663,13 +663,17 @@ The language question (below) is scripted the same way: of the texts the journey
 At the first message of a conversation the server asks Claude one extra question: in which of the
 supported languages, English or Italian, the message is written. The answer becomes the
 conversation's `language` and never changes (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 4.2).
-So a first message costs two requests to Claude, every later one a single request.
+So a first message costs two requests to Claude, every later one a single request. When the
+message is in none of them, Claude answers `none` and the conversation takes the language the
+page sent with the message, English when it sent none (`docs/MULTILANGUAGE_ARCHITECTURE.md`
+section 9).
 
 ### The line of the application, and the gaps in `seq`
 
 After each message of the person the server adds one line of its own to what Claude receives: the
 date and time now in the calendar's time zone, and the conversation's language as an instruction.
-It is stored as a message of the conversation, with its own `seq`, but a person never reads it.
+After the first message only, it also carries the notes of that language: how to address the
+person, and the application's own words for the opening hours. It is stored as a message of the conversation, with its own `seq`, but a person never reads it.
 That is why the messages of a reply are numbered 1 and 3, then 4 and 6: 2 and 5 are lines of the
 application.
 

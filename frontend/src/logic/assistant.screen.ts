@@ -1,4 +1,4 @@
-import type { AssistantLanguage, AssistantMessage, AssistantProposal, AssistantReply, AssistantStatus, Role } from '@shared-calendar/shared';
+import type { AssistantMessage, AssistantProposal, AssistantReply, AssistantStatus, Language, Role } from '@shared-calendar/shared';
 import { BehaviorSubject, Subject, type Observable, type Subscription } from 'rxjs';
 import type { AssistantService } from '../services/assistant.service';
 import type { AssistantOutcome } from '../services/assistant.types';
@@ -90,7 +90,7 @@ export class AssistantScreen {
 
   // The conversation as the server last said it.
   private conversationId: string | null = null;
-  private language: AssistantLanguage | null = null;
+  private language: Language | null = null;
   private status: AssistantStatus = 'idle';
   private held: readonly AssistantMessage[] = [];
   private rows: readonly ShownMessage[] = NOTHING.messages;
@@ -186,7 +186,7 @@ export class AssistantScreen {
     this.sent = trimmed;
     this.begin();
     this.show();
-    this.assistant.send(text);
+    this.assistant.send(text, this.texts.locale);
   }
 
   // The proposal's first button: the only way a change is made.
@@ -266,7 +266,7 @@ export class AssistantScreen {
         return;
       case 'send':
         if (outcome.status === 'failure') {
-          this.troubled(sendTrouble(this.texts, outcome.reason, this.language));
+          this.troubled(sendTrouble(this.texts, outcome.reason, this.spoken()));
           return;
         }
         this.accepted += 1;
@@ -276,7 +276,7 @@ export class AssistantScreen {
         return;
       case 'continue':
         if (outcome.status === 'failure') {
-          this.troubled(continueTrouble(this.texts, outcome.reason, this.language));
+          this.troubled(continueTrouble(this.texts, outcome.reason, this.spoken()));
           return;
         }
         this.take(outcome.reply, false);
@@ -284,7 +284,7 @@ export class AssistantScreen {
         return;
       case 'confirm':
         if (outcome.status === 'failure') {
-          this.troubled(confirmTrouble(this.texts, outcome.reason, this.language));
+          this.troubled(confirmTrouble(this.texts, outcome.reason, this.spoken()));
           return;
         }
         this.take(outcome.reply, false);
@@ -379,12 +379,18 @@ export class AssistantScreen {
       messages: this.rows,
       progress: this.away ? (this.activity ?? NO_ACTIVITY) : null,
       proposal: proposalShown(this.texts, this.proposal, this.status, this.away, this.role),
-      failure: this.failure ?? (this.left === 0 ? dayLimitText(this.language) : null),
+      failure: this.failure ?? (this.left === 0 ? dayLimitText(this.spoken()) : null),
       remaining: this.left === null ? '' : remainingText(this.texts, this.left),
       canSend: this.canSend(),
       canEnd: this.canEnd(),
       accepted: this.accepted,
       news: this.news,
     });
+  }
+
+  // The language of the panel's own sentences: the conversation's, and the page's while there is
+  // none (docs/MULTILANGUAGE_ARCHITECTURE.md section 9).
+  private spoken(): Language {
+    return this.language ?? this.texts.locale;
   }
 }

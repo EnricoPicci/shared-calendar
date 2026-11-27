@@ -13,6 +13,7 @@ import type {
 } from '../../../src/services/assistant.types';
 import { useFarBrowserZone } from './zone';
 import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
+import { PAGE_TEXTS_IT } from '../../../src/texts/texts.it';
 
 // A fake AssistantService: one stream that replays its last outcome, as the real one does, and
 // six spies. No network, no DOM.
@@ -45,7 +46,7 @@ const NONE = reply({ conversationId: null, language: null, remainingToday: 10 })
 const working = (over: Partial<AssistantReply> = {}) => reply({ status: 'working', activity: 'Looking at the calendar…', ...over });
 const waiting = (over: Partial<AssistantReply> = {}) => reply({ status: 'awaiting_confirmation', proposal: proposal(null), ...over });
 
-function screenOf(role: 'admin' | 'user' = 'user') {
+function screenOf(role: 'admin' | 'user' = 'user', texts = PAGE_TEXTS_EN) {
   const outcome$ = new ReplaySubject<AssistantOutcome>(1);
   const service = {
     outcome$: outcome$.asObservable(),
@@ -56,7 +57,7 @@ function screenOf(role: 'admin' | 'user' = 'user') {
     confirm: vi.fn<AssistantCalls['confirm']>(),
     decline: vi.fn<AssistantCalls['decline']>(),
   };
-  const screen = new AssistantScreen(service, role, PAGE_TEXTS_EN);
+  const screen = new AssistantScreen(service, role, texts);
   const states: AssistantState[] = [];
   screen.assistant$.subscribe((s) => states.push(s)); // the view subscribes first
   let changes = 0;
@@ -216,7 +217,7 @@ describe('AssistantScreen', () => {
       const { screen, service, opened, calls, last } = screenOf();
       opened();
       screen.send('  hello  ');
-      expect(service.send).toHaveBeenCalledWith('  hello  ');
+      expect(service.send).toHaveBeenCalledWith('  hello  ', 'en');
       expect(calls()).toEqual({ ...NO_CALLS, load: 1, send: 1 });
       expect(last()).toMatchObject({ canSend: false, canEnd: false, progress: '…', accepted: 0 });
     });
@@ -523,6 +524,27 @@ describe('AssistantScreen', () => {
       screen.send('ancora');
       failed.send('assistant_limit_reached');
       expect(last().failure).toBe(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_limit_reached);
+    });
+
+    it('before a conversation, the three sentences of shared/ are said in the page\'s language, and the page\'s language goes with the message', () => {
+      const { screen, service, opened, answered, failed, last } = screenOf('user', PAGE_TEXTS_IT);
+      opened();
+      screen.send('Guten Tag');
+      expect(service.send).toHaveBeenCalledWith('Guten Tag', 'it');
+      failed.send('assistant_unavailable');
+      expect(last().failure).toBe(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_unavailable);
+      answered('load', NONE);
+      screen.send('Guten Tag');
+      failed.send('assistant_limit_reached');
+      expect(last().failure).toBe(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_limit_reached);
+    });
+
+    it('a conversation in English on an Italian page: its sentences in English', () => {
+      const { screen, opened, failed, last } = screenOf('user', PAGE_TEXTS_IT);
+      opened(reply({ language: 'en', messages: [message(1, 'person', 'hello')] }));
+      screen.send('again');
+      failed.send('assistant_budget_reached');
+      expect(last().failure).toBe(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_budget_reached);
     });
 
     it('the daily limit: its sentence, and "Send" out of use from then on; reading, confirming and declining still work', () => {

@@ -1,5 +1,5 @@
 import type { ApiErrorCode } from '../api';
-import type { AssistantLanguage } from './languages';
+import type { Language } from '../language/languages';
 import { ASSISTANT_TEXTS_EN } from './texts.en';
 import { ASSISTANT_TEXTS_IT } from './texts.it';
 
@@ -14,6 +14,15 @@ export type AssistantCannotAnswerCode = Extract<
 // per language, so that a language with a text missing does not compile. A text that carries a
 // value is a function of that value.
 export type AssistantTexts = {
+  // What Claude is told of the conversation's language, in English, with the first message
+  // (docs/MULTILANGUAGE_ARCHITECTURE.md section 9): the language's English name, how the person
+  // is addressed in it, and the application's own words for the three sources of the opening
+  // hours, which Claude uses in place of its own.
+  notes: {
+    name: string;
+    address: string;
+    words: { weeklyPattern: string; dayHours: string; extraWindow: string };
+  };
   // What the person reads where the answer would have been, by the error code of the route
   // (docs/CONVERSATIONAL_ARCHITECTURE.md section 6.1). None promises a moment the server cannot
   // know, such as when a spending limit is raised.
@@ -150,9 +159,9 @@ export type MailSummary = { from: string; to: string; kind: 'calendar' | 'mine';
 export const ASSISTANT_READ_KINDS = ['settings', 'types', 'calendar', 'appointments', 'users', 'patterns', 'details'] as const;
 export type AssistantReadKind = (typeof ASSISTANT_READ_KINDS)[number];
 
-const TEXTS: Record<AssistantLanguage, AssistantTexts> = { en: ASSISTANT_TEXTS_EN, it: ASSISTANT_TEXTS_IT };
+const TEXTS: Record<Language, AssistantTexts> = { en: ASSISTANT_TEXTS_EN, it: ASSISTANT_TEXTS_IT };
 
 /** The fixed texts of one language. */
-export function assistantTexts(language: AssistantLanguage): AssistantTexts {
+export function assistantTexts(language: Language): AssistantTexts {
   return TEXTS[language];
 }

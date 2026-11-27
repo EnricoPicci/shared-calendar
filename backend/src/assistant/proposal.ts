@@ -1,4 +1,4 @@
-import { assistantTexts, type ApiErrorCode, type AssistantLanguage, type AssistantProposal, type AssistantProposalAction } from '@shared-calendar/shared';
+import { assistantTexts, type ApiErrorCode, type Language, type AssistantProposal, type AssistantProposalAction } from '@shared-calendar/shared';
 import type { Conversation, NewMessage } from '../lib/assistantDb';
 import type { ToolCall, ToolResultBlock } from './tools/tool';
 
@@ -51,7 +51,7 @@ export const isWaiting = (proposal: Proposal): boolean => proposal.changes.every
  * The proposal as the screen gets it: the question and the two labels in the conversation's
  * language, and each change in the server's words with its outcome.
  */
-export function shownProposal(proposal: Proposal, language: AssistantLanguage): AssistantProposal {
+export function shownProposal(proposal: Proposal, language: Language): AssistantProposal {
   const texts = assistantTexts(language);
   return {
     proposalId: proposal.proposalId,

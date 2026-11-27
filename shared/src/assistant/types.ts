@@ -1,5 +1,5 @@
 import type { ApiErrorCode } from '../api';
-import type { AssistantLanguage } from './languages';
+import type { Language } from '../language/languages';
 
 // What the assistant's routes answer (docs/CONVERSATIONAL_ARCHITECTURE.md section 6). Types only:
 // the server builds these values and the screen shows them.
@@ -35,7 +35,7 @@ export type AssistantReply = {
   // A ULID, or null when the person has no conversation.
   conversationId: string | null;
   // Null before the first message, which sets it for the whole conversation.
-  language: AssistantLanguage | null;
+  language: Language | null;
   status: AssistantStatus;
   // The messages this request added, or all of them from the route that reads the conversation.
   messages: AssistantMessage[];

@@ -38,7 +38,7 @@ export const handler = async (event: APIGatewayProxyEventV2, context?: Context):
 
   try {
     const request = { requestId, remainingMs: context ? () => context.getRemainingTimeInMillis() : null };
-    const result = await sendMessage({ sub: claims.value.sub, username: claims.value.username, role }, body.value.text, now, request);
+    const result = await sendMessage({ sub: claims.value.sub, username: claims.value.username, role }, body.value, now, request);
     if (result.ok) return done(result.log.outcome, ok(200, result.reply), { ...caller, ...result.log });
     const { status, message } = REFUSALS[result.refusal];
     return done(result.log.outcome, error(status, result.refusal, message), { ...caller, ...result.log });

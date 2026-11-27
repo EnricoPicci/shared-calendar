@@ -141,7 +141,15 @@ const send: CallSpec = {
     ['a text of spaces and line breaks', (s) => s.send(' \n\t '), 'text: 1 to 2000 characters'],
     ['a text of 2 001 characters', (s) => s.send('x'.repeat(2001)), 'text: 1 to 2000 characters'],
     ['no text', (s) => s.send(undefined as never), 'text: Invalid input: expected string, received undefined'],
+    ['a language not of the list', (s) => s.send('hello', 'fr' as never), 'language: Invalid option: expected one of "en"|"it"'],
   ],
+};
+
+// The same call with the page's language, which goes in the body beside the text.
+const sendInItalian: CallSpec = {
+  ...send,
+  run: (s) => s.send('  Guten Tag  ', 'it'),
+  request: { method: 'POST', path: '/assistant/messages', body: { text: 'Guten Tag', language: 'it' } },
 };
 
 const goOn: CallSpec = {
@@ -189,7 +197,9 @@ const decline: CallSpec = {
   invalid: NOT_A_ULID.map(([name, id]) => [name, (s) => s.decline(id), 'proposalId: expected a ULID']),
 };
 
-const ALL = [load, end, send, goOn, confirm, decline];
+// Two calls of the same kind are never next to each other: each spec's cancel test pairs it with
+// the next one, which must be another call.
+const ALL = [load, end, send, goOn, sendInItalian, confirm, decline];
 
 type Harness = {
   fetchMock: ReturnType<typeof vi.fn>;

@@ -7,7 +7,6 @@ export * from './api';
 export * from './password';
 export * from './roles';
 export * from './user';
-export * from './assistant/languages';
 export * from './assistant/limits';
 export * from './assistant/schemas';
 export * from './assistant/texts';

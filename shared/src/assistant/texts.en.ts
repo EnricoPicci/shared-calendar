@@ -68,6 +68,11 @@ const mailOf = ({ from, to, kind, address }: MailSummary) =>
 // The fixed texts in English. The three sentences of `cannotAnswer` are those of
 // docs/CONVERSATIONAL_ARCHITECTURE.md section 6.1, word for word.
 export const ASSISTANT_TEXTS_EN: AssistantTexts = {
+  notes: {
+    name: 'English',
+    address: 'Address the person as "you", politely and plainly.',
+    words: { weeklyPattern: 'weekly pattern', dayHours: "this day's own hours", extraWindow: 'extra window' },
+  },
   cannotAnswer: {
     assistant_limit_reached:
       "You have reached today's limit of messages to the assistant. It will be available again tomorrow. Everything can still be done from the other pages.",

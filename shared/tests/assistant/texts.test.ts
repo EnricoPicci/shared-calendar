@@ -1,10 +1,10 @@
 import {
-  ASSISTANT_LANGUAGES,
   ASSISTANT_READ_KINDS,
   ASSISTANT_LIMITS,
   ASSISTANT_TEXTS_EN,
   ASSISTANT_TEXTS_IT,
   assistantTexts,
+  SUPPORTED_LANGUAGES,
   type AssistantCannotAnswerCode,
   type AssistantTexts,
 } from '../../src/index';
@@ -130,11 +130,11 @@ describe('assistantTexts', () => {
     expect(assistantTexts('it')).toBe(ASSISTANT_TEXTS_IT);
   });
 
-  it.each(ASSISTANT_LANGUAGES)('%s has every text of English, and no other', (language) => {
+  it.each(SUPPORTED_LANGUAGES)('%s has every text of English, and no other', (language) => {
     expect([...flatten(assistantTexts(language)).keys()].sort()).toEqual([...flatten(ASSISTANT_TEXTS_EN).keys()].sort());
   });
 
-  it.each(ASSISTANT_LANGUAGES)('every text of %s is a non-empty string, whatever its arguments', (language) => {
+  it.each(SUPPORTED_LANGUAGES)('every text of %s is a non-empty string, whatever its arguments', (language) => {
     for (const [path, values] of flatten(assistantTexts(language))) {
       expect(values.length, `${path} was tried with no sample`).toBeGreaterThan(0);
       for (const value of values) {
@@ -149,7 +149,7 @@ describe('assistantTexts', () => {
     for (const [path, values] of flatten(ASSISTANT_TEXTS_EN)) expect(it_.get(path), path).not.toEqual(values);
   });
 
-  it.each(ASSISTANT_LANGUAGES)('in %s each code that stops the assistant has its own sentence', (language) => {
+  it.each(SUPPORTED_LANGUAGES)('in %s each code that stops the assistant has its own sentence', (language) => {
     const sentences = CANNOT_ANSWER_CODES.map((code) => assistantTexts(language).cannotAnswer[code]);
     for (const sentence of sentences) expect(sentence).toMatch(/\S/);
     expect(new Set(sentences).size).toBe(CANNOT_ANSWER_CODES.length);
@@ -167,14 +167,14 @@ describe('assistantTexts', () => {
     });
   });
 
-  it.each(ASSISTANT_LANGUAGES)('the question of %s tells one change from several, and names how many', (language) => {
+  it.each(SUPPORTED_LANGUAGES)('the question of %s tells one change from several, and names how many', (language) => {
     const { proposalQuestion }: AssistantTexts = assistantTexts(language);
     expect(proposalQuestion(1)).not.toMatch(/\d/);
     expect(proposalQuestion(3)).toContain('3');
     expect(proposalQuestion(3)).not.toBe(proposalQuestion(2));
   });
 
-  it.each(ASSISTANT_LANGUAGES)('in %s each kind of read has its own line of progress, none the general one', (language) => {
+  it.each(SUPPORTED_LANGUAGES)('in %s each kind of read has its own line of progress, none the general one', (language) => {
     const { reading, working } = assistantTexts(language);
     expect(Object.keys(reading).sort()).toEqual([...ASSISTANT_READ_KINDS].sort());
     const lines = ASSISTANT_READ_KINDS.map((kind) => reading[kind]);
@@ -410,5 +410,27 @@ describe('assistantTexts', () => {
     const longest = { date: '2026-09-30', now: { from: 'own' as const, windows: ten }, then: { from: 'own' as const, windows: ten }, extras: ten };
     expect(ASSISTANT_TEXTS_EN.changes.setDateOverride(longest)).toHaveLength(1847);
     expect(ASSISTANT_TEXTS_IT.changes.setDateOverride(longest)).toHaveLength(1870);
+  });
+});
+
+// What Claude is told of each language (docs/MULTILANGUAGE_ARCHITECTURE.md section 9).
+describe('the notes of a language', () => {
+  it.each(SUPPORTED_LANGUAGES)('%s has its English name, its form of address and the three words, none empty', (language) => {
+    const { notes } = assistantTexts(language);
+    for (const note of [notes.name, notes.address, ...Object.values(notes.words)]) expect(note.trim()).not.toBe('');
+  });
+
+  it('each language its own name and its own words', () => {
+    const notes = SUPPORTED_LANGUAGES.map((language) => assistantTexts(language).notes);
+    expect(new Set(notes.map((note) => note.name)).size).toBe(notes.length);
+    expect(new Set(notes.map((note) => note.words.weeklyPattern)).size).toBe(notes.length);
+  });
+
+  it('Italian: the "lei" and the words of the application', () => {
+    expect(ASSISTANT_TEXTS_IT.notes).toEqual({
+      name: 'Italian',
+      address: 'Address the person with the formal "lei", as the application\'s own texts do.',
+      words: { weeklyPattern: 'orario settimanale', dayHours: 'orari propri del giorno', extraWindow: 'finestra aggiuntiva' },
+    });
   });
 });

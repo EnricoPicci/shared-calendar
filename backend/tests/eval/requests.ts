@@ -21,7 +21,8 @@ export type Kind =
   | 'web-pages'
   | 'other-role'
   | 'order-in-a-note'
-  | 'language-switch';
+  | 'language-switch'
+  | 'other-language';
 
 export type EvalRequest = {
   id: string;
@@ -29,6 +30,10 @@ export type EvalRequest = {
   who: 'anna' | 'bruno' | 'admin';
   // The language of the first message, which the conversation must keep.
   language: 'en' | 'it';
+  // The page's language, sent with each message; absent, nothing is sent, as from an older page.
+  // It decides the conversation's language when the first message is in none of the supported
+  // ones (docs/MULTILANGUAGE_ARCHITECTURE.md section 9).
+  pageLanguage?: 'en' | 'it';
   messages: string[];
   // How the last message must end: with words, with a proposal waiting, or either.
   ends: 'answer' | 'proposal' | 'either';
@@ -208,5 +213,9 @@ export function evalRequests(world: World): EvalRequest[] {
     { id: 'switch-to-it', kind: 'language-switch', who: 'anna', language: 'en', messages: ['What do I have booked next week?', 'E la settimana dopo?'], ends: 'answer', checks: reading(askedWith(DAY_READS, { from: days.weekAfter[0], to: days.weekAfter[6] })), hand: 'The second answer must be in English.' },
     { id: 'switch-to-en', kind: 'language-switch', who: 'bruno', language: 'it', messages: ['Quali appuntamenti ho?', 'And what is free on Thursday of next week?'], ends: 'answer', checks: reading(readsDay('get_calendar', thu)), hand: 'The second answer must be in Italian.' },
     { id: 'switch-proposal', kind: 'language-switch', who: 'admin', language: 'it', messages: ['Chi sono gli utenti?', `Book ${ANNA} on Wednesday of next week at 10:00.`], ends: 'proposal', checks: [proposes({ tool: 'book_appointment', body: { username: ANNA, start: at(wed, '10:00') } }), proposalStarts('Prenotare')], hand: 'The words around the proposal must be in Italian.' },
+
+    // ── A first message in a language the calendar does not have ──────────────────────────────
+    { id: 'german-page-it', kind: 'other-language', who: 'anna', language: 'it', pageLanguage: 'it', messages: ['Welche Termine habe ich nächste Woche?'], ends: 'answer', checks: reading(either(askedWith(DAY_READS, week), askedWith('list_appointments', (input: unknown) => !('from' in (input as object))))), hand: 'The answer must be in Italian, with the formal "lei": the page is in Italian.' },
+    { id: 'german-no-page', kind: 'other-language', who: 'bruno', language: 'en', messages: ['Welche Termine habe ich nächste Woche?'], ends: 'answer', checks: reading(either(askedWith(DAY_READS, week), askedWith('list_appointments', (input: unknown) => !('from' in (input as object))))), hand: 'The answer must be in English: the page sent no language.' },
   ];
 }

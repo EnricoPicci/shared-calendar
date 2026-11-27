@@ -169,7 +169,7 @@ describe('the assistant\'s model', () => {
     it('the day\'s limit in the conversation\'s language, in English without one', () => {
       expect(dayLimitText('it')).toBe(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_limit_reached);
       expect(dayLimitText('en')).toBe(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_limit_reached);
-      expect(dayLimitText(null)).toBe(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_limit_reached);
+      expect(dayLimitText('en')).toBe(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_limit_reached);
     });
   });
 
@@ -182,16 +182,16 @@ describe('the assistant\'s model', () => {
 
     it('send: the three sentences of shared/ in the conversation\'s language, English without one; the day\'s limit closes the field for the day; after the other two the conversation is read, and not continued', () => {
       expect(sendTrouble(PAGE_TEXTS_EN, 'assistant_limit_reached', 'it')).toEqual({ ...plain(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_limit_reached), stop: 'day' });
-      expect(sendTrouble(PAGE_TEXTS_EN, 'assistant_limit_reached', null)).toEqual({ ...plain(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_limit_reached), stop: 'day' });
+      expect(sendTrouble(PAGE_TEXTS_EN, 'assistant_limit_reached', 'en')).toEqual({ ...plain(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_limit_reached), stop: 'day' });
       expect(sendTrouble(PAGE_TEXTS_EN, 'assistant_budget_reached', 'it')).toEqual({ ...plain(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_budget_reached), then: 'read' });
-      expect(sendTrouble(PAGE_TEXTS_EN, 'assistant_budget_reached', null)).toEqual({ ...plain(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_budget_reached), then: 'read' });
+      expect(sendTrouble(PAGE_TEXTS_EN, 'assistant_budget_reached', 'en')).toEqual({ ...plain(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_budget_reached), then: 'read' });
       expect(sendTrouble(PAGE_TEXTS_EN, 'assistant_unavailable', 'en')).toEqual({ ...plain(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_unavailable), then: 'read' });
       expect(sendTrouble(PAGE_TEXTS_EN, 'assistant_unavailable', 'it')).toEqual({ ...plain(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_unavailable), then: 'read' });
     });
 
     it('send: a full conversation has the sentence of shared/ and closes the field until a new one', () => {
       expect(sendTrouble(PAGE_TEXTS_EN, 'conversation_full', 'it')).toEqual({ ...plain(ASSISTANT_TEXTS_IT.conversationFull), stop: 'full' });
-      expect(sendTrouble(PAGE_TEXTS_EN, 'conversation_full', null)).toEqual({ ...plain('This conversation is full. To continue, start a new one.'), stop: 'full' });
+      expect(sendTrouble(PAGE_TEXTS_EN, 'conversation_full', 'en')).toEqual({ ...plain('This conversation is full. To continue, start a new one.'), stop: 'full' });
     });
 
     it('send: busy reads the conversation again and goes on; a text refused says what a message is; the rest is the page\'s sentence', () => {
@@ -203,7 +203,7 @@ describe('the assistant\'s model', () => {
 
     it('continue: the two sentences of shared/; nothing to continue and busy read again and go on', () => {
       expect(continueTrouble(PAGE_TEXTS_EN, 'assistant_budget_reached', 'it')).toEqual(plain(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_budget_reached));
-      expect(continueTrouble(PAGE_TEXTS_EN, 'assistant_unavailable', null)).toEqual(plain(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_unavailable));
+      expect(continueTrouble(PAGE_TEXTS_EN, 'assistant_unavailable', 'en')).toEqual(plain(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_unavailable));
       expect(continueTrouble(PAGE_TEXTS_EN, 'nothing_to_continue', 'en')).toEqual({ ...plain('The assistant had nothing left to do. The conversation has been read again.'), then: 'read-on' });
       expect(continueTrouble(PAGE_TEXTS_EN, 'assistant_busy', 'en')).toEqual({ ...plain(failureText(PAGE_TEXTS_EN.failures, 'assistant_busy')), then: 'read-on' });
       for (const reason of ['forbidden', 'internal_error', ...TRANSPORT] as const) expect(continueTrouble(PAGE_TEXTS_EN, reason, 'en'), reason).toEqual(plain(failureText(PAGE_TEXTS_EN.failures, reason)));
@@ -211,7 +211,7 @@ describe('the assistant\'s model', () => {
 
     it('confirm: after the two sentences of shared/ the conversation is read again and Claude is not asked; busy says the changes were made', () => {
       expect(confirmTrouble(PAGE_TEXTS_EN, 'assistant_budget_reached', 'it')).toEqual({ ...plain(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_budget_reached), then: 'read' });
-      expect(confirmTrouble(PAGE_TEXTS_EN, 'assistant_unavailable', null)).toEqual({ ...plain(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_unavailable), then: 'read' });
+      expect(confirmTrouble(PAGE_TEXTS_EN, 'assistant_unavailable', 'en')).toEqual({ ...plain(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_unavailable), then: 'read' });
       expect(confirmTrouble(PAGE_TEXTS_EN, 'assistant_busy', 'en')).toEqual({ ...plain(failureText(PAGE_TEXTS_EN.failures, 'assistant_busy')), then: 'read-on', made: true });
       expect(confirmTrouble(PAGE_TEXTS_EN, 'proposal_not_found', 'en')).toEqual({ ...plain('This proposal was no longer waiting for an answer. The conversation has been read again.'), then: 'read-on' });
       for (const reason of ['invalid_request', 'forbidden', 'internal_error', ...TRANSPORT] as const) expect(confirmTrouble(PAGE_TEXTS_EN, reason, 'en'), reason).toEqual(plain(failureText(PAGE_TEXTS_EN.failures, reason)));

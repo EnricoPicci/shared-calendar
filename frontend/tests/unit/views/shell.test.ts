@@ -3098,7 +3098,7 @@ describe('the navigation', () => {
       expect(toTheAssistant()).toEqual(['GET /assistant/conversation', 'POST /assistant/messages', 'POST /assistant/continue']);
       expect([field().value, one('.progress').textContent, one('.news').textContent]).toEqual(['', '', 'Tuesday is open.']);
       const sent = (fetchMock.mock.calls as [string, RequestInit][]).find(([url]) => url.endsWith('/assistant/messages'))!;
-      expect(JSON.parse(sent[1].body as string)).toEqual({ text: 'what is open?' });
+      expect(JSON.parse(sent[1].body as string)).toEqual({ text: 'what is open?', language: 'en' });
     });
 
     it('a change confirmed with the week on show: the week is loaded again by itself, once, under the open panel', async () => {

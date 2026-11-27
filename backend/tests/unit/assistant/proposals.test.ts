@@ -208,7 +208,7 @@ describe('the rules of a proposal (5.5)', () => {
     const answer = asksFor(BOOK);
     claude.askStep.mockResolvedValue(answer);
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, TOOLS);
 
     noChangeRun();
     // Claude's answer exactly as given and the proposal, in one write; no entry of results yet.
@@ -240,7 +240,7 @@ describe('the rules of a proposal (5.5)', () => {
 
   it('rule 1: no sentence typed by anybody is a confirmation, a typed "yes" runs nothing', async () => {
     waiting();
-    await exchange.sendMessage(ALICE, 'yes', NOW, REQUEST, TOOLS);
+    await exchange.sendMessage(ALICE, { text: 'yes' }, NOW, REQUEST, TOOLS);
     noChangeRun();
     expect(db.takeProposal).not.toHaveBeenCalled();
   });
@@ -256,7 +256,7 @@ describe('the rules of a proposal (5.5)', () => {
     idle();
     claude.askStep.mockResolvedValue(asksFor(BOOK));
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, TOOLS);
 
     expect(factsHandler).toHaveBeenCalledTimes(1);
     const event = factsHandler.mock.calls[0]?.[0];
@@ -274,7 +274,7 @@ describe('the rules of a proposal (5.5)', () => {
     factsHandler.mockImplementation(() => routeAnswer({ error: 'x', message: 'y' }, 409));
     claude.askStep.mockResolvedValue(asksFor(BOOK));
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, TOOLS);
 
     noChangeRun();
     const [step] = steps();
@@ -311,7 +311,7 @@ describe('the rules of a proposal (5.5)', () => {
     const answer = asksFor(LOOK, BOOK);
     claude.askStep.mockResolvedValue(answer);
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, TOOLS);
 
     expect(calendarHandler).toHaveBeenCalledTimes(1);
     const [step] = steps();
@@ -341,7 +341,7 @@ describe('the rules of a proposal (5.5)', () => {
     idle();
     claude.askStep.mockResolvedValue(asksFor(bookOn(24), LOOK, bookOn(25)));
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, TOOLS);
 
     noChangeRun();
     expect(factsHandler).toHaveBeenCalledTimes(2);
@@ -373,7 +373,7 @@ describe('the rules of a proposal (5.5)', () => {
     idle();
     claude.askStep.mockResolvedValue(asksFor(...[20, 21, 22, 23, 24].map(bookOn)));
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, TOOLS);
 
     expect(steps()[0]?.proposal?.changes.map((change) => change.toolUseId)).toEqual(['toolu_book20', 'toolu_book21', 'toolu_book22', 'toolu_book23', 'toolu_book24']);
     expect(result).toMatchObject({ ok: true, reply: { status: 'awaiting_confirmation', proposal: { question: IT.proposalQuestion(5) } } });
@@ -384,7 +384,7 @@ describe('the rules of a proposal (5.5)', () => {
     idle();
     claude.askStep.mockResolvedValue(asksFor(...[20, 21, 22].map(bookOn), LOOK, ...[23, 24, 25].map(bookOn)));
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, TOOLS);
 
     noChangeRun();
     expect(factsHandler).not.toHaveBeenCalled();
@@ -408,7 +408,7 @@ describe('the rules of a proposal (5.5)', () => {
     factsHandler.mockImplementation((event: { queryStringParameters: { date: string } }) => (event.queryStringParameters.date === '2026-11-25' ? routeAnswer({ error: 'x', message: 'y' }, 409) : routeAnswer({ type: 'Visit' })));
     claude.askStep.mockResolvedValue(asksFor(bookOn(24), bookOn(25), LOOK, bookOn(26)));
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, TOOLS);
 
     noChangeRun();
     const [step] = steps();
@@ -434,7 +434,7 @@ describe('the rules of a proposal (5.5)', () => {
     idle();
     claude.askStep.mockResolvedValue(asksFor(bookOn(24), use('toolu_bad', 'book', { date: '2026-11-25', end: '11:00' })));
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, TOOLS);
 
     expect(steps()[0]).toMatchObject({ status: 'working', proposal: null });
     expect(result.log).toMatchObject({ tools: [{ name: 'book', notRun: 'not_proposed' }, { name: 'book', notRun: 'invalid_input' }] });
@@ -444,7 +444,7 @@ describe('the rules of a proposal (5.5)', () => {
     idle();
     claude.askStep.mockResolvedValue(asksFor(bookOn(24), use('toolu_again', 'book', { date: '2026-11-24' })));
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, TOOLS);
 
     noChangeRun();
     // The same route asked the same thing by two changes of one answer is called once.
@@ -459,7 +459,7 @@ describe('the rules of a proposal (5.5)', () => {
     waiting();
     claude.askStep.mockResolvedValue(says('At eleven, then?'));
 
-    const result = await exchange.sendMessage(ALICE, 'no, at eleven', NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: 'no, at eleven' }, NOW, REQUEST, TOOLS);
 
     noChangeRun();
     expect(claude.askStep).toHaveBeenCalledTimes(1);
@@ -485,7 +485,7 @@ describe('the rules of a proposal (5.5)', () => {
     waiting();
     claude.askStep.mockResolvedValue(asksFor(use('toolu_again', 'book', { date: '2026-11-24', note: NOTE })));
 
-    const result = await exchange.sendMessage(ALICE, 'yes', NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: 'yes' }, NOW, REQUEST, TOOLS);
 
     noChangeRun();
     const [step] = steps();
@@ -530,7 +530,7 @@ describe('the step: Claude asks for a change (5.4, 7.4)', () => {
     idle();
     claude.askStep.mockResolvedValue(asksFor(use('toolu_block', 'block', { date: '2026-11-24' })));
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, TOOLS);
 
     noChangeRun();
     expect(factsHandler).not.toHaveBeenCalled();
@@ -542,7 +542,7 @@ describe('the step: Claude asks for a change (5.4, 7.4)', () => {
     idle();
     claude.askStep.mockResolvedValue(asksFor(use('toolu_book', 'book', { date: '2026-11-24', end: '11:00' })));
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, TOOLS);
 
     expect(factsHandler).not.toHaveBeenCalled();
     expect(steps()[0]).toMatchObject({ status: 'working', proposal: null });
@@ -553,7 +553,7 @@ describe('the step: Claude asks for a change (5.4, 7.4)', () => {
     idle(ADMIN);
     claude.askStep.mockResolvedValue(asksFor(use('toolu_block', 'block', { date: '2026-11-24' })));
 
-    const result = await exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ADMIN, { text: TEXT }, NOW, REQUEST, TOOLS);
 
     expect(getClaims(factsHandler.mock.calls[0]?.[0])).toMatchObject({ value: { username: 'admin', groups: ['admin'] } });
     expect(result).toMatchObject({ ok: true, reply: { proposal: { actions: [{ summary: `${IT.confirmLabel}: 2026-11-24 (Visit)` }] } }, log: { proposed: ['block'] } });
@@ -567,7 +567,7 @@ describe('the step: Claude asks for a change (5.4, 7.4)', () => {
       Promise.resolve(conversation({ language: 'en', status: step.status, nextSeq: 1 + step.messages.length, version: 1 })),
     );
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, TOOLS);
 
     expect(db.startConversation.mock.calls[0]?.[3]).toMatchObject({ status: 'awaiting_confirmation', proposal: { changes: [{ tool: 'book' }] } });
     expect(result).toMatchObject({ ok: true, reply: { status: 'awaiting_confirmation', proposal: { confirmLabel: assistantTexts('en').confirmLabel } } });
@@ -612,14 +612,14 @@ describe('the tools and the roles (3, 7.4)', () => {
     const given = () => (claude.askStep.mock.calls.at(-1)?.[0] as { tools: { name: string; description: string; input_schema: { properties: object } }[] }).tools;
 
     db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: real(ALICE) }), messages: EARLIER });
-    await exchange.sendMessage(ALICE, TEXT, NOW);
+    await exchange.sendMessage(ALICE, { text: TEXT }, NOW);
     const forUser = given();
     expect(forUser.map((tool) => tool.name)).toEqual(['get_settings', 'list_types', 'get_calendar', 'list_appointments', 'book_appointment', 'cancel_appointment', 'change_appointment', 'set_appointment_note', 'send_calendar_mail']);
     expect(JSON.stringify(forUser)).not.toContain('list_users');
     expect(Object.keys(forUser[4]!.input_schema.properties)).not.toContain('username');
 
     db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: real(ADMIN) }), messages: EARLIER });
-    await exchange.sendMessage(ADMIN, 'Book alice on Tuesday at 10', NOW);
+    await exchange.sendMessage(ADMIN, { text: 'Book alice on Tuesday at 10' }, NOW);
     const forAdmin = given();
     expect(forAdmin.map((tool) => tool.name)).toEqual([...forUser.map((tool) => tool.name), ...ADMIN_ONLY]);
     expect(Object.keys(forAdmin[4]!.input_schema.properties)).toContain('username');
@@ -638,7 +638,7 @@ describe('the tools and the roles (3, 7.4)', () => {
     db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: mark }), messages: EARLIER });
     claude.askStep.mockResolvedValue(asksFor(use('toolu_admin', name, input)));
 
-    const result = await exchange.sendMessage(ALICE, 'Change the cancellation notice to 1 hour', NOW, REQUEST, deployed);
+    const result = await exchange.sendMessage(ALICE, { text: 'Change the cancellation notice to 1 hour' }, NOW, REQUEST, deployed);
 
     for (const handler of Object.values(readRoutes)) expect(handler).not.toHaveBeenCalled();
     expect(steps()[0]).toMatchObject({ status: 'working', proposal: null });
@@ -659,7 +659,7 @@ describe('the tools and the roles (3, 7.4)', () => {
     db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: mark }), messages: EARLIER });
     claude.askStep.mockResolvedValue(asksFor(use('toolu_book', 'book_appointment', { date: '2026-11-24', time: '10:00' })));
 
-    const result = await exchange.sendMessage(ADMIN, 'Book Tuesday at 10', NOW, REQUEST, deployed);
+    const result = await exchange.sendMessage(ADMIN, { text: 'Book Tuesday at 10' }, NOW, REQUEST, deployed);
 
     for (const handler of Object.values(readRoutes)) expect(handler).not.toHaveBeenCalled();
     expect(steps()[0]).toMatchObject({ status: 'working', proposal: null });
@@ -675,7 +675,7 @@ describe('a message while a proposal waits (5.5 rule 5, 6)', () => {
   ])('refused because %s: nothing is saved and the proposal keeps waiting', async (_why, arrange, over, refusal) => {
     waiting(over);
     arrange();
-    expect(await exchange.sendMessage(ALICE, 'no, at eleven', NOW, REQUEST, TOOLS)).toMatchObject({ ok: false, refusal });
+    expect(await exchange.sendMessage(ALICE, { text: 'no, at eleven' }, NOW, REQUEST, TOOLS)).toMatchObject({ ok: false, refusal });
     untouched();
     noChangeRun();
   });
@@ -684,7 +684,7 @@ describe('a message while a proposal waits (5.5 rule 5, 6)', () => {
     waiting();
     claude.askStep.mockResolvedValue({ kind: 'unavailable', reason: 'timeout' });
 
-    const result = await exchange.sendMessage(ALICE, 'no, at eleven', NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: 'no, at eleven' }, NOW, REQUEST, TOOLS);
 
     expect(result).toMatchObject({ ok: false, refusal: 'assistant_unavailable' });
     expect(steps()[0]).toMatchObject({ status: 'working', proposal: null });
@@ -693,14 +693,14 @@ describe('a message while a proposal waits (5.5 rule 5, 6)', () => {
 
   it('a confirmation took the proposal less than 31 seconds ago: the conversation is busy and nothing is written', async () => {
     waiting({}, 30_999);
-    expect(await exchange.sendMessage(ALICE, 'and now?', NOW, REQUEST, TOOLS)).toEqual({ ok: false, refusal: 'assistant_busy', log: { conversationId: ID, outcome: 'busy' } });
+    expect(await exchange.sendMessage(ALICE, { text: 'and now?' }, NOW, REQUEST, TOOLS)).toEqual({ ok: false, refusal: 'assistant_busy', log: { conversationId: ID, outcome: 'busy' } });
     untouched();
   });
 
   it('a confirmation took it 31 seconds ago or more and never finished: the message settles it with the outcome unknown, then is read', async () => {
     waiting({}, 31_000);
 
-    const result = await exchange.sendMessage(ALICE, 'and now?', NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: 'and now?' }, NOW, REQUEST, TOOLS);
 
     noChangeRun();
     const [step] = steps();
@@ -735,7 +735,7 @@ describe('continue and a proposal (5.5 rule 6, 6)', () => {
     const settled: Proposal = { ...STORED_PROPOSAL, changes: [{ ...STORED_PROPOSAL.changes[0]!, outcome: 'done' }] };
     db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ proposal: settled }), messages: EARLIER });
 
-    const result = await exchange.sendMessage(ALICE, 'Thank you', NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: 'Thank you' }, NOW, REQUEST, TOOLS);
 
     expect(steps()[0]?.proposal).toBeNull();
     expect(result).toMatchObject({ ok: true, reply: { proposal: null }, log: {} });
@@ -1011,7 +1011,7 @@ describe('confirming a proposal of several changes (5.5 rule 4, 5.4)', () => {
     waiting({ proposal: SEVERAL });
     await decline.declineProposal(ALICE, PROPOSAL, NOW, TOOLS.map((tool) => tool.definition));
     waiting({ proposal: SEVERAL });
-    await exchange.sendMessage(ALICE, 'no', NOW, REQUEST, TOOLS);
+    await exchange.sendMessage(ALICE, { text: 'no' }, NOW, REQUEST, TOOLS);
 
     noChangeRun();
     const outcomes = steps().map((step) => (step.messages[0]?.content as { content: { content: string }[] }).content.slice(0, 3).map((one) => (JSON.parse(one.content) as { outcome: string }).outcome));
@@ -1116,7 +1116,7 @@ describe('the log lines of a proposal (10.1)', () => {
   it('the step that made a proposal names the changes proposed, and nothing of their input or wording', async () => {
     idle();
     claude.askStep.mockResolvedValue(asksFor(LOOK, BOOK));
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, TOOLS);
     expect(result.log).toMatchObject({ proposalId: expect.stringMatching(ULID), proposed: ['book'] });
     expectNoText(result.log);
   });
@@ -1135,7 +1135,7 @@ describe('the log lines of a proposal (10.1)', () => {
     waiting();
     expectNoText((await decline.declineProposal(ALICE, PROPOSAL, NOW, TOOLS.map((tool) => tool.definition))).log);
     waiting();
-    expectNoText((await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, TOOLS)).log);
+    expectNoText((await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, TOOLS)).log);
     waiting({}, 40_000);
     expectNoText((await exchange.continueExchange(ALICE, NOW, REQUEST, TOOLS)).log);
   });
@@ -1182,7 +1182,7 @@ describe('the log lines of a proposal (10.1)', () => {
       for (const text of forbidden) expect(JSON.stringify(log)).not.toContain(text);
     };
 
-    const proposed = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST);
+    const proposed = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST);
 
     // The three changes read the appointments once between them, and the move the day it goes to.
     expect(readRoutes.listAppointments).toHaveBeenCalledTimes(1);
@@ -1260,7 +1260,7 @@ describe('the log lines of a proposal (10.1)', () => {
       for (const text of forbidden) expect(JSON.stringify(log)).not.toContain(text);
     };
 
-    const proposed = await exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST);
+    const proposed = await exchange.sendMessage(ADMIN, { text: TEXT }, NOW, REQUEST);
 
     // The three changes of types read the types once between them.
     expect(readRoutes.listTypes).toHaveBeenCalledTimes(1);
@@ -1332,7 +1332,7 @@ describe('the log lines of a proposal (10.1)', () => {
       db.saveStep.mockClear();
       db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: mark }), messages: EARLIER });
       claude.askStep.mockResolvedValue(asksFor(...blocks));
-      return (await exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST)).log;
+      return (await exchange.sendMessage(ADMIN, { text: TEXT }, NOW, REQUEST)).log;
     };
 
     expect(await ask(use('a', 'edit_type', { typeId: VISIT, name: 'Check-up' }), use('b', 'delete_type', { typeId: VISIT }))).toMatchObject({
@@ -1385,7 +1385,7 @@ describe('the log lines of a proposal (10.1)', () => {
     it('the three changes of one date make one proposal, on one reading of the day and of the types; a refusal with the appointments in the way gives Claude the list, small, and the lines hold none of it', async () => {
       claude.askStep.mockResolvedValue(asksFor(OVERRIDE, DELETE, CREATE));
 
-      const proposed = await exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST);
+      const proposed = await exchange.sendMessage(ADMIN, { text: TEXT }, NOW, REQUEST);
 
       expect(readRoutes.getCalendar).toHaveBeenCalledTimes(1);
       expect(readRoutes.listTypes).toHaveBeenCalledTimes(1);
@@ -1457,7 +1457,7 @@ describe('the log lines of a proposal (10.1)', () => {
       claude.askStep.mockResolvedValue(
         asksFor(use('toolu_new', 'create_pattern', { weekday: 'Thursday', start: '14:00', end: '17:00', typeId: VISIT, validFrom: '2026-11-26' }), use('toolu_old', 'delete_pattern', { patternId: PATTERN })),
       );
-      const proposed = await exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST);
+      const proposed = await exchange.sendMessage(ADMIN, { text: TEXT }, NOW, REQUEST);
       expect((steps()[0]?.proposal as Proposal).changes.map((change) => change.summary)).toEqual([
         'Creare un orario settimanale: ogni giovedì, dalle 14:00 alle 17:00 (Visit), valido da giovedì 26 novembre 2026, senza scadenza.',
         "Eliminare l'orario settimanale: ogni martedì, dalle 09:00 alle 12:00 (Visit), valido da lunedì 2 novembre 2026, senza scadenza.",
@@ -1474,7 +1474,7 @@ describe('the log lines of a proposal (10.1)', () => {
       const ask = async (...blocks: ReturnType<typeof use>[]) => {
         db.saveStep.mockClear();
         claude.askStep.mockResolvedValue(asksFor(...blocks));
-        return ((await exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST)).log as unknown as { tools: { name: string; notRun?: string }[] }).tools.map((tool) => [tool.name, tool.notRun]);
+        return ((await exchange.sendMessage(ADMIN, { text: TEXT }, NOW, REQUEST)).log as unknown as { tools: { name: string; notRun?: string }[] }).tools.map((tool) => [tool.name, tool.notRun]);
       };
       const refused = (first: string, second: string) => [
         [first, 'not_proposed'],
@@ -1528,7 +1528,7 @@ describe('rule 4 and the places of a slot (5.5)', () => {
   const ask = async (...blocks: ReturnType<typeof use>[]) => {
     db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: markForSeats(ADMIN) }), messages: EARLIER });
     claude.askStep.mockResolvedValue(asksFor(...blocks));
-    return exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST, SEATS);
+    return exchange.sendMessage(ADMIN, { text: TEXT }, NOW, REQUEST, SEATS);
   };
   const errors = () => {
     const step = steps()[0];

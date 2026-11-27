@@ -1,4 +1,4 @@
-import { ASSISTANT_LIMITS, assistantTexts, type AssistantLanguage, type AssistantStatus } from '@shared-calendar/shared';
+import { ASSISTANT_LIMITS, assistantTexts, type AssistantMessageBody, type AssistantStatus, type Language } from '@shared-calendar/shared';
 import { askLanguage, askStep, assistantEffort, assistantModel, STEP_TIMEOUT_MS, type ConversationEntry, type StepAnswer, type TokenCounts } from '../lib/anthropic';
 import { ulid } from 'ulid';
 import { AssistantBusyError, endConversation as endStored, saveStep, startConversation, type Conversation, type NewMessage } from '../lib/assistantDb';
@@ -66,14 +66,16 @@ function answersSinceThePerson(entries: ConversationEntry[]): number {
  * confirmation may still be running; once it no longer can be, the message settles the proposal
  * with each outcome unknown (docs/CONVERSATIONAL_ARCHITECTURE.md section 5.5, rule 6). The first message of
  * a conversation is first shown to Claude alone, to ask which supported language it is written
- * in; that language is the conversation's for good. Then the message, the line with the time now
+ * in, the page's language standing in for none of them; that language is the conversation's for
+ * good. Then the message, the line with the time now
  * and the language, and one step.
  *
  * When the language question took so long that a step no longer fits in the time the function
  * has left, the message is saved with its language and the step is left to `continue`: asking
  * Claude a second time could get the function stopped with nothing saved.
  */
-export async function sendMessage(identity: Identity, text: string, now: string, request: RequestInfo = UNKNOWN_REQUEST, tools: readonly Tool[] = TOOLS): Promise<CoreResult> {
+export async function sendMessage(identity: Identity, message: AssistantMessageBody, now: string, request: RequestInfo = UNKNOWN_REQUEST, tools: readonly Tool[] = TOOLS): Promise<CoreResult> {
+  const { text } = message;
   const config = coreConfig();
   const model = assistantModel();
   const effort = assistantEffort();
@@ -107,7 +109,9 @@ export async function sendMessage(identity: Identity, text: string, now: string,
         log: { conversationId, outcome: `language_${asked.kind}`, ...(asked.kind === 'unavailable' && { reason: asked.reason }), model, effort, languageMs: Date.now() - started },
       };
     }
-    language = asked.language;
+    // A first message in none of the supported languages takes the page's language, English
+    // when the page sent none (docs/MULTILANGUAGE_ARCHITECTURE.md section 9).
+    language = asked.language ?? message.language ?? 'en';
     asking = { usage: asked.usage, ms: Date.now() - started };
   }
 
@@ -116,7 +120,7 @@ export async function sendMessage(identity: Identity, text: string, now: string,
     // answer of Claude the conversation ends with.
     ...(waiting ? [settledWithout(waiting, taken === 'abandoned' ? 'unknown' : 'dropped')] : []),
     { kind: 'model', content: { role: 'user', content: text }, fromPerson: true },
-    { kind: 'model', content: { role: 'system', content: timeLine(now, config.timeZone, language) } },
+    { kind: 'model', content: { role: 'system', content: timeLine(now, config.timeZone, language, asking !== null) } },
   ];
   // Only a request that asked the language question has spent time on Claude already.
   const room = asking !== null && request.remainingMs !== null ? request.remainingMs() : Infinity;
@@ -195,7 +199,7 @@ export class Places {
 export type StepInput = {
   identity: Identity;
   current: Current;
-  language: AssistantLanguage;
+  language: Language;
   // What the entry adds to the conversation before Claude is asked.
   added: NewMessage[];
   // The language question, when this request asked it: its token counts and how long it took.

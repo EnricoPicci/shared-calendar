@@ -71,6 +71,11 @@ const mailOf = ({ from, to, kind, address }: MailSummary) =>
 // with the formal "lei" throughout. The second button is not "Annulla": in a calendar that word
 // would read as cancelling the appointment.
 export const ASSISTANT_TEXTS_IT: AssistantTexts = {
+  notes: {
+    name: 'Italian',
+    address: 'Address the person with the formal "lei", as the application\'s own texts do.',
+    words: { weeklyPattern: 'orario settimanale', dayHours: 'orari propri del giorno', extraWindow: 'finestra aggiuntiva' },
+  },
   cannotAnswer: {
     assistant_limit_reached:
       "Ha raggiunto il limite di messaggi all'assistente per oggi. Sarà di nuovo disponibile domani. Può comunque fare tutto dalle altre pagine.",

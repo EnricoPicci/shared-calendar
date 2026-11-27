@@ -115,6 +115,30 @@
         }
       }
     },
+    "language-none": {
+      "source": "fake",
+      "status": 200,
+      "body": {
+        "id": "msg_fake_language_none",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5-5",
+        "content": [
+          {
+            "type": "text",
+            "text": "{\"language\":\"none\"}"
+          }
+        ],
+        "stop_reason": "end_turn",
+        "stop_sequence": null,
+        "usage": {
+          "input_tokens": 302,
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "output_tokens": 10
+        }
+      }
+    },
     "error-key-refused": {
       "source": "recorded",
       "status": 401,
@@ -1487,7 +1511,8 @@
     "texts": {
       "Quali appuntamenti ho la settimana prossima?": "language-it",
       "ciao": "language-it",
-      "Buongiorno, mi sente?": "language-it"
+      "Buongiorno, mi sente?": "language-it",
+      "Guten Tag, hören Sie mich?": "language-none"
     }
   },
   "messages": {
@@ -1662,6 +1687,9 @@
     "fake: e-mail me my appointments of the mail journey": [
       "tool-send-mail-week",
       "text-last-tool-result"
+    ],
+    "Guten Tag, hören Sie mich?": [
+      "text-application-line"
     ]
   }
 }

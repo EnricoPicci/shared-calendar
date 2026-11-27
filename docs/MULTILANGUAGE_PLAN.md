@@ -2,7 +2,7 @@
 
 **Version:** v1 (2026-11-27): the plan, after the Product Owner's eight decisions of the brief
 and the answer to one question of planning (section 2). v2 (2026-11-27): phase A started with
-brief `prompts/lang-l03-phase-a-implementation.md`; steps l1 to l7 done.
+brief `prompts/lang-l03-phase-a-implementation.md`; steps l1 to l8 done.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -906,7 +906,46 @@ No journey and no screen changed. One wording for section 7.
 - **Leaves for phase B:** the paid evaluation (the instructions changed, so it must be run
   once before the deploy); the conversations in progress end at the deploy.
 
-**As done (step l8).** *Empty.*
+**As done (step l8).** Done 2026-11-27. Built, the three changes of the architecture's
+section 9. (1) One list: `shared/src/assistant/languages.ts` and its test deleted; every use
+of `ASSISTANT_LANGUAGES`, `AssistantLanguage` and `DEFAULT_ASSISTANT_LANGUAGE` now takes
+`SUPPORTED_LANGUAGES` and `Language`. (2) The notes: `AssistantTexts.notes` (the language's
+English name, how to address the person, the application's three words for the opening hours)
+in `texts.en.ts` and `texts.it.ts`; `INSTRUCTIONS` lose the two sentences that named Italian and
+say instead that the application's line gives the words and the form of address;
+`timeLine(now, zone, language, first)` adds the notes after the first message only, the line
+being stored and sent again at every request; the names of the languages come from the notes,
+so `LANGUAGE_NAMES` is gone. (3) The page's language: `AssistantMessageBody` takes an optional
+`language` of the list (`400 invalid_request` otherwise); the language question answers one of
+the list or `none` (`askLanguage` gives null for `none` and for an unreadable answer);
+`sendMessage` takes the body and keeps Claude's language, else the page's, else English. On the
+page: `AssistantService.send(text, language?)` sends the language when given; the panel sends
+the page's, and its own sentences (the three of `shared/` and "conversation full") are in the
+conversation's language, else the page's (`spoken()`), the model's functions taking a language
+that is never null. The fake Claude's script: an answer `language-none` and the German sentence,
+answered with the line of the application; `backend/docker/fake-claude.mjs` itself unchanged.
+The evaluation: a kind `other-language`, a field `pageLanguage` sent by the runner, two requests
+(`german-page-it`, `german-no-page`); `npm run assistant:eval -w backend -- --list` lists 69
+requests, 75 messages; **no paid run**. Tests: shared 673 (the body with each language, with
+five that are not; the notes of every language non-empty and distinct; the Italian notes),
+backend 2090 (the instructions name no language's name or words; the line after a first
+message carries its own notes and no other language's, word for word in Italian, a later line
+none; the question's `none`; the exchange: the Italian notes after an Italian first message,
+`none` with the page's language and without, Claude's language over the page's; the handler
+passes the body and refuses `fr` and `it-IT`), frontend 3293 (the service's call with the
+language as a whole call of its own, and `fr` refused before any request; the panel before a
+conversation on an Italian page: the language sent, the sentences in Italian; an English
+conversation on an Italian page in English; the shell's request); 100 % lines. Journeys, after
+a build and a restart: the back end's block "the language of a conversation", three tests
+added (a German first message from an Italian page, the same with no language, `de` refused),
+6 passed, its page and two paragraphs of `docs/journeys/concepts.md` refreshed; the front end's
+assistant journeys once, 19 passed. The look, as `admin` on the Italian page at 1280 and 390:
+the panel before a conversation in Italian; the German sentence became an Italian conversation,
+the fake's answer showing the line with the Italian notes. Afterwards the language the sign-in
+wrote to `admin` was removed. For phase B's item 6: `shared/CLAUDE.md`'s folder map still names
+`languages.ts` among the assistant's files, and `docs/CONVERSATIONAL_ARCHITECTURE.md`
+still describes the English fallback (section 4.2 and the panel's sentences), the Italian
+sentences of the instructions and the evaluation's 67 requests (section 12.3). No new Italian wording: the notes repeat the words the instructions held.
 
 **After step l8 phase A is over, and so are the three permissions.** Claude Code writes the
 closing note below, leaves the local stack up and seeded for the Product Owner's look, and

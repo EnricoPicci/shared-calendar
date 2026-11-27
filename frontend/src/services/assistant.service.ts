@@ -1,4 +1,4 @@
-import { AssistantMessageBody, Ulid, type ApiErrorCode, type AssistantReply } from '@shared-calendar/shared';
+import { AssistantMessageBody, Ulid, type ApiErrorCode, type AssistantReply, type Language } from '@shared-calendar/shared';
 import { Observable, ReplaySubject, Subscription, of } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { apiCall, hasString, invalidRequest, unexpectedAnswer, type ApiConfig, type ApiFailure, type ApiOk } from './api';
@@ -96,10 +96,12 @@ export class AssistantService {
     );
   }
 
-  // Sends a message of the person. The text is checked with the shared schema, which also trims
-  // it: an empty or too long one is answered here, with no request.
-  send(text: string): void {
-    const body = AssistantMessageBody.safeParse({ text });
+  // Sends a message of the person, with the page's language when it is given: the server takes it
+  // for a first message written in none of the calendar's languages
+  // (docs/MULTILANGUAGE_ARCHITECTURE.md section 9). The text is checked with the shared schema,
+  // which also trims it: an empty or too long one is answered here, with no request.
+  send(text: string, language?: Language): void {
+    const body = AssistantMessageBody.safeParse(language === undefined ? { text } : { text, language });
     this.run(
       'send',
       body.success
