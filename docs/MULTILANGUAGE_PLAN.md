@@ -1103,12 +1103,15 @@ once a later group stands on it. Nothing is ever reset or amended.
 
 Kept by Claude Code while the work runs (decision 5); read first in phase B, item 2.
 
+**Phase B, item 2, settled 2026-11-27:** the Product Owner approved the Italian wordings as
+written. No correction, so no commit of corrections.
+
 | Step | Where (the key, or the mail) | English | Italian chosen | Alternatives weighed, and why this one |
 |---|---|---|---|---|
 | l4 | Every button: `html.login.signIn`, `html.frame.signOut`, `html.common.save`, `close`, `edit`, `delete`, … | Sign in, Sign out, Save, Close, Edit, Delete | Accedi, Esci, Salva, Chiudi, Modifica, Elimina | The formal "lei" would be "Acceda", "Esca", "Salvi"; the infinitive "Accedere", "Salvare" is heavy on a button. The short verb is what Italian pages put on a button, also where their sentences say "lei"; the sentences here say "lei" throughout. To confirm as the rule (decision L14 speaks of the sentences). |
 | l4 | `html.choose.heading`, `html.choose.submit` | Choose your password / Choose password | Scelga la sua password / Scegli la password | The heading is a sentence ("lei"), the button a button (the rule above). If the mix reads oddly side by side: "Imposta la password" on the button. |
 | l4 | `frame.nav.appointments` | My appointments | Appuntamenti | "I miei appuntamenti" is 19 characters, over the budget of 18 for a link of the navigation; "I miei dati" keeps "miei" beside it. |
-| l4 | `html.common.cancel` | Cancel | Annulla | Used in the dialogs that do not touch an appointment (the first password, a user's Edit, "My details"). The assistant avoids "Annulla" because it would read as cancelling an appointment; here the detail dialog's button is "Annulla l'appuntamento", in another dialog. Alternative: "Lascia stare". |
+| l4 | `html.common.cancel` | Cancel | Annulla | Used in the dialogs that do not touch an appointment (the first password, a user's Edit, "My details"). The assistant avoids "Annulla" because it would read as cancelling an appointment; here the detail dialog's button is "Annulla appuntamento", in another dialog. Alternative: "Lascia stare". |
 | l4 | `html.users.keep` (the two dialogs that confirm a deletion) | Keep | Mantieni | "Non eliminare" is clearer beside "Elimina utente", but does not fit "Not available on this day" and "Back to the weekly patterns", which the same dialog asks. "Lascia stare" is colloquial. |
 | l4 | `html.availability.confirmTitle` | Please confirm | Confermi | "Conferma richiesta" reads as "confirmation requested", "Confermare?" as a question without its object. |
 | l4 | `html.week.keep` | Keep the appointment as it is | Lascia l'appuntamento com'è | A button: the short verb (the first row). |
@@ -1130,6 +1133,16 @@ Kept by Claude Code while the work runs (decision 5); read first in phase B, ite
 
 Kept by Claude Code while the work runs (decision 6); looked at by the Product Owner in
 phase B, item 3.
+
+**Phase B, item 3, looked at 2026-11-27 by the Product Owner:** the detail dialog's button reads
+"Annulla appuntamento" (`detail.cancelAppointment` in `frontend/src/texts/texts.it.ts`, it was
+"Annulla l'appuntamento"); the narrow "Pieno" tab is fine; in "Utenti", "Elimina" alone on a
+second line under the username is not nice: the row's buttons are now one group
+(`.row-buttons` in `frontend/index.html`) that `frontend/style.css` keeps together at the row's
+right end, and the list is 52rem wide instead of 44rem, so the Italian row fits on one line at
+1280 and, on a phone, both buttons go together to a line of their own (looked at); the "Invia di
+nuovo l'invito" button shows only for a user still invited, and the local users are not; the
+weekdays stay in lower case.
 
 | Step | Screen, width, language | What was seen | What was tried | What is proposed |
 |---|---|---|---|---|

@@ -426,7 +426,7 @@ describe('index.html', () => {
     expect([one('.unread .error').getAttribute('role'), one('.empty').textContent]).toEqual(['alert', '']);
   });
 
-  it('a row of the users is the username, the name, the e-mail, the state and three buttons of type "button", "Edit", "Resend invitation" (hidden) and "Delete", and nothing in it can be typed in', () => {
+  it('a row of the users is the username, the name, the e-mail, the state and one group of three buttons of type "button", "Edit", "Resend invitation" (hidden) and "Delete", and nothing in it can be typed in', () => {
     const row = pageAside().querySelector<HTMLTemplateElement>('#tpl-user-row')!.content.firstElementChild!;
     expect(row.tagName).toBe('LI');
     expect([...row.children].map((part) => [part.tagName, part.className, part.textContent, part.hasAttribute('hidden')])).toEqual([
@@ -434,6 +434,11 @@ describe('index.html', () => {
       ['SPAN', 'name', '', false],
       ['SPAN', 'email', '', false],
       ['SPAN', 'status', '', false],
+      ['SPAN', 'row-buttons', 'Edit Resend invitation\n              Delete', false],
+    ]);
+    // The three buttons in one group, which the style sheet keeps together.
+    const buttons = row.querySelector('.row-buttons')!;
+    expect([...buttons.children].map((part) => [part.tagName, part.className, part.textContent, part.hasAttribute('hidden')])).toEqual([
       ['BUTTON', 'ask-edit', 'Edit', false],
       ['BUTTON', 'ask-resend', 'Resend invitation', true],
       ['BUTTON', 'danger ask-delete', 'Delete', false],

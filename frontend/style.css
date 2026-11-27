@@ -196,7 +196,10 @@ label.check { display: flex; align-items: center; gap: 0.4rem; }
 .user-row button { flex: none; }
 /* The row's texts share its width, the e-mail the larger part; on a narrow screen they wrap
    onto more lines rather than break an address in the middle */
-.users-screen .list { max-width: 44rem; }
+.users-screen .list { max-width: 52rem; }
+/* The row's buttons stay together, at its right end: when the row is too narrow for them they
+   go to a line of their own, both, never one under the other's texts */
+.user-row .row-buttons { display: flex; flex: none; gap: 0.5rem; margin-left: auto; }
 .user-row { flex-wrap: wrap; }
 .user-row .username { flex: 1 1 6rem; }
 .user-row .name { flex: 1 1 8rem; overflow-wrap: break-word; color: #52606d; }

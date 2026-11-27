@@ -154,7 +154,7 @@ export const PAGE_TEXTS_IT: PageTexts = {
       message: 'Messaggio',
       send: 'Invia',
     },
-    detail: { title: 'Appuntamento', when: 'Quando', type: 'Tipo', forUser: 'Per', saveNote: 'Salva la nota', cancelAppointment: 'Annulla l’appuntamento' },
+    detail: { title: 'Appuntamento', when: 'Quando', type: 'Tipo', forUser: 'Per', saveNote: 'Salva la nota', cancelAppointment: 'Annulla appuntamento' },
   },
   frame: {
     roles: { admin: 'Amministratore', user: 'Utente' },
