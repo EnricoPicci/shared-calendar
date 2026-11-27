@@ -266,6 +266,18 @@ export type DateTexts = {
   draftFull: (windows: number) => string;
 };
 
+// The assistant's panel: who wrote a message, what became of a change of a proposal, the line
+// that counts the messages left, and the line of an exchange that did not finish. What the
+// server words in the conversation's language is shared/'s (assistantTexts), not the page's.
+export type AssistantTexts = {
+  who: { person: string; assistant: string; notice: string };
+  done: string;
+  notDone: (why: string) => string;
+  unknown: string;
+  remaining: (left: number) => string;
+  couldNotFinish: string;
+};
+
 // The keys of index.html, by the part of the page they belong to.
 export type HtmlTexts = {
   // Words several parts of the page use.
@@ -388,6 +400,7 @@ export type HtmlTexts = {
     changePattern: string;
     confirmTitle: string;
   };
+  assistant: { toggle: string; end: string; processed: string; message: string; send: string };
   detail: { title: string; when: string; type: string; forUser: string; saveNote: string; cancelAppointment: string };
 };
 
@@ -405,6 +418,7 @@ export type PageTexts = {
   settings: SettingsTexts;
   availability: AvailabilityTexts;
   date: DateTexts;
+  assistant: AssistantTexts;
   // The ways a date is written, from shared/ (docs/MULTILANGUAGE_ARCHITECTURE.md decision L10).
   dates: DateFormats;
 };

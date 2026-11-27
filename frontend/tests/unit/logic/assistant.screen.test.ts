@@ -1,6 +1,5 @@
 import { ASSISTANT_TEXTS_EN, ASSISTANT_TEXTS_IT, type ApiErrorCode, type AssistantMessage, type AssistantProposal, type AssistantReply } from '@shared-calendar/shared';
 import { ReplaySubject } from 'rxjs';
-import { COULD_NOT_FINISH } from '../../../src/logic/assistant.model';
 import { AssistantScreen, type AssistantCalls, type AssistantState } from '../../../src/logic/assistant.screen';
 import { failureText } from '../../../src/logic/texts';
 import type {
@@ -57,7 +56,7 @@ function screenOf(role: 'admin' | 'user' = 'user') {
     confirm: vi.fn<AssistantCalls['confirm']>(),
     decline: vi.fn<AssistantCalls['decline']>(),
   };
-  const screen = new AssistantScreen(service, role);
+  const screen = new AssistantScreen(service, role, PAGE_TEXTS_EN);
   const states: AssistantState[] = [];
   screen.assistant$.subscribe((s) => states.push(s)); // the view subscribes first
   let changes = 0;
@@ -335,7 +334,7 @@ describe('AssistantScreen', () => {
       expect(last().failure).toBeNull();
       answered('continue', working());
       expect(calls().continue).toBe(8);
-      expect(last()).toMatchObject({ failure: COULD_NOT_FINISH, progress: null, canSend: true, canEnd: true });
+      expect(last()).toMatchObject({ failure: PAGE_TEXTS_EN.assistant.couldNotFinish, progress: null, canSend: true, canEnd: true });
     });
 
     it('the next message starts its count again', () => {

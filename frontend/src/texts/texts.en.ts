@@ -140,6 +140,13 @@ export const PAGE_TEXTS_EN: PageTexts = {
       changePattern: 'Change pattern',
       confirmTitle: 'Please confirm',
     },
+    assistant: {
+      toggle: 'Assistant',
+      end: 'New conversation',
+      processed: "This conversation is processed by Anthropic's Claude.",
+      message: 'Message',
+      send: 'Send',
+    },
     detail: { title: 'Appointment', when: 'When', type: 'Type', forUser: 'For', saveNote: 'Save note', cancelAppointment: 'Cancel appointment' },
   },
   frame: {
@@ -412,6 +419,14 @@ export const PAGE_TEXTS_EN: PageTexts = {
     removeLabel: (time, typeName) => `Remove ${time} ${typeName}`,
     overlapsDraft: 'Start and End overlap another window of this day. Choose other hours.',
     draftFull: (windows) => `A day can have ${windows} windows of its own at most. Remove one to add another.`,
+  },
+  assistant: {
+    who: { person: 'You', assistant: 'Assistant', notice: 'Notice' },
+    done: 'Done',
+    notDone: (why) => `Not done. ${why}`,
+    unknown: 'It is not known whether this was done. Please check the calendar.',
+    remaining: (left) => (left <= 0 ? 'No messages left today' : left === 1 ? '1 message left today' : `${left} messages left today`),
+    couldNotFinish: 'The assistant could not finish. Please ask again, in other words.',
   },
   dates: dateFormats('en'),
 };

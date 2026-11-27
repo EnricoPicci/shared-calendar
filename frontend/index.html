@@ -916,14 +916,14 @@
            after the screens and in none of them, mounted once for a person's whole session.
            Collapsed, it is one bar: the heading and the field. Open, the part .talk shows the
            conversation between the two. Every text of a conversation is set as plain text. -->
-      <section id="assistant" class="assistant" aria-label="Assistant" hidden>
+      <section id="assistant" class="assistant" aria-labelledby="assistant-name" hidden>
         <div class="assistant-head">
-          <h2><button type="button" class="toggle" aria-expanded="false" aria-controls="assistant-talk">Assistant</button></h2>
-          <button type="button" class="end" hidden>New conversation</button>
-          <button type="button" class="collapse" hidden>Close</button>
+          <h2><button type="button" id="assistant-name" class="toggle" aria-expanded="false" aria-controls="assistant-talk" data-text="assistant.toggle"></button></h2>
+          <button type="button" class="end" data-text="assistant.end" hidden></button>
+          <button type="button" class="collapse" data-text="common.close" hidden></button>
         </div>
         <div id="assistant-talk" class="talk" hidden>
-          <p class="processed">This conversation is processed by Anthropic's Claude.</p>
+          <p class="processed" data-text="assistant.processed"></p>
           <ol class="messages"></ol>
           <!-- One message: who wrote it, in words, and its text -->
           <template id="tpl-message">
@@ -950,8 +950,8 @@
           <p class="remaining"></p>
         </div>
         <form class="compose">
-          <label>Message <input name="message" autocomplete="off" enterkeyhint="send" /></label>
-          <button class="primary send">Send</button>
+          <label><span data-text="assistant.message"></span> <input name="message" autocomplete="off" enterkeyhint="send" /></label>
+          <button class="primary send" data-text="assistant.send"></button>
         </form>
       </section>
     </div>

@@ -147,7 +147,7 @@ function sessionObjects(config: ShellConfig, store: SessionStore, person: Person
   // must load again: the screens are handed one stream for both, and none of them knows the
   // panel (docs/FRONTEND_ARCHITECTURE.md section 6.1). The panel is told the role, as the week
   // is, to say a refused change for it.
-  const assistant = new AssistantScreen(new AssistantService(config, store), person.role);
+  const assistant = new AssistantScreen(new AssistantService(config, store), person.role, texts);
   const again$ = merge(visible$, assistant.changed$);
   const now = () => new Date();
   const week = new WeekScreen(calendar, appointments, person.role, now, again$, texts);

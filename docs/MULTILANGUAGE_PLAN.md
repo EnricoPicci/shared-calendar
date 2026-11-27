@@ -2,7 +2,7 @@
 
 **Version:** v1 (2026-11-27): the plan, after the Product Owner's eight decisions of the brief
 and the answer to one question of planning (section 2). v2 (2026-11-27): phase A started with
-brief `prompts/lang-l03-phase-a-implementation.md`; steps l1, l2 and groups l3a to l3f done.
+brief `prompts/lang-l03-phase-a-implementation.md`; steps l1, l2 and l3 done.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -583,7 +583,25 @@ frontend 3191 tests, 100 % lines. The look, padded, at both widths, as the Admin
 types, the patterns with their validity, a single date with "This day only" open, the dialog
 that confirms; everything fits; nothing for section 8.
 
-**As done (group l3g).** *Empty.*
+**As done (group l3g).** Done 2026-11-27. `PageTexts` gained `assistant` (`AssistantTexts`:
+who wrote a message, what became of a change of a proposal, the line of the messages left, the
+line of an exchange that did not finish); what the server words in the conversation's language
+stays `shared/`'s `assistantTexts`. The keys: `assistant.*` (the toggle, "New conversation", the
+line on Anthropic, the field, "Send"); "Close" is `common.close`. `messageRows`,
+`proposalShown`, `remainingText` and the five functions of a failed call take the texts first;
+`COULD_NOT_FINISH` went into the texts; `AssistantScreen` takes the page texts in its
+constructor. One change of the page: the panel's name for a screen reader, which was its own
+`aria-label`, is the words of its toggle button (`aria-labelledby`), the same "Assistant": a
+name filled by the script lands after `hidden`, and the panel, which the shell shows and hides,
+would not be the page as written after a sign-out. The closing: the list of D6 and its test are
+gone, "the page holds no words" covers the whole page; the list of files taking English straight
+is the shell alone, which starts the page in a language; a search of `src/logic` and `src/views`
+finds no sentence (import paths, selectors, the key "Escape" and the error of an unknown key
+only). The budgets found by the looks are written (group l3c's three); the three rows of
+section 8 stay for phase B. Tests: frontend 3190 (the test of the parts not yet moved went),
+100 % lines; shared 660, backend 2058; the front end's journeys, whole, 101 passed. The look,
+padded, at both widths: the panel open with a message and its answer from the fake Claude;
+everything fits; nothing for section 8.
 
 ### Step l4 — Italian on the pages, per browser
 

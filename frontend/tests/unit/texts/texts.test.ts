@@ -66,6 +66,8 @@ const SAMPLES: Record<string, unknown[]> = {
   'date.reopenQuestion': ['Monday 23 November 2026'],
   'date.removeLabel': ['09:00 – 10:00', 'Studio'],
   'date.draftFull': [5],
+  'assistant.notDone': ['The time is taken.'],
+  'assistant.remaining': [3],
   'password.problems.too_long': [256],
   'password.problems.no_symbol': ['^ $ * .'],
   'dates.shortDate': ['2026-11-16'],
@@ -148,10 +150,8 @@ describe('the padded test language (6.3)', () => {
   });
 });
 
-// While the screens are moved onto the page texts group by group
-// (docs/MULTILANGUAGE_PLAN.md decision D6), the files of the logic layer and the views not yet
-// moved take the English texts straight. The list only shortens; the last group leaves the shell
-// alone in it, which starts the page in a language.
+// The logic layer and the views take the texts of the language in use, handed in: only the
+// shell, which starts the page in a language, takes the English texts straight.
 describe('the files that take the English texts straight', () => {
   const SRC = `${import.meta.dirname}/../../../src`;
   const inFolder = (folder: string) =>
@@ -159,10 +159,7 @@ describe('the files that take the English texts straight', () => {
       .filter((name) => name.endsWith('.ts') && readFileSync(`${SRC}/${folder}/${name}`, 'utf8').includes("from '../texts/texts.en'"))
       .map((name) => `${folder}/${name}`);
 
-  it('are those not yet moved, and no other', () => {
-    expect([...inFolder('logic'), ...inFolder('views')].sort()).toEqual([
-      'logic/assistant.model.ts',
-      'views/shell.ts',
-    ]);
+  it('are the shell alone', () => {
+    expect([...inFolder('logic'), ...inFolder('views')]).toEqual(['views/shell.ts']);
   });
 });

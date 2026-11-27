@@ -21,16 +21,11 @@ function textKeys(value: unknown, path = ''): string[] {
   return [path];
 }
 
-// The parts of the page whose words have not been moved to keys yet
-// (docs/MULTILANGUAGE_PLAN.md decision D6): the list only shortens, and goes with the last group.
-const NOT_YET_MOVED = ['#assistant'];
-
 // The texts of a part of the page that a person could read: its text nodes, comments not
 // included, and the names for a screen reader written straight into it. Inside a template too.
-function wordsOf(root: ParentNode, skip: readonly string[]): string[] {
+function wordsOf(root: ParentNode): string[] {
   const words: string[] = [];
   const walk = (node: Node) => {
-    if (node instanceof Element && skip.some((selector) => node.matches(selector))) return;
     if (node.nodeType === 3 && /\p{L}/u.test(node.textContent ?? '')) words.push(node.textContent!.trim());
     if (node instanceof Element) {
       for (const name of ['aria-label', 'placeholder', 'title', 'alt']) if (node.hasAttribute(name)) words.push(`${name}="${node.getAttribute(name)}"`);
@@ -61,15 +56,10 @@ describe('the keys of index.html', () => {
     for (const element of pageAside(false).querySelectorAll('[data-text]')) expect(element.textContent, (element as HTMLElement).dataset.text).toBe('');
   });
 
-  it('the page as written holds no words outside the parts not yet moved, and its title is empty', () => {
+  it('the page as written holds no words, and its title is empty', () => {
     const page = pageAside(false);
-    expect(wordsOf(page, NOT_YET_MOVED)).toEqual([]);
+    expect(wordsOf(page)).toEqual([]);
     expect(page.querySelector('title')!.textContent).toBe('');
-  });
-
-  it('each part not yet moved is in the page', () => {
-    const page = pageAside(false);
-    for (const selector of NOT_YET_MOVED) expect(page.querySelector(selector), selector).not.toBeNull();
   });
 });
 

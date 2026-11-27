@@ -727,7 +727,9 @@ describe('index.html', () => {
       expect(panel().parentElement!.id).toBe('app');
       expect(panel().closest('main')).toBeNull();
       expect(document.querySelector('main.screen')!.compareDocumentPosition(panel()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect([panel().tagName, panel().getAttribute('aria-label'), panel().hidden, panel().className]).toEqual(['SECTION', 'Assistant', true, 'assistant']);
+      // Its name is the words of its own button, which opens and closes it.
+      const name = document.getElementById(panel().getAttribute('aria-labelledby')!)!;
+      expect([panel().tagName, name.textContent, panel().contains(name), panel().hidden, panel().className]).toEqual(['SECTION', 'Assistant', true, true, 'assistant']);
       // It is no screen: the navigation is filled by the script from the table of screens, and
       // no link of the page leads to it.
       expect(document.querySelectorAll('a[href*="assistant"]')).toHaveLength(0);
