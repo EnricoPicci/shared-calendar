@@ -2,7 +2,7 @@
 
 **Version:** v1 (2026-11-27): the plan, after the Product Owner's eight decisions of the brief
 and the answer to one question of planning (section 2). v2 (2026-11-27): phase A started with
-brief `prompts/lang-l03-phase-a-implementation.md`; steps l1, l2 and groups l3a to l3c done.
+brief `prompts/lang-l03-phase-a-implementation.md`; steps l1, l2 and groups l3a to l3d done.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -521,7 +521,28 @@ Administrator with `seed:local`'s week: the toolbar, the zone's line, a slot's p
 book dialog, the detail dialog, the banner of a move, the "E-mail…" dialog; two things for
 section 8.
 
-**As done (group l3d).** *Empty.*
+**As done (group l3d).** Done 2026-11-27. `PageTexts` gained `list` (`ListTexts`: what
+became of an appointment, the two empty lists, the three refusals of a period), `profile`
+(`ProfileTexts`: the rule of each of the four facts as a function of the shared rule's longest,
+and "Not set") and `users` (`UsersTexts`: the state of an account in words, the names of a
+row's buttons, the invitation's two sentences, a failed creation, the empty list, the username's
+hint, the question before a deletion). The keys: `common.edit`, `save`, `delete`, `back`,
+`confirm`, `retry`; `appointments.*`, `profile.*` (the four facts' labels, shared by the forms
+of "Users", the two Edit dialogs and the list of "My details"), `users.*`, `me.*`; the
+username's label and term reuse `login.username`, the role's words `frame.roles`. The models
+take the texts first (`appointmentRows`, `emptyText`, `periodRefusal`, `meDetails`,
+`profileRefusals`, `recheck`, `profileFor`, `userRows`, `usernameFor`); `PROFILE_RULES` became
+`profileRules(texts)`; `NOT_SET`, `NO_USERS`, `USERNAME_HINT`, `CREATE_FAILED`,
+`inviteQuestion`, `invitedAnswer`, `editTitle` and `deleteQuestion` left the logic for the
+texts (the Edit dialog's title is the edit button's name, `users.edit`). Found and mended: a
+row of "Users" showed the state's code (`invited`, `active`) as its text; it shows
+`UserRow.statusText` now, the same English words. `AppointmentsScreen`, `MeScreen` and
+`UsersScreen` take the page texts in their constructors; `mountUsers` gets `texts`. Tests: the
+calls given the English texts, the expectations unchanged; the list of D6 is down to
+`#settings`, `#availability` and `#assistant`; the list of files taking English straight lost
+five. frontend 3191 tests, 100 % lines. The look, padded, at both widths: "Users" with its row,
+the dialog of a deletion, "My details" with its Edit dialog (as the Administrator), "My
+appointments" with the history and a refused period (as alice); one thing for section 8.
 
 **As done (group l3e).** *Empty.*
 
@@ -850,6 +871,7 @@ phase B, item 3.
 |---|---|---|---|---|
 | l3c | The detail dialog, 390 and 1280, padded | Its three buttons ("Close", "Change", "Cancel appointment") take two rows: "Cancel appointment" goes alone to the second, right-aligned. In English they take one. | Nothing: the wrap is the style sheet's, clean and readable. | Look again in Italian in item 3 ("Annulla appuntamento" is about as long as the padded English); keep the wrap if it reads as well. |
 | l3c | The week, a slot's narrow tab beside appointments, 1280, padded | "⟦Full··⟧" fills the narrow tab and its last marks are cut. | Nothing: the tab is a few characters wide by design; the budget of 8 characters binds the real languages (`week.full`, `week.tabLeft`). | Nothing, unless the Italian ("Pieno", "2 liberi") is cut too. |
+| l3d | "Users", a row of the list, 1280, padded | "⟦Delete··⟧" goes to a second line of the row, under the username. | Nothing: the row wraps by the style sheet and stays readable. | Look in Italian ("Elimina", "Invita di nuovo" beside "Modifica"); keep the wrap if it reads well. |
 
 ## 9. Beside the other work
 

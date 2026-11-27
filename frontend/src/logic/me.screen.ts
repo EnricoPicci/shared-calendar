@@ -2,11 +2,11 @@ import type { Role } from '@shared-calendar/shared';
 import { BehaviorSubject, type Observable, type Subscription } from 'rxjs';
 import type { MeService } from '../services/me.service';
 import type { UsersService } from '../services/users.service';
+import type { PageTexts } from '../texts/texts';
 import { meDetails, meFields, type MeDetails } from './me.model';
 import { NO_REFUSALS, profileFor, recheck, type ProfileFields } from './profile.model';
 import { failureText } from './texts';
 import type { EditState, UpdateOutcome } from './users.screen';
-import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // "My details" (docs/FRONTEND_ARCHITECTURE.md section 5.1), a screen of both roles: the person's
 // own four facts, read when the screen is shown and every time the page becomes visible, and for
@@ -49,6 +49,9 @@ export class MeScreen {
     private readonly users: MeUpdateCalls,
     private readonly role: Role,
     private readonly visible$: Observable<unknown>,
+    // The page texts of the language in use, kept for the screen's life
+    // (docs/MULTILANGUAGE_PLAN.md decision D2).
+    private readonly texts: PageTexts,
   ) {
     this.state = new BehaviorSubject<MeState>(this.nothing());
     this.me$ = this.state.asObservable();
@@ -66,11 +69,11 @@ export class MeScreen {
       if (!live) return;
       if (result.status === 'failure') {
         this.username = null;
-        this.patch({ loading: false, unread: failureText(PAGE_TEXTS_EN.failures, result.reason), details: null, fields: null });
+        this.patch({ loading: false, unread: failureText(this.texts.failures, result.reason), details: null, fields: null });
         return;
       }
       this.username = result.me.username;
-      this.patch({ loading: false, unread: null, details: meDetails(result.me), fields: meFields(result.me) });
+      this.patch({ loading: false, unread: null, details: meDetails(this.texts, result.me), fields: meFields(result.me) });
     });
     subscription.add(
       this.users.updateUserResult$.subscribe((result) => {
@@ -78,7 +81,7 @@ export class MeScreen {
         this.editAsked = false;
         const edit = this.state.getValue().edit;
         if (result.status === 'success') this.patch({ edit: { ...edit, saving: false, saved: {} } });
-        else this.patch({ edit: { ...edit, saving: false, failure: failureText(PAGE_TEXTS_EN.failures, result.reason) } });
+        else this.patch({ edit: { ...edit, saving: false, failure: failureText(this.texts.failures, result.reason) } });
         this.read();
       }),
     );
@@ -113,7 +116,7 @@ export class MeScreen {
   editTyped(fields: ProfileFields): void {
     if (!this.started) return;
     const edit = this.state.getValue().edit;
-    this.patch({ edit: { ...edit, refusals: recheck(fields, edit.refusals) } });
+    this.patch({ edit: { ...edit, refusals: recheck(this.texts.profile, fields, edit.refusals) } });
   }
 
   // "Save": the Administrator's own four facts, checked, then sent. Nothing for a User, nothing
@@ -122,7 +125,7 @@ export class MeScreen {
     if (!this.started || this.role !== 'admin' || this.username === null) return;
     const edit = this.state.getValue().edit;
     if (edit.saving) return;
-    const checked = profileFor(fields);
+    const checked = profileFor(this.texts.profile, fields);
     if ('refusals' in checked) {
       this.patch({ edit: { ...edit, refusals: checked.refusals, failure: null } });
       return;

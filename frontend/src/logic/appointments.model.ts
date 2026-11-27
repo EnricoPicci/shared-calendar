@@ -1,11 +1,11 @@
 import { addDays, CALENDAR_LIMITS, localDateOf, type Appointment } from '@shared-calendar/shared';
+import type { ListTexts, PageTexts } from '../texts/texts';
 import { offsetChangesOn, rangeText } from './texts';
-import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The list of "My appointments" ready to draw (docs/FRONTEND_ARCHITECTURE.md section 5.1): the
 // appointments as the API answers them (docs/SHARED_CALENDAR_SPEC.md section 11.5) turned into
 // rows of texts, the period of the history (its default and its own checks) and the sentences
-// of the list. Pure: "now" and the calendar's time zone are arguments.
+// of the list. Pure: the page texts, "now" and the calendar's time zone are arguments.
 
 // What an appointment is at "now". "ended" is derived from the clock, never stored
 // (docs/SHARED_CALENDAR_SPEC.md section 8.1).
@@ -21,8 +21,6 @@ export type AppointmentRow = {
   status: string; // the kind in words
 };
 
-const STATUS_IN_WORDS: Record<AppointmentKind, string> = { booked: 'Booked', ended: 'Ended', cancelled: 'Cancelled', changed: 'Changed' };
-
 // A cancelled appointment says why only when it was moved to another time: an explicit
 // cancellation and the deletion of its User are both "cancelled"
 // (docs/SHARED_CALENDAR_SPEC.md decision D19). A booked one has ended when its end is not after
@@ -33,17 +31,17 @@ function kindOf(appointment: Appointment, now: Date): AppointmentKind {
 }
 
 // One row per appointment, in the order given, which is the server's: by start.
-export function appointmentRows(appointments: readonly Appointment[], now: Date, zone: string): AppointmentRow[] {
+export function appointmentRows(texts: PageTexts, appointments: readonly Appointment[], now: Date, zone: string): AppointmentRow[] {
   return appointments.map((appointment) => {
     const kind = kindOf(appointment, now);
     return {
       appointmentId: appointment.appointmentId,
-      date: PAGE_TEXTS_EN.dates.shortDate(appointment.date),
+      date: texts.dates.shortDate(appointment.date),
       time: rangeText(appointment.start, appointment.end, zone, offsetChangesOn(appointment.date, zone)),
       typeName: appointment.typeName,
       note: appointment.note ?? '',
       kind,
-      status: STATUS_IN_WORDS[kind],
+      status: texts.list.status[kind],
     };
   });
 }
@@ -52,8 +50,8 @@ export function appointmentRows(appointments: readonly Appointment[], now: Date,
 // whatever became of them (docs/SHARED_CALENDAR_SPEC.md R-VIEW-01).
 export type Mode = 'upcoming' | 'history';
 
-export function emptyText(mode: Mode): string {
-  return mode === 'upcoming' ? 'You have no upcoming appointments.' : 'There are no appointments in this period.';
+export function emptyText(texts: ListTexts, mode: Mode): string {
+  return mode === 'upcoming' ? texts.emptyUpcoming : texts.emptyHistory;
 }
 
 // The period of the history: two local dates, both included.
@@ -72,10 +70,10 @@ export function defaultPeriod(now: Date, zone: string): Period {
 // date missing (an empty field), the first date after the last, or more days than one list may
 // hold (docs/SHARED_CALENDAR_SPEC.md section 11.2). Whatever else is wrong with a date is the
 // service's and the server's to say.
-export function periodRefusal(from: string, to: string): string | null {
-  if (from === '' || to === '') return 'Choose both dates.';
-  if (from > to) return 'The first date is after the last one.';
+export function periodRefusal(texts: ListTexts, from: string, to: string): string | null {
+  if (from === '' || to === '') return texts.bothDates;
+  if (from > to) return texts.firstAfterLast;
   const days = CALENDAR_LIMITS.appointmentListDays;
-  if (to > addDays(from, days - 1)) return `A period can be at most ${days} days long. Choose a shorter one.`;
+  if (to > addDays(from, days - 1)) return texts.periodTooLong(days);
   return null;
 }

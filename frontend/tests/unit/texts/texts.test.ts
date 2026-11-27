@@ -28,6 +28,17 @@ const SAMPLES: Record<string, unknown[]> = {
   'appointment.bookedBy': ['admin', 'Thu 19 Nov, 13:24'],
   'appointment.until': ['Sun 22 Nov, 10:00'],
   'mail.sentTo': ['a•••@example.com'],
+  'list.periodTooLong': [92],
+  'profile.givenName': [100],
+  'profile.familyName': [100],
+  'profile.email': [254],
+  'profile.address': [500],
+  'users.edit': ['alice'],
+  'users.resend': ['alice'],
+  'users.remove': ['alice'],
+  'users.inviteQuestion': ['anna@example.com'],
+  'users.invitedAnswer': ['anna@example.com'],
+  'users.deleteQuestion': ['alice'],
   'password.problems.too_long': [256],
   'password.problems.no_symbol': ['^ $ * .'],
   'dates.shortDate': ['2026-11-16'],
@@ -123,8 +134,6 @@ describe('the files that take the English texts straight', () => {
 
   it('are those not yet moved, and no other', () => {
     expect([...inFolder('logic'), ...inFolder('views')].sort()).toEqual([
-      'logic/appointments.model.ts',
-      'logic/appointments.screen.ts',
       'logic/assistant.model.ts',
       'logic/availability.model.ts',
       'logic/availability.screen.ts',
@@ -132,13 +141,10 @@ describe('the files that take the English texts straight', () => {
       'logic/daily-mail.screen.ts',
       'logic/date.model.ts',
       'logic/date.screen.ts',
-      'logic/me.screen.ts',
       'logic/settings.model.ts',
       'logic/settings.screen.ts',
-      'logic/users.screen.ts',
       'views/availability.view.ts',
       'views/shell.ts',
-      'views/users.view.ts',
     ]);
   });
 });

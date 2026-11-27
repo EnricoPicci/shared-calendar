@@ -2,6 +2,7 @@ import { CALENDAR_LIMITS, type Appointment } from '@shared-calendar/shared';
 import { appointmentRows, defaultPeriod, emptyText, periodRefusal } from '../../../src/logic/appointments.model';
 import { appointment } from './fixtures';
 import { useFarBrowserZone } from './zone';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 const z = (instant: string) => `${instant}:00.000Z`;
 const at = (instant: string) => new Date(instant);
@@ -9,14 +10,14 @@ const at = (instant: string) => new Date(instant);
 // Monday 23 November 2026, 10:00–11:00 in Rome.
 const MONDAY = appointment({ appointmentId: '01M6DMQ0000000000000000001', start: z('2026-11-23T09:00'), end: z('2026-11-23T10:00'), date: '2026-11-23', note: 'First lesson' });
 const BEFORE = at('2026-11-20T08:00:00.000Z');
-const row = (over: Partial<Appointment> = {}, now = BEFORE, zone = 'Europe/Rome') => appointmentRows([{ ...MONDAY, ...over }], now, zone)[0]!;
+const row = (over: Partial<Appointment> = {}, now = BEFORE, zone = 'Europe/Rome') => appointmentRows(PAGE_TEXTS_EN, [{ ...MONDAY, ...over }], now, zone)[0]!;
 
 // Test names: section numbers are those of docs/SHARED_CALENDAR_SPEC.md.
 describe('appointmentRows', () => {
   useFarBrowserZone();
 
   it('a row: the id, the date, the time, the type, the note and the status in words', () => {
-    expect(appointmentRows([MONDAY], BEFORE, 'Europe/Rome')).toEqual([
+    expect(appointmentRows(PAGE_TEXTS_EN, [MONDAY], BEFORE, 'Europe/Rome')).toEqual([
       { appointmentId: '01M6DMQ0000000000000000001', date: 'Mon 23 Nov', time: '10:00–11:00', typeName: 'Studio', note: 'First lesson', kind: 'booked', status: 'Booked' },
     ]);
   });
@@ -74,7 +75,7 @@ describe('appointmentRows', () => {
     it('on the night the clocks go back the two hours with the same name carry their offsets', () => {
       const first = { start: z('2027-10-31T00:00'), end: z('2027-10-31T01:00'), date: '2027-10-31' };
       const second = { start: z('2027-10-31T01:00'), end: z('2027-10-31T02:00'), date: '2027-10-31' };
-      const rows = appointmentRows([{ ...MONDAY, ...first }, { ...MONDAY, ...second }], BEFORE, 'Europe/Rome');
+      const rows = appointmentRows(PAGE_TEXTS_EN, [{ ...MONDAY, ...first }, { ...MONDAY, ...second }], BEFORE, 'Europe/Rome');
       expect(rows.map((r) => [r.date, r.time])).toEqual([
         ['Sun 31 Oct', '02:00 +02:00 – 02:00 +01:00'],
         ['Sun 31 Oct', '02:00 +01:00 – 03:00 +01:00'],
@@ -85,15 +86,15 @@ describe('appointmentRows', () => {
   it('the order is the one given, which is the server\'s; an empty list gives no row', () => {
     const later = { ...MONDAY, appointmentId: 'b', start: z('2026-11-24T09:00'), end: z('2026-11-24T10:00'), date: '2026-11-24' };
     const earlier = { ...MONDAY, appointmentId: 'a' };
-    expect(appointmentRows([later, earlier], BEFORE, 'Europe/Rome').map((r) => r.appointmentId)).toEqual(['b', 'a']);
-    expect(appointmentRows([], BEFORE, 'Europe/Rome')).toEqual([]);
+    expect(appointmentRows(PAGE_TEXTS_EN, [later, earlier], BEFORE, 'Europe/Rome').map((r) => r.appointmentId)).toEqual(['b', 'a']);
+    expect(appointmentRows(PAGE_TEXTS_EN, [], BEFORE, 'Europe/Rome')).toEqual([]);
   });
 });
 
 describe('emptyText', () => {
   it('one sentence per mode', () => {
-    expect(emptyText('upcoming')).toBe('You have no upcoming appointments.');
-    expect(emptyText('history')).toBe('There are no appointments in this period.');
+    expect(emptyText(PAGE_TEXTS_EN.list, 'upcoming')).toBe('You have no upcoming appointments.');
+    expect(emptyText(PAGE_TEXTS_EN.list, 'history')).toBe('There are no appointments in this period.');
   });
 });
 
@@ -120,7 +121,7 @@ describe('defaultPeriod', () => {
 
   it('is within what one list may hold', () => {
     const { from, to } = defaultPeriod(at('2026-11-19T10:00:00.000Z'), 'Europe/Rome');
-    expect(periodRefusal(from, to)).toBeNull();
+    expect(periodRefusal(PAGE_TEXTS_EN.list, from, to)).toBeNull();
   });
 });
 
@@ -128,28 +129,28 @@ describe('periodRefusal', () => {
   const LIMIT = CALENDAR_LIMITS.appointmentListDays;
 
   it('a date missing: one sentence, whichever is missing', () => {
-    for (const [from, to] of [['', '2026-11-19'], ['2026-11-01', ''], ['', '']] as const) expect(periodRefusal(from, to)).toBe('Choose both dates.');
+    for (const [from, to] of [['', '2026-11-19'], ['2026-11-01', ''], ['', '']] as const) expect(periodRefusal(PAGE_TEXTS_EN.list, from, to)).toBe('Choose both dates.');
   });
 
   it('the first date after the last', () => {
-    expect(periodRefusal('2026-11-20', '2026-11-19')).toBe('The first date is after the last one.');
-    expect(periodRefusal('2027-01-01', '2026-12-31')).toBe('The first date is after the last one.');
+    expect(periodRefusal(PAGE_TEXTS_EN.list, '2026-11-20', '2026-11-19')).toBe('The first date is after the last one.');
+    expect(periodRefusal(PAGE_TEXTS_EN.list, '2027-01-01', '2026-12-31')).toBe('The first date is after the last one.');
   });
 
   it('one day is a period', () => {
-    expect(periodRefusal('2026-11-19', '2026-11-19')).toBeNull();
+    expect(periodRefusal(PAGE_TEXTS_EN.list, '2026-11-19', '2026-11-19')).toBeNull();
   });
 
   it('as many days as the limit of shared/ are accepted, one more is refused, with the number in the sentence', () => {
     expect(LIMIT).toBe(92);
     // 1 September to 1 December 2026 is 92 days, both included.
-    expect(periodRefusal('2026-09-01', '2026-12-01')).toBeNull();
-    expect(periodRefusal('2026-09-01', '2026-12-02')).toBe(`A period can be at most ${LIMIT} days long. Choose a shorter one.`);
-    expect(periodRefusal('2026-09-01', '2026-12-02')).toBe('A period can be at most 92 days long. Choose a shorter one.');
+    expect(periodRefusal(PAGE_TEXTS_EN.list, '2026-09-01', '2026-12-01')).toBeNull();
+    expect(periodRefusal(PAGE_TEXTS_EN.list, '2026-09-01', '2026-12-02')).toBe(`A period can be at most ${LIMIT} days long. Choose a shorter one.`);
+    expect(periodRefusal(PAGE_TEXTS_EN.list, '2026-09-01', '2026-12-02')).toBe('A period can be at most 92 days long. Choose a shorter one.');
   });
 
   it('a period may hold future dates, and may be across a year', () => {
-    expect(periodRefusal('2026-12-15', '2027-03-01')).toBeNull();
-    expect(periodRefusal('2030-01-01', '2030-03-01')).toBeNull();
+    expect(periodRefusal(PAGE_TEXTS_EN.list, '2026-12-15', '2027-03-01')).toBeNull();
+    expect(periodRefusal(PAGE_TEXTS_EN.list, '2030-01-01', '2030-03-01')).toBeNull();
   });
 });

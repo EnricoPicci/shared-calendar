@@ -7,7 +7,21 @@ const GENERAL = 'Something went wrong. Please try again.';
 // notes beside them say why a sentence reads as it does.
 export const PAGE_TEXTS_EN: PageTexts = {
   html: {
-    common: { cancel: 'Cancel', close: 'Close', note: 'Note', change: 'Change', loading: 'Loading…', from: 'From', to: 'To' },
+    common: {
+      cancel: 'Cancel',
+      close: 'Close',
+      note: 'Note',
+      change: 'Change',
+      loading: 'Loading…',
+      from: 'From',
+      to: 'To',
+      edit: 'Edit',
+      save: 'Save',
+      delete: 'Delete',
+      back: 'Back',
+      confirm: 'Confirm',
+      retry: 'Try again',
+    },
     frame: { title: 'Shared calendar', signOut: 'Sign out', screens: 'Screens' },
     login: { username: 'Username', password: 'Password', signIn: 'Sign in' },
     choose: {
@@ -53,6 +67,24 @@ export const PAGE_TEXTS_EN: PageTexts = {
       submit: 'Book',
     },
     mail: { title: 'E-mail the appointments', send: 'Send' },
+    appointments: { upcoming: 'Upcoming', history: 'History', show: 'Show' },
+    profile: { givenName: 'First name', familyName: 'Last name', email: 'E-mail', address: 'Postal address' },
+    users: {
+      heading: 'Users',
+      create: 'Create user',
+      retryLabel: 'Try again to read the users',
+      resend: 'Resend invitation',
+      inviteTitle: 'Send an invitation',
+      deleteUser: 'Delete user',
+      keep: 'Keep',
+    },
+    me: {
+      heading: 'My details',
+      retryLabel: 'Try again to read your details',
+      role: 'Role',
+      about: 'To change your details, ask the Administrator.',
+      editTitle: 'Edit my details',
+    },
     detail: { title: 'Appointment', when: 'When', type: 'Type', forUser: 'For', saveNote: 'Save note', cancelAppointment: 'Cancel appointment' },
   },
   frame: {
@@ -223,6 +255,41 @@ export const PAGE_TEXTS_EN: PageTexts = {
     },
     sentTo: (maskedAddress) => `On its way to ${maskedAddress}`,
     sentNoAddress: 'On its way to your e-mail address',
+  },
+  list: {
+    status: { booked: 'Booked', ended: 'Ended', cancelled: 'Cancelled', changed: 'Changed' },
+    emptyUpcoming: 'You have no upcoming appointments.',
+    emptyHistory: 'There are no appointments in this period.',
+    bothDates: 'Choose both dates.',
+    firstAfterLast: 'The first date is after the last one.',
+    periodTooLong: (days) => `A period can be at most ${days} days long. Choose a shorter one.`,
+  },
+  // The rules' words are held to the shared schemas by the test of src/logic/profile.model.ts.
+  profile: {
+    givenName: (longest) => `A first name has 1 to ${longest} characters, on one line.`,
+    familyName: (longest) => `A last name has 1 to ${longest} characters, on one line.`,
+    email: (longest) => `An e-mail address, such as anna.rossi@example.com, of at most ${longest} characters.`,
+    address: (longest) => `A postal address has 1 to ${longest} characters, on one or more lines.`,
+    notSet: 'Not set',
+  },
+  users: {
+    status: { invited: 'invited', active: 'active' },
+    edit: (username) => `Edit ${username}`,
+    resend: (username) => `Resend the invitation to ${username}`,
+    remove: (username) => `Delete ${username}`,
+    inviteQuestion: (email) => `An invitation will be sent to ${email}.`,
+    invitedAnswer: (email) => `An invitation was sent to ${email}.`,
+    // The route deletes an account it made but could not finish, so nothing is kept and the same
+    // username can be tried again (docs/EMAIL_ARCHITECTURE.md section 5.1).
+    createFailed: 'The user could not be created, and nothing was kept. Please try again in a moment.',
+    noUsers: 'There are no users yet.',
+    // What a username is (docs/ARCHITECTURE.md section 4): the hint under the field and the
+    // refusal of a text that is not one; the test of src/logic/users.model.ts holds it to the
+    // shared schema.
+    usernameHint: 'A username has 3 to 32 characters: lowercase letters, digits, ".", "_" and "-", starting with a letter or a digit.',
+    // Whom, what happens to their appointments (docs/SHARED_CALENDAR_SPEC.md section 10.2), and
+    // that there is no way back.
+    deleteQuestion: (username) => `Delete ${username}? Their future appointments will be cancelled. This cannot be undone.`,
   },
   dates: dateFormats('en'),
 };

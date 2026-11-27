@@ -1,10 +1,10 @@
 import { BehaviorSubject, type Observable, type Subscription } from 'rxjs';
 import type { NewUser, UsersService } from '../services/users.service';
 import type { CreateUserFailureReason, ResendInvitationFailureReason, UpdateUserFailureReason } from '../services/users.types';
+import type { PageTexts } from '../texts/texts';
 import { EMPTY_FIELDS, NO_REFUSALS, profileFor, recheck, type ProfileFields, type ProfileRefusals } from './profile.model';
 import { failureText } from './texts';
-import { CREATE_FAILED, invitedAnswer, inviteQuestion, NO_USERS, sameRow, userRows, usernameFor, type UserRow } from './users.model';
-import { PAGE_TEXTS_EN } from '../texts/texts.en';
+import { sameRow, userRows, usernameFor, type UserRow } from './users.model';
 
 // The users screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the list of users read when
 // the screen is shown; a user created from what the form holds, after a last look at the address
@@ -100,6 +100,9 @@ export class UsersScreen {
   constructor(
     private readonly users: UsersCalls,
     private readonly visible$: Observable<unknown>,
+    // The page texts of the language in use, kept for the screen's life
+    // (docs/MULTILANGUAGE_PLAN.md decision D2).
+    private readonly texts: PageTexts,
   ) {}
 
   // Called once the view has subscribed (docs/FRONTEND_ARCHITECTURE.md section 5, rule 5): reads
@@ -119,15 +122,15 @@ export class UsersScreen {
       if (!live) return;
       if (result.status === 'failure') {
         // A list that could not be read again is not left on show as if it were the present one.
-        this.patch({ loading: false, unread: failureText(PAGE_TEXTS_EN.failures, result.reason), rows: null, empty: null });
+        this.patch({ loading: false, unread: failureText(this.texts.failures, result.reason), rows: null, empty: null });
         return;
       }
-      const read = userRows(result.users);
+      const read = userRows(this.texts.users, result.users);
       // The same users as on show keep the same object, so that the view redraws nothing.
       const shown = this.state.getValue().rows;
       const same = shown !== null && shown.length === read.length && read.every((row, i) => sameRow(row, shown[i]!));
       const rows = same ? shown : read;
-      this.patch({ loading: false, unread: null, rows, empty: rows.length === 0 ? NO_USERS : null });
+      this.patch({ loading: false, unread: null, rows, empty: rows.length === 0 ? this.texts.users.noUsers : null });
     });
     subscription.add(
       this.users.createUserResult$.subscribe((result) => {
@@ -151,7 +154,7 @@ export class UsersScreen {
         this.editAsked = false;
         const edit = this.state.getValue().edit;
         if (result.status === 'success') this.patch({ edit: { ...edit, saving: false, saved: {} } });
-        else this.patch({ edit: { ...edit, saving: false, failure: failureText(PAGE_TEXTS_EN.failures, result.reason) } });
+        else this.patch({ edit: { ...edit, saving: false, failure: failureText(this.texts.failures, result.reason) } });
         this.read();
       }),
     );
@@ -182,7 +185,7 @@ export class UsersScreen {
   // once it is right.
   typed(fields: NewUserFields): void {
     if (!this.started) return;
-    this.patch({ refusals: recheck(fields, this.state.getValue().refusals) });
+    this.patch({ refusals: recheck(this.texts.profile, fields, this.state.getValue().refusals) });
   }
 
   // "Create user", with the form as it holds it. A username or a fact that is not one is said
@@ -191,8 +194,8 @@ export class UsersScreen {
   // section 4, docs/EMAIL_ARCHITECTURE.md sections 4.1 and 5.3.1).
   create(fields: NewUserFields): void {
     if (!this.started) return;
-    const checked = usernameFor(fields.username);
-    const profile = profileFor(fields);
+    const checked = usernameFor(this.texts.users, fields.username);
+    const profile = profileFor(this.texts.profile, fields);
     const refusal = 'refusal' in checked ? checked.refusal : null;
     const refusals = 'refusals' in profile ? profile.refusals : NO_REFUSALS;
     if (!('username' in checked) || !('profile' in profile)) {
@@ -231,7 +234,7 @@ export class UsersScreen {
   private ask(invitation: Invitation): void {
     this.invitation = invitation;
     this.inviteAsked = null;
-    this.patch({ invite: { question: inviteQuestion(invitation.email), sending: false, answer: null, failure: null } });
+    this.patch({ invite: { question: this.texts.users.inviteQuestion(invitation.email), sending: false, answer: null, failure: null } });
   }
 
   // The result of a creation or a resend, shown in the dialog that sent it, if it is still open.
@@ -239,10 +242,10 @@ export class UsersScreen {
     const invite = this.state.getValue().invite;
     if (this.inviteAsked !== kind || this.invitation === null || invite === null) return;
     this.inviteAsked = null;
-    if (result.status === 'success') this.patch({ invite: { ...invite, sending: false, answer: invitedAnswer(this.invitation.email) } });
+    if (result.status === 'success') this.patch({ invite: { ...invite, sending: false, answer: this.texts.users.invitedAnswer(this.invitation.email) } });
     else {
       // A creation the server failed says that nothing was kept; any other failure, its own sentence.
-      const failure = kind === 'create' && result.reason === 'internal_error' ? CREATE_FAILED : failureText(PAGE_TEXTS_EN.failures, result.reason);
+      const failure = kind === 'create' && result.reason === 'internal_error' ? this.texts.users.createFailed : failureText(this.texts.failures, result.reason);
       this.patch({ invite: { ...invite, sending: false, failure } });
     }
   }
@@ -256,7 +259,7 @@ export class UsersScreen {
   editTyped(fields: ProfileFields): void {
     if (!this.started) return;
     const edit = this.state.getValue().edit;
-    this.patch({ edit: { ...edit, refusals: recheck(fields, edit.refusals) } });
+    this.patch({ edit: { ...edit, refusals: recheck(this.texts.profile, fields, edit.refusals) } });
   }
 
   // "Save" in the Edit dialog of `username`: the four facts, checked, then sent. A save under way
@@ -265,7 +268,7 @@ export class UsersScreen {
     if (!this.started) return;
     const edit = this.state.getValue().edit;
     if (edit.saving) return;
-    const checked = profileFor(fields);
+    const checked = profileFor(this.texts.profile, fields);
     if ('refusals' in checked) {
       this.patch({ edit: { ...edit, refusals: checked.refusals, failure: null } });
       return;

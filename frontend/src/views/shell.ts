@@ -152,13 +152,13 @@ function sessionObjects(config: ShellConfig, store: SessionStore, person: Person
   const now = () => new Date();
   const week = new WeekScreen(calendar, appointments, person.role, now, again$, texts);
   // The list screen hands an appointment to move over to the week screen.
-  const list = new AppointmentsScreen(calendarSettings, appointments, week, person.role, now, again$);
+  const list = new AppointmentsScreen(calendarSettings, appointments, week, person.role, now, again$, texts);
   const settings = new SettingsScreen(calendarSettings);
   // The settings' "Daily e-mail": the daily mail's settings through a service of their own, and
   // the calendar's time zone from what the settings screen reads (docs/EMAIL_ARCHITECTURE.md
   // section 11).
   const daily = new DailyMailScreen(new MailSettingsService(config, store), calendarSettings);
-  const accounts = new UsersScreen(users, again$);
+  const accounts = new UsersScreen(users, again$, texts);
   const types = new AvailabilityTypesService(config, store);
   const rules = new AvailabilityRulesService(config, store);
   const availability = new AvailabilityScreen(calendarSettings, types, rules, now, again$);
@@ -169,7 +169,7 @@ function sessionObjects(config: ShellConfig, store: SessionStore, person: Person
   const date = new DateScreen(availability.known$, new CalendarService(config, store), types, rules, now, again$);
   // The person's own facts: read through GET /me, the Administrator's saved through the users
   // service, the one the users screen uses (docs/EMAIL_ARCHITECTURE.md section 9.1).
-  const me = new MeScreen(new MeService(config, store), users, person.role, again$);
+  const me = new MeScreen(new MeService(config, store), users, person.role, again$, texts);
   // The week's "E-mail…" dialog, with a MeService of its own: it reads the person's address once
   // a mail is asked for, and "My details" must not hear that read as its own.
   const mail = new MailScreen(new MailService(config, store), new MeService(config, store), person.role, texts);
@@ -255,8 +255,8 @@ export const SCREENS: readonly Screen[] = [
     label: (frame) => frame.nav.users,
     roles: ['admin'],
     element: '#users',
-    show: (root, { accounts, users }) => {
-      const subscription = mountUsers(root, { screen: accounts, users });
+    show: (root, { accounts, users, texts }) => {
+      const subscription = mountUsers(root, { screen: accounts, users, texts });
       subscription.add(accounts.start());
       return subscription;
     },

@@ -1,10 +1,11 @@
 import { BehaviorSubject } from 'rxjs';
-import { NO_REFUSALS, PROFILE_RULES } from '../../../src/logic/profile.model';
-import { deleteQuestion, editTitle, invitedAnswer, inviteQuestion, USERNAME_HINT, userRows, usernameFor } from '../../../src/logic/users.model';
+import { NO_REFUSALS, profileRules } from '../../../src/logic/profile.model';
+import { userRows, usernameFor } from '../../../src/logic/users.model';
 import type { EditState, InviteState, UsersState } from '../../../src/logic/users.screen';
 import type { DeleteUserState } from '../../../src/services/users.types';
 import { mountUsers, type UsersDeps } from '../../../src/views/users.view';
 import { find, submit, useRealPage } from './page';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // The DOM test of the users view (docs/FRONTEND_ARCHITECTURE.md section 8): the real
 // index.html, a fake UsersScreen whose stream the test controls, and the part of the
@@ -36,13 +37,13 @@ const state = (over: Partial<UsersState> = {}): UsersState => ({
 const factsOf = (username: string) => ({ givenName: `Given-${username}`, familyName: `Family-${username}`, email: `${username}@example.com`, address: `Street of ${username}\nTown` });
 // A User is invited when its username starts with "new", active otherwise.
 const rows = (...usernames: string[]) =>
-  userRows(usernames.map((username) => ({ username, createdAt: '2026-11-01T10:00:00.000Z', status: username.startsWith('new') ? ('invited' as const) : ('active' as const), ...factsOf(username) })));
+  userRows(PAGE_TEXTS_EN.users, usernames.map((username) => ({ username, createdAt: '2026-11-01T10:00:00.000Z', status: username.startsWith('new') ? ('invited' as const) : ('active' as const), ...factsOf(username) })));
 const TWO = rows('alice', 'bob');
 const listed = (over: Partial<UsersState> = {}) => state({ rows: TWO, ...over });
 // The invitation's dialog as the logic layer describes it: asking, sending, gone, failed.
-const ASKING: InviteState = { question: inviteQuestion('carol@example.com'), sending: false, answer: null, failure: null };
+const ASKING: InviteState = { question: PAGE_TEXTS_EN.users.inviteQuestion('carol@example.com'), sending: false, answer: null, failure: null };
 const SENDING: InviteState = { ...ASKING, sending: true };
-const WENT: InviteState = { ...ASKING, answer: invitedAnswer('carol@example.com') };
+const WENT: InviteState = { ...ASKING, answer: PAGE_TEXTS_EN.users.invitedAnswer('carol@example.com') };
 const FAILED: InviteState = { ...ASKING, failure: FAILURE };
 
 function mounted(first: UsersState = state(), remove: DeleteUserState = { status: 'idle' }) {
@@ -62,7 +63,7 @@ function mounted(first: UsersState = state(), remove: DeleteUserState = { status
   };
   const users = { deleteUser: vi.fn<UsersDeps['users']['deleteUser']>(), deleteUserState$: deleteUserState$.asObservable() };
   const root = find('#users');
-  const subscription = mountUsers(root, { screen, users });
+  const subscription = mountUsers(root, { screen, users, texts: PAGE_TEXTS_EN });
   return { users$, deleteUserState$, screen, users, root, subscription };
 }
 
@@ -109,7 +110,7 @@ describe('mountUsers', () => {
       expect([one('.loading').hidden, one('.unread').hidden, one('.empty').hidden]).toEqual([true, true, true]);
       expect(items()).toHaveLength(0);
       expect(form().hidden).toBe(false);
-      expect(one('.field .hint').textContent).toBe(USERNAME_HINT);
+      expect(one('.field .hint').textContent).toBe(PAGE_TEXTS_EN.users.usernameHint);
       expect([field().value, field().hasAttribute('aria-invalid'), refusal().textContent, invite().open]).toEqual(['', false, '', false]);
       expect(one<HTMLButtonElement>('.submit').disabled).toBe(false);
     });
@@ -165,8 +166,8 @@ describe('mountUsers', () => {
 
   describe('the username field in fault', () => {
     it('its sentence is under it, announced, and the field is marked', () => {
-      mounted(listed({ refusal: USERNAME_HINT }));
-      expect(refusal().textContent).toBe(USERNAME_HINT);
+      mounted(listed({ refusal: PAGE_TEXTS_EN.users.usernameHint }));
+      expect(refusal().textContent).toBe(PAGE_TEXTS_EN.users.usernameHint);
       expect(refusal().getAttribute('role')).toBe('alert');
       expect(refusal().closest('.field')).toBe(field().closest('.field'));
       expect(field().getAttribute('aria-invalid')).toBe('true');
@@ -175,7 +176,7 @@ describe('mountUsers', () => {
     it('it goes when the stream says so, and what was typed stays all along', () => {
       const { users$ } = mounted(listed());
       field().value = 'Bob';
-      users$.next(listed({ refusal: USERNAME_HINT }));
+      users$.next(listed({ refusal: PAGE_TEXTS_EN.users.usernameHint }));
       expect(field().value).toBe('Bob');
       users$.next(listed());
       expect([refusal().textContent, field().hasAttribute('aria-invalid'), field().value]).toEqual(['', false, 'Bob']);
@@ -183,7 +184,7 @@ describe('mountUsers', () => {
 
     it('the refusal of the logic layer is the hint that stands under the field', () => {
       mounted();
-      const checked = usernameFor('Bob');
+      const checked = usernameFor(PAGE_TEXTS_EN.users, 'Bob');
       expect('refusal' in checked && checked.refusal).toBe(one('.field .hint').textContent);
     });
   });
@@ -350,10 +351,10 @@ describe('mountUsers', () => {
     it('a fact in fault: its sentence under its field, announced, the field marked; gone when the stream says so, the text kept', () => {
       const { users$ } = mounted(listed());
       createField('email').value = 'carol@';
-      users$.next(listed({ refusals: { ...NO_REFUSALS, email: PROFILE_RULES.email, address: PROFILE_RULES.address } }));
+      users$.next(listed({ refusals: { ...NO_REFUSALS, email: profileRules(PAGE_TEXTS_EN.profile).email, address: profileRules(PAGE_TEXTS_EN.profile).address } }));
       const box = (name: string) => createField(name).closest('.field')!;
-      expect([box('email').querySelector('.refusal')!.textContent, createField('email').getAttribute('aria-invalid')]).toEqual([PROFILE_RULES.email, 'true']);
-      expect([box('address').querySelector('.refusal')!.textContent, createField('address').getAttribute('aria-invalid')]).toEqual([PROFILE_RULES.address, 'true']);
+      expect([box('email').querySelector('.refusal')!.textContent, createField('email').getAttribute('aria-invalid')]).toEqual([profileRules(PAGE_TEXTS_EN.profile).email, 'true']);
+      expect([box('address').querySelector('.refusal')!.textContent, createField('address').getAttribute('aria-invalid')]).toEqual([profileRules(PAGE_TEXTS_EN.profile).address, 'true']);
       expect([box('givenName').querySelector('.refusal')!.textContent, createField('givenName').hasAttribute('aria-invalid')]).toEqual(['', false]);
       users$.next(listed());
       expect([box('email').querySelector('.refusal')!.textContent, createField('email').hasAttribute('aria-invalid'), createField('email').value]).toEqual(['', false, 'carol@']);
@@ -374,7 +375,7 @@ describe('mountUsers', () => {
       const { screen } = mounted(listed());
       editOf('bob').click();
       expect(edit().open).toBe(true);
-      expect(one('dialog.edit h3').textContent).toBe(editTitle('bob'));
+      expect(one('dialog.edit h3').textContent).toBe(PAGE_TEXTS_EN.users.edit('bob'));
       expect(editFields()).toEqual(Object.values(factsOf('bob')));
       expect(screen.editOpened).toHaveBeenCalledTimes(1);
       expect(screen.save).not.toHaveBeenCalled();
@@ -397,9 +398,9 @@ describe('mountUsers', () => {
       editOf('bob').click();
       users$.next(listed({ edit: { ...NO_EDIT, saving: true } }));
       expect(one<HTMLButtonElement>('dialog.edit .submit').disabled).toBe(true);
-      users$.next(listed({ edit: { ...NO_EDIT, failure: FAILURE, refusals: { ...NO_REFUSALS, givenName: PROFILE_RULES.givenName } } }));
+      users$.next(listed({ edit: { ...NO_EDIT, failure: FAILURE, refusals: { ...NO_REFUSALS, givenName: profileRules(PAGE_TEXTS_EN.profile).givenName } } }));
       expect([one<HTMLButtonElement>('dialog.edit .submit').disabled, one('dialog.edit .failure').textContent, edit().open]).toEqual([false, FAILURE, true]);
-      expect([editField('givenName').closest('.field')!.querySelector('.refusal')!.textContent, editField('givenName').getAttribute('aria-invalid')]).toEqual([PROFILE_RULES.givenName, 'true']);
+      expect([editField('givenName').closest('.field')!.querySelector('.refusal')!.textContent, editField('givenName').getAttribute('aria-invalid')]).toEqual([profileRules(PAGE_TEXTS_EN.profile).givenName, 'true']);
     });
 
     it('a save that succeeds closes it; a "saved" there before it opened does not', () => {
@@ -441,7 +442,7 @@ describe('mountUsers', () => {
       const { users } = mounted(listed());
       deleteOf('bob').click();
       expect(remove().open).toBe(true);
-      expect(one('dialog.delete .question').textContent).toBe(deleteQuestion('bob'));
+      expect(one('dialog.delete .question').textContent).toBe(PAGE_TEXTS_EN.users.deleteQuestion('bob'));
       expect(one('dialog.delete .question').textContent).toBe('Delete bob? Their future appointments will be cancelled. This cannot be undone.');
       expect([one('dialog.delete .error').textContent, removeSubmit().disabled]).toEqual(['', false]);
       expect(users.deleteUser).not.toHaveBeenCalled();
@@ -527,7 +528,7 @@ describe('mountUsers', () => {
       expect([remove().open, one('dialog.delete .error').textContent, removeSubmit().disabled]).toEqual([true, '', false]);
       deleteUserState$.next({ status: 'success', username: 'bob' });
       expect(remove().open).toBe(true);
-      expect(one('dialog.delete .question').textContent).toBe(deleteQuestion('alice'));
+      expect(one('dialog.delete .question').textContent).toBe(PAGE_TEXTS_EN.users.deleteQuestion('alice'));
     });
 
     it('opened a second time, it shows nothing of the first: the other user, and no failure', () => {
@@ -537,7 +538,7 @@ describe('mountUsers', () => {
       deleteUserState$.next({ status: 'failure', reason: 'network', message: 'for a developer' });
       one('dialog.delete .keep').click();
       deleteOf('alice').click();
-      expect([one('dialog.delete .question').textContent, one('dialog.delete .error').textContent]).toEqual([deleteQuestion('alice'), '']);
+      expect([one('dialog.delete .question').textContent, one('dialog.delete .error').textContent]).toEqual([PAGE_TEXTS_EN.users.deleteQuestion('alice'), '']);
       removeSubmit().click();
       expect(users.deleteUser).toHaveBeenLastCalledWith('alice');
     });
@@ -573,7 +574,7 @@ describe('mountUsers', () => {
       const before = items();
       deleteOf('bob').focus();
       users$.next(listed({ loading: true }));
-      users$.next(listed({ refusal: USERNAME_HINT }));
+      users$.next(listed({ refusal: PAGE_TEXTS_EN.users.usernameHint }));
       users$.next(listed({ invite: FAILED }));
       users$.next(listed());
       expect(items()).toEqual(before);
@@ -600,7 +601,7 @@ describe('mountUsers', () => {
     expect(deleteOf(odd).getAttribute('aria-label')).toBe(`Delete ${odd}`);
     expect(resendOf(odd).getAttribute('aria-label')).toBe(`Resend the invitation to ${odd}`);
     deleteOf(odd).click();
-    expect(one('dialog.delete .question').textContent).toBe(deleteQuestion(odd));
+    expect(one('dialog.delete .question').textContent).toBe(PAGE_TEXTS_EN.users.deleteQuestion(odd));
     const shown = ['dialog.delete .question', 'dialog.invite .question', 'dialog.invite .answer', 'dialog.invite .error', '.empty', '.unread .error'].map((selector) => one(selector));
     for (const element of [...shown, refusal()]) {
       expect(element.textContent).toContain(SCRIPT);
@@ -622,7 +623,7 @@ describe('mountUsers', () => {
   describe('leaving the view', () => {
     it('after unsubscribing nothing is left in the page, which is as index.html has it: no row, no name, both dialogs closed and empty, the field emptied and not in fault', () => {
       const before = html();
-      const { subscription, users$, deleteUserState$ } = mounted(listed({ rows: rows('alice', 'bob', 'newbie'), loading: true, invite: { ...WENT, failure: FAILURE }, refusal: USERNAME_HINT }));
+      const { subscription, users$, deleteUserState$ } = mounted(listed({ rows: rows('alice', 'bob', 'newbie'), loading: true, invite: { ...WENT, failure: FAILURE }, refusal: PAGE_TEXTS_EN.users.usernameHint }));
       ask('carol');
       deleteOf('bob').click(); // the emulated page lets a click through a modal dialog
       removeSubmit().click();
@@ -630,7 +631,7 @@ describe('mountUsers', () => {
       field().value = 'dave';
       createField('givenName').value = 'Anna';
       editOf('alice').click();
-      users$.next(listed({ rows: rows('alice', 'bob', 'newbie'), invite: SENDING, refusals: { ...NO_REFUSALS, email: PROFILE_RULES.email }, edit: { ...NO_EDIT, saving: true, failure: FAILURE, refusals: { ...NO_REFUSALS, email: PROFILE_RULES.email } } }));
+      users$.next(listed({ rows: rows('alice', 'bob', 'newbie'), invite: SENDING, refusals: { ...NO_REFUSALS, email: profileRules(PAGE_TEXTS_EN.profile).email }, edit: { ...NO_EDIT, saving: true, failure: FAILURE, refusals: { ...NO_REFUSALS, email: profileRules(PAGE_TEXTS_EN.profile).email } } }));
       expect([invite().open, remove().open, edit().open]).toEqual([true, true, true]);
       expect(html()).not.toBe(before);
 
@@ -640,7 +641,7 @@ describe('mountUsers', () => {
       expect([field().value, field().hasAttribute('aria-invalid')]).toEqual(['', false]);
       expect(editFields()).toEqual(['', '', '', '']);
       expect([one<HTMLButtonElement>('.submit').disabled, removeSubmit().disabled, inviteButton('submit').disabled]).toEqual([false, false, false]);
-      for (const gone of ['alice', 'bob', 'carol', 'dave', 'newbie', 'Given-', 'Family-', 'Street of', 'Anna', 'An invitation', 'A username has', PROFILE_RULES.email])
+      for (const gone of ['alice', 'bob', 'carol', 'dave', 'newbie', 'Given-', 'Family-', 'Street of', 'Anna', 'An invitation', 'A username has', profileRules(PAGE_TEXTS_EN.profile).email])
         expect(anywhere(gone), gone).toBe(false);
       expect(html()).toBe(before);
     });

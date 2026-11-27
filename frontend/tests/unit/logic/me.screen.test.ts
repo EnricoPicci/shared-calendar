@@ -1,11 +1,12 @@
 import type { MeResponse } from '@shared-calendar/shared';
 import { ReplaySubject, Subject } from 'rxjs';
-import { NOT_SET } from '../../../src/logic/me.model';
+
 import { MeScreen, type MeCalls, type MeState, type MeUpdateCalls } from '../../../src/logic/me.screen';
-import { NO_REFUSALS, PROFILE_RULES } from '../../../src/logic/profile.model';
+import { NO_REFUSALS, profileRules } from '../../../src/logic/profile.model';
 import type { UpdateOutcome } from '../../../src/logic/users.screen';
 import type { MeResult } from '../../../src/services/me.types';
 import { useFarBrowserZone } from './zone';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // A fake MeService and the part of a fake UsersService "My details" uses: result streams that
 // replay their last value, as the real ones do, and spies. No network, no DOM.
@@ -23,7 +24,7 @@ function screenOf(role: 'admin' | 'user' = 'admin') {
   const visible$ = new Subject<void>();
   const getMe = vi.fn<MeCalls['getMe']>();
   const updateUser = vi.fn<MeUpdateCalls['updateUser']>();
-  const screen = new MeScreen({ getMe, meResult$: meResult$.asObservable() }, { updateUser, updateUserResult$: updateUserResult$.asObservable() }, role, visible$);
+  const screen = new MeScreen({ getMe, meResult$: meResult$.asObservable() }, { updateUser, updateUserResult$: updateUserResult$.asObservable() }, role, visible$, PAGE_TEXTS_EN);
   const states: MeState[] = [];
   screen.me$.subscribe((s) => states.push(s));
   const read = (me: MeResponse) => meResult$.next({ status: 'success', me });
@@ -63,7 +64,7 @@ describe('MeScreen', () => {
   it('an Administrator without facts yet: "Not set" for each, the dialog empty', () => {
     const { shown, last } = screenOf();
     shown(BARE_ADMIN);
-    expect(last().details).toMatchObject({ givenName: NOT_SET, familyName: NOT_SET, email: NOT_SET, address: NOT_SET });
+    expect(last().details).toMatchObject({ givenName: PAGE_TEXTS_EN.profile.notSet, familyName: PAGE_TEXTS_EN.profile.notSet, email: PAGE_TEXTS_EN.profile.notSet, address: PAGE_TEXTS_EN.profile.notSet });
     expect(last().fields).toEqual({ givenName: '', familyName: '', email: '', address: '' });
   });
 
@@ -129,7 +130,7 @@ describe('MeScreen', () => {
       shown(ADMIN);
       screen.save({ ...FACTS, email: 'ada' });
       expect(updateUser).not.toHaveBeenCalled();
-      expect(last().edit.refusals).toEqual({ ...NO_REFUSALS, email: PROFILE_RULES.email });
+      expect(last().edit.refusals).toEqual({ ...NO_REFUSALS, email: profileRules(PAGE_TEXTS_EN.profile).email });
       screen.editTyped(FACTS);
       expect(last().edit.refusals).toEqual(NO_REFUSALS);
       screen.save({ ...FACTS, email: 'ada' });

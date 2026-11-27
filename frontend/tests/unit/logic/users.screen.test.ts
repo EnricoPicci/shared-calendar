@@ -1,9 +1,10 @@
 import { ReplaySubject, Subject } from 'rxjs';
-import { NO_REFUSALS, PROFILE_RULES } from '../../../src/logic/profile.model';
-import { invitedAnswer, inviteQuestion, NO_USERS, USERNAME_HINT } from '../../../src/logic/users.model';
+import { NO_REFUSALS, profileRules } from '../../../src/logic/profile.model';
+
 import { UsersScreen, type CreateOutcome, type ResendOutcome, type UpdateOutcome, type UsersCalls, type UsersState } from '../../../src/logic/users.screen';
 import type { DeleteUserResult, ListUsersResult } from '../../../src/services/users.types';
 import { useFarBrowserZone } from './zone';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // A fake UsersService: five result streams that replay their last value, as the real ones
 // do, and four spies. No network, no DOM. A create's and a resend's success are given as the
@@ -22,15 +23,16 @@ const row = (username: string) => ({
   name: 'Anna Rossi',
   email: FACTS.email,
   status: statusOf(username),
+  statusText: statusOf(username),
   facts: FACTS,
   editLabel: `Edit ${username}`,
   resendLabel: statusOf(username) === 'invited' ? `Resend the invitation to ${username}` : null,
   deleteLabel: `Delete ${username}`,
 });
 // The invitation's dialog as it opens, as it waits, and after its answer.
-const ASKING = { question: inviteQuestion(FACTS.email), sending: false, answer: null, failure: null };
+const ASKING = { question: PAGE_TEXTS_EN.users.inviteQuestion(FACTS.email), sending: false, answer: null, failure: null };
 const SENDING = { ...ASKING, sending: true };
-const WENT = { ...ASKING, answer: invitedAnswer(FACTS.email) };
+const WENT = { ...ASKING, answer: PAGE_TEXTS_EN.users.invitedAnswer(FACTS.email) };
 // The create form with a username typed and four good facts; what the service is then given.
 const form = (username: string) => ({ username, ...FACTS });
 const sent = (username: string) => ({ username, ...FACTS });
@@ -59,6 +61,7 @@ function screenOf() {
       updateUserResult$: updateUserResult$.asObservable(),
     },
     visible$,
+    PAGE_TEXTS_EN,
   );
   const states: UsersState[] = [];
   screen.users$.subscribe((s) => states.push(s)); // the view subscribes first
@@ -161,7 +164,7 @@ describe('UsersScreen', () => {
     it('an empty list: no row, and its sentence', () => {
       const { shown, last } = screenOf();
       shown();
-      expect(last()).toEqual({ ...START, rows: [], empty: NO_USERS });
+      expect(last()).toEqual({ ...START, rows: [], empty: PAGE_TEXTS_EN.users.noUsers });
     });
 
     it('a failed read: why, in plain words, never the service\'s message, and no list', () => {
@@ -228,7 +231,7 @@ describe('UsersScreen', () => {
         expect(last().rows).not.toBe(first);
         expect(last().rows).toEqual(others.map(row));
       }
-      expect(last().empty).toBe(NO_USERS);
+      expect(last().empty).toBe(PAGE_TEXTS_EN.users.noUsers);
       listed('alice');
       expect(last().empty).toBeNull();
     });
@@ -294,7 +297,7 @@ describe('UsersScreen', () => {
       screen.confirm();
       expect(createUser).not.toHaveBeenCalled();
       expect(listUsers).toHaveBeenCalledTimes(1);
-      expect(last()).toEqual({ ...before, refusal: USERNAME_HINT });
+      expect(last()).toEqual({ ...before, refusal: PAGE_TEXTS_EN.users.usernameHint });
       expect(last().rows).toBe(before.rows);
       expect(last().field).toBe(before.field); // what was typed stays
       expect(states.filter((s) => s.invite !== null)).toHaveLength(0);
@@ -472,7 +475,7 @@ describe('UsersScreen', () => {
       shown();
       screen.create({ ...form('Bob'), email: 'anna', address: '' });
       expect(createUser).not.toHaveBeenCalled();
-      expect(last()).toMatchObject({ refusal: USERNAME_HINT, refusals: { ...NO_REFUSALS, email: PROFILE_RULES.email, address: PROFILE_RULES.address }, invite: null });
+      expect(last()).toMatchObject({ refusal: PAGE_TEXTS_EN.users.usernameHint, refusals: { ...NO_REFUSALS, email: profileRules(PAGE_TEXTS_EN.profile).email, address: profileRules(PAGE_TEXTS_EN.profile).address }, invite: null });
     });
 
     it('a good username with one fact refused: nothing is sent, the username not refused', () => {
@@ -480,7 +483,7 @@ describe('UsersScreen', () => {
       shown();
       screen.create({ ...form('carol'), givenName: ' ' });
       expect(createUser).not.toHaveBeenCalled();
-      expect(last()).toMatchObject({ refusal: null, refusals: { ...NO_REFUSALS, givenName: PROFILE_RULES.givenName } });
+      expect(last()).toMatchObject({ refusal: null, refusals: { ...NO_REFUSALS, givenName: profileRules(PAGE_TEXTS_EN.profile).givenName } });
     });
 
     it('while typing, a refused fact that becomes right loses its refusal; one not refused yet is left alone', () => {
@@ -488,7 +491,7 @@ describe('UsersScreen', () => {
       shown();
       screen.create({ ...form('carol'), email: 'anna', familyName: '' });
       screen.typed({ ...form('carol'), email: 'anna@example.com', familyName: '', givenName: '' });
-      expect(last().refusals).toEqual({ ...NO_REFUSALS, familyName: PROFILE_RULES.familyName });
+      expect(last().refusals).toEqual({ ...NO_REFUSALS, familyName: profileRules(PAGE_TEXTS_EN.profile).familyName });
     });
 
     it('the facts go as the shared rules make them, and the refusals go at the create that is sent', () => {
@@ -554,7 +557,7 @@ describe('UsersScreen', () => {
       shown('alice');
       screen.save('alice', { ...FACTS, familyName: '' });
       expect(updateUser).not.toHaveBeenCalled();
-      expect(last().edit).toEqual({ ...NO_EDIT, refusals: { ...NO_REFUSALS, familyName: PROFILE_RULES.familyName } });
+      expect(last().edit).toEqual({ ...NO_EDIT, refusals: { ...NO_REFUSALS, familyName: profileRules(PAGE_TEXTS_EN.profile).familyName } });
       screen.editTyped(FACTS);
       expect(last().edit.refusals).toEqual(NO_REFUSALS);
     });
@@ -621,7 +624,7 @@ describe('UsersScreen', () => {
       visible$.next();
       visible$.next();
       expect(listUsers).toHaveBeenCalledTimes(3);
-      expect(last()).toMatchObject({ loading: true, rows: [row('alice')], refusal: USERNAME_HINT });
+      expect(last()).toMatchObject({ loading: true, rows: [row('alice')], refusal: PAGE_TEXTS_EN.users.usernameHint });
     });
   });
 

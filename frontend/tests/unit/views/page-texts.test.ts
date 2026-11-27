@@ -23,7 +23,7 @@ function textKeys(value: unknown, path = ''): string[] {
 
 // The parts of the page whose words have not been moved to keys yet
 // (docs/MULTILANGUAGE_PLAN.md decision D6): the list only shortens, and goes with the last group.
-const NOT_YET_MOVED = ['#appointments', '#settings', '#users', '#availability', '#me', '#assistant'];
+const NOT_YET_MOVED = ['#settings', '#availability', '#assistant'];
 
 // The texts of a part of the page that a person could read: its text nodes, comments not
 // included, and the names for a screen reader written straight into it. Inside a template too.

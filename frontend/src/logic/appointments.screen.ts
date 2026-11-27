@@ -2,11 +2,11 @@ import type { Appointment, Role } from '@shared-calendar/shared';
 import { BehaviorSubject, type Observable, type Subscription } from 'rxjs';
 import type { AppointmentsService } from '../services/appointments.service';
 import type { CalendarSettingsService } from '../services/calendar-settings.service';
+import type { PageTexts } from '../texts/texts';
 import { appointmentDetail, movingOf, type AppointmentDetail } from './appointment.detail';
 import { appointmentRows, defaultPeriod, emptyText, periodRefusal, type AppointmentRow, type Mode, type Period } from './appointments.model';
 import { failureText } from './texts';
 import type { WeekScreen } from './week.screen';
-import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The screen "My appointments" (docs/FRONTEND_ARCHITECTURE.md section 5.1): which of its two
 // lists is on show, upcoming or history, the period of the history, the calendar's time zone
@@ -67,6 +67,9 @@ export class AppointmentsScreen {
     private readonly role: Role,
     private readonly now: () => Date,
     private readonly visible$: Observable<unknown>,
+    // The page texts of the language in use, kept for the screen's life
+    // (docs/MULTILANGUAGE_PLAN.md decision D2).
+    private readonly texts: PageTexts,
   ) {}
 
   // Called once the view has subscribed (docs/FRONTEND_ARCHITECTURE.md section 5, rule 5): reads
@@ -85,7 +88,7 @@ export class AppointmentsScreen {
     const subscription = this.settings.settingsResult$.subscribe((result) => {
       if (!live) return;
       if (result.status === 'failure') {
-        this.patch({ loading: false, failure: failureText(PAGE_TEXTS_EN.failures, result.reason) });
+        this.patch({ loading: false, failure: failureText(this.texts.failures, result.reason) });
         return;
       }
       this.zone = result.settings.timeZone;
@@ -96,12 +99,12 @@ export class AppointmentsScreen {
         // Without a zone no list was asked for since this start: the answer is an earlier one's.
         if (!live || this.zone === null) return;
         if (result.status === 'failure') {
-          this.patch({ loading: false, failure: failureText(PAGE_TEXTS_EN.failures, result.reason) });
+          this.patch({ loading: false, failure: failureText(this.texts.failures, result.reason) });
           return;
         }
         this.loaded = result.appointments;
-        const rows = appointmentRows(result.appointments, this.now(), this.zone);
-        this.patch({ loading: false, failure: null, rows, empty: rows.length === 0 ? emptyText(this.mode) : null });
+        const rows = appointmentRows(this.texts, result.appointments, this.now(), this.zone);
+        this.patch({ loading: false, failure: null, rows, empty: rows.length === 0 ? emptyText(this.texts.list, this.mode) : null });
       }),
     );
     const again = () => {
@@ -135,7 +138,7 @@ export class AppointmentsScreen {
   // The history over the period typed in the form, when it can be asked for; otherwise why
   // not, with no call and the list as it is.
   show(from: string, to: string): void {
-    const refusal = periodRefusal(from, to);
+    const refusal = periodRefusal(this.texts.list, from, to);
     if (refusal !== null) {
       this.patch({ refusal });
       return;
@@ -149,7 +152,7 @@ export class AppointmentsScreen {
   detail(appointmentId: string): AppointmentDetail | null {
     const appointment = this.loaded.find((a) => a.appointmentId === appointmentId);
     // A list is held only while the zone is known.
-    return appointment ? appointmentDetail(PAGE_TEXTS_EN, appointment, this.role, this.now(), this.zone!) : null;
+    return appointment ? appointmentDetail(this.texts, appointment, this.role, this.now(), this.zone!) : null;
   }
 
   // Hands the appointment `appointmentId` of the last list loaded over to the week screen, to

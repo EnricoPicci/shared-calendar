@@ -214,15 +214,15 @@
              outside the list the script redraws. -->
         <section id="appointments" class="appointments-screen" hidden>
           <div class="toolbar">
-            <button type="button" class="upcoming" aria-pressed="false">Upcoming</button>
-            <button type="button" class="history" aria-pressed="false">History</button>
-            <span class="loading" role="status" hidden>Loading…</span>
+            <button type="button" class="upcoming" aria-pressed="false" data-text="appointments.upcoming"></button>
+            <button type="button" class="history" aria-pressed="false" data-text="appointments.history"></button>
+            <span class="loading" role="status" data-text="common.loading" hidden></span>
           </div>
           <!-- novalidate: a date left empty or half typed is refused by the script, in words -->
           <form class="period" novalidate hidden>
-            <label>From <input type="date" name="from" /></label>
-            <label>To <input type="date" name="to" /></label>
-            <button class="submit">Show</button>
+            <label><span data-text="common.from"></span> <input type="date" name="from" /></label>
+            <label><span data-text="common.to"></span> <input type="date" name="to" /></label>
+            <button class="submit" data-text="appointments.show"></button>
             <p class="error refusal" role="alert"></p>
           </form>
           <p class="error failure" role="alert" hidden></p>
@@ -315,8 +315,8 @@
              script redraws. The field is a .field: its label, its hint, its refusal. -->
         <section id="users" class="users-screen" hidden>
           <div class="toolbar">
-            <h2>Users</h2>
-            <span class="loading" role="status" hidden>Loading…</span>
+            <h2 data-text="users.heading"></h2>
+            <span class="loading" role="status" data-text="common.loading" hidden></span>
           </div>
           <!-- novalidate: a text that is not a username, or a fact that does not follow its rule,
                is refused by the script, in words, under its field. A browser must neither offer
@@ -324,34 +324,34 @@
                own. -->
           <form class="create" novalidate>
             <div class="field username-field">
-              <label>Username <input name="username" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="username-hint" /></label>
+              <label><span data-text="login.username"></span> <input name="username" autocomplete="off" autocapitalize="none" spellcheck="false" aria-describedby="username-hint" /></label>
               <p class="hint" id="username-hint"></p>
               <p class="error refusal" role="alert"></p>
             </div>
             <div class="field given-name-field">
-              <label>First name <input name="givenName" autocomplete="off" /></label>
+              <label><span data-text="profile.givenName"></span> <input name="givenName" autocomplete="off" /></label>
               <p class="error refusal" role="alert"></p>
             </div>
             <div class="field family-name-field">
-              <label>Last name <input name="familyName" autocomplete="off" /></label>
+              <label><span data-text="profile.familyName"></span> <input name="familyName" autocomplete="off" /></label>
               <p class="error refusal" role="alert"></p>
             </div>
             <div class="field email-field">
-              <label>E-mail <input name="email" type="email" autocomplete="off" autocapitalize="none" spellcheck="false" /></label>
+              <label><span data-text="profile.email"></span> <input name="email" type="email" autocomplete="off" autocapitalize="none" spellcheck="false" /></label>
               <p class="error refusal" role="alert"></p>
             </div>
             <div class="field address-field">
-              <label>Postal address <textarea name="address" rows="3" autocomplete="off"></textarea></label>
+              <label><span data-text="profile.address"></span> <textarea name="address" rows="3" autocomplete="off"></textarea></label>
               <p class="error refusal" role="alert"></p>
             </div>
             <div class="actions">
-              <button class="primary submit">Create user</button>
+              <button class="primary submit" data-text="users.create"></button>
             </div>
           </form>
           <!-- Shown in the place of the list when it could not be read -->
           <div class="unread" hidden>
             <p class="error" role="alert"></p>
-            <button type="button" class="retry" aria-label="Try again to read the users">Try again</button>
+            <button type="button" class="retry" data-label="users.retryLabel" data-text="common.retry"></button>
           </div>
           <p class="empty" hidden></p>
           <ul class="list"></ul>
@@ -362,8 +362,8 @@
           <template id="tpl-user-row">
             <li class="user-row">
               <span class="username"></span> <span class="name"></span> <span class="email"></span> <span class="status"></span>
-              <button type="button" class="ask-edit">Edit</button> <button type="button" class="ask-resend" hidden>Resend invitation</button>
-              <button type="button" class="danger ask-delete">Delete</button>
+              <button type="button" class="ask-edit" data-text="common.edit"></button> <button type="button" class="ask-resend" data-text="users.resend" hidden></button>
+              <button type="button" class="danger ask-delete" data-text="common.delete"></button>
             </li>
           </template>
 
@@ -373,25 +373,25 @@
             <h3 id="edit-title"></h3>
             <form class="profile" novalidate>
               <div class="field given-name-field">
-                <label>First name <input name="givenName" autocomplete="off" /></label>
+                <label><span data-text="profile.givenName"></span> <input name="givenName" autocomplete="off" /></label>
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="field family-name-field">
-                <label>Last name <input name="familyName" autocomplete="off" /></label>
+                <label><span data-text="profile.familyName"></span> <input name="familyName" autocomplete="off" /></label>
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="field email-field">
-                <label>E-mail <input name="email" type="email" autocomplete="off" autocapitalize="none" spellcheck="false" /></label>
+                <label><span data-text="profile.email"></span> <input name="email" type="email" autocomplete="off" autocapitalize="none" spellcheck="false" /></label>
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="field address-field">
-                <label>Postal address <textarea name="address" rows="3" autocomplete="off"></textarea></label>
+                <label><span data-text="profile.address"></span> <textarea name="address" rows="3" autocomplete="off"></textarea></label>
                 <p class="error refusal" role="alert"></p>
               </div>
               <p class="error failure" role="alert"></p>
               <div class="actions">
-                <button type="button" class="cancel">Cancel</button>
-                <button class="primary submit">Save</button>
+                <button type="button" class="cancel" data-text="common.cancel"></button>
+                <button class="primary submit" data-text="common.save"></button>
               </div>
             </form>
           </dialog>
@@ -402,14 +402,14 @@
                dialog. Once the invitation went, the dialog says where, and "Close" is its one
                button; a failure is said in it, and it stays open. -->
           <dialog class="invite" aria-labelledby="invite-title" aria-describedby="invite-question">
-            <h3 id="invite-title">Send an invitation</h3>
+            <h3 id="invite-title" data-text="users.inviteTitle"></h3>
             <p class="question" id="invite-question"></p>
             <p class="answer" role="status"></p>
             <p class="error" role="alert"></p>
             <div class="actions">
-              <button type="button" class="back">Back</button>
-              <button type="button" class="primary submit">Confirm</button>
-              <button type="button" class="primary done" hidden>Close</button>
+              <button type="button" class="back" data-text="common.back"></button>
+              <button type="button" class="primary submit" data-text="common.confirm"></button>
+              <button type="button" class="primary done" data-text="common.close" hidden></button>
             </div>
           </dialog>
 
@@ -417,12 +417,12 @@
                the dialog opens, and a screen reader then says the question, which describes
                the dialog. -->
           <dialog class="delete" aria-labelledby="delete-title" aria-describedby="delete-question">
-            <h3 id="delete-title">Delete user</h3>
+            <h3 id="delete-title" data-text="users.deleteUser"></h3>
             <p class="question" id="delete-question"></p>
             <p class="error" role="alert"></p>
             <div class="actions">
-              <button type="button" class="keep">Keep</button>
-              <button type="button" class="danger submit">Delete user</button>
+              <button type="button" class="keep" data-text="users.keep"></button>
+              <button type="button" class="danger submit" data-text="users.deleteUser"></button>
             </div>
           </dialog>
         </section>
@@ -822,58 +822,58 @@
              "Not set". -->
         <section id="me" class="me-screen" hidden>
           <div class="toolbar">
-            <h2>My details</h2>
-            <span class="loading" role="status" hidden>Loading…</span>
+            <h2 data-text="me.heading"></h2>
+            <span class="loading" role="status" data-text="common.loading" hidden></span>
           </div>
           <!-- Shown in the place of the details when they could not be read -->
           <div class="unread" hidden>
             <p class="error" role="alert"></p>
-            <button type="button" class="retry" aria-label="Try again to read your details">Try again</button>
+            <button type="button" class="retry" data-label="me.retryLabel" data-text="common.retry"></button>
           </div>
           <dl class="details" hidden>
-            <dt>Username</dt>
+            <dt data-text="login.username"></dt>
             <dd class="username"></dd>
-            <dt>Role</dt>
+            <dt data-text="me.role"></dt>
             <dd class="role"></dd>
-            <dt>First name</dt>
+            <dt data-text="profile.givenName"></dt>
             <dd class="given-name"></dd>
-            <dt>Last name</dt>
+            <dt data-text="profile.familyName"></dt>
             <dd class="family-name"></dd>
-            <dt>E-mail</dt>
+            <dt data-text="profile.email"></dt>
             <dd class="email"></dd>
-            <dt>Postal address</dt>
+            <dt data-text="profile.address"></dt>
             <dd class="address"></dd>
           </dl>
-          <p class="about user-only" hidden>To change your details, ask the Administrator.</p>
+          <p class="about user-only" data-text="me.about" hidden></p>
           <div class="actions">
-            <button type="button" class="primary ask-edit" hidden>Edit</button>
+            <button type="button" class="primary ask-edit" data-text="common.edit" hidden></button>
           </div>
 
           <!-- The Administrator's own four facts. "Cancel" closes it and keeps nothing typed; it
                closes by itself once a save succeeded. -->
           <dialog class="edit" aria-labelledby="me-edit-title">
-            <h3 id="me-edit-title">Edit my details</h3>
+            <h3 id="me-edit-title" data-text="me.editTitle"></h3>
             <form class="profile" novalidate>
               <div class="field given-name-field">
-                <label>First name <input name="givenName" autocomplete="given-name" /></label>
+                <label><span data-text="profile.givenName"></span> <input name="givenName" autocomplete="given-name" /></label>
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="field family-name-field">
-                <label>Last name <input name="familyName" autocomplete="family-name" /></label>
+                <label><span data-text="profile.familyName"></span> <input name="familyName" autocomplete="family-name" /></label>
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="field email-field">
-                <label>E-mail <input name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" /></label>
+                <label><span data-text="profile.email"></span> <input name="email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" /></label>
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="field address-field">
-                <label>Postal address <textarea name="address" rows="3" autocomplete="street-address"></textarea></label>
+                <label><span data-text="profile.address"></span> <textarea name="address" rows="3" autocomplete="street-address"></textarea></label>
                 <p class="error refusal" role="alert"></p>
               </div>
               <p class="error failure" role="alert"></p>
               <div class="actions">
-                <button type="button" class="cancel">Cancel</button>
-                <button class="primary submit">Save</button>
+                <button type="button" class="cancel" data-text="common.cancel"></button>
+                <button class="primary submit" data-text="common.save"></button>
               </div>
             </form>
           </dialog>

@@ -56,6 +56,7 @@ function screenAt(now = NOW, role: 'admin' | 'user' = 'user') {
     role,
     () => new Date(clock.now),
     visible$,
+    PAGE_TEXTS_EN,
   );
   const states: ListState[] = [];
   const view$ = screen.list$.subscribe((s) => states.push(s)); // the view subscribes first
@@ -120,7 +121,7 @@ describe('AppointmentsScreen', () => {
     it('the list arrives: its rows, in the zone the settings named', () => {
       const rome = screenAt();
       rome.listed([BOOKED]);
-      expect(rome.last()).toEqual({ ...START, rows: appointmentRows([BOOKED], new Date(NOW), 'Europe/Rome') });
+      expect(rome.last()).toEqual({ ...START, rows: appointmentRows(PAGE_TEXTS_EN, [BOOKED], new Date(NOW), 'Europe/Rome') });
       expect(rome.last().rows![0]).toMatchObject({ date: 'Mon 23 Nov', time: '10:00–11:00', status: 'Booked' });
 
       const kolkata = screenAt();

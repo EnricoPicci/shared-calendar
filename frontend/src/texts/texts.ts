@@ -1,4 +1,4 @@
-import type { DateFormats, Role } from '@shared-calendar/shared';
+import type { DateFormats, Role, UserStatus } from '@shared-calendar/shared';
 
 // The type of every text of the page (docs/MULTILANGUAGE_ARCHITECTURE.md section 5.1, decision
 // L8): one object per language has this type, so that a language with a text missing does not
@@ -163,10 +163,61 @@ export type MailTexts = {
   sentNoAddress: string;
 };
 
+// "My appointments": what became of an appointment, the list with no row, and why a period of the
+// history is refused before it is asked for.
+export type ListTexts = {
+  status: { booked: string; ended: string; cancelled: string; changed: string };
+  emptyUpcoming: string;
+  emptyHistory: string;
+  bothDates: string;
+  firstAfterLast: string;
+  periodTooLong: (days: number) => string;
+};
+
+// The four facts of a person: the words of each fact's rule, with the shared rule's longest, which
+// stand under a field that does not follow it; and what stands in the place of a fact not held.
+export type ProfileTexts = {
+  givenName: (longest: number) => string;
+  familyName: (longest: number) => string;
+  email: (longest: number) => string;
+  address: (longest: number) => string;
+  notSet: string;
+};
+
+// The users screen: the state of an account, the names a screen reader says for a row's buttons
+// (whom they edit, invite again, delete), the invitation's dialog, a creation that failed, the
+// list with no row, what a username is, and the question before a deletion.
+export type UsersTexts = {
+  status: Record<UserStatus, string>;
+  edit: (username: string) => string;
+  resend: (username: string) => string;
+  remove: (username: string) => string;
+  inviteQuestion: (email: string) => string;
+  invitedAnswer: (email: string) => string;
+  createFailed: string;
+  noUsers: string;
+  usernameHint: string;
+  deleteQuestion: (username: string) => string;
+};
+
 // The keys of index.html, by the part of the page they belong to.
 export type HtmlTexts = {
   // Words several parts of the page use.
-  common: { cancel: string; close: string; note: string; change: string; loading: string; from: string; to: string };
+  common: {
+    cancel: string;
+    close: string;
+    note: string;
+    change: string;
+    loading: string;
+    from: string;
+    to: string;
+    edit: string;
+    save: string;
+    delete: string;
+    back: string;
+    confirm: string;
+    retry: string;
+  };
   frame: {
     // The page's name: the browser's tab, the header and the sign-in screen.
     title: string;
@@ -210,6 +261,19 @@ export type HtmlTexts = {
     submit: string;
   };
   mail: { title: string; send: string };
+  appointments: { upcoming: string; history: string; show: string };
+  // The four facts' fields and their names in a list, on the users screen and on "My details".
+  profile: { givenName: string; familyName: string; email: string; address: string };
+  users: {
+    heading: string;
+    create: string;
+    retryLabel: string;
+    resend: string;
+    inviteTitle: string;
+    deleteUser: string;
+    keep: string;
+  };
+  me: { heading: string; retryLabel: string; role: string; about: string; editTitle: string };
   detail: { title: string; when: string; type: string; forUser: string; saveNote: string; cancelAppointment: string };
 };
 
@@ -221,6 +285,9 @@ export type PageTexts = {
   week: WeekTexts;
   appointment: AppointmentTexts;
   mail: MailTexts;
+  list: ListTexts;
+  profile: ProfileTexts;
+  users: UsersTexts;
   // The ways a date is written, from shared/ (docs/MULTILANGUAGE_ARCHITECTURE.md decision L10).
   dates: DateFormats;
 };
@@ -241,6 +308,7 @@ export const PAGE_TEXT_BUDGETS: Budgets<PageTexts> = {
     choose: { submit: 24 },
     password: { submit: 24 },
     week: { today: 12, mailOpen: 14 },
+    appointments: { upcoming: 16, history: 16 },
   },
   // A slot's narrow tab beside the appointments that overlap it.
   week: { full: 8, tabLeft: 8 },
