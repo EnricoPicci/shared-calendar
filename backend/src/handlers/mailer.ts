@@ -1,4 +1,4 @@
-import { addDays, calendarMailText, dailyMailText, localDateOf, localTimeOf, mineMailText } from '@shared-calendar/shared';
+import { addDays, calendarMailText, dailyMailText, localDateOf, localTimeOf, mailTexts, mineMailText, readLanguage, type Language } from '@shared-calendar/shared';
 import type { Context } from 'aws-lambda';
 import type { ZodError } from 'zod';
 import { calendarConfig, listAppointments } from '../lib/calendarDb';
@@ -35,6 +35,12 @@ export type DailyResult = {
   backupCount?: number;
 };
 
+// The installation's language, for a recipient whose account holds none
+// (docs/MULTILANGUAGE_ARCHITECTURE.md section 4.3): the stack's parameter `DefaultLanguage`, given
+// as DEFAULT_LANGUAGE. The template allows only the calendar's languages; English when it is unset,
+// as on the local stack.
+const defaultLanguage = (): Language => readLanguage(process.env.DEFAULT_LANGUAGE) ?? 'en';
+
 // Only the paths of what is wrong in an event, and the names of unknown fields, never a value: the
 // event could hold anything.
 const problemsOf = (error: ZodError) =>
@@ -56,14 +62,17 @@ const nameOf = (err: unknown) => {
 //
 // The event is checked first. The address and the names are read in Cognito, never taken from the
 // event, so a mail goes only to the account's own address (docs/EMAIL_ARCHITECTURE.md decision
-// M10). The appointments are read through the calendar's own code, every status
-// (docs/EMAIL_ARCHITECTURE.md section 6.4), and the texts are those of shared/src/mail/texts.ts.
+// M10), and so is the recipient's language, else the installation's: the mail, its file and the
+// file's name are in it (docs/MULTILANGUAGE_ARCHITECTURE.md section 8). The appointments are read
+// through the calendar's own code, every status (docs/EMAIL_ARCHITECTURE.md section 6.4), and the
+// texts are those of shared/src/mail/texts.ts.
 //
 // A run that cannot succeed by being tried again (an event that is not one, an account deleted
 // since, no address) is a logged failure and sends nothing; any other failure is thrown, so that
 // Lambda tries the run twice more and the mailer's errors count it. One log line per run
 // (docs/EMAIL_ARCHITECTURE.md section 16): the kind, the recipient's username, the range, the
-// count, the SES message id, the outcome; never an address, a name, a text or a file.
+// language's code, the count, the SES message id, the outcome; never an address, a name, a text or
+// a file.
 export const handler = async (event: unknown, context?: Pick<Context, 'awsRequestId'>): Promise<MailerResult | DailyResult> => {
   if (isDailyEvent(event)) return daily(event, context);
   const started = Date.now();
@@ -83,8 +92,11 @@ export const handler = async (event: unknown, context?: Pick<Context, 'awsReques
   try {
     const { timeZone } = calendarConfig();
     let address: string | null;
+    let language: Language;
     try {
-      address = (await getProfile(username)).email;
+      const profile = await getProfile(username);
+      address = profile.email;
+      language = profile.language ?? defaultLanguage();
     } catch (err) {
       if (err instanceof UserNotFoundError) return done({ outcome: 'user_not_found' }, fields);
       throw err;
@@ -96,19 +108,20 @@ export const handler = async (event: unknown, context?: Pick<Context, 'awsReques
       listAppointments({ from, to }, { owner, status: 'all' }, now),
       kind === 'calendar' ? namesBySub() : Promise.resolve(null),
     ]);
-    const fileName = kind === 'calendar' ? `calendar-${from}-to-${to}.xlsx` : `my-appointments-${from}-to-${to}.xlsx`;
+    const files = mailTexts(language).files;
+    const fileName = kind === 'calendar' ? files.calendar(from, to) : files.mine(from, to);
     const text =
       kind === 'calendar'
-        ? calendarMailText({ from, to, count: appointments.length, file: fileName })
-        : mineMailText({
+        ? calendarMailText(language, { from, to, count: appointments.length, file: fileName })
+        : mineMailText(language, {
             from,
             to,
             file: fileName,
             appointments: appointments.map(({ appointment: a }) => ({ date: a.date, start: localTimeOf(a.start, timeZone), end: localTimeOf(a.end, timeZone), type: a.typeName, status: a.status })),
           });
-    const content = await appointmentsFile(appointments, timeZone, names);
+    const content = await appointmentsFile(language, appointments, timeZone, names);
     const sesMessageId = await sendMail(address, text, [{ fileName, contentType: XLSX_CONTENT_TYPE, content }]);
-    return done({ outcome: 'sent', appointmentCount: appointments.length }, { ...fields, appointmentCount: appointments.length, sesMessageId });
+    return done({ outcome: 'sent', appointmentCount: appointments.length }, { ...fields, language, appointmentCount: appointments.length, sesMessageId });
   } catch (err) {
     const name = nameOf(err);
     log('error', { ...fields, invocationId, outcome: 'error', reason: name, durationMs: Date.now() - started });
@@ -135,14 +148,16 @@ function firstOfLastMonth(date: string): string {
 //    on, so that a failed mail is tried again later that day; either way a mark is taken again from
 //    `failed`, or from `sending` older than ten minutes. An earlier hour stops;
 // 4. the administrators: each one with an address gets a mail of their own, so that nobody sees
-//    another's address; one without is skipped, named in the log line;
+//    another's address, in their own language, else the installation's
+//    (docs/MULTILANGUAGE_ARCHITECTURE.md section 8); one without is skipped, named in the log line;
 // 5. the two files: the next 7 days, booked only, and the backup from the 1st of last month, every
-//    status, read up to today plus 366 days, beyond any booking horizon;
+//    status, read up to today plus 366 days, beyond any booking horizon; made once for each
+//    language in use, with their names in it;
 // 6. the mails, with the text of shared/src/mail/texts.ts, then the mark `sent`.
 // Any failure after the mark sets it `failed` and is thrown, so that Lambda tries the run again and
 // the mailer's error alarm counts it; the retry finds the mark `failed` and takes it. One log line
 // per run (docs/EMAIL_ARCHITECTURE.md section 16): the outcome, the date, the hour, the mails sent
-// and skipped, the rows of the two files; never an address or a name.
+// and skipped, the languages' codes, the rows of the two files; never an address or a name.
 async function daily(event: unknown, context?: Pick<Context, 'awsRequestId'>): Promise<DailyResult> {
   const started = Date.now();
   const invocationId = context?.awsRequestId ?? 'unknown';
@@ -182,7 +197,7 @@ async function daily(event: unknown, context?: Pick<Context, 'awsRequestId'>): P
     mark = { startedAt: taken.startedAt };
 
     const admins = await adminRecipients();
-    const recipients = admins.flatMap((a) => (a.email === null ? [] : [a.email]));
+    const recipients = admins.flatMap((a) => (a.email === null ? [] : [{ address: a.email, language: a.language ?? defaultLanguage() }]));
     const skipped = admins.filter((a) => a.email === null).map((a) => a.username);
     if (recipients.length === 0) {
       await finishDailyMark(date, mark.startedAt, { state: 'sent', sesMessageIds: [], appointmentCount: 0, backupCount: 0 }, finished());
@@ -193,23 +208,34 @@ async function daily(event: unknown, context?: Pick<Context, 'awsRequestId'>): P
     const backupFrom = firstOfLastMonth(date);
     const [{ appointments }, names] = await Promise.all([listAppointments({ from: backupFrom, to: addDays(date, 366) }, { owner: null, status: 'all' }, now), namesBySub()]);
     const next = appointments.filter(({ appointment: a }) => a.status === 'booked' && a.date >= date! && a.date <= lastOfNext);
-    const nextFile = `calendar-next-7-days-${date}.xlsx`;
-    const backupFile = `calendar-backup-from-${backupFrom}.xlsx`;
-    const [nextContent, backupContent] = await Promise.all([appointmentsFile(next, timeZone, names), appointmentsFile(appointments, timeZone, names)]);
-    const text = dailyMailText({ date, nextCount: next.length, backupFrom, nextFile, backupFile });
-    const files = [
-      { fileName: nextFile, contentType: XLSX_CONTENT_TYPE, content: nextContent },
-      { fileName: backupFile, contentType: XLSX_CONTENT_TYPE, content: backupContent },
-    ];
+    // The mail and its two files in one language, made once for all who read it.
+    const today = date;
+    const languages = [...new Set(recipients.map((r) => r.language))];
+    const byLanguage = new Map(
+      await Promise.all(
+        languages.map(async (language) => {
+          const nextFile = mailTexts(language).files.next7Days(today);
+          const backupFile = mailTexts(language).files.backup(backupFrom);
+          const [nextContent, backupContent] = await Promise.all([appointmentsFile(language, next, timeZone, names), appointmentsFile(language, appointments, timeZone, names)]);
+          const text = dailyMailText(language, { date: today, nextCount: next.length, backupFrom, nextFile, backupFile });
+          const files = [
+            { fileName: nextFile, contentType: XLSX_CONTENT_TYPE, content: nextContent },
+            { fileName: backupFile, contentType: XLSX_CONTENT_TYPE, content: backupContent },
+          ];
+          return [language, { text, files }] as const;
+        }),
+      ),
+    );
 
     const sesMessageIds: string[] = [];
     for (const recipient of recipients) {
-      sesMessageIds.push(await sendMail(recipient, text, files));
+      const { text, files } = byLanguage.get(recipient.language)!;
+      sesMessageIds.push(await sendMail(recipient.address, text, files));
       mailCount += 1;
     }
     const counts = { appointmentCount: next.length, backupCount: appointments.length };
     const kept = await finishDailyMark(date, mark.startedAt, { state: 'sent', sesMessageIds, ...counts }, finished());
-    return done({ outcome: 'sent', date, hour, mailCount, skipped, ...counts }, { sesMessageIds, ...(!kept && { markTakenOver: true }) });
+    return done({ outcome: 'sent', date, hour, mailCount, skipped, ...counts }, { languages, sesMessageIds, ...(!kept && { markTakenOver: true }) });
   } catch (err) {
     const name = nameOf(err);
     if (date !== undefined && mark !== undefined) {

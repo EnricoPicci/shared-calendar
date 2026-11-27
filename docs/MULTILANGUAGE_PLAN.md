@@ -2,7 +2,7 @@
 
 **Version:** v1 (2026-11-27): the plan, after the Product Owner's eight decisions of the brief
 and the answer to one question of planning (section 2). v2 (2026-11-27): phase A started with
-brief `prompts/lang-l03-phase-a-implementation.md`; steps l1 to l5 done.
+brief `prompts/lang-l03-phase-a-implementation.md`; steps l1 to l6 done.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -773,7 +773,41 @@ One wording for section 7.
   fake mail, and its Excel file opened: the look of this step.
 - **Leaves for phase B:** the review of about 30 Italian texts; a real mail in Italian.
 
-**As done (step l6).** *Empty.*
+**As done (step l6).** Done 2026-11-27. Built: `shared/src/mail/texts.ts` as the type
+`MailTexts`, `mailTexts(language)` and the three mails taking the language first, with
+`texts.en.ts` (the English words as they were) and `texts.it.ts`: the three mails, the footer,
+the list line, the statuses and reasons, the eleven headings by a column key (`EXCEL_COLUMNS`),
+the sheet's name, the four file names; the HTML body one block `<div lang="…">`.
+`backend/src/lib/excel.ts`: the language first, the columns by key, the words from the texts,
+a column at least as wide as its heading, the dates and times as they are (O4).
+`backend/src/lib/cognito.ts`: `language` in `StoredAccount` and `AdminRecipient`, read from
+`locale` by `readLanguage`; `asUserSummary` and `asMe` leave it out (O3).
+`backend/src/handlers/mailer.ts`: the recipient's language, else `DEFAULT_LANGUAGE`, else
+English; the daily mail's text and two files made once per language in use; the log line names
+`language` (on demand) and `languages` (daily). `backend/template.yaml`: the parameter
+`DefaultLanguage` (`en`, `it`, default `en`), `DEFAULT_LANGUAGE` on the mailer, the output
+`DefaultLanguage`; `backend/samconfig.toml`: `DefaultLanguage="it"`, with its line in the
+comment; `frontend/scripts/deploy.sh` reads the third output (English when a stack has none) and
+hands it to the build. Decided while building: the reasons of a cancellation in Italian are
+"annullato", "spostato" (a change moves the appointment) and "utente eliminato". Tests: the
+mails in both languages (the HTML read back says what the plain text says, marked with its
+language, values escaped; one and several; the Italian list), the files' words (none empty, the
+sheet within 31 characters, the file names in plain letters, digits and `-`, four different);
+the Excel file in Italian with every status and reason, and English unchanged; `getProfile` and
+`adminRecipients` with a language, a word not in the list, none; the summary without it; the
+mailer: an Italian recipient (subject, list, HTML's `lang`, file name, headings, log line),
+none, a word not in the list, `DEFAULT_LANGUAGE` at `it` (and a recipient with English keeping
+it), two administrators of two languages (a mail each in their own, the Italian files' rows),
+the daily mail at `it` by default. The existing tests keep their English words, given `'en'`.
+shared 665 tests, backend 2070, frontend 3259; 100 % lines. The journey: the mailer's block
+gains test 3, mail-bob in Italian (`setLanguageOf()` of `backend/tests/integration/setup.ts`):
+the subject, the list line, the footer, the file name and the headings in Italian; its page
+refreshed. Run alone after a build and a restart of `local:api` and `local:lambda`: 4 passed.
+The look: with `admin` and `alice` given Italian in the emulator, `npm run mail:send` of both
+kinds and `npm run mail:daily` at a far date read in the fake mail, each file opened: every
+word in Italian, the dates and times as they are, the HTML marked `it`. Afterwards the two
+languages, the day's mark of that date and the mails were removed from the local stack. Two
+wordings for section 7.
 
 ### Step l7 — The invitation function
 
@@ -1003,6 +1037,8 @@ Kept by Claude Code while the work runs (decision 5); read first in phase B, ite
 | l4 | `users.deleteQuestion`, `availability.deletePattern`, `date.deleteExtraQuestion`, `date.closeQuestion`, `date.reopenQuestion`, `failures.patternsBackOverlap` | Their / Its | di alice / Quelle ore / del giorno | "suoi", "sue" for a user's or a day's things reads as "yours" next to the "lei": the owner is named instead. |
 | l4 | `settings.lastSaved`, `appointment.bookedBy` | Last saved by admin on Fri 27 Nov, 11:57 | Salvate l'ultima volta da admin il ven 27 nov, 11:57 | The date and the time come as one value of the shared formats; "alle 11:57" would need them apart. |
 | l4 | `html.frame.screens` (the navigation's name for a screen reader) | Screens | Pagine | "Schermate" is the literal word, longer and less used. |
+| l6 | The daily mail's first sentence, `shared/src/mail/texts.it.ts` | The next 7 days hold 0 appointments. | Nei prossimi 7 giorni ci sono 0 appuntamenti. | "non ci sono appuntamenti" reads better for none; kept the number, as the English does, so the two say the same. |
+| l6 | The reasons of a cancellation in the files, `texts.it.ts` | cancelled, changed, user deleted | annullato, spostato, utente eliminato | "modificato" for `changed` is closer to the code; "spostato" says what a change does to an appointment. The heading "Motivo dell'annullamento" over "annullato" repeats itself; "dalla persona" would be longer. |
 | l5 | `profile.languageNotSaved` | The language was not changed. … | La lingua non è stata cambiata. … | "non è stata salvata" is closer to the code; "cambiata" says what the person sees: the list goes back. |
 
 ## 8. What was seen on the screens and not settled

@@ -12,7 +12,7 @@ import {
   type UserStatusType,
   type UserType,
 } from '@aws-sdk/client-cognito-identity-provider';
-import type { MeResponse, UserProfile, UserStatus, UserSummary } from '@shared-calendar/shared';
+import { readLanguage, type Language, type MeResponse, type UserProfile, type UserStatus, type UserSummary } from '@shared-calendar/shared';
 
 export class UserExistsError extends Error {
   constructor(username: string) {
@@ -99,6 +99,13 @@ function statusOf(status: UserStatusType | string | undefined): UserStatus {
 // The four facts of a User, all of them. Every User has them from its creation
 // (docs/EMAIL_ARCHITECTURE.md section 4.3): a User without one is a broken directory, an ordinary
 // error (500). The error names the missing facts, never a value.
+// The person's own language, kept in the standard attribute `locale` (docs/MULTILANGUAGE_ARCHITECTURE.md
+// section 4.1). Cognito does not check the value: a missing one, or a word that is not a language
+// of the calendar, is none, and the reader uses the default.
+function languageOf(attributes: AttributeType[] | undefined): Language | null {
+  return readLanguage(attributes?.find((attribute) => attribute.Name === 'locale')?.Value);
+}
+
 function requiredFacts(username: string, facts: StoredFacts): UserProfile {
   const { givenName, familyName, email, address } = facts;
   if (givenName !== null && familyName !== null && email !== null && address !== null) return { givenName, familyName, email, address };
@@ -157,8 +164,12 @@ export async function updateProfile(username: string, profile: UserProfile): Pro
     .catch((err: unknown) => mapError(err, username));
 }
 
-/** One account read whole (AdminGetUser): its facts, each null when missing, its state and creation date. */
-export type StoredAccount = { username: string; createdAt: string; status: UserStatus } & StoredFacts;
+/**
+ * One account read whole (AdminGetUser): its facts, each null when missing, its state and creation
+ * date, and its language for the mailer, null when it holds none. The language reaches neither
+ * GET /me nor GET /users (docs/MULTILANGUAGE_ARCHITECTURE.md open point O3).
+ */
+export type StoredAccount = { username: string; createdAt: string; status: UserStatus; language: Language | null } & StoredFacts;
 
 // An account read by AdminGetUser. The facts may be missing: the Administrator's account exists
 // before its facts are typed (docs/EMAIL_ARCHITECTURE.md section 4.3). An answer without a
@@ -168,13 +179,13 @@ export async function getProfile(username: string): Promise<StoredAccount> {
     .send(new AdminGetUserCommand({ UserPoolId: userPoolId(), Username: username }))
     .catch((err: unknown) => mapError(err, username));
   if (!result.UserCreateDate) throw new Error(`User ${username} has no creation date`);
-  return { username, createdAt: result.UserCreateDate.toISOString(), status: statusOf(result.UserStatus), ...storedFacts(result.UserAttributes) };
+  return { username, createdAt: result.UserCreateDate.toISOString(), status: statusOf(result.UserStatus), language: languageOf(result.UserAttributes), ...storedFacts(result.UserAttributes) };
 }
 
 /** A stored account as a User of GET /users: every fact required (a missing one is a 500). */
 export function asUserSummary(account: StoredAccount): UserSummary {
-  const { username, createdAt, status, ...facts } = account;
-  return { username, createdAt, status, ...requiredFacts(username, facts) };
+  const { username, createdAt, status, givenName, familyName, email, address } = account;
+  return { username, createdAt, status, ...requiredFacts(username, { givenName, familyName, email, address }) };
 }
 
 /** A stored account as GET /me answers it, with the role the token gives. */
@@ -264,8 +275,8 @@ export async function namesBySub(): Promise<Map<string, { givenName: string; fam
   return names;
 }
 
-/** An administrator as the daily mail needs one: the username, and the e-mail or null when it has none. */
-export type AdminRecipient = { username: string; email: string | null };
+/** An administrator as the daily mail needs one: the username, the e-mail or null when it has none, and the language or null. */
+export type AdminRecipient = { username: string; email: string | null; language: Language | null };
 
 /**
  * Every member of group `admin`, with its e-mail, for the daily mail (docs/EMAIL_ARCHITECTURE.md
@@ -277,7 +288,7 @@ export async function adminRecipients(): Promise<AdminRecipient[]> {
   return (await membersOf('admin'))
     .map((member) => {
       if (!member.Username) throw new Error('A member of group admin has no username');
-      return { username: member.Username, email: storedFacts(member.Attributes).email };
+      return { username: member.Username, email: storedFacts(member.Attributes).email, language: languageOf(member.Attributes) };
     })
     .sort((a, b) => (a.username < b.username ? -1 : a.username > b.username ? 1 : 0));
 }

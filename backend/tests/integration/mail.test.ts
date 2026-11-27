@@ -11,6 +11,7 @@ import {
   removeUserIfPresent,
   runMailer,
   setFactsOf,
+  setLanguageOf,
   setPasswordOf,
   signIn,
   subOf,
@@ -241,6 +242,27 @@ describe('the mailer run by hand (6.1, 6.3)', () => {
     expect(rows.slice(1).every((row) => row[4] === 'alice')).toBe(true);
     expect(journeyRows(rows)).toEqual([rowOf(booked[0]!), rowOf(booked[2]!)].sort((a, b) => (a.Start! < b.Start! ? -1 : 1)));
     expect(await waitForMails('admin@example.com', 0)).toEqual([]);
+  });
+
+  // The recipient's language (docs/MULTILANGUAGE_ARCHITECTURE.md section 8).
+  it("mine in Italian: a User whose language is Italian gets the mail, its list, its file and the file's name in Italian", async () => {
+    const bob = factsOf('mail-bob');
+    await forgetMailsTo(bob.email);
+    await setLanguageOf('mail-bob', 'it');
+    const bobToken = await signIn('mail-bob', await setPasswordOf('mail-bob'));
+    const result = await runMailer(event('mine', bobToken, 'mail-bob'));
+    expect(result).toMatchObject({ outcome: 'sent' });
+
+    const [mail, ...more] = await waitForMails(bob.email, 1);
+    expect(more).toEqual([]);
+    expect(mail!.subject).toMatch(/^I suoi appuntamenti, dal /);
+    expect(mail!.text).toContain(`${localTimeOf(booked[1]!.start, zone)}–${localTimeOf(booked[1]!.end, zone)}, ${TYPE}, prenotato`);
+    expect(mail!.text).toContain("Questa è un'e-mail automatica.");
+    expect(mail!.attachments[0]!.fileName).toBe(`miei-appuntamenti-dal-${day}-al-${day}.xlsx`);
+    const rows = await rowsOf(mail!);
+    expect(rows[0]).toEqual(['Data', 'Inizio', 'Fine', 'Tipo', 'Nome utente', 'Stato', "Motivo dell'annullamento", 'Nota', 'Prenotato il']);
+    expect(rows.slice(1).filter((row) => row[7] === MARK).map((row) => [row[0], row[4], row[5]])).toEqual([[day, 'mail-bob', 'prenotato']]);
+    await forgetMailsTo(bob.email);
   });
 
   it('an event carrying an address, or a kind not of the role, sends nothing', async () => {

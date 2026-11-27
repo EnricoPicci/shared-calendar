@@ -42,6 +42,15 @@ Parameters:
       CALENDAR_TIME_ZONE. Never change it once the calendar holds data: stored local dates and
       instants would no longer agree. The functions check it on first use; an invalid value makes
       every calendar request answer 500, which fires the 5xx alarm.
+  DefaultLanguage:
+    Type: String
+    Default: en
+    AllowedValues: [en, it]
+    Description: >
+      The installation's language (docs/MULTILANGUAGE_ARCHITECTURE.md section 4.3): the mails to a
+      person who has not chosen one yet, and the page before it knows the person's. Passed to the
+      mailer as DEFAULT_LANGUAGE, and given as a stack output that the page's deployment builds
+      with.
   AssistantModel:
     Type: String
     Default: claude-sonnet-5-5
@@ -3206,6 +3215,7 @@ Resources:
           MAIL_STAGE: !Ref MailStage
           MAIL_TABLE: !Ref MailTable
           SES_ENDPOINT: ''
+          DEFAULT_LANGUAGE: !Ref DefaultLanguage
           # Local development only, never set in the cloud. 'true' lets the daily run take its
           # "now" from the event, so that the journeys and npm run mail:daily can run it at any
           # hour (docs/EMAIL_ARCHITECTURE.md section 14.2); env.local.json sets it for the local
@@ -3693,6 +3703,11 @@ Outputs:
   CalendarTableName:
     Description: DynamoDB table holding the shared calendar
     Value: !Ref CalendarTable
+  # Read by frontend/scripts/deploy.sh and built into the page (docs/MULTILANGUAGE_ARCHITECTURE.md
+  # section 4.3).
+  DefaultLanguage:
+    Description: The installation's language, en or it
+    Value: !Ref DefaultLanguage
   # The three DNS records (CNAME) that prove the mail domain to SES with Easy DKIM, at MailStage
   # 'domain' and 'on' (docs/EMAIL_ARCHITECTURE.md section 8.1): the operator adds each, its name and
   # its value, at the domain's DNS provider. AWS's CloudFormation reference

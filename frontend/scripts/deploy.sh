@@ -113,11 +113,16 @@ echo "==> reading the back end's stack $API_STACK in $REGION"
 # shellcheck disable=SC2016 # the backticks are JMESPath string literals, not shell
 values=$(aws cloudformation describe-stacks --region "$REGION" --stack-name "$API_STACK" --output text --query 'Stacks[0].[
     Outputs[?OutputKey==`ApiUrl`].OutputValue | [0],
-    Outputs[?OutputKey==`UserPoolClientId`].OutputValue | [0]]') ||
+    Outputs[?OutputKey==`UserPoolClientId`].OutputValue | [0],
+    Outputs[?OutputKey==`DefaultLanguage`].OutputValue | [0]]') ||
   die "cannot read stack $API_STACK in $REGION (AWS login? is the back end deployed? It comes first: npm run deploy -w backend)."
-read -r API_URL CLIENT_ID <<< "$values"
+read -r API_URL CLIENT_ID DEFAULT_LANGUAGE <<< "$values"
 [[ -n "${API_URL:-}" && "$API_URL" != None ]] || die "stack $API_STACK has no output ApiUrl."
 [[ -n "${CLIENT_ID:-}" && "$CLIENT_ID" != None ]] || die "stack $API_STACK has no output UserPoolClientId."
+# The installation's language, which the page uses before it knows the person's
+# (docs/MULTILANGUAGE_ARCHITECTURE.md section 4.3). A stack deployed before the template had
+# the output has none: the page then builds with English, as that stack's mails are.
+[[ -n "${DEFAULT_LANGUAGE:-}" && "$DEFAULT_LANGUAGE" != None ]] || DEFAULT_LANGUAGE=en
 
 # The host of ApiUrl, which is "https://<host>" with nothing after it. The template refuses
 # anything but a host name too (its parameter's AllowedPattern).
@@ -156,7 +161,7 @@ echo "    Cognito    $COGNITO_URL"
 build_page() {
   echo
   echo "==> npm run build (frontend)"
-  API_URL=/api COGNITO_URL="$COGNITO_URL" CLIENT_ID="$CLIENT_ID" npm run build ||
+  API_URL=/api COGNITO_URL="$COGNITO_URL" CLIENT_ID="$CLIENT_ID" DEFAULT_LANGUAGE="$DEFAULT_LANGUAGE" npm run build ||
     die "the build failed: nothing was uploaded."
   local name
   for name in index.html style.css app.js app.js.map; do
