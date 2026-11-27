@@ -1016,6 +1016,10 @@ without it, and the rules of the root `CLAUDE.md` hold as written.
    open: section 2 of `docs/ARCHITECTURE.md` still omits the e-mail functions and the
    invitation function, a gap older than this work.
 6. **The merge with `main`** (section 9), in a session of its own.
+   It waits until `docs/EMAIL_PLAN.md` step m10 is deployed: the invitation function exists only
+   at `MailStage` `on`, so item 8 can prove the invitation in Italian only after m10, and m10
+   first proves the English invitation alone, which is also what Cognito sends when the
+   function's answer is unusable. One deploy then changes one thing.
 7. **The full regression, once, on what will be deployed**: the root
    `DYNAMODB_PORT=8002 npm run verify`, the front end's journeys, the smoke test locally, and
    `docs/FRONTEND_WALK.md` in English with its new section in Italian. How much of the walk is
