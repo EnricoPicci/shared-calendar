@@ -161,12 +161,12 @@ function sessionObjects(config: ShellConfig, store: SessionStore, person: Person
   const accounts = new UsersScreen(users, again$, texts);
   const types = new AvailabilityTypesService(config, store);
   const rules = new AvailabilityRulesService(config, store);
-  const availability = new AvailabilityScreen(calendarSettings, types, rules, now, again$);
+  const availability = new AvailabilityScreen(calendarSettings, types, rules, now, again$, texts);
   // The part about a single date reads the calendar view of that one date through a
   // CalendarService of its own: the service has one pair of streams and one pending call, and
   // the week's must keep the week (docs/FRONTEND_SERVICES.md section 18). What the
   // availability screen knows (the time zone, the types, the patterns) is handed over.
-  const date = new DateScreen(availability.known$, new CalendarService(config, store), types, rules, now, again$);
+  const date = new DateScreen(availability.known$, new CalendarService(config, store), types, rules, now, again$, texts);
   // The person's own facts: read through GET /me, the Administrator's saved through the users
   // service, the one the users screen uses (docs/EMAIL_ARCHITECTURE.md section 9.1).
   const me = new MeScreen(new MeService(config, store), users, person.role, again$, texts);
@@ -270,9 +270,9 @@ export const SCREENS: readonly Screen[] = [
     // date. Both views open the one dialog that confirms, mounted here and handed to each.
     // The availability screen is started first: its three reads leave, and the object of a
     // single date, which reads nothing until a date is shown, then takes what it knows.
-    show: (root, { availability, date, types, rules }) => {
+    show: (root, { availability, date, types, rules, texts }) => {
       const confirm = mountConfirm(root);
-      const subscription = mountAvailability(root, { screen: availability, types, rules, confirm });
+      const subscription = mountAvailability(root, { screen: availability, types, rules, confirm, texts });
       subscription.add(mountDate(root, { screen: date, confirm }));
       subscription.add(confirm.subscription);
       subscription.add(availability.start());

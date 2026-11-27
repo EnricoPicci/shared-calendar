@@ -215,6 +215,57 @@ export type SettingsTexts = {
   daily: { range: string; rangeIn: (timeZone: string) => string; refusal: string };
 };
 
+// "Availability": the types, the weekly patterns and the refusals of a window's fields, which a
+// pattern, a day's own window and an extra window share (each names its field in the words of its
+// label); `what` is a pattern or a type in one line, as a row shows it.
+export type AvailabilityTexts = {
+  places: (capacity: number) => string;
+  editLabel: (what: string) => string;
+  changeLabel: (what: string) => string;
+  deleteLabel: (what: string) => string;
+  noTypes: string;
+  typeNameHint: (longest: number) => string;
+  typeCapacityHint: (min: number, max: number) => string;
+  deleteType: (name: string) => string;
+  noTypeYet: string;
+  endNotLater: string;
+  endNotWholeHours: string;
+  typeNotChosen: string;
+  validFromNotDate: string;
+  validUntilNotDate: string;
+  validUntilBefore: string;
+  noPatterns: string;
+  unknownType: string;
+  validFrom: (date: string) => string;
+  validFromTo: (from: string, to: string) => string;
+  deletePattern: (what: string, validity: string) => string;
+  // The appointments a change of availability would leave outside it.
+  inTheWay: (count: number) => string;
+};
+
+// A single date of "Availability": why "Show" is refused, the day as it is, the windows of "this
+// day only" and the questions before the day changes; `date` is the date in full words.
+export type DateTexts = {
+  dateNeeded: string;
+  pastDate: string;
+  zonePending: string;
+  draftOpen: string;
+  noPatternHours: string;
+  patternsNotKnown: string;
+  patternsApply: string;
+  ownWindows: string;
+  notAvailable: string;
+  noExtras: string;
+  deleteExtraLabel: (time: string, typeName: string) => string;
+  deleteExtraQuestion: (time: string, typeName: string, date: string) => string;
+  closeQuestion: (date: string) => string;
+  reopenQuestion: (date: string) => string;
+  draftEmpty: string;
+  removeLabel: (time: string, typeName: string) => string;
+  overlapsDraft: string;
+  draftFull: (windows: number) => string;
+};
+
 // The keys of index.html, by the part of the page they belong to.
 export type HtmlTexts = {
   // Words several parts of the page use.
@@ -303,6 +354,40 @@ export type HtmlTexts = {
     saved: string;
   };
   daily: { heading: string; retryLabel: string; enabled: string; hour: string; about: string; saved: string; submit: string };
+  availability: {
+    heading: string;
+    types: string;
+    patterns: string;
+    singleDate: string;
+    name: string;
+    capacity: string;
+    weekday: string;
+    validFrom: string;
+    validUntil: string;
+    date: string;
+    noEnd: string;
+    createType: string;
+    createPattern: string;
+    retryTypes: string;
+    retryPatterns: string;
+    retryDate: string;
+    asPatterns: string;
+    asNow: string;
+    editDay: string;
+    makeClosed: string;
+    backToPatterns: string;
+    thisDayOnly: string;
+    add: string;
+    discard: string;
+    saveDay: string;
+    extraWindows: string;
+    addWindow: string;
+    ended: string;
+    remove: string;
+    editType: string;
+    changePattern: string;
+    confirmTitle: string;
+  };
   detail: { title: string; when: string; type: string; forUser: string; saveNote: string; cancelAppointment: string };
 };
 
@@ -318,6 +403,8 @@ export type PageTexts = {
   profile: ProfileTexts;
   users: UsersTexts;
   settings: SettingsTexts;
+  availability: AvailabilityTexts;
+  date: DateTexts;
   // The ways a date is written, from shared/ (docs/MULTILANGUAGE_ARCHITECTURE.md decision L10).
   dates: DateFormats;
 };

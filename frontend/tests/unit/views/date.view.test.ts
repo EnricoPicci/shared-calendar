@@ -3,12 +3,14 @@ import { BehaviorSubject } from 'rxjs';
 import { typeChoices } from '../../../src/logic/availability.model';
 import type { Ask } from '../../../src/logic/availability.screen';
 import { conflictList } from '../../../src/logic/conflicts';
-import { dateFor, dayModel, draftAdd, draftModel, DRAFT_FULL, DRAFT_OPEN, IN_FAULT_TOO, OVERLAPS_DRAFT, PAST_DATE, STARTING_WINDOW, windowFor, type WindowFields } from '../../../src/logic/date.model';
+import { dateFor, dayModel, draftAdd, draftModel, IN_FAULT_TOO, STARTING_WINDOW, windowFor, type WindowFields } from '../../../src/logic/date.model';
 import type { DateState } from '../../../src/logic/date.screen';
 import { mountConfirm } from '../../../src/views/availability.parts';
 import { mountDate, type DateDeps } from '../../../src/views/date.view';
 import { POOL, STUDIO } from '../logic/fixtures';
 import { choicesOf, choose, chooseTime, clock, find, loadPage, setTime, submit, timeIn, useRealPage } from './page';
+import { DRAFT_FULL, DRAFT_OPEN, OVERLAPS_DRAFT, PAST_DATE } from '../logic/availability.words';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // The DOM test of the view of a single date (docs/FRONTEND_ARCHITECTURE.md section 8): the
 // real index.html, a fake DateScreen whose stream the test controls, and the real dialog that
@@ -33,20 +35,20 @@ const CONFLICTS: AppointmentConflict[] = [
   { appointmentId: 'appt-2', username: 'bob', start: '2026-11-23T09:00:00.000Z', end: '2026-11-23T10:00:00.000Z' },
   { appointmentId: 'appt-1', username: 'alice', start: '2026-11-23T08:00:00.000Z', end: '2026-11-23T09:00:00.000Z' },
 ];
-const IN_THE_WAY = conflictList(CONFLICTS, ROME)!;
+const IN_THE_WAY = conflictList(PAGE_TEXTS_EN, CONFLICTS, ROME)!;
 const SHOWN_CONFLICTS = ['2 appointments are in the way:', 'Mon 23 Nov | 09:00–10:00 | alice', 'Mon 23 Nov | 10:00–11:00 | bob'];
 
 const seen = (start: string, end: string, typeId: string, typeName: string, source: CalendarWindow['source'], sourceId = MONDAY): CalendarWindow => ({ start: toInstant(MONDAY, start, ROME), end: toInstant(MONDAY, end, ROME), typeId, typeName, source, sourceId });
 const dayOf = (windows: CalendarWindow[], hasOverride = false, types = TYPES) => {
   const day: CalendarDay = { date: MONDAY, weekday: 1, windows, slots: [], busy: [], hasOverride };
-  return dayModel(MONDAY, [PATTERN], types, day, ROME);
+  return dayModel(PAGE_TEXTS_EN, MONDAY, [PATTERN], types, day, ROME);
 };
 // The days these tests show: as the pattern gives it; with its own windows and two extra
 // ones; not available.
 const PLAIN = dayOf([seen('09:00', '13:00', STUDIO, 'Studio', 'pattern', PATTERN.patternId)]);
 const OWN = dayOf([seen('10:00', '12:00', STUDIO, 'Studio', 'override'), seen('14:00', '16:00', POOL, 'Piscina', 'override'), seen('18:00', '20:00', POOL, 'Piscina', 'one_off', W1), seen('20:00', '24:00', STUDIO, 'Studio', 'one_off', W2)], true);
 const CLOSED = dayOf([], true);
-const DRAFT = draftModel([{ start: '09:00', end: '13:00', typeId: STUDIO }, { start: '14:00', end: '16:00', typeId: POOL }], TYPES);
+const DRAFT = draftModel(PAGE_TEXTS_EN, [{ start: '09:00', end: '13:00', typeId: STUDIO }, { start: '14:00', end: '16:00', typeId: POOL }], TYPES);
 
 // The objects of the state stay the same from one state to the next unless a test brings
 // another: another object is what tells the view to draw a list or to fill a form again.
@@ -236,7 +238,7 @@ describe('mountDate', () => {
 
     it('a day the patterns give nothing: the sentence in the place of the list', () => {
       const day: CalendarDay = { date: MONDAY, weekday: 1, windows: [], slots: [], busy: [], hasOverride: false };
-      mounted(showing(dayModel(MONDAY, [], TYPES, day, ROME)));
+      mounted(showing(dayModel(PAGE_TEXTS_EN, MONDAY, [], TYPES, day, ROME)));
       expect([rows('given-rows'), one('.given .none').textContent]).toEqual([[], 'The weekly patterns give no hours on this day.']);
     });
 
@@ -288,7 +290,7 @@ describe('mountDate', () => {
       submit(form(CHOOSE));
       expect(screen.show.mock.calls).toEqual([[''], ['2020-01-01']]);
       // What the logic layer would say of them is its own to decide.
-      expect([dateFor('', '2026-11-20'), dateFor('2020-01-01', '2026-11-20')]).toEqual([{ refusal: 'Choose a date.' }, { refusal: PAST_DATE }]);
+      expect([dateFor(PAGE_TEXTS_EN, '', '2026-11-20'), dateFor(PAGE_TEXTS_EN, '2020-01-01', '2026-11-20')]).toEqual([{ refusal: 'Choose a date.' }, { refusal: PAST_DATE }]);
     });
 
     it('"Try again" calls retry(), once', () => {
@@ -314,7 +316,7 @@ describe('mountDate', () => {
     });
 
     it('none left: the sentence of an empty list', () => {
-      mounted(editing({ draft: draftModel([], TYPES) }));
+      mounted(editing({ draft: draftModel(PAGE_TEXTS_EN, [], TYPES) }));
       expect([rows('draft-rows'), one('.draft-empty').textContent]).toEqual([[], 'No window is left: saved like this, the day is not available.']);
     });
 
@@ -364,9 +366,9 @@ describe('mountDate', () => {
 
     it('every refusal of the logic layer names its field in the words of the field\'s label: at its start; the one sentence of two fields has both labels at its start, and the second field has no sentence of its own', () => {
       mounted(editing());
-      const refused = draftAdd([], { start: '10:00', end: '09:00', typeId: '' });
-      const overlap = draftAdd([{ start: '09:00', end: '12:00', typeId: STUDIO }], { start: '10:00', end: '11:00', typeId: STUDIO });
-      const window = windowFor(MONDAY, { start: '10:00', end: '09:00', typeId: '' });
+      const refused = draftAdd(PAGE_TEXTS_EN, [], { start: '10:00', end: '09:00', typeId: '' });
+      const overlap = draftAdd(PAGE_TEXTS_EN, [{ start: '09:00', end: '12:00', typeId: STUDIO }], { start: '10:00', end: '11:00', typeId: STUDIO });
+      const window = windowFor(PAGE_TEXTS_EN, MONDAY, { start: '10:00', end: '09:00', typeId: '' });
       for (const [selector, made] of [[ADD, refused], [ADD, overlap], [WINDOW, window]] as const) {
         const refusals = 'refusals' in made ? made.refusals : {};
         expect(Object.keys(refusals).length).toBeGreaterThan(0);
@@ -680,7 +682,7 @@ describe('mountDate', () => {
       expect([buttonsOf('extra-rows')[0], buttonsOf('draft-rows')[0], all('.own-rows > li')[0]]).toEqual(before);
       expect(before.every((element, i) => element === [buttonsOf('extra-rows')[0], buttonsOf('draft-rows')[0], all('.own-rows > li')[0]][i])).toBe(true);
       // Another draft object redraws the draft's rows only; another day the day's only.
-      date$.next(editing({ day: OWN, draft: draftModel([], TYPES) }));
+      date$.next(editing({ day: OWN, draft: draftModel(PAGE_TEXTS_EN, [], TYPES) }));
       expect([buttonsOf('extra-rows')[0] === before[0], buttonsOf('draft-rows').length]).toEqual([true, 0]);
       date$.next(editing({ day: dayOf([seen('18:00', '20:00', POOL, 'Piscina', 'one_off', W1)], true) }));
       expect([buttonsOf('extra-rows')[0] === before[0], rows('extra-rows')]).toEqual([false, ['18:00 – 20:00 | Piscina']]);
@@ -691,7 +693,7 @@ describe('mountDate', () => {
     it('a type\'s name containing <script> is shown as text in every place it appears: the three lists of the day, the draft, the names of the buttons, the choices and the dialog', () => {
       const types: AvailabilityType[] = [{ typeId: STUDIO, name: SCRIPT, capacity: 1, ...STAMPS }];
       const day = dayOf([seen('10:00', '12:00', STUDIO, SCRIPT, 'override'), seen('18:00', '20:00', STUDIO, SCRIPT, 'one_off', W1)], true, types);
-      mounted(showing(day, { draft: draftModel([{ start: '10:00', end: '12:00', typeId: STUDIO }], types), choices: typeChoices(types) }));
+      mounted(showing(day, { draft: draftModel(PAGE_TEXTS_EN, [{ start: '10:00', end: '12:00', typeId: STUDIO }], types), choices: typeChoices(types) }));
       expect([rows('given-rows'), rows('own-rows'), rows('extra-rows'), rows('draft-rows')]).toEqual([[`09:00 – 13:00 | ${SCRIPT}`], [`10:00 – 12:00 | ${SCRIPT}`], [`18:00 – 20:00 | ${SCRIPT}`], [`10:00 – 12:00 | ${SCRIPT}`]]);
       expect([buttonsOf('extra-rows')[0]!.getAttribute('aria-label'), buttonsOf('draft-rows')[0]!.getAttribute('aria-label')]).toEqual([`Delete the extra window 18:00 – 20:00 ${SCRIPT}`, `Remove 10:00 – 12:00 ${SCRIPT}`]);
       expect(options(ADD, 'typeId')).toEqual([[STUDIO, SCRIPT]]);
@@ -702,7 +704,7 @@ describe('mountDate', () => {
     });
 
     it('a username containing <script> in a conflicts list is shown as text, in the draft and in the dialog', () => {
-      const list = conflictList([{ appointmentId: 'appt-1', username: SCRIPT, start: '2026-11-23T08:00:00.000Z', end: '2026-11-23T09:00:00.000Z' }], ROME)!;
+      const list = conflictList(PAGE_TEXTS_EN, [{ appointmentId: 'appt-1', username: SCRIPT, start: '2026-11-23T08:00:00.000Z', end: '2026-11-23T09:00:00.000Z' }], ROME)!;
       const { date$ } = mounted(editing({ save: ask({ failure: CONFLICT, conflicts: list }) }));
       expect(draftConflicts()).toEqual(['1 appointment is in the way:', `Mon 23 Nov | 09:00–10:00 | ${SCRIPT}`]);
       one('.discard').click();

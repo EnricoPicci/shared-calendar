@@ -1,13 +1,14 @@
 import { conflictList } from '../../../src/logic/conflicts';
 import { availabilityParts, mountConfirm, type Confirmed } from '../../../src/views/availability.parts';
 import { find, useRealPage } from './page';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // The DOM test of what the two views of the availability screen share
 // (docs/FRONTEND_ARCHITECTURE.md section 8), on the real index.html. What each view does with
 // these parts is in its own test; here is what neither can see alone: one dialog, opened by
 // two views in turn.
 
-const LIST = conflictList([{ appointmentId: 'appt-1', username: 'alice', start: '2026-11-23T08:00:00.000Z', end: '2026-11-23T09:00:00.000Z' }], 'Europe/Rome');
+const LIST = conflictList(PAGE_TEXTS_EN, [{ appointmentId: 'appt-1', username: 'alice', start: '2026-11-23T08:00:00.000Z', end: '2026-11-23T09:00:00.000Z' }], 'Europe/Rome');
 const said = (over: Partial<Confirmed> = {}): Confirmed => ({ busy: false, failure: null, conflicts: null, done: false, ...over });
 const root = () => find('#availability');
 const dialog = () => find<HTMLDialogElement>('#availability dialog.delete');

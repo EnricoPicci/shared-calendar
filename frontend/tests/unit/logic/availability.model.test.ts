@@ -2,30 +2,23 @@ import { CALENDAR_LIMITS, PatternBody, TYPE_CAPACITY, TypeBody, type Availabilit
 import {
   deletePatternQuestion,
   deleteTypeQuestion,
-  END_NOT_LATER,
-  END_NOT_WHOLE_HOURS,
-  NO_PATTERNS,
-  NO_TYPE_YET,
-  NO_TYPES,
   PATTERN_FIELDS,
   patternFields,
   patternFor,
   patternGroups,
   startingFields,
   STARTING_TYPE,
-  TYPE_CAPACITY_HINT,
-  TYPE_NAME_HINT,
   typeChoices,
   typeFor,
   typeNameFor,
   typeRows,
-  UNKNOWN_TYPE,
-  WEEKDAY_CHOICES,
   type PatternFields,
 } from '../../../src/logic/availability.model';
 import { startMinutesOf, timeOf, WINDOW_STARTS, windowEnds } from '../../../src/logic/times';
 import { POOL, STUDIO } from './fixtures';
 import { useFarBrowserZone } from './zone';
+import { END_NOT_LATER, END_NOT_WHOLE_HOURS, NO_PATTERNS, NO_TYPES, NO_TYPE_YET, TYPE_CAPACITY_HINT, TYPE_NAME_HINT, UNKNOWN_TYPE, WEEKDAY_CHOICES } from './availability.words';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 const SCRIPT = '<script>alert(1)</script>';
 const type = (typeId: string, name: string): AvailabilityType => ({ typeId, name, capacity: 1, createdAt: '2026-11-01T10:00:00.000Z', updatedAt: '2026-11-01T10:00:00.000Z' });
@@ -52,34 +45,34 @@ describe('availability.model', () => {
 
   describe('typeRows (6.1)', () => {
     it('several types: one row each, in the server\'s order, with the names of its two buttons', () => {
-      expect(typeRows(TYPES)).toEqual([
+      expect(typeRows(PAGE_TEXTS_EN, TYPES)).toEqual([
         { typeId: POOL, name: 'Piscina', places: '', editLabel: 'Edit Piscina', deleteLabel: 'Delete Piscina', fields: { name: 'Piscina', capacity: '1' } },
         { typeId: STUDIO, name: 'Studio', places: '', editLabel: 'Edit Studio', deleteLabel: 'Delete Studio', fields: { name: 'Studio', capacity: '1' } },
       ]);
       // Not sorted again here: the order given is kept.
-      expect(typeRows([...TYPES].reverse()).map((row) => row.name)).toEqual(['Studio', 'Piscina']);
+      expect(typeRows(PAGE_TEXTS_EN, [...TYPES].reverse()).map((row) => row.name)).toEqual(['Studio', 'Piscina']);
     });
 
     it('one type, and none', () => {
-      expect(typeRows([type(STUDIO, 'Studio')])).toHaveLength(1);
-      expect(typeRows([])).toEqual([]);
+      expect(typeRows(PAGE_TEXTS_EN, [type(STUDIO, 'Studio')])).toHaveLength(1);
+      expect(typeRows(PAGE_TEXTS_EN, [])).toEqual([]);
       expect(NO_TYPES).toBe('There are no types yet.');
     });
 
     it('a name containing <script> is kept as text, in the row and in the names of its buttons', () => {
-      expect(typeRows([type(STUDIO, SCRIPT)])).toEqual([
+      expect(typeRows(PAGE_TEXTS_EN, [type(STUDIO, SCRIPT)])).toEqual([
         { typeId: STUDIO, name: SCRIPT, places: '', editLabel: `Edit ${SCRIPT}`, deleteLabel: `Delete ${SCRIPT}`, fields: { name: SCRIPT, capacity: '1' } },
       ]);
     });
 
     it('the words of the dialog that deletes a type name it', () => {
-      expect(deleteTypeQuestion(typeRows(TYPES)[1]!)).toBe('Delete the type Studio? This cannot be undone.');
+      expect(deleteTypeQuestion(PAGE_TEXTS_EN, typeRows(PAGE_TEXTS_EN, TYPES)[1]!)).toBe('Delete the type Studio? This cannot be undone.');
     });
   });
 
   describe('a type\'s capacity in its row (6.1, D24)', () => {
     it('"· 3 places" beside the name only for a capacity above one; the dialog opens with the capacity as text', () => {
-      const rows = typeRows([{ ...type(POOL, 'Piscina'), capacity: 3 }, type(STUDIO, 'Studio'), { ...type(STUDIO, 'Grande'), capacity: 100 }]);
+      const rows = typeRows(PAGE_TEXTS_EN, [{ ...type(POOL, 'Piscina'), capacity: 3 }, type(STUDIO, 'Studio'), { ...type(STUDIO, 'Grande'), capacity: 100 }]);
       expect(rows.map((row) => [row.places, row.fields])).toEqual([
         ['· 3 places', { name: 'Piscina', capacity: '3' }],
         ['', { name: 'Studio', capacity: '1' }],
@@ -90,26 +83,26 @@ describe('availability.model', () => {
 
   describe('typeFor (6.1, R-TYPE-01, D24)', () => {
     it('a name and a capacity within the bounds: both, the capacity a number, spaces around either removed', () => {
-      expect(typeFor({ name: ' Piscina ', capacity: ' 3 ' })).toEqual({ type: { name: 'Piscina', capacity: 3 } });
-      expect(typeFor({ name: 'Uno', capacity: '1' })).toEqual({ type: { name: 'Uno', capacity: 1 } });
-      expect(typeFor({ name: 'Cento', capacity: '100' })).toEqual({ type: { name: 'Cento', capacity: 100 } });
+      expect(typeFor(PAGE_TEXTS_EN, { name: ' Piscina ', capacity: ' 3 ' })).toEqual({ type: { name: 'Piscina', capacity: 3 } });
+      expect(typeFor(PAGE_TEXTS_EN, { name: 'Uno', capacity: '1' })).toEqual({ type: { name: 'Uno', capacity: 1 } });
+      expect(typeFor(PAGE_TEXTS_EN, { name: 'Cento', capacity: '100' })).toEqual({ type: { name: 'Cento', capacity: 100 } });
     });
 
     it.each(['0', '101', '2.5', '', '  ', '-1', '3e1', 'three'])('a capacity of "%s" is refused, in the words of the hint', (capacity) => {
-      expect(typeFor({ name: 'Sala', capacity })).toEqual({ refusals: { capacity: TYPE_CAPACITY_HINT } });
+      expect(typeFor(PAGE_TEXTS_EN, { name: 'Sala', capacity })).toEqual({ refusals: { capacity: TYPE_CAPACITY_HINT } });
     });
 
     it('every value it accepts the shared schema accepts too, and the two bounds outside it refuses', () => {
       for (const capacity of [TYPE_CAPACITY.min, 7, TYPE_CAPACITY.max]) {
-        const checked = typeFor({ name: 'Sala', capacity: String(capacity) });
+        const checked = typeFor(PAGE_TEXTS_EN, { name: 'Sala', capacity: String(capacity) });
         expect('type' in checked && TypeBody.safeParse(checked.type).success).toBe(true);
       }
       for (const capacity of [TYPE_CAPACITY.min - 1, TYPE_CAPACITY.max + 1]) expect(TypeBody.safeParse({ name: 'Sala', capacity }).success).toBe(false);
     });
 
     it('a name in fault and a capacity in fault are both refused; a name alone in fault is the only refusal', () => {
-      expect(typeFor({ name: '', capacity: '0' })).toEqual({ refusals: { name: TYPE_NAME_HINT, capacity: TYPE_CAPACITY_HINT } });
-      expect(typeFor({ name: '', capacity: '3' })).toEqual({ refusals: { name: TYPE_NAME_HINT } });
+      expect(typeFor(PAGE_TEXTS_EN, { name: '', capacity: '0' })).toEqual({ refusals: { name: TYPE_NAME_HINT, capacity: TYPE_CAPACITY_HINT } });
+      expect(typeFor(PAGE_TEXTS_EN, { name: '', capacity: '3' })).toEqual({ refusals: { name: TYPE_NAME_HINT } });
     });
 
     it('the hint says the bounds of shared/', () => {
@@ -137,7 +130,7 @@ describe('availability.model', () => {
       [SCRIPT, SCRIPT],
       ['Città · Sala 2', 'Città · Sala 2'],
     ])('"%s" is a name: "%s" is what is sent, and the shared body accepts it', (text, name) => {
-      expect(typeNameFor(text)).toEqual({ name });
+      expect(typeNameFor(PAGE_TEXTS_EN, text)).toEqual({ name });
       expect(TypeBody.parse({ name })).toEqual({ name });
     });
 
@@ -148,7 +141,7 @@ describe('availability.model', () => {
       ['a tab inside', 'Sala\tgrande'],
       ['a line break inside', 'Sala\ngrande'],
     ])('%s is refused with the hint\'s own words, as the shared body refuses it', (_what, text) => {
-      expect(typeNameFor(text)).toEqual({ refusal: TYPE_NAME_HINT });
+      expect(typeNameFor(PAGE_TEXTS_EN, text)).toEqual({ refusal: TYPE_NAME_HINT });
       expect(TypeBody.safeParse({ name: text }).success).toBe(false);
     });
 
@@ -159,7 +152,7 @@ describe('availability.model', () => {
     });
 
     it('a name that exists is not this check\'s to refuse: "studio" and "Studio" both pass', () => {
-      expect([typeNameFor('studio'), typeNameFor('Studio')]).toEqual([{ name: 'studio' }, { name: 'Studio' }]);
+      expect([typeNameFor(PAGE_TEXTS_EN, 'studio'), typeNameFor(PAGE_TEXTS_EN, 'Studio')]).toEqual([{ name: 'studio' }, { name: 'Studio' }]);
     });
   });
 
@@ -175,7 +168,7 @@ describe('availability.model', () => {
       for (const start of starts) {
         const { hours, minute } = windowEnds(start);
         for (const end of hours.map((hour) => timeOf(hour, minute))) {
-          const checked = patternFor(fields(start, end));
+          const checked = patternFor(PAGE_TEXTS_EN, fields(start, end));
           if (!('pattern' in checked) || !PatternBody.safeParse(checked.pattern).success) throw new Error(`${start}–${end}`);
           pairs += 1;
         }
@@ -214,20 +207,20 @@ describe('availability.model', () => {
       pattern({ weekday: 4, start: '22:15', end: '23:15', validUntil: '2030-12-31' }),
     ])('the fields of pattern %# sent back unchanged make the same body', (existing) => {
       const { weekday, start, end, typeId, validFrom, validUntil } = existing;
-      expect(patternFor(patternFields(existing))).toEqual({ pattern: { weekday, start, end, typeId, validFrom, validUntil } });
+      expect(patternFor(PAGE_TEXTS_EN, patternFields(existing))).toEqual({ pattern: { weekday, start, end, typeId, validFrom, validUntil } });
     });
   });
 
   describe('patternFor (6.2)', () => {
     const accepted = (fields: PatternFields) => {
-      const checked = patternFor(fields);
+      const checked = patternFor(PAGE_TEXTS_EN, fields);
       if (!('pattern' in checked)) throw new Error(`refused: ${JSON.stringify(checked.refusals)}`);
       // The shared schema has the last word: what the logic accepts, it accepts, unchanged.
       expect(PatternBody.parse(checked.pattern)).toEqual(checked.pattern);
       return checked.pattern;
     };
     const refusals = (over: Partial<PatternFields>) => {
-      const checked = patternFor({ ...FIELDS, ...over });
+      const checked = patternFor(PAGE_TEXTS_EN, { ...FIELDS, ...over });
       if (!('refusals' in checked)) throw new Error('accepted');
       // What the logic refuses, the shared schema refuses too.
       const { weekday, validUntil, ...rest } = { ...FIELDS, ...over };
@@ -299,16 +292,16 @@ describe('availability.model', () => {
 
   describe('patternGroups (6.2)', () => {
     const texts = (patterns: WeeklyPattern[], types: AvailabilityType[] | null = TYPES, today = TODAY) =>
-      patternGroups(patterns, types, today).map((group) => [group.weekday, group.rows.map((row) => `${row.time} ${row.typeName}${row.ended ? ' (ended)' : ''}`)]);
+      patternGroups(PAGE_TEXTS_EN, patterns, types, today).map((group) => [group.weekday, group.rows.map((row) => `${row.time} ${row.typeName}${row.ended ? ' (ended)' : ''}`)]);
 
     it('no pattern: no group, and the sentence of an empty list', () => {
-      expect(patternGroups([], TYPES, TODAY)).toEqual([]);
+      expect(patternGroups(PAGE_TEXTS_EN, [], TYPES, TODAY)).toEqual([]);
       expect(NO_PATTERNS).toBe('There are no weekly patterns yet.');
     });
 
     it('one pattern: its group, with its hours, its type\'s name, its validity, the names of its buttons and its fields', () => {
       const one = pattern();
-      expect(patternGroups([one], TYPES, TODAY)).toEqual([
+      expect(patternGroups(PAGE_TEXTS_EN, [one], TYPES, TODAY)).toEqual([
         {
           weekday: 'Monday',
           rows: [
@@ -341,7 +334,7 @@ describe('availability.model', () => {
     });
 
     it('on one weekday: by start, then by end, then by the first date of validity', () => {
-      const rows = patternGroups(
+      const rows = patternGroups(PAGE_TEXTS_EN, 
         [
           pattern({ start: '14:00', end: '15:00' }),
           pattern({ start: '09:00', end: '12:00', validFrom: '2027-01-01' }),
@@ -366,7 +359,7 @@ describe('availability.model', () => {
     });
 
     it('ended: a validity that ended yesterday; not one that ends today, has no end, or starts in the future', () => {
-      const rows = patternGroups(
+      const rows = patternGroups(PAGE_TEXTS_EN, 
         [
           pattern({ start: '08:00', validFrom: '2026-01-01', validUntil: '2026-11-19' }),
           pattern({ start: '09:00', validFrom: '2026-01-01', validUntil: '2026-11-20' }),
@@ -384,8 +377,8 @@ describe('availability.model', () => {
 
     it('"today" is the date given, a text: one day later, the pattern that ended today has ended', () => {
       const until = pattern({ validFrom: '2026-01-01', validUntil: '2026-11-20' });
-      expect(patternGroups([until], TYPES, '2026-11-20')[0]!.rows[0]!.ended).toBe(false);
-      expect(patternGroups([until], TYPES, '2026-11-21')[0]!.rows[0]!.ended).toBe(true);
+      expect(patternGroups(PAGE_TEXTS_EN, [until], TYPES, '2026-11-20')[0]!.rows[0]!.ended).toBe(false);
+      expect(patternGroups(PAGE_TEXTS_EN, [until], TYPES, '2026-11-21')[0]!.rows[0]!.ended).toBe(true);
     });
 
     it('a type that the list of types does not hold, and no list of types at all: a fixed word in the place of the name', () => {
@@ -394,18 +387,18 @@ describe('availability.model', () => {
       expect(texts([pattern({ typeId: other }), pattern({ start: '14:00', end: '15:00' })])).toEqual([['Monday', ['09:00 – 13:00 Unknown type', '14:00 – 15:00 Studio']]]);
       expect(texts([pattern()], null)).toEqual([['Monday', ['09:00 – 13:00 Unknown type']]]);
       // Its fields still hold its type's id: the dialog that changes it will have none chosen.
-      expect(patternGroups([pattern({ typeId: other })], TYPES, TODAY)[0]!.rows[0]!.fields.typeId).toBe(other);
+      expect(patternGroups(PAGE_TEXTS_EN, [pattern({ typeId: other })], TYPES, TODAY)[0]!.rows[0]!.fields.typeId).toBe(other);
     });
 
     it('a type\'s name containing <script> is kept as text, in the row and in the names of its buttons', () => {
-      const row = patternGroups([pattern()], [type(STUDIO, SCRIPT)], TODAY)[0]!.rows[0]!;
+      const row = patternGroups(PAGE_TEXTS_EN, [pattern()], [type(STUDIO, SCRIPT)], TODAY)[0]!.rows[0]!;
       expect([row.typeName, row.changeLabel]).toEqual([SCRIPT, `Change Monday 09:00 – 13:00 ${SCRIPT}`]);
     });
 
     it('the words of the dialog that deletes a pattern say which one, with its validity, and what follows', () => {
-      const [first, second] = patternGroups([pattern({ weekday: 2, start: '15:00', end: '18:00', typeId: POOL, validUntil: '2027-01-19' }), pattern({ weekday: 5 })], TYPES, TODAY).map((group) => group.rows[0]!);
-      expect(deletePatternQuestion(first!)).toBe('Delete the pattern Tuesday 15:00 – 18:00 Piscina, from 20 November 2026 to 19 January 2027? Its hours will no longer be open for booking. This cannot be undone.');
-      expect(deletePatternQuestion(second!)).toBe('Delete the pattern Friday 09:00 – 13:00 Studio, from 20 November 2026? Its hours will no longer be open for booking. This cannot be undone.');
+      const [first, second] = patternGroups(PAGE_TEXTS_EN, [pattern({ weekday: 2, start: '15:00', end: '18:00', typeId: POOL, validUntil: '2027-01-19' }), pattern({ weekday: 5 })], TYPES, TODAY).map((group) => group.rows[0]!);
+      expect(deletePatternQuestion(PAGE_TEXTS_EN, first!)).toBe('Delete the pattern Tuesday 15:00 – 18:00 Piscina, from 20 November 2026 to 19 January 2027? Its hours will no longer be open for booking. This cannot be undone.');
+      expect(deletePatternQuestion(PAGE_TEXTS_EN, second!)).toBe('Delete the pattern Friday 09:00 – 13:00 Studio, from 20 November 2026? Its hours will no longer be open for booking. This cannot be undone.');
     });
   });
 });

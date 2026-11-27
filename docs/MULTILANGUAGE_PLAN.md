@@ -2,7 +2,7 @@
 
 **Version:** v1 (2026-11-27): the plan, after the Product Owner's eight decisions of the brief
 and the answer to one question of planning (section 2). v2 (2026-11-27): phase A started with
-brief `prompts/lang-l03-phase-a-implementation.md`; steps l1, l2 and groups l3a to l3e done.
+brief `prompts/lang-l03-phase-a-implementation.md`; steps l1, l2 and groups l3a to l3f done.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -560,7 +560,28 @@ the calls given the English texts, the expectations unchanged; the list of D6 is
 frontend 3191 tests, 100 % lines. The look, padded, at both widths, with a refused value:
 everything fits; nothing for section 8.
 
-**As done (group l3f).** *Empty.*
+**As done (group l3f).** Done 2026-11-27. `PageTexts` gained `availability`
+(`AvailabilityTexts`: a type's places, the names of a row's buttons, the hints of a type's name
+and capacity as functions of their bounds, the refusals of a window's fields and of a pattern's
+dates, the empty lists, "Unknown type", a pattern's validity, the two questions before a
+deletion, and the sentence above the conflicts) and `date` (`DateTexts`: the refusals of the
+date, the day as it is, the windows of "this day only", the three questions with the date in
+full words). The keys: `availability.*` (the headings, the labels, the buttons of the three
+parts, the dialogs' titles, the three names of "Try again"); the time's legends and lists reuse
+`book.*`, the type's label `detail.type`, "Show" `appointments.show`, "Keep" `users.keep`. The
+models take the texts first (`typeRows`, `typeNameFor`, `typeFor`, `deleteTypeQuestion`,
+`endRefusal`, `patternFor`, `patternGroups`, `deletePatternQuestion`, `dateFor`, `dayModel`,
+`draftModel`, `draftAdd`, `windowFor`, `conflictList`); the weekdays' names are
+`texts.dates.weekdayName` (`WEEKDAY_CHOICES` became `weekdayChoices(texts)`), a date in full
+words `texts.dates.fullDate` (`dateWords` went); `TYPE_NAME_HINT` and `TYPE_CAPACITY_HINT`
+became functions of the texts; the constants of words left the logic for the texts.
+`AvailabilityScreen` and `DateScreen` take the page texts in their constructors;
+`mountAvailability` gets `texts` in its deps. Tests: the calls given the English texts, the
+expectations unchanged, the English words gathered in `tests/unit/logic/availability.words.ts`;
+the list of D6 is down to `#assistant`; the list of files taking English straight lost six.
+frontend 3191 tests, 100 % lines. The look, padded, at both widths, as the Administrator: the
+types, the patterns with their validity, a single date with "This day only" open, the dialog
+that confirms; everything fits; nothing for section 8.
 
 **As done (group l3g).** *Empty.*
 

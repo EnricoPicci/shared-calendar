@@ -434,78 +434,78 @@
              when it has one, its refusal. The choices of every list are the script's to set. -->
         <section id="availability" class="availability-screen" hidden>
           <div class="toolbar">
-            <h2>Availability</h2>
-            <span class="loading" role="status" hidden>Loading…</span>
+            <h2 data-text="availability.heading"></h2>
+            <span class="loading" role="status" data-text="common.loading" hidden></span>
           </div>
 
           <section class="types">
-            <h3>Types</h3>
+            <h3 data-text="availability.types"></h3>
             <!-- novalidate: a text that is not a name, or a capacity out of its bounds, is
                  refused by the script, in words, under its field -->
             <form class="create create-type" novalidate>
               <div class="field">
-                <label>Name <input name="name" autocomplete="off" aria-describedby="type-name-hint" /></label>
+                <label><span data-text="availability.name"></span> <input name="name" autocomplete="off" aria-describedby="type-name-hint" /></label>
                 <p class="hint name-hint" id="type-name-hint"></p>
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="field">
-                <label>Capacity <input type="number" name="capacity" inputmode="numeric" aria-describedby="type-capacity-hint" /></label>
+                <label><span data-text="availability.capacity"></span> <input type="number" name="capacity" inputmode="numeric" aria-describedby="type-capacity-hint" /></label>
                 <p class="hint capacity-hint" id="type-capacity-hint"></p>
                 <p class="error refusal" role="alert"></p>
               </div>
               <p class="error failure" role="alert"></p>
               <div class="actions">
-                <button class="primary submit">Create type</button>
+                <button class="primary submit" data-text="availability.createType"></button>
               </div>
             </form>
             <!-- Shown in the place of the list when it could not be read -->
             <div class="unread" hidden>
               <p class="error" role="alert"></p>
-              <button type="button" class="retry" aria-label="Try again to read the types">Try again</button>
+              <button type="button" class="retry" data-label="availability.retryTypes" data-text="common.retry"></button>
             </div>
             <p class="empty" hidden></p>
             <ul class="list"></ul>
           </section>
 
           <section class="patterns">
-            <h3>Weekly patterns</h3>
+            <h3 data-text="availability.patterns"></h3>
             <!-- novalidate: a field in fault is said by the script, in words, under it -->
             <form class="create-pattern" novalidate>
               <div class="pattern-fields">
                 <div class="field">
-                  <label>Weekday <select name="weekday"></select></label>
+                  <label><span data-text="availability.weekday"></span> <select name="weekday"></select></label>
                   <p class="error refusal" role="alert"></p>
                 </div>
                 <div class="field">
                   <fieldset class="clock">
-                    <legend>Start</legend>
-                    <label><span class="unseen">Hour</span> <select name="start-hour"></select></label>
+                    <legend data-text="book.start"></legend>
+                    <label><span class="unseen" data-text="book.hour"></span> <select name="start-hour"></select></label>
                     <span aria-hidden="true">:</span>
-                    <label><span class="unseen">Minute</span> <select name="start-minute"></select></label>
+                    <label><span class="unseen" data-text="book.minute"></span> <select name="start-minute"></select></label>
                   </fieldset>
                   <p class="error refusal" role="alert"></p>
                 </div>
                 <div class="field">
                   <fieldset class="clock">
-                    <legend>End</legend>
-                    <label><span class="unseen">Hour</span> <select name="end-hour"></select></label>
+                    <legend data-text="book.end"></legend>
+                    <label><span class="unseen" data-text="book.hour"></span> <select name="end-hour"></select></label>
                     <span aria-hidden="true">:</span>
-                    <label><span class="unseen">Minute</span> <select name="end-minute"></select></label>
+                    <label><span class="unseen" data-text="book.minute"></span> <select name="end-minute"></select></label>
                   </fieldset>
                   <p class="error refusal" role="alert"></p>
                 </div>
                 <div class="field">
-                  <label>Type <select name="typeId" aria-describedby="pattern-type-hint"></select></label>
+                  <label><span data-text="detail.type"></span> <select name="typeId" aria-describedby="pattern-type-hint"></select></label>
                   <p class="hint type-hint" id="pattern-type-hint"></p>
                   <p class="error refusal" role="alert"></p>
                 </div>
                 <div class="field">
-                  <label>Valid from <input type="date" name="validFrom" /></label>
+                  <label><span data-text="availability.validFrom"></span> <input type="date" name="validFrom" /></label>
                   <p class="error refusal" role="alert"></p>
                 </div>
                 <div class="field">
-                  <label>Valid until <input type="date" name="validUntil" aria-describedby="pattern-until-hint" /></label>
-                  <p class="hint" id="pattern-until-hint">Leave empty for no end.</p>
+                  <label><span data-text="availability.validUntil"></span> <input type="date" name="validUntil" aria-describedby="pattern-until-hint" /></label>
+                  <p class="hint" id="pattern-until-hint" data-text="availability.noEnd"></p>
                   <p class="error refusal" role="alert"></p>
                 </div>
               </div>
@@ -515,13 +515,13 @@
                 <ul class="conflicts-list"></ul>
               </div>
               <div class="actions">
-                <button class="primary submit">Create pattern</button>
+                <button class="primary submit" data-text="availability.createPattern"></button>
               </div>
             </form>
             <!-- Shown in the place of the list when it could not be read -->
             <div class="unread" hidden>
               <p class="error" role="alert"></p>
-              <button type="button" class="retry" aria-label="Try again to read the weekly patterns">Try again</button>
+              <button type="button" class="retry" data-label="availability.retryPatterns" data-text="common.retry"></button>
             </div>
             <p class="empty" hidden></p>
             <div class="groups"></div>
@@ -530,75 +530,75 @@
           <!-- One date: the day as the weekly patterns give it and as it is now, and what
                changes it. Every row holds buttons only; every form is outside the lists. -->
           <section class="one-date">
-            <h3>A single date</h3>
-            <span class="loading" role="status" hidden>Loading…</span>
+            <h3 data-text="availability.singleDate"></h3>
+            <span class="loading" role="status" data-text="common.loading" hidden></span>
             <!-- novalidate: a date that cannot be shown is refused by the script, in words,
                  under the field -->
             <form class="choose" novalidate>
               <div class="field">
-                <label>Date <input type="date" name="date" /></label>
+                <label><span data-text="availability.date"></span> <input type="date" name="date" /></label>
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="actions">
-                <button class="primary submit">Show</button>
+                <button class="primary submit" data-text="appointments.show"></button>
               </div>
             </form>
             <!-- Shown in the place of the day when it could not be read -->
             <div class="unread" hidden>
               <p class="error" role="alert"></p>
-              <button type="button" class="retry" aria-label="Try again to read this date">Try again</button>
+              <button type="button" class="retry" data-label="availability.retryDate" data-text="common.retry"></button>
             </div>
             <div class="shown" hidden>
               <p class="date-words"></p>
               <div class="given">
-                <h4>As the weekly patterns give it</h4>
+                <h4 data-text="availability.asPatterns"></h4>
                 <p class="none"></p>
                 <ul class="list given-rows"></ul>
               </div>
               <div class="as-now">
-                <h4>As it is now</h4>
+                <h4 data-text="availability.asNow"></h4>
                 <p class="which"></p>
                 <ul class="list own-rows"></ul>
                 <div class="actions">
-                  <button type="button" class="edit">This day only…</button>
-                  <button type="button" class="make-closed">Not available on this day</button>
-                  <button type="button" class="back">Back to the weekly patterns</button>
+                  <button type="button" class="edit" data-text="availability.editDay"></button>
+                  <button type="button" class="make-closed" data-text="availability.makeClosed"></button>
+                  <button type="button" class="back" data-text="availability.backToPatterns"></button>
                 </div>
               </div>
               <!-- "This day only": the windows being put together. Nothing is sent before
                    "Save this day". -->
               <div class="draft" hidden>
-                <h4>This day only</h4>
+                <h4 data-text="availability.thisDayOnly"></h4>
                 <p class="draft-empty"></p>
                 <ul class="list draft-rows"></ul>
                 <form class="add-draft" novalidate>
                   <div class="window-fields">
                     <div class="field">
                       <fieldset class="clock">
-                        <legend>Start</legend>
-                        <label><span class="unseen">Hour</span> <select name="start-hour"></select></label>
+                        <legend data-text="book.start"></legend>
+                        <label><span class="unseen" data-text="book.hour"></span> <select name="start-hour"></select></label>
                         <span aria-hidden="true">:</span>
-                        <label><span class="unseen">Minute</span> <select name="start-minute"></select></label>
+                        <label><span class="unseen" data-text="book.minute"></span> <select name="start-minute"></select></label>
                       </fieldset>
                       <p class="error refusal" role="alert"></p>
                     </div>
                     <div class="field">
                       <fieldset class="clock">
-                        <legend>End</legend>
-                        <label><span class="unseen">Hour</span> <select name="end-hour"></select></label>
+                        <legend data-text="book.end"></legend>
+                        <label><span class="unseen" data-text="book.hour"></span> <select name="end-hour"></select></label>
                         <span aria-hidden="true">:</span>
-                        <label><span class="unseen">Minute</span> <select name="end-minute"></select></label>
+                        <label><span class="unseen" data-text="book.minute"></span> <select name="end-minute"></select></label>
                       </fieldset>
                       <p class="error refusal" role="alert"></p>
                     </div>
                     <div class="field">
-                      <label>Type <select name="typeId"></select></label>
+                      <label><span data-text="detail.type"></span> <select name="typeId"></select></label>
                       <p class="error refusal" role="alert"></p>
                     </div>
                   </div>
                   <p class="error failure" role="alert"></p>
                   <div class="actions">
-                    <button class="submit">Add</button>
+                    <button class="submit" data-text="availability.add"></button>
                   </div>
                 </form>
                 <p class="error failure save-failure" role="alert"></p>
@@ -607,42 +607,42 @@
                   <ul class="conflicts-list"></ul>
                 </div>
                 <div class="actions">
-                  <button type="button" class="discard">Discard</button>
-                  <button type="button" class="primary save">Save this day</button>
+                  <button type="button" class="discard" data-text="availability.discard"></button>
+                  <button type="button" class="primary save" data-text="availability.saveDay"></button>
                 </div>
               </div>
               <div class="extras">
-                <h4>Extra windows</h4>
+                <h4 data-text="availability.extraWindows"></h4>
                 <p class="none"></p>
                 <ul class="list extra-rows"></ul>
                 <form class="add-window" novalidate>
                   <div class="window-fields">
                     <div class="field">
                       <fieldset class="clock">
-                        <legend>Start</legend>
-                        <label><span class="unseen">Hour</span> <select name="start-hour"></select></label>
+                        <legend data-text="book.start"></legend>
+                        <label><span class="unseen" data-text="book.hour"></span> <select name="start-hour"></select></label>
                         <span aria-hidden="true">:</span>
-                        <label><span class="unseen">Minute</span> <select name="start-minute"></select></label>
+                        <label><span class="unseen" data-text="book.minute"></span> <select name="start-minute"></select></label>
                       </fieldset>
                       <p class="error refusal" role="alert"></p>
                     </div>
                     <div class="field">
                       <fieldset class="clock">
-                        <legend>End</legend>
-                        <label><span class="unseen">Hour</span> <select name="end-hour"></select></label>
+                        <legend data-text="book.end"></legend>
+                        <label><span class="unseen" data-text="book.hour"></span> <select name="end-hour"></select></label>
                         <span aria-hidden="true">:</span>
-                        <label><span class="unseen">Minute</span> <select name="end-minute"></select></label>
+                        <label><span class="unseen" data-text="book.minute"></span> <select name="end-minute"></select></label>
                       </fieldset>
                       <p class="error refusal" role="alert"></p>
                     </div>
                     <div class="field">
-                      <label>Type <select name="typeId"></select></label>
+                      <label><span data-text="detail.type"></span> <select name="typeId"></select></label>
                       <p class="error refusal" role="alert"></p>
                     </div>
                   </div>
                   <p class="error failure" role="alert"></p>
                   <div class="actions">
-                    <button class="submit">Add window</button>
+                    <button class="submit" data-text="availability.addWindow"></button>
                   </div>
                 </form>
               </div>
@@ -652,7 +652,7 @@
           <!-- A row of the types: the name and its two buttons, whose names for a screen
                reader the script completes with the name -->
           <template id="tpl-type-row">
-            <li class="type-row"><span class="name"></span> <span class="places"></span> <button type="button" class="ask-rename">Edit</button> <button type="button" class="danger ask-delete">Delete</button></li>
+            <li class="type-row"><span class="name"></span> <span class="places"></span> <button type="button" class="ask-rename" data-text="common.edit"></button> <button type="button" class="danger ask-delete" data-text="common.delete"></button></li>
           </template>
           <!-- The patterns of one weekday, under its name -->
           <template id="tpl-pattern-group">
@@ -664,7 +664,7 @@
           <!-- A row of the patterns: its hours, its type, its validity, "ended" when that is
                over, and its two buttons -->
           <template id="tpl-pattern-row">
-            <li class="pattern-row"><span class="time"></span> <span class="type-name"></span> <span class="validity"></span> <span class="ended" hidden>ended</span> <button type="button" class="ask-change">Change</button> <button type="button" class="danger ask-delete">Delete</button></li>
+            <li class="pattern-row"><span class="time"></span> <span class="type-name"></span> <span class="validity"></span> <span class="ended" data-text="availability.ended" hidden></span> <button type="button" class="ask-change" data-text="common.change"></button> <button type="button" class="danger ask-delete" data-text="common.delete"></button></li>
           </template>
           <!-- An appointment in the way of a change of availability: one row of a conflicts list -->
           <template id="tpl-conflict">
@@ -681,31 +681,31 @@
           <!-- A window of "this day only" while it is being put together: the same, and the
                button that takes it out, whose name for a screen reader the script completes -->
           <template id="tpl-draft-row">
-            <li class="window-row"><span class="time"></span> <span class="type-name"></span> <button type="button" class="remove">Remove</button></li>
+            <li class="window-row"><span class="time"></span> <span class="type-name"></span> <button type="button" class="remove" data-text="availability.remove"></button></li>
           </template>
           <!-- An extra window of a single date: the same, and the button that asks to delete it -->
           <template id="tpl-extra-row">
-            <li class="window-row"><span class="time"></span> <span class="type-name"></span> <button type="button" class="danger ask-delete">Delete</button></li>
+            <li class="window-row"><span class="time"></span> <span class="type-name"></span> <button type="button" class="danger ask-delete" data-text="common.delete"></button></li>
           </template>
 
           <!-- Edits a type: its name and its capacity, opened with its own -->
           <dialog class="rename" aria-labelledby="rename-title">
             <form novalidate>
-              <h3 id="rename-title">Edit type</h3>
+              <h3 id="rename-title" data-text="availability.editType"></h3>
               <div class="field">
-                <label>Name <input name="name" autocomplete="off" aria-describedby="rename-hint" /></label>
+                <label><span data-text="availability.name"></span> <input name="name" autocomplete="off" aria-describedby="rename-hint" /></label>
                 <p class="hint name-hint" id="rename-hint"></p>
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="field">
-                <label>Capacity <input type="number" name="capacity" inputmode="numeric" aria-describedby="rename-capacity-hint" /></label>
+                <label><span data-text="availability.capacity"></span> <input type="number" name="capacity" inputmode="numeric" aria-describedby="rename-capacity-hint" /></label>
                 <p class="hint capacity-hint" id="rename-capacity-hint"></p>
                 <p class="error refusal" role="alert"></p>
               </div>
               <p class="error failure" role="alert"></p>
               <div class="actions">
-                <button type="button" class="close">Close</button>
-                <button class="primary submit">Save</button>
+                <button type="button" class="close" data-text="common.close"></button>
+                <button class="primary submit" data-text="common.save"></button>
               </div>
             </form>
           </dialog>
@@ -714,41 +714,41 @@
                pattern's own -->
           <dialog class="change" aria-labelledby="change-title">
             <form novalidate>
-              <h3 id="change-title">Change pattern</h3>
+              <h3 id="change-title" data-text="availability.changePattern"></h3>
               <div class="field">
-                <label>Weekday <select name="weekday"></select></label>
+                <label><span data-text="availability.weekday"></span> <select name="weekday"></select></label>
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="field">
                 <fieldset class="clock">
-                  <legend>Start</legend>
-                  <label><span class="unseen">Hour</span> <select name="start-hour"></select></label>
+                  <legend data-text="book.start"></legend>
+                  <label><span class="unseen" data-text="book.hour"></span> <select name="start-hour"></select></label>
                   <span aria-hidden="true">:</span>
-                  <label><span class="unseen">Minute</span> <select name="start-minute"></select></label>
+                  <label><span class="unseen" data-text="book.minute"></span> <select name="start-minute"></select></label>
                 </fieldset>
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="field">
                 <fieldset class="clock">
-                  <legend>End</legend>
-                  <label><span class="unseen">Hour</span> <select name="end-hour"></select></label>
+                  <legend data-text="book.end"></legend>
+                  <label><span class="unseen" data-text="book.hour"></span> <select name="end-hour"></select></label>
                   <span aria-hidden="true">:</span>
-                  <label><span class="unseen">Minute</span> <select name="end-minute"></select></label>
+                  <label><span class="unseen" data-text="book.minute"></span> <select name="end-minute"></select></label>
                 </fieldset>
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="field">
-                <label>Type <select name="typeId" aria-describedby="change-type-hint"></select></label>
+                <label><span data-text="detail.type"></span> <select name="typeId" aria-describedby="change-type-hint"></select></label>
                 <p class="hint type-hint" id="change-type-hint"></p>
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="field">
-                <label>Valid from <input type="date" name="validFrom" /></label>
+                <label><span data-text="availability.validFrom"></span> <input type="date" name="validFrom" /></label>
                 <p class="error refusal" role="alert"></p>
               </div>
               <div class="field">
-                <label>Valid until <input type="date" name="validUntil" aria-describedby="change-until-hint" /></label>
-                <p class="hint" id="change-until-hint">Leave empty for no end.</p>
+                <label><span data-text="availability.validUntil"></span> <input type="date" name="validUntil" aria-describedby="change-until-hint" /></label>
+                <p class="hint" id="change-until-hint" data-text="availability.noEnd"></p>
                 <p class="error refusal" role="alert"></p>
               </div>
               <p class="error failure" role="alert"></p>
@@ -757,8 +757,8 @@
                 <ul class="conflicts-list"></ul>
               </div>
               <div class="actions">
-                <button type="button" class="close">Close</button>
-                <button class="primary submit">Change</button>
+                <button type="button" class="close" data-text="common.close"></button>
+                <button class="primary submit" data-text="common.change"></button>
               </div>
             </form>
           </dialog>
@@ -768,7 +768,7 @@
                "Keep" comes first: the keyboard is on it when the dialog opens, and a screen
                reader then says the question, which describes the dialog. -->
           <dialog class="delete" aria-labelledby="availability-delete-title" aria-describedby="availability-delete-question">
-            <h3 id="availability-delete-title">Please confirm</h3>
+            <h3 id="availability-delete-title" data-text="availability.confirmTitle"></h3>
             <p class="question" id="availability-delete-question"></p>
             <p class="error" role="alert"></p>
             <div class="conflicts" hidden>
@@ -776,8 +776,8 @@
               <ul class="conflicts-list"></ul>
             </div>
             <div class="actions">
-              <button type="button" class="keep">Keep</button>
-              <button type="button" class="danger submit">Confirm</button>
+              <button type="button" class="keep" data-text="users.keep"></button>
+              <button type="button" class="danger submit" data-text="common.confirm"></button>
             </div>
           </dialog>
         </section>
