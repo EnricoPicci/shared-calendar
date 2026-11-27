@@ -2,7 +2,7 @@
 
 **Version:** v1 (2026-11-27): the plan, after the Product Owner's eight decisions of the brief
 and the answer to one question of planning (section 2). v2 (2026-11-27): phase A started with
-brief `prompts/lang-l03-phase-a-implementation.md`; steps l1 to l4 done.
+brief `prompts/lang-l03-phase-a-implementation.md`; steps l1 to l5 done.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -699,7 +699,47 @@ section 8 (the weekdays in lower case as headings).
 - **Leaves for phase B:** F16 whole: the change set, the gap closed, `GetUser` in the cloud.
   Locally the write list proves nothing (F8).
 
-**As done (step l5).** *Empty.*
+**As done (step l5).** Done 2026-11-27. Built: `WriteAttributes: [locale]` on the app client
+of `backend/template.yaml`, with its comment (`sam validate --lint` passes);
+`frontend/src/services/language.service.ts` and `language.types.ts`, `read()` by `GetUser` on
+`readResult$` and `write()` by `UpdateUserAttributes` on `writeResult$` and `writeState$`, the
+access token read from the store at the call, only `en` and `it` kept by the read
+(`readLanguage` of `shared/`), the targets `GetUser` and `UpdateUserAttributes` in `cognito.ts`;
+the shell's `arrive`: the login and the frame both hidden while the account's language is read,
+a language held chosen for the page (and so remembered by this browser), none held written once
+from the page's language without waiting, a read that fails entering in the page's language with
+nothing written; a language saved in "My details" chosen for the page, which enters the frame
+again at the same address; one `LanguageService` per person who signs in, made by
+`ShellDeps.accountLanguage` so that the shell's tests bring a fake; "My details": the list
+"Language" under the details for both roles, filled as the sign-in screen's (the shared
+`fillLanguages` of `page-texts.ts`), closed while a save is under way, a failure saying why under
+it with the list back on the language in use; the texts `me.language` and
+`profile.languageNotSaved`. Not changed, unlike the plan's list of files:
+`frontend/src/logic/language.ts` and `me.model.ts` (the screen holds the choice; the model has
+no part in it). Tests: the service (both calls, every refusal, the network, nobody signed in, a
+call abandoned by the next, a word not in the list and a language with a region read as none, no
+token and no other fact in a result); the screen and the view of "My details" (the list, a save,
+a failure, a result not asked for, the teardown); the shell (nothing shown before the answer, a
+language held, none, a failed read, a sign-out while unanswered, a second person read again, the
+change in "My details" with the address kept and no second read or write, a failed save; through
+`runShell`, `GetUser` with the person's token and the memory written, and the first write with
+the person's token); the two routes' handlers refuse a `language`; `page.test.ts`'s fields 72
+and failure lines 74. frontend 3259 tests, 100 % lines; shared 660, backend 2060. The journey
+"the language of a person" (8 tests, `docs/journeys/frontend/language.md`): a new account holds
+none; written and read back; changed; another account untouched; a word written by hand read as
+none; not in the id token of a new sign-in and read by `GetUser`; the two routes refuse a
+`language`; nothing sent without a session. The first sign-in's write of the page's language is
+the shell's, not the service's: the journey has no shell, so it is proved by the shell's tests
+and was seen in the look. The look: "My details" as the Administrator at 1280 in Italian and
+after a change to English (the frame entered again at `#/me`, the memory written), at 390 in
+English; the first sign-in of a new local user at 390 with Italian chosen on the sign-in screen
+("Scelga la sua password", then the frame in Italian at `#/me`, `locale` written `it` in the
+emulator), "Appuntamenti" afterwards; "My details" padded as alice. The change is made only on
+`#/me`, so "three screens' addresses" became the frame after the change seen on the other
+screens. The failure's sentence was not seen on screen (nothing locally makes the write fail):
+its place is the field's refusal line, as for the four facts. The throw-away user and the
+languages the look wrote to `admin` and `alice` were removed from the emulator afterwards.
+One wording for section 7.
 
 ### Step l6 — The mailer and the Excel files by language; `DefaultLanguage`
 
@@ -963,6 +1003,7 @@ Kept by Claude Code while the work runs (decision 5); read first in phase B, ite
 | l4 | `users.deleteQuestion`, `availability.deletePattern`, `date.deleteExtraQuestion`, `date.closeQuestion`, `date.reopenQuestion`, `failures.patternsBackOverlap` | Their / Its | di alice / Quelle ore / del giorno | "suoi", "sue" for a user's or a day's things reads as "yours" next to the "lei": the owner is named instead. |
 | l4 | `settings.lastSaved`, `appointment.bookedBy` | Last saved by admin on Fri 27 Nov, 11:57 | Salvate l'ultima volta da admin il ven 27 nov, 11:57 | The date and the time come as one value of the shared formats; "alle 11:57" would need them apart. |
 | l4 | `html.frame.screens` (the navigation's name for a screen reader) | Screens | Pagine | "Schermate" is the literal word, longer and less used. |
+| l5 | `profile.languageNotSaved` | The language was not changed. … | La lingua non è stata cambiata. … | "non è stata salvata" is closer to the code; "cambiata" says what the person sees: the list goes back. |
 
 ## 8. What was seen on the screens and not settled
 

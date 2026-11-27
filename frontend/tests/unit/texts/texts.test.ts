@@ -69,6 +69,7 @@ const SAMPLES: Record<string, unknown[]> = {
   'date.draftFull': [5],
   'assistant.notDone': ['The time is taken.'],
   'assistant.remaining': [3],
+  'profile.languageNotSaved': ['The server cannot be reached.'],
   'password.problems.too_long': [256],
   'password.problems.no_symbol': ['^ $ * .'],
   'dates.shortDate': ['2026-11-16'],

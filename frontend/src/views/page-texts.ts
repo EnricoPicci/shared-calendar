@@ -1,4 +1,4 @@
-import type { Language } from '@shared-calendar/shared';
+import { LANGUAGE_OWN_NAMES, SUPPORTED_LANGUAGES, type Language } from '@shared-calendar/shared';
 import type { HtmlTexts } from '../texts/texts';
 
 // The fixed texts of index.html, which holds keys instead of words
@@ -30,4 +30,19 @@ export function fillPage(document: Document, texts: HtmlTexts, language: Languag
   fillTexts(document, texts);
   document.title = texts.frame.title;
   document.documentElement.lang = language;
+}
+
+// Puts the calendar's languages into a list (the sign-in screen's, "My details'"): each under its
+// own name, the name marked as being in that language, as a person who speaks it looks for it.
+// The same in every language of the page: a list of languages is no text of the page.
+export function fillLanguages(list: HTMLSelectElement): void {
+  list.replaceChildren(
+    ...SUPPORTED_LANGUAGES.map((code) => {
+      const option = list.ownerDocument.createElement('option');
+      option.value = code;
+      option.lang = code;
+      option.textContent = LANGUAGE_OWN_NAMES[code];
+      return option;
+    }),
+  );
 }

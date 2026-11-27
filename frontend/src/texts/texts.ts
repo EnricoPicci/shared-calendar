@@ -184,6 +184,8 @@ export type ProfileTexts = {
   email: (longest: number) => string;
   address: (longest: number) => string;
   notSet: string;
+  // The person's language, not saved, with why.
+  languageNotSaved: (why: string) => string;
 };
 
 // The users screen: the state of an account, the names a screen reader says for a row's buttons
@@ -353,7 +355,7 @@ export type HtmlTexts = {
     deleteUser: string;
     keep: string;
   };
-  me: { heading: string; retryLabel: string; role: string; about: string; editTitle: string };
+  me: { heading: string; retryLabel: string; role: string; about: string; editTitle: string; language: string };
   // The settings form: the line of the time zone is a sentence around the zone's name.
   settings: {
     heading: string;

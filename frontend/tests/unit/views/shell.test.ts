@@ -1,13 +1,15 @@
-import { BehaviorSubject, firstValueFrom, Observable, Subscription } from 'rxjs';
+import { BehaviorSubject, firstValueFrom, Observable, ReplaySubject, Subscription } from 'rxjs';
 import { PageLanguage } from '../../../src/logic/language';
 import { padded, PADDED_CLOSE, PADDED_OPEN } from '../../../src/texts/padded';
 import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 import { PAGE_TEXTS } from '../../../src/texts/texts';
+import type { Language } from '@shared-calendar/shared';
+import type { LanguageReadResult, LanguageWriteResult } from '../../../src/services/language.types';
 import type { LoginState, Session } from '../../../src/services/login.types';
 import { LogoutService } from '../../../src/services/logout.service';
 import { SessionStore } from '../../../src/services/session.store';
 import type { LoginDeps } from '../../../src/views/login.view';
-import { mountShell, runShell, SCREENS, type Screen } from '../../../src/views/shell';
+import { mountShell, runShell, SCREENS, type AccountLanguage, type Screen } from '../../../src/views/shell';
 import { appointment, STUDIO, view, winterWeek } from '../logic/fixtures';
 import { call, cognitoError, cognitoTokens, json, jwt, session } from '../services/fixtures';
 import { find, loadPage, setTime, submit, timeIn, useRealPage } from './page';
@@ -22,6 +24,41 @@ const CONFIG = { apiUrl: 'http://api.test', cognitoUrl: 'http://cognito.test/', 
 const english = () => new PageLanguage('en', (code) => PAGE_TEXTS[code], { read: () => null, write: () => {} });
 // A call that is never answered.
 const unanswered = () => new Promise<Response>(() => {});
+
+// A fake LanguageService for mountShell: the read answers at once with `answer`, the account's
+// language (null: none held), or a failure; a write answers at once, a success unless `refuse`.
+type FakeAccount = AccountLanguage & { reads: number; written: Language[]; reads$: ReplaySubject<LanguageReadResult>; writes$: ReplaySubject<LanguageWriteResult> };
+function fakeAccount(answer: Language | null | 'failure' | 'silent' = null, refuse = false): FakeAccount {
+  const reads$ = new ReplaySubject<LanguageReadResult>(1);
+  const writes$ = new ReplaySubject<LanguageWriteResult>(1);
+  const fake: FakeAccount = {
+    reads: 0,
+    written: [],
+    reads$,
+    writes$,
+    readResult$: reads$.asObservable(),
+    writeResult$: writes$.asObservable(),
+    read: () => {
+      fake.reads++;
+      if (answer === 'silent') return;
+      reads$.next(answer === 'failure' ? { status: 'failure', reason: 'network', message: 'for a developer' } : { status: 'success', language: answer });
+    },
+    write: (language) => {
+      fake.written.push(language);
+      writes$.next(refuse ? { status: 'failure', reason: 'network', message: 'for a developer' } : { status: 'success', language });
+    },
+  };
+  return fake;
+}
+
+// For runShell, which makes the real LanguageService: the read and the write of a person's
+// language go to `accountMock`, not to `fetchMock`, so that the tests' queued answers and their
+// count of Cognito's calls are those of the sign-in, the refresh and the sign-out. By default the
+// account holds no language and the write is answered.
+const ACCOUNT_TARGETS = ['AWSCognitoIdentityProviderService.GetUser', 'AWSCognitoIdentityProviderService.UpdateUserAttributes'];
+const accountTarget = (init?: RequestInit) => (init?.headers as Record<string, string> | undefined)?.['X-Amz-Target'] ?? '';
+const accountAnswer = (_url: string, init?: RequestInit) =>
+  Promise.resolve(json(200, accountTarget(init).endsWith('GetUser') ? { Username: 'someone', UserAttributes: [] } : {}, 'application/x-amz-json-1.1'));
 
 const ALICE = session();
 const ADMIN = session({ username: 'admin', role: 'admin', accessToken: 'access-token-admin', idToken: 'id-token-admin', refreshToken: 'refresh-token-admin' });
@@ -48,9 +85,13 @@ const held = (field: HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement)
 
 let shell: Subscription | undefined;
 let fetchMock: ReturnType<typeof vi.fn>;
+let accountMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   fetchMock = vi.fn(unanswered);
-  vi.stubGlobal('fetch', fetchMock);
+  accountMock = vi.fn(accountAnswer);
+  vi.stubGlobal('fetch', (url: string, init?: RequestInit): unknown =>
+    ACCOUNT_TARGETS.includes(accountTarget(init)) ? (accountMock as (...a: unknown[]) => unknown)(url, init) : (fetchMock as (...a: unknown[]) => unknown)(url, init),
+  );
   // The emulated page keeps its address from one test to the next: each starts without a hash.
   window.history.replaceState(null, '', window.location.pathname);
 });
@@ -68,7 +109,7 @@ const apiCalls = () =>
     .map(([url, init]) => [url, (init.headers as Record<string, string>).Authorization]);
 const cognitoCalls = () => (fetchMock.mock.calls as [string, RequestInit][]).filter(([url]) => url === CONFIG.cognitoUrl);
 
-function mounted(first: Session | null = null, screens?: readonly Screen[]) {
+function mounted(first: Session | null = null, screens?: readonly Screen[], account: () => AccountLanguage = () => fakeAccount()) {
   const store = new SessionStore();
   if (first) store.set(first);
   const state$ = new BehaviorSubject<LoginState>({ status: 'idle' });
@@ -84,9 +125,11 @@ function mounted(first: Session | null = null, screens?: readonly Screen[]) {
   // The real sign-out service on the test's store: its request to Cognito stays unanswered
   // unless a test answers it. The fake login has nothing to put back.
   const logout = new LogoutService(CONFIG, store, []);
-  shell = mountShell(document.body, { config: CONFIG, language: english(), store, login, logout, ...(screens ? { screens } : {}) });
+  const language = english();
+  shell = mountShell(document.body, { config: CONFIG, language, store, login, logout, accountLanguage: account, ...(screens ? { screens } : {}) });
   return {
     store,
+    language,
     state$,
     login,
     loginMounts: () => loginMounts,
@@ -188,7 +231,7 @@ describe('mountShell', () => {
     store.set(ALICE);
     const logout = { logout: vi.fn<() => void>() };
     const login: LoginDeps = { loginState$: new BehaviorSubject<LoginState>({ status: 'idle' }), login: vi.fn<LoginDeps['login']>() };
-    shell = mountShell(document.body, { config: CONFIG, language: english(), store, login, logout });
+    shell = mountShell(document.body, { config: CONFIG, language: english(), store, login, logout, accountLanguage: () => fakeAccount() });
 
     find('#app .sign-out').click();
     expect(logout.logout).toHaveBeenCalledTimes(1);
@@ -3247,7 +3290,7 @@ describe('the password, the last screen of both roles', () => {
       void firstValueFrom(store.session$).then((s) => atReset.push(s));
     });
     const config = skipGlobalSignOut === undefined ? CONFIG : { ...CONFIG, skipGlobalSignOut };
-    shell = mountShell(document.body, { config, language: english(), store, login, logout: new LogoutService(CONFIG, store, []), pageWide });
+    shell = mountShell(document.body, { config, language: english(), store, login, logout: new LogoutService(CONFIG, store, []), pageWide, accountLanguage: () => fakeAccount() });
     window.location.hash = '#/password';
     window.dispatchEvent(new HashChangeEvent('hashchange'));
     return { store, pageWide, atReset };
@@ -3401,5 +3444,128 @@ describe('the password, the last screen of both roles', () => {
     links()[0]!.click();
     await vi.waitFor(() => expect(find('#password').hidden).toBe(true));
     expect(['current', 'next', 'again'].map((name) => one<HTMLInputElement>(`[name="${name}"]`).value)).toEqual(['', '', '']);
+  });
+});
+
+// The person's own language, read at sign-in and saved in "My details" (docs/MULTILANGUAGE_PLAN.md
+// finding F11, decision D1).
+describe('the person\'s language', () => {
+  useRealPage();
+
+  const at = (hash: string) => window.history.replaceState(null, '', `${window.location.pathname}${hash}`);
+  const ME = { username: 'alice', role: 'user', givenName: 'Alice', familyName: 'Liddell', email: 'alice@example.com', address: 'Piazza 7' };
+  const list = () => find<HTMLSelectElement>('#me .language-field select');
+
+  it('nothing is shown while the account\'s language is read; the login is gone, the frame comes with the answer', () => {
+    const account = fakeAccount('silent');
+    const { store, loginRoot, frame } = mounted(null, undefined, () => account);
+    store.set(ALICE);
+    expect([loginRoot.hidden, frame.hidden, account.reads]).toEqual([true, true, 1]);
+    expect(apiCalls()).toEqual([]);
+    account.reads$.next({ status: 'success', language: 'en' });
+    expect(frame.hidden).toBe(false);
+    expect(find('#app .username').textContent).toBe('alice');
+  });
+
+  it('a language of the calendar held by the account: the page and the frame in it, nothing written', () => {
+    const account = fakeAccount('it');
+    const { store, language } = mounted(null, undefined, () => account);
+    store.set(ALICE);
+    expect([language.state.language, document.documentElement.lang, find('#app .sign-out').textContent, find('#app .role').textContent]).toEqual(['it', 'it', 'Esci', 'Utente']);
+    expect(account.written).toEqual([]);
+  });
+
+  it('none held: the page\'s language written to the account, once, and the frame shown without waiting for the answer', () => {
+    const account = fakeAccount(null);
+    account.write = (language) => void account.written.push(language);
+    const { store, frame } = mounted(null, undefined, () => account);
+    store.set(ALICE);
+    expect([frame.hidden, account.written, document.documentElement.lang]).toEqual([false, ['en'], 'en']);
+  });
+
+  it('a read that fails: the frame in the page\'s language, nothing written', () => {
+    const account = fakeAccount('failure');
+    const { store, frame } = mounted(null, undefined, () => account);
+    store.set(ALICE);
+    expect([frame.hidden, account.written, find('#app .sign-out').textContent]).toEqual([false, [], 'Sign out']);
+  });
+
+  it('a sign-out while the read is unanswered: the login, and a late answer shows nothing', () => {
+    const account = fakeAccount('silent');
+    const { store, loginRoot, frame } = mounted(null, undefined, () => account);
+    store.set(ALICE);
+    store.clear();
+    account.reads$.next({ status: 'success', language: 'it' });
+    expect([loginRoot.hidden, frame.hidden, document.documentElement.lang]).toEqual([false, true, 'en']);
+  });
+
+  it('each person who signs in has the account\'s language read again', () => {
+    const accounts = [fakeAccount('it'), fakeAccount('en')];
+    let made = 0;
+    const { store } = mounted(null, undefined, () => accounts[made++]!);
+    store.set(ALICE);
+    expect(document.documentElement.lang).toBe('it');
+    store.clear();
+    store.set(ADMIN);
+    expect([made, document.documentElement.lang, find('#app .role').textContent]).toEqual([2, 'en', 'Administrator']);
+  });
+
+  it('"My details": another language saved, the frame entered again in it at the same address; no new read, no second write', async () => {
+    at('#/me');
+    fetchMock.mockResolvedValueOnce(json(200, ME)).mockResolvedValueOnce(json(200, ME));
+    const account = fakeAccount('en');
+    const { store } = mounted(null, undefined, () => account);
+    store.set(ALICE);
+    await vi.waitFor(() => expect(find('#me .details').hidden).toBe(false));
+    expect(list().value).toBe('en');
+    list().value = 'it';
+    list().dispatchEvent(new Event('change'));
+    expect([account.written, account.reads, window.location.hash, document.documentElement.lang]).toEqual([['it'], 1, '#/me', 'it']);
+    expect([find('#me').hidden, list().value, list().disabled, find('#app .sign-out').textContent]).toEqual([false, 'it', false, 'Esci']);
+    await vi.waitFor(() => expect(find('#me .details dd.role').textContent).toBe('Utente'));
+    expect(apiCalls().map(([url]) => url)).toEqual(['http://api.test/me', 'http://api.test/me']);
+  });
+
+  it('"My details": a save that fails says why under the list, which goes back to the language in use; the frame stays', async () => {
+    at('#/me');
+    fetchMock.mockResolvedValueOnce(json(200, ME));
+    const account = fakeAccount('en', true);
+    const { store } = mounted(null, undefined, () => account);
+    store.set(ALICE);
+    await vi.waitFor(() => expect(find('#me .details').hidden).toBe(false));
+    list().value = 'it';
+    list().dispatchEvent(new Event('change'));
+    expect([list().value, document.documentElement.lang, apiCalls()]).toEqual(['en', 'en', [['http://api.test/me', 'Bearer access-token-alice']]]);
+    expect(find('#me .language-field .refusal').textContent).toMatch(/^The language was not changed\. /);
+  });
+
+  it('runShell: GetUser with the person\'s token after the sign-in, the account\'s language becomes this browser\'s memory', async () => {
+    const held: Record<string, string> = {};
+    const storage = { getItem: (key: string) => held[key] ?? null, setItem: (key: string, value: string) => void (held[key] = value) };
+    accountMock.mockImplementation((_url: string, init?: RequestInit) =>
+      Promise.resolve(json(200, accountTarget(init).endsWith('GetUser') ? { UserAttributes: [{ Name: 'locale', Value: 'it' }] } : {}, 'application/x-amz-json-1.1')),
+    );
+    const access = jwt({ username: 'alice', 'cognito:groups': ['user'], exp: Math.floor(Date.now() / 1000) + 900 });
+    fetchMock.mockResolvedValueOnce(cognitoTokens({ AccessToken: access, IdToken: 'id-token', RefreshToken: 'refresh-token' }));
+    shell = runShell({ ...CONFIG, storage });
+    find<HTMLInputElement>('#login [name="username"]').value = 'alice';
+    find<HTMLInputElement>('#login [name="password"]').value = 'Secret-Pass-1!';
+    submit(find<HTMLFormElement>('#login form'));
+    await vi.waitFor(() => expect(find('#app').hidden).toBe(false));
+    expect([find('#app .sign-out').textContent, held['shared-calendar.language']]).toEqual(['Esci', 'it']);
+    const calls = accountMock.mock.calls as [string, RequestInit][];
+    expect(calls.map(([url, init]) => [url, accountTarget(init), JSON.parse(String(init.body))])).toEqual([[CONFIG.cognitoUrl, 'AWSCognitoIdentityProviderService.GetUser', { AccessToken: access }]]);
+  });
+
+  it('runShell: an account without a language gets the page\'s, written with the person\'s token', async () => {
+    const access = jwt({ username: 'alice', 'cognito:groups': ['user'], exp: Math.floor(Date.now() / 1000) + 900 });
+    fetchMock.mockResolvedValueOnce(cognitoTokens({ AccessToken: access, IdToken: 'id-token', RefreshToken: 'refresh-token' }));
+    shell = runShell(CONFIG);
+    find<HTMLInputElement>('#login [name="username"]').value = 'alice';
+    find<HTMLInputElement>('#login [name="password"]').value = 'Secret-Pass-1!';
+    submit(find<HTMLFormElement>('#login form'));
+    await vi.waitFor(() => expect(accountMock).toHaveBeenCalledTimes(2));
+    const [, init] = (accountMock.mock.calls as [string, RequestInit][])[1]!;
+    expect([accountTarget(init), JSON.parse(String(init.body))]).toEqual(['AWSCognitoIdentityProviderService.UpdateUserAttributes', { AccessToken: access, UserAttributes: [{ Name: 'locale', Value: 'en' }] }]);
   });
 });

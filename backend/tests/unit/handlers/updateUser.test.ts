@@ -150,6 +150,8 @@ describe('updateUser handler', () => {
     { name: 'no body', target: 'bob', raw: undefined, code: 'invalid_json' },
     { name: 'three facts of four', target: 'bob', raw: JSON.stringify({ ...AFTER, address: undefined }), code: 'invalid_request' },
     { name: 'a username in the body', target: 'bob', raw: JSON.stringify({ ...AFTER, username: 'eve' }), code: 'invalid_request' },
+    // The person's language is theirs to choose, at Cognito (docs/MULTILANGUAGE_PLAN.md finding F11).
+    { name: 'a language', target: 'bob', raw: JSON.stringify({ ...AFTER, language: 'it' }), code: 'invalid_request' },
     { name: 'an e-mail that is not one', target: 'bob', raw: JSON.stringify({ ...AFTER, email: 'bob' }), code: 'invalid_request' },
   ])('answers 400 $code and calls nothing for $name', async ({ target, raw, code }) => {
     const response = await handler(eventWith({ sub: 'sub-admin', username: 'admin', groups: '["admin"]' }, target, raw));

@@ -85,6 +85,7 @@ export const PAGE_TEXTS_EN: PageTexts = {
       role: 'Role',
       about: 'To change your details, ask the Administrator.',
       editTitle: 'Edit my details',
+      language: 'Language',
     },
     settings: {
       heading: 'Settings',
@@ -334,6 +335,7 @@ export const PAGE_TEXTS_EN: PageTexts = {
     email: (longest) => `An e-mail address, such as anna.rossi@example.com, of at most ${longest} characters.`,
     address: (longest) => `A postal address has 1 to ${longest} characters, on one or more lines.`,
     notSet: 'Not set',
+    languageNotSaved: (why) => `The language was not changed. ${why}`,
   },
   users: {
     status: { invited: 'invited', active: 'active' },

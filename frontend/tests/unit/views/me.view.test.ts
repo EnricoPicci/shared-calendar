@@ -16,7 +16,8 @@ const FAILURE = 'The server cannot be reached. Check the connection and try agai
 const NO_EDIT: EditState = { saving: false, refusals: NO_REFUSALS, failure: null, saved: null };
 const ADMIN = { username: 'admin', role: 'admin' as const, givenName: 'Ada', familyName: 'Lovelace', email: 'ada@example.com', address: 'Via dei Calcoli 1\n00100 Roma' };
 const ALICE = { username: 'alice', role: 'user' as const, givenName: 'Alice', familyName: 'Liddell', email: 'alice@example.com', address: 'Piazza 7' };
-const state = (over: Partial<MeState> = {}): MeState => ({ loading: false, unread: null, details: null, fields: null, canEdit: true, edit: NO_EDIT, ...over });
+const ENGLISH = { value: 'en' as const, saving: false, failure: null };
+const state = (over: Partial<MeState> = {}): MeState => ({ loading: false, unread: null, details: null, fields: null, canEdit: true, edit: NO_EDIT, language: ENGLISH, ...over });
 const admin = (over: Partial<MeState> = {}) => state({ details: meDetails(PAGE_TEXTS_EN, ADMIN), fields: meFields(ADMIN), ...over });
 const alice = (over: Partial<MeState> = {}) => state({ details: meDetails(PAGE_TEXTS_EN, ALICE), fields: meFields(ALICE), canEdit: false, ...over });
 
@@ -28,6 +29,7 @@ function mounted(first: MeState = state()) {
     editOpened: vi.fn<MeDeps['editOpened']>(),
     editTyped: vi.fn<MeDeps['editTyped']>(),
     save: vi.fn<MeDeps['save']>(),
+    chooseLanguage: vi.fn<MeDeps['chooseLanguage']>(),
   };
   const root = find('#me');
   const subscription = mountMe(root, screen);
@@ -160,6 +162,41 @@ describe('mountMe', () => {
       expect(root.hidden).toBe(true);
       subscription.unsubscribe();
       expect(root.hidden).toBe(true);
+    });
+  });
+
+  describe('the choice of language', () => {
+    const list = () => one<HTMLSelectElement>('.language-field select');
+    const why = () => one('.language-field .refusal');
+
+    it('each language under its own name, marked as being in it; the one in use chosen', () => {
+      mounted(alice());
+      expect([...list().options].map((option) => [option.value, option.lang, option.textContent])).toEqual([
+        ['en', 'en', 'English'],
+        ['it', 'it', 'Italiano'],
+      ]);
+      expect(list().value).toBe('en');
+    });
+
+    it('another language chosen: the call; while saving the list is closed; a failure says why', () => {
+      const { me$, screen } = mounted(admin());
+      list().value = 'it';
+      list().dispatchEvent(new Event('change'));
+      expect(screen.chooseLanguage).toHaveBeenCalledWith('it');
+      me$.next(admin({ language: { value: 'it', saving: true, failure: null } }));
+      expect([list().value, list().disabled]).toEqual(['it', true]);
+      me$.next(admin({ language: { value: 'en', saving: false, failure: SCRIPT } }));
+      expect([list().value, list().disabled, why().textContent]).toEqual(['en', false, SCRIPT]);
+      expect(why().children).toHaveLength(0);
+    });
+
+    it('after unsubscribing: no choice, no sentence, the list open, no call', () => {
+      const { me$, screen, subscription } = mounted(admin());
+      me$.next(admin({ language: { value: 'en', saving: true, failure: 'why' } }));
+      subscription.unsubscribe();
+      expect([list().options.length, list().disabled, why().textContent]).toEqual([0, false, '']);
+      list().dispatchEvent(new Event('change'));
+      expect(screen.chooseLanguage).not.toHaveBeenCalled();
     });
   });
 });

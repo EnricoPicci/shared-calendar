@@ -215,6 +215,8 @@ dialog .answer { overflow-wrap: anywhere; }
 .me-screen dd { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
 .me-screen .about { font-size: 0.8rem; color: #52606d; }
 .me-screen > .actions { justify-content: flex-start; }
+/* The person's language, under the details: a list as narrow as its longest language */
+.me-screen .language-field { max-width: 16rem; margin-top: 1.25rem; }
 /* The heading that takes the keyboard when the password dialog opens shows no ring */
 dialog h3:focus { outline: none; }
 dialog .question { overflow-wrap: anywhere; }

@@ -1,9 +1,10 @@
-import { LANGUAGE_OWN_NAMES, readLanguage, SUPPORTED_LANGUAGES } from '@shared-calendar/shared';
+import { readLanguage } from '@shared-calendar/shared';
 import { combineLatest, type Subscription } from 'rxjs';
 import type { PageLanguage } from '../logic/language';
 import { failureText } from '../logic/texts';
 import type { LoginService } from '../services/login.service';
 import type { PageTexts } from '../texts/texts';
+import { fillLanguages } from './page-texts';
 
 // What the login view uses of the LoginService: one method and one stream.
 export type LoginDeps = Pick<LoginService, 'login' | 'loginState$'>;
@@ -31,16 +32,7 @@ export function mountLogin(root: HTMLElement, login: LoginDeps, language: LoginL
   const languages = choice.querySelector('select')!;
   // Whether the notice is still said: until the next "Sign in".
   let noticed = true;
-  // The languages, each under its own name and marked as being in it.
-  languages.replaceChildren(
-    ...SUPPORTED_LANGUAGES.map((code) => {
-      const option = root.ownerDocument.createElement('option');
-      option.value = code;
-      option.lang = code;
-      option.textContent = LANGUAGE_OWN_NAMES[code];
-      return option;
-    }),
-  );
+  fillLanguages(languages);
   languages.onchange = () => {
     const chosen = readLanguage(languages.value);
     if (chosen !== null) language.choose(chosen);

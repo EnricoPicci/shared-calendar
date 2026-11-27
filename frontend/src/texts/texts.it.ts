@@ -90,6 +90,7 @@ export const PAGE_TEXTS_IT: PageTexts = {
       role: 'Ruolo',
       about: 'Per modificare i suoi dati, si rivolga all’Amministratore.',
       editTitle: 'Modifica i miei dati',
+      language: 'Lingua',
     },
     settings: {
       heading: 'Impostazioni',
@@ -295,6 +296,7 @@ export const PAGE_TEXTS_IT: PageTexts = {
     email: (longest) => `Un indirizzo e-mail, come anna.rossi@example.com, di al massimo ${longest} caratteri.`,
     address: (longest) => `Un indirizzo postale ha da 1 a ${longest} caratteri, su una o più righe.`,
     notSet: 'Non indicato',
+    languageNotSaved: (why) => `La lingua non è stata cambiata. ${why}`,
   },
   users: {
     status: { invited: 'invitato', active: 'attivo' },

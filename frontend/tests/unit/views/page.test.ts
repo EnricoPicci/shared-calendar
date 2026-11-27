@@ -82,8 +82,8 @@ describe('index.html', () => {
     it('every field has its label: a <label> around it, with words of its own', () => {
       const fields = everywhere('input, select, textarea');
       // A start and an end are two lists each, an hour and a minute: five places, ten lists more.
-      // The sign-in screen's choice of language is one of them.
-      expect(fields).toHaveLength(71);
+      // The choices of language of the sign-in screen and of "My details" are two of them.
+      expect(fields).toHaveLength(72);
       for (const field of fields) {
         const label = field.closest('label');
         expect(label, field.getAttribute('name')!).not.toBeNull();
@@ -142,7 +142,7 @@ describe('index.html', () => {
       const place = (element: Element) => [...element.classList].join('.');
       const alerts = everywhere('[role="alert"]');
       const failures = everywhere('.error');
-      expect(failures).toHaveLength(73);
+      expect(failures).toHaveLength(74);
       expect(alerts).toEqual(failures);
       for (const alert of alerts) expect(['P', alert.textContent], place(alert)).toEqual(['P', '']);
       const loading = everywhere('.loading');

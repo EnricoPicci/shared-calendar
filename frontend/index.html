@@ -851,6 +851,12 @@
           <div class="actions">
             <button type="button" class="primary ask-edit" data-text="common.edit" hidden></button>
           </div>
+          <!-- The person's language, the pages' and the mails': each language under its own name,
+               filled by the script, saved as soon as another is chosen -->
+          <div class="field language-field">
+            <label><span data-text="me.language"></span> <select name="language"></select></label>
+            <p class="error refusal" role="alert"></p>
+          </div>
 
           <!-- The Administrator's own four facts. "Cancel" closes it and keeps nothing typed; it
                closes by itself once a save succeeded. -->

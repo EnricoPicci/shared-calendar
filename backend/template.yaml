@@ -225,6 +225,11 @@ Resources:
       PreventUserExistenceErrors: ENABLED
       # Lets deleteUser revoke refresh tokens through AdminUserGlobalSignOut.
       EnableTokenRevocation: true
+      # A person's own token may write their language and no other attribute: without this list
+      # it could write every standard attribute, the e-mail address and the names included,
+      # which only the Administrator changes (docs/MULTILANGUAGE_ARCHITECTURE.md section 4.4).
+      WriteAttributes:
+        - locale
 
   # Roles are group memberships; they arrive in the token as the cognito:groups claim.
   AdminGroup:

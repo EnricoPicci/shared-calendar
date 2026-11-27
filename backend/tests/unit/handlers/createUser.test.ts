@@ -137,6 +137,8 @@ describe('createUser handler', () => {
     { name: 'an uppercase username', raw: create('Bob'), code: 'invalid_request' },
     { name: 'a username starting with a dot', raw: create('.bob'), code: 'invalid_request' },
     { name: 'an extra group field', raw: create('bob', { group: 'admin' }), code: 'invalid_request' },
+    // The person's language is theirs to choose, at Cognito (docs/MULTILANGUAGE_PLAN.md finding F11).
+    { name: 'a language', raw: create('bob', { language: 'it' }), code: 'invalid_request' },
     { name: 'the username alone', raw: '{"username":"bob"}', code: 'invalid_request' },
     { name: 'an empty first name', raw: create('bob', { givenName: '  ' }), code: 'invalid_request' },
     { name: 'an e-mail that is not one', raw: create('bob', { email: 'bob@' }), code: 'invalid_request' },

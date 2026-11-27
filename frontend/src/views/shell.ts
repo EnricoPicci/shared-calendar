@@ -1,6 +1,6 @@
 import type { Language, Role } from '@shared-calendar/shared';
 import { fromEvent, merge, Subscription } from 'rxjs';
-import { distinctUntilChanged, filter, map, startWith } from 'rxjs/operators';
+import { distinctUntilChanged, filter, map, skip, startWith, take } from 'rxjs/operators';
 import { AppointmentsScreen } from '../logic/appointments.screen';
 import { AssistantScreen } from '../logic/assistant.screen';
 import { AvailabilityScreen } from '../logic/availability.screen';
@@ -16,6 +16,7 @@ import { UsersScreen } from '../logic/users.screen';
 import { WeekScreen } from '../logic/week.screen';
 import { PAGE_TEXTS, type FrameTexts, type PageTexts } from '../texts/texts';
 import { LanguageMemory, type LanguageStorage } from '../services/language-memory';
+import { LanguageService } from '../services/language.service';
 import type { ApiConfig } from '../services/api';
 import { AppointmentsService } from '../services/appointments.service';
 import { AssistantService } from '../services/assistant.service';
@@ -102,7 +103,13 @@ export type ShellDeps = {
   // the LoginService and the RefreshService; none unless given.
   pageWide?: readonly Resettable[];
   screens?: readonly Screen[]; // the table of screens; SCREENS unless a test brings its own
+  // Makes the service of a person's own language, one per person who signs in: the real one on
+  // the store unless a test brings its own (docs/MULTILANGUAGE_PLAN.md finding F11).
+  accountLanguage?: () => AccountLanguage;
 };
+
+// What the shell and "My details" use of the LanguageService.
+export type AccountLanguage = Pick<LanguageService, 'read' | 'readResult$' | 'write' | 'writeResult$'>;
 
 // What belongs to one person's session: the API services and the logic objects, created when
 // the person enters and dropped when the person leaves, so that nothing of one person's data
@@ -123,6 +130,8 @@ export type SessionObjects = {
   role: Role;
   // The page texts of the language in use, for the views that put words with data.
   texts: PageTexts;
+  // The person's own language, which "My details" saves.
+  account: AccountLanguage;
   week: WeekScreen;
   list: AppointmentsScreen;
   settings: SettingsScreen;
@@ -141,7 +150,7 @@ export type SessionObjects = {
   changes: ChangePasswordService;
 };
 
-function sessionObjects(config: ShellConfig, store: SessionStore, person: Person, texts: PageTexts): SessionObjects {
+function sessionObjects(config: ShellConfig, store: SessionStore, person: Person, texts: PageTexts, account: AccountLanguage): SessionObjects {
   const calendar = new CalendarService(config, store);
   const appointments = new AppointmentsService(config, store);
   const users = new UsersService(config, store);
@@ -178,8 +187,9 @@ function sessionObjects(config: ShellConfig, store: SessionStore, person: Person
   // availability screen knows (the time zone, the types, the patterns) is handed over.
   const date = new DateScreen(availability.known$, new CalendarService(config, store), types, rules, now, again$, texts);
   // The person's own facts: read through GET /me, the Administrator's saved through the users
-  // service, the one the users screen uses (docs/EMAIL_ARCHITECTURE.md section 9.1).
-  const me = new MeScreen(new MeService(config, store), users, person.role, again$, texts);
+  // service, the one the users screen uses (docs/EMAIL_ARCHITECTURE.md section 9.1); and the
+  // person's language, saved straight at Cognito.
+  const me = new MeScreen(new MeService(config, store), users, person.role, again$, account, texts);
   // The week's "E-mail…" dialog, with a MeService of its own: it reads the person's address once
   // a mail is asked for, and "My details" must not hear that read as its own.
   const mail = new MailScreen(new MailService(config, store), new MeService(config, store), person.role, texts);
@@ -187,7 +197,7 @@ function sessionObjects(config: ShellConfig, store: SessionStore, person: Person
   // section 22).
   const changes = new ChangePasswordService({ cognitoUrl: config.cognitoUrl, skipGlobalSignOut: config.skipGlobalSignOut === true }, store);
   const password = new PasswordScreen(changes, texts);
-  return { role: person.role, texts, week, list, settings, daily, accounts, availability, date, appointments, users, types, rules, assistant, mail, me, password, changes };
+  return { role: person.role, texts, account, week, list, settings, daily, accounts, availability, date, appointments, users, types, rules, assistant, mail, me, password, changes };
 }
 
 // A screen of the application: its address (the URL's hash), its name in the navigation, the
@@ -344,7 +354,10 @@ export function runShell(config: AppConfig): Subscription {
 
 // Shows the login or the frame at every change of person, and in the frame the screen of the
 // address. `root` holds the elements #login and #app of index.html.
-export function mountShell(root: HTMLElement, { config, language, store, login, choose, logout, pageWide = [], screens: table = SCREENS }: ShellDeps): Subscription {
+export function mountShell(
+  root: HTMLElement,
+  { config, language, store, login, choose, logout, pageWide = [], screens: table = SCREENS, accountLanguage = () => new LanguageService(config, store) }: ShellDeps,
+): Subscription {
   const find = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
   const loginRoot = find('#login');
   const frame = find('#app');
@@ -366,11 +379,18 @@ export function mountShell(root: HTMLElement, { config, language, store, login, 
   // The frame for one person: the header and the navigation are filled here and emptied when
   // the person leaves, and whatever belongs to this person's session ends with the subscription
   // returned (docs/FRONTEND_ARCHITECTURE.md section 6, points 4 to 6).
-  const enter = (person: Person): Subscription => {
+  const enter = (person: Person, account: AccountLanguage): Subscription => {
     const { texts } = language.state;
     username.textContent = person.username;
     role.textContent = texts.frame.roles[person.role];
-    const objects = sessionObjects(config, store, person, texts);
+    const objects = sessionObjects(config, store, person, texts, account);
+    // A language saved in "My details" becomes the page's, and this browser's memory: the frame
+    // is then entered again in it (below, in `arrive`). The result stream replays the last write,
+    // the first sign-in's or the one that brought the frame here: its language is the one in use,
+    // and choosing it again changes nothing.
+    const saved = account.writeResult$.subscribe((result) => {
+      if (result.status === 'success') language.choose(result.language);
+    });
 
     // The navigation: one link per screen this role may see.
     const screens = table.filter((screen) => screen.roles.includes(person.role));
@@ -434,6 +454,7 @@ export function mountShell(root: HTMLElement, { config, language, store, login, 
     session.add(() => {
       shown?.unsubscribe();
       changed.unsubscribe();
+      saved.unsubscribe();
       assistant.unsubscribe();
       panel.hidden = true;
       nav.replaceChildren();
@@ -454,6 +475,42 @@ export function mountShell(root: HTMLElement, { config, language, store, login, 
     return shown;
   };
 
+  // A person who signs in (docs/MULTILANGUAGE_PLAN.md finding F11): the login and the frame stay
+  // hidden while their account's language is read, then the frame is entered. A language of the
+  // calendar becomes the page's, and this browser's memory. None, or a word that is not one: the
+  // page writes its own language to the account, once, without waiting for the answer; a write
+  // that fails is made again at the next sign-in, and says nothing. A read that fails: the frame
+  // in the page's language, nothing written. While the person stays, a language saved in "My
+  // details" enters the frame again, in it, at the same address (docs/MULTILANGUAGE_PLAN.md
+  // decision D1).
+  const arrive = (person: Person): Subscription => {
+    const account = accountLanguage();
+    let entered: Subscription | undefined;
+    // The read's own subscription ends with its one answer: the person's stay is another.
+    const arrival = new Subscription();
+    arrival.add(
+      account.readResult$.pipe(take(1)).subscribe((result) => {
+        if (result.status === 'success' && result.language !== null) language.choose(result.language);
+        else if (result.status === 'success') account.write(language.state.language);
+        frame.hidden = false;
+        entered = enter(person, account);
+      }),
+    );
+    arrival.add(
+      language.state$.pipe(skip(1)).subscribe(() => {
+        if (entered === undefined) return;
+        entered.unsubscribe();
+        entered = enter(person, account);
+      }),
+    );
+    arrival.add(() => {
+      entered?.unsubscribe();
+      frame.hidden = true;
+    });
+    account.read();
+    return arrival;
+  };
+
   // What is on screen: the login view, or one person's frame.
   let current: Subscription | undefined;
 
@@ -472,8 +529,8 @@ export function mountShell(root: HTMLElement, { config, language, store, login, 
     .subscribe((person) => {
       current?.unsubscribe(); // leaves the login view or the previous person's frame
       loginRoot.hidden = person !== null;
-      frame.hidden = person === null;
-      current = person === null ? showLogin() : enter(person);
+      frame.hidden = true;
+      current = person === null ? showLogin() : arrive(person);
       notice = () => ''; // said once
     });
 
