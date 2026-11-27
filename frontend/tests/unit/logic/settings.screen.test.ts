@@ -4,6 +4,7 @@ import { settingsFields, settingsInfo, type SettingsFields } from '../../../src/
 import { SettingsScreen, type SettingsCalls, type SettingsState } from '../../../src/logic/settings.screen';
 import type { SettingsResult, UpdateSettingsResult } from '../../../src/services/calendar-settings.types';
 import { useFarBrowserZone } from './zone';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // A fake CalendarSettingsService: two result streams that replay their last value, as the real
 // ones do, and two spies. No network, no DOM.
@@ -20,7 +21,7 @@ function screenOf() {
   const updateResult$ = new ReplaySubject<UpdateSettingsResult>(1);
   const load = vi.fn<SettingsCalls['load']>();
   const update = vi.fn<SettingsCalls['update']>();
-  const screen = new SettingsScreen({ load, update, settingsResult$: settingsResult$.asObservable(), updateResult$: updateResult$.asObservable() });
+  const screen = new SettingsScreen({ load, update, settingsResult$: settingsResult$.asObservable(), updateResult$: updateResult$.asObservable() }, PAGE_TEXTS_EN);
   const states: SettingsState[] = [];
   screen.settings$.subscribe((s) => states.push(s)); // the view subscribes first
   const read = (settings = DEFAULTS) => settingsResult$.next({ status: 'success', settings });
@@ -69,7 +70,7 @@ describe('SettingsScreen', () => {
     it('the settings arrive: the fields to fill, and what the form says beside them', () => {
       const { shown, last } = screenOf();
       shown(SAVED);
-      expect(last()).toEqual({ ...START, fields: settingsFields(SAVED), info: settingsInfo(SAVED) });
+      expect(last()).toEqual({ ...START, fields: settingsFields(SAVED), info: settingsInfo(PAGE_TEXTS_EN, SAVED) });
       expect(last().info).toEqual({ timeZone: 'Europe/Rome', lastSaved: 'Last saved by admin on Thu 19 Nov, 16:44' });
     });
 
@@ -91,7 +92,7 @@ describe('SettingsScreen', () => {
       expect(last()).toEqual({ ...START, unread: 'Your account is not allowed to do this.' });
       screen.retry();
       read();
-      expect(last()).toEqual({ ...START, fields: settingsFields(DEFAULTS), info: settingsInfo(DEFAULTS) });
+      expect(last()).toEqual({ ...START, fields: settingsFields(DEFAULTS), info: settingsInfo(PAGE_TEXTS_EN, DEFAULTS) });
     });
 
     it('settings that were already answered before start() are not this start\'s: the read is made and waited for', () => {
@@ -159,7 +160,7 @@ describe('SettingsScreen', () => {
       const first = last().fields;
       screen.save(TYPED);
       answered(SAVED);
-      expect(last()).toEqual({ ...START, saved: true, fields: settingsFields(SAVED), info: settingsInfo(SAVED) });
+      expect(last()).toEqual({ ...START, saved: true, fields: settingsFields(SAVED), info: settingsInfo(PAGE_TEXTS_EN, SAVED) });
       expect(last().fields).not.toBe(first);
       expect(load).toHaveBeenCalledTimes(2);
 
@@ -182,7 +183,7 @@ describe('SettingsScreen', () => {
       // The server had applied it: the line says so, and what was typed is left alone.
       read(SAVED);
       expect(last().fields).toBe(fields);
-      expect(last().info).toEqual(settingsInfo(SAVED));
+      expect(last().info).toEqual(settingsInfo(PAGE_TEXTS_EN, SAVED));
       expect(last().failure).toBe(UNREACHABLE);
     });
 
@@ -209,7 +210,7 @@ describe('SettingsScreen', () => {
       screen.save(TYPED);
       answered(SAVED);
       unread('network');
-      expect(last()).toEqual({ ...START, saved: true, fields: settingsFields(SAVED), info: settingsInfo(SAVED) });
+      expect(last()).toEqual({ ...START, saved: true, fields: settingsFields(SAVED), info: settingsInfo(PAGE_TEXTS_EN, SAVED) });
       screen.save(TYPED);
       refused('network');
       unread('network');
@@ -256,7 +257,7 @@ describe('SettingsScreen', () => {
       screen.start();
       read();
       expect(load).toHaveBeenCalledTimes(1);
-      expect(last()).toEqual({ ...START, fields: settingsFields(DEFAULTS), info: settingsInfo(DEFAULTS) });
+      expect(last()).toEqual({ ...START, fields: settingsFields(DEFAULTS), info: settingsInfo(PAGE_TEXTS_EN, DEFAULTS) });
     });
   });
 

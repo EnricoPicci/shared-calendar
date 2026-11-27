@@ -2,7 +2,7 @@ import { BehaviorSubject, type Observable, type Subscription } from 'rxjs';
 import type { CalendarSettingsService } from '../services/calendar-settings.service';
 import { settingsFields, settingsFor, settingsInfo, type Refusals, type SettingsFields, type SettingsInfo } from './settings.model';
 import { failureText } from './texts';
-import { PAGE_TEXTS_EN } from '../texts/texts.en';
+import type { PageTexts } from '../texts/texts';
 
 // The settings screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the calendar's settings read
 // when the screen is shown, the save of what the form holds, checked field by field before any
@@ -43,7 +43,12 @@ export class SettingsScreen {
   private readonly state = new BehaviorSubject<SettingsState>(NOTHING);
   readonly settings$: Observable<SettingsState> = this.state.asObservable();
 
-  constructor(private readonly settings: SettingsCalls) {}
+  constructor(
+    private readonly settings: SettingsCalls,
+    // The page texts of the language in use, kept for the screen's life
+    // (docs/MULTILANGUAGE_PLAN.md decision D2).
+    private readonly texts: PageTexts,
+  ) {}
 
   // Called once the view has subscribed (docs/FRONTEND_ARCHITECTURE.md section 5, rule 5): reads
   // the settings, and from then on takes the saves, until the subscription returned ends. The
@@ -59,10 +64,10 @@ export class SettingsScreen {
       if (result.status === 'failure') {
         // With a form on show, a read that fails after a save changes nothing: the save's own
         // outcome is what was said.
-        this.patch({ loading: false, unread: this.toFill ? failureText(PAGE_TEXTS_EN.failures, result.reason) : null });
+        this.patch({ loading: false, unread: this.toFill ? failureText(this.texts.failures, result.reason) : null });
         return;
       }
-      const info = settingsInfo(result.settings);
+      const info = settingsInfo(this.texts, result.settings);
       if (this.toFill) this.patch({ loading: false, unread: null, info, fields: settingsFields(result.settings) });
       else this.patch({ loading: false, info });
       this.toFill = false;
@@ -72,9 +77,9 @@ export class SettingsScreen {
         if (!live) return;
         if (result.status === 'success') {
           // The form is filled with what the server answers.
-          this.patch({ saving: false, saved: true, failure: null, info: settingsInfo(result.settings), fields: settingsFields(result.settings) });
+          this.patch({ saving: false, saved: true, failure: null, info: settingsInfo(this.texts, result.settings), fields: settingsFields(result.settings) });
         } else {
-          this.patch({ saving: false, failure: failureText(PAGE_TEXTS_EN.failures, result.reason) });
+          this.patch({ saving: false, failure: failureText(this.texts.failures, result.reason) });
         }
         this.settings.load();
       }),
@@ -99,7 +104,7 @@ export class SettingsScreen {
   // sent; otherwise the four values are saved together (docs/SHARED_CALENDAR_SPEC.md R-SET-02).
   save(fields: SettingsFields): void {
     if (!this.started) return;
-    const checked = settingsFor(fields);
+    const checked = settingsFor(this.texts.settings, fields);
     if ('refusals' in checked) {
       this.patch({ refusals: checked.refusals, saved: false });
       return;

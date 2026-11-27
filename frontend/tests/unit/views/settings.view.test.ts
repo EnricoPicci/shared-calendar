@@ -4,6 +4,7 @@ import type { DailyMailState } from '../../../src/logic/daily-mail.screen';
 import type { SettingsState } from '../../../src/logic/settings.screen';
 import { mountDailyMail, mountSettings, type DailyMailDeps, type SettingsDeps } from '../../../src/views/settings.view';
 import { find, submit, useRealPage } from './page';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // The DOM test of the settings view (docs/FRONTEND_ARCHITECTURE.md section 8): the real
 // index.html and a fake SettingsScreen whose stream the test controls and whose methods are
@@ -28,7 +29,7 @@ function mounted(first: SettingsState = state()) {
     retry: vi.fn<SettingsDeps['retry']>(),
   };
   const root = find('#settings');
-  const subscription = mountSettings(root, screen);
+  const subscription = mountSettings(root, screen, PAGE_TEXTS_EN);
   return { settings$, screen, root, subscription };
 }
 
@@ -152,7 +153,7 @@ describe('mountSettings', () => {
 
     it('every refusal of the logic layer starts with the words of its field\'s label in the page', () => {
       mounted(read());
-      const checked = settingsFor({ cancellationNoticeHours: '', minBookingNoticeHours: '', bookingHorizonDays: '', maxFutureAppointmentsPerUser: '', noLimit: false });
+      const checked = settingsFor(PAGE_TEXTS_EN.settings, { cancellationNoticeHours: '', minBookingNoticeHours: '', bookingHorizonDays: '', maxFutureAppointmentsPerUser: '', noLimit: false });
       const refusals = 'refusals' in checked ? checked.refusals : {};
       for (const name of SETTING_FIELDS) {
         const label = field(name).closest('label')!.textContent.trim();
@@ -327,7 +328,7 @@ describe('mountDailyMail', () => {
   function shown(first: DailyMailState = dailyState()) {
     const daily$ = new BehaviorSubject<DailyMailState>(first);
     const screen = { daily$: daily$.asObservable(), save: vi.fn<DailyMailDeps['save']>(), edited: vi.fn<DailyMailDeps['edited']>(), retry: vi.fn<DailyMailDeps['retry']>() };
-    const subscription = mountDailyMail(find('#settings'), screen);
+    const subscription = mountDailyMail(find('#settings'), screen, PAGE_TEXTS_EN);
     return { daily$, screen, subscription };
   }
 

@@ -2,7 +2,7 @@
 
 **Version:** v1 (2026-11-27): the plan, after the Product Owner's eight decisions of the brief
 and the answer to one question of planning (section 2). v2 (2026-11-27): phase A started with
-brief `prompts/lang-l03-phase-a-implementation.md`; steps l1, l2 and groups l3a to l3d done.
+brief `prompts/lang-l03-phase-a-implementation.md`; steps l1, l2 and groups l3a to l3e done.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -544,7 +544,21 @@ five. frontend 3191 tests, 100 % lines. The look, padded, at both widths: "Users
 the dialog of a deletion, "My details" with its Edit dialog (as the Administrator), "My
 appointments" with the history and a refused period (as alice); one thing for section 8.
 
-**As done (group l3e).** *Empty.*
+**As done (group l3e).** Done 2026-11-27. `PageTexts` gained `settings` (`SettingsTexts`: the
+defaults' sentence, "Last saved by … on …", the range and the refusal of each of the four
+fields as functions of its two ends, so that each language words its own units and order, and
+the "Daily e-mail" part's range, with and without the time zone, and refusal). The keys:
+`settings.*` (the four labels, "No limit", the time zone's line as a sentence around the zone,
+"Settings saved.") and `daily.*`. `settingsInfo`, `settingRange`, `settingsFor` and `dailyFor`
+take the texts first; the field names and units of `settings.model.ts` (`IN_WORDS`) went into
+the texts; `DAILY_MAIL_TEXTS` left `logic/texts.ts`: the hour "07:00", the same in every
+language, is `hourText` of `daily-mail.model.ts`, and the range under the hour is
+`dailyRange(texts, timeZone)`. `SettingsScreen` and `DailyMailScreen` take the page texts in
+their constructors; `mountSettings` and `mountDailyMail` get them as a third argument. Tests:
+the calls given the English texts, the expectations unchanged; the list of D6 is down to
+`#availability` and `#assistant`; the list of files taking English straight lost three.
+frontend 3191 tests, 100 % lines. The look, padded, at both widths, with a refused value:
+everything fits; nothing for section 8.
 
 **As done (group l3f).** *Empty.*
 

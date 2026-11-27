@@ -85,6 +85,27 @@ export const PAGE_TEXTS_EN: PageTexts = {
       about: 'To change your details, ask the Administrator.',
       editTitle: 'Edit my details',
     },
+    settings: {
+      heading: 'Settings',
+      retryLabel: 'Try again to read the settings',
+      cancellationNotice: 'Cancellation notice',
+      minBookingNotice: 'Minimum booking notice',
+      bookingHorizon: 'Booking horizon',
+      maxUpcoming: 'Maximum upcoming appointments per person',
+      noLimit: 'No limit',
+      zoneBefore: 'Time zone:',
+      zoneAfter: '. It is set when the calendar is installed and cannot be changed here.',
+      saved: 'Settings saved.',
+    },
+    daily: {
+      heading: 'Daily e-mail',
+      retryLabel: "Try again to read the daily e-mail's settings",
+      enabled: 'Send the daily e-mail',
+      hour: 'Hour',
+      about: 'Two Excel files: the appointments booked for the next 7 days, and a backup of every appointment from the first day of last month.',
+      saved: 'Daily e-mail saved.',
+      submit: 'Save daily e-mail',
+    },
     detail: { title: 'Appointment', when: 'When', type: 'Type', forUser: 'For', saveNote: 'Save note', cancelAppointment: 'Cancel appointment' },
   },
   frame: {
@@ -290,6 +311,29 @@ export const PAGE_TEXTS_EN: PageTexts = {
     // Whom, what happens to their appointments (docs/SHARED_CALENDAR_SPEC.md section 10.2), and
     // that there is no way back.
     deleteQuestion: (username) => `Delete ${username}? Their future appointments will be cancelled. This cannot be undone.`,
+  },
+  // A refusal names its field in the words of the field's label.
+  settings: {
+    defaults: 'These are the default settings: nobody has saved them yet.',
+    lastSaved: (username, when) => `Last saved by ${username} on ${when}`,
+    ranges: {
+      cancellationNoticeHours: (min, max) => `hours, from ${min} to ${max}`,
+      minBookingNoticeHours: (min, max) => `hours, from ${min} to ${max}`,
+      bookingHorizonDays: (min, max) => `days, from ${min} to ${max}`,
+      maxFutureAppointmentsPerUser: (min, max) => `appointments, from ${min} to ${max}`,
+    },
+    refusals: {
+      cancellationNoticeHours: (min, max) => `Cancellation notice must be a whole number from ${min} to ${max}.`,
+      minBookingNoticeHours: (min, max) => `Minimum booking notice must be a whole number from ${min} to ${max}.`,
+      bookingHorizonDays: (min, max) => `Booking horizon must be a whole number from ${min} to ${max}.`,
+      maxFutureAppointmentsPerUser: (min, max) => `Maximum upcoming appointments per person must be a whole number from ${min} to ${max}.`,
+    },
+    // The hour is the calendar's (docs/EMAIL_ARCHITECTURE.md section 6.2).
+    daily: {
+      range: "A whole hour, from 00:00 to 23:00, in the calendar's time zone.",
+      rangeIn: (timeZone) => `A whole hour, from 00:00 to 23:00, in the calendar's time zone, ${timeZone}.`,
+      refusal: 'The hour must be a whole hour from 00:00 to 23:00, such as 07:00.',
+    },
   },
   dates: dateFormats('en'),
 };

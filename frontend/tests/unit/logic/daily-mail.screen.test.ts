@@ -1,10 +1,10 @@
 import type { CalendarSettings } from '@shared-calendar/shared';
 import { ReplaySubject } from 'rxjs';
 import { DailyMailScreen, type DailyMailCalls, type DailyMailState } from '../../../src/logic/daily-mail.screen';
-import { DAILY_MAIL_TEXTS } from '../../../src/logic/texts';
 import type { SettingsResult } from '../../../src/services/calendar-settings.types';
 import type { MailSettingsResult, UpdateMailSettingsResult } from '../../../src/services/mail-settings.types';
 import { useFarBrowserZone } from './zone';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // A fake MailSettingsService and the result stream of a fake CalendarSettingsService: result
 // streams that replay their last value, as the real ones do, and two spies. No network, no DOM.
@@ -24,6 +24,7 @@ function screenOf() {
   const screen = new DailyMailScreen(
     { getSettings, updateSettings, settingsResult$: settingsResult$.asObservable(), updateResult$: updateResult$.asObservable() },
     { settingsResult$: calendarResult$.asObservable() },
+    PAGE_TEXTS_EN,
   );
   const states: DailyMailState[] = [];
   screen.daily$.subscribe((s) => states.push(s));
@@ -101,7 +102,7 @@ describe('DailyMailScreen', () => {
     shown();
     screen.save({ dailyEnabled: true, dailyHour: '24:00' });
     expect(updateSettings).not.toHaveBeenCalled();
-    expect(last()).toEqual({ ...START, fields: SHOWN, refusal: DAILY_MAIL_TEXTS.refusal });
+    expect(last()).toEqual({ ...START, fields: SHOWN, refusal: PAGE_TEXTS_EN.settings.daily.refusal });
   });
 
   it('save: both values sent; the answer fills the fields, says saved, and the settings are read again; an edit ends "saved"', () => {

@@ -153,11 +153,11 @@ function sessionObjects(config: ShellConfig, store: SessionStore, person: Person
   const week = new WeekScreen(calendar, appointments, person.role, now, again$, texts);
   // The list screen hands an appointment to move over to the week screen.
   const list = new AppointmentsScreen(calendarSettings, appointments, week, person.role, now, again$, texts);
-  const settings = new SettingsScreen(calendarSettings);
+  const settings = new SettingsScreen(calendarSettings, texts);
   // The settings' "Daily e-mail": the daily mail's settings through a service of their own, and
   // the calendar's time zone from what the settings screen reads (docs/EMAIL_ARCHITECTURE.md
   // section 11).
-  const daily = new DailyMailScreen(new MailSettingsService(config, store), calendarSettings);
+  const daily = new DailyMailScreen(new MailSettingsService(config, store), calendarSettings, texts);
   const accounts = new UsersScreen(users, again$, texts);
   const types = new AvailabilityTypesService(config, store);
   const rules = new AvailabilityRulesService(config, store);
@@ -235,9 +235,9 @@ export const SCREENS: readonly Screen[] = [
     // with what the server holds, and values typed and not saved are gone, as on leaving. Its part
     // "Daily e-mail" is mounted and started beside it, after it, so that it hears the time zone
     // the settings read; the assistant changes nothing of the mail, so the part is not restarted.
-    show: (root, { settings, daily, assistant }) => {
-      const subscription = mountSettings(root, settings);
-      subscription.add(mountDailyMail(root, daily));
+    show: (root, { settings, daily, assistant, texts }) => {
+      const subscription = mountSettings(root, settings, texts);
+      subscription.add(mountDailyMail(root, daily, texts));
       let started = settings.start();
       subscription.add(daily.start());
       subscription.add(

@@ -200,6 +200,21 @@ export type UsersTexts = {
   deleteQuestion: (username: string) => string;
 };
 
+// The four settings the Administrator changes (docs/SHARED_CALENDAR_SPEC.md section 9), as
+// src/logic/settings.model.ts names them.
+type SettingKeys = 'cancellationNoticeHours' | 'minBookingNoticeHours' | 'bookingHorizonDays' | 'maxFutureAppointmentsPerUser';
+
+// The settings form: who saved last and when, or that nobody did; under each field its range,
+// and why a value is refused, both with the field's two ends; and the "Daily e-mail" part: the
+// range of the hour, with the calendar's time zone once known, and why a typed hour is refused.
+export type SettingsTexts = {
+  defaults: string;
+  lastSaved: (username: string, when: string) => string;
+  ranges: Record<SettingKeys, (min: number, max: number) => string>;
+  refusals: Record<SettingKeys, (min: number, max: number) => string>;
+  daily: { range: string; rangeIn: (timeZone: string) => string; refusal: string };
+};
+
 // The keys of index.html, by the part of the page they belong to.
 export type HtmlTexts = {
   // Words several parts of the page use.
@@ -274,6 +289,20 @@ export type HtmlTexts = {
     keep: string;
   };
   me: { heading: string; retryLabel: string; role: string; about: string; editTitle: string };
+  // The settings form: the line of the time zone is a sentence around the zone's name.
+  settings: {
+    heading: string;
+    retryLabel: string;
+    cancellationNotice: string;
+    minBookingNotice: string;
+    bookingHorizon: string;
+    maxUpcoming: string;
+    noLimit: string;
+    zoneBefore: string;
+    zoneAfter: string;
+    saved: string;
+  };
+  daily: { heading: string; retryLabel: string; enabled: string; hour: string; about: string; saved: string; submit: string };
   detail: { title: string; when: string; type: string; forUser: string; saveNote: string; cancelAppointment: string };
 };
 
@@ -288,6 +317,7 @@ export type PageTexts = {
   list: ListTexts;
   profile: ProfileTexts;
   users: UsersTexts;
+  settings: SettingsTexts;
   // The ways a date is written, from shared/ (docs/MULTILANGUAGE_ARCHITECTURE.md decision L10).
   dates: DateFormats;
 };
