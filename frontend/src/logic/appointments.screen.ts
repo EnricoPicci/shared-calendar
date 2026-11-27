@@ -149,7 +149,7 @@ export class AppointmentsScreen {
   detail(appointmentId: string): AppointmentDetail | null {
     const appointment = this.loaded.find((a) => a.appointmentId === appointmentId);
     // A list is held only while the zone is known.
-    return appointment ? appointmentDetail(appointment, this.role, this.now(), this.zone!) : null;
+    return appointment ? appointmentDetail(PAGE_TEXTS_EN, appointment, this.role, this.now(), this.zone!) : null;
   }
 
   // Hands the appointment `appointmentId` of the last list loaded over to the week screen, to

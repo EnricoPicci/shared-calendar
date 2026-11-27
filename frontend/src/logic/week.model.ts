@@ -1,11 +1,12 @@
 import { effectiveWindows, localDateOf, localTimeOf, type CalendarView, type Role } from '@shared-calendar/shared';
+import type { PageTexts, WeekTexts } from '../texts/texts';
 import { offsetChangesOn, rangeText, timeText } from './texts';
-import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The week ready to draw (docs/FRONTEND_ARCHITECTURE.md section 5): what GET /calendar answers
 // (docs/SHARED_CALENDAR_SPEC.md section 11.6) turned into days of blocks, each with its place in
 // the day and its time as text, so that the view does no arithmetic. Pure: everything comes from
-// the view received, its `generatedAt` and its time zone included.
+// the view received, its `generatedAt` and its time zone included, and the page texts of the
+// language in use, handed in first.
 
 // A block's place in its day column, as CSS percentages of the hours shown, and its times as
 // text. Blocks that the clock puts in the same place stand side by side, in `lanes` columns of
@@ -164,12 +165,12 @@ function columnsOf(intervals: readonly Interval[], spans: readonly Span[]): Colu
 // What a slot says beside its time (docs/SHARED_CALENDAR_SPEC.md section 16.8): "free" with
 // one place, its places left when it has more ("2 of 3 places left"), and "Full" when none is
 // left, which only an Administrator's slot can be (docs/SHARED_CALENDAR_SPEC.md R-SLOT-04).
-export function placesOf(capacity: number, placesLeft: number): Pick<SlotBlock, 'places' | 'full'> {
-  if (placesLeft <= 0) return { places: 'Full', full: true };
-  return { places: capacity > 1 ? `${placesLeft} of ${capacity} places left` : 'free', full: false };
+export function placesOf(texts: WeekTexts, capacity: number, placesLeft: number): Pick<SlotBlock, 'places' | 'full'> {
+  if (placesLeft <= 0) return { places: texts.full, full: true };
+  return { places: capacity > 1 ? texts.placesLeft(placesLeft, capacity) : texts.free, full: false };
 }
 
-export function weekModel(view: CalendarView, role: Role): WeekModel {
+export function weekModel(texts: PageTexts, view: CalendarView, role: Role): WeekModel {
   const zone = view.timeZone;
   const today = localDateOf(view.generatedAt, zone);
   const days = view.days.map((day) => ({ ...day, appointments: view.appointments.filter((a) => a.date === day.date) }));
@@ -244,8 +245,8 @@ export function weekModel(view: CalendarView, role: Role): WeekModel {
           time,
           lane: 0,
           lanes: 1,
-          what: `${members.length} people · ${earliest.typeName}`,
-          when: `${PAGE_TEXTS_EN.dates.shortDate(day.date)}, ${time}`,
+          what: `${texts.week.people(members.length)} · ${earliest.typeName}`,
+          when: `${texts.dates.shortDate(day.date)}, ${time}`,
           colour: colourOf(earliest.typeId),
           rows: byStart.map((a) => ({ appointmentId: a.appointmentId, time: a.time, who: a.username })),
           beside: overlaps(span, slotSpans),
@@ -253,22 +254,22 @@ export function weekModel(view: CalendarView, role: Role): WeekModel {
       });
       return {
         date: day.date,
-        label: PAGE_TEXTS_EN.dates.shortDate(day.date),
+        label: texts.dates.shortDate(day.date),
         today: day.date === today,
         windows: placed(day.windows).map((w) => ({ ...place(w), typeName: w.typeName, colour: colourOf(w.typeId) })),
         slots: placed(day.slots).map((s, i) => {
           const holder = merged.find((w) => w.start <= s.start && s.end <= w.end) ?? s;
-          const shown = placesOf(s.capacity, s.placesLeft);
+          const shown = placesOf(texts.week, s.capacity, s.placesLeft);
           return {
             ...place(s),
             colour: colourOf(s.typeId),
             start: s.start,
             end: s.end,
-            day: PAGE_TEXTS_EN.dates.shortDate(day.date),
+            day: texts.dates.shortDate(day.date),
             typeName: typeNames.get(s.typeId) ?? '',
             window: { start: holder.start, end: holder.end },
             ...shown,
-            tab: overlaps(slotSpans[i]!, appointmentSpans) ? (shown.full ? 'Full' : `${s.placesLeft} left`) : null,
+            tab: overlaps(slotSpans[i]!, appointmentSpans) ? (shown.full ? texts.week.full : texts.week.tabLeft(s.placesLeft)) : null,
           };
         }),
         busy: placed(day.busy).map(place),
@@ -279,7 +280,7 @@ export function weekModel(view: CalendarView, role: Role): WeekModel {
           .map((a) => ({
             ...place(a),
             appointmentId: a.appointmentId,
-            who: role === 'admin' ? a.username : 'You',
+            who: role === 'admin' ? a.username : texts.appointment.you,
             typeName: a.typeName,
             note: a.note ?? '',
             colour: colourOf(a.typeId),

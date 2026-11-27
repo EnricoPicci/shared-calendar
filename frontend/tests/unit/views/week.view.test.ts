@@ -9,6 +9,7 @@ import type { BookState, CancelState, ChangeState, UpdateNoteState } from '../..
 import type { ListUsersState } from '../../../src/services/users.types';
 import { mountWeek, type WeekDeps } from '../../../src/views/week.view';
 import { choicesOf, choose, chooseTime, clock, find, submit, timeIn, useRealPage } from './page';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // The DOM test of the week view (docs/FRONTEND_ARCHITECTURE.md section 8): the real index.html,
 // and a fake WeekScreen, a fake AppointmentsService and a fake UsersService whose streams the
@@ -122,7 +123,7 @@ function mounted(first: WeekState = state(), role: Role = 'user', details: Appoi
     keep: vi.fn<WeekDeps['screen']['keep']>(),
     // The words of a refusal as the logic layer chooses them, with no appointment of the week to
     // name: a test that needs one answers it itself.
-    refusal: vi.fn<WeekDeps['screen']['refusal']>((reason, asked) => refusalOf(reason, asked, role, [])),
+    refusal: vi.fn<WeekDeps['screen']['refusal']>((reason, asked) => refusalOf(PAGE_TEXTS_EN, reason, asked, role, [])),
     range: vi.fn<WeekDeps['screen']['range']>(() => ({ from: '2026-11-16', to: '2026-11-22' })),
   };
   const appointments = {
@@ -139,7 +140,7 @@ function mounted(first: WeekState = state(), role: Role = 'user', details: Appoi
   const mail$ = new BehaviorSubject<MailState>(NO_MAIL);
   const mail = { mail$: mail$.asObservable(), send: vi.fn<WeekDeps['mail']['send']>(), reset: vi.fn<WeekDeps['mail']['reset']>() };
   const root = find('#week');
-  const subscription = mountWeek(root, { screen, appointments, users, mail, role });
+  const subscription = mountWeek(root, { screen, appointments, users, mail, role, texts: PAGE_TEXTS_EN });
   return { week$, bookState$, cancelState$, changeState$, updateNoteState$, listUsersState$, mail$, screen, appointments, users, mail, root, subscription };
 }
 

@@ -119,10 +119,54 @@ export type PasswordTexts = {
   changed: string;
 };
 
+// The week's words that come with data (docs/SHARED_CALENDAR_SPEC.md section 16.8): what a slot
+// says beside its time and on its narrow tab, the Administrator's block of many appointments, the
+// list of Users to book for, and a refused booking or change.
+export type WeekTexts = {
+  full: string;
+  free: string;
+  placesLeft: (left: number, capacity: number) => string;
+  // The narrow tab of a slot that appointments overlap.
+  tabLeft: (left: number) => string;
+  people: (count: number) => string;
+  loadingUsers: string;
+  noUsers: string;
+  // A full time, for the Administrator, who may book over the capacity.
+  fullForAdmin: string;
+  // `user_busy` with the appointment in the way, `what` being its time and its type.
+  busyFor: (username: string, what: string) => string;
+  busyYou: (what: string) => string;
+};
+
+// An appointment as the detail dialog and the lists say it: who for, who booked it and when, and
+// the one sentence about what can still be done to it.
+export type AppointmentTexts = {
+  // The User, for a User reading about their own appointment.
+  you: string;
+  // The note when there is none.
+  noNote: string;
+  bookedBy: (by: string, when: string) => string;
+  // Who booked it, when the reader did.
+  byYou: string;
+  moved: string;
+  cancelled: string;
+  ended: string;
+  until: (when: string) => string;
+  tooLate: string;
+};
+
+// The week's "E-mail…" dialog: what the mail holds, by role, and where it goes, the address
+// already masked.
+export type MailTexts = {
+  what: Record<Role, string>;
+  sentTo: (maskedAddress: string) => string;
+  sentNoAddress: string;
+};
+
 // The keys of index.html, by the part of the page they belong to.
 export type HtmlTexts = {
   // Words several parts of the page use.
-  common: { cancel: string };
+  common: { cancel: string; close: string; note: string; change: string; loading: string; from: string; to: string };
   frame: {
     // The page's name: the browser's tab, the header and the sign-in screen.
     title: string;
@@ -134,6 +178,39 @@ export type HtmlTexts = {
   // "Choose your password": its sentence is two texts around the username.
   choose: { heading: string; aboutBefore: string; aboutAfter: string; submit: string };
   password: { heading: string; current: string; newPassword: string; newPasswordAgain: string; about: string; submit: string };
+  // The week: its toolbar, the banner of a move (a sentence around the appointment moved), the
+  // line of the time zone (a sentence around the zone's name), a User's busy time.
+  week: {
+    previous: string;
+    today: string;
+    next: string;
+    mailOpen: string;
+    movingBefore: string;
+    movingAfter: string;
+    keep: string;
+    zoneBefore: string;
+    zoneAfter: string;
+    busy: string;
+  };
+  // The book dialog, which also confirms the move of an appointment.
+  book: {
+    titleBooking: string;
+    titleChange: string;
+    from: string;
+    to: string;
+    forUser: string;
+    start: string;
+    end: string;
+    hour: string;
+    minute: string;
+    anywayBooking: string;
+    anywayChange: string;
+    forceBooking: string;
+    forceChange: string;
+    submit: string;
+  };
+  mail: { title: string; send: string };
+  detail: { title: string; when: string; type: string; forUser: string; saveNote: string; cancelAppointment: string };
 };
 
 export type PageTexts = {
@@ -141,6 +218,9 @@ export type PageTexts = {
   frame: FrameTexts;
   failures: FailureTexts;
   password: PasswordTexts;
+  week: WeekTexts;
+  appointment: AppointmentTexts;
+  mail: MailTexts;
   // The ways a date is written, from shared/ (docs/MULTILANGUAGE_ARCHITECTURE.md decision L10).
   dates: DateFormats;
 };
@@ -151,9 +231,19 @@ export type PageTexts = {
 // binds every real language, not the padded test language, whose job is to find the places.
 export type Budgets<T> = { [K in keyof T]?: T[K] extends string | ((...args: never[]) => string) ? number : Budgets<T[K]> };
 
-// The tight places: the header and the links of the navigation, which share one row.
+// The tight places: the header and the links of the navigation, which share one row; the buttons
+// of the week's toolbar and of the dialogs, side by side; a slot's narrow tab.
 export const PAGE_TEXT_BUDGETS: Budgets<PageTexts> = {
-  html: { frame: { title: 24, signOut: 12 }, common: { cancel: 16 }, login: { signIn: 20 }, choose: { submit: 24 }, password: { submit: 24 } },
+  html: {
+    frame: { title: 24, signOut: 12 },
+    common: { cancel: 16, close: 12, change: 14 },
+    login: { signIn: 20 },
+    choose: { submit: 24 },
+    password: { submit: 24 },
+    week: { today: 12, mailOpen: 14 },
+  },
+  // A slot's narrow tab beside the appointments that overlap it.
+  week: { full: 8, tabLeft: 8 },
   frame: {
     roles: { admin: 14, user: 14 },
     nav: { week: 16, appointments: 18, settings: 16, users: 16, availability: 16, me: 16, password: 16 },

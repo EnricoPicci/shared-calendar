@@ -1,9 +1,9 @@
-import type { Role } from '@shared-calendar/shared';
+import { maskAddress, type Role } from '@shared-calendar/shared';
 import { BehaviorSubject, type Observable, type Subscription } from 'rxjs';
 import type { MailService } from '../services/mail.service';
 import type { MeService } from '../services/me.service';
-import { failureText, MAIL_TEXTS } from './texts';
-import { PAGE_TEXTS_EN } from '../texts/texts.en';
+import type { PageTexts } from '../texts/texts';
+import { failureText } from './texts';
 
 // The week's "E-mail…" dialog (docs/FRONTEND_ARCHITECTURE.md section 5.1), for both roles: asks
 // for the mail of two dates, then, once it is asked for, reads the person's own address with
@@ -31,6 +31,9 @@ export class MailScreen {
     private readonly mail: MailCalls,
     private readonly me: MailMeCalls,
     private readonly role: Role,
+    // The page texts of the language in use, kept for the screen's life
+    // (docs/MULTILANGUAGE_PLAN.md decision D2).
+    private readonly texts: PageTexts,
   ) {
     this.state = new BehaviorSubject<MailState>(this.nothing());
     this.mail$ = this.state.asObservable();
@@ -46,7 +49,7 @@ export class MailScreen {
       if (!live || this.awaited !== 'mail') return;
       if (result.status === 'failure') {
         this.awaited = null;
-        this.state.next({ ...this.nothing(), failure: failureText(PAGE_TEXTS_EN.failures, result.reason, 'mail') });
+        this.state.next({ ...this.nothing(), failure: failureText(this.texts.failures, result.reason, 'mail') });
         return;
       }
       this.awaited = 'me';
@@ -56,7 +59,7 @@ export class MailScreen {
       this.me.meResult$.subscribe((result) => {
         if (!live || this.awaited !== 'me') return;
         this.awaited = null;
-        this.state.next({ ...this.nothing(), sent: MAIL_TEXTS.sent(result.status === 'success' ? result.me.email : null) });
+        this.state.next({ ...this.nothing(), sent: this.sentTo(result.status === 'success' ? result.me.email : null) });
       }),
     );
     live = true;
@@ -80,6 +83,11 @@ export class MailScreen {
   }
 
   private nothing(): MailState {
-    return { what: MAIL_TEXTS.what[this.role], sending: false, sent: null, failure: null };
+    return { what: this.texts.mail.what[this.role], sending: false, sent: null, failure: null };
+  }
+
+  // Where the mail goes: the address masked, or in general words when it could not be read.
+  private sentTo(address: string | null): string {
+    return address === null ? this.texts.mail.sentNoAddress : this.texts.mail.sentTo(maskAddress(address));
   }
 }

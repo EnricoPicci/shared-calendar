@@ -18,7 +18,6 @@ import type {
   AssistantLoadFailureReason,
   AssistantSendFailureReason,
 } from '../services/assistant.types';
-import { FULL_FOR_ADMIN } from './booking';
 import { failureText } from './texts';
 import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
@@ -95,7 +94,7 @@ function outcomeWords(action: AssistantProposalAction, role: Role): string {
     case 'done':
       return 'Done';
     case 'refused':
-      return `Not done. ${role === 'admin' && action.error === 'slot_taken' ? FULL_FOR_ADMIN : failureText(PAGE_TEXTS_EN.failures, action.error, undefined, role)}`;
+      return `Not done. ${role === 'admin' && action.error === 'slot_taken' ? PAGE_TEXTS_EN.week.fullForAdmin : failureText(PAGE_TEXTS_EN.failures, action.error, undefined, role)}`;
     case 'unknown':
       return 'It is not known whether this was done. Please check the calendar.';
   }

@@ -11,6 +11,7 @@ import { mountAppointments, type AppointmentsDeps } from '../../../src/views/app
 import { mountDetail, type DetailDeps, type DetailView } from '../../../src/views/detail.view';
 import { mountWeek, type WeekDeps } from '../../../src/views/week.view';
 import { find, submit, useRealPage } from './page';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // The DOM test of the appointment detail (docs/FRONTEND_ARCHITECTURE.md sections 4 and 8): the
 // real index.html, and fakes whose streams the test controls and whose methods are spies. The
@@ -83,7 +84,7 @@ const ALONE: Host = {
   mount: (details = [DETAIL]) => {
     const { cancelState$, updateNoteState$, detail, appointments } = fakes(details);
     const change = vi.fn<DetailDeps['change']>();
-    alone = mountDetail(find<HTMLDialogElement>('#detail'), { detail, appointments, change });
+    alone = mountDetail(find<HTMLDialogElement>('#detail'), { detail, appointments, change, texts: PAGE_TEXTS_EN });
     return { screen: { detail }, appointments, cancelState$, updateNoteState$, changed: () => change.mock.calls.map(([id]) => id), subscription: alone.subscription };
   },
   open: (index = 0) => alone.open(SHOWN[index]!),
@@ -134,6 +135,7 @@ const BY_THE_WEEK: Host = {
       users: { listUsersState$: new BehaviorSubject<ListUsersState>({ status: 'idle' }).asObservable(), listUsers: vi.fn() },
       mail: { mail$: new BehaviorSubject<MailState>({ what: '', sending: false, sent: null, failure: null }).asObservable(), send: vi.fn(), reset: vi.fn() },
       role: 'user',
+      texts: PAGE_TEXTS_EN,
     });
     return { screen: { detail }, appointments, cancelState$, updateNoteState$, changed: () => move.mock.calls.map(([id]) => id), subscription };
   },
@@ -158,6 +160,7 @@ const BY_THE_LIST: Host = {
       },
       appointments,
       showWeek: vi.fn(),
+      texts: PAGE_TEXTS_EN,
     });
     return { screen: { detail }, appointments, cancelState$, updateNoteState$, changed: () => move.mock.calls.map(([id]) => id), subscription };
   },

@@ -2,7 +2,7 @@ import type { Subscription } from 'rxjs';
 import type { AppointmentDetail } from '../logic/appointment.detail';
 import { failureText } from '../logic/texts';
 import type { AppointmentsService } from '../services/appointments.service';
-import { PAGE_TEXTS_EN } from '../texts/texts.en';
+import type { PageTexts } from '../texts/texts';
 
 // What the detail dialog uses, handed over by the screen's view that mounts it: how that screen
 // answers the detail of one of its appointments by its id; of the AppointmentsService the two
@@ -11,6 +11,8 @@ export type DetailDeps = {
   detail: (appointmentId: string) => AppointmentDetail | null;
   appointments: Pick<AppointmentsService, 'cancel' | 'cancelState$' | 'updateNote' | 'updateNoteState$'>;
   change: (appointmentId: string) => void;
+  // The page texts of the language in use, for a failure's sentence.
+  texts: PageTexts;
 };
 
 // What the view that mounted the dialog gets back: the subscription, which it ends with its
@@ -25,7 +27,7 @@ const DETAIL_TEXTS = ['when', 'typeName', 'who', 'note', 'booked', 'hint'] as co
 // index.html, which belongs to no screen. The view of the screen on show mounts it, so it is
 // mounted once at a time. It shows what the logic layer hands over ready, saves the note,
 // cancels the appointment, and forwards "Change" to the screen that mounted it.
-export function mountDetail(root: HTMLDialogElement, { detail, appointments, change }: DetailDeps): DetailView {
+export function mountDetail(root: HTMLDialogElement, { detail, appointments, change, texts: words }: DetailDeps): DetailView {
   // 1. Find the elements, once.
   const find = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
   const texts = DETAIL_TEXTS.map((field) => [field, find(`.${field}`)] as const);
@@ -104,7 +106,7 @@ export function mountDetail(root: HTMLDialogElement, { detail, appointments, cha
     cancelling = state.status === 'pending' ? state.appointmentId : null;
     enable();
     if (!cancelAsked) return;
-    error.textContent = state.status === 'failure' ? failureText(PAGE_TEXTS_EN.failures, state.reason) : '';
+    error.textContent = state.status === 'failure' ? failureText(words.failures, state.reason) : '';
     if (state.status === 'success') root.close();
   });
   // A note saved, the same way.
@@ -113,7 +115,7 @@ export function mountDetail(root: HTMLDialogElement, { detail, appointments, cha
       saving = state.status === 'pending' ? state.appointmentId : null;
       enable();
       if (!noteAsked) return;
-      error.textContent = state.status === 'failure' ? failureText(PAGE_TEXTS_EN.failures, state.reason) : '';
+      error.textContent = state.status === 'failure' ? failureText(words.failures, state.reason) : '';
       if (state.status === 'success') root.close();
     }),
   );

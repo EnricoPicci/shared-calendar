@@ -69,21 +69,21 @@
              detail dialog, which is after the screens. -->
         <section id="week" class="week-screen" hidden>
           <div class="toolbar">
-            <button type="button" class="previous" aria-label="Previous week">‹</button>
-            <button type="button" class="today">Today</button>
-            <button type="button" class="next" aria-label="Next week">›</button>
-            <button type="button" class="mail-open">E-mail…</button>
+            <button type="button" class="previous" data-label="week.previous">‹</button>
+            <button type="button" class="today" data-text="week.today"></button>
+            <button type="button" class="next" data-label="week.next">›</button>
+            <button type="button" class="mail-open" data-text="week.mailOpen"></button>
             <h2 class="week-label"></h2>
-            <span class="loading" role="status" hidden>Loading…</span>
+            <span class="loading" role="status" data-text="common.loading" hidden></span>
           </div>
           <p class="error failure" role="alert" hidden></p>
           <!-- Shown while an appointment is being moved to another time: the next free slot
                clicked is the new time. Outside the region the script redraws. -->
           <div class="moving" hidden>
-            <p role="status">Moving: <span class="moving-what"></span>. Choose a free time.</p>
-            <button type="button" class="keep">Keep the appointment as it is</button>
+            <p role="status"><span data-text="week.movingBefore"></span> <span class="moving-what"></span><span data-text="week.movingAfter"></span></p>
+            <button type="button" class="keep" data-text="week.keep"></button>
           </div>
-          <p class="zone" hidden>Times are in the calendar's time zone, <span class="zone-name"></span>.</p>
+          <p class="zone" hidden><span data-text="week.zoneBefore"></span> <span class="zone-name"></span><span data-text="week.zoneAfter"></span></p>
           <ul class="legend"></ul>
 
           <div class="week">
@@ -98,41 +98,41 @@
                only, those marked in-change in the second only. -->
           <dialog class="book" aria-labelledby="book-title">
             <form>
-              <h3 id="book-title"><span class="in-booking">Book an appointment</span><span class="in-change" hidden>Change appointment</span></h3>
-              <p class="in-change" hidden>From: <span class="old"></span></p>
-              <p><span class="in-change" hidden>To: </span><span class="what"></span></p>
+              <h3 id="book-title"><span class="in-booking" data-text="book.titleBooking"></span><span class="in-change" data-text="book.titleChange" hidden></span></h3>
+              <p class="in-change" hidden><span data-text="book.from"></span> <span class="old"></span></p>
+              <p><span class="in-change" hidden><span data-text="book.to"></span> </span><span class="what"></span></p>
               <div class="choices" hidden>
                 <div class="user in-booking">
-                  <label>For <select name="username"></select></label>
+                  <label><span data-text="book.forUser"></span> <select name="username"></select></label>
                   <p class="users-message" role="status"></p>
                 </div>
                 <div class="times">
                   <fieldset class="clock">
-                    <legend>Start</legend>
-                    <label><span class="unseen">Hour</span> <select name="start-hour"></select></label>
+                    <legend data-text="book.start"></legend>
+                    <label><span class="unseen" data-text="book.hour"></span> <select name="start-hour"></select></label>
                     <span aria-hidden="true">:</span>
-                    <label><span class="unseen">Minute</span> <select name="start-minute"></select></label>
+                    <label><span class="unseen" data-text="book.minute"></span> <select name="start-minute"></select></label>
                   </fieldset>
                   <fieldset class="clock">
-                    <legend>End</legend>
-                    <label><span class="unseen">Hour</span> <select name="end-hour"></select></label>
+                    <legend data-text="book.end"></legend>
+                    <label><span class="unseen" data-text="book.hour"></span> <select name="end-hour"></select></label>
                     <span aria-hidden="true">:</span>
-                    <label><span class="unseen">Minute</span> <select name="end-minute"></select></label>
+                    <label><span class="unseen" data-text="book.minute"></span> <select name="end-minute"></select></label>
                   </fieldset>
                 </div>
               </div>
-              <label>Note <textarea name="note" rows="3" maxlength="500"></textarea></label>
+              <label><span data-text="common.note"></span> <textarea name="note" rows="3" maxlength="500"></textarea></label>
               <p class="error" role="alert"></p>
               <!-- Offered to the Administrator after a refusal because the time is full, for the
                    request refused only: it sends that request again over the capacity, and
                    changing anything in the dialog hides it. -->
               <div class="anyway" hidden>
-                <p id="anyway-question"><span class="in-booking">Book anyway, over the capacity?</span><span class="in-change" hidden>Change anyway, over the capacity?</span></p>
-                <button type="button" class="danger force" aria-describedby="anyway-question"><span class="in-booking">Book anyway</span><span class="in-change" hidden>Change anyway</span></button>
+                <p id="anyway-question"><span class="in-booking" data-text="book.anywayBooking"></span><span class="in-change" data-text="book.anywayChange" hidden></span></p>
+                <button type="button" class="danger force" aria-describedby="anyway-question"><span class="in-booking" data-text="book.forceBooking"></span><span class="in-change" data-text="book.forceChange" hidden></span></button>
               </div>
               <div class="actions">
-                <button type="button" class="close">Close</button>
-                <button class="primary submit"><span class="in-booking">Book</span><span class="in-change" hidden>Change</span></button>
+                <button type="button" class="close" data-text="common.close"></button>
+                <button class="primary submit"><span class="in-booking" data-text="book.submit"></span><span class="in-change" data-text="common.change" hidden></span></button>
               </div>
             </form>
           </dialog>
@@ -143,17 +143,17 @@
                redraws. -->
           <dialog class="mail" aria-labelledby="mail-title">
             <form>
-              <h3 id="mail-title">E-mail the appointments</h3>
+              <h3 id="mail-title" data-text="mail.title"></h3>
               <p class="mail-what"></p>
               <div class="dates">
-                <label>From <input type="date" name="from"></label>
-                <label>To <input type="date" name="to"></label>
+                <label><span data-text="common.from"></span> <input type="date" name="from"></label>
+                <label><span data-text="common.to"></span> <input type="date" name="to"></label>
               </div>
               <p class="mail-sent" role="status"></p>
               <p class="error" role="alert"></p>
               <div class="actions">
-                <button type="button" class="close">Close</button>
-                <button class="primary submit">Send</button>
+                <button type="button" class="close" data-text="common.close"></button>
+                <button class="primary submit" data-text="mail.send"></button>
               </div>
             </form>
           </dialog>
@@ -165,7 +165,7 @@
             <p class="when"></p>
             <ul class="people"></ul>
             <div class="actions">
-              <button type="button" class="close">Close</button>
+              <button type="button" class="close" data-text="common.close"></button>
             </div>
           </dialog>
 
@@ -188,7 +188,7 @@
             <div class="block window"><span class="type-name"></span></div>
           </template>
           <template id="tpl-busy">
-            <div class="block busy"><span class="time"></span> busy</div>
+            <div class="block busy"><span class="time"></span> <span data-text="week.busy"></span></div>
           </template>
           <template id="tpl-slot">
             <button type="button" class="block slot"><span class="time"></span> <span class="places"></span></button>
@@ -885,30 +885,30 @@
            both open it, each while it is on show. The note is a text to read (the part .noted)
            or, while it can be edited, the field of the form. -->
       <dialog id="detail" class="detail" aria-labelledby="detail-title">
-        <h3 id="detail-title">Appointment</h3>
+        <h3 id="detail-title" data-text="detail.title"></h3>
         <dl>
-          <dt>When</dt>
+          <dt data-text="detail.when"></dt>
           <dd class="when"></dd>
-          <dt>Type</dt>
+          <dt data-text="detail.type"></dt>
           <dd class="typeName"></dd>
-          <dt>For</dt>
+          <dt data-text="detail.forUser"></dt>
           <dd class="who"></dd>
           <div class="noted">
-            <dt>Note</dt>
+            <dt data-text="common.note"></dt>
             <dd class="note"></dd>
           </div>
         </dl>
         <form class="note-form" hidden>
-          <label>Note <textarea name="note" rows="3" maxlength="500"></textarea></label>
-          <button class="submit">Save note</button>
+          <label><span data-text="common.note"></span> <textarea name="note" rows="3" maxlength="500"></textarea></label>
+          <button class="submit" data-text="detail.saveNote"></button>
         </form>
         <p class="booked"></p>
         <p class="hint"></p>
         <p class="error" role="alert"></p>
         <div class="actions">
-          <button type="button" class="close">Close</button>
-          <button type="button" class="change" hidden>Change</button>
-          <button type="button" class="danger cancel" hidden>Cancel appointment</button>
+          <button type="button" class="close" data-text="common.close"></button>
+          <button type="button" class="change" data-text="common.change" hidden></button>
+          <button type="button" class="danger cancel" data-text="detail.cancelAppointment" hidden></button>
         </div>
       </dialog>
 

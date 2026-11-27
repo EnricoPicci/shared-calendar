@@ -8,6 +8,7 @@ import type { WeekScreen } from '../logic/week.screen';
 import { LAST_TIME } from '../logic/times';
 import type { AppointmentsService } from '../services/appointments.service';
 import type { UsersService } from '../services/users.service';
+import type { PageTexts } from '../texts/texts';
 import { mountDetail } from './detail.view';
 import { startSetsEnd, timeLists } from './time.parts';
 
@@ -27,6 +28,8 @@ export type WeekDeps = {
   users: Pick<UsersService, 'listUsers' | 'listUsersState$'>;
   mail: Pick<MailScreen, 'mail$' | 'send' | 'reset'>;
   role: Role;
+  // The page texts of the language in use, for the book dialog and the detail dialog.
+  texts: PageTexts;
 };
 
 // The week view (docs/FRONTEND_ARCHITECTURE.md sections 3 and 4): wires the element #week of
@@ -38,7 +41,7 @@ export type WeekDeps = {
 // the week's own too, whose rows open their detail. While an appointment is being moved a
 // banner says so, and a slot opens the book dialog in its second mode, as the confirmation of
 // the change. "E-mail…" opens the mail's dialog, for both roles.
-export function mountWeek(root: HTMLElement, { screen, appointments, users, mail, role }: WeekDeps): Subscription {
+export function mountWeek(root: HTMLElement, { screen, appointments, users, mail, role, texts }: WeekDeps): Subscription {
   // 1. Find the elements, once.
   const find = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
   const all = <T extends HTMLElement = HTMLElement>(selector: string) => [...root.querySelectorAll<T>(selector)];
@@ -95,6 +98,7 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, mail
     detail: (appointmentId) => screen.detail(appointmentId),
     appointments,
     change: (appointmentId) => screen.move(appointmentId),
+    texts,
   });
 
   // 2. Pure view state (docs/FRONTEND_ARCHITECTURE.md section 3, rule 10): what the open book
@@ -386,7 +390,7 @@ export function mountWeek(root: HTMLElement, { screen, appointments, users, mail
   subscription.add(
     users.listUsersState$.subscribe((state) => {
       if (!book.open || booking!.moving) return;
-      const choice = userChoice(state);
+      const choice = userChoice(texts, state);
       choices(bookUser, choice.usernames);
       bookUsersMessage.textContent = choice.message;
       usersReady = choice.ready;

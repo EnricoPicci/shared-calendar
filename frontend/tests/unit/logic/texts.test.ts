@@ -1,5 +1,5 @@
 import { CALENDAR_LIMITS, PASSWORD_PROBLEMS, PASSWORD_SYMBOLS } from '@shared-calendar/shared';
-import { dateTimeText, failureText, MAIL_TEXTS, offsetChangesOn, offsetText, rangeText, timeText } from '../../../src/logic/texts';
+import { dateTimeText, failureText, offsetChangesOn, offsetText, rangeText, timeText } from '../../../src/logic/texts';
 import { PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS } from './password.words';
 import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
@@ -385,15 +385,6 @@ describe('texts', () => {
         differ: 'The two new passwords are not the same.',
         changed: 'Password changed.',
       });
-    });
-  });
-
-  describe('MAIL_TEXTS', () => {
-    it('says what the mail holds for each role, and where it goes: the address masked, or in general words', () => {
-      expect(MAIL_TEXTS.what.admin).toMatch(/^The whole calendar /);
-      expect(MAIL_TEXTS.what.user).toMatch(/^Your appointments /);
-      expect(MAIL_TEXTS.sent('alice@example.com')).toBe('On its way to a•••@example.com');
-      expect(MAIL_TEXTS.sent(null)).toBe('On its way to your e-mail address');
     });
   });
 });

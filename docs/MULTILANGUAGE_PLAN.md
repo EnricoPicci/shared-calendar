@@ -2,7 +2,7 @@
 
 **Version:** v1 (2026-11-27): the plan, after the Product Owner's eight decisions of the brief
 and the answer to one question of planning (section 2). v2 (2026-11-27): phase A started with
-brief `prompts/lang-l03-phase-a-implementation.md`; steps l1, l2 and groups l3a, l3b done.
+brief `prompts/lang-l03-phase-a-implementation.md`; steps l1, l2 and groups l3a to l3c done.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -496,7 +496,30 @@ lines. The look, at both widths: the sign-in, "Choose your password" (a throw-aw
 temporary password, deleted after) and "Password", padded; everything fits, the buttons side by
 side included. Nothing for section 8.
 
-**As done (group l3c).** *Empty.*
+**As done (group l3c).** Done 2026-11-27. `PageTexts` gained `week` (`WeekTexts`: a slot's
+"Full", "free", places left and narrow tab; the Administrator's block of many people; the
+list of Users to book for; the refusals of a full time and of `user_busy`), `appointment`
+(`AppointmentTexts`: "You", the empty note, "Booked by … on …", the detail's sentence) and
+`mail` (`MailTexts`, which took the place of `MAIL_TEXTS`: the address is masked by the screen,
+the sentence gets it masked). The keys: `common.close`, `note`, `change`, `loading`, `from`,
+`to`; `week.*` (the toolbar, the two names for a screen reader of ‹ and ›, the banner of a move
+and the line of the zone as sentences around a value, a busy time in its template), `book.*`,
+`mail.*`, `detail.*`. `weekModel`, `placesOf`, `userChoice`, `refusalOf` and
+`appointmentDetail` take the texts first; `FULL_FOR_ADMIN` became `week.fullForAdmin`
+(`assistant.model.ts` takes it from the English texts until group l3g); `WeekScreen` and
+`MailScreen` take the page texts in their constructors; `mountWeek`, `mountDetail` and
+`mountAppointments` get `texts` in their deps (the last one early, since it mounts the detail
+dialog; `appointments.screen.ts` hands the English texts to `appointmentDetail` until group
+l3d); the shell's `SessionObjects` carry `texts`. A key on an element that the script hides
+and shows stands before `hidden`, so that the page after a view's teardown is the page as
+written, attribute for attribute. Not changed: the legend's types are still sorted with
+`localeCompare(…, 'en')`, which step l4 decides with the language. Tests: the calls given the
+English texts, the expectations unchanged; `MAIL_TEXTS`'s test is covered by the mail
+screen's; the list of D6 lost `#week` and `#detail`, the list of files taking English
+straight lost six. frontend 3191 tests, 100 % lines. The look, padded, at both widths, as the
+Administrator with `seed:local`'s week: the toolbar, the zone's line, a slot's places, the
+book dialog, the detail dialog, the banner of a move, the "E-mail…" dialog; two things for
+section 8.
 
 **As done (group l3d).** *Empty.*
 
@@ -825,7 +848,8 @@ phase B, item 3.
 
 | Step | Screen, width, language | What was seen | What was tried | What is proposed |
 |---|---|---|---|---|
-| | | | | |
+| l3c | The detail dialog, 390 and 1280, padded | Its three buttons ("Close", "Change", "Cancel appointment") take two rows: "Cancel appointment" goes alone to the second, right-aligned. In English they take one. | Nothing: the wrap is the style sheet's, clean and readable. | Look again in Italian in item 3 ("Annulla appuntamento" is about as long as the padded English); keep the wrap if it reads as well. |
+| l3c | The week, a slot's narrow tab beside appointments, 1280, padded | "⟦Full··⟧" fills the narrow tab and its last marks are cut. | Nothing: the tab is a few characters wide by design; the budget of 8 characters binds the real languages (`week.full`, `week.tabLeft`). | Nothing, unless the Italian ("Pieno", "2 liberi") is cut too. |
 
 ## 9. Beside the other work
 

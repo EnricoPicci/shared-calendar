@@ -1,10 +1,11 @@
 import { BookBody, ChangeBody } from '@shared-calendar/shared';
 import type { Moving } from '../../../src/logic/appointment.detail';
-import { bookingFor, bookingText, changeFor, FULL_FOR_ADMIN, inTheWay, refusalOf, timeChoice, userChoice, type Asked, type BookingFields } from '../../../src/logic/booking';
+import { bookingFor, bookingText, changeFor, inTheWay, refusalOf, timeChoice, userChoice, type Asked, type BookingFields } from '../../../src/logic/booking';
 import { weekModel } from '../../../src/logic/week.model';
 import type { SlotBlock } from '../../../src/logic/week.model';
 import { appointment, POOL, STUDIO, view } from './fixtures';
 import { useFarBrowserZone } from './zone';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 const z = (instant: string) => `${instant}:00.000Z`;
 
@@ -20,7 +21,7 @@ function slotOf(date: string, window: [string, string], slot: [string, string], 
       slots: [{ start: z(slot[0]), end: z(slot[1]), typeId: STUDIO, capacity: 1, placesLeft: 1 }],
     },
   ]);
-  return weekModel(week, 'admin').days.find((day) => day.date === date)!.slots[0]!;
+  return weekModel(PAGE_TEXTS_EN, week, 'admin').days.find((day) => day.date === date)!.slots[0]!;
 }
 
 // Monday 23 November 2026 in Rome (UTC+1): a window 08:30–12:00, the slot 10:00–11:00.
@@ -97,8 +98,8 @@ describe('booking', () => {
 
   describe('userChoice', () => {
     it('before any list and while one loads: no name, not ready; loading says so', () => {
-      expect(userChoice({ status: 'idle' })).toEqual({ usernames: [], message: '', ready: false });
-      expect(userChoice({ status: 'pending' })).toEqual({ usernames: [], message: 'Loading the users…', ready: false });
+      expect(userChoice(PAGE_TEXTS_EN, { status: 'idle' })).toEqual({ usernames: [], message: '', ready: false });
+      expect(userChoice(PAGE_TEXTS_EN, { status: 'pending' })).toEqual({ usernames: [], message: 'Loading the users…', ready: false });
     });
 
     it('a list: the names in the order received, ready', () => {
@@ -106,15 +107,15 @@ describe('booking', () => {
         { username: 'alice', createdAt: '2026-11-01T10:00:00.000Z', status: 'active' as const, givenName: 'G', familyName: 'F', email: 'alice@example.com', address: 'A' },
         { username: 'bob', createdAt: '2026-11-02T10:00:00.000Z', status: 'active' as const, givenName: 'G', familyName: 'F', email: 'bob@example.com', address: 'A' },
       ];
-      expect(userChoice({ status: 'success', users })).toEqual({ usernames: ['alice', 'bob'], message: '', ready: true });
+      expect(userChoice(PAGE_TEXTS_EN, { status: 'success', users })).toEqual({ usernames: ['alice', 'bob'], message: '', ready: true });
     });
 
     it('an empty list says that there is no User to book for', () => {
-      expect(userChoice({ status: 'success', users: [] })).toEqual({ usernames: [], message: 'There is no User to book for.', ready: false });
+      expect(userChoice(PAGE_TEXTS_EN, { status: 'success', users: [] })).toEqual({ usernames: [], message: 'There is no User to book for.', ready: false });
     });
 
     it('a failed list is said in plain words, never with the service\'s message', () => {
-      expect(userChoice({ status: 'failure', reason: 'network', message: 'TypeError: Failed to fetch' })).toEqual({
+      expect(userChoice(PAGE_TEXTS_EN, { status: 'failure', reason: 'network', message: 'TypeError: Failed to fetch' })).toEqual({
         usernames: [],
         message: 'The server cannot be reached. Check the connection and try again.',
         ready: false,
@@ -359,36 +360,36 @@ describe('booking', () => {
 
     describe('user_busy names the appointment in the way, or says it plainly; nothing is offered', () => {
       it('a User booking over her own appointment: its time and its type, and to open it', () => {
-        expect(refusalOf('user_busy', asked(), 'user', [ALICES])).toEqual({
+        expect(refusalOf(PAGE_TEXTS_EN, 'user_busy', asked(), 'user', [ALICES])).toEqual({
           text: 'You already have an appointment at this time (09:15–10:00 · Studio); open it to change it.',
           offer: false,
         });
       });
 
       it('the Administrator booking for alice over hers: her name, its time and its type', () => {
-        expect(refusalOf('user_busy', asked(), 'admin', [BOBS, ALICES])).toEqual({ text: 'alice already has an appointment at this time (09:15–10:00 · Studio).', offer: false });
+        expect(refusalOf(PAGE_TEXTS_EN, 'user_busy', asked(), 'admin', [BOBS, ALICES])).toEqual({ text: 'alice already has an appointment at this time (09:15–10:00 · Studio).', offer: false });
       });
 
       it('none found in the week shown: the sentences without the appointment, the User\'s and the Administrator\'s', () => {
-        expect(refusalOf('user_busy', asked(), 'user', [])).toEqual({ text: USERS, offer: false });
-        expect(refusalOf('user_busy', asked(), 'admin', [])).toEqual({ text: ADMINS, offer: false });
+        expect(refusalOf(PAGE_TEXTS_EN, 'user_busy', asked(), 'user', [])).toEqual({ text: USERS, offer: false });
+        expect(refusalOf(PAGE_TEXTS_EN, 'user_busy', asked(), 'admin', [])).toEqual({ text: ADMINS, offer: false });
       });
 
       it('the Administrator booking for bob: alice\'s appointment is not his, so none is found', () => {
         const forBob = asked({ fields: untouched(nine(), 'Europe/Rome', { username: 'bob' }) });
-        expect(refusalOf('user_busy', forBob, 'admin', [ALICES])).toEqual({ text: ADMINS, offer: false });
+        expect(refusalOf(PAGE_TEXTS_EN, 'user_busy', forBob, 'admin', [ALICES])).toEqual({ text: ADMINS, offer: false });
       });
 
       it('a change leaves the appointment being moved out: alone in the way, none is found; another one is', () => {
-        expect(refusalOf('user_busy', asked({ moving: moving('appt-alice', 'You') }), 'user', [ALICES])).toEqual({ text: USERS, offer: false });
-        expect(refusalOf('user_busy', asked({ moving: moving('appt-other', 'You') }), 'user', [ALICES]).text).toBe(
+        expect(refusalOf(PAGE_TEXTS_EN, 'user_busy', asked({ moving: moving('appt-alice', 'You') }), 'user', [ALICES])).toEqual({ text: USERS, offer: false });
+        expect(refusalOf(PAGE_TEXTS_EN, 'user_busy', asked({ moving: moving('appt-other', 'You') }), 'user', [ALICES]).text).toBe(
           'You already have an appointment at this time (09:15–10:00 · Studio); open it to change it.',
         );
       });
 
       it('the Administrator\'s change: the User is the moved appointment\'s, not the one the form holds', () => {
         const change = asked({ moving: moving('appt-other', 'alice'), fields: untouched(nine(), 'Europe/Rome', { username: '' }) });
-        expect(refusalOf('user_busy', change, 'admin', [ALICES]).text).toBe('alice already has an appointment at this time (09:15–10:00 · Studio).');
+        expect(refusalOf(PAGE_TEXTS_EN, 'user_busy', change, 'admin', [ALICES]).text).toBe('alice already has an appointment at this time (09:15–10:00 · Studio).');
       });
     });
 
@@ -414,13 +415,13 @@ describe('booking', () => {
 
     describe('slot_taken: the Administrator is offered to go over the capacity; a User is not', () => {
       it('the Administrator, booking or changing: the time is full, and the offer', () => {
-        expect(refusalOf('slot_taken', asked(), 'admin', [])).toEqual({ text: FULL_FOR_ADMIN, offer: true });
-        expect(refusalOf('slot_taken', asked({ moving: moving('appt-alice', 'alice') }), 'admin', [])).toEqual({ text: FULL_FOR_ADMIN, offer: true });
-        expect(FULL_FOR_ADMIN).toBe('This time is full: there is no place left.');
+        expect(refusalOf(PAGE_TEXTS_EN, 'slot_taken', asked(), 'admin', [])).toEqual({ text: PAGE_TEXTS_EN.week.fullForAdmin, offer: true });
+        expect(refusalOf(PAGE_TEXTS_EN, 'slot_taken', asked({ moving: moving('appt-alice', 'alice') }), 'admin', [])).toEqual({ text: PAGE_TEXTS_EN.week.fullForAdmin, offer: true });
+        expect(PAGE_TEXTS_EN.week.fullForAdmin).toBe('This time is full: there is no place left.');
       });
 
       it('a User: the sentence of every page, with the week read again, and no offer', () => {
-        expect(refusalOf('slot_taken', asked(), 'user', [ALICES])).toEqual({
+        expect(refusalOf(PAGE_TEXTS_EN, 'slot_taken', asked(), 'user', [ALICES])).toEqual({
           text: 'This time is full: there is no place left. The calendar has been refreshed: please choose another time.',
           offer: false,
         });
@@ -428,8 +429,8 @@ describe('booking', () => {
     });
 
     it('every other reason is failureText\'s, with what was attempted', () => {
-      expect(refusalOf('cancellation_notice_too_short', asked({ moving: moving('appt-alice', 'You') }), 'user', [])).toEqual({ text: 'It is too late to change this appointment.', offer: false });
-      expect(refusalOf('booking_in_past', asked(), 'admin', [ALICES])).toEqual({ text: 'This time has already passed. Please choose a later one.', offer: false });
+      expect(refusalOf(PAGE_TEXTS_EN, 'cancellation_notice_too_short', asked({ moving: moving('appt-alice', 'You') }), 'user', [])).toEqual({ text: 'It is too late to change this appointment.', offer: false });
+      expect(refusalOf(PAGE_TEXTS_EN, 'booking_in_past', asked(), 'admin', [ALICES])).toEqual({ text: 'This time has already passed. Please choose a later one.', offer: false });
     });
   });
 });

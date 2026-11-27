@@ -7,6 +7,7 @@ import type { AppointmentsResult, CancelResult, UpdateNoteResult } from '../../.
 import type { SettingsResult } from '../../../src/services/calendar-settings.types';
 import { appointment } from './fixtures';
 import { useFarBrowserZone } from './zone';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // A fake CalendarSettingsService and a fake AppointmentsService (result streams that replay
 // their last value, as the real ones do, and spies), a fake WeekScreen (a spy), a stream for
@@ -504,7 +505,7 @@ describe('AppointmentsScreen', () => {
     it('an appointment of the list, ready to show, at the "now" given and in the zone of the settings', () => {
       const { screen, listed } = screenAt();
       listed();
-      expect(screen.detail('booked')).toEqual(appointmentDetail(BOOKED, 'user', new Date(NOW), 'Europe/Rome'));
+      expect(screen.detail('booked')).toEqual(appointmentDetail(PAGE_TEXTS_EN, BOOKED, 'user', new Date(NOW), 'Europe/Rome'));
       expect(screen.detail('booked')).toMatchObject({
         when: 'Mon 23 Nov, 10:00–11:00',
         who: 'You',
@@ -568,7 +569,7 @@ describe('AppointmentsScreen', () => {
         { appointmentId: 'booked', when: 'Mon 23 Nov, 10:00–11:00', what: 'Mon 23 Nov, 10:00–11:00 · Studio', who: 'You', note: 'First lesson' },
         '2026-11-23',
       );
-      expect(handOver.mock.calls[0]![0]).toEqual(movingOf(appointmentDetail(BOOKED, 'user', new Date(NOW), 'Europe/Rome'), 'user'));
+      expect(handOver.mock.calls[0]![0]).toEqual(movingOf(appointmentDetail(PAGE_TEXTS_EN, BOOKED, 'user', new Date(NOW), 'Europe/Rome'), 'user'));
       expect(list).toHaveBeenCalledTimes(1); // handing over asks nothing of the server
     });
 

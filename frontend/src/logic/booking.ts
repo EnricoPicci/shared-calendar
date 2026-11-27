@@ -1,16 +1,16 @@
 import { localDateOf, localTimeOf, toInstant, type Appointment, type BookBody, type ChangeBody, type Role } from '@shared-calendar/shared';
 import type { ListUsersState } from '../services/users.types';
+import type { PageTexts } from '../texts/texts';
 import type { Moving } from './appointment.detail';
 import { failureText, offsetChangesOn, rangeText } from './texts';
 import { clockOf, DAY_MINUTES, minuteOfClock, windowHours, type TimeHours } from './times';
 import type { SlotBlock } from './week.model';
-import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The book dialog's logic (docs/FRONTEND_ARCHITECTURE.md section 5): what is being booked in
 // words, the times and the Users the Administrator may choose, and the way from what the dialog
 // holds to the argument of AppointmentsService.book or, when the dialog confirms the move of an
 // appointment, of AppointmentsService.change, and what the dialog says when the server refuses
-// one. Pure. Whether a booking or a change is allowed is the server's to say
+// one. Pure; the words are the page texts', handed in first. Whether a booking or a change is allowed is the server's to say
 // (docs/FRONTEND_SERVICES.md section 8, decision 42): nothing is checked here.
 
 // "Mon 23 Nov, 10:00–11:00 · Studio": the slot's day, time and type.
@@ -48,12 +48,12 @@ export function timeChoice(slot: SlotBlock, zone: string): TimeChoice {
 // for the picker, what to say beside it, and whether a User can be chosen yet.
 export type UserChoice = { usernames: string[]; message: string; ready: boolean };
 
-export function userChoice(state: ListUsersState): UserChoice {
-  if (state.status === 'pending') return { usernames: [], message: 'Loading the users…', ready: false };
-  if (state.status === 'failure') return { usernames: [], message: failureText(PAGE_TEXTS_EN.failures, state.reason), ready: false };
+export function userChoice(texts: PageTexts, state: ListUsersState): UserChoice {
+  if (state.status === 'pending') return { usernames: [], message: texts.week.loadingUsers, ready: false };
+  if (state.status === 'failure') return { usernames: [], message: failureText(texts.failures, state.reason), ready: false };
   if (state.status === 'idle') return { usernames: [], message: '', ready: false };
   const usernames = state.users.map((user) => user.username);
-  if (usernames.length === 0) return { usernames, message: 'There is no User to book for.', ready: false };
+  if (usernames.length === 0) return { usernames, message: texts.week.noUsers, ready: false };
   return { usernames, message: '', ready: true };
 }
 
@@ -104,10 +104,6 @@ export type Asked = { slot: SlotBlock; zone: string; fields: BookingFields; movi
 // "Change anyway") is offered under it.
 export type Refusal = { text: string; offer: boolean };
 
-// The Administrator's refusal for a time that is full, which "Book anyway, over the capacity?"
-// follows in the page: the week is read again, but the time is still the one to book.
-export const FULL_FOR_ADMIN = 'This time is full: there is no place left.';
-
 // The interval asked for: the two instants the Administrator sent, or a User's slot, whose end
 // the server takes as the slot's (docs/SHARED_CALENDAR_SPEC.md R-BOOK-02).
 function intervalOf({ slot, zone, fields }: Asked, role: Role): { start: string; end: string } {
@@ -133,22 +129,18 @@ export function inTheWay(appointments: readonly Appointment[], role: Role, asked
 
 // What the dialog says about a refused booking or change.
 // - `slot_taken` for the Administrator: the time is full, and the same request may be sent
-//   again over the capacity (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13). A User's is the sentence
+//   again over the capacity, which "Book anyway, over the capacity?" follows in the page (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13). A User's is the sentence
 //   of every page, with the week read again.
 // - `user_busy` names the appointment in the way, its time and its type, when the week on show
 //   holds it; the person opens it and changes it. Nothing is offered: the force does not lift
 //   the rule (docs/SHARED_CALENDAR_SPEC.md R-BOOK-12).
 // - Everything else is failureText's, with what was attempted and who attempted it.
-export function refusalOf(reason: string, asked: Asked, role: Role, appointments: readonly Appointment[]): Refusal {
-  if (reason === 'slot_taken' && role === 'admin') return { text: FULL_FOR_ADMIN, offer: true };
+export function refusalOf(texts: PageTexts, reason: string, asked: Asked, role: Role, appointments: readonly Appointment[]): Refusal {
+  if (reason === 'slot_taken' && role === 'admin') return { text: texts.week.fullForAdmin, offer: true };
   const found = reason === 'user_busy' ? inTheWay(appointments, role, asked) : null;
   if (found !== null) {
     const what = `${rangeText(found.start, found.end, asked.zone, offsetChangesOn(found.date, asked.zone))} · ${found.typeName}`;
-    const text =
-      role === 'admin'
-        ? `${found.username} already has an appointment at this time (${what}).`
-        : `You already have an appointment at this time (${what}); open it to change it.`;
-    return { text, offer: false };
+    return { text: role === 'admin' ? texts.week.busyFor(found.username, what) : texts.week.busyYou(what), offer: false };
   }
-  return { text: failureText(PAGE_TEXTS_EN.failures, reason, asked.moving === null ? undefined : 'change', role), offer: false };
+  return { text: failureText(texts.failures, reason, asked.moving === null ? undefined : 'change', role), offer: false };
 }

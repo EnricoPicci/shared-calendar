@@ -111,6 +111,8 @@ export type ShellDeps = {
 // shell also hears.
 export type SessionObjects = {
   role: Role;
+  // The page texts of the language in use, for the views that put words with data.
+  texts: PageTexts;
   week: WeekScreen;
   list: AppointmentsScreen;
   settings: SettingsScreen;
@@ -148,7 +150,7 @@ function sessionObjects(config: ShellConfig, store: SessionStore, person: Person
   const assistant = new AssistantScreen(new AssistantService(config, store), person.role);
   const again$ = merge(visible$, assistant.changed$);
   const now = () => new Date();
-  const week = new WeekScreen(calendar, appointments, person.role, now, again$);
+  const week = new WeekScreen(calendar, appointments, person.role, now, again$, texts);
   // The list screen hands an appointment to move over to the week screen.
   const list = new AppointmentsScreen(calendarSettings, appointments, week, person.role, now, again$);
   const settings = new SettingsScreen(calendarSettings);
@@ -170,12 +172,12 @@ function sessionObjects(config: ShellConfig, store: SessionStore, person: Person
   const me = new MeScreen(new MeService(config, store), users, person.role, again$);
   // The week's "E-mail…" dialog, with a MeService of its own: it reads the person's address once
   // a mail is asked for, and "My details" must not hear that read as its own.
-  const mail = new MailScreen(new MailService(config, store), new MeService(config, store), person.role);
+  const mail = new MailScreen(new MailService(config, store), new MeService(config, store), person.role, texts);
   // The change of the person's own password, straight at Cognito (docs/FRONTEND_SERVICES.md
   // section 22).
   const changes = new ChangePasswordService({ cognitoUrl: config.cognitoUrl, skipGlobalSignOut: config.skipGlobalSignOut === true }, store);
   const password = new PasswordScreen(changes, texts);
-  return { role: person.role, week, list, settings, daily, accounts, availability, date, appointments, users, types, rules, assistant, mail, me, password, changes };
+  return { role: person.role, texts, week, list, settings, daily, accounts, availability, date, appointments, users, types, rules, assistant, mail, me, password, changes };
 }
 
 // A screen of the application: its address (the URL's hash), its name in the navigation, the
@@ -200,8 +202,8 @@ export const SCREENS: readonly Screen[] = [
     label: (frame) => frame.nav.week,
     roles: ['admin', 'user'],
     element: '#week',
-    show: (root, { week, appointments, users, mail, role }) => {
-      const subscription = mountWeek(root, { screen: week, appointments, users, mail, role });
+    show: (root, { week, appointments, users, mail, role, texts }) => {
+      const subscription = mountWeek(root, { screen: week, appointments, users, mail, role, texts });
       subscription.add(week.start());
       subscription.add(mail.start());
       return subscription;
@@ -212,13 +214,13 @@ export const SCREENS: readonly Screen[] = [
     label: (frame) => frame.nav.appointments,
     roles: ['user'],
     element: '#appointments',
-    show: (root, { list, appointments }) => {
+    show: (root, { list, appointments, texts }) => {
       // The view is handed the way to the week, for an appointment it sends there to be moved:
       // a change of address, which the shell follows like any other.
       const showWeek = () => {
         window.location.hash = WEEK_HASH;
       };
-      const subscription = mountAppointments(root, { screen: list, appointments, showWeek });
+      const subscription = mountAppointments(root, { screen: list, appointments, showWeek, texts });
       subscription.add(list.start());
       return subscription;
     },

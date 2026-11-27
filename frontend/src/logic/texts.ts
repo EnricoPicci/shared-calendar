@@ -1,4 +1,4 @@
-import { ASSISTANT_LIMITS, CALENDAR_LIMITS, localDateOf, localTimeOf, MAIL_LIMITS, maskAddress, toInstant, type DateFormats, type Role } from '@shared-calendar/shared';
+import { ASSISTANT_LIMITS, CALENDAR_LIMITS, localDateOf, localTimeOf, MAIL_LIMITS, toInstant, type DateFormats, type Role } from '@shared-calendar/shared';
 import { FAILURE_REASONS, type FailureReason, type FailureTexts } from '../texts/texts';
 
 // The texts that depend on data (docs/FRONTEND_ARCHITECTURE.md section 5 and section 12.4): a
@@ -88,18 +88,6 @@ export function failureText(failures: FailureTexts, reason: string, attempt?: At
   if (role === 'admin' && reason === 'user_busy') return failures.userBusyForAdmin;
   return isFailureReason(reason) ? failures.reasons[reason] : failures.general;
 }
-
-// The words of the week's "E-mail…" dialog (docs/FRONTEND_ARCHITECTURE.md section 5.1): what the
-// mail holds, which is the role's (docs/EMAIL_ARCHITECTURE.md section 9.1), and where it goes once
-// asked for, the person's own address masked (docs/EMAIL_ARCHITECTURE.md section 12.4), or in
-// general words when it could not be read.
-export const MAIL_TEXTS = {
-  what: {
-    admin: 'The whole calendar between the two dates, as an Excel file, to your own e-mail address.',
-    user: 'Your appointments between the two dates, as an Excel file, to your own e-mail address.',
-  },
-  sent: (address: string | null) => `On its way to ${address === null ? 'your e-mail address' : maskAddress(address)}`,
-} as const satisfies { what: Record<Role, string>; sent: (address: string | null) => string };
 
 // The words of the settings' "Daily e-mail" (docs/FRONTEND_ARCHITECTURE.md section 5.1): an hour
 // as the field shows it, "07:00"; under the field, what it takes, with the calendar's time zone

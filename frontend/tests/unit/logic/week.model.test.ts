@@ -2,6 +2,7 @@ import type { CalendarView } from '@shared-calendar/shared';
 import { colourOf, placesOf, weekModel } from '../../../src/logic/week.model';
 import { appointment, POOL, STUDIO, view, winterWeek } from './fixtures';
 import { useFarBrowserZone } from './zone';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 const z = (instant: string) => `${instant}:00.000Z`;
 // A percentage of the hours shown, as the model writes it.
@@ -13,7 +14,7 @@ describe('weekModel', () => {
   useFarBrowserZone();
 
   describe('a week in Europe/Rome in winter (the example of 11.6), for a User', () => {
-    const model = weekModel(winterWeek(), 'user');
+    const model = weekModel(PAGE_TEXTS_EN, winterWeek(), 'user');
     const monday = model.days[0]!;
 
     it('names the time zone and shows 08:00 to 18:00, one label per hour', () => {
@@ -100,7 +101,7 @@ describe('weekModel', () => {
           appointment({ start: z('2026-11-18T08:00'), end: z('2026-11-18T09:00'), date: '2026-11-18', username: 'carol' }),
         ],
       });
-      const model = weekModel(week, 'admin');
+      const model = weekModel(PAGE_TEXTS_EN, week, 'admin');
       expect(model.days[0]!.appointments.map((a) => [a.who, a.time, a.typeName, a.note])).toEqual([
         ['alice', '09:00–10:00', 'Studio', 'First lesson'],
         ['bob', '10:15–11:00', 'Swimming Pool', ''],
@@ -113,8 +114,8 @@ describe('weekModel', () => {
 
     it('the same view for a User would say "You": the name comes from the role, not from the data', () => {
       const week = view('2026-11-16', { appointments: [appointment({ start: z('2026-11-16T08:00'), end: z('2026-11-16T09:00'), date: '2026-11-16', username: 'alice' })] });
-      expect(weekModel(week, 'user').days[0]!.appointments[0]!.who).toBe('You');
-      expect(JSON.stringify(weekModel(week, 'user'))).not.toContain('alice');
+      expect(weekModel(PAGE_TEXTS_EN, week, 'user').days[0]!.appointments[0]!.who).toBe('You');
+      expect(JSON.stringify(weekModel(PAGE_TEXTS_EN, week, 'user'))).not.toContain('alice');
     });
   });
 
@@ -126,7 +127,7 @@ describe('weekModel', () => {
         slots: [{ start: z('2027-07-05T07:00'), end: z('2027-07-05T08:00'), typeId: STUDIO, capacity: 1, placesLeft: 1 }],
       },
     ]);
-    const day = weekModel(week, 'user').days[0]!;
+    const day = weekModel(PAGE_TEXTS_EN, week, 'user').days[0]!;
     expect(day.label).toBe('Mon 5 Jul');
     expect(day.windows[0]).toMatchObject({ top: '10%', height: '40%', time: '09:00–13:00' });
     expect(day.slots[0]).toMatchObject({ top: '10%', height: '10%', time: '09:00–10:00' });
@@ -141,7 +142,7 @@ describe('weekModel', () => {
         slots: [{ start: z('2026-11-16T03:30'), end: z('2026-11-16T04:30'), typeId: STUDIO, capacity: 1, placesLeft: 1 }],
       },
     ]);
-    const model = weekModel(week, 'user');
+    const model = weekModel(PAGE_TEXTS_EN, week, 'user');
     expect(model.timeZone).toBe('Asia/Kolkata');
     expect(model.days[0]!.windows[0]).toMatchObject({ top: '10%', height: '20%', time: '09:00–11:00' });
     expect(model.days[0]!.slots[0]).toMatchObject({ top: '10%', height: '10%', time: '09:00–10:00' });
@@ -150,15 +151,15 @@ describe('weekModel', () => {
 
   it('today is the date of generatedAt in the calendar\'s zone, not in UTC nor in the browser\'s', () => {
     // Sunday 23:30 UTC is Monday 00:30 in Rome and Monday 13:30 in the browser's zone of the test.
-    expect(weekModel(view('2026-11-16', { generatedAt: z('2026-11-15T23:30') }), 'user').days.map((day) => day.today).indexOf(true)).toBe(0);
+    expect(weekModel(PAGE_TEXTS_EN, view('2026-11-16', { generatedAt: z('2026-11-15T23:30') }), 'user').days.map((day) => day.today).indexOf(true)).toBe(0);
     // Monday 22:30 UTC is still Monday in Rome; it is already Tuesday in the browser's zone.
-    expect(weekModel(view('2026-11-16', { generatedAt: z('2026-11-16T22:30') }), 'user').days.map((day) => day.today).indexOf(true)).toBe(0);
+    expect(weekModel(PAGE_TEXTS_EN, view('2026-11-16', { generatedAt: z('2026-11-16T22:30') }), 'user').days.map((day) => day.today).indexOf(true)).toBe(0);
     // A week that does not hold today marks no day.
-    expect(weekModel(view('2026-11-23', { generatedAt: z('2026-11-16T22:30') }), 'user').days.some((day) => day.today)).toBe(false);
+    expect(weekModel(PAGE_TEXTS_EN, view('2026-11-23', { generatedAt: z('2026-11-16T22:30') }), 'user').days.some((day) => day.today)).toBe(false);
   });
 
   it('a week with nothing in it: seven empty days, 08:00 to 18:00, no legend', () => {
-    const model = weekModel(view('2026-11-16'), 'admin');
+    const model = weekModel(PAGE_TEXTS_EN, view('2026-11-16'), 'admin');
     expect(model.hours).toHaveLength(10);
     expect(model.legend).toEqual([]);
     expect(model.days).toHaveLength(7);
@@ -169,7 +170,7 @@ describe('weekModel', () => {
     const week = view('2026-11-16', {}, [
       { date: '2026-11-16', windows: [{ start: z('2026-11-16T19:00'), end: z('2026-11-16T23:00'), typeId: STUDIO, typeName: 'Studio' }] },
     ]);
-    const model = weekModel(week, 'admin');
+    const model = weekModel(PAGE_TEXTS_EN, week, 'admin');
     expect(model.hours).toHaveLength(16);
     expect(model.hours.at(-1)).toBe('23:00');
     expect(model.days[0]!.windows[0]).toMatchObject({ top: percent(12 * 60, 16 * 60), height: percent(4 * 60, 16 * 60), time: '20:00–24:00' });
@@ -180,7 +181,7 @@ describe('weekModel', () => {
       { date: '2026-11-17', windows: [{ start: z('2026-11-17T05:30'), end: z('2026-11-17T08:00'), typeId: STUDIO, typeName: 'Studio' }] },
       { date: '2026-11-18', busy: [{ start: z('2026-11-18T08:00'), end: z('2026-11-18T09:00') }] },
     ]);
-    const model = weekModel(week, 'admin');
+    const model = weekModel(PAGE_TEXTS_EN, week, 'admin');
     // 06:30 on Tuesday opens the day at 06:00; 20:45 on Friday closes it at 21:00.
     expect(model.hours[0]).toBe('06:00');
     expect(model.hours.at(-1)).toBe('20:00');
@@ -209,7 +210,7 @@ describe('weekModel', () => {
         ],
       },
     ]);
-    const model = weekModel(week, 'user');
+    const model = weekModel(PAGE_TEXTS_EN, week, 'user');
     const sunday = model.days[6]!;
     const shown = 17 * 60; // 01:00 to 18:00
 
@@ -249,14 +250,14 @@ describe('weekModel', () => {
         { start: z('2027-10-31T00:00'), end: z('2027-10-31T01:00') },
         { start: z('2027-10-31T01:00'), end: z('2027-10-31T02:00') },
       ];
-      const users = weekModel(view('2027-10-25', {}, [{ date: '2027-10-31', busy: repeated }]), 'user').days[6]!;
+      const users = weekModel(PAGE_TEXTS_EN, view('2027-10-25', {}, [{ date: '2027-10-31', busy: repeated }]), 'user').days[6]!;
       expect(users.busy.map((b) => [b.time, b.lane, b.lanes])).toEqual([
         ['02:00 +02:00 – 02:00 +01:00', 0, 2],
         ['02:00 +01:00 – 03:00 +01:00', 1, 2],
       ]);
       // Given in the other order, the earlier one is still on the left.
       const appointments = [...repeated].reverse().map((r, i) => appointment({ ...r, date: '2027-10-31', username: ['bob', 'alice'][i]! }));
-      const admins = weekModel(view('2027-10-25', { appointments }), 'admin').days[6]!;
+      const admins = weekModel(PAGE_TEXTS_EN, view('2027-10-25', { appointments }), 'admin').days[6]!;
       expect(admins.appointments.map((a) => [a.who, a.time, a.lane, a.lanes])).toEqual([
         ['bob', '02:00 +01:00 – 03:00 +01:00', 1, 2],
         ['alice', '02:00 +02:00 – 02:00 +01:00', 0, 2],
@@ -266,7 +267,7 @@ describe('weekModel', () => {
     it('an appointment across the repeated hour that ends, on the clock, before it starts gets its real length', () => {
       // 02:30 +02:00 to 02:15 +01:00: 45 real minutes.
       const a = appointment({ start: z('2027-10-31T00:30'), end: z('2027-10-31T01:15'), date: '2027-10-31' });
-      const day = weekModel(view('2027-10-25', { appointments: [a] }), 'admin').days[6]!;
+      const day = weekModel(PAGE_TEXTS_EN, view('2027-10-25', { appointments: [a] }), 'admin').days[6]!;
       // The hours shown start at 02:00: 16 hours.
       expect(day.appointments[0]).toMatchObject({ top: percent(30, 960), height: percent(45, 960), time: '02:30 +02:00 – 02:15 +01:00', ...FULL });
     });
@@ -274,7 +275,7 @@ describe('weekModel', () => {
     it('a block that reaches midnight across the repeated hour stops at the end of the day', () => {
       // An odd answer, not one the calendar gives: 23:30 to 23:30 on the clock, 25 real hours.
       const odd = { start: z('2027-10-30T21:30'), end: z('2027-10-31T22:30') };
-      const day = weekModel(view('2027-10-25', {}, [{ date: '2027-10-30', busy: [odd] }]), 'user').days[5]!;
+      const day = weekModel(PAGE_TEXTS_EN, view('2027-10-25', {}, [{ date: '2027-10-30', busy: [odd] }]), 'user').days[5]!;
       expect(day.busy[0]).toMatchObject({ top: percent(15.5 * 60, 16 * 60), height: percent(30, 16 * 60) });
     });
   });
@@ -291,7 +292,7 @@ describe('weekModel', () => {
         ],
       },
     ]);
-    const sunday = weekModel(week, 'user').days[6]!;
+    const sunday = weekModel(PAGE_TEXTS_EN, week, 'user').days[6]!;
     const shown = 17 * 60;
 
     it('the times carry their offsets, and no block is in the missing hour', () => {
@@ -308,7 +309,7 @@ describe('weekModel', () => {
     it('an appointment carries its id, for both roles', () => {
       const a = appointment({ appointmentId: '01M6DMQ0000000000000000001', start: z('2026-11-16T08:00'), end: z('2026-11-16T09:00'), date: '2026-11-16' });
       for (const role of ['admin', 'user'] as const) {
-        expect(weekModel(view('2026-11-16', { appointments: [a] }), role).days[0]!.appointments[0]!.appointmentId).toBe('01M6DMQ0000000000000000001');
+        expect(weekModel(PAGE_TEXTS_EN, view('2026-11-16', { appointments: [a] }), role).days[0]!.appointments[0]!.appointmentId).toBe('01M6DMQ0000000000000000001');
       }
     });
 
@@ -329,7 +330,7 @@ describe('weekModel', () => {
           ],
         },
       ]);
-      const [studio, pool] = weekModel(week, 'admin').days[0]!.slots;
+      const [studio, pool] = weekModel(PAGE_TEXTS_EN, week, 'admin').days[0]!.slots;
       expect(studio!.window).toEqual({ start: z('2026-11-16T07:30'), end: z('2026-11-16T11:00') });
       expect(pool!.window).toEqual({ start: z('2026-11-16T11:00'), end: z('2026-11-16T13:00') });
       expect([studio!.typeName, pool!.typeName]).toEqual(['Studio', 'Swimming Pool']);
@@ -337,7 +338,7 @@ describe('weekModel', () => {
 
     it('a slot that no window of the answer holds is its own window, and its type has no name', () => {
       const week = view('2026-11-16', {}, [{ date: '2026-11-17', slots: [{ start: z('2026-11-17T08:00'), end: z('2026-11-17T09:00'), typeId: STUDIO, capacity: 1, placesLeft: 1 }] }]);
-      expect(weekModel(week, 'user').days[1]!.slots[0]).toMatchObject({
+      expect(weekModel(PAGE_TEXTS_EN, week, 'user').days[1]!.slots[0]).toMatchObject({
         day: 'Tue 17 Nov',
         typeName: '',
         window: { start: z('2026-11-17T08:00'), end: z('2026-11-17T09:00') },
@@ -353,7 +354,7 @@ describe('weekModel', () => {
           slots: [slot('2027-10-31T00:00', '2027-10-31T01:00'), slot('2027-10-31T01:00', '2027-10-31T02:00')],
         },
       ]);
-      const slots = weekModel(week, 'user').days[6]!.slots;
+      const slots = weekModel(PAGE_TEXTS_EN, week, 'user').days[6]!.slots;
       expect(slots.map((s) => [s.start, s.end])).toEqual([
         [z('2027-10-31T00:00'), z('2027-10-31T01:00')],
         [z('2027-10-31T01:00'), z('2027-10-31T02:00')],
@@ -366,7 +367,7 @@ describe('weekModel', () => {
   describe('the places of a slot (R-SLOT-02, R-SLOT-04, 16.8)', () => {
     const slot = (capacity: number, placesLeft: number) => ({ start: z('2026-11-16T08:00'), end: z('2026-11-16T09:00'), typeId: POOL, capacity, placesLeft });
     const slotOf = (capacity: number, placesLeft: number, role: 'admin' | 'user') =>
-      weekModel(view('2026-11-16', {}, [{ date: '2026-11-16', slots: [slot(capacity, placesLeft)] }]), role).days[0]!.slots[0]!;
+      weekModel(PAGE_TEXTS_EN, view('2026-11-16', {}, [{ date: '2026-11-16', slots: [slot(capacity, placesLeft)] }]), role).days[0]!.slots[0]!;
 
     it('a capacity of 1 says "free", as a slot always did', () => {
       expect(slotOf(1, 1, 'user')).toMatchObject({ places: 'free', full: false, time: '09:00–10:00' });
@@ -383,7 +384,7 @@ describe('weekModel', () => {
     });
 
     it('placesOf never answers a negative number of places', () => {
-      expect(placesOf(2, -1)).toEqual({ places: 'Full', full: true });
+      expect(placesOf(PAGE_TEXTS_EN.week, 2, -1)).toEqual({ places: 'Full', full: true });
     });
   });
 
@@ -393,7 +394,7 @@ describe('weekModel', () => {
     const booked = (username: string, from = '08:00', to = '09:00') =>
       appointment({ appointmentId: `appt-${username}`, start: z(`2026-11-16T${from}`), end: z(`2026-11-16T${to}`), date: '2026-11-16', username, typeId: POOL, typeName: 'Swimming Pool' });
     const dayOf = (slots: ReturnType<typeof slot>[], appointments: ReturnType<typeof booked>[]) =>
-      weekModel(view('2026-11-16', { appointments }, [{ date: '2026-11-16', slots }]), 'admin').days[0]!;
+      weekModel(PAGE_TEXTS_EN, view('2026-11-16', { appointments }, [{ date: '2026-11-16', slots }]), 'admin').days[0]!;
 
     it('a slot with no appointment over it is drawn whole: no tab; an appointment with no slot under it leaves no room', () => {
       const day = dayOf([slot(3)], [booked('alice', '10:00', '11:00')]);
@@ -431,7 +432,7 @@ describe('weekModel', () => {
     // Monday 2026-11-16 in Rome, UTC+1: 10:00 local is 09:00Z. Each appointment a User of its own.
     const at = (from: string, to: string, username: string, typeName = 'Swimming Pool') =>
       appointment({ appointmentId: `appt-${username}`, start: z(`2026-11-16T${from}`), end: z(`2026-11-16T${to}`), date: '2026-11-16', username, typeId: POOL, typeName });
-    const dayOf = (appointments: ReturnType<typeof at>[], role: 'admin' | 'user' = 'admin') => weekModel(view('2026-11-16', { appointments }), role).days[0]!;
+    const dayOf = (appointments: ReturnType<typeof at>[], role: 'admin' | 'user' = 'admin') => weekModel(PAGE_TEXTS_EN, view('2026-11-16', { appointments }), role).days[0]!;
     const columns = (day: ReturnType<typeof dayOf>) => day.appointments.map((a) => [a.who, a.lane, a.lanes]);
     const shown = 600; // 08:00 to 18:00
 
@@ -535,7 +536,7 @@ describe('weekModel', () => {
     };
     const at = (from: string, to: string, username: string) =>
       appointment({ appointmentId: `appt-${username}`, start: z(`2026-11-16T${local(from)}`), end: to === '24:00' ? z('2026-11-16T23:00') : z(`2026-11-16T${local(to)}`), date: '2026-11-16', username, typeId: POOL, typeName: 'Swimming Pool' });
-    const dayOf = (appointments: ReturnType<typeof at>[], role: 'admin' | 'user' = 'admin', over: Partial<CalendarView> = {}) => weekModel(view('2026-11-16', { appointments, ...over }), role).days[0]!;
+    const dayOf = (appointments: ReturnType<typeof at>[], role: 'admin' | 'user' = 'admin', over: Partial<CalendarView> = {}) => weekModel(PAGE_TEXTS_EN, view('2026-11-16', { appointments, ...over }), role).days[0]!;
     const drawn = (day: ReturnType<typeof dayOf>) => day.appointments.map((a) => [a.who, a.time, a.top, a.height, a.lane, a.lanes]);
     const shown = 600; // 08:00 to 18:00
     const place = (from: number, tall: number) => [percent(from - 480, shown), percent(tall, shown)];
@@ -609,18 +610,18 @@ describe('weekModel', () => {
 
     it('a slot\'s tab follows the true times: the free slot after a short appointment is drawn whole, under the taller block\'s last minutes', () => {
       const slot = { start: z('2026-11-16T10:00'), end: z('2026-11-16T11:00'), typeId: POOL, capacity: 1, placesLeft: 1 };
-      const day = weekModel(view('2026-11-16', { appointments: [at('10:50', '10:55', 'alice')] }, [{ date: '2026-11-16', slots: [slot] }]), 'admin').days[0]!;
+      const day = weekModel(PAGE_TEXTS_EN, view('2026-11-16', { appointments: [at('10:50', '10:55', 'alice')] }, [{ date: '2026-11-16', slots: [slot] }]), 'admin').days[0]!;
       expect([day.slots[0]!.tab, day.appointments[0]!.beside, day.appointments[0]!.height]).toEqual([null, false, percent(15, shown)]);
     });
 
     it('in a half-hour zone and on the night the clocks go back, the drawn height is of the clock', () => {
       // Kolkata, UTC+5:30: 10:10–10:15 local is 04:40Z–04:45Z.
       const kolkata = appointment({ start: z('2026-11-16T04:40'), end: z('2026-11-16T04:45'), date: '2026-11-16' });
-      const india = weekModel(view('2026-11-16', { timeZone: 'Asia/Kolkata', appointments: [kolkata] }), 'user').days[0]!;
+      const india = weekModel(PAGE_TEXTS_EN, view('2026-11-16', { timeZone: 'Asia/Kolkata', appointments: [kolkata] }), 'user').days[0]!;
       expect([india.appointments[0]!.time, india.appointments[0]!.top, india.appointments[0]!.height]).toEqual(['10:10–10:15', percent(130, shown), percent(15, shown)]);
       // 2027-10-31 in Rome: 02:10–02:15 +01:00 is 01:10Z–01:15Z, the second 02:10 of the night.
       const late = appointment({ start: z('2027-10-31T01:10'), end: z('2027-10-31T01:15'), date: '2027-10-31' });
-      const night = weekModel(view('2027-10-25', { appointments: [late] }), 'user').days[6]!;
+      const night = weekModel(PAGE_TEXTS_EN, view('2027-10-25', { appointments: [late] }), 'user').days[6]!;
       // The hours shown widen to 02:00–18:00.
       expect([night.appointments[0]!.time, night.appointments[0]!.height]).toEqual(['02:10 +01:00 – 02:15 +01:00', percent(15, 960)]);
     });
