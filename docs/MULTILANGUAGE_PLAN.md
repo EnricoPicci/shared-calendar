@@ -2,7 +2,7 @@
 
 **Version:** v1 (2026-11-27): the plan, after the Product Owner's eight decisions of the brief
 and the answer to one question of planning (section 2). v2 (2026-11-27): phase A started with
-brief `prompts/lang-l03-phase-a-implementation.md`; step l1 done.
+brief `prompts/lang-l03-phase-a-implementation.md`; steps l1, l2 done.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -384,7 +384,18 @@ cold) answered in 0.81 s, the second in 0.04 s. Step l2 finds the branch green.
 - **Check:** the short check.
 - **Leaves for phase B:** the Italian names of days and months, for the review.
 
-**As done (step l2).** *Empty.*
+**As done (step l2).** Done 2026-11-27. `shared/src/language/`: `languages.ts`
+(`SUPPORTED_LANGUAGES`, the schema `Language`, `LANGUAGE_OWN_NAMES`, `readLanguage` for a
+stored value, `chooseLanguage` for a browser's list), `formats.ts` (the types `DateNames` and
+`DateFormats`, `dateNames(language)`, `dateFormats(language)`: `shortDate`,
+`shortDateWithYear`, `longDate`, `fullDate`, `weekLabel`, `weekdayName`), `formats.en.ts`,
+`formats.it.ts`. One writer serves every language, since L15 keeps one order of the parts; a
+language with another order would write its own. Moved onto it: `shared/src/mail/texts.ts`,
+the assistant's `texts.en.ts` and `texts.it.ts`, `backend/src/assistant/prompt.ts`;
+`ASSISTANT_LANGUAGES` and `AssistantLanguage` are now other names of the one list, until step
+l8. The page's `frontend/src/logic/texts.ts` still asks `Intl`: group l3a moves it. Tests: 28
+new in `shared/tests/language/` (shared 660); every existing test passed unchanged, English
+byte for byte the same (backend 2058, frontend 3165). Step l3a finds `dateFormats` ready.
 
 ### Step l3 — The page's mechanism, in seven groups
 

@@ -1,5 +1,5 @@
 import type { AppointmentStatus } from '../calendar/types';
-import { weekdayOf } from '../calendar/time';
+import { dateFormats } from '../language/formats';
 
 // The texts of the mails the mailer sends, in English (docs/EMAIL_ARCHITECTURE.md section 6.6 and
 // decision M17), as pure functions: each gives a subject, a plain-text body and an HTML body with
@@ -23,11 +23,8 @@ export type MineMailFacts = { from: string; to: string; appointments: MailLine[]
 /** The last line of every mail: `noreply@` receives nothing, the Reply-To does. */
 export const MAIL_FOOTER = "This is an automatic e-mail. Replies reach the calendar's Administrator.";
 
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-// A local date written short: "Tue 1 Dec 2026".
-const shortDate = (date: string) => `${WEEKDAYS[weekdayOf(date) - 1]} ${Number(date.slice(8, 10))} ${MONTHS[Number(date.slice(5, 7)) - 1]} ${date.slice(0, 4)}`;
+// A local date written short, with its year: "Tue 1 Dec 2026".
+const shortDate = dateFormats('en').shortDateWithYear;
 
 // "1 appointment", "3 appointments".
 const appointments = (count: number) => `${count} appointment${count === 1 ? '' : 's'}`;

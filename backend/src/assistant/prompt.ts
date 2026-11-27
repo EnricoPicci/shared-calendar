@@ -1,4 +1,4 @@
-import { localDateOf, localTimeOf, weekdayOf, type AssistantLanguage, type Role } from '@shared-calendar/shared';
+import { dateFormats, localDateOf, localTimeOf, type AssistantLanguage, type Role } from '@shared-calendar/shared';
 import { createHash } from 'node:crypto';
 import type { ToolDefinition } from '../lib/anthropic';
 
@@ -47,9 +47,9 @@ export function contextBlock(person: { username: string; role: Role }, timeZone:
   return `The person writing to you has the username "${person.username}" and is ${ROLE_NAMES[person.role]}. The calendar's time zone is ${timeZone}.`;
 }
 
-// Written out here, not taken from Intl: the line must read the same on every machine.
-const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+// The date in English words from shared/, not from Intl: the line must read the same on every
+// machine (docs/MULTILANGUAGE_ARCHITECTURE.md decision L10).
+const fullDate = dateFormats('en').fullDate;
 // A record, so that a supported language without its name does not compile.
 const LANGUAGE_NAMES: Record<AssistantLanguage, string> = { en: 'English', it: 'Italian' };
 
@@ -61,7 +61,7 @@ const LANGUAGE_NAMES: Record<AssistantLanguage, string> = { en: 'English', it: '
  */
 export function timeLine(now: string, timeZone: string, language: AssistantLanguage): string {
   const date = localDateOf(now, timeZone);
-  const day = `${WEEKDAYS[weekdayOf(date) - 1]} ${Number(date.slice(8, 10))} ${MONTHS[Number(date.slice(5, 7)) - 1]} ${date.slice(0, 4)}`;
+  const day = fullDate(date);
   const name = LANGUAGE_NAMES[language];
   return (
     `Now it is ${day} (${date}), ${localTimeOf(now, timeZone)}, in the calendar's time zone (${timeZone}). ` +

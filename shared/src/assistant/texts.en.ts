@@ -1,11 +1,8 @@
-import { weekdayOf } from '../calendar/time';
+import { dateFormats } from '../language/formats';
 import type { AppointmentSummary, AssistantSettingName, AssistantTexts, DayHours, HoursSummary, MailSummary, OverCapacity, PatternSummary, SettingChange, TypeEditSummary } from './texts';
 
-const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-// A local date written out in full: "Tuesday 24 November 2026".
-const fullDate = (date: string) => `${WEEKDAYS[weekdayOf(date) - 1]} ${Number(date.slice(8, 10))} ${MONTHS[Number(date.slice(5, 7)) - 1]} ${date.slice(0, 4)}`;
+// A local date written out in full, "Tuesday 24 November 2026", and the name of a weekday.
+const { fullDate, weekdayName } = dateFormats('en');
 
 // An existing appointment as a sentence names it: "the appointment of alice on Tuesday 24 November
 // 2026, from 10:00 to 11:00 (Visit)", without "of alice" when it is the person's own.
@@ -30,7 +27,7 @@ const settingChange = ({ setting, from, to }: SettingChange) => {
 // A weekly pattern as a sentence names it: "every Tuesday, from 09:00 to 12:00 (Visit), valid from
 // Tuesday 1 December 2026, with no end".
 const thePattern = ({ weekday, start, end, type, validFrom, validUntil }: PatternSummary) =>
-  `every ${WEEKDAYS[weekday - 1]}, from ${start} to ${end} (${type}), valid from ${fullDate(validFrom)}` + (validUntil === null ? ', with no end' : ` until ${fullDate(validUntil)}`);
+  `every ${weekdayName(weekday)}, from ${start} to ${end} (${type}), valid from ${fullDate(validFrom)}` + (validUntil === null ? ', with no end' : ` until ${fullDate(validUntil)}`);
 
 // Some hours in a list: "09:00–12:00 (Visit)".
 const hours = ({ start, end, type }: HoursSummary) => `${start}–${end} (${type})`;
