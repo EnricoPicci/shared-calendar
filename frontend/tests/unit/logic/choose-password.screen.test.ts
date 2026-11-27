@@ -21,7 +21,7 @@ function screenOf(state: LoginState = { status: 'idle' }) {
   const loginState$ = new BehaviorSubject<LoginState>(state);
   const choosePassword = vi.fn<ChoosePasswordCalls['choosePassword']>();
   const reset = vi.fn<ChoosePasswordCalls['reset']>();
-  const screen = new ChoosePasswordScreen({ loginState$, choosePassword, reset }, PAGE_TEXTS_EN);
+  const screen = new ChoosePasswordScreen({ loginState$, choosePassword, reset }, () => PAGE_TEXTS_EN);
   const states: ChoosePasswordState[] = [];
   screen.choose$.subscribe((s) => states.push(s)); // the view subscribes first
   return { screen, loginState$, choosePassword, reset, states, last: () => states.at(-1)! };

@@ -22,6 +22,9 @@
         <button class="primary" data-text="login.signIn"></button>
         <p class="error" role="alert"></p>
       </form>
+      <!-- The page's language, each language under its own name, filled by the script; hidden
+           while "Choose your password" is on show -->
+      <label class="language"><span data-text="login.language"></span> <select name="language"></select></label>
       <!-- "Choose your password" (src/views/choose-password.view.ts): an account whose password is
            temporary signs in, and chooses its own before it gets in. Two fields, each a .field
            with its hint; what the new password still misses is a list under it. The browser's

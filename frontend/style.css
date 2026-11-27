@@ -35,6 +35,8 @@ fieldset.clock label { min-width: 0; }
 /* After a change of password, until the next "Sign in" */
 .login .notice { margin: 0.75rem 0 0; color: #1b6e3c; }
 .login .notice:empty { display: none; }
+/* The choice of language, under the sign-in form: the label's words and the list on one line */
+.login .language { display: flex; align-items: center; gap: 0.5rem; margin-top: 1rem; font-size: 0.9rem; }
 /* "Choose your password", in place of the sign-in form: the login's narrow card, the password
    screen's fields */
 .first-password { display: grid; gap: 0.75rem; margin-top: 1rem; }

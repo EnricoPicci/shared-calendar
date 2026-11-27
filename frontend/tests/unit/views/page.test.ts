@@ -82,7 +82,8 @@ describe('index.html', () => {
     it('every field has its label: a <label> around it, with words of its own', () => {
       const fields = everywhere('input, select, textarea');
       // A start and an end are two lists each, an hour and a minute: five places, ten lists more.
-      expect(fields).toHaveLength(70);
+      // The sign-in screen's choice of language is one of them.
+      expect(fields).toHaveLength(71);
       for (const field of fields) {
         const label = field.closest('label');
         expect(label, field.getAttribute('name')!).not.toBeNull();

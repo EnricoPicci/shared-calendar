@@ -192,7 +192,7 @@ export function weekModel(texts: PageTexts, view: CalendarView, role: Role): Wee
     hours: Array.from({ length: (last - first) / 60 }, (_, i) => `${String(first / 60 + i).padStart(2, '0')}:00`),
     legend: [...typeNames]
       .map(([typeId, name]) => ({ name, colour: colourOf(typeId) }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'en')),
+      .sort((a, b) => a.name.localeCompare(b.name, texts.locale)),
     days: days.map((day) => {
       // A day in which the zone's offset changes: every time shown in it carries its offset.
       const offsetChanges = offsetChangesOn(day.date, zone);

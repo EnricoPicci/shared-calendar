@@ -42,9 +42,10 @@ try {
 // forwarded port of a Codespace). The sign-out everywhere after a change of password is skipped:
 // cognito-local does not implement GlobalSignOut (docs/ARCHITECTURE.md section 8). The padded
 // test language is offered: http://localhost:5173/?padded shows the page in it
-// (docs/MULTILANGUAGE_ARCHITECTURE.md section 6.3, rule 4).
+// (docs/MULTILANGUAGE_ARCHITECTURE.md section 6.3, rule 4). The default language is English: a
+// browser that names neither language shows the page in it.
 async function bundle() {
-  const config = { API_URL: '/api', COGNITO_URL: '/cognito/', CLIENT_ID: await clientId(), SKIP_GLOBAL_SIGN_OUT: true, TEST_LANGUAGE: true };
+  const config = { API_URL: '/api', COGNITO_URL: '/cognito/', CLIENT_ID: await clientId(), SKIP_GLOBAL_SIGN_OUT: true, TEST_LANGUAGE: true, DEFAULT_LANGUAGE: 'en' };
   const result = await build({ ...bundleOptions(config), sourcemap: 'inline', write: false });
   return result.outputFiles[0].text;
 }

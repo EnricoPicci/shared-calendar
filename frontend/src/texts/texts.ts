@@ -1,4 +1,6 @@
-import type { DateFormats, Role, UserStatus } from '@shared-calendar/shared';
+import type { DateFormats, Language, Role, UserStatus } from '@shared-calendar/shared';
+import { PAGE_TEXTS_EN } from './texts.en';
+import { PAGE_TEXTS_IT } from './texts.it';
 
 // The type of every text of the page (docs/MULTILANGUAGE_ARCHITECTURE.md section 5.1, decision
 // L8): one object per language has this type, so that a language with a text missing does not
@@ -303,7 +305,7 @@ export type HtmlTexts = {
     // The navigation's name for a screen reader.
     screens: string;
   };
-  login: { username: string; password: string; signIn: string };
+  login: { username: string; password: string; signIn: string; language: string };
   // "Choose your password": its sentence is two texts around the username.
   choose: { heading: string; aboutBefore: string; aboutAfter: string; submit: string };
   password: { heading: string; current: string; newPassword: string; newPasswordAgain: string; about: string; submit: string };
@@ -405,6 +407,9 @@ export type HtmlTexts = {
 };
 
 export type PageTexts = {
+  // The language the texts are in: no text, the order in which names are sorted in it (the
+  // week's legend). The padded test language keeps it as it is.
+  locale: Language;
   html: HtmlTexts;
   frame: FrameTexts;
   failures: FailureTexts;
@@ -422,6 +427,10 @@ export type PageTexts = {
   // The ways a date is written, from shared/ (docs/MULTILANGUAGE_ARCHITECTURE.md decision L10).
   dates: DateFormats;
 };
+
+// The page texts of each language the calendar speaks: a language of shared/'s list without its
+// texts does not compile (docs/MULTILANGUAGE_ARCHITECTURE.md section 5.3).
+export const PAGE_TEXTS: Record<Language, PageTexts> = { en: PAGE_TEXTS_EN, it: PAGE_TEXTS_IT };
 
 // The type of the length budgets (docs/MULTILANGUAGE_ARCHITECTURE.md section 6.3, rule 2): the
 // shape of the texts, partial, with the highest number of characters where a text stands in a

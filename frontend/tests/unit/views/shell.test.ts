@@ -2,6 +2,7 @@ import { BehaviorSubject, firstValueFrom, Observable, Subscription } from 'rxjs'
 import { PageLanguage } from '../../../src/logic/language';
 import { padded, PADDED_CLOSE, PADDED_OPEN } from '../../../src/texts/padded';
 import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
+import { PAGE_TEXTS } from '../../../src/texts/texts';
 import type { LoginState, Session } from '../../../src/services/login.types';
 import { LogoutService } from '../../../src/services/logout.service';
 import { SessionStore } from '../../../src/services/session.store';
@@ -16,9 +17,9 @@ import { find, loadPage, setTime, submit, timeIn, useRealPage } from './page';
 // LogoutService, and the global fetch a stub: entering the frame creates the real API services, whose first call
 // stays unanswered unless a test answers it.
 
-const CONFIG = { apiUrl: 'http://api.test', cognitoUrl: 'http://cognito.test/', clientId: 'client-123' };
-// The page in English, as the start-up makes it.
-const english = () => new PageLanguage({ language: 'en', texts: PAGE_TEXTS_EN });
+const CONFIG = { apiUrl: 'http://api.test', cognitoUrl: 'http://cognito.test/', clientId: 'client-123', defaultLanguage: 'en' as const, storage: null };
+// The page in English, as the start-up makes it, with a browser that remembers nothing.
+const english = () => new PageLanguage('en', (code) => PAGE_TEXTS[code], { read: () => null, write: () => {} });
 // A call that is never answered.
 const unanswered = () => new Promise<Response>(() => {});
 
@@ -40,6 +41,9 @@ const summary = (username: string, createdAt = '2026-11-01T10:00:00.000Z') => ({
 });
 // What a field of the page holds: its value, or for a checkbox, whose value never changes,
 // whether it is ticked.
+// Every field a person fills, the choice of the page's language left out: it holds the language
+// in use, which is no one's data.
+const FIELDS = 'textarea, select:not([name="language"]), input';
 const held = (field: HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement) => (field instanceof HTMLInputElement && field.type === 'checkbox' ? (field.checked ? 'ticked' : '') : field.value);
 
 let shell: Subscription | undefined;
@@ -240,7 +244,7 @@ describe('mountShell', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-19T10:00:00.000Z'));
     // The whole page as a person finds it: its source, and what every field holds.
-    const page = () => ({ source: html(), fields: [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held) });
+    const page = () => ({ source: html(), fields: [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>(FIELDS)].map(held) });
 
     // The Administrator, alone on a fresh page.
     mounted(ADMIN);
@@ -333,6 +337,50 @@ describe('runShell', () => {
       expect(find('#app .role').textContent).toBe('Administrator');
       expect(document.title).toBe('Shared calendar');
       expect(document.documentElement.lang).toBe('en');
+    });
+
+    // The language before sign-in (docs/MULTILANGUAGE_PLAN.md finding F11).
+    const storage = (held: Record<string, string> = {}) => ({ getItem: (key: string) => held[key] ?? null, setItem: vi.fn((key: string, value: string) => void (held[key] = value)) });
+    const browser = (languages: string[]) => vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(languages);
+    afterEach(() => vi.restoreAllMocks());
+
+    it('is the one this browser remembers, before the browser\'s own', () => {
+      browser(['en-US']);
+      shell = runShell({ ...CONFIG, storage: storage({ 'shared-calendar.language': 'it' }) });
+      expect([document.documentElement.lang, document.title, find('#login button').textContent]).toEqual(['it', 'Calendario condiviso', 'Accedi']);
+      expect(find<HTMLSelectElement>('#login [name="language"]').value).toBe('it');
+    });
+
+    it('is the browser\'s own when nothing is remembered: it-IT counts as Italian', () => {
+      browser(['fr-FR', 'it-IT']);
+      shell = runShell(CONFIG);
+      expect(document.documentElement.lang).toBe('it');
+    });
+
+    it('is the bundle\'s default when the browser names no language of the calendar', () => {
+      browser(['fr-FR']);
+      shell = runShell({ ...CONFIG, defaultLanguage: 'it' });
+      expect(document.documentElement.lang).toBe('it');
+      vi.restoreAllMocks();
+      browser(['de']);
+      shell.unsubscribe();
+      shell = runShell(CONFIG);
+      expect(document.documentElement.lang).toBe('en');
+    });
+
+    it('chosen on the sign-in screen: the page in it, remembered by this browser, and the frame entered in it', async () => {
+      browser(['en-GB']);
+      const held = storage();
+      shell = runShell({ ...CONFIG, storage: held });
+      const languages = find<HTMLSelectElement>('#login [name="language"]');
+      languages.value = 'it';
+      languages.dispatchEvent(new Event('change'));
+      expect([document.documentElement.lang, find('#login button').textContent]).toEqual(['it', 'Accedi']);
+      expect(held.setItem).toHaveBeenCalledWith('shared-calendar.language', 'it');
+      fetchMock.mockResolvedValueOnce(tokensFor('ada', 'admin'));
+      signIn('ada', 'Secret-Pass-1!');
+      await vi.waitFor(() => expect(find('#app').hidden).toBe(false));
+      expect([find('#app .sign-out').textContent, find('#app .role').textContent]).toEqual(['Esci', 'Amministratore']);
     });
 
     it('is English when the address asks for the padded language and the bundle offers none', () => {
@@ -468,7 +516,7 @@ describe('runShell', () => {
     expect(cognitoCalls()).toHaveLength(before + 1);
     expect(JSON.parse(String(cognitoCalls().at(-1)![1].body))).toEqual({ ClientId: 'client-123', Token: 'refresh-token' });
 
-    const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
+    const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>(FIELDS)].map(held);
     for (const left of ['alice', 'refresh-token', 'id-token', 'Secret-Pass-1!']) {
       expect(html()).not.toContain(left);
       expect(fields.join('\n')).not.toContain(left);
@@ -998,7 +1046,7 @@ describe('the navigation', () => {
 
       signOut.click();
       expect([banner().hidden, book().open, detail().open]).toEqual([true, false, false]);
-      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
+      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>(FIELDS)].map(held);
       expect(fields.every((value) => value === '')).toBe(true);
       for (const gone of ['bob', 'Bob\'s note', 'A private note', 'Typed in the detail', 'Mon 16 Nov', 'Studio']) expect(html()).not.toContain(gone);
       expect(html()).toBe(before);
@@ -1572,7 +1620,7 @@ describe('the navigation', () => {
       expect(detail().open).toBe(false);
       expect(rows()).toHaveLength(0);
       expect(find('#appointments').hidden).toBe(true);
-      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
+      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>(FIELDS)].map(held);
       expect(fields.every((value) => value === '')).toBe(true);
       for (const gone of ['alice', 'First lesson', 'A private note', 'Mon 7 Dec', 'Studio', 'Changed']) expect(html()).not.toContain(gone);
       expect(links()).toHaveLength(0);
@@ -1834,7 +1882,7 @@ describe('the navigation', () => {
       expect(html()).toContain('carol');
 
       signOut.click();
-      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
+      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>(FIELDS)].map(held);
       expect(fields.every((value) => value === '')).toBe(true);
       for (const gone of ['carol', 'Europe/Rome', 'must be', 'from 0 to 720', 'aria-invalid']) expect(html()).not.toContain(gone);
       expect(html()).toBe(before);
@@ -1948,7 +1996,7 @@ describe('the navigation', () => {
     const inviteText = (part: string) => find(`#users dialog.invite .${part}`).textContent;
     const remove = () => find<HTMLDialogElement>('#users dialog.delete');
     const current = () => links().map((a) => [a.textContent, a.getAttribute('aria-current')]);
-    const fields = () => [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
+    const fields = () => [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>(FIELDS)].map(held);
     // Whether a text is in the page's source, in a field or in the address.
     const anywhere = (text: string) => html().includes(text) || fields().some((value) => value.includes(text)) || window.location.href.includes(text);
     // The Administrator on the users' address, with the list read.
@@ -2288,7 +2336,7 @@ describe('the navigation', () => {
     };
     const dialog = (name: 'rename' | 'change' | 'delete') => one<HTMLDialogElement>(`dialog.${name}`);
     const current = () => links().map((a) => [a.textContent, a.getAttribute('aria-current')]);
-    const fields = () => [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
+    const fields = () => [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>(FIELDS)].map(held);
     const anywhere = (text: string) => html().includes(text) || fields().some((value) => value.includes(text));
     const MONDAY = 'Monday: 09:00 – 13:00 Studio';
     const TUESDAY = 'Tuesday: 15:00 – 18:00 Piscina';

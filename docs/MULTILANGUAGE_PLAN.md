@@ -2,7 +2,7 @@
 
 **Version:** v1 (2026-11-27): the plan, after the Product Owner's eight decisions of the brief
 and the answer to one question of planning (section 2). v2 (2026-11-27): phase A started with
-brief `prompts/lang-l03-phase-a-implementation.md`; steps l1, l2 and l3 done.
+brief `prompts/lang-l03-phase-a-implementation.md`; steps l1 to l4 done.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -630,7 +630,41 @@ everything fits; nothing for section 8.
   length goes into the list of section 7 with the longer one it replaced.
 - **Leaves for phase B:** the review of about 310 Italian texts; the Product Owner's look.
 
-**As done (step l4).** *Empty.*
+**As done (step l4).** Done 2026-11-27. Built: `frontend/src/texts/texts.it.ts`, every text of
+the page in Italian, formal "lei" in the sentences, the calendar's words those of the assistant's
+Italian texts ("orario settimanale", "orari propri del giorno", "finestra aggiuntiva", "tipo di
+appuntamento", "capienza"), every budget kept; `PAGE_TEXTS` in `texts.ts`, the record of the page
+texts by language over `shared/`'s list; `frontend/src/services/language-memory.ts`, one entry
+of `localStorage` handed in by `main.ts`, a refusing storage counting as empty;
+`firstLanguage` and `PageLanguage.choose` in `frontend/src/logic/language.ts` (memory, browser,
+default; a choice remembered, and given to the stream when it differs); the constant
+`DEFAULT_LANGUAGE` in the bundle (`en` when the build's environment gives none, `en` for the
+development server, a value not in the list stops the bundle; `scripts/bundle.mjs` holds the
+list of languages, held equal to `shared/`'s by its test); the choice on the sign-in screen
+under the form, each language under its own name and `lang`, hidden while "Choose your
+password" is on show; the shell filling the page again at each choice, the login view wording
+its notice and failure line again with what was typed kept. Decided while building:
+`PageTexts.locale`, the language of the texts, which the week's legend sorts its names in and
+the padded test language keeps as it is (a text of its own would have been padded into a
+locale that `localeCompare` refuses); "Choose your password" reads the texts of the language in
+use when it asks (it lives as long as the page, and the language can be chosen before it asks,
+never while it is on show). Tests: the texts' and the budgets' tests over both languages, the
+texts' language; the memory; the first language in each case of F11 (in the logic and through
+`runShell`); the choice (the page filled again, what was typed kept, the failure line and the
+notice worded again, hidden while a password is chosen, a value outside the list refused, the
+list emptied at the teardown); one known Italian sentence after the choice; the bundle's new
+constant; `page.test.ts`'s fields, 71; the shell's checks of fields left empty leave out the
+choice, which holds the language in use. frontend 3221 tests, 100 % lines; shared 660, backend
+2058. The look: the sign-in screen in English, Italian and padded; every screen in Italian at
+both widths, as the Administrator (the week, the book, detail and "E-mail…" dialogs, settings,
+users and the dialog of a deletion, availability with a single date, "This day only" and the
+dialog that confirms, "My details", "Password", the assistant's panel) and as alice (the week
+and the detail dialog, "My appointments" with a refused period). Nothing overflows. Of section
+8's three rows: the detail dialog wraps "Annulla l'appuntamento" to a second row as the padded
+English did; "Pieno" fits its tab; a row of "Users" keeps its buttons on one line at 390. Found
+and mended in the look: "suo", "sue" for a user's or a day's things (read as "yours" beside
+the "lei"), and a gendered "disconnesso". Seventeen wordings for section 7, one row for
+section 8 (the weekdays in lower case as headings).
 
 ### Step l5 — The person's language
 
@@ -913,7 +947,22 @@ Kept by Claude Code while the work runs (decision 5); read first in phase B, ite
 
 | Step | Where (the key, or the mail) | English | Italian chosen | Alternatives weighed, and why this one |
 |---|---|---|---|---|
-| | | | | |
+| l4 | Every button: `html.login.signIn`, `html.frame.signOut`, `html.common.save`, `close`, `edit`, `delete`, … | Sign in, Sign out, Save, Close, Edit, Delete | Accedi, Esci, Salva, Chiudi, Modifica, Elimina | The formal "lei" would be "Acceda", "Esca", "Salvi"; the infinitive "Accedere", "Salvare" is heavy on a button. The short verb is what Italian pages put on a button, also where their sentences say "lei"; the sentences here say "lei" throughout. To confirm as the rule (decision L14 speaks of the sentences). |
+| l4 | `html.choose.heading`, `html.choose.submit` | Choose your password / Choose password | Scelga la sua password / Scegli la password | The heading is a sentence ("lei"), the button a button (the rule above). If the mix reads oddly side by side: "Imposta la password" on the button. |
+| l4 | `frame.nav.appointments` | My appointments | Appuntamenti | "I miei appuntamenti" is 19 characters, over the budget of 18 for a link of the navigation; "I miei dati" keeps "miei" beside it. |
+| l4 | `html.common.cancel` | Cancel | Annulla | Used in the dialogs that do not touch an appointment (the first password, a user's Edit, "My details"). The assistant avoids "Annulla" because it would read as cancelling an appointment; here the detail dialog's button is "Annulla l'appuntamento", in another dialog. Alternative: "Lascia stare". |
+| l4 | `html.users.keep` (the two dialogs that confirm a deletion) | Keep | Mantieni | "Non eliminare" is clearer beside "Elimina utente", but does not fit "Not available on this day" and "Back to the weekly patterns", which the same dialog asks. "Lascia stare" is colloquial. |
+| l4 | `html.availability.confirmTitle` | Please confirm | Confermi | "Conferma richiesta" reads as "confirmation requested", "Confermare?" as a question without its object. |
+| l4 | `html.week.keep` | Keep the appointment as it is | Lascia l'appuntamento com'è | A button: the short verb (the first row). |
+| l4 | `appointment.you`, `appointment.byYou`, `assistant.who.person` | You / you | Lei / lei | "Per: Lei", "Prenotato da lei il …", the name over the person's own message. "Io" or "Tu" would break the "lei". |
+| l4 | `week.full`, `week.free`, `week.tabLeft` | Full, free, 2 left | Pieno, libero, 2 liberi | Agreeing with "orario" (masculine); "1 libero" for one place. Within the budget of 8. |
+| l4 | `availability.inTheWay` | 1 appointment is in the way: | 1 appuntamento è d'ostacolo: | "impedisce la modifica" is longer and says less of what follows (the list). |
+| l4 | `html.availability.remove`, `date.removeLabel` | Remove | Togli | "Rimuovi" is the usual word on a computer; "Togli" is the plainer one and shorter in the row of a window. Either is right. |
+| l4 | `html.book.hour`, `html.book.minute` (read only by a screen reader) | Hour, Minute | Ora, Minuti | "Ora" also means "now"; it stands before a list of hours, so the meaning is clear. "Ore" is the alternative. |
+| l4 | `html.password.about` | After the change you are signed out, here and on every other device, and sign in again… | Dopo la modifica la sessione si chiude, qui e su ogni altro dispositivo, e si accede di nuovo… | "viene disconnesso" says a gender the page does not know; the impersonal says the same without it. |
+| l4 | `users.deleteQuestion`, `availability.deletePattern`, `date.deleteExtraQuestion`, `date.closeQuestion`, `date.reopenQuestion`, `failures.patternsBackOverlap` | Their / Its | di alice / Quelle ore / del giorno | "suoi", "sue" for a user's or a day's things reads as "yours" next to the "lei": the owner is named instead. |
+| l4 | `settings.lastSaved`, `appointment.bookedBy` | Last saved by admin on Fri 27 Nov, 11:57 | Salvate l'ultima volta da admin il ven 27 nov, 11:57 | The date and the time come as one value of the shared formats; "alle 11:57" would need them apart. |
+| l4 | `html.frame.screens` (the navigation's name for a screen reader) | Screens | Pagine | "Schermate" is the literal word, longer and less used. |
 
 ## 8. What was seen on the screens and not settled
 
@@ -925,6 +974,7 @@ phase B, item 3.
 | l3c | The detail dialog, 390 and 1280, padded | Its three buttons ("Close", "Change", "Cancel appointment") take two rows: "Cancel appointment" goes alone to the second, right-aligned. In English they take one. | Nothing: the wrap is the style sheet's, clean and readable. | Look again in Italian in item 3 ("Annulla appuntamento" is about as long as the padded English); keep the wrap if it reads as well. |
 | l3c | The week, a slot's narrow tab beside appointments, 1280, padded | "⟦Full··⟧" fills the narrow tab and its last marks are cut. | Nothing: the tab is a few characters wide by design; the budget of 8 characters binds the real languages (`week.full`, `week.tabLeft`). | Nothing, unless the Italian ("Pieno", "2 liberi") is cut too. |
 | l3d | "Users", a row of the list, 1280, padded | "⟦Delete··⟧" goes to a second line of the row, under the username. | Nothing: the row wraps by the style sheet and stays readable. | Look in Italian ("Elimina", "Invita di nuovo" beside "Modifica"); keep the wrap if it reads well. |
+| l4 | "Availability", the weekdays of the pattern form's list and the headings of the patterns' groups, both widths, Italian | "lunedì", "martedì" in lower case, as Italian writes them inside a sentence; as a heading and in a list they read better with a capital. | Nothing: the names are `shared/`'s, for sentences, the same the assistant and the mails use. | A capital at the start of a heading or a list item, for every language alike (rule 1 of the architecture's section 6.3): a `::first-letter` rule of the style sheet on those two places, or a capitalised form beside the sentence form in `shared/`. |
 
 ## 9. Beside the other work
 

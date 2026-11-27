@@ -6,6 +6,7 @@ const GENERAL = 'Something went wrong. Please try again.';
 // The texts of the page in English. The failures' sentences say what the person can do next; the
 // notes beside them say why a sentence reads as it does.
 export const PAGE_TEXTS_EN: PageTexts = {
+  locale: 'en',
   html: {
     common: {
       cancel: 'Cancel',
@@ -23,7 +24,7 @@ export const PAGE_TEXTS_EN: PageTexts = {
       retry: 'Try again',
     },
     frame: { title: 'Shared calendar', signOut: 'Sign out', screens: 'Screens' },
-    login: { username: 'Username', password: 'Password', signIn: 'Sign in' },
+    login: { username: 'Username', password: 'Password', signIn: 'Sign in', language: 'Language' },
     choose: {
       heading: 'Choose your password',
       aboutBefore: 'You signed in as',

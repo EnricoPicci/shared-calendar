@@ -46,14 +46,21 @@ export class ChoosePasswordScreen {
   private readonly state: BehaviorSubject<ChoosePasswordState>;
   readonly choose$: Observable<ChoosePasswordState>;
 
-  // `texts` are the page texts of the language in use, kept for the screen's life
-  // (docs/MULTILANGUAGE_PLAN.md decision D2).
+  // `textsOf` gives the page texts of the language in use. The screen lives as long as the page,
+  // and the language may be chosen on the sign-in screen before it asks for a password; it is
+  // never chosen while the screen is on show (docs/MULTILANGUAGE_PLAN.md finding F4), so every
+  // sentence of one asking is in one language.
   constructor(
     private readonly login: ChoosePasswordCalls,
-    private readonly texts: PageTexts,
+    private readonly textsOf: () => PageTexts,
   ) {
-    this.state = new BehaviorSubject(nothing(texts));
+    this.state = new BehaviorSubject(nothing(textsOf()));
     this.choose$ = this.state.asObservable();
+  }
+
+  // The page texts of the language in use now.
+  private get texts(): PageTexts {
+    return this.textsOf();
   }
 
   // Called once the view has subscribed (docs/FRONTEND_ARCHITECTURE.md section 5, rule 5): from

@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { pad, PADDED_CLOSE, PADDED_OPEN, padded } from '../../../src/texts/padded';
-import { PAGE_TEXT_BUDGETS, type PageTexts } from '../../../src/texts/texts';
+import { SUPPORTED_LANGUAGES } from '@shared-calendar/shared';
+import { PAGE_TEXT_BUDGETS, PAGE_TEXTS, type PageTexts } from '../../../src/texts/texts';
 import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // The checks of the page texts (docs/MULTILANGUAGE_ARCHITECTURE.md section 5.2): every text is
@@ -9,7 +10,7 @@ import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // The languages of the page, each with its texts. The padded test language is not one of them: a
 // budget does not bind it.
-const LANGUAGES: [string, PageTexts][] = [['en', PAGE_TEXTS_EN]];
+const LANGUAGES: [string, PageTexts][] = SUPPORTED_LANGUAGES.map((code) => [code, PAGE_TEXTS[code]]);
 
 // The sample values each function text is called with, by its path: a new function text needs
 // its line here, or the test that every function answers fails.
@@ -106,6 +107,10 @@ describe('the page texts', () => {
     }
   });
 
+  it.each(LANGUAGES)('%s: the texts say which language they are in', (language, texts) => {
+    expect(texts.locale).toBe(language);
+  });
+
   it('every sample is for a function text that exists', () => {
     const functions = leaves(PAGE_TEXTS_EN).filter((l) => typeof l.value === 'function').map((l) => l.path);
     expect(Object.keys(SAMPLES).sort()).toEqual(functions.sort());
@@ -140,7 +145,9 @@ describe('the padded test language (6.3)', () => {
   it('marks every text of the English page, a string or a function\'s answer, and keeps the shape', () => {
     const marked = leaves(padded(PAGE_TEXTS_EN));
     expect(marked.map((leaf) => leaf.path)).toEqual(leaves(PAGE_TEXTS_EN).map((leaf) => leaf.path));
-    for (const leaf of marked) expect(textOf(leaf), leaf.path).toMatch(new RegExp(`^${PADDED_OPEN}[^]+·+${PADDED_CLOSE}$`));
+    // The language of the texts is no text: it is kept, so that names are still sorted in it.
+    expect(padded(PAGE_TEXTS_EN).locale).toBe('en');
+    for (const leaf of marked.filter((leaf) => leaf.path !== 'locale')) expect(textOf(leaf), leaf.path).toMatch(new RegExp(`^${PADDED_OPEN}[^]+·+${PADDED_CLOSE}$`));
     expect(padded(PAGE_TEXTS_EN).dates.shortDate('2026-11-16')).toBe(pad('Mon 16 Nov'));
   });
 
@@ -150,16 +157,16 @@ describe('the padded test language (6.3)', () => {
   });
 });
 
-// The logic layer and the views take the texts of the language in use, handed in: only the
-// shell, which starts the page in a language, takes the English texts straight.
-describe('the files that take the English texts straight', () => {
+// The logic layer and the views take the texts of the language in use, handed in; the shell takes
+// them from the record of the languages. None takes one language's texts straight.
+describe('the files that take one language\'s texts straight', () => {
   const SRC = `${import.meta.dirname}/../../../src`;
   const inFolder = (folder: string) =>
     readdirSync(`${SRC}/${folder}`)
-      .filter((name) => name.endsWith('.ts') && readFileSync(`${SRC}/${folder}/${name}`, 'utf8').includes("from '../texts/texts.en'"))
+      .filter((name) => name.endsWith('.ts') && /from '\.\.\/texts\/texts\.[a-z]+'/.test(readFileSync(`${SRC}/${folder}/${name}`, 'utf8')))
       .map((name) => `${folder}/${name}`);
 
-  it('are the shell alone', () => {
-    expect([...inFolder('logic'), ...inFolder('views')]).toEqual(['views/shell.ts']);
+  it('are none', () => {
+    expect([...inFolder('logic'), ...inFolder('views')]).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-import type { Role } from '@shared-calendar/shared';
+import type { Language, Role } from '@shared-calendar/shared';
 import { fromEvent, merge, Subscription } from 'rxjs';
 import { distinctUntilChanged, filter, map, startWith } from 'rxjs/operators';
 import { AppointmentsScreen } from '../logic/appointments.screen';
@@ -7,15 +7,15 @@ import { AvailabilityScreen } from '../logic/availability.screen';
 import { ChoosePasswordScreen } from '../logic/choose-password.screen';
 import { DateScreen } from '../logic/date.screen';
 import { DailyMailScreen } from '../logic/daily-mail.screen';
-import { PageLanguage } from '../logic/language';
+import { firstLanguage, PageLanguage } from '../logic/language';
 import { MailScreen } from '../logic/mail.screen';
 import { MeScreen } from '../logic/me.screen';
 import { PasswordScreen } from '../logic/password.screen';
 import { SettingsScreen } from '../logic/settings.screen';
 import { UsersScreen } from '../logic/users.screen';
 import { WeekScreen } from '../logic/week.screen';
-import { PAGE_TEXTS_EN } from '../texts/texts.en';
-import type { FrameTexts, PageTexts } from '../texts/texts';
+import { PAGE_TEXTS, type FrameTexts, type PageTexts } from '../texts/texts';
+import { LanguageMemory, type LanguageStorage } from '../services/language-memory';
 import type { ApiConfig } from '../services/api';
 import { AppointmentsService } from '../services/appointments.service';
 import { AssistantService } from '../services/assistant.service';
@@ -58,9 +58,18 @@ import { mountWeek } from './week.view';
 // section 8, decision 67). It is skipped only when `skipGlobalSignOut` is true, so that a
 // configuration without it always signs out.
 // `testLanguage`, given only by the development server's bundle, makes the padded test language
-// out of the English texts; the page is then shown in it when its address asks for it with
+// out of a language's texts; the page is then shown in it when its address asks for it with
 // `?padded` (docs/MULTILANGUAGE_ARCHITECTURE.md section 6.3, rule 4).
-export type AppConfig = ApiConfig & CognitoConfig & { skipGlobalSignOut?: boolean; testLanguage?: (english: PageTexts) => PageTexts };
+// `defaultLanguage` is the bundle's, the page's language when neither this browser's memory nor
+// its own languages name one the calendar speaks; `storage` is the browser's, where the language
+// chosen is remembered, or null where it cannot be had (docs/MULTILANGUAGE_PLAN.md finding F11).
+export type AppConfig = ApiConfig &
+  CognitoConfig & {
+    skipGlobalSignOut?: boolean;
+    testLanguage?: (texts: PageTexts) => PageTexts;
+    defaultLanguage: Language;
+    storage: LanguageStorage | null;
+  };
 
 // What the shell needs of the configuration for each session: the API's address for the API
 // services, Cognito's and the skip value for the change of password.
@@ -76,7 +85,8 @@ export type LogoutDeps = Pick<LogoutService, 'logout'>;
 
 export type ShellDeps = {
   config: ShellConfig; // where the API and Cognito are, for the services of each session
-  // The page's language: the page is filled from its texts before anything is shown.
+  // The page's language: the page is filled from its texts before anything is shown, and again
+  // when the person chooses another on the sign-in screen.
   language: PageLanguage;
   // The whole store: an API service reads the token from it at the moment of each call
   // (docs/FRONTEND_SERVICES.md section 2, rule 9). The shell itself uses `session$` only.
@@ -314,15 +324,18 @@ export const SCREENS: readonly Screen[] = [
 // puts back to their first state at a sign-out. It is not ended with the shell: a request that
 // tells Cognito of a sign-out ends by itself (docs/FRONTEND_SERVICES.md section 8, decision 48).
 export function runShell(config: AppConfig): Subscription {
-  // English, or the padded test language when the development server's page asks for it.
+  // The language this browser remembers, else its own, else the bundle's; its texts padded when
+  // the development server's page asks for the padded test language.
   const padded = config.testLanguage !== undefined && window.location.search === '?padded';
-  const language = new PageLanguage({ language: 'en', texts: padded ? config.testLanguage!(PAGE_TEXTS_EN) : PAGE_TEXTS_EN });
+  const memory = new LanguageMemory(config.storage);
+  const first = firstLanguage(memory.read(), window.navigator.languages, config.defaultLanguage);
+  const language = new PageLanguage(first, (code) => (padded ? config.testLanguage!(PAGE_TEXTS[code]) : PAGE_TEXTS[code]), memory);
   const store = new SessionStore();
   const login = new LoginService(config, store);
   const refresh = new RefreshService(config, store);
   const logout = new LogoutService(config, store, [login, refresh]);
   // Lives as long as the page, as the LoginService it follows does.
-  const choose = new ChoosePasswordScreen(login, language.state.texts);
+  const choose = new ChoosePasswordScreen(login, () => language.state.texts);
   refresh.start();
   const subscription = mountShell(document.body, { config, language, store, login, choose, logout, pageWide: [login, refresh] });
   subscription.add(() => refresh.stop());
@@ -332,8 +345,6 @@ export function runShell(config: AppConfig): Subscription {
 // Shows the login or the frame at every change of person, and in the frame the screen of the
 // address. `root` holds the elements #login and #app of index.html.
 export function mountShell(root: HTMLElement, { config, language, store, login, choose, logout, pageWide = [], screens: table = SCREENS }: ShellDeps): Subscription {
-  const { texts } = language.state;
-  fillPage(root.ownerDocument, texts.html, language.state.language);
   const find = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
   const loginRoot = find('#login');
   const frame = find('#app');
@@ -349,13 +360,14 @@ export function mountShell(root: HTMLElement, { config, language, store, login, 
   find('#app .sign-out').onclick = () => logout.logout();
 
   // What the login says the next time it is shown: "Password changed" after a change, set below
-  // and given to the login view once.
-  let notice = '';
+  // and given to the login view once, in the words of the language in use.
+  let notice = (_texts: PageTexts) => '';
 
   // The frame for one person: the header and the navigation are filled here and emptied when
   // the person leaves, and whatever belongs to this person's session ends with the subscription
   // returned (docs/FRONTEND_ARCHITECTURE.md section 6, points 4 to 6).
   const enter = (person: Person): Subscription => {
+    const { texts } = language.state;
     username.textContent = person.username;
     role.textContent = texts.frame.roles[person.role];
     const objects = sessionObjects(config, store, person, texts);
@@ -385,7 +397,7 @@ export function mountShell(root: HTMLElement, { config, language, store, login, 
     // above: its result stream has nothing earlier to replay.
     const changed = objects.changes.changePasswordResult$.pipe(filter((result) => result.status === 'success')).subscribe(() => {
       pageWide.forEach((service) => service.reset());
-      notice = texts.password.changed;
+      notice = (words) => words.password.changed;
     });
 
     // The screen on show, with its logic object.
@@ -434,7 +446,7 @@ export function mountShell(root: HTMLElement, { config, language, store, login, 
   // The login view, with "Choose your password" beside it when given: view first, then its logic
   // object (docs/FRONTEND_ARCHITECTURE.md section 3, rule 8).
   const showLogin = (): Subscription => {
-    const shown = mountLogin(loginRoot, login, texts, notice);
+    const shown = mountLogin(loginRoot, login, language, notice);
     if (choose) {
       shown.add(mountChoosePassword(loginRoot, choose));
       shown.add(choose.start());
@@ -444,6 +456,10 @@ export function mountShell(root: HTMLElement, { config, language, store, login, 
 
   // What is on screen: the login view, or one person's frame.
   let current: Subscription | undefined;
+
+  // The page's fixed texts and its `<html lang>`, from the language in use: first before anything
+  // is shown, again at each language chosen on the sign-in screen.
+  const filled = language.state$.subscribe((state) => fillPage(root.ownerDocument, state.texts.html, state.language));
 
   const subscription = store.session$
     .pipe(
@@ -458,12 +474,13 @@ export function mountShell(root: HTMLElement, { config, language, store, login, 
       loginRoot.hidden = person !== null;
       frame.hidden = person === null;
       current = person === null ? showLogin() : enter(person);
-      notice = ''; // said once
+      notice = () => ''; // said once
     });
 
   // Ending the shell leaves whatever is on screen and hides both.
   subscription.add(() => {
     current?.unsubscribe();
+    filled.unsubscribe();
     loginRoot.hidden = true;
     frame.hidden = true;
   });
