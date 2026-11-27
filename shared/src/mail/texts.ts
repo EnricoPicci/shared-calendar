@@ -6,8 +6,8 @@ import { MAIL_TEXTS_IT } from './texts.it';
 // The texts of the mails the mailer sends and of the Excel files it attaches, in each language of
 // the calendar (docs/MULTILANGUAGE_ARCHITECTURE.md section 8, docs/EMAIL_ARCHITECTURE.md section
 // 6.6 and decision M17). A mail is a subject, a plain-text body and an HTML body with the same
-// words, marked with its language. The invitation is not here: Cognito sends it from the pool's
-// own template.
+// words, marked with its language. The invitation is Cognito's mail, worded here and answered to
+// Cognito by the invitation function (docs/MULTILANGUAGE_ARCHITECTURE.md section 7).
 
 /** One mail's words. */
 export type MailText = { subject: string; text: string; html: string };
@@ -28,6 +28,9 @@ export type MineMailFacts = { from: string; to: string; appointments: MailLine[]
 export const EXCEL_COLUMNS = ['date', 'start', 'end', 'type', 'username', 'givenName', 'familyName', 'status', 'cancelReason', 'note', 'bookedAt'] as const;
 export type ExcelColumn = (typeof EXCEL_COLUMNS)[number];
 
+/** The invitation: where Cognito puts the username and the temporary password, and the page's address. */
+export type InvitationFacts = { username: string; password: string; page: string };
+
 /** A mail before it is put together: its subject, its paragraphs, and the items of a list after the first paragraph. */
 export type MailParts = { subject: string; paragraphs: string[]; items?: string[] };
 
@@ -36,6 +39,16 @@ export type MailParts = { subject: string; paragraphs: string[]; items?: string[
 export type MailTexts = {
   // The last line of every mail: `noreply@` receives nothing, the Reply-To does.
   footer: string;
+  // The invitation's words, put together around the username, the password and the page's link.
+  invitation: {
+    subject: string;
+    hello: string;
+    username: string;
+    password: string;
+    // The sentence that holds the page's link: the words before it and after it.
+    signIn: { before: string; after: string };
+    unexpected: string;
+  };
   // The three mails, from their facts.
   daily: (facts: DailyMailFacts) => MailParts;
   calendar: (facts: CalendarMailFacts) => MailParts;
@@ -79,6 +92,25 @@ function mail(language: Language, { subject, paragraphs, items }: MailParts): Ma
   const text = [first!, ...textList, ...rest].join('\n\n') + '\n';
   const html = `<div lang="${language}">${[`<p>${escapeHtml(first!)}</p>`, ...htmlList, ...rest.map((p) => `<p>${escapeHtml(p)}</p>`)].join('\n')}</div>`;
   return { subject, text, html };
+}
+
+/**
+ * The invitation, a subject and an HTML body: Cognito sends no plain text with it. The username and
+ * the password are what Cognito gives in their place, `{username}` and `{####}`, which it fills in
+ * after; the password never passes through this code.
+ */
+export function invitationMailText(language: Language, { username, password, page }: InvitationFacts): { subject: string; html: string } {
+  const words = mailTexts(language);
+  const { invitation: say } = words;
+  const link = `<a href="${escapeHtml(page)}">${escapeHtml(page)}</a>`;
+  const paragraphs = [
+    escapeHtml(say.hello),
+    `${escapeHtml(say.username)}: ${escapeHtml(username)}<br>${escapeHtml(say.password)}: ${escapeHtml(password)}`,
+    `${escapeHtml(say.signIn.before)}${link}${escapeHtml(say.signIn.after)}`,
+    escapeHtml(say.unexpected),
+    escapeHtml(words.footer),
+  ];
+  return { subject: say.subject, html: `<div lang="${language}">${paragraphs.map((p) => `<p>${p}</p>`).join('\n')}</div>` };
 }
 
 /** The daily mail to the Administrator, with its two files (docs/EMAIL_ARCHITECTURE.md section 6.3). */

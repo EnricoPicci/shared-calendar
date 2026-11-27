@@ -169,6 +169,14 @@ Resources:
               <p>If you did not expect this e-mail, ignore it.</p>
               <p>This is an automatic e-mail. Replies reach the calendar's Administrator.</p>
           - !Ref AWS::NoValue
+      # At MailStage 'on' the invitation's words come from the invitation function below, in the
+      # installation's language (docs/MULTILANGUAGE_ARCHITECTURE.md section 7): Cognito's "custom
+      # message" trigger, which Cognito calls before it e-mails an invitation or its resend. The
+      # English template above stays as what Cognito sends when the function's answer is unusable.
+      LambdaConfig: !If
+        - MailOn
+        - CustomMessage: !GetAtt InviteMessageFunction.Arn
+        - !Ref AWS::NoValue
       # A temporary password (an invitation's) is refused after 7 days; set at MailStage 'on' only,
       # where invitations are sent (docs/EMAIL_ARCHITECTURE.md section 5.1). AWS's CloudFormation
       # reference for PasswordPolicy (aws-properties-cognito-userpool-passwordpolicy.html):
@@ -3557,6 +3565,76 @@ Resources:
                 Action:
                   - dynamodb:PutItem
                 Resource: !GetAtt MailTable.Arn
+
+  # The invitation function (docs/MULTILANGUAGE_ARCHITECTURE.md section 7), at MailStage 'on' only,
+  # where invitations are sent. Cognito calls it before it e-mails an invitation, and it answers the
+  # subject and the body in the installation's language (DEFAULT_LANGUAGE), with the page's address
+  # (PAGE_ADDRESS). It receives the username and the temporary password as placeholders, never as
+  # values. It belongs to no route and calls no AWS service.
+  InviteMessageFunction:
+    Type: AWS::Serverless::Function
+    Condition: MailOn
+    Properties:
+      Handler: inviteMessage.handler
+      Role: !GetAtt InviteMessageRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref InviteMessageLogGroup
+      Environment:
+        Variables:
+          DEFAULT_LANGUAGE: !Ref DefaultLanguage
+          PAGE_ADDRESS: !Ref PageAddress
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Format: esm
+        OutExtension:
+          - .js=.mjs
+        Sourcemap: true
+        EntryPoints:
+          - src/handlers/inviteMessage.ts
+
+  InviteMessageLogGroup:
+    Type: AWS::Logs::LogGroup
+    Condition: MailOn
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AWS::StackName}-invite-message
+      RetentionInDays: 14
+
+  # The invitation function's role: it may write its own logs and nothing else.
+  InviteMessageRole:
+    Type: AWS::IAM::Role
+    Condition: MailOn
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: write-own-logs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${InviteMessageLogGroup}:log-stream:*
+
+  # Lets Cognito call the invitation function, for this user pool only.
+  InviteMessagePermission:
+    Type: AWS::Lambda::Permission
+    Condition: MailOn
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt InviteMessageFunction.Arn
+      Principal: cognito-idp.amazonaws.com
+      SourceArn: !GetAtt UserPool.Arn
+      SourceAccount: !Ref AWS::AccountId
 
   # The hourly timer of the daily mail (docs/EMAIL_ARCHITECTURE.md decision M14): at minute 0 of
   # every hour, in UTC, EventBridge Scheduler starts the mailer with the event {"kind":"daily"}, in

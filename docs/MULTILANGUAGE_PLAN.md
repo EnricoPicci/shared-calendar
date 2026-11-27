@@ -2,7 +2,7 @@
 
 **Version:** v1 (2026-11-27): the plan, after the Product Owner's eight decisions of the brief
 and the answer to one question of planning (section 2). v2 (2026-11-27): phase A started with
-brief `prompts/lang-l03-phase-a-implementation.md`; steps l1 to l6 done.
+brief `prompts/lang-l03-phase-a-implementation.md`; steps l1 to l7 done.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -841,7 +841,32 @@ wordings for section 7.
   function fails the creation cleanly, are for the cloud (the smoke test and one invitation
   looked at by hand).
 
-**As done (step l7).** *Empty.*
+**As done (step l7).** Done 2026-11-27. Built: `backend/src/handlers/inviteMessage.ts`, the
+"custom message" trigger: for `CustomMessage_AdminCreateUser` the subject and the HTML body of
+`invitationMailText` (new in `shared/src/mail/texts.ts`, the words in `texts.en.ts`, those of
+the pool's template, and `texts.it.ts`), in the language of `locale` by `readLanguage`, else
+`DEFAULT_LANGUAGE`, else English; Cognito's `usernameParameter` and `codeParameter` put in as
+they come; `PAGE_ADDRESS` for the link; any other source answered untouched; no AWS SDK; one log
+line, the source, the language's code and the outcome. `backend/template.yaml`, all at
+`MailStage` `on` (the condition `MailOn`, where invitations are sent):
+`InviteMessageFunction` (no route, variables `DEFAULT_LANGUAGE` and `PAGE_ADDRESS`),
+`InviteMessageLogGroup`, `InviteMessageRole` (its own log streams only, no wildcard action),
+`InviteMessagePermission` (`lambda:InvokeFunction` for `cognito-idp.amazonaws.com`, `SourceArn`
+the pool and `SourceAccount` the account), and `LambdaConfig.CustomMessage` on the pool;
+`InviteMessageTemplate` kept in English as Cognito's fallback. `backend/scripts/local-seed.sh`
+unchanged: `env.local.json` needs no entry for a function nothing calls locally. Tests: the
+function (English by default; `DEFAULT_LANGUAGE` at `it` with none and with a word not in the
+list; a person's own language over the default both ways; each placeholder once, the body
+within 20 000 characters and the subject within 140; another source untouched; the log line
+without an attribute, a name, an address or a word of the mail; no page address and no username
+placeholder); the invitation's texts in both languages (the English exactly, each placeholder
+once, the limits, `lang`, a page address with markup escaped). shared 670 tests, backend 2077,
+frontend 3259; 100 % lines; `sam validate --lint` passes. The template holds 39 functions.
+**The measure of F9**: after the build and a restart, `local:api` listened after 9 s; the first
+`POST /hello` as `alice`, both containers cold, answered in 0.83 s (step l1: 0.81 s), the second
+in 0.03 s: no stall, no slowdown. The invitation's block of
+`frontend/tests/integration/login.service.test.ts`, run alone with `local:lambda` up: 4 passed.
+No journey and no screen changed. One wording for section 7.
 
 ### Step l8 — The assistant
 
@@ -1039,6 +1064,7 @@ Kept by Claude Code while the work runs (decision 5); read first in phase B, ite
 | l4 | `html.frame.screens` (the navigation's name for a screen reader) | Screens | Pagine | "Schermate" is the literal word, longer and less used. |
 | l6 | The daily mail's first sentence, `shared/src/mail/texts.it.ts` | The next 7 days hold 0 appointments. | Nei prossimi 7 giorni ci sono 0 appuntamenti. | "non ci sono appuntamenti" reads better for none; kept the number, as the English does, so the two say the same. |
 | l6 | The reasons of a cancellation in the files, `texts.it.ts` | cancelled, changed, user deleted | annullato, spostato, utente eliminato | "modificato" for `changed` is closer to the code; "spostato" says what a change does to an appointment. The heading "Motivo dell'annullamento" over "annullato" repeats itself; "dalla persona" would be longer. |
+| l7 | The invitation, `shared/src/mail/texts.it.ts` | Your account on the shared calendar; Hello, an account was created for you; … choose your own password | Il suo account sul calendario condiviso; Buongiorno, è stato creato un account per lei; … scegliere una password sua | "Gentile utente" would greet without knowing the person's name or gender; "Buongiorno" says neither. "una password sua" keeps the stress of "your own"; "la sua password" would read as the temporary one. |
 | l5 | `profile.languageNotSaved` | The language was not changed. … | La lingua non è stata cambiata. … | "non è stata salvata" is closer to the code; "cambiata" says what the person sees: the list goes back. |
 
 ## 8. What was seen on the screens and not settled

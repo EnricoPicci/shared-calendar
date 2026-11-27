@@ -14,6 +14,17 @@ const STATUSES = { booked: 'prenotato', cancelled: 'annullato' } as const;
 
 export const MAIL_TEXTS_IT: MailTexts = {
   footer: "Questa è un'e-mail automatica. Le risposte arrivano all'Amministratore del calendario.",
+  invitation: {
+    subject: 'Il suo account sul calendario condiviso',
+    hello: 'Buongiorno, è stato creato un account per lei.',
+    username: 'Nome utente',
+    password: 'Password temporanea',
+    signIn: {
+      before: 'Acceda da ',
+      after: ': le verrà chiesto di scegliere una password sua. La password temporanea vale una sola volta e scade dopo 7 giorni.',
+    },
+    unexpected: 'Se non si aspettava questa e-mail, la ignori.',
+  },
   daily: ({ date, nextCount, backupFrom, nextFile, backupFile }) => ({
     subject: `Calendario: prossimi 7 giorni e copia di sicurezza, ${shortDate(date)}`,
     paragraphs: [

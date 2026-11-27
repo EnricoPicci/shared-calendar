@@ -13,6 +13,14 @@ const STATUSES = { booked: 'booked', cancelled: 'cancelled' } as const;
 
 export const MAIL_TEXTS_EN: MailTexts = {
   footer: "This is an automatic e-mail. Replies reach the calendar's Administrator.",
+  invitation: {
+    subject: 'Your account on the shared calendar',
+    hello: 'Hello, an account was created for you.',
+    username: 'Username',
+    password: 'Temporary password',
+    signIn: { before: 'Sign in at ', after: ': you will be asked to choose your own password. The temporary password works once and expires in 7 days.' },
+    unexpected: 'If you did not expect this e-mail, ignore it.',
+  },
   daily: ({ date, nextCount, backupFrom, nextFile, backupFile }) => ({
     subject: `Calendar: next 7 days and backup, ${shortDate(date)}`,
     paragraphs: [

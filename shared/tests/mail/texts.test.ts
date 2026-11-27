@@ -1,4 +1,4 @@
-import { calendarMailText, dailyMailText, EXCEL_COLUMNS, mailTexts, mineMailText, SUPPORTED_LANGUAGES, type Language } from '../../src/index';
+import { calendarMailText, dailyMailText, EXCEL_COLUMNS, invitationMailText, mailTexts, mineMailText, SUPPORTED_LANGUAGES, type Language } from '../../src/index';
 
 const MAIL_FOOTER = mailTexts('en').footer;
 
@@ -116,5 +116,43 @@ describe('the mails and the files in each language', () => {
     expect(mine!.text).toContain('- mar 1 dic 2026, 10:00–11:00, Visit <b>, prenotato\n- gio 3 dic 2026, 09:00–09:30, Call, annullato');
     expect(none!.text.startsWith('Non ha appuntamenti in questo periodo.')).toBe(true);
     expect(mailTexts('it').files.mine('2026-12-01', '2026-12-07')).toBe('miei-appuntamenti-dal-2026-12-01-al-2026-12-07.xlsx');
+  });
+});
+
+// The invitation, which the invitation function answers to Cognito (docs/MULTILANGUAGE_ARCHITECTURE.md section 7).
+describe('the invitation', () => {
+  const FACTS = { username: '{username}', password: '{####}', page: 'https://calendar.example.com' };
+
+  it('in English: the words of the pool\'s own template, the two placeholders and the link', () => {
+    const mail = invitationMailText('en', FACTS);
+    expect(mail.subject).toBe('Your account on the shared calendar');
+    expect(mail.html).toBe(
+      '<div lang="en"><p>Hello, an account was created for you.</p>\n' +
+        '<p>Username: {username}<br>Temporary password: {####}</p>\n' +
+        '<p>Sign in at <a href="https://calendar.example.com">https://calendar.example.com</a>: you will be asked to choose your own password. The temporary password works once and expires in 7 days.</p>\n' +
+        '<p>If you did not expect this e-mail, ignore it.</p>\n' +
+        "<p>This is an automatic e-mail. Replies reach the calendar&#39;s Administrator.</p></div>",
+    );
+  });
+
+  it.each(SUPPORTED_LANGUAGES)('%s: each placeholder once, the body within 20 000 characters and the subject within 140, marked with its language', (language) => {
+    const mail = invitationMailText(language, FACTS);
+    expect(mail.html.split('{username}')).toHaveLength(2);
+    expect(mail.html.split('{####}')).toHaveLength(2);
+    expect(mail.html.length).toBeLessThanOrEqual(20_000);
+    expect(mail.subject.length).toBeGreaterThan(0);
+    expect(mail.subject.length).toBeLessThanOrEqual(140);
+    expect(mail.html.startsWith(`<div lang="${language}">`)).toBe(true);
+  });
+
+  it('in Italian, with the "lei"', () => {
+    const mail = invitationMailText('it', FACTS);
+    expect(mail.subject).toBe('Il suo account sul calendario condiviso');
+    expect(mail.html).toContain('<p>Nome utente: {username}<br>Password temporanea: {####}</p>');
+    expect(mail.html).toContain('<p>Acceda da <a href="https://calendar.example.com">https://calendar.example.com</a>: le verrà chiesto');
+  });
+
+  it('a page address with markup is written as text', () => {
+    expect(invitationMailText('en', { ...FACTS, page: 'https://x.example/"><b>' }).html).toContain('href="https://x.example/&quot;&gt;&lt;b&gt;"');
   });
 });
