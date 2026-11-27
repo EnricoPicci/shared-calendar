@@ -1,9 +1,13 @@
 import { BehaviorSubject } from 'rxjs';
 import { ChoosePasswordScreen, type ChoosePasswordCalls, type ChoosePasswordState } from '../../../src/logic/choose-password.screen';
-import { EMPTY_NEW_HINTS, newPasswordHints } from '../../../src/logic/password.model';
-import { PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS } from '../../../src/logic/texts';
+import {
+  newPasswordHints,
+} from '../../../src/logic/password.model';
+
 import type { LoginState } from '../../../src/services/login.types';
 import { useFarBrowserZone } from './zone';
+import { EMPTY_NEW_HINTS, PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS } from './password.words';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // The screen "Choose your password" of a first sign-in, with a fake LoginService: a state stream
 // that gives its present value, as the real one does, and spies. No network, no DOM. The
@@ -17,7 +21,7 @@ function screenOf(state: LoginState = { status: 'idle' }) {
   const loginState$ = new BehaviorSubject<LoginState>(state);
   const choosePassword = vi.fn<ChoosePasswordCalls['choosePassword']>();
   const reset = vi.fn<ChoosePasswordCalls['reset']>();
-  const screen = new ChoosePasswordScreen({ loginState$, choosePassword, reset });
+  const screen = new ChoosePasswordScreen({ loginState$, choosePassword, reset }, PAGE_TEXTS_EN);
   const states: ChoosePasswordState[] = [];
   screen.choose$.subscribe((s) => states.push(s)); // the view subscribes first
   return { screen, loginState$, choosePassword, reset, states, last: () => states.at(-1)! };
@@ -67,7 +71,7 @@ describe('ChoosePasswordScreen', () => {
     const { screen, last } = screenOf(ASKED);
     screen.start();
     screen.typed({ next: 'Next', again: '' });
-    expect(last().hints).toEqual(newPasswordHints({ next: 'Next', again: '' }));
+    expect(last().hints).toEqual(newPasswordHints(PASSWORD_TEXTS, { next: 'Next', again: '' }));
     expect(last().blocked).toBe(true);
     screen.typed({ next: NEXT, again: 'Next' });
     expect(last().hints.again).toBe(PASSWORD_TEXTS.differ);

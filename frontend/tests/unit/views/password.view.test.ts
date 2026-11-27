@@ -1,9 +1,10 @@
 import { BehaviorSubject } from 'rxjs';
-import { EMPTY_HINTS } from '../../../src/logic/password.model';
+
 import type { PasswordState } from '../../../src/logic/password.screen';
-import { PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS } from '../../../src/logic/texts';
+
 import { mountPassword, type PasswordDeps } from '../../../src/views/password.view';
 import { find, submit, useRealPage } from './page';
+import { EMPTY_HINTS, PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS } from '../logic/password.words';
 
 // The DOM test of the password view (docs/FRONTEND_ARCHITECTURE.md section 8): the real
 // index.html, and a fake PasswordScreen whose stream the test controls and whose methods are

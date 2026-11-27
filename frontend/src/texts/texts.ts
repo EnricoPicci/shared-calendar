@@ -98,21 +98,49 @@ export type FrameTexts = {
   nav: { week: string; appointments: string; settings: string; users: string; availability: string; me: string; password: string };
 };
 
+// The password's words, which the password screen and "Choose your password" share: what a new
+// password still misses, by the problems of the shared rule (shared/src/password.ts) and being the
+// current password again, with the rule's own numbers and symbols; the hints of the other fields;
+// and what the login says after a change.
+export type PasswordTexts = {
+  problems: {
+    too_short: (minimum: number) => string;
+    too_long: (maximum: number) => string;
+    no_uppercase: string;
+    no_lowercase: string;
+    no_digit: string;
+    no_symbol: (symbols: string) => string;
+    blank: string;
+    same_as_current: string;
+  };
+  currentEmpty: string;
+  againEmpty: string;
+  differ: string;
+  changed: string;
+};
+
 // The keys of index.html, by the part of the page they belong to.
 export type HtmlTexts = {
+  // Words several parts of the page use.
+  common: { cancel: string };
   frame: {
-    // The page's name: the browser's tab, and the header.
+    // The page's name: the browser's tab, the header and the sign-in screen.
     title: string;
     signOut: string;
     // The navigation's name for a screen reader.
     screens: string;
   };
+  login: { username: string; password: string; signIn: string };
+  // "Choose your password": its sentence is two texts around the username.
+  choose: { heading: string; aboutBefore: string; aboutAfter: string; submit: string };
+  password: { heading: string; current: string; newPassword: string; newPasswordAgain: string; about: string; submit: string };
 };
 
 export type PageTexts = {
   html: HtmlTexts;
   frame: FrameTexts;
   failures: FailureTexts;
+  password: PasswordTexts;
   // The ways a date is written, from shared/ (docs/MULTILANGUAGE_ARCHITECTURE.md decision L10).
   dates: DateFormats;
 };
@@ -125,7 +153,7 @@ export type Budgets<T> = { [K in keyof T]?: T[K] extends string | ((...args: nev
 
 // The tight places: the header and the links of the navigation, which share one row.
 export const PAGE_TEXT_BUDGETS: Budgets<PageTexts> = {
-  html: { frame: { title: 24, signOut: 12 } },
+  html: { frame: { title: 24, signOut: 12 }, common: { cancel: 16 }, login: { signIn: 20 }, choose: { submit: 24 }, password: { submit: 24 } },
   frame: {
     roles: { admin: 14, user: 14 },
     nav: { week: 16, appointments: 18, settings: 16, users: 16, availability: 16, me: 16, password: 16 },

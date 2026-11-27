@@ -170,11 +170,11 @@ export default tseslint.config(
     },
   },
   {
-    // The services and the logic layer never touch the DOM (docs/FRONTEND_ARCHITECTURE.md
-    // section 2): no global document or window there. A parameter or a variable with one of these
-    // names is not the global and is allowed. This block's list replaces the one above for these
-    // files, so it repeats the Node globals.
-    files: ['frontend/src/services/**/*.ts', 'frontend/src/logic/**/*.ts'],
+    // The services, the logic layer and the page texts never touch the DOM
+    // (docs/FRONTEND_ARCHITECTURE.md section 2): no global document or window there. A parameter or
+    // a variable with one of these names is not the global and is allowed. This block's list
+    // replaces the one above for these files, so it repeats the Node globals.
+    files: ['frontend/src/services/**/*.ts', 'frontend/src/logic/**/*.ts', 'frontend/src/texts/**/*.ts'],
     rules: {
       'no-restricted-globals': ['error',
         ...NODE_GLOBALS,

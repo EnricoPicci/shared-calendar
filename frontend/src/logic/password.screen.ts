@@ -1,8 +1,8 @@
 import { BehaviorSubject, type Observable, type Subscription } from 'rxjs';
 import type { ChangePasswordService } from '../services/change-password.service';
-import { EMPTY_HINTS, failurePlace, hintStands, passwordHints, problemTexts, type PasswordFields, type PasswordHints } from './password.model';
+import type { PageTexts } from '../texts/texts';
+import { emptyHints, failurePlace, hintStands, passwordHints, problemTexts, type PasswordFields, type PasswordHints } from './password.model';
 import { failureText } from './texts';
-import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The password screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the hints under the three
 // fields while the person types, the change asked for only when no hint stands, and what the
@@ -30,16 +30,24 @@ export type PasswordState = {
 // What the screen uses of the ChangePasswordService.
 export type PasswordCalls = Pick<ChangePasswordService, 'changePassword' | 'changePasswordResult$' | 'changePasswordState$'>;
 
-function nothing(): PasswordState {
-  return { hints: EMPTY_HINTS, pending: false, blocked: true, wrongCurrent: null, failure: null, emptied: {} };
+function nothing(texts: PageTexts): PasswordState {
+  return { hints: emptyHints(texts.password), pending: false, blocked: true, wrongCurrent: null, failure: null, emptied: {} };
 }
 
 export class PasswordScreen {
   private started = false;
-  private readonly state = new BehaviorSubject<PasswordState>(nothing());
-  readonly password$: Observable<PasswordState> = this.state.asObservable();
+  private readonly state: BehaviorSubject<PasswordState>;
+  readonly password$: Observable<PasswordState>;
 
-  constructor(private readonly changes: PasswordCalls) {}
+  // `texts` are the page texts of the language in use, kept for the screen's life
+  // (docs/MULTILANGUAGE_PLAN.md decision D2).
+  constructor(
+    private readonly changes: PasswordCalls,
+    private readonly texts: PageTexts,
+  ) {
+    this.state = new BehaviorSubject(nothing(texts));
+    this.password$ = this.state.asObservable();
+  }
 
   // Called once the view has subscribed (docs/FRONTEND_ARCHITECTURE.md section 5, rule 5): from
   // then on the hints follow the fields, a change can be asked for, and its outcome is heard,
@@ -54,15 +62,15 @@ export class PasswordScreen {
     subscription.add(
       this.changes.changePasswordResult$.subscribe((result) => {
         if (!live) return;
-        if (result.status === 'success') this.patch({ hints: EMPTY_HINTS, emptied: {} });
-        else if (result.reason === 'new_password_refused') this.patch({ hints: { ...this.state.getValue().hints, next: problemTexts(result.problems) } });
-        else if (failurePlace(result.reason) === 'current') this.patch({ hints: EMPTY_HINTS, wrongCurrent: failureText(PAGE_TEXTS_EN.failures, result.reason), emptied: {} });
-        else this.patch({ failure: failureText(PAGE_TEXTS_EN.failures, result.reason) });
+        if (result.status === 'success') this.patch({ hints: emptyHints(this.texts.password), emptied: {} });
+        else if (result.reason === 'new_password_refused') this.patch({ hints: { ...this.state.getValue().hints, next: problemTexts(this.texts.password, result.problems) } });
+        else if (failurePlace(result.reason) === 'current') this.patch({ hints: emptyHints(this.texts.password), wrongCurrent: failureText(this.texts.failures, result.reason), emptied: {} });
+        else this.patch({ failure: failureText(this.texts.failures, result.reason) });
       }),
     );
     subscription.add(() => {
       this.started = false;
-      this.state.next(nothing());
+      this.state.next(nothing(this.texts));
     });
     live = true;
     this.started = true;
@@ -71,13 +79,13 @@ export class PasswordScreen {
 
   // At every change of a field: the hints of what the three hold.
   typed(fields: PasswordFields): void {
-    if (this.started) this.patch({ hints: passwordHints(fields) });
+    if (this.started) this.patch({ hints: passwordHints(this.texts.password, fields) });
   }
 
   // "Change password": asked of the service only when no hint stands and no change is under way.
   change(fields: PasswordFields): void {
     if (!this.started) return;
-    const hints = passwordHints(fields);
+    const hints = passwordHints(this.texts.password, fields);
     this.patch({ hints });
     if (hintStands(hints) || this.state.getValue().pending) return;
     this.patch({ wrongCurrent: null, failure: null });

@@ -1,9 +1,10 @@
 import { BehaviorSubject } from 'rxjs';
 import type { ChoosePasswordState } from '../../../src/logic/choose-password.screen';
-import { EMPTY_NEW_HINTS } from '../../../src/logic/password.model';
-import { PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS } from '../../../src/logic/texts';
+
+
 import { mountChoosePassword, type ChoosePasswordDeps } from '../../../src/views/choose-password.view';
 import { find, submit, useRealPage } from './page';
+import { EMPTY_NEW_HINTS, PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS } from '../logic/password.words';
 
 // The DOM test of the view "Choose your password" (docs/FRONTEND_ARCHITECTURE.md section 8): the
 // real index.html, and a fake ChoosePasswordScreen whose stream the test controls and whose

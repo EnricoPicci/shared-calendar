@@ -7,7 +7,23 @@ const GENERAL = 'Something went wrong. Please try again.';
 // notes beside them say why a sentence reads as it does.
 export const PAGE_TEXTS_EN: PageTexts = {
   html: {
+    common: { cancel: 'Cancel' },
     frame: { title: 'Shared calendar', signOut: 'Sign out', screens: 'Screens' },
+    login: { username: 'Username', password: 'Password', signIn: 'Sign in' },
+    choose: {
+      heading: 'Choose your password',
+      aboutBefore: 'You signed in as',
+      aboutAfter: 'with a temporary password. Choose your own password to go on.',
+      submit: 'Choose password',
+    },
+    password: {
+      heading: 'Password',
+      current: 'Current password',
+      newPassword: 'New password',
+      newPasswordAgain: 'New password again',
+      about: 'After the change you are signed out, here and on every other device, and sign in again with the new password.',
+      submit: 'Change password',
+    },
   },
   frame: {
     roles: { admin: 'Administrator', user: 'User' },
@@ -130,6 +146,22 @@ export const PAGE_TEXTS_EN: PageTexts = {
     // `user_busy` is about the User the Administrator booked for, not about the Administrator
     // (docs/SHARED_CALENDAR_SPEC.md R-BOOK-12).
     userBusyForAdmin: 'This User already has an appointment at this time.',
+  },
+  password: {
+    problems: {
+      too_short: (minimum) => `At least ${minimum} characters.`,
+      too_long: (maximum) => `At most ${maximum} characters.`,
+      no_uppercase: 'An upper-case letter, A to Z.',
+      no_lowercase: 'A lower-case letter, a to z.',
+      no_digit: 'A digit, 0 to 9.',
+      no_symbol: (symbols) => `One of these symbols: ${symbols}`,
+      blank: 'No space, and no other blank character.',
+      same_as_current: 'Not the same as the current password.',
+    },
+    currentEmpty: 'Type the password you use now.',
+    againEmpty: 'Type the new password once more.',
+    differ: 'The two new passwords are not the same.',
+    changed: 'Password changed.',
   },
   dates: dateFormats('en'),
 };

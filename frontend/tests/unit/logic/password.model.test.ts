@@ -1,8 +1,6 @@
 import { PASSWORD_PROBLEMS } from '@shared-calendar/shared';
 import {
   againHint,
-  EMPTY_HINTS,
-  EMPTY_NEW_HINTS,
   failurePlace,
   hintStands,
   newHintStands,
@@ -11,8 +9,9 @@ import {
   passwordHints,
   problemTexts,
 } from '../../../src/logic/password.model';
-import { PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS } from '../../../src/logic/texts';
+
 import { useFarBrowserZone } from './zone';
+import { EMPTY_HINTS, EMPTY_NEW_HINTS, PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS } from './password.words';
 
 // The pure part of the password screen: the hints of the three fields, and where a failure is
 // said; and the hints of the two fields of "Choose your password", which are the same. No network, no DOM, and no password of a real account: made-up texts only.
@@ -54,38 +53,38 @@ describe('password.model', () => {
 
   describe('problemTexts', () => {
     it('one sentence per problem, in the order given', () => {
-      expect(problemTexts(['no_digit', 'too_short'])).toEqual([PASSWORD_PROBLEM_TEXT.no_digit, PASSWORD_PROBLEM_TEXT.too_short]);
-      expect(problemTexts([])).toEqual([]);
+      expect(problemTexts(PASSWORD_TEXTS, ['no_digit', 'too_short'])).toEqual([PASSWORD_PROBLEM_TEXT.no_digit, PASSWORD_PROBLEM_TEXT.too_short]);
+      expect(problemTexts(PASSWORD_TEXTS, [])).toEqual([]);
     });
   });
 
   describe('passwordHints', () => {
     it('an empty form: each field says what to type, the new one every condition', () => {
-      expect(passwordHints({ current: '', next: '', again: '' })).toEqual({
+      expect(passwordHints(PASSWORD_TEXTS, { current: '', next: '', again: '' })).toEqual({
         current: PASSWORD_TEXTS.currentEmpty,
         next: text('too_short', 'no_uppercase', 'no_lowercase', 'no_digit', 'no_symbol'),
         again: PASSWORD_TEXTS.againEmpty,
       });
-      expect(EMPTY_HINTS).toEqual(passwordHints({ current: '', next: '', again: '' }));
+      expect(EMPTY_HINTS).toEqual(passwordHints(PASSWORD_TEXTS, { current: '', next: '', again: '' }));
     });
 
     it('while the new password is typed, the conditions it still misses, one by one', () => {
-      expect(passwordHints({ current: CURRENT, next: 'n', again: '' }).next).toEqual(text('too_short', 'no_uppercase', 'no_digit', 'no_symbol'));
-      expect(passwordHints({ current: CURRENT, next: 'Next-Pass', again: '' }).next).toEqual(text('too_short', 'no_digit'));
-      expect(passwordHints({ current: CURRENT, next: GOOD, again: '' }).next).toEqual([]);
+      expect(passwordHints(PASSWORD_TEXTS, { current: CURRENT, next: 'n', again: '' }).next).toEqual(text('too_short', 'no_uppercase', 'no_digit', 'no_symbol'));
+      expect(passwordHints(PASSWORD_TEXTS, { current: CURRENT, next: 'Next-Pass', again: '' }).next).toEqual(text('too_short', 'no_digit'));
+      expect(passwordHints(PASSWORD_TEXTS, { current: CURRENT, next: GOOD, again: '' }).next).toEqual([]);
     });
 
     it('the two new passwords differ: said under the second', () => {
-      expect(passwordHints({ current: CURRENT, next: GOOD, again: 'Next-Password-2' }).again).toBe(PASSWORD_TEXTS.differ);
-      expect(passwordHints({ current: CURRENT, next: GOOD, again: GOOD }).again).toBeNull();
+      expect(passwordHints(PASSWORD_TEXTS, { current: CURRENT, next: GOOD, again: 'Next-Password-2' }).again).toBe(PASSWORD_TEXTS.differ);
+      expect(passwordHints(PASSWORD_TEXTS, { current: CURRENT, next: GOOD, again: GOOD }).again).toBeNull();
     });
 
     it('the new one equal to the current: said under the new one', () => {
-      expect(passwordHints({ current: GOOD, next: GOOD, again: GOOD }).next).toEqual(text('same_as_current'));
+      expect(passwordHints(PASSWORD_TEXTS, { current: GOOD, next: GOOD, again: GOOD }).next).toEqual(text('same_as_current'));
     });
 
     it('all three right: no hint stands', () => {
-      const hints = passwordHints({ current: CURRENT, next: GOOD, again: GOOD });
+      const hints = passwordHints(PASSWORD_TEXTS, { current: CURRENT, next: GOOD, again: GOOD });
       expect(hints).toEqual({ current: null, next: [], again: null });
       expect(hintStands(hints)).toBe(false);
     });
@@ -97,16 +96,16 @@ describe('password.model', () => {
     });
 
     it('no hint holds a password typed', () => {
-      const hints = passwordHints({ current: CURRENT, next: 'Next-Pass', again: 'Something' });
+      const hints = passwordHints(PASSWORD_TEXTS, { current: CURRENT, next: 'Next-Pass', again: 'Something' });
       for (const secret of [CURRENT, 'Next-Pass', 'Something']) expect(JSON.stringify(hints)).not.toContain(secret);
     });
   });
 
   describe('againHint', () => {
     it('empty, different, then the same: two sentences, then none', () => {
-      expect(againHint(GOOD, '')).toBe(PASSWORD_TEXTS.againEmpty);
-      expect(againHint(GOOD, 'Next')).toBe(PASSWORD_TEXTS.differ);
-      expect(againHint(GOOD, GOOD)).toBeNull();
+      expect(againHint(PASSWORD_TEXTS, GOOD, '')).toBe(PASSWORD_TEXTS.againEmpty);
+      expect(againHint(PASSWORD_TEXTS, GOOD, 'Next')).toBe(PASSWORD_TEXTS.differ);
+      expect(againHint(PASSWORD_TEXTS, GOOD, GOOD)).toBeNull();
     });
   });
 
@@ -122,20 +121,20 @@ describe('password.model', () => {
         { next: 'next password', again: 'next' },
         { next: GOOD, again: GOOD },
       ]) {
-        const full = passwordHints({ current: '', ...fields });
-        expect(newPasswordHints(fields)).toEqual({ next: full.next, again: full.again });
+        const full = passwordHints(PASSWORD_TEXTS, { current: '', ...fields });
+        expect(newPasswordHints(PASSWORD_TEXTS, fields)).toEqual({ next: full.next, again: full.again });
       }
     });
 
     it('both right: no hint stands; any one hint stands on its own', () => {
-      expect(newPasswordHints({ next: GOOD, again: GOOD })).toEqual({ next: [], again: null });
+      expect(newPasswordHints(PASSWORD_TEXTS, { next: GOOD, again: GOOD })).toEqual({ next: [], again: null });
       expect(newHintStands({ next: [], again: null })).toBe(false);
       expect(newHintStands({ next: ['x'], again: null })).toBe(true);
       expect(newHintStands({ next: [], again: 'x' })).toBe(true);
     });
 
     it('no hint holds a password typed', () => {
-      const hints = newPasswordHints({ next: 'Next-Pass', again: 'Something' });
+      const hints = newPasswordHints(PASSWORD_TEXTS, { next: 'Next-Pass', again: 'Something' });
       for (const secret of ['Next-Pass', 'Something']) expect(JSON.stringify(hints)).not.toContain(secret);
     });
   });

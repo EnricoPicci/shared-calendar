@@ -13,13 +13,13 @@
     <!-- The login view (src/views/login.view.ts); its sign-in form is hidden while "Choose your
          password" is shown in its place -->
     <main id="login" class="login" hidden>
-      <h1>Shared calendar</h1>
+      <h1 data-text="frame.title"></h1>
       <!-- What the page says after the person changed their password, until the next "Sign in" -->
       <p class="notice" role="status"></p>
       <form class="sign-in">
-        <label>Username <input name="username" autocomplete="username" autocapitalize="none" required /></label>
-        <label>Password <input name="password" type="password" autocomplete="current-password" required /></label>
-        <button class="primary">Sign in</button>
+        <label><span data-text="login.username"></span> <input name="username" autocomplete="username" autocapitalize="none" required /></label>
+        <label><span data-text="login.password"></span> <input name="password" type="password" autocomplete="current-password" required /></label>
+        <button class="primary" data-text="login.signIn"></button>
         <p class="error" role="alert"></p>
       </form>
       <!-- "Choose your password" (src/views/choose-password.view.ts): an account whose password is
@@ -27,21 +27,21 @@
            with its hint; what the new password still misses is a list under it. The browser's
            own check is off: the script says in words what is missing. -->
       <section class="first-password" aria-labelledby="first-password-heading" hidden>
-        <h2 id="first-password-heading">Choose your password</h2>
-        <p class="about">You signed in as <strong class="account"></strong> with a temporary password. Choose your own password to go on.</p>
+        <h2 id="first-password-heading" data-text="choose.heading"></h2>
+        <p class="about"><span data-text="choose.aboutBefore"></span> <strong class="account"></strong> <span data-text="choose.aboutAfter"></span></p>
         <form class="new-password" novalidate>
           <div class="field new-field">
-            <label>New password <input name="next" type="password" autocomplete="new-password" aria-describedby="first-next-needs" /></label>
+            <label><span data-text="password.newPassword"></span> <input name="next" type="password" autocomplete="new-password" aria-describedby="first-next-needs" /></label>
             <ul class="needs hint" id="first-next-needs"></ul>
           </div>
           <div class="field again-field">
-            <label>New password again <input name="again" type="password" autocomplete="new-password" aria-describedby="first-again-hint" /></label>
+            <label><span data-text="password.newPasswordAgain"></span> <input name="again" type="password" autocomplete="new-password" aria-describedby="first-again-hint" /></label>
             <p class="hint" id="first-again-hint"></p>
           </div>
           <p class="error failure" role="alert"></p>
           <div class="actions">
-            <button class="primary submit">Choose password</button>
-            <button type="button" class="cancel">Cancel</button>
+            <button class="primary submit" data-text="choose.submit"></button>
+            <button type="button" class="cancel" data-text="common.cancel"></button>
           </div>
         </form>
         <!-- One condition the new password still misses -->
@@ -789,26 +789,26 @@
              signs in again. -->
         <section id="password" class="password-screen" hidden>
           <div class="toolbar">
-            <h2>Password</h2>
+            <h2 data-text="password.heading"></h2>
           </div>
           <form class="change-password" novalidate>
             <div class="field current-field">
-              <label>Current password <input name="current" type="password" autocomplete="current-password" aria-describedby="current-hint" /></label>
+              <label><span data-text="password.current"></span> <input name="current" type="password" autocomplete="current-password" aria-describedby="current-hint" /></label>
               <p class="hint" id="current-hint"></p>
               <p class="error refusal" role="alert"></p>
             </div>
             <div class="field new-field">
-              <label>New password <input name="next" type="password" autocomplete="new-password" aria-describedby="next-needs" /></label>
+              <label><span data-text="password.newPassword"></span> <input name="next" type="password" autocomplete="new-password" aria-describedby="next-needs" /></label>
               <ul class="needs hint" id="next-needs"></ul>
             </div>
             <div class="field again-field">
-              <label>New password again <input name="again" type="password" autocomplete="new-password" aria-describedby="again-hint" /></label>
+              <label><span data-text="password.newPasswordAgain"></span> <input name="again" type="password" autocomplete="new-password" aria-describedby="again-hint" /></label>
               <p class="hint" id="again-hint"></p>
             </div>
-            <p class="about">After the change you are signed out, here and on every other device, and sign in again with the new password.</p>
+            <p class="about" data-text="password.about"></p>
             <p class="error failure" role="alert"></p>
             <div class="actions">
-              <button class="primary submit">Change password</button>
+              <button class="primary submit" data-text="password.submit"></button>
             </div>
           </form>
           <!-- One condition the new password still misses -->

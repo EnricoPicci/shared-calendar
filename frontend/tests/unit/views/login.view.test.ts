@@ -2,6 +2,7 @@ import { BehaviorSubject } from 'rxjs';
 import type { LoginState } from '../../../src/services/login.types';
 import { mountLogin, type LoginDeps } from '../../../src/views/login.view';
 import { find, submit, useRealPage } from './page';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // The DOM test of the login view (docs/FRONTEND_ARCHITECTURE.md section 8): the real index.html,
 // and a fake LoginService whose state stream the test controls and whose method is a spy.
@@ -12,7 +13,7 @@ function mounted(first: LoginState = { status: 'idle' }) {
   const state$ = new BehaviorSubject<LoginState>(first);
   const login = { loginState$: state$.asObservable(), login: vi.fn<LoginDeps['login']>() };
   const root = find('#login');
-  const subscription = mountLogin(root, login);
+  const subscription = mountLogin(root, login, PAGE_TEXTS_EN);
   return {
     state$,
     login,
@@ -154,13 +155,13 @@ describe('mountLogin', () => {
   it('a notice given by the shell is said until the next "Sign in", and gone when the view is left', () => {
     const state$ = new BehaviorSubject<LoginState>({ status: 'idle' });
     const login = { loginState$: state$.asObservable(), login: vi.fn<LoginDeps['login']>() };
-    const subscription = mountLogin(find('#login'), login, 'Password changed.');
+    const subscription = mountLogin(find('#login'), login, PAGE_TEXTS_EN, 'Password changed.');
     const notice = find('#login .notice');
     expect(notice.textContent).toBe('Password changed.');
     submit(find<HTMLFormElement>('#login form'));
     expect(notice.textContent).toBe('');
     subscription.unsubscribe();
-    const again = mountLogin(find('#login'), login, 'Password changed.');
+    const again = mountLogin(find('#login'), login, PAGE_TEXTS_EN, 'Password changed.');
     again.unsubscribe();
     expect(notice.textContent).toBe('');
   });

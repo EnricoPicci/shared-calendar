@@ -2,7 +2,7 @@
 
 **Version:** v1 (2026-11-27): the plan, after the Product Owner's eight decisions of the brief
 and the answer to one question of planning (section 2). v2 (2026-11-27): phase A started with
-brief `prompts/lang-l03-phase-a-implementation.md`; steps l1, l2 and group l3a done.
+brief `prompts/lang-l03-phase-a-implementation.md`; steps l1, l2 and groups l3a, l3b done.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -477,7 +477,24 @@ lines. The look: the frame at 1280 × 800 and 390 × 844 in English (unchanged) 
 padded header fits at both widths, the navigation scrolls sideways at 390 as it does in English
 (`overflow-x: auto`): nothing to settle. Group l3b finds `PageTexts` ready to grow.
 
-**As done (group l3b).** *Empty.*
+**As done (group l3b).** Done 2026-11-27. `PageTexts` gained `password` (`PasswordTexts`: the
+problems of a new password, those with a number or the symbols as functions, the three hints,
+"Password changed.") and the keys `common.cancel`, `login.*`, `choose.*` (its sentence two
+texts around the username, `aboutBefore` and `aboutAfter`), `password.*`; the sign-in's `<h1>`
+uses `frame.title`, and the two screens share `password.newPassword` and
+`password.newPasswordAgain`. A label's words are a `<span data-text>` before its field (F3).
+`password.model.ts` takes the texts first (`problemText`, `problemTexts`, `againHint`,
+`passwordHints`, `newPasswordHints`; `EMPTY_HINTS` and `EMPTY_NEW_HINTS` became `emptyHints`
+and `emptyNewHints`); `PasswordScreen` and `ChoosePasswordScreen` take the page texts in their
+constructors; `mountLogin(root, login, texts, notice)`; `sessionObjects` gets the texts.
+`PASSWORD_PROBLEM_TEXT` and `PASSWORD_TEXTS` left `logic/texts.ts`. The lint rule "no DOM
+global" of the logic layer now covers `frontend/src/texts` too (F14; it was due in l3a). Tests:
+a helper `tests/unit/logic/password.words.ts` gives the English words under their old names,
+so the expectations of seven test files are unchanged; the list of D6 lost `#login` and
+`#password`; the list of files taking English straight lost three. frontend 3192 tests, 100 %
+lines. The look, at both widths: the sign-in, "Choose your password" (a throw-away user with a
+temporary password, deleted after) and "Password", padded; everything fits, the buttons side by
+side included. Nothing for section 8.
 
 **As done (group l3c).** *Empty.*
 

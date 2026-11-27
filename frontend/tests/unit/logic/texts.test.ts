@@ -1,5 +1,6 @@
 import { CALENDAR_LIMITS, PASSWORD_PROBLEMS, PASSWORD_SYMBOLS } from '@shared-calendar/shared';
-import { dateTimeText, failureText, MAIL_TEXTS, offsetChangesOn, offsetText, PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS, rangeText, timeText } from '../../../src/logic/texts';
+import { dateTimeText, failureText, MAIL_TEXTS, offsetChangesOn, offsetText, rangeText, timeText } from '../../../src/logic/texts';
+import { PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS } from './password.words';
 import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 const { shortDate: dateText, longDate: longDateText, weekLabel } = PAGE_TEXTS_EN.dates;
@@ -378,7 +379,7 @@ describe('texts', () => {
     });
 
     it('the other words of the screen and of the login', () => {
-      expect(PASSWORD_TEXTS).toEqual({
+      expect(PASSWORD_TEXTS).toMatchObject({
         currentEmpty: 'Type the password you use now.',
         againEmpty: 'Type the new password once more.',
         differ: 'The two new passwords are not the same.',

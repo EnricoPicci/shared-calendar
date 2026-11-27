@@ -12,7 +12,6 @@ import { MailScreen } from '../logic/mail.screen';
 import { MeScreen } from '../logic/me.screen';
 import { PasswordScreen } from '../logic/password.screen';
 import { SettingsScreen } from '../logic/settings.screen';
-import { PASSWORD_TEXTS } from '../logic/texts';
 import { UsersScreen } from '../logic/users.screen';
 import { WeekScreen } from '../logic/week.screen';
 import { PAGE_TEXTS_EN } from '../texts/texts.en';
@@ -130,7 +129,7 @@ export type SessionObjects = {
   changes: ChangePasswordService;
 };
 
-function sessionObjects(config: ShellConfig, store: SessionStore, person: Person): SessionObjects {
+function sessionObjects(config: ShellConfig, store: SessionStore, person: Person, texts: PageTexts): SessionObjects {
   const calendar = new CalendarService(config, store);
   const appointments = new AppointmentsService(config, store);
   const users = new UsersService(config, store);
@@ -175,7 +174,7 @@ function sessionObjects(config: ShellConfig, store: SessionStore, person: Person
   // The change of the person's own password, straight at Cognito (docs/FRONTEND_SERVICES.md
   // section 22).
   const changes = new ChangePasswordService({ cognitoUrl: config.cognitoUrl, skipGlobalSignOut: config.skipGlobalSignOut === true }, store);
-  const password = new PasswordScreen(changes);
+  const password = new PasswordScreen(changes, texts);
   return { role: person.role, week, list, settings, daily, accounts, availability, date, appointments, users, types, rules, assistant, mail, me, password, changes };
 }
 
@@ -321,7 +320,7 @@ export function runShell(config: AppConfig): Subscription {
   const refresh = new RefreshService(config, store);
   const logout = new LogoutService(config, store, [login, refresh]);
   // Lives as long as the page, as the LoginService it follows does.
-  const choose = new ChoosePasswordScreen(login);
+  const choose = new ChoosePasswordScreen(login, language.state.texts);
   refresh.start();
   const subscription = mountShell(document.body, { config, language, store, login, choose, logout, pageWide: [login, refresh] });
   subscription.add(() => refresh.stop());
@@ -357,7 +356,7 @@ export function mountShell(root: HTMLElement, { config, language, store, login, 
   const enter = (person: Person): Subscription => {
     username.textContent = person.username;
     role.textContent = texts.frame.roles[person.role];
-    const objects = sessionObjects(config, store, person);
+    const objects = sessionObjects(config, store, person, texts);
 
     // The navigation: one link per screen this role may see.
     const screens = table.filter((screen) => screen.roles.includes(person.role));
@@ -384,7 +383,7 @@ export function mountShell(root: HTMLElement, { config, language, store, login, 
     // above: its result stream has nothing earlier to replay.
     const changed = objects.changes.changePasswordResult$.pipe(filter((result) => result.status === 'success')).subscribe(() => {
       pageWide.forEach((service) => service.reset());
-      notice = PASSWORD_TEXTS.changed;
+      notice = texts.password.changed;
     });
 
     // The screen on show, with its logic object.
@@ -433,7 +432,7 @@ export function mountShell(root: HTMLElement, { config, language, store, login, 
   // The login view, with "Choose your password" beside it when given: view first, then its logic
   // object (docs/FRONTEND_ARCHITECTURE.md section 3, rule 8).
   const showLogin = (): Subscription => {
-    const shown = mountLogin(loginRoot, login, notice);
+    const shown = mountLogin(loginRoot, login, texts, notice);
     if (choose) {
       shown.add(mountChoosePassword(loginRoot, choose));
       shown.add(choose.start());

@@ -1,7 +1,7 @@
 import type { Subscription } from 'rxjs';
 import { failureText } from '../logic/texts';
 import type { LoginService } from '../services/login.service';
-import { PAGE_TEXTS_EN } from '../texts/texts.en';
+import type { PageTexts } from '../texts/texts';
 
 // What the login view uses of the LoginService: one method and one stream.
 export type LoginDeps = Pick<LoginService, 'login' | 'loginState$'>;
@@ -10,8 +10,9 @@ export type LoginDeps = Pick<LoginService, 'login' | 'loginState$'>;
 // index.html. The password is read from the form at submit and goes straight into the call's
 // argument (docs/FRONTEND_SERVICES.md section 2, rule 6). `notice` is what the shell has the login
 // say when it is shown, "Password changed" after a change of password and nothing otherwise
-// (docs/FRONTEND_ARCHITECTURE.md section 6); it stays until the next "Sign in".
-export function mountLogin(root: HTMLElement, login: LoginDeps, notice = ''): Subscription {
+// (docs/FRONTEND_ARCHITECTURE.md section 6); it stays until the next "Sign in". `texts` are the
+// page texts of the language in use, for a failure's sentence.
+export function mountLogin(root: HTMLElement, login: LoginDeps, texts: PageTexts, notice = ''): Subscription {
   // 1. Find the elements, once.
   const form = root.querySelector<HTMLFormElement>('form.sign-in')!;
   const button = form.querySelector('button')!;
@@ -44,7 +45,7 @@ export function mountLogin(root: HTMLElement, login: LoginDeps, notice = ''): Su
     // The form is shown first: a browser gives no keyboard to a field of a hidden form.
     if (back) password.focus();
     button.disabled = state.status === 'pending';
-    error.textContent = state.status === 'failure' ? failureText(PAGE_TEXTS_EN.failures, state.reason) : '';
+    error.textContent = state.status === 'failure' ? failureText(texts.failures, state.reason) : '';
   });
 
   // 4. Leaving the view: the element stays in the page, only hidden, so what was typed and the

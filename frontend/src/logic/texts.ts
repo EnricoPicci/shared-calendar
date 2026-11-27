@@ -1,6 +1,5 @@
-import { ASSISTANT_LIMITS, CALENDAR_LIMITS, localDateOf, localTimeOf, MAIL_LIMITS, maskAddress, PASSWORD_POLICY, PASSWORD_SYMBOLS, toInstant, type DateFormats, type Role } from '@shared-calendar/shared';
+import { ASSISTANT_LIMITS, CALENDAR_LIMITS, localDateOf, localTimeOf, MAIL_LIMITS, maskAddress, toInstant, type DateFormats, type Role } from '@shared-calendar/shared';
 import { FAILURE_REASONS, type FailureReason, type FailureTexts } from '../texts/texts';
-import type { NewPasswordProblem } from '../services/change-password.types';
 
 // The texts that depend on data (docs/FRONTEND_ARCHITECTURE.md section 5 and section 12.4): a
 // time, a range, a date with a time, a UTC offset, and a failure in plain words. Pure functions.
@@ -89,29 +88,6 @@ export function failureText(failures: FailureTexts, reason: string, attempt?: At
   if (role === 'admin' && reason === 'user_busy') return failures.userBusyForAdmin;
   return isFailureReason(reason) ? failures.reasons[reason] : failures.general;
 }
-
-// The change of one's own password (docs/FRONTEND_ARCHITECTURE.md section 5.1): what a new
-// password still misses, one sentence per name of the shared rule (shared/src/password.ts) and
-// for being the current password again, with the rule's own numbers and its 32 symbols.
-export const PASSWORD_PROBLEM_TEXT: Record<NewPasswordProblem, string> = {
-  too_short: `At least ${PASSWORD_POLICY.minimumLength} characters.`,
-  too_long: `At most ${PASSWORD_POLICY.maximumLength} characters.`,
-  no_uppercase: 'An upper-case letter, A to Z.',
-  no_lowercase: 'A lower-case letter, a to z.',
-  no_digit: 'A digit, 0 to 9.',
-  no_symbol: `One of these symbols: ${[...PASSWORD_SYMBOLS].join(' ')}`,
-  blank: 'No space, and no other blank character.',
-  same_as_current: 'Not the same as the current password.',
-};
-
-// The other words of the password screen: the field of the current password while it is empty,
-// the repeated new password while it is empty or differs, and what the login says after a change.
-export const PASSWORD_TEXTS = {
-  currentEmpty: 'Type the password you use now.',
-  againEmpty: 'Type the new password once more.',
-  differ: 'The two new passwords are not the same.',
-  changed: 'Password changed.',
-} as const;
 
 // The words of the week's "E-mail…" dialog (docs/FRONTEND_ARCHITECTURE.md section 5.1): what the
 // mail holds, which is the role's (docs/EMAIL_ARCHITECTURE.md section 9.1), and where it goes once
