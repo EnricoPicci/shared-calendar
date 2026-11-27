@@ -21,6 +21,7 @@ import type { AvailabilityTypesService } from '../services/availability-types.se
 import type { RemoveTypeState } from '../services/availability-types.types';
 import { availabilityParts, type Confirm, type Tell } from './availability.parts';
 import { windowTimes } from './time.parts';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // What the availability view uses: of the AvailabilityScreen its stream, the four writes it
 // checks, the two new tries after a read that failed, and the appointments in the way of a
@@ -194,7 +195,7 @@ export function mountAvailability(root: HTMLElement, { screen, types, rules, con
     deletePending[kind] = state.status === 'pending';
     if (deleting?.kind !== kind) return;
     const failed = state.status === 'failure';
-    deleting.tell({ busy: deletePending[kind], failure: failed ? failureText(state.reason) : null, conflicts: failed ? screen.conflicts(state.conflicts) : null, done: state.status === 'success' });
+    deleting.tell({ busy: deletePending[kind], failure: failed ? failureText(PAGE_TEXTS_EN.failures, state.reason) : null, conflicts: failed ? screen.conflicts(state.conflicts) : null, done: state.status === 'success' });
   };
   subscription.add(types.removeState$.subscribe(deleted('type')));
   subscription.add(rules.deletePatternState$.subscribe(deleted('pattern')));

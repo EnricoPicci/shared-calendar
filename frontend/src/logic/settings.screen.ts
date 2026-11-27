@@ -2,6 +2,7 @@ import { BehaviorSubject, type Observable, type Subscription } from 'rxjs';
 import type { CalendarSettingsService } from '../services/calendar-settings.service';
 import { settingsFields, settingsFor, settingsInfo, type Refusals, type SettingsFields, type SettingsInfo } from './settings.model';
 import { failureText } from './texts';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The settings screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the calendar's settings read
 // when the screen is shown, the save of what the form holds, checked field by field before any
@@ -58,7 +59,7 @@ export class SettingsScreen {
       if (result.status === 'failure') {
         // With a form on show, a read that fails after a save changes nothing: the save's own
         // outcome is what was said.
-        this.patch({ loading: false, unread: this.toFill ? failureText(result.reason) : null });
+        this.patch({ loading: false, unread: this.toFill ? failureText(PAGE_TEXTS_EN.failures, result.reason) : null });
         return;
       }
       const info = settingsInfo(result.settings);
@@ -73,7 +74,7 @@ export class SettingsScreen {
           // The form is filled with what the server answers.
           this.patch({ saving: false, saved: true, failure: null, info: settingsInfo(result.settings), fields: settingsFields(result.settings) });
         } else {
-          this.patch({ saving: false, failure: failureText(result.reason) });
+          this.patch({ saving: false, failure: failureText(PAGE_TEXTS_EN.failures, result.reason) });
         }
         this.settings.load();
       }),

@@ -2,7 +2,7 @@
 
 **Version:** v1 (2026-11-27): the plan, after the Product Owner's eight decisions of the brief
 and the answer to one question of planning (section 2). v2 (2026-11-27): phase A started with
-brief `prompts/lang-l03-phase-a-implementation.md`; steps l1, l2 done.
+brief `prompts/lang-l03-phase-a-implementation.md`; steps l1, l2 and group l3a done.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -447,7 +447,35 @@ written.
   frontend`), as the proof that nothing below the views moved.
 - **Leaves for phase B:** the budgets' numbers, for the Product Owner's look; the full walk.
 
-**As done (group l3a).** *Empty.*
+**As done (group l3a).** Done 2026-11-27. Built: `frontend/src/texts/texts.ts` (the type
+`PageTexts`: `html`, the keys of `index.html`, by part of the page; `frame`; `failures`, typed
+by `FAILURE_REASONS`, with the variants by attempt and by role as fields and functions;
+`dates`, `shared/`'s `DateFormats`; the type `Budgets` and `PAGE_TEXT_BUDGETS` for the header
+and the navigation), `texts.en.ts`, `padded.ts` (marks `⟦…⟧`, padding `·`),
+`logic/language.ts` (`PageLanguage`), `views/page-texts.ts` (`fillPage`, `fillTexts`,
+`htmlText`); the frame's three keys and an empty `<title>` in `index.html`; the shell fills
+the page before it shows anything and words the role and the navigation from the texts
+(`Screen.label` is a function of the frame's texts); `failureText(failures, reason, …)`;
+`dateText`, `longDateText` and `weekLabel` gone from `logic/texts.ts` (the callers use
+`dates`), `dateTimeText(dates, …)`, `Intl` gone from it; `TEST_LANGUAGE` in `main.ts`,
+`bundle.mjs` and `dev.mjs`, the dev server answering `/?padded`. **Differed from the plan:**
+(1) a key names a text under `html` (`data-text="frame.signOut"` is `texts.html.frame.signOut`),
+so that "every text for the page is used by a key" is a test with an answer; the texts the
+logic puts together live beside `html`. (2) The callers of `failureText` and of the dates in the
+screens of the later groups pass the English object straight (`PAGE_TEXTS_EN.failures`): the
+"model not yet moved keeps its own constants" of F5. A test lists those files, and each group
+shortens the list, until only the shell is left. (3) The password's conditions
+(`PASSWORD_PROBLEM_TEXT`) move with their screens in l3b, and `sessionObjects` gets the texts
+in the group that first needs them. (4) `pageAside()` of the views' tests fills the page
+unless asked not to (`pageAside(false)`, the page as written). Tests: new
+`tests/unit/texts/texts.test.ts` (texts, samples, budgets, padded, the list of files),
+`tests/unit/views/page-texts.test.ts` (keys, "the page holds no words" with the list of D6
+whole, `fillPage`), `tests/unit/logic/language.test.ts`, four runShell cases in
+`shell.test.ts` (English; the padded frame marked), two bundle tests (no mark in a build as
+`npm run build` makes it, minified; the mark in the dev server's); frontend 3192 tests, 100 %
+lines. The look: the frame at 1280 × 800 and 390 × 844 in English (unchanged) and padded; the
+padded header fits at both widths, the navigation scrolls sideways at 390 as it does in English
+(`overflow-x: auto`): nothing to settle. Group l3b finds `PageTexts` ready to grow.
 
 **As done (group l3b).** *Empty.*
 

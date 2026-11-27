@@ -13,7 +13,8 @@ import {
   type WindowBody,
 } from '@shared-calendar/shared';
 import { endRefusal, TYPE_NOT_CHOSEN, UNKNOWN_TYPE, WEEKDAY_CHOICES } from './availability.model';
-import { longDateText } from './texts';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
+
 
 // A single date of the availability screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the
 // check of the date chosen, the day as the weekly patterns give it and as it is now, the
@@ -43,7 +44,7 @@ export function dateFor(text: string, today: string): { date: string } | { refus
 
 // A date with its weekday and its year: "Monday 23 November 2026".
 export function dateWords(date: string): string {
-  return `${WEEKDAY_CHOICES[weekdayOf(date) - 1]!.label} ${longDateText(date)}`;
+  return `${WEEKDAY_CHOICES[weekdayOf(date) - 1]!.label} ${PAGE_TEXTS_EN.dates.longDate(date)}`;
 }
 
 // ── The day ─────────────────────────────────────────────────────────────────────────────────

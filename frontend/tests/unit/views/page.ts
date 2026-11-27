@@ -1,4 +1,6 @@
 import { readFileSync } from 'node:fs';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
+import { fillPage, fillTexts } from '../../../src/views/page-texts';
 
 // The real page for the views' tests (docs/FRONTEND_ARCHITECTURE.md section 8): a selector of a
 // view that does not match the markup of index.html fails here, since nothing checks it when the
@@ -14,22 +16,27 @@ export function pageSource(): string {
 }
 
 // The whole page as elements that are kept aside, in a <template>: nothing of it is loaded or
-// run, so its <script> and <link> can be looked at.
-export function pageAside(): DocumentFragment {
+// run, so its <script> and <link> can be looked at. Its keys are filled with the English texts,
+// as the shell fills them, unless `filled` is false: then it is the page as written, keys and no
+// words.
+export function pageAside(filled = true): DocumentFragment {
   const template = document.createElement('template');
   template.innerHTML = pageSource();
+  if (filled) fillTexts(template.content, PAGE_TEXTS_EN.html);
   return template.content;
 }
 
-// Replaces the emulated document's <body> with the one of index.html: every test starts from the
-// page as the browser has it before the script runs. Only the body: the <head>'s script and
-// style sheet are never loaded.
+// Replaces the emulated document's <body> with the one of index.html, its keys filled with the
+// English texts as the shell fills them before it shows anything: every test starts from the page
+// as the browser has it once the script has started, the words where they always were. Only the
+// body: the <head>'s script and style sheet are never loaded.
 export function loadPage(): void {
   const source = pageSource();
   const start = source.indexOf('<body>');
   const end = source.lastIndexOf('</body>');
   if (start < 0 || end < start) throw new Error('index.html has no <body>…</body>');
   document.body.innerHTML = source.slice(start + '<body>'.length, end);
+  fillPage(document, PAGE_TEXTS_EN.html, 'en');
 }
 
 // Call once in a test file: the page is loaded again before each of its tests.

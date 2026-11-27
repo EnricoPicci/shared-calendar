@@ -6,6 +6,7 @@ import { meDetails, meFields, type MeDetails } from './me.model';
 import { NO_REFUSALS, profileFor, recheck, type ProfileFields } from './profile.model';
 import { failureText } from './texts';
 import type { EditState, UpdateOutcome } from './users.screen';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // "My details" (docs/FRONTEND_ARCHITECTURE.md section 5.1), a screen of both roles: the person's
 // own four facts, read when the screen is shown and every time the page becomes visible, and for
@@ -65,7 +66,7 @@ export class MeScreen {
       if (!live) return;
       if (result.status === 'failure') {
         this.username = null;
-        this.patch({ loading: false, unread: failureText(result.reason), details: null, fields: null });
+        this.patch({ loading: false, unread: failureText(PAGE_TEXTS_EN.failures, result.reason), details: null, fields: null });
         return;
       }
       this.username = result.me.username;
@@ -77,7 +78,7 @@ export class MeScreen {
         this.editAsked = false;
         const edit = this.state.getValue().edit;
         if (result.status === 'success') this.patch({ edit: { ...edit, saving: false, saved: {} } });
-        else this.patch({ edit: { ...edit, saving: false, failure: failureText(result.reason) } });
+        else this.patch({ edit: { ...edit, saving: false, failure: failureText(PAGE_TEXTS_EN.failures, result.reason) } });
         this.read();
       }),
     );

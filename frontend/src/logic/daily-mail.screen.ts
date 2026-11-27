@@ -3,6 +3,7 @@ import type { CalendarSettingsService } from '../services/calendar-settings.serv
 import type { MailSettingsService } from '../services/mail-settings.service';
 import { dailyFields, dailyFor, type DailyFields } from './daily-mail.model';
 import { failureText } from './texts';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The settings' section "Daily e-mail" (docs/FRONTEND_ARCHITECTURE.md section 5.1): the daily
 // mail's settings read when the screen is shown, the save of what its two fields hold, checked
@@ -69,10 +70,10 @@ export class DailyMailScreen {
       this.mail.settingsResult$.subscribe((result) => {
         if (!live) return;
         if (result.status === 'failure') {
-          if (result.reason === 'mail_unavailable') this.patch({ loading: false, unavailable: failureText(result.reason), unread: null, fields: null });
+          if (result.reason === 'mail_unavailable') this.patch({ loading: false, unavailable: failureText(PAGE_TEXTS_EN.failures, result.reason), unread: null, fields: null });
           // With fields on show, a read that fails after a save changes nothing: the save's own
           // outcome is what was said.
-          else this.patch({ loading: false, unread: this.toFill ? failureText(result.reason) : null });
+          else this.patch({ loading: false, unread: this.toFill ? failureText(PAGE_TEXTS_EN.failures, result.reason) : null });
           return;
         }
         if (this.toFill) this.patch({ loading: false, unavailable: null, unread: null, fields: dailyFields(result.settings) });
@@ -84,8 +85,8 @@ export class DailyMailScreen {
       this.mail.updateResult$.subscribe((result) => {
         if (!live) return;
         if (result.status === 'success') this.patch({ saving: false, saved: true, failure: null, fields: dailyFields(result.settings) });
-        else if (result.reason === 'mail_unavailable') this.patch({ saving: false, unavailable: failureText(result.reason), fields: null });
-        else this.patch({ saving: false, failure: failureText(result.reason) });
+        else if (result.reason === 'mail_unavailable') this.patch({ saving: false, unavailable: failureText(PAGE_TEXTS_EN.failures, result.reason), fields: null });
+        else this.patch({ saving: false, failure: failureText(PAGE_TEXTS_EN.failures, result.reason) });
         this.mail.getSettings();
       }),
     );

@@ -4,6 +4,7 @@ import type { Moving } from './appointment.detail';
 import { failureText, offsetChangesOn, rangeText } from './texts';
 import { clockOf, DAY_MINUTES, minuteOfClock, windowHours, type TimeHours } from './times';
 import type { SlotBlock } from './week.model';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The book dialog's logic (docs/FRONTEND_ARCHITECTURE.md section 5): what is being booked in
 // words, the times and the Users the Administrator may choose, and the way from what the dialog
@@ -49,7 +50,7 @@ export type UserChoice = { usernames: string[]; message: string; ready: boolean 
 
 export function userChoice(state: ListUsersState): UserChoice {
   if (state.status === 'pending') return { usernames: [], message: 'Loading the users…', ready: false };
-  if (state.status === 'failure') return { usernames: [], message: failureText(state.reason), ready: false };
+  if (state.status === 'failure') return { usernames: [], message: failureText(PAGE_TEXTS_EN.failures, state.reason), ready: false };
   if (state.status === 'idle') return { usernames: [], message: '', ready: false };
   const usernames = state.users.map((user) => user.username);
   if (usernames.length === 0) return { usernames, message: 'There is no User to book for.', ready: false };
@@ -149,5 +150,5 @@ export function refusalOf(reason: string, asked: Asked, role: Role, appointments
         : `You already have an appointment at this time (${what}); open it to change it.`;
     return { text, offer: false };
   }
-  return { text: failureText(reason, asked.moving === null ? undefined : 'change', role), offer: false };
+  return { text: failureText(PAGE_TEXTS_EN.failures, reason, asked.moving === null ? undefined : 'change', role), offer: false };
 }

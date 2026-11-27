@@ -20,6 +20,7 @@ import {
 } from '../../../src/logic/assistant.model';
 import { failureText } from '../../../src/logic/texts';
 import { useFarBrowserZone } from './zone';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // The pure functions of the assistant's panel. No network, no DOM.
 
@@ -127,7 +128,7 @@ describe('the assistant\'s model', () => {
           buttons: 'none',
           actions: [
             { summary: 'one', outcome: 'Done' },
-            { summary: 'two', outcome: `Not done. ${failureText('slot_taken')}` },
+            { summary: 'two', outcome: `Not done. ${failureText(PAGE_TEXTS_EN.failures, 'slot_taken')}` },
             { summary: 'three', outcome: 'It is not known whether this was done. Please check the calendar.' },
           ],
         });
@@ -175,7 +176,7 @@ describe('the assistant\'s model', () => {
 
   describe('a call that failed, reason by reason', () => {
     it('load and end: the page\'s sentence, nothing after it', () => {
-      for (const reason of ['forbidden', 'internal_error', ...TRANSPORT] as const) expect(loadTrouble(reason), reason).toEqual(plain(failureText(reason)));
+      for (const reason of ['forbidden', 'internal_error', ...TRANSPORT] as const) expect(loadTrouble(reason), reason).toEqual(plain(failureText(PAGE_TEXTS_EN.failures, reason)));
       expect(loadTrouble('network').say).toBe('The server cannot be reached. Check the connection and try again.');
       expect(loadTrouble('session_rejected').say).toBe('Your session has ended. Please sign in again.');
     });
@@ -196,36 +197,36 @@ describe('the assistant\'s model', () => {
 
     it('send: busy reads the conversation again and goes on; a text refused says what a message is; the rest is the page\'s sentence', () => {
       expect(sendTrouble('assistant_busy', 'it')).toEqual({ ...plain('The assistant was still at work on this conversation. The conversation has been read again: please look at it before going on.'), then: 'read-on' });
-      for (const reason of ['invalid_json', 'invalid_request'] as const) expect(sendTrouble(reason, 'en'), reason).toEqual(plain(failureText(reason, 'message')));
+      for (const reason of ['invalid_json', 'invalid_request'] as const) expect(sendTrouble(reason, 'en'), reason).toEqual(plain(failureText(PAGE_TEXTS_EN.failures, reason, 'message')));
       expect(sendTrouble('invalid_request', 'en').say).toBe('A message can be 2000 characters long at most, and cannot be empty.');
-      for (const reason of ['forbidden', 'internal_error', ...TRANSPORT] as const) expect(sendTrouble(reason, 'it'), reason).toEqual(plain(failureText(reason)));
+      for (const reason of ['forbidden', 'internal_error', ...TRANSPORT] as const) expect(sendTrouble(reason, 'it'), reason).toEqual(plain(failureText(PAGE_TEXTS_EN.failures, reason)));
     });
 
     it('continue: the two sentences of shared/; nothing to continue and busy read again and go on', () => {
       expect(continueTrouble('assistant_budget_reached', 'it')).toEqual(plain(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_budget_reached));
       expect(continueTrouble('assistant_unavailable', null)).toEqual(plain(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_unavailable));
       expect(continueTrouble('nothing_to_continue', 'en')).toEqual({ ...plain('The assistant had nothing left to do. The conversation has been read again.'), then: 'read-on' });
-      expect(continueTrouble('assistant_busy', 'en')).toEqual({ ...plain(failureText('assistant_busy')), then: 'read-on' });
-      for (const reason of ['forbidden', 'internal_error', ...TRANSPORT] as const) expect(continueTrouble(reason, 'en'), reason).toEqual(plain(failureText(reason)));
+      expect(continueTrouble('assistant_busy', 'en')).toEqual({ ...plain(failureText(PAGE_TEXTS_EN.failures, 'assistant_busy')), then: 'read-on' });
+      for (const reason of ['forbidden', 'internal_error', ...TRANSPORT] as const) expect(continueTrouble(reason, 'en'), reason).toEqual(plain(failureText(PAGE_TEXTS_EN.failures, reason)));
     });
 
     it('confirm: after the two sentences of shared/ the conversation is read again and Claude is not asked; busy says the changes were made', () => {
       expect(confirmTrouble('assistant_budget_reached', 'it')).toEqual({ ...plain(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_budget_reached), then: 'read' });
       expect(confirmTrouble('assistant_unavailable', null)).toEqual({ ...plain(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_unavailable), then: 'read' });
-      expect(confirmTrouble('assistant_busy', 'en')).toEqual({ ...plain(failureText('assistant_busy')), then: 'read-on', made: true });
+      expect(confirmTrouble('assistant_busy', 'en')).toEqual({ ...plain(failureText(PAGE_TEXTS_EN.failures, 'assistant_busy')), then: 'read-on', made: true });
       expect(confirmTrouble('proposal_not_found', 'en')).toEqual({ ...plain('This proposal was no longer waiting for an answer. The conversation has been read again.'), then: 'read-on' });
-      for (const reason of ['invalid_request', 'forbidden', 'internal_error', ...TRANSPORT] as const) expect(confirmTrouble(reason, 'en'), reason).toEqual(plain(failureText(reason)));
+      for (const reason of ['invalid_request', 'forbidden', 'internal_error', ...TRANSPORT] as const) expect(confirmTrouble(reason, 'en'), reason).toEqual(plain(failureText(PAGE_TEXTS_EN.failures, reason)));
     });
 
     it('decline: a proposal not found reads again; the rest is the page\'s sentence', () => {
-      expect(declineTrouble('proposal_not_found')).toEqual({ ...plain(failureText('proposal_not_found')), then: 'read-on' });
-      for (const reason of ['invalid_request', 'forbidden', 'internal_error', ...TRANSPORT] as const) expect(declineTrouble(reason), reason).toEqual(plain(failureText(reason)));
+      expect(declineTrouble('proposal_not_found')).toEqual({ ...plain(failureText(PAGE_TEXTS_EN.failures, 'proposal_not_found')), then: 'read-on' });
+      for (const reason of ['invalid_request', 'forbidden', 'internal_error', ...TRANSPORT] as const) expect(declineTrouble(reason), reason).toEqual(plain(failureText(PAGE_TEXTS_EN.failures, reason)));
     });
 
     it('no sentence is the general one for want of its own', () => {
-      const general = failureText('a reason nobody knows');
+      const general = failureText(PAGE_TEXTS_EN.failures, 'a reason nobody knows');
       for (const reason of ['assistant_busy', 'proposal_not_found', 'nothing_to_continue', 'forbidden', 'internal_error', 'invalid_request', 'invalid_json', 'not_signed_in', 'session_rejected', 'network', 'server']) {
-        expect(failureText(reason), reason).not.toBe(general);
+        expect(failureText(PAGE_TEXTS_EN.failures, reason), reason).not.toBe(general);
       }
     });
   });

@@ -4,6 +4,7 @@ import type { CreateUserFailureReason, ResendInvitationFailureReason, UpdateUser
 import { EMPTY_FIELDS, NO_REFUSALS, profileFor, recheck, type ProfileFields, type ProfileRefusals } from './profile.model';
 import { failureText } from './texts';
 import { CREATE_FAILED, invitedAnswer, inviteQuestion, NO_USERS, sameRow, userRows, usernameFor, type UserRow } from './users.model';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The users screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the list of users read when
 // the screen is shown; a user created from what the form holds, after a last look at the address
@@ -118,7 +119,7 @@ export class UsersScreen {
       if (!live) return;
       if (result.status === 'failure') {
         // A list that could not be read again is not left on show as if it were the present one.
-        this.patch({ loading: false, unread: failureText(result.reason), rows: null, empty: null });
+        this.patch({ loading: false, unread: failureText(PAGE_TEXTS_EN.failures, result.reason), rows: null, empty: null });
         return;
       }
       const read = userRows(result.users);
@@ -150,7 +151,7 @@ export class UsersScreen {
         this.editAsked = false;
         const edit = this.state.getValue().edit;
         if (result.status === 'success') this.patch({ edit: { ...edit, saving: false, saved: {} } });
-        else this.patch({ edit: { ...edit, saving: false, failure: failureText(result.reason) } });
+        else this.patch({ edit: { ...edit, saving: false, failure: failureText(PAGE_TEXTS_EN.failures, result.reason) } });
         this.read();
       }),
     );
@@ -241,7 +242,7 @@ export class UsersScreen {
     if (result.status === 'success') this.patch({ invite: { ...invite, sending: false, answer: invitedAnswer(this.invitation.email) } });
     else {
       // A creation the server failed says that nothing was kept; any other failure, its own sentence.
-      const failure = kind === 'create' && result.reason === 'internal_error' ? CREATE_FAILED : failureText(result.reason);
+      const failure = kind === 'create' && result.reason === 'internal_error' ? CREATE_FAILED : failureText(PAGE_TEXTS_EN.failures, result.reason);
       this.patch({ invite: { ...invite, sending: false, failure } });
     }
   }

@@ -2,6 +2,7 @@ import type { Subscription } from 'rxjs';
 import type { AppointmentDetail } from '../logic/appointment.detail';
 import { failureText } from '../logic/texts';
 import type { AppointmentsService } from '../services/appointments.service';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // What the detail dialog uses, handed over by the screen's view that mounts it: how that screen
 // answers the detail of one of its appointments by its id; of the AppointmentsService the two
@@ -103,7 +104,7 @@ export function mountDetail(root: HTMLDialogElement, { detail, appointments, cha
     cancelling = state.status === 'pending' ? state.appointmentId : null;
     enable();
     if (!cancelAsked) return;
-    error.textContent = state.status === 'failure' ? failureText(state.reason) : '';
+    error.textContent = state.status === 'failure' ? failureText(PAGE_TEXTS_EN.failures, state.reason) : '';
     if (state.status === 'success') root.close();
   });
   // A note saved, the same way.
@@ -112,7 +113,7 @@ export function mountDetail(root: HTMLDialogElement, { detail, appointments, cha
       saving = state.status === 'pending' ? state.appointmentId : null;
       enable();
       if (!noteAsked) return;
-      error.textContent = state.status === 'failure' ? failureText(state.reason) : '';
+      error.textContent = state.status === 'failure' ? failureText(PAGE_TEXTS_EN.failures, state.reason) : '';
       if (state.status === 'success') root.close();
     }),
   );

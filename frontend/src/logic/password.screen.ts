@@ -2,6 +2,7 @@ import { BehaviorSubject, type Observable, type Subscription } from 'rxjs';
 import type { ChangePasswordService } from '../services/change-password.service';
 import { EMPTY_HINTS, failurePlace, hintStands, passwordHints, problemTexts, type PasswordFields, type PasswordHints } from './password.model';
 import { failureText } from './texts';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The password screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the hints under the three
 // fields while the person types, the change asked for only when no hint stands, and what the
@@ -55,8 +56,8 @@ export class PasswordScreen {
         if (!live) return;
         if (result.status === 'success') this.patch({ hints: EMPTY_HINTS, emptied: {} });
         else if (result.reason === 'new_password_refused') this.patch({ hints: { ...this.state.getValue().hints, next: problemTexts(result.problems) } });
-        else if (failurePlace(result.reason) === 'current') this.patch({ hints: EMPTY_HINTS, wrongCurrent: failureText(result.reason), emptied: {} });
-        else this.patch({ failure: failureText(result.reason) });
+        else if (failurePlace(result.reason) === 'current') this.patch({ hints: EMPTY_HINTS, wrongCurrent: failureText(PAGE_TEXTS_EN.failures, result.reason), emptied: {} });
+        else this.patch({ failure: failureText(PAGE_TEXTS_EN.failures, result.reason) });
       }),
     );
     subscription.add(() => {

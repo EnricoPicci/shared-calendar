@@ -7,6 +7,7 @@ import { AvailabilityScreen } from '../logic/availability.screen';
 import { ChoosePasswordScreen } from '../logic/choose-password.screen';
 import { DateScreen } from '../logic/date.screen';
 import { DailyMailScreen } from '../logic/daily-mail.screen';
+import { PageLanguage } from '../logic/language';
 import { MailScreen } from '../logic/mail.screen';
 import { MeScreen } from '../logic/me.screen';
 import { PasswordScreen } from '../logic/password.screen';
@@ -14,6 +15,8 @@ import { SettingsScreen } from '../logic/settings.screen';
 import { PASSWORD_TEXTS } from '../logic/texts';
 import { UsersScreen } from '../logic/users.screen';
 import { WeekScreen } from '../logic/week.screen';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
+import type { FrameTexts, PageTexts } from '../texts/texts';
 import type { ApiConfig } from '../services/api';
 import { AppointmentsService } from '../services/appointments.service';
 import { AssistantService } from '../services/assistant.service';
@@ -39,6 +42,7 @@ import { mountChoosePassword, type ChoosePasswordDeps } from './choose-password.
 import { mountDate } from './date.view';
 import { mountLogin, type LoginDeps } from './login.view';
 import { mountMe } from './me.view';
+import { fillPage } from './page-texts';
 import { mountPassword } from './password.view';
 import { mountDailyMail, mountSettings } from './settings.view';
 import { mountUsers } from './users.view';
@@ -54,7 +58,10 @@ import { mountWeek } from './week.view';
 // against the local stack, whose Cognito emulator cannot do it (docs/FRONTEND_SERVICES.md
 // section 8, decision 67). It is skipped only when `skipGlobalSignOut` is true, so that a
 // configuration without it always signs out.
-export type AppConfig = ApiConfig & CognitoConfig & { skipGlobalSignOut?: boolean };
+// `testLanguage`, given only by the development server's bundle, makes the padded test language
+// out of the English texts; the page is then shown in it when its address asks for it with
+// `?padded` (docs/MULTILANGUAGE_ARCHITECTURE.md section 6.3, rule 4).
+export type AppConfig = ApiConfig & CognitoConfig & { skipGlobalSignOut?: boolean; testLanguage?: (english: PageTexts) => PageTexts };
 
 // What the shell needs of the configuration for each session: the API's address for the API
 // services, Cognito's and the skip value for the change of password.
@@ -70,6 +77,8 @@ export type LogoutDeps = Pick<LogoutService, 'logout'>;
 
 export type ShellDeps = {
   config: ShellConfig; // where the API and Cognito are, for the services of each session
+  // The page's language: the page is filled from its texts before anything is shown.
+  language: PageLanguage;
   // The whole store: an API service reads the token from it at the moment of each call
   // (docs/FRONTEND_SERVICES.md section 2, rule 9). The shell itself uses `session$` only.
   store: SessionStore;
@@ -85,8 +94,6 @@ export type ShellDeps = {
   pageWide?: readonly Resettable[];
   screens?: readonly Screen[]; // the table of screens; SCREENS unless a test brings its own
 };
-
-const ROLE_IN_WORDS: Record<Role, string> = { admin: 'Administrator', user: 'User' };
 
 // What belongs to one person's session: the API services and the logic objects, created when
 // the person enters and dropped when the person leaves, so that nothing of one person's data
@@ -178,7 +185,7 @@ function sessionObjects(config: ShellConfig, store: SessionStore, person: Person
 // point 5). The subscription returned holds both.
 export type Screen = {
   hash: string;
-  label: string;
+  label: (frame: FrameTexts) => string;
   roles: readonly Role[];
   element: string;
   show: (root: HTMLElement, objects: SessionObjects) => Subscription;
@@ -191,7 +198,7 @@ const WEEK_HASH = '#/week';
 export const SCREENS: readonly Screen[] = [
   {
     hash: WEEK_HASH,
-    label: 'Week',
+    label: (frame) => frame.nav.week,
     roles: ['admin', 'user'],
     element: '#week',
     show: (root, { week, appointments, users, mail, role }) => {
@@ -203,7 +210,7 @@ export const SCREENS: readonly Screen[] = [
   },
   {
     hash: '#/appointments',
-    label: 'My appointments',
+    label: (frame) => frame.nav.appointments,
     roles: ['user'],
     element: '#appointments',
     show: (root, { list, appointments }) => {
@@ -219,7 +226,7 @@ export const SCREENS: readonly Screen[] = [
   },
   {
     hash: '#/settings',
-    label: 'Settings',
+    label: (frame) => frame.nav.settings,
     roles: ['admin'],
     element: '#settings',
     // The settings screen reads once, when it is shown, and has nothing to load again on. When
@@ -244,7 +251,7 @@ export const SCREENS: readonly Screen[] = [
   },
   {
     hash: '#/users',
-    label: 'Users',
+    label: (frame) => frame.nav.users,
     roles: ['admin'],
     element: '#users',
     show: (root, { accounts, users }) => {
@@ -255,7 +262,7 @@ export const SCREENS: readonly Screen[] = [
   },
   {
     hash: '#/availability',
-    label: 'Availability',
+    label: (frame) => frame.nav.availability,
     roles: ['admin'],
     element: '#availability',
     // One screen, two views and two logic objects: the types and the patterns, and a single
@@ -276,7 +283,7 @@ export const SCREENS: readonly Screen[] = [
     // For both roles, just before the password: each person reads their own facts; the
     // Administrator also changes them (docs/EMAIL_ARCHITECTURE.md section 11).
     hash: '#/me',
-    label: 'My details',
+    label: (frame) => frame.nav.me,
     roles: ['admin', 'user'],
     element: '#me',
     show: (root, { me }) => {
@@ -289,7 +296,7 @@ export const SCREENS: readonly Screen[] = [
     // Last in the navigation, for both roles: each person changes their own password, and only
     // theirs (docs/CHANGE_PASSWORD_PLAN.md section 2, decisions D1 and D3).
     hash: '#/password',
-    label: 'Password',
+    label: (frame) => frame.nav.password,
     roles: ['admin', 'user'],
     element: '#password',
     show: (root, { password }) => {
@@ -306,6 +313,9 @@ export const SCREENS: readonly Screen[] = [
 // puts back to their first state at a sign-out. It is not ended with the shell: a request that
 // tells Cognito of a sign-out ends by itself (docs/FRONTEND_SERVICES.md section 8, decision 48).
 export function runShell(config: AppConfig): Subscription {
+  // English, or the padded test language when the development server's page asks for it.
+  const padded = config.testLanguage !== undefined && window.location.search === '?padded';
+  const language = new PageLanguage({ language: 'en', texts: padded ? config.testLanguage!(PAGE_TEXTS_EN) : PAGE_TEXTS_EN });
   const store = new SessionStore();
   const login = new LoginService(config, store);
   const refresh = new RefreshService(config, store);
@@ -313,14 +323,16 @@ export function runShell(config: AppConfig): Subscription {
   // Lives as long as the page, as the LoginService it follows does.
   const choose = new ChoosePasswordScreen(login);
   refresh.start();
-  const subscription = mountShell(document.body, { config, store, login, choose, logout, pageWide: [login, refresh] });
+  const subscription = mountShell(document.body, { config, language, store, login, choose, logout, pageWide: [login, refresh] });
   subscription.add(() => refresh.stop());
   return subscription;
 }
 
 // Shows the login or the frame at every change of person, and in the frame the screen of the
 // address. `root` holds the elements #login and #app of index.html.
-export function mountShell(root: HTMLElement, { config, store, login, choose, logout, pageWide = [], screens: table = SCREENS }: ShellDeps): Subscription {
+export function mountShell(root: HTMLElement, { config, language, store, login, choose, logout, pageWide = [], screens: table = SCREENS }: ShellDeps): Subscription {
+  const { texts } = language.state;
+  fillPage(root.ownerDocument, texts.html, language.state.language);
   const find = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
   const loginRoot = find('#login');
   const frame = find('#app');
@@ -344,7 +356,7 @@ export function mountShell(root: HTMLElement, { config, store, login, choose, lo
   // returned (docs/FRONTEND_ARCHITECTURE.md section 6, points 4 to 6).
   const enter = (person: Person): Subscription => {
     username.textContent = person.username;
-    role.textContent = ROLE_IN_WORDS[person.role];
+    role.textContent = texts.frame.roles[person.role];
     const objects = sessionObjects(config, store, person);
 
     // The navigation: one link per screen this role may see.
@@ -352,7 +364,7 @@ export function mountShell(root: HTMLElement, { config, store, login, choose, lo
     const links = screens.map((screen) => {
       const link = linkTemplate.content.firstElementChild!.cloneNode(true) as HTMLAnchorElement;
       link.href = screen.hash;
-      link.textContent = screen.label;
+      link.textContent = screen.label(texts.frame);
       return link;
     });
     nav.replaceChildren(...links);

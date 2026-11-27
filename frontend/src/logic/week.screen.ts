@@ -4,8 +4,9 @@ import type { AppointmentsService } from '../services/appointments.service';
 import type { CalendarService } from '../services/calendar.service';
 import { appointmentDetail, movingOf, type AppointmentDetail, type Moving } from './appointment.detail';
 import { refusalOf, type Asked, type Refusal } from './booking';
-import { failureText, weekLabel } from './texts';
+import { failureText } from './texts';
 import { weekModel, type WeekModel } from './week.model';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The week screen (docs/FRONTEND_ARCHITECTURE.md section 5): which week is on screen, its load
 // at every change of week, the last week loaded kept while the next one loads or fails, the
@@ -67,7 +68,7 @@ export class WeekScreen {
     const subscription = this.calendar.calendarState$.subscribe((state) => {
       const shown = this.state.getValue();
       if (state.status === 'pending') this.state.next({ ...shown, label: this.label(), loading: true });
-      if (state.status === 'failure') this.state.next({ ...shown, loading: false, failure: failureText(state.reason) });
+      if (state.status === 'failure') this.state.next({ ...shown, loading: false, failure: failureText(PAGE_TEXTS_EN.failures, state.reason) });
       if (state.status === 'success') {
         this.view = state.calendar;
         this.state.next({ ...shown, label: this.label(), loading: false, failure: null, week: weekModel(state.calendar, this.role) });
@@ -176,7 +177,7 @@ export class WeekScreen {
   }
 
   private label(): string {
-    return weekLabel(this.monday, addDays(this.monday, 6));
+    return PAGE_TEXTS_EN.dates.weekLabel(this.monday, addDays(this.monday, 6));
   }
 
   // Once started, the load's own "pending" brings the new label with `loading`, in one

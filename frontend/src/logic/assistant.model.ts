@@ -20,6 +20,7 @@ import type {
 } from '../services/assistant.types';
 import { FULL_FOR_ADMIN } from './booking';
 import { failureText } from './texts';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // Pure functions for the assistant's panel (docs/FRONTEND_ARCHITECTURE.md section 5.1): the
 // conversation put together from the server's replies and made ready to draw, the proposal with
@@ -94,7 +95,7 @@ function outcomeWords(action: AssistantProposalAction, role: Role): string {
     case 'done':
       return 'Done';
     case 'refused':
-      return `Not done. ${role === 'admin' && action.error === 'slot_taken' ? FULL_FOR_ADMIN : failureText(action.error, undefined, role)}`;
+      return `Not done. ${role === 'admin' && action.error === 'slot_taken' ? FULL_FOR_ADMIN : failureText(PAGE_TEXTS_EN.failures, action.error, undefined, role)}`;
     case 'unknown':
       return 'It is not known whether this was done. Please check the calendar.';
   }
@@ -157,7 +158,7 @@ export function loadTrouble(reason: AssistantLoadFailureReason | AssistantEndFai
     case 'network':
     case 'server':
     case 'unexpected':
-      return plain(failureText(reason));
+      return plain(failureText(PAGE_TEXTS_EN.failures, reason));
   }
 }
 
@@ -177,10 +178,10 @@ export function sendTrouble(reason: AssistantSendFailureReason, language: Assist
     // A step of the conversation waits, or a confirmation is under way: the conversation is
     // read again and the step that waits is asked for.
     case 'assistant_busy':
-      return { ...plain(failureText(reason)), then: 'read-on' };
+      return { ...plain(failureText(PAGE_TEXTS_EN.failures, reason)), then: 'read-on' };
     case 'invalid_json':
     case 'invalid_request':
-      return plain(failureText(reason, 'message'));
+      return plain(failureText(PAGE_TEXTS_EN.failures, reason, 'message'));
     case 'forbidden':
     case 'internal_error':
     case 'not_signed_in':
@@ -188,7 +189,7 @@ export function sendTrouble(reason: AssistantSendFailureReason, language: Assist
     case 'network':
     case 'server':
     case 'unexpected':
-      return plain(failureText(reason));
+      return plain(failureText(PAGE_TEXTS_EN.failures, reason));
   }
 }
 
@@ -199,7 +200,7 @@ export function continueTrouble(reason: AssistantContinueFailureReason, language
       return plain(cannotAnswer(reason, language));
     case 'nothing_to_continue':
     case 'assistant_busy':
-      return { ...plain(failureText(reason)), then: 'read-on' };
+      return { ...plain(failureText(PAGE_TEXTS_EN.failures, reason)), then: 'read-on' };
     case 'forbidden':
     case 'internal_error':
     case 'not_signed_in':
@@ -207,7 +208,7 @@ export function continueTrouble(reason: AssistantContinueFailureReason, language
     case 'network':
     case 'server':
     case 'unexpected':
-      return plain(failureText(reason));
+      return plain(failureText(PAGE_TEXTS_EN.failures, reason));
   }
 }
 
@@ -222,9 +223,9 @@ export function confirmTrouble(reason: AssistantConfirmFailureReason, language: 
     // The changes were made and their outcomes are not saved
     // (docs/CONVERSATIONAL_ARCHITECTURE.md section 6): no reply will show them.
     case 'assistant_busy':
-      return { ...plain(failureText(reason)), then: 'read-on', made: true };
+      return { ...plain(failureText(PAGE_TEXTS_EN.failures, reason)), then: 'read-on', made: true };
     case 'proposal_not_found':
-      return { ...plain(failureText(reason)), then: 'read-on' };
+      return { ...plain(failureText(PAGE_TEXTS_EN.failures, reason)), then: 'read-on' };
     case 'invalid_request':
     case 'forbidden':
     case 'internal_error':
@@ -233,14 +234,14 @@ export function confirmTrouble(reason: AssistantConfirmFailureReason, language: 
     case 'network':
     case 'server':
     case 'unexpected':
-      return plain(failureText(reason));
+      return plain(failureText(PAGE_TEXTS_EN.failures, reason));
   }
 }
 
 export function declineTrouble(reason: AssistantDeclineFailureReason): Trouble {
   switch (reason) {
     case 'proposal_not_found':
-      return { ...plain(failureText(reason)), then: 'read-on' };
+      return { ...plain(failureText(PAGE_TEXTS_EN.failures, reason)), then: 'read-on' };
     case 'invalid_request':
     case 'forbidden':
     case 'internal_error':
@@ -249,6 +250,6 @@ export function declineTrouble(reason: AssistantDeclineFailureReason): Trouble {
     case 'network':
     case 'server':
     case 'unexpected':
-      return plain(failureText(reason));
+      return plain(failureText(PAGE_TEXTS_EN.failures, reason));
   }
 }

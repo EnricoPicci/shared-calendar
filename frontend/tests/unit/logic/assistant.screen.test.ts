@@ -13,6 +13,7 @@ import type {
   AssistantSendFailureReason,
 } from '../../../src/services/assistant.types';
 import { useFarBrowserZone } from './zone';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // A fake AssistantService: one stream that replays its last outcome, as the real one does, and
 // six spies. No network, no DOM.
@@ -21,7 +22,7 @@ const START: AssistantState = { open: false, messages: [], progress: null, propo
 const CONVERSATION = '01ARZ3NDEKTSV4RRFFQ69G5FAW';
 const PROPOSAL_ID = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
 const UNREACHABLE = 'The server cannot be reached. Check the connection and try again.';
-const BUSY = failureText('assistant_busy');
+const BUSY = failureText(PAGE_TEXTS_EN.failures, 'assistant_busy');
 
 const message = (seq: number, from: AssistantMessage['from'], text: string): AssistantMessage => ({ seq, from, text, at: '2026-11-22T09:00:00.000Z' });
 const proposal = (...outcomes: (null | 'done' | 'unknown')[]): AssistantProposal => ({
@@ -193,7 +194,7 @@ describe('AssistantScreen', () => {
       screen.start();
       screen.open();
       failed.load(reason);
-      expect(last()).toEqual({ ...START, open: true, failure: failureText(reason) });
+      expect(last()).toEqual({ ...START, open: true, failure: failureText(PAGE_TEXTS_EN.failures, reason) });
       expect(JSON.stringify(last())).not.toContain('for a developer');
       screen.close();
       screen.open();
@@ -366,12 +367,12 @@ describe('AssistantScreen', () => {
       ['assistant_budget_reached', ASSISTANT_TEXTS_EN.cannotAnswer.assistant_budget_reached],
       ['assistant_unavailable', ASSISTANT_TEXTS_EN.cannotAnswer.assistant_unavailable],
       ['network', UNREACHABLE],
-      ['server', failureText('server')],
-      ['unexpected', failureText('unexpected')],
-      ['forbidden', failureText('forbidden')],
-      ['internal_error', failureText('internal_error')],
-      ['not_signed_in', failureText('not_signed_in')],
-      ['session_rejected', failureText('session_rejected')],
+      ['server', failureText(PAGE_TEXTS_EN.failures, 'server')],
+      ['unexpected', failureText(PAGE_TEXTS_EN.failures, 'unexpected')],
+      ['forbidden', failureText(PAGE_TEXTS_EN.failures, 'forbidden')],
+      ['internal_error', failureText(PAGE_TEXTS_EN.failures, 'internal_error')],
+      ['not_signed_in', failureText(PAGE_TEXTS_EN.failures, 'not_signed_in')],
+      ['session_rejected', failureText(PAGE_TEXTS_EN.failures, 'session_rejected')],
     ] as const)('a step that fails with %s stops the loop: the sentence, no further step and no read', (reason, sentence) => {
       const { screen, opened, answered, failed, calls, last } = screenOf();
       opened();
@@ -390,11 +391,11 @@ describe('AssistantScreen', () => {
       answered('send', working({ messages: [message(1, 'person', 'what is open?')] }));
       failed.continue(reason);
       expect(calls()).toEqual({ ...NO_CALLS, load: 2, send: 1, continue: 1 });
-      expect(last()).toMatchObject({ failure: failureText(reason), progress: 'Looking at the calendar…', canSend: false });
+      expect(last()).toMatchObject({ failure: failureText(PAGE_TEXTS_EN.failures, reason), progress: 'Looking at the calendar…', canSend: false });
       // Another tab got the answer meanwhile.
       answered('load', reply({ messages: [message(1, 'person', 'what is open?'), message(2, 'assistant', 'Tuesday is open.')] }));
       expect(texts(last())).toEqual(['what is open?', 'Tuesday is open.']);
-      expect(last()).toMatchObject({ failure: failureText(reason), progress: null, canSend: true });
+      expect(last()).toMatchObject({ failure: failureText(PAGE_TEXTS_EN.failures, reason), progress: null, canSend: true });
       expect(calls().continue).toBe(1);
     });
 
@@ -425,14 +426,14 @@ describe('AssistantScreen', () => {
   describe('a message the server does not take', () => {
     it.each([
       ['invalid_request', 'A message can be 2000 characters long at most, and cannot be empty.'],
-      ['invalid_json', failureText('invalid_json')],
-      ['forbidden', failureText('forbidden')],
-      ['internal_error', failureText('internal_error')],
+      ['invalid_json', failureText(PAGE_TEXTS_EN.failures, 'invalid_json')],
+      ['forbidden', failureText(PAGE_TEXTS_EN.failures, 'forbidden')],
+      ['internal_error', failureText(PAGE_TEXTS_EN.failures, 'internal_error')],
       ['network', UNREACHABLE],
-      ['server', failureText('server')],
-      ['unexpected', failureText('unexpected')],
-      ['not_signed_in', failureText('not_signed_in')],
-      ['session_rejected', failureText('session_rejected')],
+      ['server', failureText(PAGE_TEXTS_EN.failures, 'server')],
+      ['unexpected', failureText(PAGE_TEXTS_EN.failures, 'unexpected')],
+      ['not_signed_in', failureText(PAGE_TEXTS_EN.failures, 'not_signed_in')],
+      ['session_rejected', failureText(PAGE_TEXTS_EN.failures, 'session_rejected')],
     ] as const)('%s: its sentence, the field not emptied, no step and no read, and "Send" in use again', (reason, sentence) => {
       const { screen, opened, failed, calls, last } = screenOf();
       opened();
@@ -694,7 +695,7 @@ describe('AssistantScreen', () => {
       failed[call]('proposal_not_found');
       expect(calls().load).toBe(2);
       answered('load', reply({ messages: [message(1, 'person', 'book it'), message(2, 'notice', 'Nothing was changed.')] }));
-      expect(last()).toMatchObject({ failure: failureText('proposal_not_found'), proposal: null, canSend: true });
+      expect(last()).toMatchObject({ failure: failureText(PAGE_TEXTS_EN.failures, 'proposal_not_found'), proposal: null, canSend: true });
       expect(texts(last())).toEqual(['book it', 'Nothing was changed.']);
     });
 
@@ -707,7 +708,7 @@ describe('AssistantScreen', () => {
         opened(waiting());
         screen[call]();
         failed[call](reason);
-        expect(last(), reason).toMatchObject({ failure: failureText(reason), canSend: true });
+        expect(last(), reason).toMatchObject({ failure: failureText(PAGE_TEXTS_EN.failures, reason), canSend: true });
         expect(last().proposal!.buttons, reason).toBe('offered');
         expect([calls().load, changes()], reason).toEqual([1, 0]);
       }
@@ -780,7 +781,7 @@ describe('AssistantScreen', () => {
       opened(reply({ messages: [message(1, 'person', 'hi')] }));
       screen.end();
       failed.end(reason);
-      expect(last()).toMatchObject({ failure: failureText(reason), canSend: true, canEnd: true });
+      expect(last()).toMatchObject({ failure: failureText(PAGE_TEXTS_EN.failures, reason), canSend: true, canEnd: true });
       expect(texts(last())).toEqual(['hi']);
     });
   });

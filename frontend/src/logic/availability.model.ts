@@ -1,5 +1,6 @@
 import { CALENDAR_LIMITS, lastsWholeHours, LocalDate, TYPE_CAPACITY, TypeName, type AvailabilityType, type PatternBody, type WeeklyPattern } from '@shared-calendar/shared';
-import { longDateText } from './texts';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
+
 
 // The availability screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the availability types
 // and the weekly patterns as the API answers them (docs/SHARED_CALENDAR_SPEC.md sections 6.1
@@ -213,12 +214,12 @@ export function patternGroups(patterns: readonly WeeklyPattern[], types: readonl
         const time = `${pattern.start} – ${pattern.end}`;
         const typeName = names.get(pattern.typeId) ?? UNKNOWN_TYPE;
         const what = `${weekday} ${time} ${typeName}`;
-        const from = `from ${longDateText(pattern.validFrom)}`;
+        const from = `from ${PAGE_TEXTS_EN.dates.longDate(pattern.validFrom)}`;
         return {
           patternId: pattern.patternId,
           time,
           typeName,
-          validity: pattern.validUntil === null ? from : `${from} to ${longDateText(pattern.validUntil)}`,
+          validity: pattern.validUntil === null ? from : `${from} to ${PAGE_TEXTS_EN.dates.longDate(pattern.validUntil)}`,
           ended: pattern.validUntil !== null && pattern.validUntil < today,
           what,
           changeLabel: `Change ${what}`,

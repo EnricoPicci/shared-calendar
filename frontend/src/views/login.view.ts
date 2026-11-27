@@ -1,6 +1,7 @@
 import type { Subscription } from 'rxjs';
 import { failureText } from '../logic/texts';
 import type { LoginService } from '../services/login.service';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // What the login view uses of the LoginService: one method and one stream.
 export type LoginDeps = Pick<LoginService, 'login' | 'loginState$'>;
@@ -43,7 +44,7 @@ export function mountLogin(root: HTMLElement, login: LoginDeps, notice = ''): Su
     // The form is shown first: a browser gives no keyboard to a field of a hidden form.
     if (back) password.focus();
     button.disabled = state.status === 'pending';
-    error.textContent = state.status === 'failure' ? failureText(state.reason) : '';
+    error.textContent = state.status === 'failure' ? failureText(PAGE_TEXTS_EN.failures, state.reason) : '';
   });
 
   // 4. Leaving the view: the element stays in the page, only hidden, so what was typed and the

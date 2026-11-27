@@ -1,5 +1,6 @@
 import { addDays, CALENDAR_LIMITS, localDateOf, type Appointment } from '@shared-calendar/shared';
-import { dateText, offsetChangesOn, rangeText } from './texts';
+import { offsetChangesOn, rangeText } from './texts';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The list of "My appointments" ready to draw (docs/FRONTEND_ARCHITECTURE.md section 5.1): the
 // appointments as the API answers them (docs/SHARED_CALENDAR_SPEC.md section 11.5) turned into
@@ -37,7 +38,7 @@ export function appointmentRows(appointments: readonly Appointment[], now: Date,
     const kind = kindOf(appointment, now);
     return {
       appointmentId: appointment.appointmentId,
-      date: dateText(appointment.date),
+      date: PAGE_TEXTS_EN.dates.shortDate(appointment.date),
       time: rangeText(appointment.start, appointment.end, zone, offsetChangesOn(appointment.date, zone)),
       typeName: appointment.typeName,
       note: appointment.note ?? '',

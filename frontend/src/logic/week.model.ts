@@ -1,5 +1,6 @@
 import { effectiveWindows, localDateOf, localTimeOf, type CalendarView, type Role } from '@shared-calendar/shared';
-import { dateText, offsetChangesOn, rangeText, timeText } from './texts';
+import { offsetChangesOn, rangeText, timeText } from './texts';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The week ready to draw (docs/FRONTEND_ARCHITECTURE.md section 5): what GET /calendar answers
 // (docs/SHARED_CALENDAR_SPEC.md section 11.6) turned into days of blocks, each with its place in
@@ -244,7 +245,7 @@ export function weekModel(view: CalendarView, role: Role): WeekModel {
           lane: 0,
           lanes: 1,
           what: `${members.length} people · ${earliest.typeName}`,
-          when: `${dateText(day.date)}, ${time}`,
+          when: `${PAGE_TEXTS_EN.dates.shortDate(day.date)}, ${time}`,
           colour: colourOf(earliest.typeId),
           rows: byStart.map((a) => ({ appointmentId: a.appointmentId, time: a.time, who: a.username })),
           beside: overlaps(span, slotSpans),
@@ -252,7 +253,7 @@ export function weekModel(view: CalendarView, role: Role): WeekModel {
       });
       return {
         date: day.date,
-        label: dateText(day.date),
+        label: PAGE_TEXTS_EN.dates.shortDate(day.date),
         today: day.date === today,
         windows: placed(day.windows).map((w) => ({ ...place(w), typeName: w.typeName, colour: colourOf(w.typeId) })),
         slots: placed(day.slots).map((s, i) => {
@@ -263,7 +264,7 @@ export function weekModel(view: CalendarView, role: Role): WeekModel {
             colour: colourOf(s.typeId),
             start: s.start,
             end: s.end,
-            day: dateText(day.date),
+            day: PAGE_TEXTS_EN.dates.shortDate(day.date),
             typeName: typeNames.get(s.typeId) ?? '',
             window: { start: holder.start, end: holder.end },
             ...shown,

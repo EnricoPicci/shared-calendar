@@ -4,6 +4,7 @@ import { deleteQuestion, editTitle, USERNAME_HINT, type UserRow } from '../logic
 import type { UsernameField, UsersScreen } from '../logic/users.screen';
 import type { UsersService } from '../services/users.service';
 import { editDialog, profileForm } from './profile.parts';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // What the users view uses: of the UsersScreen its stream, the create, the invitation's dialog,
 // the edit and the new try after a read that failed; of the UsersService the delete with its
@@ -183,7 +184,7 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
     users.deleteUserState$.subscribe((state) => {
       removeSubmit.disabled = state.status === 'pending';
       if (!deleteAsked) return;
-      removeError.textContent = state.status === 'failure' ? failureText(state.reason) : '';
+      removeError.textContent = state.status === 'failure' ? failureText(PAGE_TEXTS_EN.failures, state.reason) : '';
       if (state.status === 'success') remove.close();
     }),
   );

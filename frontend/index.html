@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Shared calendar</title>
+    <title></title>
     <link rel="stylesheet" href="style.css" />
     <script type="module" src="app.js"></script>
   </head>
@@ -54,11 +54,11 @@
     <!-- The frame of the application, for a signed-in person (src/views/shell.ts) -->
     <div id="app" hidden>
       <header class="bar">
-        <strong class="title">Shared calendar</strong>
+        <strong class="title" data-text="frame.title"></strong>
         <span class="who"><span class="username"></span> <span class="role"></span></span>
-        <button type="button" class="sign-out">Sign out</button>
+        <button type="button" class="sign-out" data-text="frame.signOut"></button>
       </header>
-      <nav class="nav" aria-label="Screens"></nav>
+      <nav class="nav" data-label="frame.screens"></nav>
       <!-- A link of the navigation: the shell copies it once per screen the person may see -->
       <template id="tpl-nav-link">
         <a class="nav-link"></a>

@@ -1,5 +1,6 @@
 import type { Appointment, Role } from '@shared-calendar/shared';
-import { dateText, dateTimeText, offsetChangesOn, rangeText } from './texts';
+import { dateTimeText, offsetChangesOn, rangeText } from './texts';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The appointment detail (docs/FRONTEND_ARCHITECTURE.md section 5): an appointment as the API
 // answers it (docs/SHARED_CALENDAR_SPEC.md section 11.5) turned into what the detail dialog
@@ -40,12 +41,12 @@ export function appointmentDetail(appointment: Appointment, role: Role, now: Dat
   const by = !admin && appointment.createdBy.role === 'user' ? 'you' : appointment.createdBy.username;
   return {
     appointmentId: appointment.appointmentId,
-    when: `${dateText(appointment.date)}, ${rangeText(appointment.start, appointment.end, zone, offsetChangesOn(appointment.date, zone))}`,
+    when: `${PAGE_TEXTS_EN.dates.shortDate(appointment.date)}, ${rangeText(appointment.start, appointment.end, zone, offsetChangesOn(appointment.date, zone))}`,
     typeName: appointment.typeName,
     who: admin ? appointment.username : 'You',
     note: appointment.note ?? '—',
     noteValue: appointment.note ?? '',
-    booked: `Booked by ${by} on ${dateTimeText(appointment.createdAt, zone)}`,
+    booked: `Booked by ${by} on ${dateTimeText(PAGE_TEXTS_EN.dates, appointment.createdAt, zone)}`,
     canEditNote: active,
     canChange: canCancel,
     canCancel,
@@ -65,7 +66,7 @@ function sentence(appointment: Appointment, admin: boolean, active: boolean, can
   if (!active) return 'This appointment has ended.';
   if (admin) return '';
   return canCancel
-    ? `It can be changed or cancelled until ${dateTimeText(appointment.cancellableUntil!, zone)}.`
+    ? `It can be changed or cancelled until ${dateTimeText(PAGE_TEXTS_EN.dates, appointment.cancellableUntil!, zone)}.`
     : 'It is too late to change or cancel this appointment.';
 }
 

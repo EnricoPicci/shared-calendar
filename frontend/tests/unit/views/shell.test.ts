@@ -1,4 +1,7 @@
 import { BehaviorSubject, firstValueFrom, Observable, Subscription } from 'rxjs';
+import { PageLanguage } from '../../../src/logic/language';
+import { padded, PADDED_CLOSE, PADDED_OPEN } from '../../../src/texts/padded';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 import type { LoginState, Session } from '../../../src/services/login.types';
 import { LogoutService } from '../../../src/services/logout.service';
 import { SessionStore } from '../../../src/services/session.store';
@@ -14,6 +17,8 @@ import { find, loadPage, setTime, submit, timeIn, useRealPage } from './page';
 // stays unanswered unless a test answers it.
 
 const CONFIG = { apiUrl: 'http://api.test', cognitoUrl: 'http://cognito.test/', clientId: 'client-123' };
+// The page in English, as the start-up makes it.
+const english = () => new PageLanguage({ language: 'en', texts: PAGE_TEXTS_EN });
 // A call that is never answered.
 const unanswered = () => new Promise<Response>(() => {});
 
@@ -75,7 +80,7 @@ function mounted(first: Session | null = null, screens?: readonly Screen[]) {
   // The real sign-out service on the test's store: its request to Cognito stays unanswered
   // unless a test answers it. The fake login has nothing to put back.
   const logout = new LogoutService(CONFIG, store, []);
-  shell = mountShell(document.body, { config: CONFIG, store, login, logout, ...(screens ? { screens } : {}) });
+  shell = mountShell(document.body, { config: CONFIG, language: english(), store, login, logout, ...(screens ? { screens } : {}) });
   return {
     store,
     state$,
@@ -179,7 +184,7 @@ describe('mountShell', () => {
     store.set(ALICE);
     const logout = { logout: vi.fn<() => void>() };
     const login: LoginDeps = { loginState$: new BehaviorSubject<LoginState>({ status: 'idle' }), login: vi.fn<LoginDeps['login']>() };
-    shell = mountShell(document.body, { config: CONFIG, store, login, logout });
+    shell = mountShell(document.body, { config: CONFIG, language: english(), store, login, logout });
 
     find('#app .sign-out').click();
     expect(logout.logout).toHaveBeenCalledTimes(1);
@@ -312,6 +317,47 @@ describe('runShell', () => {
     expect(find('#login').hidden).toBe(false);
     expect(find('#app').hidden).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // The padded test language (docs/MULTILANGUAGE_ARCHITECTURE.md section 6.3, rule 4).
+  describe('the language of the page', () => {
+    const at = (search: string) => window.history.replaceState(null, '', `${window.location.pathname}${search}`);
+    afterEach(() => at(''));
+
+    it('is English, its words in the frame and in the title, the page in English for a screen reader', async () => {
+      fetchMock.mockResolvedValueOnce(tokensFor('ada', 'admin'));
+      shell = runShell(CONFIG);
+      signIn('ada', 'Secret-Pass-1!');
+      await vi.waitFor(() => expect(find('#app').hidden).toBe(false));
+      expect(find('#app .sign-out').textContent).toBe('Sign out');
+      expect(find('#app .role').textContent).toBe('Administrator');
+      expect(document.title).toBe('Shared calendar');
+      expect(document.documentElement.lang).toBe('en');
+    });
+
+    it('is English when the address asks for the padded language and the bundle offers none', () => {
+      at('?padded');
+      shell = runShell(CONFIG);
+      expect(document.title).toBe('Shared calendar');
+    });
+
+    it('is English when the bundle offers the padded language and the address does not ask for it', () => {
+      shell = runShell({ ...CONFIG, testLanguage: padded });
+      expect(document.title).toBe('Shared calendar');
+    });
+
+    it('is the padded language when the bundle offers it and the address asks: every text of the frame is marked', async () => {
+      at('?padded');
+      fetchMock.mockResolvedValueOnce(tokensFor('ada', 'admin'));
+      shell = runShell({ ...CONFIG, testLanguage: padded });
+      signIn('ada', 'Secret-Pass-1!');
+      await vi.waitFor(() => expect(find('#app').hidden).toBe(false));
+      const marked = new RegExp(`^${PADDED_OPEN}.+${PADDED_CLOSE}$`);
+      expect(document.title).toMatch(marked);
+      for (const element of [find('#app .title'), find('#app .sign-out'), find('#app .role'), ...document.querySelectorAll<HTMLElement>('#app .nav a')]) expect(element.textContent).toMatch(marked);
+      expect(find('#app .nav').getAttribute('aria-label')).toMatch(marked);
+      expect(find('#app .username').textContent).toBe('ada');
+    });
   });
 
   it('signing in posts to the configured Cognito with the configured client, then shows the frame', async () => {
@@ -1067,7 +1113,7 @@ describe('the navigation', () => {
     const other = () => {
       const left = vi.fn();
       const show = vi.fn<Screen['show']>(() => new Subscription(left));
-      const screen: Screen = { hash: '#/other', label: 'Other', roles: ['admin'], element: '#week', show };
+      const screen: Screen = { hash: '#/other', label: () => 'Other', roles: ['admin'], element: '#week', show };
       return { screens: [...SCREENS, screen], show, left };
     };
     const current = () => links().map((a) => [a.textContent, a.getAttribute('aria-current')]);
@@ -3081,7 +3127,7 @@ describe('"My details", for both roles', () => {
 
   it('is the row just before the password, for both roles, at #/me', () => {
     const row = SCREENS.at(-2)!;
-    expect([row.hash, row.label, row.roles, row.element]).toEqual(['#/me', 'My details', ['admin', 'user'], '#me']);
+    expect([row.hash, row.label(PAGE_TEXTS_EN.frame), row.roles, row.element]).toEqual(['#/me', 'My details', ['admin', 'user'], '#me']);
   });
 
   it('a User on #/me: one GET /me with the person\'s token, the details shown, no Edit, and the sentence that says whom to ask', async () => {
@@ -3153,7 +3199,7 @@ describe('the password, the last screen of both roles', () => {
       void firstValueFrom(store.session$).then((s) => atReset.push(s));
     });
     const config = skipGlobalSignOut === undefined ? CONFIG : { ...CONFIG, skipGlobalSignOut };
-    shell = mountShell(document.body, { config, store, login, logout: new LogoutService(CONFIG, store, []), pageWide });
+    shell = mountShell(document.body, { config, language: english(), store, login, logout: new LogoutService(CONFIG, store, []), pageWide });
     window.location.hash = '#/password';
     window.dispatchEvent(new HashChangeEvent('hashchange'));
     return { store, pageWide, atReset };
@@ -3172,7 +3218,7 @@ describe('the password, the last screen of both roles', () => {
 
   it('is the last row of the table, for both roles, at #/password', () => {
     const row = SCREENS.at(-1)!;
-    expect([row.hash, row.label, row.roles, row.element]).toEqual(['#/password', 'Password', ['admin', 'user'], '#password']);
+    expect([row.hash, row.label(PAGE_TEXTS_EN.frame), row.roles, row.element]).toEqual(['#/password', 'Password', ['admin', 'user'], '#password']);
   });
 
   it.each([

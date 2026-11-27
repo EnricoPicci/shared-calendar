@@ -22,6 +22,7 @@ import {
   type WindowFields,
 } from './date.model';
 import { failureText, type Attempt } from './texts';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // A single date of the availability screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the
 // date chosen, its day read from the calendar view, the windows of "this day only" while they
@@ -176,7 +177,7 @@ export class DateScreen {
       const day = result.status === 'success' ? result.calendar.days.find((each) => each.date === this.shown) : undefined;
       this.read = day === undefined || result.status !== 'success' ? null : { day, zone: result.calendar.timeZone };
       // A view without the date asked for is not what the contract says.
-      this.draw({ loading: false, unread: result.status === 'failure' ? failureText(result.reason) : day === undefined ? failureText('unexpected') : null });
+      this.draw({ loading: false, unread: result.status === 'failure' ? failureText(PAGE_TEXTS_EN.failures, result.reason) : day === undefined ? failureText(PAGE_TEXTS_EN.failures, 'unexpected') : null });
     });
 
     // A save and "not available" are one call: the answer is of the one under way.
@@ -339,7 +340,7 @@ export class DateScreen {
   // A write that failed: why, in plain words, with the appointments in the way when the
   // server named some, in the time zone the date was judged in.
   private failed(about: string, result: Outcome & { status: 'failure' }, attempt?: Attempt): Ask<never> {
-    return { ...QUIET, about, failure: failureText(result.reason, attempt), conflicts: conflictList(result.conflicts, this.zone!) };
+    return { ...QUIET, about, failure: failureText(PAGE_TEXTS_EN.failures, result.reason, attempt), conflicts: conflictList(result.conflicts, this.zone!) };
   }
 
   private today(zone: string): string {

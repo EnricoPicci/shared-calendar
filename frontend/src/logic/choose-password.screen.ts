@@ -3,6 +3,7 @@ import type { LoginService } from '../services/login.service';
 import type { LoginState } from '../services/login.types';
 import { EMPTY_NEW_HINTS, newHintStands, newPasswordHints, problemTexts, type NewPasswordFields, type NewPasswordHints } from './password.model';
 import { failureText } from './texts';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The screen "Choose your password" of a first sign-in (docs/FRONTEND_ARCHITECTURE.md section
 // 5.1): shown in place of the login while the LoginService waits for a new password, with the
@@ -98,7 +99,7 @@ export class ChoosePasswordScreen {
     if (refusal === undefined) return this.patch({ pending: false });
     // The shared rule's refusal shows as the new field's hints; any other refusal under the form.
     if (refusal.reason === 'new_password_refused') this.patch({ pending: false, hints: { ...this.state.getValue().hints, next: problemTexts(refusal.problems) } });
-    else this.patch({ pending: false, failure: failureText(refusal.reason) });
+    else this.patch({ pending: false, failure: failureText(PAGE_TEXTS_EN.failures, refusal.reason) });
   }
 
   private patch(change: Partial<ChoosePasswordState>): void {

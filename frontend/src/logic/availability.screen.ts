@@ -23,6 +23,7 @@ import {
 } from './availability.model';
 import { conflictList, type ConflictList } from './conflicts';
 import { failureText, type Attempt } from './texts';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The availability screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the availability types
 // and the weekly patterns read when the screen is shown, the four writes that have a check
@@ -174,19 +175,19 @@ export class AvailabilityScreen {
     hear(this.settings.settingsResult$, (result) => {
       const first = this.zone === null && result.status === 'success';
       if (result.status === 'success') this.zone = result.settings.timeZone;
-      this.zoneWhy = result.status === 'failure' ? failureText(result.reason) : null;
+      this.zoneWhy = result.status === 'failure' ? failureText(PAGE_TEXTS_EN.failures, result.reason) : null;
       // The form that creates a pattern starts on today, once the zone says which day that is.
       this.haveRead('settings', first ? { patternFields: startingFields(this.today()) } : {});
     });
     hear(this.types.typesResult$, (result) => {
       this.listed = result.status === 'success' ? result.types : null;
       this.known = this.listed ?? this.known;
-      this.typesWhy = result.status === 'failure' ? failureText(result.reason) : null;
+      this.typesWhy = result.status === 'failure' ? failureText(PAGE_TEXTS_EN.failures, result.reason) : null;
       this.haveRead('types');
     });
     hear(this.rules.patternsResult$, (result) => {
       this.patterns = result.status === 'success' ? result.patterns : null;
-      this.patternsWhy = result.status === 'failure' ? failureText(result.reason) : null;
+      this.patternsWhy = result.status === 'failure' ? failureText(PAGE_TEXTS_EN.failures, result.reason) : null;
       this.haveRead('patterns');
     });
 
@@ -302,7 +303,7 @@ export class AvailabilityScreen {
   private answer(ask: AskName, result: Outcome, attempt: Attempt, more: Partial<AvailabilityState> = {}): void {
     // The answer is of the call under way, which is the one the state is about.
     const about = this.state.getValue()[ask].about;
-    const outcome = result.status === 'success' ? { ...QUIET, about, done: true } : { ...QUIET, about, failure: failureText(result.reason, attempt), conflicts: this.conflicts(result.conflicts) };
+    const outcome = result.status === 'success' ? { ...QUIET, about, done: true } : { ...QUIET, about, failure: failureText(PAGE_TEXTS_EN.failures, result.reason, attempt), conflicts: this.conflicts(result.conflicts) };
     this.patch({ [ask]: outcome, ...more });
   }
 

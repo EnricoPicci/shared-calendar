@@ -6,6 +6,7 @@ import { appointmentDetail, movingOf, type AppointmentDetail } from './appointme
 import { appointmentRows, defaultPeriod, emptyText, periodRefusal, type AppointmentRow, type Mode, type Period } from './appointments.model';
 import { failureText } from './texts';
 import type { WeekScreen } from './week.screen';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The screen "My appointments" (docs/FRONTEND_ARCHITECTURE.md section 5.1): which of its two
 // lists is on show, upcoming or history, the period of the history, the calendar's time zone
@@ -84,7 +85,7 @@ export class AppointmentsScreen {
     const subscription = this.settings.settingsResult$.subscribe((result) => {
       if (!live) return;
       if (result.status === 'failure') {
-        this.patch({ loading: false, failure: failureText(result.reason) });
+        this.patch({ loading: false, failure: failureText(PAGE_TEXTS_EN.failures, result.reason) });
         return;
       }
       this.zone = result.settings.timeZone;
@@ -95,7 +96,7 @@ export class AppointmentsScreen {
         // Without a zone no list was asked for since this start: the answer is an earlier one's.
         if (!live || this.zone === null) return;
         if (result.status === 'failure') {
-          this.patch({ loading: false, failure: failureText(result.reason) });
+          this.patch({ loading: false, failure: failureText(PAGE_TEXTS_EN.failures, result.reason) });
           return;
         }
         this.loaded = result.appointments;

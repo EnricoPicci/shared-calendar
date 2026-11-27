@@ -1,5 +1,6 @@
 import { SETTINGS_RANGES, type CalendarSettings, type UpdateSettingsBody } from '@shared-calendar/shared';
 import { dateTimeText } from './texts';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The settings form (docs/FRONTEND_ARCHITECTURE.md section 5.1): the calendar's settings as the
 // API answers them (docs/SHARED_CALENDAR_SPEC.md section 9) turned into what the form's fields
@@ -38,7 +39,7 @@ export function settingsInfo(settings: CalendarSettings): SettingsInfo {
   const lastSaved =
     updatedAt === null || updatedBy === null
       ? 'These are the default settings: nobody has saved them yet.'
-      : `Last saved by ${updatedBy.username} on ${dateTimeText(updatedAt, timeZone)}`;
+      : `Last saved by ${updatedBy.username} on ${dateTimeText(PAGE_TEXTS_EN.dates, updatedAt, timeZone)}`;
   return { timeZone, lastSaved };
 }
 

@@ -3,6 +3,7 @@ import { BehaviorSubject, type Observable, type Subscription } from 'rxjs';
 import type { MailService } from '../services/mail.service';
 import type { MeService } from '../services/me.service';
 import { failureText, MAIL_TEXTS } from './texts';
+import { PAGE_TEXTS_EN } from '../texts/texts.en';
 
 // The week's "E-mail…" dialog (docs/FRONTEND_ARCHITECTURE.md section 5.1), for both roles: asks
 // for the mail of two dates, then, once it is asked for, reads the person's own address with
@@ -45,7 +46,7 @@ export class MailScreen {
       if (!live || this.awaited !== 'mail') return;
       if (result.status === 'failure') {
         this.awaited = null;
-        this.state.next({ ...this.nothing(), failure: failureText(result.reason, 'mail') });
+        this.state.next({ ...this.nothing(), failure: failureText(PAGE_TEXTS_EN.failures, result.reason, 'mail') });
         return;
       }
       this.awaited = 'me';
