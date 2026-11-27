@@ -951,8 +951,28 @@ sentences of the instructions and the evaluation's 67 requests (section 12.3). N
 closing note below, leaves the local stack up and seeded for the Product Owner's look, and
 stops.
 
-**As done (phase A, the closing).** *Empty: the commits of the fourteen steps, the counts of
-tests, what each list of sections 7 and 8 holds, what is known to be unproven.*
+**As done (phase A, the closing).** Done 2026-11-27, on the branch `multilanguage`, nothing
+pushed. The fourteen commits, in order: l1 `c9830d3`, l2 `fda2627`, l3a `ae4e610`, l3b
+`b3c19ed`, l3c `3b58682`, l3d `cf5bfa8`, l3e `3e7df32`, l3f `fa53647`, l3g `fcd370c`, l4
+`e1b5623`, l5 `46e6b64`, l6 `fc39d3c`, l7 `b64a113`, l8 `adb2627`. Unit tests at the end:
+`shared` 673, `backend` 2090, `frontend` 3293 (at step l1: 632, 2058, 3165), all green, 100 %
+lines; `typecheck`, `lint` and `sam validate --lint` pass. Each step ran only its own
+journeys; the full regression (`verify`, every journey, `docs/FRONTEND_WALK.md`, `smoke`) was
+not run, as the working rhythm keeps it for before a deploy. **Stops of section 6.3 met:
+none.** The local stack never hung; `local:lambda` started together with `local:api` once
+failed with "Template file not found" and started cleanly alone after it. Section 7 holds 20
+Italian wordings to review, section 8 four screens not settled. **Known to be unproven**, all
+for phase B: the cloud's facts of F16 (the app client writing `locale` and the page reading it
+with `GetUser` at the real Cognito; the invitation function called by Cognito, its mail in
+Italian with a working password, a failure of it failing the creation cleanly);
+`DefaultLanguage` `it` at the cloud's stack and the page built with it; the assistant's
+instructions changed, so the paid evaluation (69 requests) must run once, and the conversations
+in progress end at the deploy; every Italian text, read by no Italian speaker yet; the
+documents of phase B's item 6, including `shared/CLAUDE.md` and
+`docs/CONVERSATIONAL_ARCHITECTURE.md`, which still describe what step l8 changed. Left for the
+Product Owner's look: the local stack up (`local:api`, `local:lambda`, the dev page on
+http://localhost:5173), the calendar seeded, `admin` and `alice` with no language held, no
+conversation in progress for `admin`. The three permissions of section 2.2 end here.
 
 ## 5. Phase B: what waits for the Product Owner
 
