@@ -942,7 +942,7 @@ added (a German first message from an Italian page, the same with no language, `
 assistant journeys once, 19 passed. The look, as `admin` on the Italian page at 1280 and 390:
 the panel before a conversation in Italian; the German sentence became an Italian conversation,
 the fake's answer showing the line with the Italian notes. Afterwards the language the sign-in
-wrote to `admin` was removed. For phase B's item 6: `shared/CLAUDE.md`'s folder map still names
+wrote to `admin` was removed. For phase B's item 5: `shared/CLAUDE.md`'s folder map still names
 `languages.ts` among the assistant's files, and `docs/CONVERSATIONAL_ARCHITECTURE.md`
 still describes the English fallback (section 4.2 and the panel's sentences), the Italian
 sentences of the instructions and the evaluation's 67 requests (section 12.3). No new Italian wording: the notes repeat the words the instructions held.
@@ -968,7 +968,7 @@ Italian with a working password, a failure of it failing the creation cleanly);
 `DefaultLanguage` `it` at the cloud's stack and the page built with it; the assistant's
 instructions changed, so the paid evaluation (69 requests) must run once, and the conversations
 in progress end at the deploy; every Italian text, read by no Italian speaker yet; the
-documents of phase B's item 6, including `shared/CLAUDE.md` and
+documents of phase B's item 5, including `shared/CLAUDE.md` and
 `docs/CONVERSATIONAL_ARCHITECTURE.md`, which still describe what step l8 changed. Left for the
 Product Owner's look: the local stack up (`local:api`, `local:lambda`, the dev page on
 http://localhost:5173), the calendar seeded, `admin` and `alice` with no language held, no
@@ -986,12 +986,16 @@ without it, and the rules of the root `CLAUDE.md` hold as written.
    corrections in one commit; a correction that goes over a budget is settled by L16's rule 3.
 3. **The Product Owner's own look at the screens**: the list of section 8, then whatever else
    the Product Owner wants to see, on the local page in Italian and at `?padded`.
-4. **The cloud's facts, reading only** (F16), each command on an explicit instruction: the
-   app client as it is today (its write and read lists), the pool (no trigger yet).
-5. **The paid evaluation**: 69 requests; the last run of 67 cost 53.00 US cents, so about 55,
+4. **The paid evaluation**: 69 requests; the last run of 67 cost 53.00 US cents, so about 55,
    said again and agreed before it is run, on a stack started with the real key by the
    Product Owner. The requests in Italian and the two new ones are read by hand.
-6. **The documents of the architecture's section 14**, written in one pass from the "As done"
+   **Run 2026-11-27, agreed by the Product Owner:** 69 of 69 passed, 132 steps, on
+   `claude-sonnet-5-5` at effort `low`, 52.96 US cents (ceiling 2 dollars). Read by hand: the
+   German first message from an Italian page answered in Italian with the formal "lei", the
+   same with no page language answered in English; the 19 Italian answers of the hand file use
+   no informal form and no "pattern", "override" or "one-off", and the seven about the opening
+   hours use the application's words.
+5. **The documents of the architecture's section 14**, written in one pass from the "As done"
    notes and reviewed: `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md` (M17 replaced),
    `docs/FRONTEND_ARCHITECTURE.md` (section 12.4 rewritten, D1 and D2 as decisions),
    `docs/FRONTEND_SERVICES.md`, `docs/CONVERSATIONAL_ARCHITECTURE.md`,
@@ -1000,20 +1004,22 @@ without it, and the rules of the root `CLAUDE.md` hold as written.
    and the two packages' files, `.claude/rules/frontend-views.md` (the label's words, F3),
    all left in line with "Changing these files". The sentence for the privacy notice (the
    language and its purpose) is given to the Product Owner, who owns the notice.
-7. **The merge with `main`** (section 9), in a session of its own.
-8. **The full regression, once, on what will be deployed**: the root
+6. **The merge with `main`** (section 9), in a session of its own.
+7. **The full regression, once, on what will be deployed**: the root
    `DYNAMODB_PORT=8002 npm run verify`, the front end's journeys, the smoke test locally, and
    `docs/FRONTEND_WALK.md` in English with its new section in Italian. How much of the walk is
    walked is agreed first, as in the earlier releases.
-9. **The deploy**, each command on an explicit instruction: the API first, with
-   `DefaultLanguage` at `it`. Its change set is read before it is carried out: the app client
+8. **The deploy**, each command on an explicit instruction: the API first, with
+   `DefaultLanguage` at `it`. Before it, the cloud's facts, reading only (F16), each command on
+   an explicit instruction: the app client as it is today (its write and read lists) and the
+   pool (no trigger yet). Its change set is read before it is carried out: the app client
    and the pool "Modify", never "Replace"; one function, one role, one log group and one
    permission added. Then the smoke test in the cloud; the gap of the architecture's section
    4.4 tried on a test user (its own e-mail can no longer be written, its `locale` can); one
    invitation received and read, in Italian, its password used. Then the page. Then the
    Product Owner signs in once, so that the Administrator's account gets its language and the
    daily mail follows it.
-10. **The release closed**: the version (a minor one after the e-mail work's, chosen then),
+9. **The release closed**: the version (a minor one after the e-mail work's, chosen then),
     the record in `docs/RUNBOOK.md`, `README.md`'s versions, the tag, the push.
 
 ## 6. The rules of the run
@@ -1176,7 +1182,7 @@ Phase A waits for none of it. What the merge of phase B must do about each:
   sentence in `shared/src/mail/`, `backend/src/lib/excel.ts`, the mailer's file names, the
   template's invitation, the assistant's instructions.
 - **The assistant.** Step l8 changes the instructions; so may `whatsapp`. The paid evaluation
-  judges the code that is deployed: if a merge after phase B's item 5 changes the
+  judges the code that is deployed: if a merge after phase B's item 4 changes the
   instructions again, it is run again, its cost said first.
 
 ## 10. Out of this plan
