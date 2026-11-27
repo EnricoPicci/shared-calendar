@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Finalized as a design, not built. The decisions of section 2.2, the proposals of section 2.3 and every open point (section 16) are confirmed by the Product Owner (2026-11-27). Four facts about AWS are still to try, in the plan's first step (section 17) |
+| Status | Finalized as a design, being built (`docs/MULTILANGUAGE_PLAN.md`). The decisions of section 2.2, the proposals of section 2.3 and every open point (section 16) are confirmed by the Product Owner (2026-11-27); L7 was changed by the plan's decision P1. The facts about the local Cognito are tried; the facts about the cloud's pool wait for the plan's phase B (section 17) |
 | Date | 2026-11-27 |
 | Brief | `prompts/lang-l01-multilanguage-idea.md`, with the answers of the clarification round (section 2.2) |
 | Builds on | `docs/ARCHITECTURE.md` (section 5.1, the user pool), `docs/EMAIL_ARCHITECTURE.md` (sections 4, 5, 6 and 7), `docs/FRONTEND_ARCHITECTURE.md` (section 12.4, the language), `docs/CONVERSATIONAL_ARCHITECTURE.md` (section 4.2, the language of a conversation) |
@@ -17,7 +17,8 @@ operator, have to decide and do (section 16).
 
 The facts about the code were read in the repository on 2026-11-27. The facts about AWS were
 read that day in AWS's documentation (section 17); those not yet tried on a real stack are
-marked "to try", and the plan's first step tries them.
+marked "to try". The local Cognito was tried in the plan's step l1; the cloud's pool is tried in
+the plan's phase B (`docs/MULTILANGUAGE_PLAN.md` section 5).
 
 ---
 
@@ -42,7 +43,7 @@ marked "to try", and the plan's first step tries them.
 
 The language is a fact of the person, kept in Cognito beside the other four, in Cognito's
 standard attribute `locale`. The person writes it themselves, straight at Cognito, as they
-change their password today; the page reads it from the sign-in's answer; the mailer reads it
+change their password today; the page asks Cognito for it right after sign-in; the mailer reads it
 with the address it already looks up. The translations are **typed objects in the code, one per
 language**, as the assistant's fixed texts already are: a language with a text missing does not
 compile. There is one list of languages, in `shared/`; adding a language is adding its entry and
@@ -92,10 +93,10 @@ writing the files the compiler then asks for. No library is added.
 | L4 | The language is Cognito's standard attribute `locale`, holding the bare code (`en`, `it`) | Cognito stays the only store of people; a standard attribute changes no schema, so the pool is never replaced (`docs/EMAIL_ARCHITECTURE.md` section 4.1) |
 | L5 | The person writes it straight at Cognito (`UpdateUserAttributes` with their own token); the API gets no route for it | It makes R3 true by construction: no code of ours can set anybody's language. No new function, no new role. The password already works this way |
 | L6 | The app client may write `locale` and nothing else (`WriteAttributes`) | Needed for L5, and it closes the gap of section 4.4 |
-| L7 | The page reads the language from the id token it already receives at sign-in and at each refresh | No extra request before the first screen, so no screen shown in the wrong language first |
+| L7 | Right after sign-in the page asks Cognito for the person's own attributes (`GetUser`, with the access token it already holds) and reads `locale` there; the frame stays hidden until the answer. The id token is not read for the language | The local Cognito never puts `locale` into the id token (section 17), so reading the token could be neither run nor tested locally; one request more per sign-in, the same path locally and in the cloud, and still no screen shown in the wrong language first. Decided by the Product Owner at planning (`docs/MULTILANGUAGE_PLAN.md` decision P1) |
 | L8 | Translations are typed objects in the code, one per language, checked by the compiler; no translation library, no files loaded at run time | The assistant's texts already work this way (`shared/src/assistant/texts.ts`); two small languages do not justify a library or a loading step |
 | L9 | One list of languages in `shared/`, used by the page, the mails and the assistant | Today the assistant has its own list; two lists would drift |
-| L10 | The names of days and months are written out per language in `shared/`, not asked of the runtime (`Intl`) | The same words in every browser and in Lambda, whatever their version; today's code already avoids `Intl`'s wording for this reason (`frontend/src/logic/texts.ts`) |
+| L10 | The names of days and months are written out per language in `shared/`, not asked of the runtime (`Intl`) | The same words in every browser and in Lambda, whatever their version. Today's page avoids `Intl`'s order and punctuation (`frontend/src/logic/texts.ts` puts the parts together itself) but still takes the names from `Intl` in `en-US`; the names are written in four more places (`shared/src/mail/texts.ts`, the assistant's two files of texts, `backend/src/assistant/prompt.ts`), which this design brings onto one |
 | L11 | `frontend/index.html` holds no words: each fixed text is a key, filled from the language's object before anything is shown | One home for every text; switching language is filling again |
 | L12 | A small function words Cognito's invitation from the same typed texts (Cognito's "custom message" trigger) | The invitation's translations are kept and checked with all the others, instead of living in `backend/template.yaml` (section 7 weighs the alternative) |
 | L13 | The assistant keeps its rule; three small changes around it (section 9) | It already does what R2 asks |
@@ -132,7 +133,7 @@ flowchart LR
     end
     B -- 1 --> S
     S -- 2 sign in --> COG
-    COG -- 3 id token --> V
+    COG -- 3 GetUser --> V
     V -- 4 change --> COG
     V -- 5 --> PT
     PT -- 6 --> L
@@ -147,7 +148,7 @@ flowchart LR
 | Arrow | What happens |
 |---|---|
 | 1 | Before sign-in the page's language is the one this browser remembers, else the browser's own if supported, else the default |
-| 2, 3 | The person signs in; the id token carries their `locale`; from then on the page uses it |
+| 2, 3 | The person signs in; the page asks Cognito for their attributes (`GetUser`) and reads `locale`; from then on the page uses it |
 | 4 | An account with no language yet gets the page's current one, once; later the person changes it in "My details" |
 | 5, 6 | A screen takes every word from the page's texts of that language, and dates from the formats in `shared/` |
 | 7, 8 | When a user is created Cognito asks the invitation function for the mail's words; the function answers in the default language |
@@ -192,7 +193,7 @@ get the default language), provided every reader checks, and the plan tests that
 
 | Who | Read | Change |
 |---|---|---|
-| The person | their own (the id token) | their own, at Cognito, from "My details" |
+| The person | their own (`GetUser`, with their access token) | their own, at Cognito, from "My details" |
 | Administrator | nobody else's (the Users list does not show it, open point O3; it can be added later) | **nobody else's** |
 | The API | the mailer, of the person it writes to; the invitation function, of the person invited | **never**: no route, and no function's role is given the right for this purpose |
 | Assistant | none | none |
@@ -244,7 +245,8 @@ The design sets `WriteAttributes: [locale]` on the app client. A person's token 
 their language and nothing else. The Administrator's routes are not affected: they use the
 administrative calls, which this list does not govern.
 
-To try in the plan's first step: that the change of `WriteAttributes` updates the app client in
+To try in the cloud (the plan's phase B; the local Cognito ignores the write list, section 17):
+that the change of `WriteAttributes` updates the app client in
 place (the client id must not change, or every page would lose its sign-in), and that the
 back end's routes still write the four facts afterwards.
 
@@ -252,15 +254,16 @@ back end's routes still write the four facts afterwards.
 
 | Part | How |
 |---|---|
-| The page | from the claim `locale` of the id token, at sign-in and at each refresh; after a change, from what it just wrote |
+| The page | from the attribute `locale` that Cognito's `GetUser` answers, asked with the person's access token right after each sign-in and before the frame is shown; after a change, from what it just wrote. A refresh of the tokens does not read it again |
 | The mailer | from the attribute `locale` of the account, read with the same call that already reads the address (`getProfile`, `adminRecipients` in `backend/src/lib/cognito.ts`). No new permission |
 | The invitation function | from the attributes Cognito hands it with the request; absent for an invited person, so the default |
 | The assistant | does not use it (section 9) |
 
 The profile is still "never put into the token" by our code (`docs/EMAIL_ARCHITECTURE.md`
-section 9.2): Cognito puts the standard attributes into the id token by itself, today already.
-The API never reads the id token; only the page does. To try in the plan's first step: that the
-claim is there, locally and in the cloud.
+section 9.2). The page does not read the language from the id token at all: the local Cognito
+never puts `locale` there (section 17), so `GetUser` is the one path, locally and in the cloud.
+To try in the cloud (the plan's phase B): that `GetUser` answers `locale` with the app client's
+default read list.
 
 ---
 
@@ -438,9 +441,10 @@ characters is silently dropped and the default sent). The temporary password sti
 through our code: the function receives a placeholder, not the password, and Cognito puts the
 password in afterwards.
 
-Locally nothing changes: the local Cognito prints its own invitation in its log and no test
-reads it. The function is proved by its unit tests and, in the cloud, by the smoke test and one
-invitation looked at by hand. To try in the plan: that `sam local start-api` is not slowed by a
+Locally nothing changes: the local Cognito calls a "custom message" function only when its own
+configuration names one (`backend/docker/cognito-local-config.json` names none), so it prints its
+own invitation in its log as today and no test reads it. The function is proved by its unit tests and, in the cloud, by the smoke test and one
+invitation looked at by hand. To try in the plan's step l7: that `sam local start-api` is not slowed by a
 function that belongs to no route (the local stack is sensitive to the number of functions).
 
 ---
@@ -567,8 +571,11 @@ language.
   `locale`); a new page on the old API could not save a language, so the API goes first.
 - **Version**: nothing breaks an old client, so a minor version; its number is chosen at the
   plan, after the e-mail work's release.
-- **Locally**: the local Cognito keeps `locale` like any attribute, and its code knows
-  `UpdateUserAttributes` (found in the image, not yet tried: the plan's first step). The fake
+- **Locally**: the local Cognito keeps `locale` like any attribute, answers
+  `UpdateUserAttributes` and `GetUser` with the person's access token, and accepts any word as
+  `locale` (tried, section 17). It never puts `locale` into the id token, and it does not know
+  the app client's write list: locally a person's token can write any of its own attributes, so
+  the closing of the gap of section 4.4 is proved only in the cloud. The fake
   mail shows a mail in Italian as it shows one in English.
 - **Cost**: nothing measurable. One more function called once per invitation; the same number
   of mails. The one real cost is the paid evaluation of section 9, once.
@@ -600,11 +607,11 @@ sized by what they touch, not by time.
 
 | Step | What | Seen by a person |
 |---|---|---|
-| l1 | Try the AWS facts marked "to try" (sections 4.4, 4.5, 7, 13) locally and on the cloud's pool, reading only; correct this document | nothing |
+| l1 | Try the facts marked "to try" (sections 4.4, 4.5, 7, 13) on the local Cognito; correct this document. The cloud's pool waits for the plan's phase B | nothing |
 | l2 | `shared/`: the list of languages and the formats; the mail's and the assistant's date words moved onto them | nothing |
 | l3 | The page's mechanism: the type of the page texts, the English object, the keys in `index.html`, the checks of section 5.2, the padded test language on the local page and the walk in it that sets the length budgets (section 6.3). The largest step; the plan may cut it by groups of screens | nothing |
 | l4 | The Italian page texts; the page's language before sign-in (browser, memory, default); the choice on the sign-in screen | the pages in Italian, per browser |
-| l5 | The person's language: the app client's write list, the service, the field in "My details", the first sign-in's write, the language read from the id token, the live change | the language follows the person |
+| l5 | The person's language: the app client's write list, the service, the field in "My details", the first sign-in's write, the language read with `GetUser` after sign-in, the live change | the language follows the person |
 | l6 | The mailer and the Excel files by language; `DefaultLanguage` | mails in Italian |
 | l7 | The invitation function | the invitation in the default language |
 | l8 | The assistant: the one list, the notes, the fallback; the paid evaluation | little |
@@ -666,6 +673,22 @@ that are switched on.
 - In the repository: the local Cognito's image (`jagregory/cognito-local:5.3.0`) names
   `UpdateUserAttributes` and `CustomMessage_AdminCreateUser` in its code; neither was run.
 
-Not yet confirmed, for step l1: that `locale` is in the id token of this pool; that setting
-`WriteAttributes` updates the app client in place; that the administrative calls are untouched
-by it; that the local Cognito answers `UpdateUserAttributes` and puts `locale` in its id token.
+Tried on the local Cognito (`jagregory/cognito-local:5.3.0`) on 2026-11-27, with a throw-away
+user created, read, written and deleted (`docs/MULTILANGUAGE_PLAN.md` step l1):
+
+- **Confirmed**: `UpdateUserAttributes` with the person's access token answers 200 and stores
+  `locale`; `GetUser` with the same token answers it; any word is accepted as `locale`
+  (`klingon` was stored), so every reader's check of section 4.1 is needed and can be tested
+  locally.
+- **False**: the id token never carries `locale`, at sign-in or after a refresh; its claims are
+  the username, `email`, `email_verified`, the groups and the token's own. Hence L7 as decided
+  by P1.
+- **Found**: the local Cognito does not apply the app client's write list: with the same token
+  the probe changed its own `given_name`. It calls no "custom message" function unless its own
+  configuration names one.
+
+Still to try, on the cloud's pool, in the plan's phase B: that setting `WriteAttributes`
+updates the app client in place (the change set says "Modify", not "Replace"); that a write
+list of `locale` alone is accepted; that the administrative calls still write the four facts;
+that `GetUser` answers `locale` with the default read list; that a person's token can no longer
+write their own e-mail.

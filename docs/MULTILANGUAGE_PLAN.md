@@ -1,7 +1,8 @@
 # Shared Calendar: several languages (implementation plan)
 
 **Version:** v1 (2026-11-27): the plan, after the Product Owner's eight decisions of the brief
-and the answer to one question of planning (section 2). Not started.
+and the answer to one question of planning (section 2). v2 (2026-11-27): phase A started with
+brief `prompts/lang-l03-phase-a-implementation.md`; step l1 done.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -350,7 +351,19 @@ its check, what it leaves for phase B, and its note. The check is the lean one o
   anything is changed: the base the next steps are held to.
 - **Leaves for phase B:** every fact of F16.
 
-**As done (step l1).** *Empty.*
+**As done (step l1).** Done 2026-11-27. No other folder's stack was up; `npm ci` was run first
+(the worktree had no `node_modules`). This folder's stack started cleanly (`local:api` ready
+in about 10 s). The probe of F8, run again on this stack with a throw-away user
+`lang-probe-…` (created, read, written, deleted), gave the same facts: `UpdateUserAttributes`
+and `GetUser` answer 200, `locale` is stored, any word is accepted (`klingon`), the id token
+never carries `locale` (neither at sign-in nor after a refresh), the person's own
+`given_name` can be written (no write list). `docs/MULTILANGUAGE_ARCHITECTURE.md` corrected:
+the status line, L7 and section 4.5 by P1, L10's reason by F2, sections 1, 3, 4.2, 4.4, 7,
+13, 15 and 17 (what is confirmed, false, found, and what waits for the cloud). Base numbers:
+unit tests 632 (`shared`), 2058 (`backend`), 3165 (`frontend`), all green, 100 % lines;
+**38 functions** in the template, not 39 as F9 says (step l7 adds the 39th); the first
+request to `local:api` (`POST /hello` as `alice`, authorizer and function containers both
+cold) answered in 0.81 s, the second in 0.04 s. Step l2 finds the branch green.
 
 ### Step l2 — `shared/`: the list of languages and the formats
 
