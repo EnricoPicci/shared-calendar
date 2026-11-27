@@ -7,6 +7,10 @@ adds to the root `CLAUDE.md`, whose rules all apply here. Paths are relative to 
   error code or response field starts in `src/api.ts`.
 - No build step: `exports` points at `src/index.ts`, and each consumer bundles it.
 - `src/calendar/time.ts` uses `Intl` only, never the machine's zone.
+- A text a mail, a file, the invitation or the assistant shows a person is in that part's
+  `texts.<language>.ts`, one object per language of `src/language/languages.ts`: a new text goes
+  into every one, and the compiler finds a language that misses it. Names of days and months
+  are in `src/language/formats.<language>.ts`, never asked of `Intl`.
 
 ## Folder map
 
@@ -24,11 +28,16 @@ adds to the root `CLAUDE.md`, whose rules all apply here. Paths are relative to 
   hours (`lastsWholeHours`), `cancellableUntil`; `defaults.ts`, default
   settings, limits, settings ranges and the type's capacity range.
 - `src/assistant/`: the assistant's contract. `types.ts`, `AssistantReply` and its parts;
-  `schemas.ts`, the body of a message; `limits.ts`; `languages.ts`, the list `en`, `it`;
-  `texts.ts`, the type `AssistantTexts`, with one object per language in `texts.en.ts` and
-  `texts.it.ts`: a new text goes into both.
+  `schemas.ts`, the body of a message, with the page's language; `limits.ts`; `texts.ts`, the
+  type `AssistantTexts`, with one object per language in `texts.en.ts` and `texts.it.ts`,
+  the notes Claude gets of each language included.
+- `src/language/`: `languages.ts`, the one list (`SUPPORTED_LANGUAGES`, `Language`, each
+  language's own name, `readLanguage`, `chooseLanguage`); `formats.ts`, a language's date
+  writers, with its names in `formats.en.ts` and `formats.it.ts`.
 - `src/mail/`: the mail's contract. `schemas.ts`, the mail settings and `MailCalendarBody`;
-  `limits.ts`; `texts.ts`, a mail's subject, text and HTML per kind; `mask.ts`, `maskAddress`.
+  `limits.ts`; `texts.ts`, the type `MailTexts` and the functions that take a language (each
+  mail's subject, text and HTML, the Excel file's words and names, the invitation), with the
+  words in `texts.en.ts` and `texts.it.ts`; `mask.ts`, `maskAddress`.
 - `src/index.ts`: re-exports.
 - `tests/` mirrors `src/`. Generated, git-ignored: `coverage/`.
 

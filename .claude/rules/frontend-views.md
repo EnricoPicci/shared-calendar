@@ -31,6 +31,10 @@ sections 8 and 12.3). Paths are relative to `frontend/`.
 - Every file calls `useRealPage()` (`tests/unit/views/page.ts`), which loads the `<body>` of
   the real `index.html` before each test; no test writes markup of its own, so a selector that
   does not match the page fails.
+- `useRealPage()` fills the page's keys with the English texts, as the shell does; a test
+  expects the English words, written out or read from `src/texts/texts.en.ts`.
+  `index.html` itself holds keys, never words: `page-texts.test.ts` refuses an element with a
+  key that holds words of its own, a key that names no text, and a page text no key uses.
 - The mount function gets fake services: plain objects typed with the view's `…Deps`, whose
   streams are subjects the test controls and whose methods are `vi.fn`.
 - Every view's test has: each state of each stream, each action of the user and its call, a
@@ -75,7 +79,8 @@ What it cannot show is for the browser check.
   `selectedIndex` −1, as in a browser, which is how the availability's forms have no type
   chosen; rebuilt with `replaceChildren`, and after `form.reset()`, it has its first choice
   chosen. The `textContent` of a `<label>` around a list holds the texts of the list's choices:
-  a test that reads a label's words reads its first text node.
+  a label's words are in a `<span data-text>` that is its first child, and a test that reads them
+  reads that child (`docs/MULTILANGUAGE_PLAN.md` finding F3).
 - It sends a `hashchange` on `history.replaceState` too, which a browser does not: harmless for
   the shell (`distinctUntilChanged` on the screen), but do not build on it.
 - In the browser check, a button the page does not offer (the day's three while the list of

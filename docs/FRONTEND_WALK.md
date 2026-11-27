@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v15 (2026-11-25, `docs/EMAIL_PLAN.md` step m8): a new User is invited, checks 56 to 60 rewritten, and section 17, checks 217 to 219. v14 (2026-11-25, `docs/EMAIL_PLAN.md` step m7): "Choose your password", the first sign-in with a temporary password, is section 16, checks 207 to 216. v13 (2026-11-25, `docs/EMAIL_PLAN.md` step m6): a mail asked for through the assistant's panel is section 15, checks 203 to 206. v12 (2026-11-25, `docs/EMAIL_PLAN.md` step m5): the settings' "Daily e-mail" is section 14, checks 195 to 202. v11 (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): the week's "E-mail…" dialog is section 13, checks 185 to 194; section 1 says what it needs. v10 (2026-11-25, `docs/EMAIL_PLAN.md` step m2): the four facts of a person and "My details" are section 12, checks 171 to 184; checks 3, 40, 53 and section 1 in line. v9 (2026-11-25, `docs/WINDOW_HOURS_PLAN.md` step w5): the walk kept to the change before the release of `v2.5.0`, 28 checks, every one yes after a fix found by check 167, which now says "10:10 alice"; still 170 checks. v8 (2026-11-25, `docs/WINDOW_HOURS_PLAN.md` step w4): the end of a window chosen as an hour; checks 73, 86, 87, 157 to 168 and 170 rewritten, the last on a Sunday pattern 08:05–12:05; still 170 checks. v7 (2026-11-25, `docs/SLOT_STEP_PLAN.md` step s6): walked whole at 1280 × 800 and at 390 × 844 in headless Chromium against the local stack, every check yes after one fix of the style sheet (its change log); checks 102 and 169 corrected. v6 (2026-11-25, `docs/SLOT_STEP_PLAN.md` steps s4 and s5): times on 5-minute steps are section 11, checks 157 to 170, looked at against the local stack that day (its change log); checks 42, 43, 45, 76 and 86 in line. v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
+| Status | v16 (2026-11-27, `docs/MULTILANGUAGE_PLAN.md` phase B item 5): the languages are section 18, checks 220 to 240; checks 179, 182, 183 and 219 in line. v15 (2026-11-25, `docs/EMAIL_PLAN.md` step m8): a new User is invited, checks 56 to 60 rewritten, and section 17, checks 217 to 219. v14 (2026-11-25, `docs/EMAIL_PLAN.md` step m7): "Choose your password", the first sign-in with a temporary password, is section 16, checks 207 to 216. v13 (2026-11-25, `docs/EMAIL_PLAN.md` step m6): a mail asked for through the assistant's panel is section 15, checks 203 to 206. v12 (2026-11-25, `docs/EMAIL_PLAN.md` step m5): the settings' "Daily e-mail" is section 14, checks 195 to 202. v11 (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): the week's "E-mail…" dialog is section 13, checks 185 to 194; section 1 says what it needs. v10 (2026-11-25, `docs/EMAIL_PLAN.md` step m2): the four facts of a person and "My details" are section 12, checks 171 to 184; checks 3, 40, 53 and section 1 in line. v9 (2026-11-25, `docs/WINDOW_HOURS_PLAN.md` step w5): the walk kept to the change before the release of `v2.5.0`, 28 checks, every one yes after a fix found by check 167, which now says "10:10 alice"; still 170 checks. v8 (2026-11-25, `docs/WINDOW_HOURS_PLAN.md` step w4): the end of a window chosen as an hour; checks 73, 86, 87, 157 to 168 and 170 rewritten, the last on a Sunday pattern 08:05–12:05; still 170 checks. v7 (2026-11-25, `docs/SLOT_STEP_PLAN.md` step s6): walked whole at 1280 × 800 and at 390 × 844 in headless Chromium against the local stack, every check yes after one fix of the style sheet (its change log); checks 102 and 169 corrected. v6 (2026-11-25, `docs/SLOT_STEP_PLAN.md` steps s4 and s5): times on 5-minute steps are section 11, checks 157 to 170, looked at against the local stack that day (its change log); checks 42, 43, 45, 76 and 86 in line. v5 (2026-11-24, `docs/CAPACITY_PLAN.md` step u5): the capacity of a type is section 10, checks 134 to 156, walked against the local stack that day at both widths (its change log); checks 12, 41, 66 and 70 in line. v4 (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3): the password screen is section 9, walked against the local stack that day (its change log). v3 (2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c13, brief `prompts/a15-step-c13-implementation.md`): the assistant's panel is part of the walk. Run whole on that day in headless Chromium 156, at a desktop width and at a phone width, on a fresh, seeded local stack with the fake Claude: every check answered yes at both. v1 (2026-11-20, `docs/FRONTEND_VIEW_PLAN.md` step 69) was run the same way in Chromium 159 |
 | What it is | One list of checks that walks every screen of the front end and the assistant's panel in a browser, as a User and as the Administrator, against the local stack. **The check to repeat after a later change to the view layer** |
 | What it is not | A source of truth, and not an automated test. On any conflict `docs/FRONTEND_ARCHITECTURE.md` and the tests win, and this page is fixed. No end-to-end test tool is in the repository (`docs/FRONTEND_VIEW_PLAN.md` section 8, decision 6): a person follows the list by hand, or drives a browser with a script kept outside the repository |
 | Made from | The browser checks of `docs/FRONTEND_VIEW_PLAN.md` steps 60 to 68, of `docs/CONVERSATIONAL_PLAN.md` step c12 and of `docs/CAPACITY_PLAN.md` step u5, in the order a person would follow, and `docs/SHARED_CALENDAR_SPEC.md` section 16.8 |
@@ -29,6 +29,7 @@
 | v14 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m7: **the first sign-in with a temporary password**, section 16, checks 207 to 216: an account made by `npm run test-user -w backend -- local`, "Choose your password" in the login's place, its hints, a too-weak password, Cancel, a good one signing in, the temporary password refused afterwards and the new one accepted, the phone width. The end of Cognito's 3 minutes cannot be walked locally (cognito-local never ends a challenge): check 216 is for the deployed page. No other check changed. |
 | v15 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m8: **the invitation**. Creating a User shows no password: checks 56 to 60 are the last look before sending, the answer "An invitation was sent to …", the state `invited` then `active` in the list, the first sign-in with the temporary password cognito-local prints, and "Resend invitation". Section 1 says how a User of the walk gets its first password; check 61 and the note on other browsers in section 7 in line; section 17, checks 217 to 219: "E-mail is not available yet." and the phone width; the row of m8 in section 8. |
 | v15, note | 2026-11-25 | The branch `slot-5min` merged into `main`, where the e-mail work had been written at the same time. Its versions v6 to v9 and section 11, checks 157 to 170, are released (tags `v2.4.0` and `v2.5.0`) and keep their numbers; the e-mail's versions, first numbered v6 to v11, are v10 to v15, its sections 11 to 16 are 12 to 17 and its checks 157 to 205 are 171 to 219; every reference to them was changed with them. Section 8 holds the rows of both. 219 checks. No other text changed. |
+| v16 | 2026-11-27 | `docs/MULTILANGUAGE_PLAN.md` phase B item 5: **the languages**, section 18, checks 220 to 240, with what they need and leave in its opening: the sign-in screen's list of languages, the page filled again with what was typed kept, the browser's memory and its own language; the account's language at sign-in and the first sign-in's write; "Language" in "My details" for both roles, the frame entered again at `#/me`, a failure; every screen in Italian at both widths, the dates, the legend, the tight places; `?padded`; the assistant's panel in Italian and a German first message; the mails and the Excel files in Italian. Checks 179 and 183: the list "Language" in "My details". Checks 182 and 219: a row's buttons stay together at its right end, on a line of their own when the row is narrow. Section 7 gains a screen reader in Italian, an Italian reader, and a German first message to the real Claude; the row of steps l4, l5 and l8 in section 8. Not yet walked. 240 checks. |
 
 ---
 
@@ -630,6 +631,11 @@ The run of a script in a headless browser cannot say these; they are for a perso
   Covered by the tests of `frontend/tests/unit/logic/week.model.test.ts` only.
 - **Another browser than Chromium**: the Escape key on a dialog, and where the keyboard is
   after a dialog closes.
+- **A screen reader in Italian**: with the page in Italian (`<html lang="it">`, check 221) its
+  words are spoken with an Italian voice, and the list "Lingua" names each choice in its own
+  language.
+- **An Italian reader of the screens and the mails**: the wordings were approved as written
+  (`docs/MULTILANGUAGE_PLAN.md` section 7); a person reads them where they stand.
 
 **The assistant with the real Claude.** A short list, for a person: what to try and what to
 judge, never the words of an answer, which differ every time. It needs the real Claude wired
@@ -643,6 +649,8 @@ section 6 and the journeys run on the fake only.
 - **The same in Italian**, after "New conversation". → The answer is in Italian, with the
   formal "lei"; later the proposal's question and its two buttons are in Italian too. A
   message in the other language, later in the conversation, does not change its language.
+- **A first message in a third language** (German) with the page in Italian. → The answer is
+  in Italian, with the formal "lei"; with the page in English, in English.
 - **A booking**, with the week on show. → The proposal says exactly what was asked for;
   "Confirm" makes it, the week behind shows it with nothing pressed, and the closing words
   are true.
@@ -687,11 +695,12 @@ section 6 and the journeys run on the fake only.
 | m6 | The assistant's mail: the proposal with the two dates and the masked address, Confirm and the mail at the fake mail, Don't | 203 to 206 |
 | m7 | "Choose your password": an account made by the script, its temporary password leading to the screen, a too-weak password refused with the live checks, a good one signing in, the temporary one refused afterwards and the new one accepted, the 3 minutes over (at the deployed page), the phone width | 207 to 216 |
 | m8 | The invitation: the last look and Back, Confirm and the answer, `invited` then `active` after the first sign-in, "Resend invitation" and its failure on the local stack, "E-mail is not available yet.", the phone width | 56 to 60, 217 to 219 |
+| l4, l5, l8 | The sign-in screen's list, the page filled again, the browser's memory; the account's language at sign-in, the first sign-in's write; "Language" in "My details" for both roles and its failure; every screen in Italian at both widths, the dates and the legend; the padded test language; the panel before a conversation and a German first message; the mails and the Excel files in Italian; the users row's buttons together (`docs/MULTILANGUAGE_PLAN.md` section 8) | 220 to 240, 179, 182, 183, 219 |
 | p3 | The hints while typing, the two new ones differing, a wrong current password, a change that succeeds, "Password changed" at the login, the old password refused, the new one accepted; as `alice` and as `admin`, at the two widths | 123 to 133 |
 
 Steps 60 to 68 are those of `docs/FRONTEND_VIEW_PLAN.md`; step c12 is of
 `docs/CONVERSATIONAL_PLAN.md`; step p3 of `docs/CHANGE_PASSWORD_PLAN.md`; step u5 of
-`docs/CAPACITY_PLAN.md`; steps s4 and s5 of `docs/SLOT_STEP_PLAN.md`; steps m2, m4, m5, m6, m7 and m8 of `docs/EMAIL_PLAN.md`.
+`docs/CAPACITY_PLAN.md`; steps s4 and s5 of `docs/SLOT_STEP_PLAN.md`; steps m2, m4, m5, m6, m7 and m8 of `docs/EMAIL_PLAN.md`; steps l4, l5 and l8 of `docs/MULTILANGUAGE_PLAN.md`.
 
 Left out on purpose: "the screens of the earlier steps still work, in short" (`docs/FRONTEND_VIEW_PLAN.md`
 section 4), which was each step's own short walk and is this whole list.
@@ -908,15 +917,18 @@ back as found.
 178. `[K]` "Edit" again, change a field, then "Cancel"; then again and the Escape key. → Nothing
      saved; the row as it was.
 179. `[K]` Press "My details". → "My details": Username `admin`, Role "Administrator", the four
-     facts of the seed, the address on its two lines; the button "Edit".
+     facts of the seed, the address on its two lines; the button "Edit"; under them "Language", a
+     list with "English" and "Italiano", the language in use chosen (section 18).
 180. `[K]` "Edit". → "Edit my details", filled; the browser may offer its own address there.
      Empty the first name, "Save". → Refused. "Cancel".
 181. `[K]` `[N]` "Edit", change the first name, "Save". → One `PUT /users/admin`, then one
      `GET /me`; the details show the change. Put it back the same way.
-182. → At 390 × 844 the rows wrap rather than run off, an e-mail breaks inside the row, and the
-     page does not scroll sideways. Delete `walk-<tag>-e`.
+182. → At 390 × 844 the rows wrap rather than run off, an e-mail breaks inside the row, the row's
+     buttons stay together at its right end, both on a line of their own when the row is too
+     narrow, and the page does not scroll sideways. Delete `walk-<tag>-e`.
 183. `[K]` Sign out, sign in as `alice`, press "My details". → Her username, "User", her four
-     facts; no "Edit"; the sentence "To change your details, ask the Administrator."
+     facts; no "Edit"; the sentence "To change your details, ask the Administrator."; under
+     them the list "Language", as for `admin`.
 184. `[=]` The address `#/users`, typed by hand as `alice`. → The week.
 
 ## 13. The mail of two dates
@@ -1063,6 +1075,136 @@ restarted with `MAIL_STAGE` `off`, as check 200 does; it leaves nothing, since n
      "Resend invitation", "Confirm" → the same sentence.
 218. Set `MAIL_STAGE` back to `on` and restart the API. → "Create user" and "Confirm" invite
      again (check 57). Delete what was made.
-219. → At 390 × 844 the rows with their state and "Resend invitation" wrap inside the list, the
-     dialog's sentence with a long address wraps inside the dialog, and the page does not scroll
-     sideways.
+219. → At 390 × 844 the rows with their state wrap inside the list, an invited User's three
+     buttons ("Edit", "Resend invitation", "Delete") together on a line of their own, never one
+     alone under the row's texts; the dialog's sentence with a long address wraps inside the
+     dialog, and the page does not scroll sideways.
+
+## 18. The languages
+
+Walked after section 17, with `local:lambda`, the fake Claude and the fake mail (section 1;
+`docs/MULTILANGUAGE_ARCHITECTURE.md` sections 4.3, 6 and 6.3). The rest of the walk is in
+English: at their first sign-in of the walk (checks 2 and 40) `alice` and `admin`, who held no
+language, were given the page's, English. **What it needs**: a private window of the browser,
+whose memory is empty; as `admin`, in "Users", two Users of the run: `walk-<tag>-l`, signed in
+at check 225, and `walk-<tag>-i`, left invited; and next week's Monday 09:00–10:00 booked for
+`walk-<tag>-l` (note `walk-<tag> lingua`). **What it leaves**: nothing, after check 240, but the
+mails in the fake mail and one day's mark of the daily mail. The invitation in Italian cannot be
+walked locally (cognito-local prints its own, in English): it is looked at in the cloud
+(`docs/MULTILANGUAGE_PLAN.md` phase B, item 8).
+
+**The sign-in screen.**
+
+220. `[K]` Sign out. → Under the form, "Language" and a list holding "English" and "Italiano",
+     each language under its own name, "English" chosen.
+221. `[K]` Type `alice` and a wrong password, "Sign in", then choose "Italiano". → At once, with
+     no reload: "Calendario condiviso", "Nome utente", "Password", "Accedi", "Lingua"; the
+     failure said again in Italian; the username and the password typed still in their fields.
+     `[=]` In the Elements panel, `<html lang="it">`.
+222. Reload the page. → The login in Italian, "Italiano" chosen: the browser remembers it (in
+     the Application panel, Local Storage, `shared-calendar.language` is `it`). Choose
+     "English", reload. → English. Choose "Italiano" again.
+223. `[=]` In a private window of a browser whose first language is Italian (in Chrome:
+     Settings, Languages, Italian at the top), nothing remembered. → The login in Italian. With
+     another language at the top (not Italian, not English): in English, the local page's
+     default. Put the browser's languages back.
+
+**The account's language.**
+
+224. `[N]` With "Italiano" chosen, sign in as `admin`, who holds English. → One request to
+     `/cognito/` ending in `GetUser`; then the frame, in English from the first moment
+     ("Administrator", "Week"), with no Italian frame before it, and no `UpdateUserAttributes`.
+     Sign out. → The login in English: the browser's memory followed the account.
+225. Choose "Italiano"; sign in as `walk-<tag>-l` with the temporary password of cognito-local's
+     log (section 1). → "Scelga la sua password", its conditions in Italian, no list of
+     languages on show. The new password twice, "Scegli la password". → The frame in Italian:
+     "Utente", "Settimana", "Appuntamenti", "I miei dati", "Password", "Esci".
+226. `[N]` → After the `RespondToAuthChallenge`, one `GetUser` before the frame showed, then one
+     `UpdateUserAttributes` answered 200: the page wrote its language to an account that held
+     none. Sign out, choose "English", sign in as `walk-<tag>-l`. → The frame in Italian from
+     the first moment; no `UpdateUserAttributes`; after "Esci" the login is in Italian.
+
+**"My details": "Language".** As `walk-<tag>-l`, in Italian.
+
+227. `[K]` `[N]` "I miei dati". → Under the details, "Lingua", with "Italiano" chosen; no
+     "Modifica", the sentence "Per modificare i suoi dati, si rivolga all’Amministratore.".
+     Choose "English". → No button to press: the list out of use for a moment, then the frame
+     entered again at `#/me`, in English: "My details", "Language" on "English", "User". One
+     `UpdateUserAttributes` answered 200 and no `GetUser`. Choose "Italiano". → Italian again,
+     at `#/me`.
+228. Go offline and choose "English". → Under the list "La lingua non è stata cambiata. Il server
+     non è raggiungibile. Controlli la connessione e riprovi."; the list back on "Italiano", the
+     page still in Italian. Go online.
+229. `[K]` Sign out, sign in as `admin`, "My details". → "Language" under the details, the button
+     "Edit" beside it. Choose "Italiano". → The frame at `#/me` in Italian: "I miei dati",
+     "Amministratore", "Settimana", "Impostazioni", "Utenti", "Disponibilità", "Password",
+     with "Modifica" and "Lingua" on "Italiano".
+
+**Every screen in Italian.** At 1280 × 800 and at 390 × 844. What a person typed stays as typed
+(the types "Piscina" and "Studio", notes, usernames, names, addresses), and so does the time
+zone's name, `Europe/Rome`.
+
+230. As `admin`, in Italian: the week (next week, a slot's book dialog with "Per", "Inizio",
+     "Fine", the detail dialog of an appointment, "E-mail…", the banner of a move);
+     "Impostazioni" with a refused value and "E-mail giornaliera"; "Utenti" with the dialog of a
+     deletion ("Mantieni") and "Invia di nuovo l’invito" on `walk-<tag>-i`; "Disponibilità" with
+     a single date, "Solo questo giorno…" and the dialog that confirms; "I miei dati" with
+     "Modifica"; "Password"; the assistant's panel open. → No English word anywhere; no text cut,
+     none over another; every button inside its dialog; the page does not scroll sideways.
+231. As `alice`: "My details", "Italiano". Then the week, a booking and its detail dialog,
+     "Appuntamenti" with "Prossimi", "Storico" and a period refused ("Scelga entrambe le date."),
+     "Password". → The same as check 230.
+232. → The dates in Italian: the week's label (such as "30 nov – 6 dic 2026"), the days ("lun 30
+     nov"), a date in full under "Un singolo giorno" ("mercoledì 6 gennaio 2027"), "Prenotato da lei
+     il …" in the detail, the pattern form's days "lunedì" to "domenica", in lower case as
+     decided (`docs/MULTILANGUAGE_PLAN.md` section 8); the times as in English (09:00). The
+     week's legend sorted by name in Italian: "Piscina", then "Studio".
+233. → The tight places, at both widths: the detail dialog's "Chiudi", "Modifica", "Annulla
+     appuntamento" readable, the last on a second row of its own when the dialog is narrow; the
+     narrow tab "Pieno" whole beside an appointment (as `admin`); a row of "Utenti" on one line
+     at 1280, its buttons together at its right end, and at 390 together on a line of their own.
+234. Go offline, press "Settimana successiva". → "Il server non è raggiungibile. Controlli la
+     connessione e riprovi." above the week. Go online, "Oggi".
+
+**The padded test language** (`docs/MULTILANGUAGE_ARCHITECTURE.md` section 6.3, rule 4).
+
+235. Open http://localhost:5173/?padded with "English" chosen on the sign-in screen, and walk the
+     screens of check 230 as `admin` and of check 231 as `alice`, at both widths. → Every text
+     between ⟦ ⟧, lengthened with ·; a word with no marks, other than what a person typed and
+     the digits of a time list, is a text the page missed. Nothing cut that matters: the narrow
+     tab "⟦Full··⟧" loses its last marks, as accepted (`docs/MULTILANGUAGE_PLAN.md` section 8).
+     At the deployed page `?padded` changes nothing.
+
+**The assistant's panel.** As `walk-<tag>-l`, in Italian, with no conversation.
+
+236. `[N]` Open the panel. → "Assistente", "Nuova conversazione", "Chiudi", "Questa
+     conversazione è elaborata da Claude di Anthropic.", "Messaggio", "Invia", "10 messaggi
+     rimasti oggi"; nothing in English.
+237. `[N]` Send `Guten Tag, hören Sie mich?`. → The `POST /assistant/messages` carries
+     `"language":"it"`. The fake Claude's answer, in English as every answer of the fake, shows
+     the application's line: "The language of this conversation is Italian", the formal "lei"
+     and the three words "orario settimanale", "orari propri del giorno", "finestra
+     aggiuntiva". "9 messaggi rimasti oggi". Press "Nuova conversazione".
+
+**The mails and the Excel files** (`docs/EMAIL_ARCHITECTURE.md` sections 6.5 and 11).
+
+238. `[K]` As `walk-<tag>-l`, in next week, "E-mail…", "Invia". → "In arrivo a
+     w•••@example.com". At http://localhost:8025, the newest mail: "I suoi appuntamenti, dal
+     lun 30 nov al dom 6 dic" (with the week's own dates), its text and its footer in Italian,
+     the file `miei-appuntamenti-dal-<from>-al-<to>.xlsx`. Opened: the sheet "Appuntamenti", the
+     headings `Data`, `Inizio`, `Fine`, `Tipo`, `Nome utente`, `Stato`, `Motivo
+     dell'annullamento`, `Nota`, `Prenotato il`; the row of `walk-<tag> lingua` "prenotato"; its
+     date written `YYYY-MM-DD` and its times `09:00`, `10:00`, as in English. (The same mail by
+     `npm run mail:send -w backend -- mine walk-<tag>-l <from> <to>`, which counts nothing:
+     `docs/COMMANDS.md`.)
+239. As `admin`, in Italian, "E-mail…", "Invia". → A mail "Calendario, dal …", the file
+     `calendario-dal-<from>-al-<to>.xlsx`, with `Nome` and `Cognome` after `Nome utente`. Then
+     `npm run mail:daily -w backend -- <instant>`, the instant a later day at the hour saved in
+     "E-mail giornaliera", in UTC (Rome is UTC+1 in winter). → `"outcome":"sent"`; the mail
+     "Calendario: prossimi 7 giorni e copia di sicurezza, …" with
+     `calendario-prossimi-7-giorni-<date>.xlsx` and `calendario-copia-dal-<date>.xlsx`, both in
+     Italian.
+240. Clean up: as `admin` cancel `walk-<tag> lingua`, delete `walk-<tag>-l` and `walk-<tag>-i`,
+     choose "English" in "I miei dati"; as `alice` choose "English" in "My details"; on the
+     sign-in screen, "English". → The frame and the login in English again; the users are the
+     seed's. The console shows, besides the known report of `zod`, nothing new.

@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Status | Being built, `docs/EMAIL_PLAN.md`. The decisions of sections 2.2 and 2.3 and every open point (section 21) are confirmed by the Product Owner (2026-11-25); the plan's decisions F1 to F5, F13 and F15 (its section 3), and the deletion of the existing Users moved to step 9, are written in here (2026-11-25); step m5's decisions on the daily mail's retry and on several administrators are in section 6.2 |
-| Date | 2026-11-25 |
+| Status | Being built, `docs/EMAIL_PLAN.md`. The decisions of sections 2.2 and 2.3 and every open point (section 21) are confirmed by the Product Owner (2026-11-25); the plan's decisions F1 to F5, F13 and F15 (its section 3), and the deletion of the existing Users moved to step 9, are written in here (2026-11-25); step m5's decisions on the daily mail's retry and on several administrators are in section 6.2; the languages of `docs/MULTILANGUAGE_ARCHITECTURE.md` (English and Italian, built in `docs/MULTILANGUAGE_PLAN.md` steps l6 and l7, not deployed yet) replace decision M17 and are written in sections 2.3, 3.1, 4, 5.1, 6, 12, 13.1 and 21 (2026-11-27) |
+| Date | 2026-11-25; the languages 2026-11-27 |
 | Brief | `prompts/mail-m01-integrate-mail-idea.md`, with the answers of the clarification round (section 2.2) |
 | Builds on | `docs/ARCHITECTURE.md` (sections 4, 5, 6.3, 7, 9, 10), `docs/SHARED_CALENDAR_SPEC.md` section 15 (e-mail notifications prepared), `docs/CONVERSATIONAL_ARCHITECTURE.md` sections 5.4 and 8 (proposals and tools) |
 | Would add to the stack | Amazon SES (one domain identity, one configuration set), one SNS topic, one DynamoDB table `mail`, one scheduled function `mailer`, five routes, one assistant tool |
@@ -101,7 +101,7 @@ every hour; when the hour is the one the Administrator chose, it sends the daily
 | M14 | The hourly timer, not a timer set at the chosen hour | A fixed schedule in the template, no permission to change schedules; the hour is just a setting the mailer reads |
 | M15 | A new table `mail` for the mail settings and counters, not the `calendar` table | The calendar's contract, lock and tools stay untouched |
 | M16 | At most 5 on-demand mails per person per day, and at most 366 days in one request | Protects the sender's reputation at SES and the cost; enough for any real use |
-| M17 | The texts of the mails are in English, like the pages | The pages are English only (`docs/FRONTEND_ARCHITECTURE.md` section 12.4) |
+| M17 | The mails, their Excel files and the invitation are written in the recipient's language (English or Italian), else in the installation's default language (`DefaultLanguage`), else in English | The calendar has one list of languages for the pages, the mails and the assistant (`docs/MULTILANGUAGE_ARCHITECTURE.md` sections 7 and 8) |
 
 Also decided in review (2026-11-25): the postal address is kept for future features, such as
 printing invoices (O1, section 12.3); the Reply-To is today's alarm address, `AlertEmail` (O2,
@@ -173,6 +173,7 @@ flowchart LR
 | **SES domain identity** with Easy DKIM | Proves we may send as `…@<domain>` | Mail signed for the domain lands in inboxes, not in spam; the domain is a parameter |
 | **SES configuration set** + **SNS topic** | Reports bounces and complaints by e-mail to the Reply-To address | `noreply@` receives nothing, so without it a bounce would be lost |
 | **Cognito invitation** | Sends E1 | Cognito makes the temporary password, keeps it, expires it and resends it; our code never touches it |
+| **Invitation function** (`inviteMessage`) | Words E1 in the person's language, else the installation's (section 5.1) | Cognito's "custom message" trigger: the words stay in `shared/src/mail/` with the other mails' texts, and the password still never reaches our code |
 | **`mailer` function** | Sends E2, E3, E4 | One function holds the right to send mail and the Excel library; the routes stay small and fast |
 | **EventBridge Scheduler**, every hour | Starts the daily mail | Free at this volume; a fixed schedule (decision M14) |
 | **Table `mail`** | The daily-mail settings, the "sent today" mark, the per-person counters | Small, separate from the calendar (decision M15) |
@@ -205,6 +206,14 @@ routes and the tests.
 there is no verification code. The consequence is honest: a mistyped address means the
 invitation goes nowhere (or to a stranger); the Administrator corrects it and resends (section 5.3).
 
+**A fifth fact, the language**, is kept beside the four in the account, in Cognito's standard
+attribute `locale` (`en` or `it`), as `docs/MULTILANGUAGE_ARCHITECTURE.md` section 4.1 says.
+Unlike the four, it is the person's own: they choose it in "My details", and the page writes it
+straight at Cognito with their own token. The Administrator never sets it, and no body of the
+API carries it (`POST /users` and `PUT /users/{username}` refuse a `language` field). An invited
+person has none until their first sign-in. Whoever reads it treats a missing value, or a word
+not in the list, as none, and uses the installation's default (section 6.6).
+
 ### 4.2 Who may read and change them
 
 | Who | Read | Change |
@@ -212,6 +221,11 @@ invitation goes nowhere (or to a stranger); the Administrator corrects it and re
 | Administrator | every User's (`GET /users`), their own (`GET /me`) | every User's, and their own (`PUT /users/{username}`); never another administrator's |
 | User | their own (`GET /me`) | none: they ask the Administrator |
 | Assistant | the first name of the person speaking, for a greeting (optional, open point O4) | none |
+
+The language follows its own table (`docs/MULTILANGUAGE_ARCHITECTURE.md` section 4.2): the
+person reads and changes their own at Cognito; the mailer reads the recipient's with the
+address (`getProfile`, `adminRecipients` in `backend/src/lib/cognito.ts`); `GET /users` and
+`GET /me` do not show it.
 
 ### 4.3 The accounts that exist today
 
@@ -282,9 +296,17 @@ sequenceDiagram
   the challenge is answered, so the authorizer, the routes and the assistant need no change.
 - **The temporary password expires** after `TemporaryPasswordValidityDays` = 7 (pool setting).
   Used once, it is gone. So an old invitation lying in a mailbox opens nothing.
-- **The invitation's text** is the pool's `InviteMessageTemplate` (subject and HTML body, with
-  Cognito's two placeholders, the username and the temporary password, and the page's address),
-  set in `template.yaml` from the parameters. Its wording is in section 6.6.
+- **The invitation's text** comes from the invitation function, `backend/src/handlers/inviteMessage.ts`,
+  Cognito's "custom message" trigger, which exists at `MailStage` `on`. Before sending the
+  invitation, or its resend, Cognito calls it with the person's attributes and two placeholders;
+  it answers the subject and the HTML body of `invitationMailText` (`shared/src/mail/texts.ts`)
+  in the language of the person's `locale`, which an invited person does not have yet, so in
+  practice in the installation's (`DEFAULT_LANGUAGE`, else English), with the page's address
+  (`PAGE_ADDRESS`). It puts Cognito's two placeholders for the username and the temporary
+  password in as they come, and Cognito fills them afterwards: the password never passes
+  through our code. Any other kind of Cognito message is answered untouched. The pool's
+  `InviteMessageTemplate` stays in `template.yaml`, in English, as the text Cognito falls back
+  to when the function's answer is unusable. The wording is in section 6.6.
 
 ### 5.2 The page
 
@@ -374,7 +396,10 @@ person P, range R".
 
 What the mailer receives in its event: the kind, the person's `sub`, username and role, the
 range, the request's id. **Never an address**: the mailer looks the address up in Cognito
-itself, so a mail can only go to the account's own address (decision M10).
+itself, so a mail can only go to the account's own address (decision M10). It reads the
+recipient's language in the same call, and writes the mail and its files in it (section 6.6);
+the event carries no language either. The daily mail goes to each administrator in their own
+language; its text and its two files are made once per language in use.
 
 How it is started: the route calls Lambda's asynchronous invoke (`InvocationType: Event`) and
 answers `202` at once. Lambda retries a failed run twice; a run that still fails is logged and
@@ -422,6 +447,15 @@ in the calendar's zone.
 One sheet per file, one row per appointment, sorted by start. Times are local to the calendar's
 time zone, as on the pages.
 
+The file is in the recipient's language (`appointmentsFile(language, …)` in
+`backend/src/lib/excel.ts`): the eleven headings (by the column keys `EXCEL_COLUMNS` of
+`shared/src/mail/texts.ts`), the sheet's name ("Appointments", "Appuntamenti"), the statuses
+(booked, cancelled; "prenotato", "annullato") and the reasons of a cancellation (cancelled,
+changed, user deleted; "annullato", "spostato", "utente eliminato") come from the mail texts of
+that language. The cells of dates and times stay as they are, `2026-12-01` and `10:00`, in every
+language, so that they sort and filter rightly in any Excel. The table below gives the English
+headings; the Italian ones are in `shared/src/mail/texts.it.ts`.
+
 | Column | From |
 |---|---|
 | Date | the appointment's local date |
@@ -444,6 +478,15 @@ The ranges:
 
 A User's file is the same with only their appointments (by `sub`) and without the name
 columns of others. The backup on 26 November 2026 covers 1 October 2026 onwards: no gap.
+
+The file names are in the language too, in plain letters, digits and `-`, without accents:
+
+| File | English | Italian |
+|---|---|---|
+| On demand, Administrator | `calendar-{from}-to-{to}.xlsx` | `calendario-dal-{from}-al-{to}.xlsx` |
+| On demand, User | `my-appointments-{from}-to-{to}.xlsx` | `miei-appuntamenti-dal-{from}-al-{to}.xlsx` |
+| Daily, "next 7 days" | `calendar-next-7-days-{date}.xlsx` | `calendario-prossimi-7-giorni-{date}.xlsx` |
+| Daily, backup | `calendar-backup-from-{from}.xlsx` | `calendario-copia-dal-{from}.xlsx` |
 
 The files are made in memory and attached; they are never stored. Size is no concern: a year
 of this calendar is a few thousand rows, well under a megabyte.
@@ -474,15 +517,31 @@ calendar's read-only permission set. It never writes the calendar.
 
 ### 6.6 The texts
 
-The texts are pure functions in `shared/src/mail/` (subject, plain-text body, HTML body), so
-the tests can check them and the assistant can quote them. English (decision M17). Examples:
+The texts are pure functions in `shared/src/mail/texts.ts` (subject, plain-text body, HTML
+body), so the tests can check them and the assistant can quote them. Each takes the language
+first (`dailyMailText`, `calendarMailText`, `mineMailText`, `invitationMailText`); the words of
+each language are one object of the type `MailTexts`, `shared/src/mail/texts.en.ts` and
+`shared/src/mail/texts.it.ts`, reached through `mailTexts(language)`. The HTML body is one block
+`<div lang="en">` (or `"it"`), so that a reader pronounces it in its language.
+
+**Which language** (decision M17): the recipient's own, the attribute `locale` of section 4.1;
+else the installation's, the deploy parameter `DefaultLanguage` (`en` or `it`, `it` in the
+cloud's `samconfig.toml`), which reaches the mailer and the invitation function as
+`DEFAULT_LANGUAGE`; else English. The invitation goes to a person who has never signed in, so
+it is in practice always in the installation's language. The bounce and alarm mails are AWS's
+own and stay in English.
+
+Examples, in English; the Italian words, approved by the Product Owner, are in
+`shared/src/mail/texts.it.ts` (and `docs/MULTILANGUAGE_PLAN.md` section 7):
 
 - Invitation. Subject "Your account on the shared calendar". Body: "Hello, an account was
   created for you. Username: {username}. Temporary password: {password}. Sign in
   at {page address}: you will be asked to choose your own password. The temporary password
   works once and expires in 7 days. If you did not expect this e-mail, ignore it." (Cognito
-  fills the username and the password. The first name is not one of Cognito's placeholders:
-  greeting by name needs a Cognito trigger function, open point O3.)
+  fills the username and the password; the invitation function of section 5.1 gives the
+  words. The first name is not one of Cognito's placeholders, and the function does not add it:
+  open point O3.) In Italian: "Il suo account sul calendario condiviso", "Buongiorno, è stato
+  creato un account per lei. …".
 - Daily. Subject "Calendar: next 7 days and backup, {date}". Body: the count of appointments of
   the next 7 days, the two file names, a line saying the backup covers from {date} onwards.
 - Mine. Subject "Your appointments, {from} to {to}". Body: one line per appointment ("Tue 1 Dec,
@@ -713,6 +772,7 @@ views follow `docs/FRONTEND_ARCHITECTURE.md` sections 3 and 4 (a dialog, a form)
 | `createUser` | unchanged actions (`AdminCreateUser` now also sends; same permission) |
 | `updateUser`, `resendInvitation`, `getMe` (new routes) | Cognito `AdminUpdateUserAttributes`, `AdminCreateUser` (resend), `AdminGetUser`, `AdminListGroupsForUser`, on the one pool |
 | `getMailSettings`, `updateMailSettings` (new routes) | the `mail` table, read or read/write |
+| `inviteMessage` (new, no route, at `MailStage` `on`) | a role of its own that writes its own log streams only; Cognito may call it through a permission limited to this pool (`SourceArn`) and this account (`SourceAccount`) |
 | Cognito itself | a service-linked role that Cognito creates when the pool is pointed at our SES (section 13) |
 
 Every new resource ARN is named; the SES actions are scoped to the identity's and the
@@ -724,10 +784,11 @@ configuration set's ARNs.
   GDPR asks that each have a stated purpose ("data minimisation"). Names and e-mail serve E1 to
   E4. The postal address is collected for future features such as printing invoices
   (decision O1): the privacy notice must say so, and, until those features exist, it is only
-  stored and shown, never sent anywhere.
+  stored and shown, never sent anywhere. The language (section 4.1) is a mild fifth fact, to
+  write to the person in their language; it goes into the privacy notice with the others.
 - **Recipients**: AWS (SES, in `eu-north-1`, inside the EU) sends the mails; the mailbox
   providers of the recipients receive them. No new outside company (unlike WhatsApp).
-- **Erasure**: deleting a User deletes their Cognito account and so their four facts; the
+- **Erasure**: deleting a User deletes their Cognito account and so their facts and language; the
   appointments keep the username only, as today; Excel files already mailed are outside the
   system, in the Administrator's mailbox.
 - **Access**: `GET /me` shows a person what is held about them.
@@ -738,7 +799,9 @@ configuration set's ARNs.
 A new logging rule, added to the root `CLAUDE.md` (section 17): **logs never contain an e-mail
 address, a name, a postal address, a mail's text or an attachment**. The mailer logs the kind,
 the recipient's username, the range, the number of appointments, the SES message id, the
-outcome. The profile routes log the target's username and which facts changed, never their
+outcome, and the language's code (`language` on demand, `languages` for the daily mail). The
+invitation function logs the kind of Cognito message, the language's code and the outcome,
+nothing of the person. The profile routes log the target's username and which facts changed, never their
 values.
 
 ---
@@ -755,6 +818,7 @@ values.
 | `MailFromName` | `Shared calendar` | yes |
 | `MailReplyTo` | empty: replies go to `AlertEmail` | yes while empty; a real address **never** (passed once, as `AlertEmail`) |
 | `PageAddress` | `https://calendar.enricopiccinin.com` | yes (the invitation's link) |
+| `DefaultLanguage` | `en` (the default), `it` | yes, `it` for the cloud: the language of a mail to a person with none, so of every invitation (section 6.6) |
 
 ### 13.2 In stages
 
@@ -973,7 +1037,7 @@ to m10) and says each step's check. Nothing reaches the cloud before step 9.
 |---|---|---|
 | O1 | The postal address: what is it for? | **Decided**: future features, such as printing invoices |
 | O2 | The Reply-To: the same address as `AlertEmail`, or another? | **Decided**: `AlertEmail` |
-| O3 | Should the invitation greet by first name? Cognito's template has no name placeholder; a "custom message" trigger function can add it | **Decided**: no, "Hello" is enough; one fewer function |
+| O3 | Should the invitation greet by first name? Cognito's template has no name placeholder; a "custom message" trigger function can add it | **Decided**: no, "Hello" is enough. The invitation function of section 5.1 exists for the language and could add the name later; today it does not |
 | O4 | May the assistant greet a person by first name? | **Decided**: later; not part of this work |
 | O5 | The resend locally: a flag in `env.local.json`, or proved only in the cloud? | **Decided**: only in the cloud, by the smoke test, like the global sign-out's revocation |
 | O6 | Does the profile `shared-calendar-admin` allow `iam:CreateServiceLinkedRole`? | **Answered** (2026-11-25, `docs/EMAIL_PLAN.md` step m9): yes, a policy simulation on its role, for Cognito's e-mail role, answers `allowed` (`docs/RUNBOOK.md` section 3.3) |

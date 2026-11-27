@@ -348,7 +348,9 @@ Plan step 11 has the full list; in short:
    put it in `backend/samconfig.toml` (both `region` lines), in `frontend/samconfig.toml` (the
    page's deploy stops when the two files name different regions) and in the profile.
 1. Steps 1 to 3 of section 2 (commit, local stack, verify).
-2. `npm run deploy -w backend -- --parameter-overrides AdminUsername="admin" FunctionArchitecture="arm64" AssistantModel="claude-sonnet-5-5" AssistantDailyMessageLimit="30" AlertEmail=<alert address>`.
+2. `npm run deploy -w backend -- --parameter-overrides AdminUsername="admin" FunctionArchitecture="arm64" AssistantModel="claude-sonnet-5-5" AssistantDailyMessageLimit="30" MailStage="off" MailDomain="…" MailFromLocalPart="noreply" MailFromName="Shared calendar" PageAddress="…" DefaultLanguage="it" AlertEmail=<alert address>`,
+   the values of the line in `backend/samconfig.toml` but `MailStage`, which a new stack starts
+   at `off` (section 3.3).
    `backend/samconfig.toml` holds everything else (stack, region, capabilities); the address is
    the one value it leaves out, because the repository is public. A `--parameter-overrides` on the
    command line replaces the whole `parameter_overrides` line of `backend/samconfig.toml`, so the
@@ -623,6 +625,39 @@ the smoke test (65 PASS, section 2.4) and its invitation in your mailbox; the da
 in "Settings"; a User created in the page with your own address, its invitation, its first sign-in; a mail on demand from the week
 page; the next morning, the daily mail. A bounce report, should one come, reaches the Reply-To
 mailbox: correct the User's address in the Users screen and "Resend invitation".
+
+### 3.4 The languages
+
+The page, the mails, the Excel files, the invitation and the assistant speak English and Italian
+(`docs/MULTILANGUAGE_ARCHITECTURE.md`). What the operator sets, and what each person chooses:
+
+- **The installation's language**: the parameter `DefaultLanguage` of the API's stack, `en` or
+  `it`, in the line of `backend/samconfig.toml` (`it`). It is the language of a mail, a file and
+  an invitation for a person whose account holds none, which an invited person never does; and
+  the page's language for a browser that remembers none and speaks none of the calendar's. The
+  page takes it at its release: `npm run deploy -w frontend` reads the stack's output
+  `DefaultLanguage` and builds with it. Changing it is one deploy of the API, then one release of
+  the page.
+- **A person's language**: their own choice, on the sign-in screen (remembered by that browser)
+  and in "My details" (kept in their account, the attribute `locale`). At a first sign-in the
+  page saves its language into an account that holds none. The Administrator cannot set another
+  person's language and the API has no field for it. After a deploy that brings the languages,
+  the Administrator signs in once so that the daily mail follows their language.
+- **The invitation** is worded by the invitation function (`InviteMessageFunction`), which the
+  stack has only at `MailStage` `on`; the template's English invitation, `InviteMessageTemplate`,
+  stays as what Cognito sends when the function's answer is unusable. Its log group is
+  `/aws/lambda/<stack>-invite-message`: one line per invitation, its kind and the language's
+  code.
+- **The assistant** answers in the language of a conversation's first message, else the page's,
+  else English. A change of its instructions ends the conversations in progress at the deploy,
+  and asks for the paid evaluation before it (section 3.2).
+- **What a first deploy with the languages must show** (`docs/MULTILANGUAGE_PLAN.md` phase B,
+  item 8): read first, without changing anything, the app client's attribute lists
+  (`aws cognito-idp describe-user-pool-client`) and the pool's triggers
+  (`aws cognito-idp describe-user-pool`); in the change set, the user pool and its app client
+  "Modify", never "Replace", and one function, one role, one log group and one permission added;
+  after it, the smoke test, a test User whose own token can change its `locale` and can no longer
+  change its e-mail, one invitation received in Italian and its password used.
 
 ---
 

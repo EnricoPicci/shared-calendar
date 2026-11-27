@@ -189,9 +189,9 @@ mailer as `local:lambda` names it); and sections of their own for `MailerFunctio
   `xhigh`, `max`; `local:up` refuses another value. Without them the template's model and the
   effort `low` are used, and a `local:up` without them is the way back.
 - **`npm run assistant:eval -w backend`: the evaluation with the real model**
-  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3). It plays 67 requests in English and
-  Italian against the local API and checks what Claude did. **It costs money at Anthropic**:
-  about 50 US cents and four minutes for the whole list on `claude-sonnet-5-5`, 3 cents on
+  (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 12.3). It plays 69 requests in English and
+  Italian, two of them a first message in German, against the local API and checks what Claude
+  did. **It costs money at Anthropic**: about 53 US cents and four minutes for the whole list on `claude-sonnet-5-5`, 3 cents on
   `claude-haiku-5-5`. It is no part of `verify`. Run it before a deployment that changes the
   instructions (`backend/src/assistant/prompt.ts`), a tool or the model.
   - It needs: the real Claude wired; **a stack started afresh** (`local:down`, `local:up`), as
@@ -288,6 +288,11 @@ mailer as `local:lambda` names it); and sections of their own for `MailerFunctio
   table `mail`. `admin` and `alice` keep their `sub` across `local:up`, so after five requests
   of a day by hand, wait for tomorrow or run `local:down` and `local:up` (the table is in
   memory).
+- **The language of a mail.** The mailer writes each mail, its file and the file's name in the
+  recipient's language, the attribute `locale` of the account; an account that holds none gets
+  the installation's (`DefaultLanguage`), which the local stack leaves at its default, English
+  (`docs/MULTILANGUAGE_ARCHITECTURE.md` section 8). To see a mail in Italian locally, choose
+  "Italiano" in that person's "My details" on the local page, then send.
 - **The daily mail by hand**: `npm run mail:daily -w backend -- [<instant>]`. The hourly timer
   of the cloud does not run locally; this starts the mailer's daily run once through
   `local:lambda`, waits and prints its result (`{"outcome": "sent", "mailCount": 1, …}`, or why
@@ -424,6 +429,12 @@ mailer as `local:lambda` names it); and sections of their own for `MailerFunctio
     file is missing) and, to sign in, `local:api`.
   - Serves `/`, `/style.css` and `/app.js` (bundled by esbuild at every request: an edit shows
     after a reload of the page; an edit to `dev.mjs` itself needs a restart).
+  - Its first language is the one this browser remembers, else the browser's own, else English;
+    the sign-in screen and "My details" choose another (`docs/MULTILANGUAGE_ARCHITECTURE.md`
+    section 6). `http://localhost:5173/?padded` shows the page in the padded test language:
+    every text between ⟦ ⟧ and a third longer, so that a word written straight into the code
+    shows without marks and a place too tight for a longer language shows at once. Only this
+    bundle has it.
   - Its bundle skips the sign-out everywhere after a change of password
     (`SKIP_GLOBAL_SIGN_OUT` true): cognito-local has no `GlobalSignOut`, so another browser
     signed in as the same person stays signed in (`docs/FRONTEND_ARCHITECTURE.md` section 12.1).
@@ -460,10 +471,12 @@ mailer as `local:lambda` names it); and sections of their own for `MailerFunctio
     (`docs/FRONTEND_WALK.md`) need a restart between them.
   - Its date arithmetic imports `shared/src/calendar/time.ts` in node (Node ≥ 22.18, type
     stripping), like the smoke test's.
-- `API_URL=… COGNITO_URL=… CLIENT_ID=… npm run build -w frontend` (`frontend/scripts/build.mjs`):
+- `API_URL=… COGNITO_URL=… CLIENT_ID=… [DEFAULT_LANGUAGE=it] npm run build -w frontend` (`frontend/scripts/build.mjs`):
   writes `frontend/dist/` (git-ignored, emptied first): `index.html`, `style.css`, `app.js`
   (minified) and `app.js.map`, and prints their sizes. The three values come from the
   environment only, never from a committed file; a missing one stops the build and is named.
+  `DEFAULT_LANGUAGE`, one of the calendar's languages, is the page's language for a browser
+  that remembers none and speaks none of them; English when it is not given.
   No variable turns off the sign-out everywhere after a change of password: a build always
   does it. The
   front end's deploy command runs it with the stack's values (section 6); `backend`'s `build` is
@@ -493,7 +506,11 @@ Every command of this section that names a stack acts on a real AWS account. `CL
   (front-end work in progress blocks a back-end deploy too; the check is `scripts/deploy-gate.sh`,
   which both deploy scripts source); then `npm run build` and
   `sam deploy` with the default config env, whose `parameter_overrides` in `samconfig.toml` set
-  `AdminUsername`, `FunctionArchitecture`, `AssistantModel` and `AssistantDailyMessageLimit`.
+  `AdminUsername`, `FunctionArchitecture`, `AssistantModel` and `AssistantDailyMessageLimit`,
+  the mail's (`MailStage`, `MailDomain`, `MailFromLocalPart`, `MailFromName`, `PageAddress`) and
+  `DefaultLanguage` (`it`: the installation's language, for the mails and the invitation of a
+  person whose account holds none, and for the page; `docs/MULTILANGUAGE_ARCHITECTURE.md`
+  section 4.3).
   Extra arguments go to `sam deploy`. The first deploy of a stack adds `AlertEmail`, and a
   `--parameter-overrides` on the command line replaces samconfig's whole list, so it repeats the
   four with their values (`docs/RUNBOOK.md` section 3, step 2); later deploys take no argument
@@ -503,11 +520,12 @@ Every command of this section that names a stack acts on a real AWS account. `CL
 - `npm run deploy -w frontend` (`frontend/scripts/deploy.sh`, `docs/FRONTEND_ARCHITECTURE.md`
   section 13.6): releases the page; the procedure is `docs/RUNBOOK.md` section 2, step 6. In
   order: the deploy gate (the same stamp `backend/.verify-ok` as the back end's deploy),
-  `npm run verify -w frontend`, a read of the back end's stack (`ApiUrl`, `UserPoolClientId`;
+  `npm run verify -w frontend`, a read of the back end's stack (`ApiUrl`, `UserPoolClientId`, `DefaultLanguage`, English
+  when the stack has no such output;
   stack name and region from the two `samconfig.toml`, which must name one region; `AWS_REGION`
   wins), `sam deploy` of `frontend/template.yaml` to the stack `shared-calendar-web` with
   `ApiDomain` (change set confirmed; no `sam build`, no bucket for artifacts; a release that
-  changes no resource asks nothing), a read of its outputs, the build (`API_URL=/api`), four
+  changes no resource asks nothing), a read of its outputs, the build (`API_URL=/api`, `DEFAULT_LANGUAGE` from the read), four
   `aws s3 cp` by name with content type and `Cache-Control: no-cache` (`index.html` last; never
   `sync` or `--delete`: the bucket's policy names four objects), an invalidation of `/*` that it
   waits for, and four checks with curl and no credentials, PASS or FAIL each (`/` 200 with the

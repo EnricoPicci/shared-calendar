@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| Status | v31 — the invitation on the users screen: a last look at the address before "Confirm", the answer that says where the invitation went, each User's state, "Resend invitation"; no password shown (2026-11-25, `docs/EMAIL_PLAN.md` step m8; sections 4, 5.1, 8 and 11). v30 — "Choose your password", the first sign-in with a temporary password, in the login's place (2026-11-25, `docs/EMAIL_PLAN.md` step m7; sections 4, 5.1 and 6). v29 — the settings' section "Daily e-mail", the Administrator's (2026-11-25, `docs/EMAIL_PLAN.md` step m5; sections 4, 5.1 and 6). v28 — the week's "E-mail…" dialog, for both roles (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4; sections 4, 5.1 and 6). v27 — the four facts of a person on the users screen, its Edit dialog, and the screen "My details" (2026-11-25, `docs/EMAIL_PLAN.md` steps m1 and m2; sections 4, 5.1 and 6). v26 — a short appointment that shares its width shows its start and its User (2026-11-25, `docs/WINDOW_HOURS_PLAN.md` step w5, section 5.1, decision 203). v25 — **the end of a window chosen as an hour** (2026-11-25, `docs/WINDOW_HOURS_PLAN.md` step w4, brief `prompts/slot-s09-step-w4-implementation.md`, from `docs/SHARED_CALENDAR_SPEC.md` decision D33): in the four forms of a window the end's minute is the start's and its hours follow the start, the start's hour 23 offers 00 only, and a window not whole hours is refused under "End" (sections 4, 5.1 and 11, decisions 201 and 202); the book dialog unchanged. v24 — **times on 5-minute steps on the screens** (2026-11-25, `docs/SLOT_STEP_PLAN.md` steps s4 and s5, brief `prompts/slot-s04-pair-s4-s5-implementation.md`): each time an hour and a minute, a start chosen setting the end one hour later, and a short appointment drawn 15 minutes tall (sections 4, 5.1 and 11, decisions 195 to 200); released with the time lists of a date's window widened on a phone (`docs/SLOT_STEP_PLAN.md` step s6, `docs/RUNBOOK.md` section 5.9). v23 — the assistant's panel says a refused change for the person's role (2026-11-24, `docs/CAPACITY_PLAN.md` step u6, section 6.1). v22 — **the capacity of a type on the screens** (2026-11-24, `docs/CAPACITY_PLAN.md` step u5, brief `prompts/e15-step-u5-implementation.md`): a slot's places, the Administrator's full slot and a slot under appointments as a tab beside them, the Administrator's overlapping appointments side by side or as one block with its list, "Book anyway" after `slot_taken`, the `user_busy` sentences that name the appointment in the way, a type's capacity in the form and in the dialog "Edit type" (sections 4, 5.1 and 11); walked against the local stack (`docs/FRONTEND_WALK.md` section 10). v21 — **the password screen built** (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3, brief `prompts/e05-step-p3-implementation.md`): a sixth screen, "Password", last for both roles (section 6), its logic in section 5.1, the login's "Password changed" and the reaction of the shell to a change (section 6), the bundle's fourth constant (section 12.1); walked against the local stack (`docs/FRONTEND_WALK.md` section 9). v20 — the view layer **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12, walked at step c13 on 2026-11-23); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`), **written** (`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21, brief `prompts/94-step-70-implementation.md`: the template, the deploy command and its gate) **and deployed** (step 72, 2026-11-21, brief `prompts/96-step-72-implementation.md`): the stack `shared-calendar-web` exists and the page is in use at the address of its output `PageUrl`; section 13 says what is built and deployed, with how each thing was seen. `docs/FRONTEND_DEPLOY_PLAN.md` is done (its step 73, 2026-11-21, brief `prompts/97-step-73-implementation.md`), **with checks at the deployed page still owed**: a refresh with the revoked token refused by the real Cognito, a session renewed after its fifteen minutes, "Sign out" with the network off, a reload and the console, and the rest of the walk with the phone width (the open items of `docs/RUNBOOK.md` section 5.5); **logout is built** (step 71, 2026-11-21, brief `prompts/95-step-71-implementation.md`: `docs/FRONTEND_SERVICES.md` v8, section 20; here sections 6 and 13.7), proven against the local stack, and at the deployed page as far as the revocation answered 200. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it. Windows of whole hours (`docs/SHARED_CALENDAR_SPEC.md` decision D33) are on the page, v25, with v26, and deployed (`docs/WINDOW_HOURS_PLAN.md` step w5, `docs/RUNBOOK.md` section 5.10). |
+| Status | v32 — **the page in every language of the calendar**, English and Italian, built and not deployed (2026-11-27, `docs/MULTILANGUAGE_PLAN.md` steps l3 to l5 and l8 and its phase B item 3): every word in `frontend/src/texts/`, keys in `index.html`, the page's first language from this browser, the choice on the sign-in screen and in "My details", the account's language read at sign-in, the frame entered again on a change (sections 3 to 6, 12.4, decisions 217 to 222). v31 — the invitation on the users screen: a last look at the address before "Confirm", the answer that says where the invitation went, each User's state, "Resend invitation"; no password shown (2026-11-25, `docs/EMAIL_PLAN.md` step m8; sections 4, 5.1, 8 and 11). v30 — "Choose your password", the first sign-in with a temporary password, in the login's place (2026-11-25, `docs/EMAIL_PLAN.md` step m7; sections 4, 5.1 and 6). v29 — the settings' section "Daily e-mail", the Administrator's (2026-11-25, `docs/EMAIL_PLAN.md` step m5; sections 4, 5.1 and 6). v28 — the week's "E-mail…" dialog, for both roles (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4; sections 4, 5.1 and 6). v27 — the four facts of a person on the users screen, its Edit dialog, and the screen "My details" (2026-11-25, `docs/EMAIL_PLAN.md` steps m1 and m2; sections 4, 5.1 and 6). v26 — a short appointment that shares its width shows its start and its User (2026-11-25, `docs/WINDOW_HOURS_PLAN.md` step w5, section 5.1, decision 203). v25 — **the end of a window chosen as an hour** (2026-11-25, `docs/WINDOW_HOURS_PLAN.md` step w4, brief `prompts/slot-s09-step-w4-implementation.md`, from `docs/SHARED_CALENDAR_SPEC.md` decision D33): in the four forms of a window the end's minute is the start's and its hours follow the start, the start's hour 23 offers 00 only, and a window not whole hours is refused under "End" (sections 4, 5.1 and 11, decisions 201 and 202); the book dialog unchanged. v24 — **times on 5-minute steps on the screens** (2026-11-25, `docs/SLOT_STEP_PLAN.md` steps s4 and s5, brief `prompts/slot-s04-pair-s4-s5-implementation.md`): each time an hour and a minute, a start chosen setting the end one hour later, and a short appointment drawn 15 minutes tall (sections 4, 5.1 and 11, decisions 195 to 200); released with the time lists of a date's window widened on a phone (`docs/SLOT_STEP_PLAN.md` step s6, `docs/RUNBOOK.md` section 5.9). v23 — the assistant's panel says a refused change for the person's role (2026-11-24, `docs/CAPACITY_PLAN.md` step u6, section 6.1). v22 — **the capacity of a type on the screens** (2026-11-24, `docs/CAPACITY_PLAN.md` step u5, brief `prompts/e15-step-u5-implementation.md`): a slot's places, the Administrator's full slot and a slot under appointments as a tab beside them, the Administrator's overlapping appointments side by side or as one block with its list, "Book anyway" after `slot_taken`, the `user_busy` sentences that name the appointment in the way, a type's capacity in the form and in the dialog "Edit type" (sections 4, 5.1 and 11); walked against the local stack (`docs/FRONTEND_WALK.md` section 10). v21 — **the password screen built** (2026-11-23, `docs/CHANGE_PASSWORD_PLAN.md` step p3, brief `prompts/e05-step-p3-implementation.md`): a sixth screen, "Password", last for both roles (section 6), its logic in section 5.1, the login's "Password changed" and the reaction of the shell to a change (section 6), the bundle's fourth constant (section 12.1); walked against the local stack (`docs/FRONTEND_WALK.md` section 9). v20 — the view layer **implemented** (2026-11-20; the assistant's panel of section 6.1 on 2026-11-22, `docs/CONVERSATIONAL_PLAN.md` step c12, walked at step c13 on 2026-11-23); **the hosting and the deployment decided** (2026-11-21, section 13, brief `prompts/93-deploy-frontend.md`), **written** (`docs/FRONTEND_DEPLOY_PLAN.md` step 70, 2026-11-21, brief `prompts/94-step-70-implementation.md`: the template, the deploy command and its gate) **and deployed** (step 72, 2026-11-21, brief `prompts/96-step-72-implementation.md`): the stack `shared-calendar-web` exists and the page is in use at the address of its output `PageUrl`; section 13 says what is built and deployed, with how each thing was seen. `docs/FRONTEND_DEPLOY_PLAN.md` is done (its step 73, 2026-11-21, brief `prompts/97-step-73-implementation.md`), **with checks at the deployed page still owed**: a refresh with the revoked token refused by the real Cognito, a session renewed after its fifteen minutes, "Sign out" with the network off, a reload and the console, and the rest of the walk with the phone width (the open items of `docs/RUNBOOK.md` section 5.5); **logout is built** (step 71, 2026-11-21, brief `prompts/95-step-71-implementation.md`: `docs/FRONTEND_SERVICES.md` v8, section 20; here sections 6 and 13.7), proven against the local stack, and at the deployed page as far as the revocation answered 200. Every screen of `docs/FRONTEND_VIEW_PLAN.md` section 3 exists in `frontend/`, tested and walked in a browser against the local stack (`docs/FRONTEND_WALK.md`); the plan's steps 60 to 69 are done (briefs `prompts/83-step-60-implementation.md` to `prompts/92-step-69-implementation.md`). What is built: the build and dev-server commands and the tests' environment (section 12); the shell with its navigation (section 6); the logic layer (section 5.1); the login; the week calendar with booking, cancelling, the note and the change; a User's "My appointments"; and the Administrator's settings, users and availability (the types, the weekly patterns and a single date). The fallback of section 7 was not needed; what the code became, and the verdict on the fallback, are in sections 7.1 and 7.2; section 3, rule 12 was reworded after it. Windows of whole hours (`docs/SHARED_CALENDAR_SPEC.md` decision D33) are on the page, v25, with v26, and deployed (`docs/WINDOW_HOURS_PLAN.md` step w5, `docs/RUNBOOK.md` section 5.10). |
 | Scope | How the views of the front end are written: the technology, the layers and which may use which, the rules of a view, the logic between the services and the views, the shell, the tests, the folders; and, since v13, how the page is hosted and deployed (section 13) |
 | Not in scope | Keeping the session across a reload, the size of the bundle, a domain of our own: open points of section 10, none of which blocked the deployment. The design of the logout service: it is `docs/FRONTEND_SERVICES.md` section 20; section 13.7 here keeps the direction and what follows from it for the page |
-| Depends on | `docs/FRONTEND_SERVICES.md` v9 (the services the views use, the sign-out and the assistant among them), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work of the views), `docs/FRONTEND_DEPLOY_PLAN.md` (the order of work of the hosting) |
+| Depends on | `docs/FRONTEND_SERVICES.md` v9 (the services the views use, the sign-out and the assistant among them), `docs/MULTILANGUAGE_ARCHITECTURE.md` (the languages: sections 5 and 6), `docs/SHARED_CALENDAR_SPEC.md` section 16.8 (what the views need), `docs/FOLDER_STRUCTURE.md` section 7, `docs/FRONTEND_VIEW_PLAN.md` (the order of work of the views), `docs/FRONTEND_DEPLOY_PLAN.md` (the order of work of the hosting) |
 | Why this choice | `docs/FRONTEND_VIEW_OPTIONS.md` v3: the options compared (plain HTML/CSS, `lit-html`, Lit, React, Angular, Svelte) and the reasons. Not repeated here |
 
 ### Change log
@@ -47,6 +47,7 @@
 | v30 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m7 (brief `prompts/mail-m07-first-sign-in-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` section 5.2. Section 4: "Choose your password", `section.first-password` inside `#login`, shown in place of the sign-in form (`form.sign-in`) while the `LoginService` asks for a new password: the account's name, two fields with the password screen's hints, "Choose password" and "Cancel"; the login view hides its form meanwhile, wipes the temporary password and keeps the username for the way back. Section 5.1: `choose-password.screen.ts`; `password.model.ts` gains the hints of the two new fields (`newPasswordHints`, `againHint`, `newHintStands`, `EMPTY_NEW_HINTS`), which `passwordHints` now uses for its own two; `texts.ts` gains the sentences of `session_expired` and `password_refused`. Section 6: `runShell` makes one `ChoosePasswordScreen`, which lives as long as the page; `mountShell` takes it as `choose` and mounts and starts it with the login view. Section 11: decisions 204 to 208. Section 7.1 is not measured again; the new files' sizes are in section 4. |
 | v31 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m8 (brief `prompts/mail-m08-invitation-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 5.1 to 5.3.1, 9.1 and 11. Section 4: the users screen's password dialog `dialog.created` is removed; "Create user" opens the invitation's dialog `dialog.invite`, "Send an invitation": the last look ("An invitation will be sent to …", "Back" and "Confirm"), then the answer ("An invitation was sent to …") with "Close", which gets the keyboard, or a failure said in the dialog, "E-mail is not available yet." among them; the form loses its failure line; a row shows the state, `invited` or `active`, and "Resend invitation" for an invited User, which opens the same dialog. Section 5.1: `users.model.ts` gains the state of a row, `resendLabel`, `inviteQuestion` and `invitedAnswer`; `UsersScreen` gains `invite` in its state (`InviteState`), `resend`, `confirm` and `closeInvite`, and loses `creating`, `failure` and `created`; the view no longer reads the service's create state. Section 8: the dialogs and the focus, the Escape key (no dialog has `closedby`), a password in the tests. Section 11: decisions 77, 78, 81 and 83 no longer hold; decisions 209 to 216. Section 7.1 is not measured again; the users view's size is in decision 216. The walk's checks: `docs/FRONTEND_WALK.md` checks 56 to 60 and 217 to 219. |
 | v31, note | 2026-11-25 | The branch `slot-5min` merged into `main`, where the e-mail work had been written at the same time. Its versions v24 to v26 and decisions 195 to 203 are released (tags `v2.4.0` and `v2.5.0`) and keep their numbers; the e-mail's versions, first numbered v24 to v28, are v27 to v31, and its decisions, first numbered 195 to 207, are 204 to 216; every reference to them was changed with them. Section 5.1 holds both sides' files, twenty-eight. The status row says both. No other text changed. |
+| v32 | 2026-11-27 | `docs/MULTILANGUAGE_PLAN.md` steps l3 to l5 and l8, and its phase B item 3 (the Product Owner's look), from `docs/MULTILANGUAGE_ARCHITECTURE.md` sections 5 and 6; built and tested against the local stack, not deployed. Section 12.4 rewritten: where the texts live (`frontend/src/texts/`, `PageTexts`, the budgets, the padded test language), the dates by `shared/`'s `dateFormats`, the keys in the page and `page-texts.ts`, the page's language and its three changes, the tests. Section 3, rule 2: no word in the page. Section 4: the login example with keys and the language; the choice of language on the sign-in screen; the users row's buttons in one group (`.row-buttons`), the list 52rem. Section 5: rule 8, the texts given to the logic; section 5.1: twenty-nine files (`language.ts`), the rows whose names changed, `failureText` with the language's `failures`, "My details'" list "Language". Section 6: `PageLanguage` made by `runShell` and the page filled first, the account's language read before the frame (`arrive`), the texts and the `LanguageService` in `sessionObjects`, a screen's label from the frame's texts, the sequence of a change of language. Section 6.1: the panel's words and languages. Sections 7.1, 8, 9, 10 (O8), 12.1 (`TEST_LANGUAGE`, `DEFAULT_LANGUAGE`), 12.2, 13.1 and 13.6. Section 11: decision 21 no longer holds; decisions 16, 148, 160, 164 and 215 amended; decisions 175 to 183, which stood inside the table of section 7.1, moved to their place; decisions 217 to 222, with `docs/MULTILANGUAGE_PLAN.md` decisions D1 and D2 as 217 and 218. |
 | v20, note | 2026-11-23 | The branch `deploy-frontend` merged into `main`, where the assistant's panel had been written at the same time. The panel's two versions, first numbered v13 and v14, are v19 and v20, after the hosting's v13 to v18; its decisions, first numbered 138 to 153, are 159 to 174, after the hosting's 138 to 158; every reference to them was changed with them. The status row says both. No other text changed. |
 
 **The decision in one paragraph.** The views are written in **plain HTML and CSS, with one
@@ -72,6 +73,9 @@ code of that view proves painful (section 7); no view needed it (section 7.2).
   decided, written and deployed; their order of work was `docs/FRONTEND_DEPLOY_PLAN.md`
   (steps 70 to 73, done, with checks at the deployed page still owed: `docs/RUNBOOK.md`
   section 5.5).
+- `docs/MULTILANGUAGE_ARCHITECTURE.md` is the design of the languages, and
+  `docs/MULTILANGUAGE_PLAN.md` its order of work and the record of what was built; for the page
+  they are merged here (section 12.4).
 - `docs/FRONTEND_WALK.md` is the walk through every screen in a browser: the check to repeat
   after a later change. It is not a source of truth either: this document and the tests win.
 
@@ -109,7 +113,10 @@ end up in a view.
    in-memory session alive from screen to screen. The style sheet's first rule about it is
    `[hidden] { display: none !important; }`, so that no other rule can show an element the
    script has not shown: between the moment the page is parsed and the moment the script
-   decides, the page is blank, and nothing of a screen flashes.
+   decides, the page is blank, and nothing of a screen flashes. The page holds no word outside
+   a comment: an element's words are a key (`data-text`, `data-label`) that the shell fills in
+   the language in use before it shows anything, and a view writes no sentence of its own
+   (section 12.4).
 
 3. **Repeated elements are copies of a `<template>`.** HTML has no loop. A row, a day, a block
    is drawn by copying the content of a `<template>` element of `index.html` and filling the
@@ -173,15 +180,17 @@ end up in a view.
 
 ## 4. The shape of a view
 
-The login view, complete. The markup, in `index.html`:
+The login view, cut down to its sign-in form (the real one adds the notice, the choice of
+language and "Choose your password", below). The markup, in `index.html`, holds keys, not
+words; the shell fills them in the language in use before it shows anything (section 12.4):
 
 ```html
 <main id="login" class="login" hidden>
-  <h1>Shared calendar</h1>
-  <form>
-    <label>Username <input name="username" autocomplete="username" required /></label>
-    <label>Password <input name="password" type="password" autocomplete="current-password" required /></label>
-    <button class="primary">Sign in</button>
+  <h1 data-text="frame.title"></h1>
+  <form class="sign-in">
+    <label><span data-text="login.username"></span> <input name="username" autocomplete="username" required /></label>
+    <label><span data-text="login.password"></span> <input name="password" type="password" autocomplete="current-password" required /></label>
+    <button class="primary" data-text="login.signIn"></button>
     <p class="error" role="alert"></p>
   </form>
 </main>
@@ -192,12 +201,14 @@ The mount function:
 ```ts
 // What the view uses of the service: one method and one stream.
 export type LoginDeps = Pick<LoginService, 'login' | 'loginState$'>;
+// And of the page's language: the language in use, with its texts.
+export type LoginLanguage = Pick<PageLanguage, 'state$' | 'choose'>;
 
-export function mountLogin(root: HTMLElement, login: LoginDeps): Subscription {
+export function mountLogin(root: HTMLElement, login: LoginDeps, language: LoginLanguage): Subscription {
   // 1. Find the elements, once.
-  const form = root.querySelector('form')!;
-  const button = root.querySelector('button')!;
-  const error = root.querySelector('.error')!;
+  const form = root.querySelector<HTMLFormElement>('form.sign-in')!;
+  const button = form.querySelector('button')!;
+  const error = form.querySelector('.error')!;
 
   // 2. The user's actions become calls.
   form.onsubmit = (event) => {
@@ -207,10 +218,10 @@ export function mountLogin(root: HTMLElement, login: LoginDeps): Subscription {
   };
 
   // 3. The streams' notifications fill the elements.
-  const subscription = login.loginState$.subscribe((state) => {
+  const subscription = combineLatest([login.loginState$, language.state$]).subscribe(([state, { texts }]) => {
     button.disabled = state.status === 'pending';
-    // In plain words, by its reason (section 5): never the service's own message.
-    error.textContent = state.status === 'failure' ? failureText(state.reason) : '';
+    // In plain words, by its reason, in the language in use (section 5): never the service's own message.
+    error.textContent = state.status === 'failure' ? failureText(texts.failures, state.reason) : '';
   });
 
   // 4. Leaving the view: what was typed is wiped.
@@ -228,7 +239,8 @@ fields could not be replaced by one.
 
 **How the two meet.** The contract between the HTML and the TypeScript is the selectors: an `id`
 for a view's root and for each `<template>`, class names for the elements inside, `name`
-attributes for the form fields. Nothing checks this contract when the code is compiled: a class
+attributes for the form fields; and the keys of the page's words (`data-text`, `data-label`),
+whose test is `page-texts.test.ts` (section 12.4). Nothing checks the selectors when the code is compiled: a class
 renamed in the HTML and not in the script is a `null` when the view is mounted. The view's test
 (section 8) is the check.
 
@@ -262,7 +274,14 @@ network, the server) is said under the form, and the fields are kept. "Cancel" a
 Cognito: the sign-in form is back with the username, and the temporary password still works.
 The screen is one gate: a later one (the privacy terms, `docs/EMAIL_ARCHITECTURE.md` section 5.2)
 would follow it. Sizes: `choose-password.view.ts` 79 lines, `choose-password.screen.ts` 108,
-`login.view.ts` 56 (39 before).
+`login.view.ts` 84 with the choice of language.
+
+**The choice of language** (section 12.4) is a list under the sign-in form,
+`label.language`, the calendar's languages each under its own name (`fillLanguages`). The login
+view hides it while "Choose your password" is on show, and empties it when it is left. A choice
+calls `PageLanguage.choose`; the shell fills the page's fixed texts again, and the view, which
+listens to the language's stream beside `loginState$`, words its notice and its failure line
+again. The username and the password typed stay in their fields.
 
 **The handlers of a view that was left stay where they are.** A handler is attached by
 assigning a property (`form.onsubmit = …`, `button.onclick = …`), never with
@@ -623,12 +642,14 @@ reads, fills, marks and empties the four the same way in every form that holds t
   offers nothing (`autocomplete="off"`): the facts are another person's. A success empties all
   five; a refusal or a failure keeps what was typed.
 - **A row** shows the username, the name ("Alice Liddell"), the e-mail and the state of the
-  account, `invited` until the first sign-in and `active` after it (`.status`; the row of an
-  invited User has the class `is-invited`, which colours its state as a thing to do), then
-  "Edit", "Resend invitation" for an invited User only, and "Delete" (`.ask-edit`,
-  `.ask-resend`, `.ask-delete`, each named for its user: "Edit alice", "Resend the invitation to
-  alice"). The row wraps on a narrow screen, and an e-mail breaks where it must rather than leave
-  the row.
+  account in words, "invited" until the first sign-in and "active" after it (`.status`; the row
+  of an invited User has the class `is-invited`, which colours its state as a thing to do), then
+  one group of buttons (`.row-buttons`): "Edit", "Resend invitation" for an invited User only,
+  and "Delete" (`.ask-edit`, `.ask-resend`, `.ask-delete`, each named for its user: "Edit alice",
+  "Resend the invitation to alice"). The row wraps on a narrow screen, and an e-mail breaks where
+  it must rather than leave the row; the group stays whole at the row's right end, and goes to a
+  line of its own, all its buttons together, when the row is too narrow for it. The list is
+  52rem wide at most, so that an Italian row fits on one line at a desktop width.
 - **The Edit dialog** (`dialog.edit`, a dialog with a form, the pattern of the availability's
   dialogs): its title names the user, its form the four facts filled from the row, then
   `.failure`, "Cancel" and "Save". Opening it starts its state clean; "Cancel" and the Escape
@@ -723,7 +744,7 @@ let deleteAsked = false;                       // "Delete user" was pressed sinc
 const openDelete = (row: UserRow) => {         // a row's "Delete": a click only opens the dialog
   deleting = row.username;
   deleteAsked = false;
-  question.textContent = deleteQuestion(row.username);
+  question.textContent = texts.users.deleteQuestion(row.username);
   removeError.textContent = '';
   remove.showModal();
 };
@@ -732,13 +753,13 @@ removeSubmit.onclick = () => { deleteAsked = true; users.deleteUser(deleting); }
 users.deleteUserState$.subscribe((state) => {
   removeSubmit.disabled = state.status === 'pending';
   if (!deleteAsked) return;                    // not this opening's delete
-  removeError.textContent = state.status === 'failure' ? failureText(state.reason) : '';
+  removeError.textContent = state.status === 'failure' ? failureText(texts.failures, state.reason) : '';
   if (state.status === 'success') remove.close();
 });
 ```
 
 - **Its shape is the shape of a dialog above**, with nothing to type: what it is about and one
-  "asked" are local; the words come from the logic layer (`deleteQuestion`); the outcome comes
+  "asked" are local; the words come from the page texts (`users.deleteQuestion`); the outcome comes
   from the service's state. A failure is said in the dialog, which stays open, and the button
   can be pressed again; a success closes it. The row goes because the logic layer reads the
   list again (section 5.1), not because the view removes it.
@@ -980,7 +1001,7 @@ either. It lives in the logic layer:
 | When to call again | After a booking, a cancellation, a change or a note saved, whatever its outcome, load the calendar again (`docs/FRONTEND_SERVICES.md` section 18.6) |
 | A response made ready to draw | The week: per day, its windows, slots, busy blocks and appointments, each with its place in the day and its time as text |
 | What is offered | Whether the note can be edited and whether "Change" and "Cancel" are shown for an appointment (the status, the end, the role, `cancellableUntil`) |
-| The texts | A date and a time in the calendar's time zone, whatever the browser's; a failure `reason` in plain words (`docs/SHARED_CALENDAR_SPEC.md` section 16.8) |
+| The texts | A date and a time in the calendar's time zone, whatever the browser's; a failure `reason` in plain words (`docs/SHARED_CALENDAR_SPEC.md` section 16.8); each in the language in use, from the page texts it was given (section 12.4) |
 | From the user's input to a call's argument | The booking body from a slot, a note and a username; the settings' body from four fields typed as text, or why not, field by field; the username to create from what its field holds, or why not; a type's name and a pattern's body from what their forms hold, or why not, field by field |
 
 Its rules:
@@ -999,43 +1020,49 @@ Its rules:
    through the browser's own zone.
 7. **Tested like the services**: unit tests with no network and no DOM, inside the 100 % line
    coverage of `frontend/src`.
+8. **Its words are the page texts it is given** (section 12.4): a class takes the `PageTexts`
+   of the language in use in its constructor and keeps them for its life; a pure model takes
+   the texts, or the group of them it needs, as its first parameter. No sentence is written in
+   a file of the logic layer, and no stream of the language reaches a screen's class
+   (`docs/MULTILANGUAGE_PLAN.md` decision D2; section 11, decision 218).
 
-### 5.1 As built: twenty-eight files
+### 5.1 As built: twenty-nine files
 
 `frontend/src/logic/` (`docs/FRONTEND_VIEW_PLAN.md` steps 61 to 68,
 `docs/CONVERSATIONAL_PLAN.md` step c12 for the assistant's two and `docs/CHANGE_PASSWORD_PLAN.md`
-step p3 for the password's two, `docs/EMAIL_PLAN.md` step m2 for the facts' three, step m4 for the mail's one, step m5 for the daily mail's two and step m7 for the first sign-in's one), each with its test in
+step p3 for the password's two, `docs/EMAIL_PLAN.md` step m2 for the facts' three, step m4 for the mail's one, step m5 for the daily mail's two and step m7 for the first sign-in's one, `docs/MULTILANGUAGE_PLAN.md` step l3 for the page's language), each with its test in
 `frontend/tests/unit/logic/`:
 
 | File | What it holds |
 |---|---|
-| `texts.ts` | Pure functions: a date (`dateText`, "Mon 16 Nov"), a time (`timeText`, "09:00"), a range (`rangeText`, "09:00–10:00"), a date with a time (`dateTimeText`, "Mon 23 Nov, 10:00"), a date with its year (`longDateText`, "20 November 2026"), a week's label (`weekLabel`, "16 Nov – 22 Nov 2026"), a UTC offset (`offsetText`, "+02:00"), whether a day's offset changes (`offsetChangesOn`), a failure in plain words (`failureText`); and the words of the password screen: one sentence per condition a new password can miss (`PASSWORD_PROBLEM_TEXT`, with the shared rule's numbers and its 32 symbols) and the screen's other sentences, "Password changed" among them (`PASSWORD_TEXTS`); and the mail dialog's: what the mail holds for each role and where it went, masked (`MAIL_TEXTS`) |
-| `week.model.ts` | Pure: `weekModel(view, role)`, a `CalendarView` in, the week ready to draw out, an appointment drawn at least `SHORTEST_DRAWN` (15) minutes tall and marked `short`, its `shown` time its start alone when it is short and shares its width; a slot's places in words (`placesOf`) |
+| `texts.ts` | Pure functions, the same in every language: a time (`timeText`, "09:00"), a range (`rangeText`, "09:00–10:00"), a UTC offset (`offsetText`, "+02:00"), whether a day's offset changes (`offsetChangesOn`); a date with a time (`dateTimeText(dates, …)`, "Mon 23 Nov, 10:00", with the language's `dates`); and a failure in plain words (`failureText(failures, reason, attempt, role)`, the sentence of the language's `failures`). The dates themselves are `PageTexts.dates`, `shared/`'s `dateFormats(language)` (section 12.4) |
+| `language.ts` | The class `PageLanguage`, page-wide, made by `runShell`: the language in use and its page texts (`state`, `state$`), and `choose`, which this browser remembers and gives to the stream when it differs; and `firstLanguage`, the page's language before anyone signs in: this browser's memory, else the browser's own languages, else the bundle's default (section 12.4) |
+| `week.model.ts` | Pure: `weekModel(texts, view, role)`, a `CalendarView` in, the week ready to draw out, an appointment drawn at least `SHORTEST_DRAWN` (15) minutes tall and marked `short`, its `shown` time its start alone when it is short and shares its width, the legend's types sorted by name in the texts' language (`texts.locale`); a slot's places in words (`placesOf`) |
 | `times.ts` | Pure: a time as two lists. The minutes of an hour (`MINUTES`, `minutesOf`: only 00 for the hour 24), a time taken apart and put together (`partsOf`, `timeOf`), minutes and the clock (`minuteOfClock`, `clockOf`), the times of a form of a window (the start's hours `WINDOW_STARTS` and minutes `startMinutesOf`, 00 alone in the hour 23; the end's hours and one minute for a start, `windowEnds`; `LAST_TIME`), the hours of the book dialog (`windowHours`), and the end a start sets (`endFor`) or, in a form of a window, the end after the start's hour or minute chosen (`endAfter`) |
-| `booking.ts` | Pure, for the book dialog: what is booked in words (`bookingText`), the hours the Administrator may choose, the slot's times and the window's end (`timeChoice`), the Users to choose from (`userChoice`), and from what the dialog holds to the argument of `AppointmentsService.book` (`bookingFor`) or, when it confirms a change, of `AppointmentsService.change` (`changeFor`), each with `overbook: true` when asked; what a refusal says in the dialog and whether it offers "Book anyway" (`refusalOf`, with `FULL_FOR_ADMIN`), and the appointment of the shown week in the way of a `user_busy` (`inTheWay`) |
-| `appointment.detail.ts` | Pure: `appointmentDetail(appointment, role, now, zone)`, an `Appointment` in, what the detail dialog shows out, with which of its three actions are offered (the note, "Change", "Cancel appointment"), the note as a text and as a field's value, and the sentence about them; `movingOf(detail, role)`, an appointment being moved, in the words of the banner and of the confirmation, with whose it is (`who`: the User's name for the Administrator, "You" for a User) |
+| `booking.ts` | Pure, for the book dialog: what is booked in words (`bookingText`), the hours the Administrator may choose, the slot's times and the window's end (`timeChoice`), the Users to choose from (`userChoice(texts, …)`), and from what the dialog holds to the argument of `AppointmentsService.book` (`bookingFor`) or, when it confirms a change, of `AppointmentsService.change` (`changeFor`), each with `overbook: true` when asked; what a refusal says in the dialog and whether it offers "Book anyway" (`refusalOf(texts, …)`, with the Administrator's `week.fullForAdmin`), and the appointment of the shown week in the way of a `user_busy` (`inTheWay`) |
+| `appointment.detail.ts` | Pure: `appointmentDetail(texts, appointment, role, now, zone)`, an `Appointment` in, what the detail dialog shows out, with which of its three actions are offered (the note, "Change", "Cancel appointment"), the note as a text and as a field's value, and the sentence about them; `movingOf(detail, role)`, an appointment being moved, in the words of the banner and of the confirmation, with whose it is (`who`: the User's name for the Administrator, "You" for a User) |
 | `week.screen.ts` | The class `WeekScreen`: which week is on screen, its loads and reloads, the detail of one of its appointments, and the appointment being moved to another time, one of its own or one handed over by the list screen; the dates of the week on show, for the mail dialog (`range`) |
-| `appointments.model.ts` | Pure, for "My appointments": `appointmentRows(appointments, now, zone)`, the list ready to draw (date, time, type, note, and the status in words); the two sentences of an empty list (`emptyText`); the period the history opens on (`defaultPeriod`) and the period's own checks (`periodRefusal`) |
+| `appointments.model.ts` | Pure, for "My appointments": `appointmentRows(texts, appointments, now, zone)`, the list ready to draw (date, time, type, note, and the status in words); the two sentences of an empty list (`emptyText`); the period the history opens on (`defaultPeriod`) and the period's own checks (`periodRefusal`) |
 | `appointments.screen.ts` | The class `AppointmentsScreen`: which of the two lists is on show, the period of the history, the time zone read from the settings, the loads and reloads, the detail of one of its appointments, and the hand-over of one to the week screen |
 | `settings.model.ts` | Pure, for the settings form: what the fields are filled with (`settingsFields`), what the form says beside them (`settingsInfo`: the time zone, who saved last and when), the range of a field with its words (`settingRange`), and from what the fields hold to the body of the save or to the refusals (`settingsFor`) |
 | `settings.screen.ts` | The class `SettingsScreen`: the settings read when the screen is shown, the save with its checks, and the read that follows every save |
-| `users.model.ts` | Pure, for the users screen: the list ready to draw (`userRows`: the username, the name, the e-mail and the state of the account, the facts the Edit dialog opens with, and the names of its "Edit", "Resend invitation" (an invited User's only) and "Delete" buttons; `sameRow`), the two sentences of the invitation's dialog (`inviteQuestion`, `invitedAnswer`), the Edit dialog's title (`editTitle`), the sentence of an empty list (`NO_USERS`), what a username is in words (`USERNAME_HINT`), from what the field holds to the username to create or to the refusal (`usernameFor`), and the words of the dialog that confirms a deletion (`deleteQuestion`) |
+| `users.model.ts` | Pure, for the users screen: the list ready to draw (`userRows`: the username, the name, the e-mail and the state of the account, the state in words (`statusText`), the facts the Edit dialog opens with, and the names of its "Edit", "Resend invitation" (an invited User's only) and "Delete" buttons; `sameRow`), and from what the field holds to the username to create or to the refusal (`usernameFor`). Its sentences (the invitation's two, the empty list, what a username is, the question before a deletion) are the page texts' `users` |
 | `users.screen.ts` | The class `UsersScreen`: the list read when the screen is shown, a create with its checks (the username and the four facts) and the invitation's dialog, its last look at the address before "Confirm", the resend of an invitation through the same dialog, the Edit dialog's state and save, and the list read again after every create, resend, edit and delete and when the page becomes visible |
-| `availability.model.ts` | Pure, for the availability screen. The types: the list ready to draw (`typeRows`, with "· 3 places" and the fields "Edit type" opens with), the sentence of an empty list (`NO_TYPES`), what a name and a capacity are in words (`TYPE_NAME_HINT`, `TYPE_CAPACITY_HINT`), what the form starts with (`STARTING_TYPE`), from what the field holds to the name or to the refusal (`typeNameFor`), from the two fields to the type or to the refusals (`typeFor`), the question before a deletion (`deleteTypeQuestion`). The patterns: the choices of the form's lists (`WEEKDAY_CHOICES`, `typeChoices`; the hours are `times.ts`'s), what the form starts with (`startingFields`), the fields of an existing pattern (`patternFields`), from what the form holds to the body or to the refusals (`patternFor`; the refusal of a window's two times, `endRefusal`, shared with `date.model.ts`), the list grouped by weekday and ready to draw (`patternGroups`), the question before a deletion (`deletePatternQuestion`) |
+| `availability.model.ts` | Pure, for the availability screen. The types: the list ready to draw (`typeRows`, with "· 3 places" and the fields "Edit type" opens with), what a name and a capacity are in words (`typeNameHint`, `typeCapacityHint`), what the form starts with (`STARTING_TYPE`), from what the field holds to the name or to the refusal (`typeNameFor`), from the two fields to the type or to the refusals (`typeFor`), the question before a deletion (`deleteTypeQuestion`). The patterns: the choices of the form's lists (`weekdayChoices`, from `texts.dates.weekdayName`, and `typeChoices`; the hours are `times.ts`'s), what the form starts with (`startingFields`), the fields of an existing pattern (`patternFields`), from what the form holds to the body or to the refusals (`patternFor`; the refusal of a window's two times, `endRefusal`, shared with `date.model.ts`), the list grouped by weekday and ready to draw (`patternGroups`), the question before a deletion (`deletePatternQuestion`) |
 | `conflicts.ts` | Pure: `conflictList(conflicts, zone)`, the appointments in the way of a refused change of availability, ready to draw, with the sentence that counts them |
 | `availability.screen.ts` | The class `AvailabilityScreen`: the settings (for the time zone), the types and the patterns read when the screen is shown, the four writes that have a check, and the lists read again after every write and when the page becomes visible; and `known$`, what it knows, for the object of a single date |
-| `date.model.ts` | Pure, for a single date: the date chosen checked (`dateFor`), a date in words (`dateWords`), the day as the weekly patterns give it and as it is now, with the three questions of the dialog (`dayModel`), the windows "this day only" starts from (`startingWindows`), those windows ready to draw (`draftModel`), one more of them or why not (`draftAdd`), and an extra window's body from its form (`windowFor`) |
+| `date.model.ts` | Pure, for a single date: the date chosen checked (`dateFor`), a date in full words (`texts.dates.fullDate`), the day as the weekly patterns give it and as it is now, with the three questions of the dialog (`dayModel`), the windows "this day only" starts from (`startingWindows`), those windows ready to draw (`draftModel`), one more of them or why not (`draftAdd`), and an extra window's body from its form (`windowFor`) |
 | `date.screen.ts` | The class `DateScreen`: the date on show, its day read from the calendar view and read again after every write, the windows of "this day only" being put together, and the five writes on a date |
 | `assistant.model.ts` | Pure, for the assistant's panel (section 6.1): the conversation put together from the replies with no message twice (`joined`) and ready to draw (`messageRows`); what a reply added for a screen reader (`newsOf`); the proposal with what became of each change and whether its buttons are offered (`proposalShown`); whether a change was made (`changeMade`); the line that counts the messages left (`remainingText`); and, one function per call, what the panel says and does about each reason of a failure (`loadTrouble`, `sendTrouble`, `continueTrouble`, `confirmTrouble`, `declineTrouble`): a `switch` over the call's closed list of reasons with no default, so a code added to a route does not compile until it is named |
-| `assistant.screen.ts` | The class `AssistantScreen`: whether the panel is open, the first read at the first opening, the conversation on show, the loop that calls `continue`, the proposal, the failure line, what is in use, one state on one stream (`assistant$`), and `changed$`, which tells the shell that a change was made. Its methods: `open`, `close`, `toggle`, `send`, `confirm`, `decline`, `end` |
-| `password.model.ts` | Pure, for the password screen: what a new password still misses (`newProblems`: the shared rule's conditions, then being the current one again), their sentences (`problemTexts`), the hints of the three fields from what they hold (`passwordHints`, `EMPTY_HINTS`: the current password missing, the conditions, the new one again missing or different), whether one stands (`hintStands`), and where a failure is said (`failurePlace`: a wrong current password under its field, the rest under the form). The same hints for the two fields of "Choose your password", which has no current password: `newPasswordHints`, `EMPTY_NEW_HINTS`, `newHintStands`, and `againHint`, the one hint of the second field both screens use. It keeps no text typed |
+| `assistant.screen.ts` | The class `AssistantScreen`: whether the panel is open, the first read at the first opening, the conversation on show, the loop that calls `continue`, the proposal, the failure line, what is in use, one state on one stream (`assistant$`), and `changed$`, which tells the shell that a change was made; the conversation's language, which its own sentences follow, else the page's (`spoken()`), and the page's language sent with every message. Its methods: `open`, `close`, `toggle`, `send`, `confirm`, `decline`, `end` |
+| `password.model.ts` | Pure, for the password screen: what a new password still misses (`newProblems`: the shared rule's conditions, then being the current one again), their sentences (`problemTexts`), the hints of the three fields from what they hold (`passwordHints`, `emptyHints`: the current password missing, the conditions, the new one again missing or different), whether one stands (`hintStands`), and where a failure is said (`failurePlace`: a wrong current password under its field, the rest under the form). The same hints for the two fields of "Choose your password", which has no current password: `newPasswordHints`, `emptyNewHints`, `newHintStands`, and `againHint`, the one hint of the second field both screens use. It keeps no text typed |
 | `password.screen.ts` | The class `PasswordScreen`: the hints while the person types (`typed`), the change asked of the `ChangePasswordService` only when no hint stands and none is under way (`change`), the button disabled meanwhile, and what each outcome means for the form: the fields emptied after a success and after a wrong current password, the other failures said under the form. One stream, `password$`; no password on it or on the object |
 | `choose-password.screen.ts` | The class `ChoosePasswordScreen`, for "Choose your password": it follows the `LoginService`'s state (open while it is `new_password_required` or `answering`, with the account's name), the hints of the two fields at each keystroke (`typed`, with `newPasswordHints` of `password.model.ts`), the new password sent only when no hint stands and none is on its way (`choose`), the shared rule's refusal as the new field's hints and any other refusal under the form, and Cancel (`cancel`, the service's `reset()`). One stream, `choose$`; no password on it or on the object. It lives as long as the page, like the service it follows |
-| `profile.model.ts` | Pure, the four facts of a person in a form: their fields (`ProfileFields`, `EMPTY_FIELDS`), what is refused and why (`profileRefusals`, with the sentences of `PROFILE_RULES` built from the shared limits), a refused field checked again as it is typed (`recheck`), from the fields to the facts to send or the refusals (`profileFor`), and the fields a person's facts fill (`fieldsOf`) |
+| `profile.model.ts` | Pure, the four facts of a person in a form: their fields (`ProfileFields`, `EMPTY_FIELDS`), what is refused and why (`profileRefusals`, with the sentences of `profileRules(texts)` built from the shared limits), a refused field checked again as it is typed (`recheck`), from the fields to the facts to send or the refusals (`profileFor`), and the fields a person's facts fill (`fieldsOf`) |
 | `me.model.ts` | Pure, for "My details": a `MeResponse` ready to show (`meDetails`: the role in words, a fact not held yet "Not set"), and the fields its Edit dialog opens with (`meFields`) |
-| `me.screen.ts` | The class `MeScreen`: the person's own facts read when the screen is shown and when the page becomes visible, `retry` after a read that failed, and for the Administrator only the Edit dialog's state and save through `UsersService.updateUser`, after which the facts are read again |
-| `mail.screen.ts` | The class `MailScreen`, for the week's "E-mail…" dialog: what the mail will hold, in the role's words; the request through `MailService` (`send`), nothing while one is under way; after its success the person's address read with `MeService.getMe()` and said masked (`MAIL_TEXTS.sent`); a failure in plain words (`failureText(reason, 'mail')`); `reset` when the dialog opens again, so that an answer no dialog waits for is not shown |
-| `daily-mail.model.ts` | Pure, for the settings' "Daily e-mail": what its two fields are filled with (`dailyFields`, the hour as `07:00`), and the hour typed checked (`dailyFor`: `7`, `07` or `07:00`, a whole hour 0 to 23, else the refusal of `DAILY_MAIL_TEXTS`) |
+| `me.screen.ts` | The class `MeScreen`: the person's own facts read when the screen is shown and when the page becomes visible, `retry` after a read that failed, for the Administrator only the Edit dialog's state and save through `UsersService.updateUser`, after which the facts are read again; and for both roles the choice of language (`language`: the language the list shows, a save under way, why the last failed), saved at once with the session's `LanguageService` (`chooseLanguage`) |
+| `mail.screen.ts` | The class `MailScreen`, for the week's "E-mail…" dialog: what the mail will hold, in the role's words; the request through `MailService` (`send`), nothing while one is under way; after its success the person's address read with `MeService.getMe()` and said masked (`texts.mail.sent`); a failure in plain words (`failureText(…, 'mail')`); `reset` when the dialog opens again, so that an answer no dialog waits for is not shown |
+| `daily-mail.model.ts` | Pure, for the settings' "Daily e-mail": what its two fields are filled with (`dailyFields`, the hour as `07:00`, `hourText`, the same in every language), the range under the hour (`dailyRange`, with the calendar's time zone when known), and the hour typed checked (`dailyFor`: `7`, `07` or `07:00`, a whole hour 0 to 23, else the refusal of the texts' `settings`) |
 | `daily-mail.screen.ts` | The class `DailyMailScreen`: the daily mail's settings read when the screen is shown, the save of the two fields checked before any call, the read after every save; `503 mail_unavailable` says "E-mail is not available yet." in place of the fields; the time zone heard from the calendar's settings, which it never asks for itself |
 
 **"Now" is passed in.** Nothing in `logic/` reads the clock by itself. `WeekScreen` receives a
@@ -1056,9 +1083,10 @@ today in `Europe/Rome`, not in the calendar's zone). "Next" or "previous" reache
 Lifting the limit means reading the calendar's zone before the first load.
 
 **Dates and times** go through `shared/`'s helpers only (`localDateOf`, `localTimeOf`, `addDays`,
-`weekdayOf`, `toInstant`). A date is turned into words with `Intl.DateTimeFormat` reading it as
-UTC and its parts put together by hand, so that neither the browser's zone nor its version of
-the locale data changes the text.
+`weekdayOf`, `toInstant`). A date is turned into words by the language's `dates`
+(`shared/`'s `dateFormats(language)`, section 12.4), from the names written once per language
+and the date's own digits, so that neither the browser's zone nor its locale data changes the
+text; `Intl` words nothing on the page.
 
 **The UTC offset** of an instant is derived from those helpers: the local date and time read as
 if they were UTC, minus the instant, to the minute. `shared/` has no function for it and was not
@@ -1477,11 +1505,11 @@ export class UsersScreen {
 
 - **The invitation's dialog** (`docs/EMAIL_ARCHITECTURE.md` section 5.3.1). `create` checks
   the five fields and, when all are right, keeps the new user and opens the dialog with
-  `inviteQuestion(email)`, the address as the shared rule makes it; `resend` does the same for
+  the texts' `users.inviteQuestion(email)`, the address as the shared rule makes it; `resend` does the same for
   an invited User's row, with the row's address. Only `confirm` calls the service, once per
   look (not while `sending`, not after the answer). The result is shown in the dialog that sent
-  it, if it is still open: a success as `invitedAnswer(email)`, a failure as `failureText`, but
-  a creation the server failed (`internal_error`) as `CREATE_FAILED`, "The user could not be
+  it, if it is still open: a success as `users.invitedAnswer(email)`, a failure as `failureText`, but
+  a creation the server failed (`internal_error`) as `users.createFailed`, "The user could not be
   created, and nothing was kept. …" (the route deletes what it half made).
   `closeInvite` closes it; a call already sent goes on, and the list is read again at its
   result. A create that succeeds empties the form, whether the dialog is open or not.
@@ -1498,7 +1526,7 @@ export class UsersScreen {
   schema and nothing else: no pattern and no length is written in `frontend/src`. Spaces around
   the name are removed, as a name pasted with one would have them, and nothing else is
   changed: "Bob" is refused, not sent as "bob". The refusal is one sentence, the same that
-  stands under the field as its hint (`USERNAME_HINT`): "A username has 3 to 32 characters:
+  stands under the field as its hint (`users.usernameHint` of the texts): "A username has 3 to 32 characters:
   lowercase letters, digits, ".", "_" and "-", starting with a letter or a digit." The two
   lengths and the three signs are in those words only; the test of the file holds them to the
   schema (a name one character shorter and one longer than the words say, each sign inside a
@@ -1513,6 +1541,7 @@ export class UsersScreen {
   `ResendOutcome`: a success, or a failure with its reason), so it uses nothing of a success but
   the fact that it came.
 - **The state of the account** is the server's (`GET /users`): a row says `invited` or `active`,
+  in the words of the language in use (`statusText`),
   and only an invited row has a `resendLabel`, so only it offers "Resend invitation". Two reads
   that differ only in a User's state are different lists, and the rows are drawn again.
 - **Reading.** `start()` reads the list; until it arrives the stream says `loading`. A read
@@ -1551,7 +1580,14 @@ dialog as the users screen's (`profile.parts.ts`), whose fields the browser may 
 own); its save is `UsersService.updateUser` on their own username, after which the facts are
 read again. A User has no "Edit" and the sentence "To change your details, ask the
 Administrator." The `MeScreen` is given the session's `UsersService` and hears only the
-updates it asked for, as the users screen does.
+updates it asked for, as the users screen does. Under the details both roles have the list
+"Language" (`.language-field`), filled as the sign-in screen's (`fillLanguages`) and showing the
+language in use: another one chosen is saved at once, with no "Save" (`chooseLanguage`, the
+`LanguageService`'s `write`, straight at Cognito with the person's token). The list is closed
+while the save is under way. On its success the shell enters the frame again in the new
+language, at `#/me` (section 6); on a failure the sentence `profile.languageNotSaved` says why
+under the list, which goes back to the language in use. Choosing the language in use asks
+nothing.
 
 **The availability screen** (`docs/FRONTEND_VIEW_PLAN.md` step 67; the Administrator's; the
 first screen that uses two services at once, and a third for the time zone).
@@ -1633,14 +1669,14 @@ export class AvailabilityScreen {
 - **A type's name is checked here, before any call** (`typeNameFor`), with the shared
   `TypeName` schema and nothing else: spaces around it are removed, by the schema, and
   nothing else is changed. The refusal is one sentence, the same that stands under the field
-  as its hint (`TYPE_NAME_HINT`): "A name has 1 to 40 characters, with no tab in it.", the
+  as its hint (`typeNameHint`): "A name has 1 to 40 characters, with no tab in it.", the
   number being `CALENDAR_LIMITS.typeNameLength` of `shared/`. A name that exists, whatever
   its capitals, and the limit of types are the server's to say: the form's failure, the field
   not marked. The page never compares a name with the list on show. A rename to the same name
   is sent as it is.
 - **A type's capacity is checked with its name** (`typeFor`): digits only, spaces around them
   aside, within `TYPE_CAPACITY` of `shared/` (1 to 100), so that 0, 101, 2.5, an empty field
-  and a text are refused with one sentence, the hint under the field (`TYPE_CAPACITY_HINT`).
+  and a text are refused with one sentence, the hint under the field (`typeCapacityHint`).
   A name and a capacity both in fault are both said. Both are always sent, at a create and at
   an edit: the field starts at 1 and "Edit type" opens with the type's own.
 - **A pattern's fields are checked here, before any call** (`patternFor`). The refusals: "End
@@ -1883,8 +1919,10 @@ the calendar's zone. **Known limits, on the two nights of a clock change:**
 
 Availability at night on those two nights is rare; neither is solved.
 
-**Failures in plain words.** `failureText(reason)` turns a failure's `reason` into a sentence. It
-knows the reasons a person can meet: the transport reasons every API service shares
+**Failures in plain words.** `failureText(failures, reason, attempt, role)` turns a failure's
+`reason` into the sentence of the language in use: `failures` is the page texts' group, one
+sentence per reason of `FAILURE_REASONS` (`frontend/src/texts/texts.ts`), with the variants
+below; the sentences quoted here are the English ones. It knows the reasons a person can meet: the transport reasons every API service shares
 (`docs/FRONTEND_SERVICES.md` section 10.2), the codes of `GET /calendar`, the login's reasons,
 and the codes of a booking, of a cancellation, of a change, of a note and of the list of users
 (`docs/FRONTEND_SERVICES.md` sections 19.1 and 13.1). The list of appointments and the read of
@@ -1898,8 +1936,8 @@ calendar has been refreshed: please choose another time.", holds for a capacity 
 more, and says that the calendar has been refreshed, which the reload above makes true.
 `user_busy` (`docs/SHARED_CALENDAR_SPEC.md` R-BOOK-12) is "You already have an appointment at
 this time. To move it, change that appointment instead." for a User and "This User already has
-an appointment at this time." for the Administrator: **a third, optional argument says who
-attempted** (`failureText(reason, attempt, role)`), and only `user_busy` reads it. In the book
+an appointment at this time." for the Administrator: **the last, optional argument says who
+attempted**, the role, and only `user_busy` reads it. In the book
 dialog `refusalOf` (`booking.ts`) goes further: it looks among the shown week's appointments
 for the target User's active one that overlaps the time asked, the moved one left out in a
 change, the earliest first, and names it: "You already have an appointment at this time
@@ -1911,11 +1949,11 @@ the Administrator `slot_taken` is "This time is full: there is no place left." w
 "Book anyway" (section 4); nothing else offers it. The assistant's panel (section 6.1) words a refused change of a
 proposal for the person's role too: the Administrator's `user_busy` is "This User already has an
 appointment at this time.", the Administrator's `slot_taken` the same "This time is full: there
-is no place left." (`FULL_FOR_ADMIN`), without the offer, and a User's keep their sentences. `invalid_request` has one
+is no place left." (`week.fullForAdmin`), without the offer, and a User's keep their sentences. `invalid_request` has one
 sentence for every case and every screen, "The request was not accepted. Check what you entered
 and try again.": an end not after the start has no sentence of its own, and the logic layer
-does not check the two times. **A second, optional argument says what was attempted**
-(`failureText(reason, 'change')`), for a reason whose words depend on it. There are two.
+does not check the two times. **An optional argument says what was attempted**
+(`failureText(failures, reason, 'change')`), for a reason whose words depend on it. There are two.
 `cancellation_notice_too_short` is "It is too late to cancel this appointment." after a
 cancellation and "It is too late to change this appointment." after a change, which the server
 refuses with the same code (`docs/SHARED_CALENDAR_SPEC.md` section 8.4).
@@ -1955,14 +1993,16 @@ nothing there (`docs/SHARED_CALENDAR_SPEC.md` section 6.5, the last row of its t
 The raw technical text is never shown: a reason without a sentence gets one general sentence,
 never the service's `message`, which is written for a developer. The login view uses it too. A
 wrong password and an unknown user are one reason and get one sentence. A new route's codes get
-their sentences here.
+their sentences in `FAILURE_REASONS` and in every language's `failures`: a language without one
+does not compile.
 
 ## 6. The shell
 
 The shell is the start-up code, one function called by the entry file of the bundle:
 `runShell(config)`, in `frontend/src/views/shell.ts`. It creates what lives as long as the page
-(point 1) and calls `mountShell(root, { config, store, login, logout, pageWide })`, which does the rest and is
-what the shell's DOM test drives, with a store, a login and a sign-out service of its own. `mountShell` gets the
+(point 1) and calls `mountShell(root, { config, language, store, login, choose, logout, pageWide })`,
+which does the rest and is what the shell's DOM test drives, with a store, a login and a sign-out
+service of its own, and a fake of the account's language (`accountLanguage`). `mountShell` gets the
 API's configuration and the whole store because it creates the API services of each session
 (point 4), which read the token from the store at each call.
 
@@ -1976,7 +2016,13 @@ API's configuration and the whole store because it creates the API services of e
    `logout`, beside `login`, and the `LoginService` and the `RefreshService` as `pageWide`, which
    it puts back to their first state after a change of password (below). The `LogoutService` is not one of the objects of point 4: the teardown of the
    person who leaves must not cancel the request that tells Cognito. Ending the shell does
-   not end it either: a request under way ends by itself, in 10 seconds at most.
+   not end it either: a request under way ends by itself, in 10 seconds at most. Before them
+   it makes the page's language, `PageLanguage` (section 12.4), from this browser's memory
+   (`LanguageMemory` on the storage `main.ts` hands it), the browser's languages and the
+   bundle's `defaultLanguage`; with `testLanguage`, given by the dev server's bundle only, and
+   the address `?padded`, its texts are the padded test language. `mountShell` subscribes to
+   its `state$` first of all and fills the page from it (`fillPage`), before the login or the
+   frame is shown, and again at every change.
 2. **It subscribes to `store.session$`** (`docs/FRONTEND_SERVICES.md` section 9.5). `null` shows
    and mounts the login view. A session hides it and shows the application, with the navigation
    its `role` allows. The application's frame is one element of `index.html` (`#app`): a header
@@ -1987,9 +2033,12 @@ API's configuration and the whole store because it creates the API services of e
    nothing and shows nothing about Cognito's answer. The screen changes because the service
    clears the `SessionStore` during that call, and `session$` then notifies `null`. A session
    that ends by itself (its expiry, a token rejected) reaches the shell the same way, as a
-   `null`, with no call to the service. The login view is mounted with a notice, empty but
-   after a change of password, when it is "Password changed." (`PASSWORD_TEXTS.changed`): the
-   view says it until the next "Sign in" and wipes it when it is left; the shell gives it once.
+   `null`, with no call to the service. The login view is mounted with the page's language,
+   whose choice it offers (section 12.4), and a notice, empty but after a change of password,
+   when it is "Password changed." (`password.changed` of the page texts, worded in the language
+   in use whenever it is shown): the view says it until the next "Sign in" and wipes it when it
+   is left; the shell gives it once. A session does not show the frame at once: the shell
+   first reads the account's language (`arrive`, below).
    Beside the login view the shell mounts "Choose your password" (`mountChoosePassword`) on the
    same `#login` and starts its logic object, the one `ChoosePasswordScreen` that `runShell`
    creates with the `LoginService` and hands to `mountShell` as `choose` (none unless given); both
@@ -2014,7 +2063,10 @@ API's configuration and the whole store because it creates the API services of e
    `ChangePasswordService`, with Cognito's address and the skip value of the configuration
    (`skipGlobalSignOut`, true only when the configuration says exactly so; section 12.1), with
    the `PasswordScreen` given it: each person changes their own password through a service of
-   their own, holding their own token. Each screen
+   their own, holding their own token. `sessionObjects` also gets the page texts of the language
+   in use, which it hands to every logic object it makes (decision 218), and the person's
+   `LanguageService` (`docs/FRONTEND_SERVICES.md` section 26), made by `arrive`, which the `MeScreen`
+   saves the language with. Each screen
    listens to it only while it is started, so the screen on show is the one that loads again,
    and nothing is loaded at the login or after signing out.
 5. **Mounting.** To show a view the shell un-hides its element, calls its mount function, then
@@ -2031,7 +2083,7 @@ the navigation. An entry is:
 ```ts
 export type Screen = {
   hash: string;             // '#/week'
-  label: string;            // 'Week', the link's text
+  label: (frame: FrameTexts) => string; // the link's text, 'Week', in the language in use
   roles: readonly Role[];   // who may see it
   element: string;          // '#week', the screen's element inside main.screen
   // Mounts the view on the element, then starts its logic object; the subscription holds both.
@@ -2090,17 +2142,25 @@ order:
 2. On a success the `LoginService` puts the session in the `SessionStore`; `session$` notifies
    the shell, which reduces it to a person (the username and the role).
 3. The shell **leaves the login view first**: it unsubscribes it, and the view's teardown
-   resets the form, so the password typed is no longer in the page. Then it hides `#login`
-   and shows `#app`.
-4. `enter(person)` fills the header, creates the session's services and logic objects
-   (`sessionObjects`: nothing is asked of the server yet), and fills the navigation.
-5. The address is read. With no hash it becomes `#/week`, in place. The entry's `show` runs:
+   resets the form, so the password typed is no longer in the page. Then it hides `#login`;
+   `#app` stays hidden.
+4. `arrive(person)` reads the account's language (`LanguageService.read`, `GetUser` at
+   Cognito with the person's token), while `#login` and `#app` both stay hidden. A language of
+   the calendar becomes the page's (`PageLanguage.choose`, so this browser remembers it too, and
+   the page is filled again); none, or a word not in the list, makes the page write its own
+   language to the account, once, without waiting for the answer (a failed write is made again
+   at the next sign-in, and says nothing); a read that fails enters in the page's language and
+   writes nothing. Then `#app` is shown.
+5. `enter(person)` fills the header in the language in use, creates the session's services and
+   logic objects with its texts (`sessionObjects`: nothing is asked of the API yet), and fills
+   the navigation.
+6. The address is read. With no hash it becomes `#/week`, in place. The entry's `show` runs:
    it un-hides `#week`, **mounts the view**, which subscribes to `week$` and gets its starting
    state at once (the label of the week, no week, nothing loading), and **then** starts the
    `WeekScreen` (section 3, rule 8).
-6. `start()` asks for the week: `week$` says `loading` with the label, and the view shows
+7. `start()` asks for the week: `week$` says `loading` with the label, and the view shows
    "Loading…".
-7. The answer arrives; the `WeekScreen` makes the week ready to draw (`weekModel`) and
+8. The answer arrives; the `WeekScreen` makes the week ready to draw (`weekModel`) and
    `week$` carries it; the view draws the days from the templates, once for that week object.
 
 Signing out is the same sequence backwards, with a step before it and one after
@@ -2131,6 +2191,23 @@ this order, all in one run of the script once Cognito answered:
 The shell's subscription is one of the session's: it ends with the person. A change made from
 the screen and answered after the person left it still ends the session, and still has the
 login say so, since the service and the shell's subscription live as long as the session.
+
+**A change of language while signed in** (decision 217, `docs/MULTILANGUAGE_PLAN.md` decision
+D1) takes the path of a second person signing in, for the same person:
+
+1. In "My details" the person chooses another language; the `MeScreen` writes it with the
+   session's `LanguageService` (`UpdateUserAttributes`, the one attribute `locale`).
+2. On its success the shell, subscribed to the write's result for the whole stay, makes it the
+   page's language (`PageLanguage.choose`): this browser remembers it and the page's fixed
+   texts are filled again.
+3. `arrive` hears the new language and leaves the frame: every view is unsubscribed and wipes
+   what it put in the page, and the panel with them (section 3, rule 9).
+4. `enter` runs again with the new texts: new services and logic objects, the header and the
+   navigation in the new words, and the screen of the address shown again, which reads its
+   data again. Nothing is read or written at Cognito a second time.
+
+A failed write changes nothing of the frame: "My details" says why under its list and puts the
+list back on the language in use.
 
 ### 6.1 The assistant's panel: a view that lives across the screens
 
@@ -2188,19 +2265,27 @@ on the reason.
 - **The outcome of a refused change** on a settled proposal is "Not done." and the sentence of
   its code for the person's role: the shell gives `AssistantScreen` the role, as it gives
   `WeekScreen`, and `proposalShown` passes it to `failureText`; the Administrator's `slot_taken`
-  is `FULL_FOR_ADMIN` of `booking.ts`, without "The calendar has been refreshed", since the panel
+  is the page texts' `week.fullForAdmin`, the book dialog's, without "The calendar has been refreshed", since the panel
   reads no calendar and the conversation offers to go over the capacity. The panel offers no
   "Book anyway" (decision 194).
 - **Failures**, one line: the three codes of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1
-  with the sentence of `shared/` in the conversation's language (English while there is none),
-  `conversation_full` with `shared/`'s too, every other reason with a sentence of `texts.ts`
-  in English. The service's `message` never reaches the state. After `assistant_busy`,
+  with the sentence of `shared/` in the conversation's language, else the page's while there
+  is none (`spoken()`), `conversation_full` with `shared/`'s too, every other reason with the
+  page's sentence (`failureText`), in the language in use. The service's `message` never reaches the state. After `assistant_busy`,
   `proposal_not_found` and `nothing_to_continue` the conversation is read again, once in an
   exchange, and continued if it then waits for a step. After a message that got
   `assistant_unavailable` or `assistant_budget_reached` it is read once too and **not**
   continued, whatever it waits for: the server may have saved and counted the message, so the
   messages left, the conversation and "New conversation" are the server's, the text stays in
   the field, and Claude is asked again only when the person sends (decision 172).
+- **The languages** (section 12.4, decision 222). The panel's fixed words and its own
+  sentences (who wrote a message, the messages left, what became of a change, "The assistant
+  could not finish…") are the page texts the `AssistantScreen` was made with. Every message
+  goes with the page's language (`AssistantService.send(text, language)`), which the server
+  keeps for a conversation whose first message is in no language of the calendar. The
+  conversation's language is that of the last reply that names one, and is forgotten at "New
+  conversation". What Claude and the server write in the conversation is in its language,
+  whatever the page's.
 - **"Send" out of use for longer**: after the day's limit, or a reply whose `remainingToday`
   is 0 (the limit's sentence is then shown without a refusal), until the page is loaded again;
   after `conversation_full`, until "New conversation". Reading, confirming and declining
@@ -2225,8 +2310,9 @@ set.
 - **Dialogs come first.** Every dialog of the page is modal, so while one is open the browser
   makes the panel inert: it cannot be pressed, typed in or reached by Tab, and the Escape key
   is the dialog's. Nothing was written for this.
-- **Without a mouse.** The panel is a `<section>` named "Assistant". Its heading is a button
-  with `aria-expanded`. Collapsed, the conversation's part and the two buttons of the heading
+- **Without a mouse.** The panel is a `<section>` named by its heading's button
+  (`aria-labelledby`), "Assistant" in English: a name the shell would fill on the section
+  itself would stand after `hidden`. Its heading is a button with `aria-expanded`. Collapsed, the conversation's part and the two buttons of the heading
   are `hidden`, so neither Tab nor a screen reader reaches them. `.news` is a live region
   (`role="status"`), shown to a screen reader only, that says each new answer, notice and
   line of progress once; the failure line is a `role="alert"`. The proposal's buttons come
@@ -2289,15 +2375,6 @@ Measured at `docs/FRONTEND_VIEW_PLAN.md` step 69 (2026-11-20), with every screen
 | `week.view.ts` | 315 | 227 | 47 | 4 | 1 (the book dialog, in its two modes); it mounts the detail |
 | `availability.view.ts` | 213 | 159 | 23 | 3 | 2 (rename, change); it opens the one that confirms |
 | `date.view.ts` | 174 | 131 | 18 | 1 | 0; it opens the one that confirms |
-| 175 | The password is a screen of its own, `#/password`, "Password", the last row of `SCREENS`, for both roles; its service and its logic object are the session's, like every screen's (section 6) | The Product Owner's decisions D1 and D3 of `docs/CHANGE_PASSWORD_PLAN.md` section 2. Nothing of the shell's switching changed: one more row | |
-| 176 | The hints are the logic layer's, computed at each keystroke from the three fields handed over as arguments (`typed`, `change`); nothing keeps a password typed, and no state holds one | `docs/FRONTEND_SERVICES.md` section 2, rule 6 holds for the logic layer too: the passwords are in the fields and in the call's arguments only. The service checks the rule again before any request (`docs/FRONTEND_SERVICES.md` section 8, decision 63) | |
-| 177 | "Change password" is out of use while a hint stands and while the change is under way; the hints of an empty form say what to type (the current password, the new one's five conditions, the new one again), so the button is out of use at the start | The service abandons a first change on a second call (`docs/FRONTEND_SERVICES.md` section 8, decision 68): the button keeps that from the page. An empty current password would reach Cognito as a refusal of its own, which the page never asks for | Beyond: the two sentences of an empty current and an empty second field |
-| 178 | What a new password still misses is a list under its field, one item per condition, redrawn only when it changes; the comparisons ("not the same", "the same as the current") stand under the field they concern | The Product Owner asked to see "in words what the new one still misses while typing". A list reads each condition on its own and shrinks as the person types | |
-| 179 | The view empties the three fields after a success, after a wrong current password and on leaving; another failure keeps what was typed | `docs/FRONTEND_ARCHITECTURE.md` section 3, rule 9, and `docs/CHANGE_PASSWORD_PLAN.md` step p3. After a wrong current password the person types all three again, as after a refused sign-in; after a network failure they can press again | |
-| 180 | "Password changed." is shown by the login view, in an element of its own (`#login .notice`, `role="status"`), given by the shell when it mounts the login after a change, and wiped at the next "Sign in" and when the login is left; no timer | Decided by the Product Owner at the start of `docs/CHANGE_PASSWORD_PLAN.md` step p3. The password screen is gone when the person is signed out; the login is where they look next. `mountLogin` takes it as an optional third argument, so the login's tests did not change | |
-| 181 | The skip value is the bundle's fourth constant, `SKIP_GLOBAL_SIGN_OUT`: `true` only in the dev server's bundle, `false` in every build, with no variable to set it; the shell takes anything but `true` as `false` (section 12.1) | Decided by the Product Owner at the start of `docs/CHANGE_PASSWORD_PLAN.md` step p3. A cloud build cannot skip the sign-out everywhere by a mistake in the environment; `frontend/tests/unit/scripts/bundle.test.ts` is the first test of a script of the front end | |
-| 182 | After a change the shell puts the `LoginService` and the `RefreshService` back to their first state, in its reaction to the success, before the store is cleared (section 6); `mountShell` takes them as `pageWide`, none unless given | Decided by the Product Owner at the start of `docs/CHANGE_PASSWORD_PLAN.md` step p3, with the order of `docs/FRONTEND_SERVICES.md` section 8, decision 69, that makes it possible: a change ends the session as "Sign out" does, and leaves nothing of the person in a service (`docs/FRONTEND_SERVICES.md` section 8, decision 53) | |
-| 183 | The tests of the shell and of the page that list the navigation or count the page's fields and failure lines gained the new screen's | A link for both roles changes every list of links; `tests/unit/views/page.test.ts` counts the fields (40) and the places of a failure (51) on purpose. No other test of a screen, of the login or of the sign-out changed | |
 | `users.view.ts` | 172 | 121 | 25 | 3 | 2 (the password, the delete) |
 | `availability.parts.ts` | 160 | 107 | 19 | 0 | 1 (the one that confirms, `mountConfirm`) |
 | `detail.view.ts` | 134 | 89 | 10 | 2 | 1 (the detail) |
@@ -2400,6 +2477,15 @@ the lists of the ten times, two each; `frontend/style.css` is 355 lines. In step
 390 pixels found the four lists of "This day only" too narrow to show their values: the fields
 of a date's window (`.window-fields`) are now never narrower than 9rem, so on a phone the type
 takes a row of its own.
+
+**The languages** (`docs/MULTILANGUAGE_PLAN.md` steps l3 to l5 and l8, 2026-11-27), not
+measured again in the tables above: a new folder, `src/texts/` (`texts.ts` 461 lines,
+`texts.en.ts` 435, `texts.it.ts` 390, `padded.ts` 32); `src/logic/language.ts` (51 lines) and
+`src/views/page-texts.ts` (48); among the services, `language.service.ts` (98) and
+`language-memory.ts` (35). `src/logic/texts.ts` is 90 lines, its sentences gone to the texts;
+`shell.ts` is 545 and `login.view.ts` 84. `frontend/index.html` is 968 lines, with 72 fields and
+74 places for a failure or a refusal (`page.test.ts` holds both counts); `frontend/style.css`
+is 397 lines. `npm run test:unit -w frontend`: 3293 tests, 100 % of the lines.
 
 ### 7.2 The verdict on the fallback
 
@@ -2507,7 +2593,9 @@ grows.
   already cover the services against the local stack.
 
 The emulated document is `happy-dom`'s, and the views are inside the 100 % line coverage of
-`frontend/src` (section 12.3).
+`frontend/src` (section 12.3). The page each test gets is filled with the English texts, as the
+shell fills it; the checks of the texts and of the keys themselves, and of the padded test
+language, are in section 12.4.
 
 **What the tests cannot see is walked in a browser.** `docs/FRONTEND_WALK.md` is one numbered
 list of checks through every screen, as a User and as the Administrator, at a desktop and at a
@@ -2522,18 +2610,22 @@ voice, the native date picker.
 **Reading the page without a mouse** (`docs/FRONTEND_VIEW_PLAN.md` step 69). Four things, the
 first and the third held by `page.test.ts` from now on:
 
-- **Every field has its label.** Each of the 36 `input`, `select` and `textarea` elements of
-  `index.html` is inside a `<label>` that has words of its own and holds no other field. A
+- **Every field has its label.** Each of the 72 `input`, `select` and `textarea` elements of
+  `index.html` is inside a `<label>` that has words of its own (a key's `<span>`, filled by the
+  shell) and holds no other field. A
   button whose words do not say what it acts on gets a name from the script, with the words
   of the logic layer: a row's "Delete", "Edit", "Change" and "Remove" (which row), and a
   slot and an appointment of the week (which day). The five "Try again" and the two arrows of
   the week have theirs in the page.
 - **Every dialog takes the focus and gives it back**: the table below.
-- **Every failure is announced.** The 48 elements that show a failure or a refusal (class
+- **Every failure is announced.** The 74 elements that show a failure or a refusal (class
   `error`) have `role="alert"`, and nothing else has; the six "Loading…" have `role="status"`,
   as have three other pieces of news: the appointment being moved, "Settings saved." and the
   message beside the User picker of the book dialog, which can also be a failure (section 11,
   decision 133). The two dialogs that ask are described by their question.
+- **The language is said.** `<html lang>` is the language in use, set by the shell with the
+  texts, so that a screen reader pronounces the page rightly; in the two lists of languages
+  each choice carries its own `lang`.
 - **Everything is reachable by keyboard.** In the walk's desktop run every action of every
   screen is done once by keyboard only (the checks marked `[K]`): Tab to reach, Enter or the
   space bar to press, typing or the arrow keys in a list, Escape.
@@ -2778,7 +2870,9 @@ frontend/
 ├── src/
 │   ├── main.ts                # the entry file of the bundle: the configuration, then the shell
 │   ├── services/              # docs/FRONTEND_SERVICES.md
-│   ├── logic/                 # the logic layer, no DOM (section 5.1): texts.ts, week.model.ts,
+│   ├── texts/                 # every word of the page (section 12.4): texts.ts (PageTexts, the budgets),
+│   │                          # texts.en.ts, texts.it.ts, padded.ts (the test language of ?padded)
+│   ├── logic/                 # the logic layer, no DOM (section 5.1): texts.ts, language.ts, week.model.ts,
 │   │                          # booking.ts, appointment.detail.ts, week.screen.ts,
 │   │                          # appointments.model.ts, appointments.screen.ts,
 │   │                          # settings.model.ts, settings.screen.ts, users.model.ts,
@@ -2794,10 +2888,12 @@ frontend/
 │                              # with availability.parts.ts, what the two share; detail.view.ts,
 │                              # the dialog two views mount; assistant.view.ts, the panel at the
 │                              # bottom of every screen (section 6.1); password.view.ts;
-│                              # choose-password.view.ts, beside the login
+│                              # choose-password.view.ts, beside the login; page-texts.ts, which
+│                              # fills the page's keys (section 12.4)
 ├── tests/
 │   └── unit/
 │       ├── services/          # vitest project `unit`, in node
+│       ├── texts/             # texts.test.ts: every language's texts, the budgets, the padded language
 │       ├── logic/             # mirrors src/logic; project `unit`; zone.ts (the browser's zone of
 │       │                      # the tests), fixtures.ts (calendar views)
 │       ├── views/             # mirrors src/views: the DOM tests, vitest project `views` (happy-dom);
@@ -2811,7 +2907,7 @@ frontend/
   import.
 - Two lint rules guard the layers (root `eslint.config.js`): no `innerHTML`, `outerHTML` or
   `insertAdjacentHTML` in `frontend/src` (section 3, rule 5), and no global `document` or
-  `window` in `frontend/src/logic` and `frontend/src/services` (section 2). The second is on the
+  `window` in `frontend/src/logic`, `frontend/src/texts` and `frontend/src/services` (section 2). The second is on the
   global: a parameter named `window` is not concerned.
 - `frontend/scripts/*.mjs` run in Node and are outside the rules for the browser's code; the
   comment rule of `CLAUDE.md` applies to them.
@@ -2823,7 +2919,8 @@ frontend/
 
 Three points are still open: O3, O9 and O10, and none of them blocks anything. "Blocks" says
 what cannot be done before a point is settled. The others are decided, and their rows say where
-the decision is written: O4, O6 and O8 with `docs/FRONTEND_VIEW_PLAN.md` (its section 2); O1, O2
+the decision is written: O4 and O6 with `docs/FRONTEND_VIEW_PLAN.md` (its section 2), O8 with it
+and again with `docs/MULTILANGUAGE_ARCHITECTURE.md`; O1, O2
 and O5 on 2026-11-21 (section 13), built and deployed with `docs/FRONTEND_DEPLOY_PLAN.md`; O7
 designed and built the same day (`docs/FRONTEND_SERVICES.md` section 20). A row says **what is
 true of it today** (2026-11-21, the page deployed as the stack `shared-calendar-web`). "Not yet
@@ -2839,7 +2936,7 @@ section 5.5.
 | O5 | **The Content-Security-Policy of the hosting** | **Decided:** `default-src 'self'`, Cognito's address for the login, no frame, no `<base>`; sent by the distribution with three more headers; the dev server sends the same without Cognito's address. `zod`'s probe for `eval` stays reported and harmless. Section 13.4. **Today:** built and deployed: the distribution sends the policy and the three other headers with every answer, a file's and the API's alike (read with curl on 2026-11-21), and the login, the screens used that day and `RevokeToken` worked under it at the deployed page. The dev server sends `default-src 'self'; frame-ancestors 'none'; base-uri 'none'`; the login and the week were seen under it, with `zod`'s one report and no other (the whole walk ran under `default-src 'self'` alone, before). Not yet looked at: the console at the deployed page (`zod`'s one report and no other, under the distribution's policy) | Nothing any more |
 | O6 | **The DOM emulation for the views' tests and the coverage of the views** | **Decided: `happy-dom`, and the views inside the 100 % line coverage** of `frontend/src`. Section 12.3 | Nothing any more |
 | O7 | ~~**Logout.** Not designed in the services layer~~ **Closed** on 2026-11-21 (`docs/FRONTEND_DEPLOY_PLAN.md` step 71): designed and built, `docs/FRONTEND_SERVICES.md` section 20 | "Sign out" makes the page forget the person at once (the page-wide services back to their first state, the `SessionStore` cleared), then tells Cognito to revoke the refresh token (`RevokeToken`), giving up after 10 seconds; the person is signed out of the page whatever Cognito answers, and sees nothing about it. Section 13.7. **At the deployed page** (2026-11-21): a browser may make the call from the page's address, and the real Cognito answered it 200. **Not yet looked at:** a refresh with the revoked token refused by the real Cognito, and "Sign out" with the network off. Which error the real Cognito gives a refusal was not asked | Nothing |
-| O8 | **The language of the interface** and where its texts are kept | **Decided: English only**, no translation mechanism. Section 12.4 | Nothing any more |
+| O8 | **The language of the interface** and where its texts are kept | **Decided: every language of the calendar**, English and Italian (`docs/MULTILANGUAGE_ARCHITECTURE.md`): the words in `frontend/src/texts/`, keys in `index.html`, the language chosen live. Section 12.4. **Today:** built and tested against the local stack, not deployed | Nothing any more |
 | O9 | **The size of the bundle.** Of the 490 kB of `app.js` at plan step 60, 454 are `zod`, and 264 of those are its messages in other languages, which the interface never shows (section 12.1). **Today:** open. As deployed, `app.js` is 578,155 bytes as built and 121,188 as downloaded, compressed with Brotli (130,771 with gzip only; section 13.5); a first load of the page is about 131 kB. The shares were last measured at `docs/FRONTEND_VIEW_PLAN.md` step 69, on 575 kB (section 7.1): `zod` 454 kB of it, 79 %, and everything written for this front end (the services, the logic, the views) 87 kB | Slimming it means changing how `shared/` brings `zod` in (which entry of `zod` its schemas import, or what `shared/` exports to the browser): a change to `shared/`, which the back end uses too, so a decision of its own | Nothing: it did not block the deployment (section 11, decision 150) |
 | O10 | **A domain of our own** for the page, in the place of `<id>.cloudfront.net` | None yet. A certificate for a CloudFront distribution must be made in `us-east-1`, where the organization's policy lets this account do nothing (`docs/AWS_ACCOUNTS.md`); so it starts with that policy, or with another account (`docs/NEW_ACCOUNT.md`). **Today:** open. The page's address is the one AWS gave the distribution, the stack's output `PageUrl`. No code, template, script or token holds it; it is written in `README.md` and in the record of `docs/RUNBOOK.md` section 5.5, for a person to read. So a later change costs a deployment, those two lines and telling the people | Nothing: the page works on the address AWS gives |
 
@@ -2874,12 +2971,12 @@ than what the trial showed: these deserve the first look in a review.
 | 13 | Two lint rules, in place since the first view: no `innerHTML` and its relatives; no DOM in `logic/` and `services/` (section 9) | A rule that lint can check is not left to review | The second one, yes |
 | 14 | The logic layer is inside the 100 % line coverage of `frontend/src` (section 5, rule 7) | It is where the rules of the screens are; it needs no DOM to be tested | Yes |
 | 15 | esbuild bundles; two Node scripts, `build.mjs` and `dev.mjs`, and a third file, `bundle.mjs`, with the options they share (section 12.1) | Already a development dependency; no configuration file of a tool. The shared file keeps the dev server and the build from drifting apart (the target, the format, the constants) | The third file |
-| 16 | The configuration is three constants, `API_URL`, `COGNITO_URL` and `CLIENT_ID`, put in by esbuild's `define` and read in `src/main.ts` only (section 12.1); a fourth, `SKIP_GLOBAL_SIGN_OUT`, by decision 181 | `docs/FRONTEND_SERVICES.md` section 2, rule 3: nothing below the entry file knows where a value comes from; nothing about a stack is in a committed file | |
+| 16 | The configuration is three constants, `API_URL`, `COGNITO_URL` and `CLIENT_ID`, put in by esbuild's `define` and read in `src/main.ts` only (section 12.1); a fourth, `SKIP_GLOBAL_SIGN_OUT`, by decision 181; a fifth and a sixth, `TEST_LANGUAGE` and `DEFAULT_LANGUAGE`, by `docs/MULTILANGUAGE_PLAN.md` decision D5 and finding F12 (amended in v32) | `docs/FRONTEND_SERVICES.md` section 2, rule 3: nothing below the entry file knows where a value comes from; nothing about a stack is in a committed file | |
 | 17 | Under the dev server the two addresses have no host: `/api` and `/cognito/` (section 12.2) | The browser completes them with the origin the page came from, so the same bundle works on `localhost` and through a forwarded port of a Codespace, where the server cannot know its public name | Yes: "the dev server's own origin" was first meant as a full address |
 | 18 | The dev server listens on `127.0.0.1` only, and answers `/favicon.ico` with an empty 204 (section 12.2) | It passes requests on to the local stack: not for the network. A 404 for the icon would be an error in the browser's console at every load | Yes |
 | 19 | The views' tests run in a vitest project of their own, `views`, with `happy-dom`; the `unit` project stays in `node` (section 12.3) | A folder gets an environment through a project; the alternative vitest offers, a `@vitest-environment` comment, is per file and can be forgotten. In `node` a DOM global in a service or in the logic fails the test | |
 | 20 | `src/main.ts` is the one file left out of the coverage, by name (section 12.3) | One statement, which needs the three constants only the bundle command defines; the browser check runs it | |
-| 21 | English only; the fixed texts are in `index.html`, the texts that depend on data in the logic layer (section 12.4) | Decided with the plan. The shell holds the two role names | |
+| 21 | ~~English only; the fixed texts are in `index.html`, the texts that depend on data in the logic layer (section 12.4)~~ No longer holds since v32: the page speaks every language of the calendar, its words in `frontend/src/texts/` and keys in `index.html` (section 12.4, decisions 217 to 222) | Decided with the plan. The shell holds the two role names | |
 | 22 | "Now" is passed in: `WeekScreen` receives `now: () => Date`; nothing in `logic/` reads the clock (section 5.1) | A test fixes the moment without faking the clock, and the rule "no hidden input" holds for time as it does for the services | Yes |
 | 23 | "Today", for the week to open on, is taken in `DEFAULT_TIME_ZONE`; no request for the settings before the first week (section 5.1) | The first week is loaded at once, and the week screen needs the `CalendarService` only. The price is the known limit around midnight for a calendar in another zone. `docs/FRONTEND_VIEW_PLAN.md` step 61 first said otherwise and was corrected | Yes |
 | 24 | The UTC offset is derived in `logic/texts.ts` from `shared/`'s `localDateOf` and `localTimeOf`; no new helper in `shared/` (section 5.1) | `shared/` is not changed by the view layer's plan. It held for whole-hour and half-hour zones and both nights of the clock change | Yes |
@@ -3006,7 +3103,7 @@ than what the trial showed: these deserve the first look in a review.
 | 145 | Every file is uploaded with `Cache-Control: no-cache`; the names stay fixed; the deploy command invalidates `/*` (section 13.5). Seen at the deployed page: `no-cache` on the four files, and "not changed" (304) to a second question | A name with a hash in it would mean rewriting `index.html` at build time, which is copied as it is and tested as it is. Three small files asked again at each load is a price nobody notices | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 146 | The source map is uploaded with the three files | The repository is public, so the map tells nothing new, and a failure in a person's console can then be read | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 147 | `npm run deploy -w frontend` stands behind the back end's gate (`backend/.verify-ok`), runs the front end's own `verify` itself, and the gate's check becomes one file both deploy scripts use (section 13.6, point 1). Since `docs/FRONTEND_DEPLOY_PLAN.md` step 70 that `verify` ends with `sam validate --lint` of the hosting's template (decision 157) | The gate's promise is "what is deployed is a committed, checked state of the repository" (`docs/FOLDER_STRUCTURE.md` section 4.5), and there is one history. The stamp is written before the front end's checks run, so it does not prove them; they need no Docker and take a minute | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
-| 148 | The deploy command reads `ApiUrl` and `UserPoolClientId` from the back end's stack and builds with them; nothing of a deployment is in a committed file (section 13.6, points 2 and 5) | `docs/FOLDER_STRUCTURE.md` section 7; the repository is public. It also fixes the order: the back end first | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
+| 148 | The deploy command reads `ApiUrl` and `UserPoolClientId` from the back end's stack, and `DefaultLanguage` (amended in v32) and builds with them; nothing of a deployment is in a committed file (section 13.6, points 2 and 5) | `docs/FOLDER_STRUCTURE.md` section 7; the repository is public. It also fixes the order: the back end first | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 149 | The deploy command ends with four checks made with curl and no credentials; the signed-in call is proven by the walk's first login (section 13.6, point 8). At the first deployment the four checks passed, twice, and the Administrator's sign-in at the page was that proof | A script that signs in would need a password. The four checks prove the bucket, the headers, the rule for `/api/*`, the function and that a failure of the API arrives as the API sent it | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 150 | The size of the bundle (O9) does not block the first deployment. It did not: `app.js` is downloaded as 121 kB, with Brotli (section 13.5) | It is sent compressed: 128 kB, once per load of the page, answered "not changed" afterwards. Slimming it is a change to `shared/`, which the back end uses too: a decision of its own, and not one to take in a hurry before a release | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
 | 151 | No root `deploy` script that runs both deployments; the order is a procedure of `docs/RUNBOOK.md` | The back end's deploy takes arguments of its own and asks to confirm a change set; the page is released alone more often than with the API | Yes: decided with brief `prompts/93-deploy-frontend.md`, for review |
@@ -3018,11 +3115,11 @@ than what the trial showed: these deserve the first look in a review.
 | 157 | `npm run verify -w frontend` runs `sam validate --lint` on the template, last, and so needs the SAM CLI; without it the last step fails and says that `sam` is not found. It does not go through `backend/scripts/check-sam.sh` | The root `verify` already needs the SAM CLI for the back end, and a template that lint refuses must not reach a deployment. The minimum version of `check-sam.sh` is about `sam build` in a monorepo (`docs/FOLDER_STRUCTURE.md` section 4.3), which this template never needs. The price: a machine with node alone can no longer run the front end's whole `verify`; `typecheck`, `lint` and `test:unit` still run there one by one | |
 | 158 | The header `Strict-Transport-Security` names no sub-domain and asks for no preload; the bucket has `ObjectOwnership: BucketOwnerEnforced`; the resources that need a name carry the stack's (`shared-calendar-web-bucket`, `-strip-api-prefix`, `-headers`) | The address is `<id>.cloudfront.net`, which has no sub-domain of ours. The ownership setting turns the per-object permission lists off, so the bucket's policy is the only grant; it is S3's default for a new bucket, written down. The names must be free in the account | |
 | 159 | The assistant is a panel at the bottom of every screen once a person is signed in, not a screen: no address, no navigation entry, none at the login. Collapsed it is one bar (the heading "Assistant", the field, "Send") fixed to the bottom of the window; open it grows upward to about half the window, most of it on a phone, and the screen behind stays in use. It opens when the field takes the keyboard, when the heading is pressed and when a message is sent; "Close" and Escape collapse it. Open or collapsed is kept across screens and nowhere in the browser. The conversation is asked of the server at the first opening (section 6.1) | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12: the person asks while looking at the calendar and sees it change | Beyond |
-| 160 | The line "This conversation is processed by Anthropic's Claude." is under the heading of the open panel, in fixed English | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 10.2) |  |
+| 160 | The line "This conversation is processed by Anthropic's Claude." is under the heading of the open panel, a fixed text of the page in the language in use (`assistant.processed`; amended in v32) | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 10.2) |  |
 | 161 | A proposal is shown once, in place, under the last message: the server's question, each action's sentence, two buttons with the server's labels, out of use while a call is away. Once settled the same block has no buttons and each action its outcome: "Done"; "Not done." with the page's sentence for the action's error code; or that it is not known whether it was done. A declined proposal is gone, and the block goes when a reply carries none | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12. The contract carries an error code for a refused action, not a sentence, so the words are those `failureText` has for that code on every other screen |  |
 | 162 | While the assistant works the field stays writable and keeps what was typed; "Send" is out of use and Enter sends nothing until the exchange ends; nothing is queued. The progress line shows the server's `activity`, "…" when there is none. While a proposal waits the field is in use, and a message drops the proposal | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 |  |
 | 163 | The loop is the logic's: `continue` while a reply says `working`, at most `ASSISTANT_LIMITS.modelRequestsPerMessage` times per message, then a sentence that the assistant could not finish. No `continue` after a failure | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 |  |
-| 164 | A failure is one line under the conversation, a `role="alert"`, and the text stays in the field when its message was not taken. The three codes of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 use `shared/`'s sentence in the conversation's language; the day's limit or `remainingToday` 0 puts "Send" out of use until the page is loaded again; `conversation_full` until "New conversation"; the other reasons have English sentences in `texts.ts`; after `assistant_busy`, `proposal_not_found` and `nothing_to_continue` the conversation is read again, once | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12. The line is marked by a bar at its side and not written in red: the calendar is not in fault |  |
+| 164 | A failure is one line under the conversation, a `role="alert"`, and the text stays in the field when its message was not taken. The three codes of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 use `shared/`'s sentence in the conversation's language, else the page's (amended in v32, decision 222); the day's limit or `remainingToday` 0 puts "Send" out of use until the page is loaded again; `conversation_full` until "New conversation"; the other reasons have the page's sentences, in the language in use (amended in v32); after `assistant_busy`, `proposal_not_found` and `nothing_to_continue` the conversation is read again, once | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12. The line is marked by a bar at its side and not written in red: the calendar is not in fault |  |
 | 165 | "N messages left today" is a small line by the field, from `remainingToday` | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 |  |
 | 166 | "New conversation" does not ask first. It is out of use while there is no conversation and while a call is away. After it the panel is empty, still open, the keyboard in the field | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12 |  |
 | 167 | After a change (a reply whose proposal has an action `done`) the logic tells the screens to load again through `changed$`, which the shell merges into the stream the screens already load again on; the settings screen, which has none, is started afresh | The Product Owner's choice at `docs/CONVERSATIONAL_PLAN.md` step c12; the mechanism is section 6.1's. No screen was changed |  |
@@ -3033,6 +3130,15 @@ than what the trial showed: these deserve the first look in a review.
 | 172 | After a message that got one of the two `503` answers the conversation is read once and not continued; the text stays in the field, and sending it again is how the person asks for its answer (the server answers `assistant_busy` when it holds the message, and the read after that continues it) | The server counted and perhaps saved the message, and the failure carries no count: without the read "N messages left today" was one too high and, after the first message of a conversation, "New conversation" stayed out of use. One more request after a failure; Claude is not asked again by the panel itself, as `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 asks. Decided by the Product Owner for `docs/CONVERSATIONAL_PLAN.md` step c13; step c12 had left both as known |  |
 | 173 | The arrow beside the panel's heading is drawn by the style sheet with an empty alternative text (`content: ' ▾' / ''`, after a plain declaration for a browser that does not know the slash) | Found in the walk: the browser named the button "Assistant ▾", and a screen reader would read the arrow; whether the panel is open is said by `aria-expanded`. `page.test.ts` reads the two rules of the style sheet | |
 | 174 | The view keeps the conversation at its end when something appears under it: it reads whether the list is at its end before it changes anything, and scrolls after | Found in the walk: the proposal's block takes its room from the list, and the last message, the one the proposal answers, went out of sight. A person who scrolled back is not moved | |
+| 175 | The password is a screen of its own, `#/password`, "Password", the last row of `SCREENS`, for both roles; its service and its logic object are the session's, like every screen's (section 6) | The Product Owner's decisions D1 and D3 of `docs/CHANGE_PASSWORD_PLAN.md` section 2. Nothing of the shell's switching changed: one more row | |
+| 176 | The hints are the logic layer's, computed at each keystroke from the three fields handed over as arguments (`typed`, `change`); nothing keeps a password typed, and no state holds one | `docs/FRONTEND_SERVICES.md` section 2, rule 6 holds for the logic layer too: the passwords are in the fields and in the call's arguments only. The service checks the rule again before any request (`docs/FRONTEND_SERVICES.md` section 8, decision 63) | |
+| 177 | "Change password" is out of use while a hint stands and while the change is under way; the hints of an empty form say what to type (the current password, the new one's five conditions, the new one again), so the button is out of use at the start | The service abandons a first change on a second call (`docs/FRONTEND_SERVICES.md` section 8, decision 68): the button keeps that from the page. An empty current password would reach Cognito as a refusal of its own, which the page never asks for | Beyond: the two sentences of an empty current and an empty second field |
+| 178 | What a new password still misses is a list under its field, one item per condition, redrawn only when it changes; the comparisons ("not the same", "the same as the current") stand under the field they concern | The Product Owner asked to see "in words what the new one still misses while typing". A list reads each condition on its own and shrinks as the person types | |
+| 179 | The view empties the three fields after a success, after a wrong current password and on leaving; another failure keeps what was typed | `docs/FRONTEND_ARCHITECTURE.md` section 3, rule 9, and `docs/CHANGE_PASSWORD_PLAN.md` step p3. After a wrong current password the person types all three again, as after a refused sign-in; after a network failure they can press again | |
+| 180 | "Password changed." is shown by the login view, in an element of its own (`#login .notice`, `role="status"`), given by the shell when it mounts the login after a change, and wiped at the next "Sign in" and when the login is left; no timer | Decided by the Product Owner at the start of `docs/CHANGE_PASSWORD_PLAN.md` step p3. The password screen is gone when the person is signed out; the login is where they look next. `mountLogin` takes it as an optional third argument, so the login's tests did not change | |
+| 181 | The skip value is the bundle's fourth constant, `SKIP_GLOBAL_SIGN_OUT`: `true` only in the dev server's bundle, `false` in every build, with no variable to set it; the shell takes anything but `true` as `false` (section 12.1) | Decided by the Product Owner at the start of `docs/CHANGE_PASSWORD_PLAN.md` step p3. A cloud build cannot skip the sign-out everywhere by a mistake in the environment; `frontend/tests/unit/scripts/bundle.test.ts` is the first test of a script of the front end | |
+| 182 | After a change the shell puts the `LoginService` and the `RefreshService` back to their first state, in its reaction to the success, before the store is cleared (section 6); `mountShell` takes them as `pageWide`, none unless given | Decided by the Product Owner at the start of `docs/CHANGE_PASSWORD_PLAN.md` step p3, with the order of `docs/FRONTEND_SERVICES.md` section 8, decision 69, that makes it possible: a change ends the session as "Sign out" does, and leaves nothing of the person in a service (`docs/FRONTEND_SERVICES.md` section 8, decision 53) | |
+| 183 | The tests of the shell and of the page that list the navigation or count the page's fields and failure lines gained the new screen's | A link for both roles changes every list of links; `tests/unit/views/page.test.ts` counts the fields (40) and the places of a failure (51) on purpose. No other test of a screen, of the login or of the sign-out changed | |
 | 184 | A slot says its places beside its time from the model's `places`: "free" for a capacity of one, "2 of 3 places left" above, "Full" for the Administrator's slot with no place left, grey and hatched, which opens the book dialog (section 4) | `docs/SHARED_CALENDAR_SPEC.md` section 16.8. "free" kept for a capacity of one, so that a calendar of one-person types reads as it always did | |
 | 185 | A slot that appointments overlap, the Administrator's only, is a narrow tab at the right of its time, in front, "Full" or "2 left"; the appointments and the group beside it leave it room (`tab`, `beside`, section 5.1) | Found in the walk of `docs/CAPACITY_PLAN.md` step u5: drawn whole, the slot lay under the appointments that fill it and could not be clicked, though section 16.8 of `docs/SHARED_CALENDAR_SPEC.md` asks that the Administrator's full slot can be. The Product Owner chose the tab of three ways (the slot hidden again, a column of its own); it serves a slot with places left too, which was covered the same way | Yes |
 | 186 | The Administrator's appointments that overlap are chained by `[start, end)` and placed by interval colouring, the earliest first in the leftmost free column; a peak of three or less is drawn side by side, four or more is one block "N people · <type>" with its list in `dialog.group`, each row opening the detail (section 5.1) | The Product Owner's decision at `docs/CAPACITY_PLAN.md` step u5. One placement serves this and the repeated hour of the night the clocks go back, whose `lane` and `lanes` were widened from two to any number | |
@@ -3064,8 +3170,14 @@ than what the trial showed: these deserve the first look in a review.
 | 212 | A failure of a creation is said in the invitation's dialog, which stays open with "Back" and "Confirm"; the form has no failure line of its own (`form.create .failure` removed) | The creation is sent from the dialog, so its answer belongs there; "Confirm" tries again with no retyping | |
 | 213 | When the invitation went, the view moves the keyboard to "Close", once: the one `focus()` of a dialog in the views, against decision 134's "no focus management of our own" | The keyboard was on "Confirm", which is then hidden: without it the keyboard is on nothing inside an open modal dialog | Yes |
 | 214 | The invitation's dialog closes with the Escape key, like every other dialog of the page; no dialog has `closedby` | Nothing is lost by closing it: the invitation is in the User's mailbox, and "Resend invitation" sends another | |
-| 215 | A row shows the account's state as the server's word, `invited` or `active`, the invited one coloured as a thing to do (`.is-invited`) | `docs/EMAIL_ARCHITECTURE.md` sections 5.3 and 11: the state tells the Administrator whether the invitation was used | |
+| 215 | A row shows the account's state, `invited` or `active`, in the words of the language in use (`UserRow.statusText`, amended in v32), the invited one coloured as a thing to do (`.is-invited`) | `docs/EMAIL_ARCHITECTURE.md` sections 5.3 and 11: the state tells the Administrator whether the invitation was used | |
 | 216 | No condition of section 7 was met at `docs/EMAIL_PLAN.md` step m8 | `users.view.ts` is 210 lines (158 of code) and listens to two streams; 35 of its lines look a node up or copy a template. The new dialog has no field, its buttons are in the page, and one loop of the subscription fills it | |
+| 217 | A change of language while signed in **leaves the frame and enters it again**, as when a second person signs in: every screen and the assistant's panel are unmounted, their objects made again with the new texts, and the screen of the address is shown again (section 6) | `docs/MULTILANGUAGE_PLAN.md` decision D1 (its finding F4): a screen's state holds sentences already worded, so wording them again in place would need every class to keep its raw data beside them and recompute; the shell already had the path. It happens only when the person saves another language in "My details", since the account's language is read before the frame is first shown. The price, accepted: what was open or half typed is lost, and the panel reads its conversation again | Yes |
+| 218 | The logic layer's objects get the page texts **as a plain object when they are made**, fixed for their life; a pure model takes the texts as its first parameter. No stream of the language reaches a screen's class (section 5.1) | `docs/MULTILANGUAGE_PLAN.md` decision D2: with decision 217 no screen outlives its language, so a stream would buy nothing. The exceptions live as long as the page: the login view follows `PageLanguage.state$`, and `ChoosePasswordScreen` reads the texts in use when it asks | |
+| 219 | A text of the page is a key in an attribute of its element (`data-text`, and `data-label` for a name read by a screen reader), its path under `html`; the shell fills every key, the templates' included, before it shows anything (section 12.4) | `docs/MULTILANGUAGE_PLAN.md` decision D3. The markup stays where it is and keeps rule 2 of section 3: nothing is seen before it is filled. A path under `html` makes "every text for the page is used by a key" a test with an answer | |
+| 220 | The page's first language is this browser's memory, else the browser's own languages, else the bundle's `DEFAULT_LANGUAGE`; the choice on the sign-in screen is remembered by this browser; the account's language, read at sign-in, wins over both (sections 6 and 12.4) | `docs/MULTILANGUAGE_PLAN.md` finding F11 and its approved change P1: the id token never carries `locale`, so the shell reads it with `GetUser` and keeps the frame hidden until the answer, so that no screen is seen in the wrong language. An account holding none gets the page's, written once without waiting; a failed read enters in the page's language and writes nothing | Yes |
+| 221 | "My details" has the list "Language" for both roles, saved at once with no "Save"; while a save is under way the list is closed; a failure says why under it and puts the list back on the language in use (section 5.1) | `docs/MULTILANGUAGE_PLAN.md` finding F11. The language is the person's own, at Cognito, through the person's token: neither the users screen nor any route of the API writes it | |
+| 222 | The assistant's panel says the four sentences of `shared/` (the three codes of `docs/CONVERSATIONAL_ARCHITECTURE.md` section 6.1 and `conversation_full`) in the conversation's language, else the page's (`spoken()`); its other words are the page's, in the language in use; it sends the page's language with a message (section 6.1) | `docs/MULTILANGUAGE_ARCHITECTURE.md` section 9 and `docs/MULTILANGUAGE_PLAN.md` step l8: the server keeps Claude's language, else the page's, so a first message in no language of the calendar gets the page's; the panel's sentences then match the conversation | |
 
 ## 12. The tooling (open points O4, O6 and O8, decided)
 
@@ -3080,7 +3192,7 @@ than what the trial showed: these deserve the first look in a review.
 | `dist/app.js` | `src/main.ts` and everything it imports, as one minified module script (esbuild: `bundle`, format `esm`, target `es2022`) |
 | `dist/app.js.map` | The source map, a file of its own, named in the last line of `app.js` |
 
-**The configuration** reaches the bundle as four constants, which esbuild's `define` writes in
+**The configuration** reaches the bundle as six constants, which esbuild's `define` writes in
 place of their names:
 
 | Constant | What | In a build | Under the dev server |
@@ -3089,15 +3201,21 @@ place of their names:
 | `COGNITO_URL` | Where `InitiateAuth` is posted | Environment variable `COGNITO_URL` | `/cognito/` |
 | `CLIENT_ID` | The app client of the user pool | Environment variable `CLIENT_ID` | `AuthorizerFunction.CLIENT_ID` of `backend/env.local.json` |
 | `SKIP_GLOBAL_SIGN_OUT` | Whether a change of password skips the sign-out everywhere that follows it (`docs/FRONTEND_SERVICES.md` section 22.2) | `false`, always: no variable is read for it | `true`: cognito-local has no `GlobalSignOut` (`docs/ARCHITECTURE.md` section 8) |
+| `TEST_LANGUAGE` | Whether the padded test language is offered, at the address `?padded` (section 12.4) | `false`, always: no variable is read for it, and the minified build drops the branch and the padded texts with it | `true` |
+| `DEFAULT_LANGUAGE` | The page's language when neither this browser's memory nor its own languages name one the calendar speaks (section 12.4) | Environment variable `DEFAULT_LANGUAGE`, `en` when it is not given; the deploy command gives the back end's output `DefaultLanguage` | `en` |
 
 They are declared and read in `frontend/src/main.ts` and nowhere else; it hands them to the shell
 as one plain object (`docs/FRONTEND_SERVICES.md` section 2, rule 3). A build with one of the
-three variables missing stops and names it. The fourth is `false` in every build: `bundleOptions`
+three variables missing stops and names it; a `DEFAULT_LANGUAGE` that is not a language of the
+calendar stops the bundle (`LANGUAGES` of `frontend/scripts/bundle.mjs`, which a Node script
+keeps beside `shared/`'s list, and its test holds the two equal). `TEST_LANGUAGE` is `true` on
+the same terms as the fourth, which is `false` in every build: `bundleOptions`
 of `frontend/scripts/bundle.mjs` writes `true` only for a configuration holding exactly `true`,
 which only the dev server gives, and the build reads no variable for it, so a page built for the
 cloud always signs a person out everywhere after a change of password.
 `frontend/tests/unit/scripts/bundle.test.ts` holds this, down to the bundle built with the
-build's configuration. No value is written in a committed file
+build's configuration, and that a build holds no mark of the padded test language while the
+dev server's does. No value is written in a committed file
 (`docs/FOLDER_STRUCTURE.md` section 7). Which values a deployment uses, and the script that reads
 them from the stack's outputs, are in section 13.6.
 
@@ -3119,8 +3237,8 @@ id, and says so when the file is missing) and, to sign in, `npm run local:api -w
 
 - Port 5173, or the one given (`npm run dev -w frontend -- 5180`); it listens on this machine
   only (`127.0.0.1`).
-- It answers `/` (`index.html`), `/style.css` and `/app.js`, and reads nothing else from the
-  disk. `/app.js` is bundled again at every request, with the source map inside it: an edit
+- It answers `/` (`index.html`, also as `/?padded`, the page in the padded test language,
+  section 12.4), `/style.css` and `/app.js`, and reads nothing else from the disk. `/app.js` is bundled again at every request, with the source map inside it: an edit
   shows after a reload of the page. When esbuild refuses the code the answer is a 500 with the
   error, also printed in the terminal, and the page stays blank.
 - It passes `/api/…` on to `http://127.0.0.1:3000` and `/cognito/…` to `http://localhost:9229`,
@@ -3151,43 +3269,105 @@ id, and says so when the file is missing) and, to sign in, `npm run local:api -w
 - All of `frontend/src` is held to 100 % lines, the views and the shell included. The one file
   left out, by name, is `src/main.ts`.
 
-### 12.4 The language
+### 12.4 The languages
 
-English only, with no translation mechanism. The fixed texts are written in `index.html`; the
-texts that depend on data are made by the logic layer (section 5.1, `frontend/src/logic/texts.ts`):
-dates, times, and a failure in plain words by its `reason`. The sentences that depend on a
-state are there too: the one about changing and cancelling in the detail
-(`appointment.detail.ts`), those beside the User picker (`booking.ts`, section 11,
-decision 40), those of "My appointments": the status of a row, the empty list and the
-period's refusals (`appointments.model.ts`), and those of the settings: the range under a
-field, a field's refusal and the line about the last save (`settings.model.ts`), and those of
-the users: what a username is, which is the hint and the refusal, the sentence of an empty
-list, the names of a row's buttons for a screen reader, the two sentences of the invitation's
-dialog ("An invitation will be sent to …", "An invitation was sent to …"), the creation's
-server failure (`CREATE_FAILED`) and the question of
-the delete dialog (`users.model.ts`); the state of a row (`invited`, `active`) is the server's
-word; the fixed words of the dialogs of the users ("Send an invitation", "Back", "Confirm",
-"Close", "Resend invitation", "Delete user", "Keep") are in the page. Those of the availability are made by the logic
-layer too: what a type's name and its capacity are, which are the hints and the refusals,
-a type's places ("· 3 places"), the refusals of a
-pattern's fields, the two sentences of an empty list, the word for a type that is not known,
-that a type must be created first, the names of the weekdays, a pattern's validity, the names
-of a row's buttons for a screen reader, the two questions before a deletion
-(`availability.model.ts`) and the sentence that counts the appointments in the way
-(`conflicts.ts`); the fixed words of the screen ("Types", "Weekly patterns", the six labels,
-"Leave empty for no end.", "ended", "Edit type", "Capacity", "Change pattern", "Confirm the deletion",
-"Close", "Keep", "Delete") are in the page; since plan step 68 the dialog that confirms
-says "Please confirm", "Keep" and "Confirm". Those of a single date are made by the logic
-layer too (`date.model.ts`): the refusals of the date, the date in words, the sentences of
-the day (which of the three it is, that the patterns give no hours, that there is no extra
-window, that no window is left), the refusals of a window, the names of a row's button and
-the three questions; its fixed words ("A single date", "Date", "Show", "As the weekly
-patterns give it", "As it is now", "This day only…", "Not available on this day", "Back to
-the weekly patterns", "This day only", "Start", "End", "Type", "Add", "Discard", "Save this
-day", "Extra windows", "Add window", "Remove", "Delete") are in the page. The words that name an appointment being moved come from the logic layer
-(`movingOf`); the fixed words around them ("Moving: … Choose a free time.", "From:", "To:") are
-in the page. No view shows the `message` of a
-service. The shell holds the two names of the roles.
+The page speaks every language of the calendar: English and Italian, the one list
+`SUPPORTED_LANGUAGES` of `shared/src/language/languages.ts` (`docs/MULTILANGUAGE_ARCHITECTURE.md`
+sections 5 and 6). Every screen, dialog and the assistant's panel is in the language in use.
+`index.html` holds no word outside a comment, and no file of `frontend/src/logic` or
+`frontend/src/views` holds a sentence: every word is in `frontend/src/texts/`.
+
+**Where the texts live** (`frontend/src/texts/`, no DOM, under the logic layer's lint rule):
+
+- `texts.ts`: the type `PageTexts`, one object per language. It is grouped: `html`, the fixed
+  texts of `index.html` by part of the page; then the texts the logic layer puts together with
+  data, `frame` (the roles' and the navigation's words), `failures` (a sentence per reason of
+  `FAILURE_REASONS`, with the variants by what was attempted and by role, and a general one),
+  `password`, `week`, `appointment`, `mail`, `list`, `profile`, `users`, `settings`,
+  `availability`, `date`, `assistant`; `dates`, the writers of a date (below); and `locale`, the
+  language of the texts, which is no text (the week's legend sorts its names in it). A fixed text
+  is a string; a text that carries a value is a function of the value, so that each language
+  builds its own sentence, word order and plural. `PAGE_TEXTS` is a `Record<Language,
+  PageTexts>`: a language of the list without all its texts does not compile.
+  `PAGE_TEXT_BUDGETS` has the same shape, partial, with the most characters a tight place takes
+  (the header and the navigation, which share one row; the buttons of the week's toolbar and of
+  the dialogs; a slot's narrow tab); it binds every real language.
+- `texts.en.ts` and `texts.it.ts`, the two objects. The Italian sentences address the person
+  with the formal "lei"; a button has the short verb ("Salva", "Accedi").
+- `padded.ts`, the padded test language: each English text between `⟦` and `⟧`, lengthened by a
+  third with `·`, so that a word written straight into a view shows unmarked and a place too
+  tight shows at once. Only the views' tests and the development server use it, at
+  `http://localhost:5173/?padded`; a build holds none of it (`TEST_LANGUAGE`, section 12.1).
+
+Not the page's: what the server words in a conversation's language (`shared/`'s
+`assistantTexts`, section 6.1), and the mails (`shared/src/mail/texts.ts`). Never translated:
+what people type (a username, a name, a note, a type's name) and the service's `message`, which
+no view shows.
+
+**Dates** are written by `shared/`'s `dateFormats(language)` (`shared/src/language/formats.ts`),
+held in `PageTexts.dates`: `shortDate` ("Mon 16 Nov"), `shortDateWithYear`, `longDate`,
+`fullDate`, `weekLabel`, `weekdayName`. No `Intl` wording is used: the names are written once
+per language. A time, a range and an offset ("09:00", "09:00–10:00", "+02:00") are the same in
+every language and stay in `frontend/src/logic/texts.ts`.
+
+**The keys in the page** (`docs/MULTILANGUAGE_PLAN.md` decision D3; section 11, decision 219).
+An element whose whole content is a text carries `data-text="<key>"`; one whose name for a
+screen reader is a text carries `data-label="<key>"`. The key is the text's path under `html`:
+`data-text="frame.signOut"` is `texts.html.frame.signOut`. The words beside a field are a
+`<span data-text>` inside its `<label>`, before the field, so that filling them leaves the field
+in place. A sentence around a value is two keys on either side of the value's element ("You
+signed in as … with a temporary password": `choose.aboutBefore`, `choose.aboutAfter`). A key on
+an element that the script hides and shows is written before `hidden`, so that the page after
+a view's teardown is the page as written. `frontend/src/views/page-texts.ts` fills them:
+
+- `fillPage(document, texts.html, language)`: every key's `textContent` or `aria-label`, the
+  keys inside every `<template>` included (a copy carries its words already), the tab's title
+  and `<html lang>`. A key that names no text, or a group of texts, throws.
+- `fillLanguages(list)`: the calendar's languages put into a list, each under its own name
+  (`LANGUAGE_OWN_NAMES` of `shared/`) with its own `lang`, the same on every page: a list of
+  languages is no text of the page. The sign-in screen's and "My details'" use it.
+
+The shell fills the page before it shows anything; everything starts `hidden`, so nothing is
+seen unfilled (section 3, rule 2).
+
+**The page's language** is one page-wide object of the logic layer, `PageLanguage`
+(`frontend/src/logic/language.ts`), made by `runShell`: the language in use with its texts
+(`state`, and `state$` for the shell and the login view) and `choose(language)`, which this
+browser remembers (`frontend/src/services/language-memory.ts`, `docs/FRONTEND_SERVICES.md` section 26.8, one
+entry of `localStorage` handed in by `main.ts`; a storage that refuses, as in some private windows, counts as empty).
+The page starts in `firstLanguage(…)`: the language this browser remembers; else the first of
+the browser's own languages, in its order, that the calendar speaks (`it-IT` counts as `it`);
+else the bundle's `DEFAULT_LANGUAGE` (section 12.1).
+
+**The live change.** A language changes in three moments:
+
+1. **On the sign-in screen**, the list "Language" under the form (`label.language`), hidden
+   while "Choose your password" is on show. A choice fills the page's fixed texts again (the
+   shell's subscription to `state$`), and the login view words its notice and its failure line
+   again; the username and the password typed stay, and nothing is unmounted.
+   `ChoosePasswordScreen` reads the texts of the language in use when it asks.
+2. **At sign-in** the shell reads the account's language before it shows the frame (section 6):
+   a language held becomes the page's; none, or a word not in the list, makes the page write its
+   own to the account.
+3. **In "My details"**, both roles, the list "Language" saves at once (section 5.1). Once saved,
+   the shell **leaves the frame and enters it again** in the new language, at the same address
+   (`docs/MULTILANGUAGE_PLAN.md` decision D1; section 11, decision 217). No screen words its
+   state again by itself: every logic object gets the texts when it is made and keeps them for
+   its life (`docs/MULTILANGUAGE_PLAN.md` decision D2; section 11, decision 218). What was open
+   or half typed at that moment is lost, as at a sign-out; the assistant's panel reads its
+   conversation again.
+
+**The tests.** `frontend/tests/unit/texts/texts.test.ts`: every text of every language not
+empty, every function answering sample values, the budgets in English and in Italian, the
+padded language marked everywhere, each language's `locale`. `tests/unit/views/page-texts.test.ts`:
+every key of the page names a text, every text of `html` is used by a key, an element with a key
+holds no words of its own, the page as written holds no words and an empty `<title>`, and
+`fillPage` in the padded language leaves no text unmarked. `tests/unit/scripts/bundle.test.ts`:
+a build as `npm run build` makes it holds no mark, the dev server's does. `useRealPage()` fills
+the page with the English texts, as the shell does (`pageAside(false)` gives the page as
+written), and the tests of the views and of the logic run in English; the shell's test signs in
+with each case of the first language and of the account's, and the login's sees one known
+Italian sentence after the choice (`docs/MULTILANGUAGE_ARCHITECTURE.md` section 5.2).
 
 ---
 
@@ -3242,6 +3422,8 @@ Where the deployed page and the local one differ, and nowhere else:
 | `API_URL` | `/api`, passed on to `http://127.0.0.1:3000` | `/api`, passed on to the API of the stack `shared-calendar-api` |
 | `COGNITO_URL` | `/cognito/`, passed on to cognito-local | `https://cognito-idp.<region>.amazonaws.com/` |
 | `CLIENT_ID` | From `backend/env.local.json` | The output `UserPoolClientId` of the back end's stack |
+| `DEFAULT_LANGUAGE` | `en` | The output `DefaultLanguage` of the back end's stack, `en` when it has none |
+| The padded test language | At `?padded` | None |
 | Content-Security-Policy | Section 13.4, without Cognito's address | Section 13.4 |
 
 ### 13.2 The stack `shared-calendar-web`
@@ -3413,8 +3595,10 @@ stopping at the first failure and naming it:
    `sam validate --lint` of the hosting's template; no Docker, about a minute) are run by the
    command itself, here, before anything is read from AWS.
 2. **Read the back end's stack** (`shared-calendar-api`, the name in `backend/samconfig.toml`;
-   read-only `describe-stacks`, as `backend/scripts/target.sh` does): `ApiUrl` and
-   `UserPoolClientId`. A missing stack or output stops the command and is named. So the back
+   read-only `describe-stacks`, as `backend/scripts/target.sh` does): `ApiUrl`,
+   `UserPoolClientId` and `DefaultLanguage`, the installation's language. A missing stack or
+   one of the first two outputs missing stops the command and is named; a stack without
+   `DefaultLanguage` builds the page with `en`. So the back
    end is deployed first, always.
 3. **`sam deploy`** of `frontend/template.yaml` with `ApiDomain` = the host of `ApiUrl`
    (`frontend/samconfig.toml` holds the stack's name and region, nothing of a deployment). The
@@ -3423,8 +3607,8 @@ stopping at the first failure and naming it:
    (the template has no code) and no bucket for artifacts (section 11, decision 155).
 4. **Read its own stack**: `BucketName`, `DistributionId`, `PageUrl`.
 5. **Build**: `npm run build -w frontend` with `API_URL=/api`,
-   `COGNITO_URL=https://cognito-idp.<region>.amazonaws.com/` and `CLIENT_ID` in the
-   environment. No value of a stack is written in a committed file. The command then
+   `COGNITO_URL=https://cognito-idp.<region>.amazonaws.com/`, `CLIENT_ID` and
+   `DEFAULT_LANGUAGE` in the environment. No value of a stack is written in a committed file. The command then
    refuses to go on if one of the four files is missing or empty, if `app.js` holds
    `localhost`, or if it lacks Cognito's address.
 6. **Upload** the four files of `frontend/dist/` by name (four `aws s3 cp`, never a `sync`,

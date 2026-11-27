@@ -31,7 +31,8 @@ when those files are touched (`.claude/rules/frontend-views.md`).
   blocks; then one `<name>.service.ts` + `<name>.types.ts` per service: `login`, `refresh`,
   `logout`, `hello`, `users`, `calendar-settings`, `availability-types`, `availability-rules`,
   `calendar`, `appointments`, `assistant`, `change-password` (straight at Cognito, no route), `me`,
-  `mail`, `mail-settings`.
+  `mail`, `mail-settings`, `language` (the person's `locale`, straight at Cognito); and
+  `language-memory.ts`, the one entry of the browser's storage.
   One result/state pair per method, except `assistant`: one stream, `outcome$`, for its six
   calls. Input checked with the shared schemas before sending. Tokens live only in the
   `SessionStore`: no result, state or service field holds one.
@@ -43,7 +44,8 @@ when those files are touched (`.claude/rules/frontend-views.md`).
   the script sets them.
 - `style.css`: the one style sheet.
 - `src/main.ts`: the bundle's entry, one statement, the only file that knows `API_URL`,
-  `COGNITO_URL`, `CLIENT_ID` and `SKIP_GLOBAL_SIGN_OUT` (true only in the dev server's bundle).
+  `COGNITO_URL`, `CLIENT_ID`, `DEFAULT_LANGUAGE`, and `SKIP_GLOBAL_SIGN_OUT` and
+  `TEST_LANGUAGE` (both true only in the dev server's bundle).
 - `src/views/`: `shell.ts` (`runShell`, `mountShell`, the table `SCREENS`, `sessionObjects`:
   new services and logic objects per person, a second `CalendarService` for a single date,
   never the week's; the assistant's panel, mounted once per session and in no row of
@@ -52,8 +54,11 @@ when those files are touched (`.claude/rules/frontend-views.md`).
   screen), `assistant`, `me`, `password`, `choose-password` (beside the login, on `#login`); `detail.view.ts`, the dialog two views mount; `availability.parts.ts`, the
   helpers the availability's two views share, with `mountConfirm`; `profile.parts.ts`, the four
   facts' fields and the Edit dialog, shared by the users view and `me`; `time.parts.ts`, the two
-  lists (hour, minute) of one time in a form.
-- `src/logic/`: pure models (`texts.ts`, `week.model.ts`, `booking.ts`,
+  lists (hour, minute) of one time in a form; `page-texts.ts`, which fills the page's keys.
+- `src/texts/`: every word of the page: `texts.ts` (the type `PageTexts`, the budgets,
+  `pageTexts`), one object per language (`texts.en.ts`, `texts.it.ts`), and `padded.ts`, the
+  test language of `?padded` (dev server and tests only). Same lint rules as `src/logic/`.
+- `src/logic/`: pure models (`texts.ts`, `language.ts`, `week.model.ts`, `booking.ts`,
   `appointment.detail.ts`, `appointments.model.ts`, `settings.model.ts`, `users.model.ts`,
   `availability.model.ts`, `conflicts.ts`, `date.model.ts`, `assistant.model.ts`,
   `password.model.ts`, `profile.model.ts`, `me.model.ts`, `daily-mail.model.ts`, `times.ts`) and one class
@@ -89,8 +94,12 @@ when those files are touched (`.claude/rules/frontend-views.md`).
 - A teardown wipes what the view put in the page.
 - `src/logic/` has no DOM, gets "now" passed in, and reads dates and times through `shared/`'s
   helpers in the calendar's zone, never the machine's.
-- A new route's failure codes get their sentences in `src/logic/texts.ts` (`failureText`); the
-  assistant's four that the server words in two languages are `shared/`'s (`assistantTexts`).
+- A word a person reads is never written in `index.html` or in a view or logic file: the page
+  holds a key (`data-text`, `data-label`) and the word is in `src/texts/`, in every language.
+  `?padded` on the dev server shows a missed word: it is the one without ⟦ ⟧.
+- A new route's failure codes get their sentences in `src/texts/` (`failures`, read by
+  `failureText` in `src/logic/texts.ts`); the assistant's four that the server words are
+  `shared/`'s (`assistantTexts`).
 - Nothing of a conversation is stored in the browser or logged.
 
 ## Tests

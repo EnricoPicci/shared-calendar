@@ -1004,6 +1004,17 @@ without it, and the rules of the root `CLAUDE.md` hold as written.
    and the two packages' files, `.claude/rules/frontend-views.md` (the label's words, F3),
    all left in line with "Changing these files". The sentence for the privacy notice (the
    language and its purpose) is given to the Product Owner, who owns the notice.
+   **Written 2026-11-27, reviewed by the Product Owner:** `docs/ARCHITECTURE.md` v19,
+   `docs/FRONTEND_ARCHITECTURE.md` v32 (section 12.4 "The languages", D1 and D2 as decisions
+   217 and 218), `docs/FRONTEND_SERVICES.md` v18 (section 26, `LanguageService` and
+   `LanguageMemory`), `docs/CONVERSATIONAL_ARCHITECTURE.md` v25, `docs/FRONTEND_WALK.md` v16
+   (section 18, checks 220 to 240, not yet walked), `docs/FOLDER_STRUCTURE.md` v2; in
+   `docs/EMAIL_ARCHITECTURE.md`, which has no change log, M17 rewritten and its Status line
+   dated; `docs/RUNBOOK.md` section 3.4. The root `CLAUDE.md` gained the hard rule and the
+   pointer to `docs/MULTILANGUAGE_ARCHITECTURE.md`; its folder map's list of root files left,
+   since `docs/FOLDER_STRUCTURE.md` section 2 holds it. The privacy sentence was given. Left
+   open: section 2 of `docs/ARCHITECTURE.md` still omits the e-mail functions and the
+   invitation function, a gap older than this work.
 6. **The merge with `main`** (section 9), in a session of its own.
 7. **The full regression, once, on what will be deployed**: the root
    `DYNAMODB_PORT=8002 npm run verify`, the front end's journeys, the smoke test locally, and
