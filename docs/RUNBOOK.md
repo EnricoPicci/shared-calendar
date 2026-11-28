@@ -717,8 +717,9 @@ The page, the mails, the Excel files, the invitation and the assistant speak Eng
 - **The invitation** is worded by the invitation function (`InviteMessageFunction`), which the
   stack has only at `MailStage` `on`; the template's English invitation, `InviteMessageTemplate`,
   stays as what Cognito sends when the function's answer is unusable. Its log group is
-  `/aws/lambda/<stack>-invite-message`: one line per invitation, its kind and the language's
-  code.
+  `/aws/lambda/<stack>-invite-message`: one line per invitation and per resend, its kind
+  (`source`, `CustomMessage_AdminCreateUser` for both), the language's code (`language`) and
+  `outcome` `worded`; a call of another kind says `untouched` and has no language.
 - **The assistant** answers in the language of a conversation's first message, else the page's,
   else English. A change of its instructions ends the conversations in progress at the deploy,
   and asks for the paid evaluation before it (section 3.2).
@@ -728,7 +729,20 @@ The page, the mails, the Excel files, the invitation and the assistant speak Eng
   (`aws cognito-idp describe-user-pool`); in the change set, the user pool and its app client
   "Modify", never "Replace", and one function, one role, one log group and one permission added;
   after it, the smoke test, a test User whose own token can change its `locale` and can no longer
-  change its e-mail, one invitation received in Italian and its password used.
+  change its e-mail, one invitation received in Italian and its password used. Section 5.12 is
+  the record of that deploy. What it taught:
+  - Read the change set with `aws cloudformation describe-change-set` (its rows'
+    `Action`, `Replacement` and each detail's `RequiresRecreation`), not only on the terminal:
+    recorded with `script`, the deploy's table lost rows, among them the pool and the app client.
+  - The test User for the gap is made in "Users" (`npm run test-user cloud` sends no
+    invitation); its first password is chosen on the page before its token is tried. The outcome
+    of each `UpdateUserAttributes` is also in CloudTrail (`aws cloudtrail lookup-events`, event
+    name `UpdateUserAttributes`, its `errorCode` only).
+  - The Administrator's mail in their language is looked for before the smoke tests of the day
+    or on the next: each smoke test spends one of the Administrator's five mails on demand, and
+    a sixth is `429 mail_limit_reached`. A language equal to `DefaultLanguage` proves nothing in
+    a mail; the stored `locale` is read with `aws cognito-idp admin-get-user` and a `--query` of
+    that attribute alone.
 
 ---
 
@@ -1477,6 +1491,67 @@ read-only `aws` commands, and printed no address.
   the smoke test again; `simtest`, `miri` and `enri` deleted.
 - **Cost:** a few dozen mails through SES, a fraction of a US cent; the smoke tests' exchanges at
   Anthropic, about three US cents.
+
+### 5.12 The languages (`docs/MULTILANGUAGE_PLAN.md` phase B, item 8, 2026-11-28)
+
+The API and the page at `744572b`, on the branch `multilanguage` (`main` at `ef6ddc4` merged
+in), not pushed; `main` and the cloud before it at `v3.0.0` (section 5.11). Who did what: the
+operator ran the deploy, the smoke test and the page's release in a terminal inside `script -q`
+(macOS: `script -q <file> <command>`), typing `y`, the admin password and their own address, and
+looked at the page, the mails and the gap; the session ran `verify`, read-only `aws` commands
+and the recordings by line, wrote the scratch script of the gap outside the repository, and saw
+no password, token or address.
+
+- **Before, read-only:** the app client with no `ReadAttributes` and no `WriteAttributes` (every
+  standard attribute writable by a person's own token), `ExplicitAuthFlows`
+  `ALLOW_USER_PASSWORD_AUTH` and `ALLOW_REFRESH_TOKEN_AUTH`; the pool's `LambdaConfig` empty, the
+  invitation's subject the English one, sending `DEVELOPER`; the stack's `MailStage` `on`, no
+  parameter and no output `DefaultLanguage`; SES in the sandbox (`ProductionAccessEnabled`
+  false, 200 mails a day, 1 a second). As the documents say.
+- **The gate:** root `DYNAMODB_PORT=8002 npm run verify` PASSED at `744572b` on a clean tree:
+  2090 back-end unit tests, 673 shared, 3296 front end, 100 % line coverage, 249 back-end
+  journeys. One stamp served both deploys.
+- **The API's deploy**, 12:44 to 12:46 UTC: 58 changes, 4 Add (`InviteMessageFunction`, its role,
+  log group and permission) and 54 Modify, every one Replacement `False`, every detail
+  `RequiresRecreation` `Never`, no Remove. The pool Modify on `LambdaConfig`, the app client
+  Modify on `WriteAttributes`; 37 functions for their code, the mailer's environment too
+  (`DEFAULT_LANGUAGE`); 13 roles, `HttpApi` and the daily schedule only for the names they point
+  at, none changed directly; the mailer's role with its `identity/*` of part A untouched. The
+  tables, the Administrator, the SES identity and the configuration set not in the list. Read
+  with `describe-change-set`: the terminal's table had lost the pool's and the client's rows
+  (section 3.4). `UPDATE_COMPLETE`; after it, the client's write list `locale`, its id unchanged,
+  the pool's `CustomMessage` the new function, the parameter and the output `DefaultLanguage`
+  `it`.
+- **The smoke test in the cloud:** **65 PASS**, no FAIL, no SKIP; the mailer's line `sent` after
+  10 s. The invitation and its resend reached the operator's mailbox in Italian, from
+  `noreply@<domain>`, not in spam. The invitation function's log: five lines, each
+  `CustomMessage_AdminCreateUser`, `it`, `worded` (the smoke User and the capacity journey's two
+  at the mailbox simulator, the operator's and its resend). No line of level `error` or `warn`
+  in the 39 log groups; the access log without a 5xx, its seven 4xx the smoke test's expected
+  refusals.
+- **The page**, at 12:57 UTC on the same stamp: the hosting stack had no change, the four checks
+  PASS, the served `app.js` byte for byte the built one, holding the default language `it`.
+  Right after, the page's name did not resolve on the operator's Mac for some minutes (curl:
+  `Could not resolve host`, the CloudFront name too) while CloudFront answered 200 through a
+  public resolver: a passing DNS failure on that machine, not the release.
+- **The operator's look, all yes:** the sign-in screen with its list of languages, following the
+  browser's; a throw-away User made in "Users", its invitation in Italian, the first sign-in with
+  the temporary password, "Choose your password", the frame and "My details" in the page's
+  language, the language changed and back and kept at the next sign-in, the User deleted; the
+  assistant's panel, one message answered in the page's language.
+- **The gap closed:** the scratch script, with the throw-away User's own access token:
+  `UpdateUserAttributes` on `email` refused, `NotAuthorizedException`; on `locale` accepted;
+  `GetUser` answering `locale`, the e-mail unchanged. CloudTrail shows the same, and the page's
+  own writes of `locale` all accepted.
+- **The Administrator:** signed in once, its account holds `locale` `it` (read with
+  `admin-get-user`, that attribute only). Its "E-mail…" at 13:12 UTC answered `429
+  mail_limit_reached`: the day's five mails on demand were spent by part A's look and the smoke
+  tests. The mail opened was the smoke test's, sent while the account had no language, so in the
+  default. **Owed:** the next daily mail, in the Administrator's language, read the day after.
+- **The alarms:** the API's 5xx, the authorizer's and the mailer's errors all `OK`, unchanged
+  since before the deploy; the new function has no alarm of its own.
+- **Cost:** a handful of mails through SES and of calls of the new function, nothing measurable;
+  the smoke test's and the panel's exchanges at Anthropic, about two US cents.
 
 ## 6. A person's password: what to tell them
 

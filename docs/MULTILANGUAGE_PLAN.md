@@ -5,7 +5,8 @@ and the answer to one question of planning (section 2). v2 (2026-11-27): phase A
 brief `prompts/lang-l03-phase-a-implementation.md`; steps l1 to l8 done. v3 (2026-11-28):
 `main` merged in at phase B's item 6, with brief `prompts/lang-l04-merge-with-main.md`. v4
 (2026-11-28): phase B's item 7, the full regression, with brief
-`prompts/lang-l05-full-regression.md`.
+`prompts/lang-l05-full-regression.md`. v5 (2026-11-28): phase B's item 8, the deploy, with brief
+`prompts/lang-l06-deploy.md`.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -1093,6 +1094,27 @@ without it, and the rules of the root `CLAUDE.md` hold as written.
    invitation received and read, in Italian, its password used. Then the page. Then the
    Product Owner signs in once, so that the Administrator's account gets its language and the
    daily mail follows it.
+   **As done (2026-11-28)**, with the brief `prompts/lang-l06-deploy.md`; the record is
+   `docs/RUNBOOK.md` section 5.12.
+   - The cloud's facts before, as the documents say: the app client with no write or read list,
+     the pool with no trigger, no `DefaultLanguage`, SES in its sandbox.
+   - The gate green at `744572b`; the API deployed: 58 changes, 4 Add (the function, its role,
+     log group and permission), 54 Modify, no Remove, no Replacement; the pool Modify on
+     `LambdaConfig` and the app client on `WriteAttributes`, each `Never`, the client's id
+     unchanged.
+   - The smoke test in the cloud 65 PASS; the invitation and its resend in Italian; the function's
+     lines `it`, `worded`; no error in the logs, no 5xx.
+   - The page released from the same commit, its default language `it`.
+   - The Product Owner's look all yes: the throw-away User's invitation in Italian and first
+     sign-in, its language in "My details" and kept, the panel answering in the page's language.
+   - F16 tried: a person's own token refused on `email` (`NotAuthorizedException`) and accepted
+     on `locale`; `GetUser` answers `locale` with the default read list; the administrative
+     calls still write the four facts (the smoke test).
+   - The alarms `OK`. The Administrator's account holds `it`; its "E-mail…" was refused
+     `mail_limit_reached`, the day's five spent by the smoke tests, so the proof that its mail
+     follows its language is the next daily mail.
+   - Item 9 finds the cloud at `744572b` on this branch, not pushed, `main` still at `ef6ddc4`:
+     the version, `README.md`'s row, the tag, `main` moved and the push are left to it.
 9. **The release closed**: the version (a minor one after the e-mail work's, chosen then),
     the record in `docs/RUNBOOK.md`, `README.md`'s versions, the tag, the push.
 
