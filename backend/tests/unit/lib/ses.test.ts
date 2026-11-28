@@ -33,7 +33,7 @@ describe('sendMail', () => {
         Simple: {
           Subject: { Data: TEXT.subject, Charset: 'UTF-8' },
           Body: { Text: { Data: TEXT.text, Charset: 'UTF-8' }, Html: { Data: TEXT.html, Charset: 'UTF-8' } },
-          Attachments: [{ FileName: FILE.fileName, ContentType: XLSX_CONTENT_TYPE, ContentDisposition: 'ATTACHMENT', RawContent: FILE.content }],
+          Attachments: [{ FileName: FILE.fileName, ContentType: XLSX_CONTENT_TYPE, ContentDisposition: 'ATTACHMENT', ContentTransferEncoding: 'BASE64', RawContent: FILE.content }],
         },
       },
     });

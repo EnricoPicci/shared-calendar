@@ -1167,6 +1167,18 @@ listed in `docs/EMAIL_ARCHITECTURE.md` section 22.2):
   to the stack's address, so that it still sends only as `noreply@<domain>`: the one exception to
   the root `CLAUDE.md`'s wildcard rule, written in that rule. Part B, out of the sandbox, puts the
   domain's identity back.
+- **The Excel file arrived broken** (found at part A's second smoke test, 2026-11-28). The mail on
+  demand reached the mailbox, but its `.xlsx` did not open: the file was about half as large
+  again as the one the mailer makes, and every byte that is not text had become the UTF-8
+  replacement character, as a binary file sent as 7-bit text does. `backend/src/lib/ses.ts` gave
+  no `ContentTransferEncoding`, which SES's reference allows as `BASE64`, `QUOTED_PRINTABLE` or
+  `SEVEN_BIT` without saying which applies when none is given ("Attachment", Amazon SES API v2
+  reference, https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_Attachment.html). It now
+  sends `BASE64`. The fake mail reads the SDK's base64 itself, so no local test could see it; the
+  operator's look at the file is the proof.
+- **The smoke test's mail line** read the mailer's count with `--query 'length(events)'`, which
+  the AWS CLI prints once per page: two lines (`1` and `0`) where the script waited for one
+  number, so it failed though the mail was `sent`. `backend/scripts/smoke.sh` adds the lines up.
 
 #### Part A — the stage `on` in the sandbox, and the release v3.0.0
 
