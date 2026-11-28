@@ -1,6 +1,13 @@
 # Shared Calendar: e-mail (implementation plan)
 
-**Version:** v13 (2026-11-26): step m9 done, its "As done" note written; the daily mail's hour
+**Version:** v14 (2026-11-28): step m10 cut into parts A (the stage `on` in SES's sandbox,
+every recipient an address verified in SES, the smoke test, the operator's look with real mails,
+the tag `v3.0.0`) and B (after production access: the Users invited again, the test Users and
+the verified addresses kept or deleted at the operator's choice, the documents closed), each with its start, its check and its
+"As done" note, since AWS's answer on production access can take days and everything else can be
+proven before it (the Product Owner's decisions, with the brief
+`prompts/mail-m10-split-step-m10.md`); section 4's row m10, section 5.2 and section 7 follow.
+v13 (2026-11-26): step m9 done, its "As done" note written; the daily mail's hour
 moved from step m9 to step m10, since its routes answer `503` at the stage `domain`
 (`docs/EMAIL_ARCHITECTURE.md` section 9.1). v12 (2026-11-25): the branch `slot-5min` (times on 5-minute steps and windows of
 whole hours, released as `v2.4.0` and `v2.5.0`) merged into `main` before step m9; the note
@@ -53,10 +60,11 @@ The shape of the answer, in short:
 - **Steps m9 and m10 are the cloud**, each command on the operator's explicit instruction: the
   stage `domain` (the operator's DNS records, the SNS confirmation, the request for SES
   production access), with the new API **and the new page** deployed together, because
-  `POST /users` no longer answers a password (F13); then the stage `on`, when mail works, and the
-  release **v3.0.0**.
+  `POST /users` no longer answers a password (F13); then the stage `on`, in two parts: A in SES's
+  sandbox, every recipient an address verified in SES, ending with the release **v3.0.0**; B once
+  AWS grants production access, the Users invited again.
 - **The full regression runs twice**: in step m9 before the first cloud deploy, and at the end of
-  step m10 (section 5.2).
+  step m10's part A (section 5.2).
 - **Two pairs of steps are built together**: m1 with m2 (the four facts, from the contract to the
   screens) and m3 with m4 (the mailer and the route that starts it). A pair has one brief, one
   check (both steps' checks, run once at the end) and one stop for review; each step keeps its own
@@ -82,7 +90,7 @@ plan most:
 | O6: `iam:CreateServiceLinkedRole` checked before step 10 | A read-only check in step m9 |
 | O7: our own fake mail | A fifth service of the local Docker stack (step m3) |
 | Section 4.3: the existing Users deleted, moved from the start to just before the first cloud deploy (2026-11-25) | Step m9; step m1 writes the move into sections 4.3, 20 and 21 of `docs/EMAIL_ARCHITECTURE.md` |
-| Section 9.1: v3.0.0 | Step m10 |
+| Section 9.1: v3.0.0 | Step m10, part A |
 
 ## 3. What planning found
 
@@ -227,7 +235,8 @@ breaks it**, not later.
 | m7 | `docs/FRONTEND_SERVICES.md` (the sign-in's challenge), `docs/FRONTEND_ARCHITECTURE.md` and `docs/FRONTEND_WALK.md` (the screen "Choose your password") |
 | m8 | **Root `CLAUDE.md`: the hard rule's password part** becomes "A User's first password is temporary: Cognito makes it, e-mails it and forces its change at the first sign-in; the API never sees it or answers it. The Administrator's password is set once as permanent by the bootstrap" (the creation without a password is what makes it true), with F15's exception for the operator's test User. `docs/ARCHITECTURE.md` sections 1.2, 5.1, 6.3, 7.3, 7.4, 10 and 13 rewritten from `docs/EMAIL_ARCHITECTURE.md` (its section 17), with the stages and parameters; `docs/RUNBOOK.md` section 6 and a draft of the stages' steps; the three front-end documents (the users screen's invitation); every changed journey's page |
 | m9 | `docs/RUNBOOK.md`: the stage `domain`, the DNS records, the production access, the suppression list; section 5.11, the deployment record, opened |
-| m10 | `docs/EMAIL_ARCHITECTURE.md` a record (status line); `docs/ARCHITECTURE.md` v18 closed; `docs/SHARED_CALENDAR_SPEC.md` section 15's sentence on the address confirmed; `docs/CONVERSATIONAL_ARCHITECTURE.md` status line (deployed); `docs/RUNBOOK.md` section 5.11 closed; `README.md` "Versions": v3.0.0; root `CLAUDE.md`: `docs/EMAIL_PLAN.md` among the records of finished work |
+| m10 A | `README.md` "Versions": v3.0.0; `docs/RUNBOOK.md` section 3.3's "At `on`", part A, corrected by the run, and section 5.11 continued |
+| m10 B | `docs/EMAIL_ARCHITECTURE.md` a record (status line); `docs/ARCHITECTURE.md` v18 closed; `docs/SHARED_CALENDAR_SPEC.md` section 15's sentence on the address confirmed; `docs/CONVERSATIONAL_ARCHITECTURE.md` status line (deployed); `docs/RUNBOOK.md` section 3.3's "At `on`", part B, corrected, and section 5.11 closed; root `CLAUDE.md`: `docs/EMAIL_PLAN.md` among the records of finished work |
 
 ## 5. The acceptance check
 
@@ -261,11 +270,14 @@ whole of `docs/FRONTEND_WALK.md` on a restarted and seeded local stack, and
 - **Step m9, before the first cloud deploy.** The deploy gate requires `verify` on the commit
   that ships, and must not be bypassed; the rest of the regression runs there too, since it is
   the last look at the whole system before the cloud.
-- **Step m10, at the end.** The gate's `verify` before each deploy (F12: a mechanical
+- **Step m10, part A.** The deploy at `on` is part A's, in SES's sandbox, so the regression's
+  cloud end is part A's check: the gate's `verify` before each deploy (F12: a mechanical
   requirement, minutes long), the smoke test in the cloud, and the operator's look at the
-  deployed page with real mails. The whole local walk is not repeated unless a screen changed
-  after step m9 (the page is deployed in step m9, F13); if one did, it runs again in full before
-  the page's second deploy.
+  deployed page with real mails, every recipient an address verified in SES. The whole local walk
+  is not repeated unless a screen changed after step m9 (the page is deployed in step m9, F13);
+  if one did, it runs again in full before the page's second deploy. Part B redeploys nothing
+  unless something changed after part A; if something did, the gate's `verify`, the deploy and
+  the smoke test run again there.
 
 ## 6. Steps
 
@@ -1087,31 +1099,150 @@ sign-in, the username kept (`docs/FRONTEND_WALK.md` check 216).
   `domain` for each expected 503 of an e-mail route; the console's form for production access has
   no use case, which AWS asks for in a support case. `docs/RUNBOOK.md` section 3.3 says how.
 
-Step m10 waits for AWS's production access.
+Step m10's part A waits only for the domain, verified at step m9; its part B waits for AWS's production access.
 
 ### Step m10 — Cloud, stage `on`, and the release v3.0.0 (each command on the operator's explicit instruction)
 
-Starts only when SES shows the domain verified and the account out of the sandbox (read-only
-checks).
+Built in two parts, each with its brief, its check and its "As done" note, as step m8 was: **A**,
+the stage `on` in SES's sandbox, every recipient an address verified in SES, and the release
+`v3.0.0`; **B**, once AWS grants production access, the Users invited again and the documents
+closed. The cut (the Product Owner's decision, 2026-11-28, brief
+`prompts/mail-m10-split-step-m10.md`): AWS's answer can take days, and everything but mailing an
+address that is not verified can be deployed and proven before it
+(`docs/EMAIL_ARCHITECTURE.md` section 13.2).
 
-1. `MailStage=on` in `backend/samconfig.toml`, committed; the gate's `verify`;
-   `npm run deploy -w backend`. The pool now sends through SES.
-2. `npm run deploy -w frontend` only if the page changed after step m9 (the gate again if the
-   commit changed).
-3. **Operator:** the daily mail's hour in "Settings"; the test User's "E-mail…", its mail and
-   Excel file arriving in the operator's mailbox.
-4. The smoke test against the cloud: PASS, including the invitation to the operator's address.
-5. **Operator, the look at the deployed page with real mails:** the smoke's invitation arrived
-   (from `noreply@<domain>`, Reply-To the alarm address, not in spam); a throw-away User created
-   with one's own address, signed in with the temporary password, a password chosen, the User
-   deleted; a mail on demand from the week page, its Excel file opened; the next morning, the
-   daily mail with its two files.
-6. **Operator:** the Users who need an account created again (step m9's list); each receives
-   their invitation; future appointments booked again by hand if wanted.
-7. The documents closed (section 4's row m10); the tag `v3.0.0` when the operator asks for it.
+**What the sandbox allows at `on`**, from AWS's documentation read on 2026-11-28 (the pages are
+listed in `docs/EMAIL_ARCHITECTURE.md` section 22.2):
 
-**Check:** the end of the full regression (section 5.2): the gate's `verify`, the smoke test
-PASS in the cloud, the operator's look all yes; this plan marked finished.
+- **Who receives mail.** Only addresses and domains verified in SES, and SES's mailbox
+  simulator; at most 200 mails in 24 hours, 1 a second (SES guide, "Request production access
+  (Moving out of the Amazon SES sandbox)").
+- **The Reply-To.** The identities to verify are those used as "From", "Source", "Sender" or
+  "Return-Path" (the same page), and the sandbox limits only where mail goes. No page says a
+  Reply-To must be verified: ours, the alarm address, needs nothing.
+- **Cognito's invitation** (`EmailSendingAccount: DEVELOPER`) obeys the same rule: in the
+  sandbox it reaches only verified addresses and the simulator, and "Amazon Cognito can't send
+  messages to your users' email addresses" (Cognito guide, "Email settings for Amazon Cognito
+  user pools", step 2).
+- **A User created for an address that is not verified: not said.** `AdminCreateUser`'s API
+  reference lists `CodeDeliveryFailureException` among its errors, but no page says whether the
+  sandbox's refusal raises it or whether the account is kept. What our code would do in each
+  case: if `AdminCreateUser` throws, `createUser.ts` answers `500 internal_error` and logs at
+  level `error`, so the API's 5xx alarm goes off; an account Cognito kept would be in no group,
+  so the Users screen would not list it and the same username would answer `409 user_exists`.
+  If it succeeds and the mail is dropped, the route answers `201 invited` and no mail comes. A
+  mail asked from the mailer for such an address is refused by SES, and the mailer's error alarm
+  counts it (`backend/src/handlers/mailer.ts`). Hence part A's rule: **no User is created, and no
+  mail asked, for an address that is not verified**.
+- **How an address is verified.** In the SES console, region Europe (Stockholm): Identities,
+  "Create identity", "Email address", the address typed, "Create identity"; within five minutes a
+  mail from `no-reply-aws@amazon.com` or `no-reply-aws@verification.amazonses.com`, whose link
+  (valid 24 hours, "Resend" on the identity's page) makes the identity Verified (SES guide,
+  "Creating and verifying identities in Amazon SES"). Not the "Get started" wizard
+  (`docs/RUNBOOK.md` section 3.3).
+- **After production access** a recipient needs no identity, so an address identity needs
+  nothing more; it can be deleted on its own, and the domain's identity is untouched, since a
+  verified address overrides the domain's settings only for an address of that domain, and the
+  recipients' addresses are not at it (SES guides "Creating and verifying identities in Amazon
+  SES" and "Delete an identity using the SES console"). So part B keeps them or deletes them at
+  the operator's choice: they are the operator's own addresses, cost nothing, and spare a new
+  verification should mail be tried again in a sandbox (another stack or region).
+
+#### Part A — the stage `on` in the sandbox, and the release v3.0.0
+
+**Starts when** SES shows the domain verified, read-only:
+`aws sesv2 get-email-identity --email-identity enricopiccinin.com` with a `--query` of
+`VerificationStatus` and `DkimAttributes.Status`, both `SUCCESS`. It does not wait for
+production access.
+
+1. **Operator: every address that will receive a mail in part A verified in SES** (the console's
+   steps above):
+   - your own address, for the smoke test's invitation and the throw-away User of point 6;
+   - the Administrator's address in "My details", for the smoke test's mail on demand and the
+     daily mail;
+   - the address of each test User that will ask for a mail.
+
+   One address may serve several. The session checks it read-only and prints no address:
+   `aws sesv2 list-email-identities --query "EmailIdentities[?IdentityType=='EMAIL_ADDRESS'].VerificationStatus"`,
+   one state per address identity, each `SUCCESS`; the operator compares the console's list with
+   "My details" and the test Users' addresses by eye. No address goes into a command's argument,
+   a log, a document or a message.
+2. **The Users, before the deploy.** The pool holds `admin`, `miri` and `enri` (step m9). A test
+   User whose address is not verified is deleted in the Users screen, or kept and never used for
+   a mail. No other User is created until part B: only the smoke test's (the simulator and your
+   own address) and the throw-away User of point 6 (your own).
+3. **The deploy.** `MailStage=on` in `backend/samconfig.toml`, committed, and pushed if the
+   operator decides so; the gate's `verify` (F12); `npm run deploy -w backend`. The change set
+   is read before "y". It should hold what step m9's change set at `on` showed beyond the stage
+   `domain` (`docs/RUNBOOK.md` section 5.11): the pool Modify, every detail
+   `RequiresRecreation` `Never`; the mailer, its role, its log group and its error alarm, the
+   hourly schedule and its role, Add; the routes that start the mailer Modify (their
+   `MAILER_FUNCTION`) with their invoke permission. No Remove, no Replacement of the tables or the
+   pool. Anything else: stop and say so.
+4. **The page:** `npm run deploy -w frontend` only if `frontend/` or `shared/` changed after the
+   page deployed in step m9 (`e756e17`); the gate again if the commit changed.
+5. **The smoke test** against `shared-calendar-api`, your own verified address typed when asked:
+   65 PASS (`docs/RUNBOOK.md` section 2.4); its invitation, sent and resent, in your mailbox; its
+   mail on demand in the Administrator's. Then the log search from the deploy on, by field only
+   (`level`, `status`, `route`), as in step m9. A failure that names SES's rate (1 mail a second
+   in the sandbox) is said as such, not fixed by hand.
+6. **Operator, the look at the deployed page with real mails**, every recipient verified:
+   - the smoke's invitation: from `noreply@<domain>`, Reply-To the alarm address, not in spam;
+   - a throw-away User created in the page with your own address, the last look checked: its
+     invitation; "Resend invitation" while it is invited, a second mail, the first password now
+     opening nothing; the first sign-in with the second, "Choose your password", a password
+     chosen, `active` in the list; then the User deleted;
+   - "E-mail…" in the week, as the Administrator and as a test User whose address is verified:
+     each mail arrives, its Excel file opened;
+   - "Settings": the daily mail's hour, set to the next whole hour so as not to wait a day; at
+     that hour the daily mail with its two files; then the hour the Administrator wants.
+7. **The alarms.** At `on` the e-mail routes no longer answer `503`, so the API's 5xx alarm
+   should stop going off for them (at `domain` it went off for each, step m9's "As done" note): one
+   now is a fault, looked at in the access log. The mailer's error alarm is watched: a mail asked
+   for an address that is not verified would show there.
+8. **The documents of part A:** section 4's row m10 A, this part's "As done" note. Then the tag
+   `v3.0.0` on the operator's word, at the commit of the record, as for `v2.4.0`.
+
+**Operator, in plain words (A):** verify each address that will get a mail in the SES console and
+click the link in AWS's mail; delete or set aside a test User whose address is not verified; say
+"y" to the deploy once its change set is read; type your address for the smoke test and look in
+your mailbox; try the page as point 6 says; say when to tag.
+
+**Check (A):** the gate's `verify` before each deploy; the smoke test 65 PASS in the cloud; the
+logs clean; the operator's look all yes; the tag `v3.0.0`. With it the full regression ends
+(section 5.2).
+
+#### Part B — out of the sandbox: the Users invited again, the documents closed
+
+**Starts when** `aws sesv2 get-account` shows `ProductionAccessEnabled` true, read-only, with a
+`--query` of `ProductionAccessEnabled` and `SendQuota` only (the whole answer holds the contact
+addresses). The new daily quota and rate are written in `docs/RUNBOOK.md` section 5.11.
+
+1. **Nothing is deployed:** the stage `on` mails any address once the account is out of the
+   sandbox. Only if the code or the page changed after part A: the gate's `verify`, the deploy
+   and the smoke test again (section 5.2).
+2. **Operator:**
+   - the Users of step m9's list created again in the page, each with their four facts and the
+     last look checked; each receives their invitation; their future appointments booked again
+     by hand, if wanted. A bounce report, should one come: correct the address, "Resend
+     invitation" (`docs/RUNBOOK.md` section 3.3);
+   - the test Users `miri` and `enri` deleted in the Users screen;
+   - the address identities verified for part A: kept, or deleted if no longer wanted, in the
+     SES console (Identities, the address, "Delete"); nothing depends on them any more. The
+     domain's identity is never deleted: the stack owns it, and it stays `SUCCESS`;
+   - the privacy notice updated with the new data and the Excel files, outside the system
+     (`docs/EMAIL_ARCHITECTURE.md` section 12.3).
+3. **The documents closed:** section 4's row m10 B; this part's "As done" note; this plan marked
+   finished (its version line).
+
+**Operator, in plain words (B):** say when AWS's answer has come; create the people again in the
+page and tell them to look for the invitation, spam folder included; book their appointments
+again if wanted; delete the two test Users; keep or delete the verified addresses, as you like;
+update the privacy notice.
+
+**Check (B):** the operator reports the Users invited and their mails received; `miri` and
+`enri` gone; the domain's identity still `SUCCESS`; root `typecheck` and `lint` green; the documents closed.
+Then the merge of `multilanguage` may begin, with its own brief.
 
 ## 7. The operator's tasks, in one list
 
@@ -1125,10 +1256,14 @@ PASS in the cloud, the operator's look all yes; this plan marked finished.
 | m9 | Three DKIM records and one DMARC record | The domain's DNS provider |
 | m9 | Confirm the bounce topic's subscription | The alarm mailbox |
 | m9 | Request SES production access | The SES console |
-| m10 | The daily mail's hour | The deployed page |
-| m10 | The test User's "E-mail…" | The deployed page, own mailbox |
-| m10 | The look with real mails; the Users invited again | The deployed page, own mailbox |
-| m10 | The privacy notice updated with the new data and the Excel files (`docs/EMAIL_ARCHITECTURE.md` section 12.3) | Outside the system |
+| m10 A | Verify in SES every address that will receive a mail in part A (own, the Administrator's, a test User's) | The SES console, own mailbox |
+| m10 A | Delete, or keep away from mail, a test User whose address is not verified | The deployed page |
+| m10 A | Type own address for the smoke test; its invitation | Own terminal, own mailbox |
+| m10 A | The look with real mails: a throw-away User, its resend and first sign-in; "E-mail…" as the Administrator and as a test User; the daily mail's hour and its mail | The deployed page, own mailbox |
+| m10 A | The word for the tag `v3.0.0` | The review |
+| m10 B | The Users invited again (step m9's list), their appointments booked again if wanted | The deployed page |
+| m10 B | The test Users `miri` and `enri` deleted; the verified addresses kept or deleted, as the operator prefers | The deployed page, the SES console |
+| m10 B | The privacy notice updated with the new data and the Excel files (`docs/EMAIL_ARCHITECTURE.md` section 12.3) | Outside the system |
 
 ## 8. Out of this plan
 

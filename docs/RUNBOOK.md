@@ -549,11 +549,14 @@ other route.
 A key that leaked is deleted in the Console at once, without waiting: the assistant then
 answers `503` (`key_refused`) until step 2 is done and ten minutes have passed.
 
-### 3.3 E-mail: the stages (`domain` run in `docs/EMAIL_PLAN.md` step m9; `on` is a draft, run and corrected in its step m10)
+### 3.3 E-mail: the stages (`domain` run in `docs/EMAIL_PLAN.md` step m9; `on` is a draft, run and corrected in its step m10, parts A and B)
 
 E-mail is switched on in two deploys, because SES must first prove the domain, which waits for
-DNS, and lift the sandbox, which waits for AWS (`docs/ARCHITECTURE.md` section 9.2,
-`docs/EMAIL_ARCHITECTURE.md` section 13.2). Each deploy is section 2's steps 1 to 6, with the one
+DNS (`docs/ARCHITECTURE.md` section 9.2, `docs/EMAIL_ARCHITECTURE.md` section 13.2). The stage
+`on` does not wait for SES's sandbox to be lifted, which waits for AWS: in the sandbox it mails
+only addresses verified in SES, so it is deployed and tried first with those (part A), and the
+people are invited once AWS grants production access (part B), with no deploy. The split lets
+the work go on while AWS answers, which can take days. Each deploy is section 2's steps 1 to 6, with the one
 line of `backend/samconfig.toml` changed: `MailStage=off` → `domain` → `on`. `MailDomain`,
 `MailFromLocalPart`, `MailFromName` and `PageAddress` are already in that line; `MailReplyTo` is
 left out, so replies and bounce reports go to `AlertEmail`. No e-mail address goes into the file.
@@ -618,11 +621,59 @@ of 5xx (section 5.11 has the search).
   one tries the 3 minutes of "Choose your password" (`docs/FRONTEND_WALK.md` check 216). Delete
   them in the Users screen when done.
 
-**At `on`**, once SES shows the domain verified and the account out of the sandbox: the deploy,
-the smoke test (65 PASS, section 2.4) and its invitation in your mailbox; the daily mail's hour
-in "Settings"; a User created in the page with your own address, its invitation, its first sign-in; a mail on demand from the week
-page; the next morning, the daily mail. A bounce report, should one come, reaches the Reply-To
-mailbox: correct the User's address in the Users screen and "Resend invitation".
+**At `on`, part A: in the sandbox, every recipient verified** (`docs/EMAIL_PLAN.md` step m10,
+part A). Until production access SES delivers only to addresses verified in SES and to the
+mailbox simulator, Cognito's invitations included (`docs/EMAIL_ARCHITECTURE.md` section 22.2).
+**Create no User, and ask no mail, for an address that is not verified**: AWS's documentation
+does not say what `AdminCreateUser` does then, and a mail the mailer sends there fails.
+
+1. Read-only, before: the domain still verified (`aws sesv2 get-email-identity --email-identity
+   <domain>` with a `--query` of `VerificationStatus` and `DkimAttributes.Status`: `SUCCESS`).
+2. **Verify each address that will receive a mail**: your own (the smoke test's invitation, a
+   throw-away User), the Administrator's in "My details" (the smoke test's mail on demand, the
+   daily mail), each test User's that will ask for a mail. In the SES console, region Europe
+   (Stockholm): Identities, "Create identity", "Email address", the address, "Create identity";
+   then the link in the mail from `no-reply-aws@amazon.com` or
+   `no-reply-aws@verification.amazonses.com` (valid 24 hours; "Resend" on the identity's page).
+   Not "Get started". Checked without printing an address:
+   `aws sesv2 list-email-identities --query "EmailIdentities[?IdentityType=='EMAIL_ADDRESS'].VerificationStatus"`,
+   each `SUCCESS`; compare the console's list with the addresses by eye.
+3. A test User whose address is not verified: delete it in the Users screen, or never use it for
+   a mail. Create no other User until part B.
+4. `MailStage=on` in `backend/samconfig.toml`, committed; section 2's steps. The change set before
+   "y": the pool Modify, every detail `RequiresRecreation` `Never`; Add for the mailer, its role,
+   log group and error alarm, the hourly schedule and its role; Modify for the routes that start
+   the mailer, with their invoke permission; no Remove, no Replacement of the tables or the pool
+   (section 5.11 has the change set at `on` read in step m9). The page only if `frontend/` or
+   `shared/` changed since its last deploy.
+5. The smoke test, your verified address typed when asked: 65 PASS (section 2.4); its invitation
+   and its resend in your mailbox, from `noreply@<domain>`, Reply-To the alarm address, not in
+   spam; its mail on demand in the Administrator's. Then the log search of section 5.11, by field.
+6. In the page: a throw-away User with your own address, its invitation, "Resend invitation", the
+   first sign-in with the second password, "Choose your password", then the User deleted;
+   "E-mail…" in the week as the Administrator and as a test User whose address is verified, each
+   Excel file opened; in "Settings" the daily mail's hour, set to the next whole hour to see the
+   daily mail and its two files the same day, then to the hour wanted.
+7. The API's 5xx alarm should no longer go off for the e-mail routes, which answer `503` only
+   below `on`: one now is a fault, looked at in the access log. The mailer's error alarm counts a
+   mail SES refused, such as one to an address that is not verified.
+8. The tag `v3.0.0`, on the operator's word, at the commit of the record (`README.md` "Versions").
+
+**At `on`, part B: out of the sandbox** (`docs/EMAIL_PLAN.md` step m10, part B). It starts when
+`aws sesv2 get-account --query '{production:ProductionAccessEnabled,quota:SendQuota}'` answers
+`production` true; the query keeps the contact addresses out of the answer. Write the new quota
+in section 5.11. Nothing is deployed.
+
+1. Create again, in the page, the Users who need an account (step m9's list): each receives an
+   invitation; book their future appointments again by hand if wanted. A bounce report, should
+   one come, reaches the Reply-To mailbox: correct the User's address in the Users screen and
+   "Resend invitation".
+2. Delete the test Users in the Users screen.
+3. The address identities verified in part A: keep them, or delete those no longer wanted (SES
+   console, Identities, the address, "Delete"). A recipient needs no identity out of the sandbox,
+   so nothing depends on them; kept, they spare a new verification should mail be tried in a
+   sandbox again. Never delete the domain's identity, which the stack owns.
+4. Update the privacy notice, outside the system (`docs/EMAIL_ARCHITECTURE.md` section 12.3).
 
 ---
 
