@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Agreed with the Product Owner in the session of 2026-11-27. Steps 1 to 3 are done (`main` at the tag `v3.1.0`). Step 4 is under way: `main` is merged into the branch `multi-calendar`, the design is being corrected against it, no plan yet. Step 5 is open: AWS has not granted production access |
+| Status | Agreed with the Product Owner in the session of 2026-11-27. Steps 1 to 3 are done (`main` at the tag `v3.1.0`). Step 4 is under way: `main` is merged into the branch `multi-calendar`, the design is corrected against it (its version 4, its decisions confirmed), no plan yet. Step 5 is open: AWS has not granted production access |
 | Date | 2026-11-27, the states of the steps as of 2026-11-28 |
 | What it is | The order in which three pieces of work reach `main` and the cloud: e-mail (`docs/EMAIL_PLAN.md`, its step m10), the two languages (`docs/MULTILANGUAGE_PLAN.md`) and several calendars (`docs/MULTI_CALENDAR_ARCHITECTURE.md`, designed, no plan yet) |
 | Why it exists | Step m10 of `docs/EMAIL_PLAN.md` waits for AWS to grant production access to Amazon SES, a wait of unknown length that held everything behind it. This order takes that wait off the path |
@@ -27,7 +27,7 @@
 | 1 | Done | `ef6ddc4`, tag `v3.0.0`: the addresses were verified within part A of step m10 of `docs/EMAIL_PLAN.md` |
 | 2 | Done | `ef6ddc4`, tag `v3.0.0` |
 | 3 | Done | `491ca3c`, tag `v3.1.0` |
-| 4 | Under way | Its point 1, the merge of `main` at `491ca3c` into the branch, is done. Points 2 to 5 are open |
+| 4 | Under way | Its point 1, the merge of `main` at `491ca3c` into the branch, is done, and its point 2, the design corrected, is written as version 4 of `docs/MULTI_CALENDAR_ARCHITECTURE.md`. Points 3 to 5 are open |
 | 5 | Open | AWS has not granted production access. Part B of step m10 of `docs/EMAIL_PLAN.md` is owed, from `main` |
 
 ---
@@ -143,7 +143,8 @@ section 5.12). Still owed on `main`, by that work: the look at the daily mail in
 **Done when** v4.0.0 is deployed and the branch is merged into `main`.
 
 **State: under way.** Point 1 is done: `main` at `491ca3c` is merged into the branch, without a
-conflict. Point 2 is being done. Points 3 to 5 are open. Whenever `main` moves again (part B
+conflict. Point 2 is written: version 4 of `docs/MULTI_CALENDAR_ARCHITECTURE.md`, its
+decisions confirmed on 2026-11-28. Points 3 to 5 are open. Whenever `main` moves again (part B
 of step m10, a fix of a release), the branch merges it again.
 
 ### Step 5. Production access, whenever AWS grants it
@@ -166,7 +167,7 @@ moment.
 |---|---|---|---|
 | `docs/EMAIL_PLAN.md`, step m10 | Split in two: the stage `on` in the sandbox with verified addresses (step 2 here); the real Users, at production access (step 5 here). `docs/RUNBOOK.md` section 3.3 said that the stage `on` follows production access | the e-mail work's session, on `main` | Done on `main` (`d1d66cc`): parts A and B of step m10 |
 | `docs/MULTILANGUAGE_PLAN.md`, phase B | Its merge waits for step 2 here, not for production access | that branch's session | Done on `main` (`f6755c7`, the merge after part A) |
-| `docs/MULTI_CALENDAR_ARCHITECTURE.md` section 18 | "The build starts only after v3.0.0 is deployed" becomes: after step 3 here, on the branch `multi-calendar`, merged into `main` after its release | this branch, at step 4 | Open: step 4's point 2 |
+| `docs/MULTI_CALENDAR_ARCHITECTURE.md` section 18 | "The build starts only after v3.0.0 is deployed" becomes: after step 3 here, on the branch `multi-calendar`, merged into `main` after its release | this branch, at step 4 | Done on this branch: section 18 of version 4 |
 
 ---
 

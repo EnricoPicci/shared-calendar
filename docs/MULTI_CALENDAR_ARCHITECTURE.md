@@ -2,23 +2,24 @@
 
 | | |
 |---|---|
-| Status | Proposal v3, agreed in its decisions, for the Product Owner's last reading before the plan (v3, 2026-11-27: the open points Q1 to Q6 decided as proposed, the proposals of section 2.3 confirmed, the reasons for one table written out in section 19. v2, 2026-11-27: the assistant sees every calendar of the person, decision K21, where v1 kept it to one calendar). Nothing is built. No plan exists yet: `docs/MULTI_CALENDAR_PLAN.md` is written after this document is agreed |
-| Date | 2026-11-27 |
-| Brief | `prompts/cal-c01-plan-multiple-calendars.md`, with the answers of the clarification round (section 2.2) |
-| Designed against | `main` at commit `a2b4774`: e-mail built up to step m9 of `docs/EMAIL_PLAN.md` (the cloud at the stage `domain`), step m10 and the release v3.0.0 still to come |
-| Builds on | `docs/ARCHITECTURE.md` (sections 3, 4, 5, 6 and 7), `docs/SHARED_CALENDAR_SPEC.md` (sections 4, 8, 10 and 13), `docs/EMAIL_ARCHITECTURE.md` (sections 4, 5, 6 and 13), `docs/CONVERSATIONAL_ARCHITECTURE.md` (sections 4, 8 and 9) |
-| Would add | A new Cognito user pool, where a person signs in with their e-mail address; calendars, and the links between people and calendars, in the table `calendar`; about a dozen routes; two background functions' work (the invitation mail to a person who already has an account, the deletion of a calendar) |
+| Status | Proposal v4, agreed in its decisions, for the Product Owner's last reading before the plan (v4, 2026-11-28: corrected against `main` at `491ca3c`, which holds e-mail at the stage `on` and the two languages; the decisions K1 to K25 and Q1 to Q6 stand, and the points this version adds, K26 to K32 of section 2.4, are confirmed. v3, 2026-11-27: the open points Q1 to Q6 decided as proposed, the proposals of section 2.3 confirmed, the reasons for one table written out in section 19. v2, 2026-11-27: the assistant sees every calendar of the person, decision K21, where v1 kept it to one calendar). Nothing is built. No plan exists yet: `docs/MULTI_CALENDAR_PLAN.md` is written after this document is agreed |
+| Date | 2026-11-27, corrected on 2026-11-28 |
+| Brief | `prompts/cal-c01-plan-multiple-calendars.md`, with the answers of the clarification round (section 2.2); `prompts/cal-c02-revise-design-and-plan.md` for v4 |
+| Designed against | `main` at commit `491ca3c`, tag `v3.1.0`: e-mail at the stage `on` in SES's sandbox (part A of step m10 of `docs/EMAIL_PLAN.md`, released as `v3.0.0`) and the two languages (`docs/MULTILANGUAGE_PLAN.md`, released as `v3.1.0`), both deployed. Part B of step m10 is still to come |
+| Builds on | `docs/ARCHITECTURE.md` (sections 3, 4, 5, 6 and 7), `docs/SHARED_CALENDAR_SPEC.md` (sections 4, 8, 10 and 13), `docs/EMAIL_ARCHITECTURE.md` (sections 4, 5, 6 and 13), `docs/CONVERSATIONAL_ARCHITECTURE.md` (sections 4, 8 and 9), `docs/MULTILANGUAGE_ARCHITECTURE.md` (sections 4, 5, 7, 8 and 9) |
+| Would add | A new Cognito user pool, where a person signs in with their e-mail address; calendars, and the links between people and calendars, in the table `calendar`; about a dozen routes; two background functions' work (the invitation mail to a person who already has an account, the deletion of a calendar); every new text a person reads, in English and in Italian (section 11.6) |
 | Would change | Every calendar route's path; the roles (no longer two kinds of account); the creation of a User (an invitation the person accepts); who holds a person's details (the person); the keys of the tables `calendar`, `mail` and `assistant` |
 | Would remove | The Cognito groups `admin` and `user`; the username a person signs in with; the routes under `/users` |
-| Release | v4.0.0, a major version: every client breaks (section 9.4). Built only after v3.0.0, the e-mail release, is deployed (section 18) |
+| Release | v4.0.0, a major version: every client breaks (section 9.4). Built on the branch `multi-calendar`, which is merged into `main` once, after the release is deployed (section 18) |
 
 This document says how the shared calendar would hold several calendars, each with its own
 Administrator, what changes for the people who use it, what changes in the code and in the cloud,
 and what you, as Product Owner and operator, have to decide and do. It edits no existing
-document: section 17 says, document by document, what the plan's first step will change in each.
+document: section 17 says, document by document, what the plan's steps will change in each.
 
-The facts about AWS were read on 2026-11-27 in AWS's documentation (section 22). Nothing was
-tried on the local stack: what must be tried before the first step is listed in section 14.1.
+The facts about AWS were read on 2026-11-27 in AWS's documentation (section 22). What `main`
+holds was read in the repository on 2026-11-28. Nothing was tried on the local stack: what must
+be tried before the first step is listed in section 14.1.
 
 ---
 
@@ -54,6 +55,9 @@ tried on the local stack: what must be tried before the first step is listed in 
 9. **The assistant knows all of a person's calendars.** "What do I have this week?" is answered
    over every calendar the person is linked to, and a change says which calendar it is for
    before the person confirms. A super-user's assistant sees every calendar.
+10. **Everything a person reads is in their own language**, English or Italian, as today: the
+    new screens, the invitations, the closing mail and its Excel file, the assistant's
+    sentences. A person still chooses their language themself (section 4.2).
 
 **How it works, in one paragraph**
 
@@ -81,7 +85,10 @@ in two calendars cannot both pass.
 - **Several decisions of the e-mail work are reversed** (section 17.1): the Administrator no
   longer types or edits a person's details, the e-mail address becomes unique, the routes under
   `/users` go.
-- **People and appointments are not carried over** (decision K10): the first calendar keeps its
+- **While SES keeps the account in its sandbox, an invitation reaches only an address verified
+  at SES** (section 5.7). It is enough to build, test and release; the real Users are invited
+  when AWS grants production access (section 18).
+- **People and appointments are not carried over** (decision K11): the first calendar keeps its
   set-up, its Users are invited again and their future appointments are booked again by hand.
 
 ---
@@ -139,6 +146,33 @@ proposal of the first version and is a decision of section 2.2.)
 | K24 | At most 20 invitations a calendar and local day, the resends included | An invitation mails an address a person typed: the limit keeps a calendar from mailing strangers in bulk |
 | K25 | An appointment stores the person's identifier, not a name. A name is read from Cognito when an answer needs it; a person no longer linked to the calendar is shown as "former user" | A removed person's name must not stay in the calendar; the identifier keeps the history together |
 
+### 2.4 Decided on 2026-11-28, and what version 4 adds
+
+Decided by the Product Owner in the brief `prompts/cal-c02-revise-design-and-plan.md`:
+
+- the decisions K1 to K25 and Q1 to Q6 stand; version 4 corrects this document against `main`
+  and reopens none of them;
+- the decisions L1 to L16 of `docs/MULTILANGUAGE_ARCHITECTURE.md` stand too: everything a
+  person reads in several calendars exists in English and in Italian, kept and checked the way
+  that document says;
+- the build happens on the branch `multi-calendar`, never on `main`, which stays what runs in
+  the cloud; the branch is merged into `main` once, after v4.0.0 is deployed;
+- the release is v4.0.0.
+
+What version 4 settles, where `main` asked a question the earlier versions could not see.
+Each was proposed by this document and **confirmed by the Product Owner on 2026-11-28**, one at
+a time; K32 was the Product Owner's choice between two moments.
+
+| Id | Decision | Why |
+|---|---|---|
+| K26 | The language stays where decisions L4 to L6 put it: in Cognito's `locale`, written by the person straight at Cognito. `PUT /me` carries the three details and no language; `GET /me` answers no language | L5 stands, and nothing of the page's language has to be built again. The three details go through the API because they need the server's checks, which Cognito does not make (section 4.2) |
+| K27 | Cognito's invitation, to a person with no account yet, is in the installation's default language. The mailer's invitation and the closing mail are in the recipient's own language, and in the default when their account holds none | Decision L1: an invited person has not chosen a language, and nobody chooses for them. A person who has an account usually has chosen (section 5.5) |
+| K28 | The default language stays the stack's, the parameter `DefaultLanguage`. A calendar has no language of its own | One value that the page, the mailer and the invitation function already read. A language per calendar would be a setting its Administrator keeps for people who each have their own; like the time zone (decision K19), it can be added later without touching a key |
+| K29 | The message of `POST /hello` stays in English | It is an answer of the API, stored as the proof of the chain, and no page shows it: requirement R6 of `docs/MULTILANGUAGE_ARCHITECTURE.md` keeps the API's own words English |
+| K30 | Two more error codes go: `cannot_delete_admin`, answered as `403 forbidden`, and `no_email_address` | No route deletes an account by name any more, and every account has an address, its sign-in name (section 9.6) |
+| K31 | The existing documents are changed step by step, each step merging what it built, and not all of them in the plan's first step | Asked by the brief, and how `docs/EMAIL_PLAN.md` worked: no document describes what is not built yet (section 17) |
+| K32 | The facts that only a pool in AWS can answer are tried early, in the plan's first step, in a small stack of its own that the operator deploys and deletes the same day | A fact that fails is found before anything is built on it, not on the day of the release (section 14.1) |
+
 ---
 
 ## 3. The model
@@ -178,7 +212,7 @@ flowchart LR
 
 | Word | Meaning |
 |---|---|
-| Person | An account of the user pool: an e-mail address, a password, three details |
+| Person | An account of the user pool: an e-mail address, a password, three details, a language |
 | Calendar | What "the calendar" is today: types, opening hours, settings, appointments. It has an identifier and a name |
 | Link | A person's relation to a calendar: a role and a state |
 | Administrator (of a calendar) | The person whose link to it has the role `admin`. One per calendar |
@@ -235,6 +269,9 @@ reaches it.
 | Groups | `admin`, `user` | `superuser` only |
 | Password policy, token lives, self sign-up disabled, tier, deletion protection | | unchanged |
 | The invitation by e-mail, the 7-day temporary password, the sending through SES | `docs/EMAIL_ARCHITECTURE.md` section 5 | unchanged in mechanism; the text changes (section 5.5) |
+| The invitation's words | the invitation function, named by the pool's `LambdaConfig.CustomMessage` (`docs/MULTILANGUAGE_ARCHITECTURE.md` section 7) | the same function, named by the new pool |
+| The person's language | the attribute `locale`, which the app client alone may write (`WriteAttributes: [locale]`) | the same, on the new pool's app client: a person's token writes their language and nothing else, so never the e-mail address, which is now the sign-in name |
+| The first account | `AdminUser`, made by the template from the parameter `AdminUsername` and put in the group `admin` | none made by the template, which must not hold an e-mail address: the bootstrap script makes each super-user (section 4.3). `AdminUsername`, `AdminUser`, its attachment and the two groups go |
 
 Why Cognito keeping the address unique matters: two Administrators who invite the same new
 address at the same moment cannot make two accounts. The second `AdminCreateUser` is refused
@@ -251,34 +288,54 @@ at it, as a new account.
 
 ### 4.2 A person's details
 
-| Fact | Where | Who writes it | Who reads it |
+| Fact | Where | Who writes it, and how | Who reads it |
 |---|---|---|---|
-| E-mail | Cognito, the sign-in name | whoever invites first (it creates the account) | the person; the Administrators of the calendars the person accepted; the super-user |
-| First name, last name | Cognito, `given_name`, `family_name` | the person | the same |
-| Postal address | Cognito, `address` | the person | the same |
+| E-mail | Cognito, the sign-in name | whoever invites first (it creates the account); nobody changes it | the person; the Administrators of the calendars the person accepted; the super-user |
+| First name, last name | Cognito, `given_name`, `family_name` | the person, through `PUT /me` | the same |
+| Postal address | Cognito, `address` | the person, through `PUT /me` | the same |
+| Language | Cognito, `locale` | the person, straight at Cognito (`docs/MULTILANGUAGE_ARCHITECTURE.md` section 4) | the person; the mailer and the invitation function, for the mail they write to that person. No Administrator, not even the super-user |
 
-The rules of each fact stay those of `shared/src/user.ts`. Cognito stays the only store of
-people. An Administrator sees, of a `pending` or `declined` link, only the address they typed
-and the state.
+The rules of each fact stay those of `shared/src/user.ts`, and of
+`shared/src/language/languages.ts` for the language. Cognito stays the only store of people. An
+Administrator sees, of a `pending` or `declined` link, only the address they typed and the
+state.
+
+**The language and the three details are both the person's own, and are written in two ways**
+(decision K26). Neither way is changed by this design:
+
+| | The three details | The language |
+|---|---|---|
+| Written by | the route `PUT /me`, with the administrative call | the page, straight at Cognito (`UpdateUserAttributes` with the person's token), as on `main` |
+| Why | the server checks each fact (`shared/src/user.ts`); Cognito checks nothing, so a write straight at Cognito could store a name of any length or an empty one, which an Administrator would then read | decision L5: no code of ours can set anybody's language; any word stored is read as "none yet" by every reader |
+| Read by the page | `GET /me` | `GetUser`, right after the sign-in and before anything is shown, as on `main` |
+| The app client's write list | not in it: a person's token cannot write them | `locale`, alone |
+
+So `GET /me` answers no language and `PUT /me` refuses one, as `PUT /users/{username}` does on
+`main`. The page's language service (`frontend/src/services/language.service.ts`), the choice
+on the sign-in screen and the field "Language" in "My details" stay as they are; what changes
+around them is that the other fields of "My details" become editable (section 13).
 
 **The first sign-in is two steps**, each shown once: 1. "Choose your password" (Cognito's
 challenge, as built in step m7 of `docs/EMAIL_PLAN.md`), 2. "Your details" (the three facts).
-The second is the page's, backed by the server: until the three facts exist, accepting an
+Between the two the page stores its own language as the person's, as it does on `main` for an
+account that holds none, so "Your details" is already shown in it.
+The second step is the page's, backed by the server: until the three facts exist, accepting an
 invitation answers `409 details_required` (section 9.2), so no Administrator ever sees a person
 without a name. The future consent step of the GDPR work plugs in at the same place
 (`docs/EMAIL_ARCHITECTURE.md` section 5.2).
 
 ### 4.3 The super-user
 
-Made by `npm run bootstrap-superuser -w backend -- <stack>`, the bootstrap script of today under
-a new name: with the operator's AWS credentials it creates the account (the e-mail address
+Made by `npm run bootstrap-superuser -w backend -- <stack|local>`, the script `bootstrap-admin`
+of today under a new name and with more to do, since the template makes no account any more: with the operator's AWS credentials it creates the account (the e-mail address
 prompted), puts it in the group `superuser`, and sets a permanent password (prompted, never
 saved). It refuses an address that already has an account (decision K15). Run once per
 super-user. A super-user is removed by the operator in the Cognito console; no script and no
 route does it.
 
 A super-user has an e-mail address but needs no details: `GET /me` answers them `null` until
-typed, and nothing asks for them.
+typed, and nothing asks for them. Their language is stored by the page at their first sign-in,
+as anyone's; until then a mail to them is in the default language.
 
 ### 4.4 An account with no link
 
@@ -367,27 +424,45 @@ removes an accepted one (section 6.3).
 | Sends an invitation again | `202` | which of the two mails went |
 | Removes a User | the User gone from the list | whether the account still exists |
 | Invites a super-user's address | `202`, pending for ever | that it is a super-user's |
-| Books a User at a time they are busy elsewhere | `409 user_busy`, with no appointment named | where, or with whom (decision K4) |
+| Books a User at a time they are busy elsewhere | `409 user_busy`, the body of a User busy in this calendar | where, or with whom (decision K4) |
 
 What remains, and is accepted: an Administrator who invites an address and sees it accepted
 within seconds may guess that the person already had an account. Nothing tells them, and a
 quick first sign-in looks the same.
 
-### 5.5 The texts
+### 5.5 The texts, and their language
 
-- **Cognito's invitation** (a new account). The pool's one template, which cannot name a
-  calendar: "Hello, you have been invited to a shared calendar. Sign in at {page address} with
-  your e-mail address and this temporary password: {password}. You will be asked to choose your
-  own password, then you can accept or decline the invitation. The temporary password works
-  once and expires in 7 days. If you did not expect this e-mail, ignore it." Whether Cognito's
-  placeholder for the username prints the address or the made identifier in such a pool is to
-  be confirmed (section 14.1); the template must hold it (`docs/EMAIL_ARCHITECTURE.md` section
-  22.1), so the wording follows what it prints.
-- **The mailer's invitation** (an account that existed). Subject "An invitation is waiting for
-  you". Body: "Hello, you have been invited to a calendar. Sign in at {page address} to accept
-  or decline." No calendar's name and no inviter's name: a mail is read on lock screens and
-  forwarded, and the page shows both after the sign-in.
-- **The closing mail** (section 7.2). Subject "Calendar {name}: deleted, last backup".
+Each text exists in English and in Italian, in the mail texts of `main`
+(`shared/src/mail/texts.ts`, the type `MailTexts`, with one object per language). The English is
+given here; the Italian is written with the code, in the formal "lei", and read by the Product
+Owner before the release (section 11.6).
+
+| | Cognito's invitation | The mailer's invitation | The closing mail |
+|---|---|---|---|
+| Sent to | a person with no account yet | a person who has an account | a deleted calendar's Administrator and every super-user (section 7.2) |
+| Worded by | the invitation function, which answers Cognito (`backend/src/handlers/inviteMessage.ts`) | the mailer, kind `invitation` | the mailer, kind `closing` |
+| Language (decision K27) | the installation's default, `DefaultLanguage`: the account is new and holds none. The function already reads the account's `locale` first, so a resend to a person who has signed in is in theirs | the recipient's own, read with their address; the default when the account holds none (invited once, never signed in) | each recipient's own, else the default; the Excel file is built once per language in use, as the daily mail's are |
+
+- **Cognito's invitation.** It cannot name a calendar: Cognito hands the function the account,
+  not the reason it was made. "Hello, you have been invited to a shared calendar. Sign in at
+  {page address} with your e-mail address and this temporary password: {password}. You will be
+  asked to choose your own password, then you can accept or decline the invitation. The
+  temporary password works once and expires in 7 days. If you did not expect this e-mail,
+  ignore it." It replaces the words of `MailTexts.invitation`, whose line "Username" goes.
+  Whether Cognito's placeholder for the username prints the address or the made identifier in
+  such a pool is to be confirmed (section 14.1); the message must hold the placeholder
+  (`docs/EMAIL_ARCHITECTURE.md` section 22.1), so the wording follows what it prints. The
+  template's own `InviteMessageTemplate` stays, in English, as what Cognito sends when the
+  function's answer is unusable.
+- **The mailer's invitation.** Subject "An invitation is waiting for you". Body: "Hello, you
+  have been invited to a calendar. Sign in at {page address} to accept or decline." No
+  calendar's name and no inviter's name: a mail is read on lock screens and forwarded, and the
+  page shows both after the sign-in.
+- **The closing mail.** Subject "Calendar {name}: deleted, last backup". Its file has the
+  columns and words of the mailer's other files (section 11.2).
+
+The default language is the stack's (decision K28): the invitation function and the mailer read
+it from their environment, as on `main`, and no route's body carries a language to them.
 
 ### 5.6 The operator's command for a demonstration
 
@@ -397,6 +472,24 @@ with a temporary password the operator types, sets three placeholder details, an
 **accepted** link with the role `user` to the calendar named. It is the one path that links a
 person without their Accept (decision K3's exception), run with the operator's AWS credentials
 and never reachable through the API. It refuses an address that already has an account.
+
+### 5.7 While SES keeps the account in its sandbox
+
+Until AWS grants production access, SES delivers only to addresses verified at SES and to its
+mailbox simulator, Cognito's invitations included (`docs/EMAIL_ARCHITECTURE.md` section 22.2).
+For this design:
+
+- **An invitation is typed only for a verified address**, the rule `docs/RUNBOOK.md` section 3.3
+  gives today for creating a User. AWS does not say what `AdminCreateUser` does for an address
+  that is not verified, nor whether the account is then kept.
+- **When Cognito refuses to send**, the route writes no link and answers `500 internal_error`,
+  as `POST /users` does today. In the sandbox this answer differs from the `202` of an address
+  that has an account, so the rule "the same answer" (section 5.4) holds fully only out of the
+  sandbox. Accepted: in the sandbox every Administrator is the operator or a tester.
+- **The mailer's two new kinds** send under the mailer's role as it is, with its right on every
+  identity of the account while the sandbox lasts (section 12.2).
+- The sandbox's 200 mails a day are the account's: the 20 invitations a calendar and day
+  (decision K24) stay well inside them for a build and its tests, not for many calendars.
 
 ---
 
@@ -417,7 +510,7 @@ specification is not rewritten; it gains "of this calendar".
 | The Administrator's `overbook` | goes over a type's capacity; never over `user_busy` | unchanged: no Administrator can book a person twice at one time |
 | The view, for a User | their own appointments, others' as anonymous busy time | also `busyElsewhere`, the person's own booked times in other calendars inside the range, as intervals with nothing else; the page shows "you have another appointment" and offers no slot there |
 | The view, for the Administrator | everything of the calendar | unchanged: nothing of any other calendar |
-| `user_busy` to the Administrator | the error names the appointment in the way (`conflicts`) | when the appointment is in another calendar, `conflicts` is absent: the sentence is "This person is busy at that time" |
+| `user_busy` to the Administrator | the code and a sentence, with no appointment named: `conflicts` belongs to `availability_conflict` alone | unchanged, and so the same body whether the appointment in the way is in this calendar or in another. The page's sentence for the Administrator, "This User already has an appointment at this time.", is true of both and stays |
 
 The refusal is the one thing an Administrator can learn about a User's life elsewhere, one
 time at a time, and each try is a booking they must be willing to make. The limit of the page's
@@ -572,11 +665,11 @@ that may repeat, confuses a person who is a User of two calendars called the sam
 
 | Method & path | Who | Request | Success | Errors |
 |---|---|---|---|---|
-| `GET /me` (changed) | every person | | `200 { id, email, givenName, familyName, address, superuser, calendars, invitations }`: `calendars` each `{ calendarId, name, role }` for the accepted links, `invitations` each `{ calendarId, name, role, invitedAt }` for the pending ones; both empty for a super-user. A detail not typed yet is `null` | |
-| `PUT /me` (new) | every person | `{ givenName, familyName, address }`, all three | `200` as `GET /me` | 400 |
+| `GET /me` (changed) | every person | | `200 { id, email, givenName, familyName, address, superuser, calendars, invitations }`: `calendars` each `{ calendarId, name, role }` for the accepted links, `invitations` each `{ calendarId, name, role, invitedAt }` for the pending ones; both empty for a super-user. A detail not typed yet is `null`. No language: the page reads it at Cognito (section 4.2). Today's `username` and `role` go | |
+| `PUT /me` (new) | every person | `{ givenName, familyName, address }`, all three and no other field: an `email` or a `language` is refused | `200` as `GET /me` | 400 |
 | `POST /me/invitations/{calendarId}/accept` (new) | the invited person | | `200` as `GET /me` | 404 `invitation_not_found` · 409 `details_required` |
 | `POST /me/invitations/{calendarId}/decline` (new) | the invited person | | `200` as `GET /me` | 404 `invitation_not_found` |
-| `DELETE /me/calendars/{calendarId}` (new) | a User of the calendar | | `200` as `GET /me` | 404 `calendar_not_found` · 403 (its Administrator) · 409 `concurrent_update` |
+| `DELETE /me/calendars/{calendarId}` (new) | a User of the calendar | | `200` as `GET /me` | 404 `calendar_not_found` · 403 `forbidden` (its Administrator) · 409 `concurrent_update` |
 | `POST /hello` (changed) | every person | | `201`, the message of section 11.4 | |
 
 `GET /me` is the page's first call after the sign-in: it says which calendars to offer and
@@ -589,7 +682,7 @@ whether the person is a super-user. It replaces the role the page reads from the
 | `GET /calendars/{calendarId}/users` | Administrator | | `200 { users }`, each `{ userId, email, status, invitedAt }`, and for `status` `accepted` also `givenName`, `familyName`, `address`, `acceptedAt`; sorted by e-mail | 404 · 403 |
 | `POST /calendars/{calendarId}/users` | Administrator | `{ email }` | `202 { userId, email, status: "pending" }` | 404 · 403 · 503 `mail_unavailable` · 400 · 409 `already_invited` · 429 `invitation_limit_reached` |
 | `POST /calendars/{calendarId}/users/{userId}/invitation` | Administrator | | `202 { userId, email, status: "pending" }` | 404 `user_not_found` · 409 `not_pending` · 503 · 429 |
-| `DELETE /calendars/{calendarId}/users/{userId}` | Administrator | | `204` | 404 `user_not_found` · 403 (the Administrator's own link) · 409 `concurrent_update` |
+| `DELETE /calendars/{calendarId}/users/{userId}` | Administrator | | `204` | 404 `user_not_found` · 403 `forbidden` (the Administrator's own link) · 409 `concurrent_update` |
 
 "Administrator" in these tables means the calendar's Administrator or a super-user. The `userId`
 of an answer is the person's identifier; it is the same in two calendars, which two
@@ -597,7 +690,9 @@ Administrators who compared their lists could notice. They could compare the e-m
 as easily: two Administrators who talk to each other are outside what decision K2 can protect.
 
 Removed: `POST /users`, `GET /users`, `PUT /users/{username}`, `DELETE /users/{username}`,
-`POST /users/{username}/invitation`.
+`POST /users/{username}/invitation`. The `status` of these answers is the link's (`pending`,
+`accepted`, `declined`); the account's own state, `invited` or `active` on `main`, is answered
+nowhere (section 5.4).
 
 ### 9.4 The calendar's own routes (moved)
 
@@ -606,10 +701,10 @@ body, its answers and its checks unchanged but for the points of section 9.5.
 
 | Today | Becomes |
 |---|---|
-| `GET /calendar` (the view) | `GET /calendars/{calendarId}/view` |
+| `GET /calendar?from&to` (the view) | `GET /calendars/{calendarId}/view?from&to` |
 | `/calendar/settings`, `/calendar/types…`, `/calendar/patterns…`, `/calendar/overrides…`, `/calendar/windows…`, `/calendar/appointments…` | `/calendars/{calendarId}/settings`, `…/types…`, `…/patterns…`, `…/overrides…`, `…/windows…`, `…/appointments…` |
 | `GET` and `PUT /mail/settings`, `POST /mail/calendar` | `GET` and `PUT /calendars/{calendarId}/mail/settings`, `POST /calendars/{calendarId}/mail` |
-| the six `/assistant/…` routes | unchanged: a conversation belongs to the person, not to a calendar (section 11.1). The body of `POST /assistant/messages` gains an optional `calendarId`, the calendar on the person's screen |
+| the six `/assistant/…` routes | unchanged: a conversation belongs to the person, not to a calendar (section 11.1). The body of `POST /assistant/messages`, `{ text, language? }` on `main`, gains an optional `calendarId`, the calendar on the person's screen |
 
 **Every client breaks**: the page, the smoke test, any script. The page and the API are
 released together as **v4.0.0** (`README.md`, section "Versions": the major version changes
@@ -628,13 +723,31 @@ when a client would break).
 - **The target of a booking** must hold an accepted link with the role `user` to the calendar:
   `404 user_not_found` otherwise (today's `409 target_not_user` goes, since an Administrator
   cannot be a User of their own calendar and a super-user has no link).
+- **An appointment in the way** of an availability write (`AppointmentConflict`, in the body of
+  `availability_conflict`) names its person by `userId` where `username` is today.
+
+In `shared/src`, by `main`'s names: `USERNAME_PATTERN`, `Username`, `UsernameParam`,
+`CreateUserBody`, `UpdateUserBody`, `CreateUserResponse`, `UserSummary`, `ListUsersResponse`
+and `UserStatus` go with the routes under `/users`; `MeResponse` becomes the answer of section
+9.2; `Role` gains `superuser` and `resolveRole`, which reads the token's groups, gives way to
+the module of section 8.1; `HelloResponse` keeps its shape with the roles of section 11.4;
+`EmailAddress` keeps its rule and loses the sentence that two people may share one.
 
 ### 9.6 New error codes
 
-They start in `shared/src/api.ts`: `calendar_not_found`, `calendar_name_taken`,
-`name_mismatch`, `invitation_not_found`, `already_invited`, `not_pending`, `details_required`,
-`invitation_limit_reached`. Removed: `user_exists`, `cannot_edit_admin`, `not_invited`,
-`target_not_user`.
+They start in `shared/src/api.ts`, in the type `ApiErrorCode`: `calendar_not_found`,
+`calendar_name_taken`, `name_mismatch`, `invitation_not_found`, `already_invited`,
+`not_pending`, `details_required`, `invitation_limit_reached`.
+
+Removed: `user_exists`, `cannot_edit_admin`, `not_invited`, `target_not_user`, and with
+decision K30 `cannot_delete_admin` and `no_email_address`.
+
+Kept, with a wider or narrower use: `user_not_found` (a `userId` that is not among the Users of
+the calendar), `mail_unavailable` (the invitations, the deletion of a calendar and the mail
+routes, below the stage `on`), `mail_limit_reached`, `forbidden`, `concurrent_update`.
+
+Each new code gets its sentence in the page's texts, in both languages (section 11.6): the
+page words a failure by its code and never shows the server's `message`, which stays English.
 
 ---
 
@@ -701,8 +814,9 @@ with the calendar's identifier:
 | Deleted-user marker | `DELETEDUSER#<sub>` | removed (section 6.3) | |
 
 Every read and write of today keeps its shape, with a longer partition key. The attributes
-change as section 9.5 says: `username` goes from the appointment and from the actors, `userId`
-stays.
+change as section 9.5 says: `username` goes from the appointment, from the event's
+`recipients` and from every stored actor (`createdBy`, `updatedBy`, `cancelledBy`, the event's
+`actor`, `{ username, role }` on `main`), which become `{ id, role }`; `userId` stays.
 
 ### 10.2 New items
 
@@ -775,7 +889,7 @@ against a state nobody is changing.
 
 | Table | Item | Key today | Becomes |
 |---|---|---|---|
-| `mail` | Settings of the daily mail | `SETTINGS` / `SETTINGS` | `CAL#<calendarId>#SETTINGS` / `SETTINGS` |
+| `mail` | Settings of the daily mail | `SETTINGS` / `SETTINGS` | `CAL#<calendarId>#SETTINGS` / `SETTINGS`; `updatedBy` holds the person's identifier where the username is |
 | `mail` | Daily mark | `DAILY` / `<local date>` | `CAL#<calendarId>#DAILY` / `<local date>` |
 | `mail` | A person's count of the day | `QUOTA#<sub>` / `<local date>` | unchanged: five a person and day, over all their calendars |
 | `mail` | A calendar's invitations of the day (new) | | `INVITES#<calendarId>` / `<local date>`: `count`, deleted by its time to live |
@@ -809,7 +923,10 @@ the deploy of the new API and the first invitation:
    and `LOCK`) are deleted, after the operator has the last backup file in hand;
 4. the mail settings of today become the first calendar's; the tables `assistant` and
    `hello-messages` are left as they are (conversations expire by themselves; the messages are
-   history that names accounts of the old pool).
+   history that names accounts of the old pool);
+5. the accounts of the old pool are not touched by the script. They stop working when the
+   authorizer and the page turn to the new pool, and go with the old pool when it is removed
+   (section 14.1).
 
 The script holds no person's identifier and writes no appointment, so it cannot put an
 appointment under the wrong person. Before the release the Administrator notes, outside the
@@ -836,9 +953,11 @@ may be worth its risk. The plan's first step counts them.
 | Users | `list_users` answers the accepted Users of the calendar named, with their names and `userId`; `book_appointment` for a User takes a `userId` from that list. No tool invites, removes or lists the people of a calendar the caller does not administer |
 | A proposal | names the calendar of each change in the server's own words ("Book Tuesday 1 December, 10:00 to 11:00, in Calendar 1"), so a calendar Claude chose wrongly is seen before Confirm. One proposal may hold changes in several calendars; each runs through its own calendar's handler and has its own outcome |
 | Busy elsewhere | for a person's own booking the assistant may say where, since it is their own appointment in a calendar they see. For an Administrator booking a User who is busy in a calendar the Administrator does not hold, the refusal is `user_busy` without a place, as in the page (decision K4) |
-| The instructions | say that the person may have several calendars and how to choose one. Their mark changes, which ends the conversations in progress at the deploy (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 4.3) |
+| The instructions | say that the person may have several calendars and how to choose one. They are written in English whatever the conversation's language, as on `main` (`backend/src/assistant/prompt.ts`), and so are the tools' descriptions: both are read by Claude, not by the person. Their mark changes, which ends the conversations in progress at the deploy (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 4.3) |
+| The fixed sentences | in English and Italian, in `shared/src/assistant/texts.ts` (section 11.6): a proposal's sentence for each kind of change gains its calendar's name; a person is named by first and last name where the username is; the panel's line "reading…" gains the kind of the new tool. The notes of each language (its form of address, the application's own words) change only if a new word of the application needs one |
+| The language of a conversation | unchanged: the language of its first message, else the page's, else English (`docs/MULTILANGUAGE_ARCHITECTURE.md` section 9) |
 | The daily allowance | per person, over all their calendars, as the cost is |
-| The evaluation | run again with the real model, its cost said and agreed first: the existing requests with one calendar, and new ones with two (a request that names no calendar, two calendars with types of the same name, "what do I have this week?" over both, a change in the calendar that is not on screen, a slot busy elsewhere, the Administrator booking a User who is busy elsewhere, a person who is the Administrator of one and a User of the other asking for an Administrator's change in the wrong one, a super-user over three calendars). The wrong calendar chosen is the new mistake it measures |
+| The evaluation | owed again, since the instructions and every tool change: run with the real model at the release, its cost said and agreed first (the last run, 69 requests in both languages, cost 52.96 US cents). The existing requests with one calendar, and new ones with two, some of them in Italian (a request that names no calendar, two calendars with types of the same name, "what do I have this week?" over both, a change in the calendar that is not on screen, a slot busy elsewhere, the Administrator booking a User who is busy elsewhere, a person who is the Administrator of one and a User of the other asking for an Administrator's change in the wrong one, a super-user over three calendars). The wrong calendar chosen is the new mistake it measures |
 | The hard rule | unchanged: a change, or a mail, only through `confirmProposal`, after the person's button, through a route's handler |
 
 What Anthropic receives changes in two points. A person's first and last name are sent where a
@@ -859,8 +978,10 @@ proposal in the server's words and the person's button (`docs/ARCHITECTURE.md` s
 |---|---|
 | The daily mail | per calendar: the hourly run reads the calendars, and for each its settings and its mark. It goes to the calendar's Administrator, at their own address. A calendar whose Administrator has not accepted gets none |
 | The mail on demand | `POST /calendars/{calendarId}/mail`: the whole calendar for its Administrator or a super-user, the person's own appointments in that calendar for a User |
-| The files | the columns "Username" becomes "E-mail" in the Administrator's files; the names are read from Cognito, empty for a person no longer linked |
-| New kinds of the mailer | `invitation` (section 5.1) and `closing` (section 7.2) |
+| The files | the column `username` of `EXCEL_COLUMNS` becomes `email`, with its heading in both languages; the names are read from Cognito, empty for a person no longer linked. The words of a file follow its recipient's language, as on `main` |
+| The language of a mail | the recipient's own, read with their address, else `DefaultLanguage`, as on `main`. The daily mail is in its Administrator's language; the closing mail's file is built once per language among its recipients |
+| The subject | the daily mail's and the Administrator's mail on demand name the calendar, since a person may administer several |
+| New kinds of the mailer | `invitation` (section 5.1) and `closing` (section 7.2), beside `calendar`, `mine` and `daily`. On `main` the kind on demand follows the caller's role; it follows the caller's role on the calendar of the route |
 | The rule "mail only to oneself" | holds for every kind: the mailer reads each address in Cognito, and no body or event carries one. What is new is that an invitation mails an address a person typed; today's creation of a User already does, and the 20 a day bound it |
 
 ### 11.3 The settings
@@ -877,6 +998,9 @@ the super-user is speaking"; anyone else "Hello World, I am {first name}", and "
 am a new person" before the details are typed. The stored message keeps the person's identifier
 and its `role` is `superuser` or `person`; `userName` goes.
 
+The message is in English for everyone (decision K29): it is an answer of the API, kept as the
+proof of the chain, and the page shows it nowhere.
+
 ### 11.5 The logs
 
 Every log line of a route of a calendar carries `calendarId` and the caller's identifier, where
@@ -885,6 +1009,28 @@ Every log line of a route of a calendar carries `calendarId` and the caller's id
 invitation routes log the target's identifier and the outcome, never the address typed, and
 never whether the account existed (a log line that said so would be the leak decision K2
 forbids, one console away).
+
+### 11.6 The texts, in two languages
+
+Every text a person reads lives in the texts of its part, in English and in Italian, and
+nowhere else: the hard rule of the root `CLAUDE.md`, kept by the compiler and by the tests of
+`docs/MULTILANGUAGE_ARCHITECTURE.md` section 5.2. This design adds no mechanism; it adds and
+changes texts in the three objects `main` has. The plan counts them, step by step.
+
+| Part | The object on `main` | New | Changed or removed |
+|---|---|---|---|
+| The pages | `PageTexts` in `frontend/src/texts/texts.ts`, with `texts.en.ts` and `texts.it.ts`; the keys in `frontend/index.html` | the screens "Your details", "Calendars" (the calendars with the person's role in each, the invitations with Accept and Decline, "Leave this calendar" and its question, "You have no calendar yet") and "All calendars" ("New calendar", "Delete" and its typed confirmation, the sentence that the Users are not told, the state of a calendar being deleted); the calendar's name and the way back in the header; "you have another appointment" in the week; the three states of a link; "former user"; the sentence of each new error code (section 9.6) | the sign-in asks for an e-mail address; "Users": "Invite" with one field, "Send again", "Remove" and its question, the texts of the creation form and of "Edit" removed; "My details": the three details editable, their save and its refusals; the sentences of the removed error codes go; the words of the account's state (`invited`, `active`) go |
+| The tight places (decision L16) | `PAGE_TEXT_BUDGETS`, beside the type | a budget for each new button and link that stands in a row: Accept, Decline, Invite, Send again, Remove, Leave, New calendar, Delete, the links to "Calendars" and "All calendars", the state's word in a row of a list | the walk in the padded test language, on the new and changed screens only |
+| The mails and the files | `MailTexts` in `shared/src/mail/texts.ts`, with `texts.en.ts` and `texts.it.ts` | the mailer's invitation; the closing mail and its file's name | Cognito's invitation, reworded (section 5.5); the heading of the column `email` in the place of `username`; the reason `user_removed` in the place of `user_deleted`; the calendar's name in two subjects (section 11.2) |
+| The assistant | `AssistantTexts` in `shared/src/assistant/texts.ts`, with `texts.en.ts` and `texts.it.ts` | the calendar's name in the sentence of each kind of change; the kind of the new read | a person named by first and last name where the username is |
+
+Not translated, by requirement R6 of `docs/MULTILANGUAGE_ARCHITECTURE.md`: the API's error
+codes and `message`, the message of `POST /hello`, the logs, the assistant's instructions and
+tools, what the operator's scripts print (the bootstrap, `test-user`, the migration).
+
+The Italian is written with the code, in the formal "lei" (decision L14) and within the
+budgets, and read once by the Product Owner before the release. The tests stay in English and
+name a text by its English words or its key; the local stack's default language stays `en`.
 
 ---
 
@@ -913,7 +1059,7 @@ the calendars are data, not resources of the template: it would need a role per 
 at run time. So a mistake in a handler could read another calendar, and section 12.3 exists to
 catch it.
 
-### 12.2 Permissions (one role per function, nothing wildcard)
+### 12.2 Permissions (one role per function, nothing wildcard but the mailer's in the sandbox)
 
 | Function | Holds |
 |---|---|
@@ -925,12 +1071,17 @@ catch it.
 | `removeCalendarUser`, `leaveCalendar` | the `calendar` table, read, write and delete; Cognito `AdminUserGlobalSignOut`, `AdminDeleteUser` (section 4.4) |
 | `getMe`, `updateMe` | Cognito `AdminGetUser`, `AdminUpdateUserAttributes` (`updateMe` only); the `calendar` table, read |
 | `acceptInvitation`, `declineInvitation` | the `calendar` table, read and write (decline: and delete, with the Cognito pair of section 4.4) |
-| `mailer` | as today, and `lambda:InvokeFunction` on the eraser alone |
+| `mailer` | as today (`ses:SendEmail`, the `calendar` table's read policy, the table `mail`, Cognito `ListUsersInGroup` and `AdminGetUser`, now on the new pool: the group read is `superuser`'s, for the closing mail), and `lambda:InvokeFunction` on the eraser alone. Its two new kinds need no new right to send |
+| The invitation function | as today: its own log and nothing else. The permission that lets Cognito call it names the new pool |
 | `eraser` (new, no route) | the `calendar` table, `Query` and `DeleteItem`; the table `mail`, `Query` and `DeleteItem`; Cognito `AdminUserGlobalSignOut`, `AdminDeleteUser` |
 | The authorizer | none, as today; it verifies against the new pool |
 | No function | may add a member to the group `superuser`, set a password, or create a pool's group |
 
-Every resource is named by its ARN; no action and no resource is a wildcard. `AdminCreateUser`
+Every resource is named by its ARN; no action and no resource is a wildcard, with the one
+exception `main` has: while SES keeps the account in its sandbox the mailer's `ses:SendEmail`
+is on every identity of the account, the sender held to the stack's address
+(`docs/EMAIL_ARCHITECTURE.md` section 12.2). This design neither widens nor needs it; part B of
+step m10 of `docs/EMAIL_PLAN.md` takes it back (section 18). `AdminCreateUser`
 in a route's role is what `createUser` holds today; it cannot make a super-user, since no role
 holds `AdminAddUserToGroup` any more.
 
@@ -951,7 +1102,7 @@ holds `AdminAddUserToGroup` any more.
      A answers that route's own `404`;
   5. the shared User booked in B: in A, the User's view holds the time in `busyElsewhere`, the
      Administrator's view holds nothing of it, and the Administrator's booking of that User at
-     that time answers `user_busy` without `conflicts`;
+     that time answers `user_busy` with the very body of a User busy in A;
   6. two bookings of the shared User at the same time in A and B, sent together: exactly one
      succeeds;
   7. `GET /calendars` answers `403` to both Administrators.
@@ -989,13 +1140,13 @@ holds `AdminAddUserToGroup` any more.
 
 | Screen | Change |
 |---|---|
-| Sign-in | an e-mail address where the username is |
+| Sign-in | an e-mail address where the username is; its choice of language stays |
 | Your details (new) | after "Choose your password" at the first sign-in, and whenever the details are missing: the three facts |
 | Calendars (new, the first screen after the sign-in) | the person's calendars, each with its role, and the invitations waiting, each with Accept and Decline. With exactly one calendar and no invitation it is skipped; with none it says "You have no calendar yet" |
 | The calendar's screens | the Administrator's or the User's of today, by the person's role on the calendar chosen; the calendar's name in the header, with the way back to "Calendars"; the address in the browser holds the calendar's identifier, so a page reloaded stays on its calendar |
 | Week, for a User | a time busy elsewhere shown as "you have another appointment" |
 | Users, for the Administrator | "Invite" with one field, the e-mail address; the list with each state (pending, accepted, declined); "Send again"; "Remove" in the place of "Delete"; no "Edit" |
-| My details | editable by the person; a User's "Leave this calendar" is on the Calendars screen |
+| My details | the three details editable by the person, saved through `PUT /me`; the e-mail address shown and not editable; the field "Language" as today, saved at once at Cognito; a User's "Leave this calendar" is on the Calendars screen |
 | All calendars (new, the super-user) | every calendar with its Administrator's address and state and its number of Users; "New calendar"; "Delete", which asks for the name typed; opening one shows the Administrator's screens |
 | Settings | the daily e-mail's section is the calendar's own |
 | Assistant panel | one conversation, the same on every screen and calendar; a proposal names the calendar of each change. It is also on the Calendars screen |
@@ -1006,6 +1157,14 @@ rewritten on the calendar's Users, and every calendar and mail service taking th
 identifier; `AssistantService` sends the calendar on screen with a message. The session keeps no role: the role comes from `GET /me` for the
 calendar chosen. The views follow `docs/FRONTEND_ARCHITECTURE.md` sections 3 and 4.
 
+Every screen, new or changed, takes its words from the page's texts in the person's language
+(section 11.6), by the mechanism `main` has: a key on each element of `frontend/index.html`,
+the logic layer's objects given the texts when they are made, the frame entered again when the
+language changes. "Calendars" and "All calendars" are screens of the frame like the others, so
+a change of language in "My details" needs nothing new from them. The rule of
+`.claude/rules/frontend-views.md` that no class holds the word `admin` is read again by the
+plan, now that a screen is the Administrator's by the calendar chosen and not by the account.
+
 ---
 
 ## 14. Local development and testing
@@ -1013,7 +1172,8 @@ calendar chosen. The views follow `docs/FRONTEND_ARCHITECTURE.md` sections 3 and
 ### 14.1 To try before the first step
 
 Nothing was run for this proposal. The plan's first step tries, on the local stack and in AWS's
-documentation, and the design is corrected by what it finds:
+documentation, and the design is corrected by what it finds. The first row is the one that can
+change the design:
 
 | To try | Why it matters | If it fails |
 |---|---|---|
@@ -1022,24 +1182,61 @@ documentation, and the design is corrected by what it finds:
 | The `username` claim of an access token of such a pool | the authorizer passes the identifier on | the handlers use `sub`, which is the identifier in any case |
 | The replacement of the pool in CloudFormation: a new logical resource beside the old one, the old one removed in a later deploy (it has deletion protection) | the release's order (section 18) | the old pool is removed by hand after the release, and the runbook says how |
 | The limit of 100 items a transaction, against the removal's chunks of 30 | section 10.3 | smaller chunks |
+| `cognito-local` with such a pool: `GetUser` and `UpdateUserAttributes` with the person's token, `locale` stored and answered | the page's language (section 4.2), tried on today's kind of pool only (`docs/MULTILANGUAGE_ARCHITECTURE.md` section 17) | the same answer as the first row: accounts whose username is the address |
+| `sam local start-api` with the functions this design adds (13 new and 4 removed, on the 39 of today) | the local API has stalled on a new function before (`docs/MULTILANGUAGE_PLAN.md` finding F9) | the time of the first request measured before and after each step that adds functions; a stall told from a slow start with `docker ps`; one restart tried, then the step stops and asks |
+
+**In the cloud, on the new pool.** The cloud's facts of `docs/MULTILANGUAGE_ARCHITECTURE.md`
+section 17 were tried on today's pool. A new pool with a new app client makes one of them
+pointless and four of them new:
+
+| Fact of that section | On the new pool |
+|---|---|
+| The app client is changed in place, its id unchanged | Pointless: the new pool has a new app client and a new id, which the page receives at its release, as it receives the API's address. Everybody signs in again in any case |
+| A write list of `locale` alone is accepted | **To try again.** A pool whose sign-in name is the e-mail address may count the address as an attribute the app client must be able to write. AWS's guide, read on 2026-11-28, does not say (section 22). The new pool's schema declares no required attribute, as today's, so that nothing forces another name into the list |
+| A person's own token cannot write its e-mail and can write `locale` | **To try again**, and it matters more: the e-mail is the sign-in name |
+| `GetUser` answers `locale` with the default read list | **To try again** |
+| The invitation function is called for an invitation and its resend, and its mail arrives | **To try again**, with what Cognito's placeholder for the username prints (the second row of the table above) |
+
+They need a pool in AWS, and the emulator cannot answer them: it knows no write list and calls
+no invitation function. **They are tried in the plan's first step** (decision K32), in a small
+stack of its own: a pool made as the new one will be, its app client with the write list, the
+invitation function, and nothing of the application. The operator deploys it and deletes it the
+same day, each command on their word; it costs nothing and does not touch the stack
+`shared-calendar-api`. The same stack answers the second and third rows of the first table
+above, what the placeholder for the username prints and what the token's `username` claim
+holds. Its invitation goes to an address verified at SES, the operator's.
+
+If a write list of `locale` alone is refused, the list would also name what Cognito demands,
+and the gap that `docs/MULTILANGUAGE_ARCHITECTURE.md` section 4.4 closed would be open again
+for that attribute: decision K26 is then read again with the Product Owner, before the second
+step. The release's deploy reads the same facts once more in its change set and with a
+throw-away person, as a check and no longer as a trial.
 
 ### 14.2 The local stack
 
 No new service. The local seed makes one super-user, two calendars with their Administrators
 and three people, one of them a User of both, so that the two-Administrator journey and a look
 at the pages need no set-up. The accounts of `docs/COMMANDS.md` change with it. The fake mail
-shows the mailer's invitation; Cognito's own invitation is not sent locally, as today.
+shows the mailer's invitation; Cognito's own invitation is not sent locally, as today, and
+the emulator does not call the invitation function. The local default language stays `en`, the
+language the tests and the journeys run in. One local stack runs on this machine at a time,
+whatever the folder (`docs/MULTILANGUAGE_PLAN.md` finding F10).
 
 ### 14.3 Tests
 
-- `shared/`: the new bodies and answers, the error codes, the texts of the two new mails.
+- `shared/`: the new bodies and answers, the error codes, the texts of the two new mails and
+  the assistant's changed sentences, each in every language (the tests of
+  `docs/MULTILANGUAGE_ARCHITECTURE.md` section 5.2: no empty text, every function answers, a
+  mail's plain text and its HTML say the same).
 - Back end, unit, 100 % lines on `src/lib`: `access.ts`, the new parts of `calendarDb.ts` (the
   links, the person's lock and booked times), `mailDb.ts`.
 - Back end, journeys: section 12.3; the invitation accepted and declined; a User removed, a
   User leaving, the account with no link deleted; a calendar created, deleted, the closing mail
   read back from the fake mail, nothing of it left in the table.
 - Front end: the new and changed services against the local stack; the new screens by the rules
-  of `docs/FRONTEND_ARCHITECTURE.md` section 8; `docs/FRONTEND_WALK.md` walked as a super-user,
+  of `docs/FRONTEND_ARCHITECTURE.md` section 8 and of `.claude/rules/frontend-views.md`; the
+  page's keys, the budgets and the marked test language over the new texts; a look at the new
+  and changed screens in Italian and in the padded test language, at both widths; `docs/FRONTEND_WALK.md` walked as a super-user,
   an Administrator, a User of two calendars.
 - Every existing journey and its page under `docs/journeys/` changes its sign-in and its paths.
 
@@ -1052,7 +1249,9 @@ below the free 10 000; the new pool is in the same tier. The tables stay inside 
 capacity (section 10.6). The invitations and the closing mails are a few more mails at SES's
 price (`docs/EMAIL_ARCHITECTURE.md` section 15). The assistant's cost is Anthropic's and grows
 with the people who use it: each person's daily allowance bounds it, and with several
-calendars the number of people is what to watch (point Q3 of section 21).
+calendars the number of people is what to watch (point Q3 of section 21). The one cost of the
+build itself is the paid evaluation of section 11.1, once, at the release: about the last
+run's 53 US cents, more by the new requests, said and agreed before it runs.
 
 ---
 
@@ -1068,9 +1267,11 @@ calendars the number of people is what to watch (point Q3 of section 21).
 
 ## 17. What changes in the existing documents and rules
 
-None of these is edited now. The plan's first step makes the changes, when the build starts.
+None of these is edited now. Each step of the plan merges what it built into the documents
+below (decision K31), so that no document describes what is not built. Until its last step,
+this document and the plan are the truth for what the steps built, on the branch only.
 
-### 17.1 Decisions of the e-mail work that this reverses
+### 17.1 Decisions of the e-mail work and of the languages that this reverses or touches
 
 | Decision of `docs/EMAIL_ARCHITECTURE.md` | Becomes |
 |---|---|
@@ -1082,63 +1283,96 @@ None of these is edited now. The plan's first step makes the changes, when the b
 | Section 6.2: the daily mail to every member of the group `admin` | to each calendar's Administrator, per calendar |
 | Section 5.4: the command `test-user` | extended (section 5.6) |
 
+No decision of `docs/MULTILANGUAGE_ARCHITECTURE.md` is reversed (L1 to L16 stand). Four of its
+sentences describe what this design changes:
+
+| Where in `docs/MULTILANGUAGE_ARCHITECTURE.md` | Becomes |
+|---|---|
+| Section 4.1: the other four facts "are the Administrator's to type, this one is the person's own" | three of the four are the person's too, written through `PUT /me`; the language keeps its own way (decision K26) |
+| Section 4.2: `PUT /users/{username}` and `POST /users` refuse a `language` | the routes go; `PUT /me` refuses one |
+| Section 4.4: the app client's write list closes a way to change the facts "that are the Administrator's to change" | the list stays `locale` alone; what it protects is the sign-in name and the server's checks of the three details |
+| Sections 7 and 8: one invitation, Cognito's; the daily mail to each administrator | two invitations (section 5.5); the daily mail per calendar; a new mail, the closing one |
+
 ### 17.2 Document by document
 
 | Where | What changes |
 |---|---|
 | Root `CLAUDE.md`, "What this project is" | several calendars, each with its Administrator; a super-user; a person signs in with their e-mail address |
-| Root `CLAUDE.md`, "Hard rules" | the two rules of section 8.2; "A User's first password…" keeps its sense, with "person" for "User" and the super-user's permanent one for the Administrator's; a new rule: "Every handler of a route that names a calendar goes through `backend/src/lib/access.ts` first; a calendar that is not the caller's answers 404" |
+| Root `CLAUDE.md`, "Where the truth lives" | this document, merged into the documents above it, which win, as the line of `docs/MULTILANGUAGE_ARCHITECTURE.md` says of the languages |
+| Root `CLAUDE.md`, "Hard rules" | the two rules of section 8.2; the rule on the texts and the rule on the logs unchanged; the wildcard rule as `main` has it when the step is done; "A User's first password…" keeps its sense, with "person" for "User" and the super-user's permanent one for the Administrator's; a new rule: "Every handler of a route that names a calendar goes through `backend/src/lib/access.ts` first; a calendar that is not the caller's answers 404" |
 | Root `CLAUDE.md`, "Everyday commands" | the local accounts |
-| `backend/CLAUDE.md`, `frontend/CLAUDE.md`, `shared/CLAUDE.md` | the folder maps, as the files move |
+| `backend/CLAUDE.md`, `frontend/CLAUDE.md`, `shared/CLAUDE.md` | the folder maps, as the files move; what each says of roles, of the Users' routes and of the session |
+| `.claude/rules/frontend-views.md` | the rule that no class holds the word `admin`, and whatever else it says of a role, read again for a role that depends on the calendar chosen; the new screens among its examples |
+| `.claude/rules/comments.md` | its examples of references, where a section or an item they name is renumbered or removed by the rows below |
 | `docs/ARCHITECTURE.md` section 1 | a new requirement after F6, the several calendars; F2 and F3 rewritten; the decision rows on the Administrator's provisioning and on the User's credentials |
 | `docs/ARCHITECTURE.md` sections 2 and 3 | the overview's diagram and its table; section 3 replaced by section 8 of this document |
 | `docs/ARCHITECTURE.md` section 4 | every route's path and role; the routes of sections 9.1 to 9.3; the points of section 9.5; the error codes |
-| `docs/ARCHITECTURE.md` section 5 | 5.1 the new pool; 5.3 the keys and the new items, the lock paragraph gaining the person's lock; 5.4 and 5.5 the keys of section 10.5 |
+| `docs/ARCHITECTURE.md` section 5 | 5.1 the new pool, its app client's write list and its invitation function, the paragraph on the person's language beside the three details; 5.2 the message's `role` and no `userName`; 5.3 the keys and the new items, the lock paragraph gaining the person's lock; 5.4 and 5.5 the keys of section 10.5 |
 | `docs/ARCHITECTURE.md` section 6 | 6.1 the bootstrap of the super-user; 6.3 "Create a User" becomes the invitation of section 5.1; 6.4 "Delete a User" becomes the removal; 6.7 and 6.8 the two locks; a new diagram for a calendar's deletion |
 | `docs/ARCHITECTURE.md` section 7 | the rows "Authorization", "Privilege boundary", "Least privilege IAM", "Logging"; the threats, with the reading of another calendar; the residual risks of section 12.4, the deleted user's token window shortened |
 | `docs/ARCHITECTURE.md` sections 8 to 11 | the local seed and the emulator's notes; the parameters; the smoke test; the eraser's alarm |
 | `docs/SHARED_CALENDAR_SPEC.md` | section 4 (actors: per calendar, the super-user); section 8 (`user_busy` over every calendar, `busyElsewhere`); section 10 (the Users of a calendar, the removal); section 11 (the paths, the bodies' `userId`); section 13 (the keys, the person's lock); R-PERM-01 gains the calendar's own `404` |
 | `docs/EMAIL_ARCHITECTURE.md` | a record by then; a note at its top pointing at section 17.1 of this document |
-| `docs/CONVERSATIONAL_ARCHITECTURE.md` | section 3 (what the assistant can do: over every calendar of the person), section 6 (the message's `calendarId`), section 7 (the instructions), section 8 (every tool's `calendarId`, `list_my_calendars`, the proposal's wording), section 9 (the proposal's `calendarId`), section 10 (the planted text across calendars), section 12 (the evaluation's new requests) |
-| `docs/FRONTEND_SERVICES.md` | the sign-in by address; the session without a role; `MeService`, `UsersService`, a new `CalendarsService`; every calendar service's calendar identifier |
-| `docs/FRONTEND_ARCHITECTURE.md` | the shell's navigation by calendar and role; the new screens of section 13 |
-| `docs/FRONTEND_WALK.md` | the checks of the new screens; every existing check walked inside a calendar |
+| `docs/MULTILANGUAGE_ARCHITECTURE.md` | a record too; a note at its top pointing at the second table of section 17.1 |
+| `docs/EMAIL_PLAN.md`, `docs/MULTILANGUAGE_PLAN.md` and the other plans | nothing: records of finished work. Part B of step m10 of `docs/EMAIL_PLAN.md` is changed on `main`, by its own session, if it is still open at the release (section 18) |
+| `docs/CONVERSATIONAL_ARCHITECTURE.md` | section 3 (what the assistant can do: over every calendar of the person), section 4.2 (the fixed sentences that name a calendar), section 6 (the message's `calendarId`), section 7 (the instructions), section 8 (every tool's `calendarId`, `list_my_calendars`, the proposal's wording), section 9 (the proposal's `calendarId`), section 10 (the planted text across calendars), section 12 (the evaluation's new requests) |
+| `docs/FRONTEND_SERVICES.md` | the sign-in by address; the session without a role; `MeService`, `UsersService`, a new `CalendarsService`; every calendar service's calendar identifier; the language service unchanged but for the new pool's app client |
+| `docs/FRONTEND_ARCHITECTURE.md` | the shell's navigation by calendar and role; the new screens of section 13; section 12.4, the new texts and their budgets |
+| `docs/FRONTEND_WALK.md` | the checks of the new screens; every existing check walked inside a calendar; the short lists in Italian and in the padded test language, for the new and changed screens |
 | `docs/journeys/` | every page: the sign-in and the paths; new pages for the journeys of section 12.3 |
-| `docs/RUNBOOK.md`, `docs/COMMANDS.md` | `bootstrap-superuser`; the release's order and the migration; a super-user's removal; a deletion stuck; the local accounts |
+| `docs/RUNBOOK.md`, `docs/COMMANDS.md` | `bootstrap-superuser`; the release's order and the migration; a super-user's removal; a deletion stuck; the local accounts; `docs/RUNBOOK.md` sections 3.3 and 3.4, the invitation and the languages on the new pool, with the facts of section 14.1 as tried; a new record in its section 5 |
+| `docs/MULTI_CALENDAR_SEQUENCE.md` | the state of its steps, at each of them |
 | `docs/FOLDER_STRUCTURE.md` | the new handlers, `access.ts`, the eraser |
 | `README.md` | what the project is; "Versions": v4.0.0 |
 
 ---
 
-## 18. What depends on the e-mail work, and the order of the releases
+## 18. What this builds on, and the order of the releases
 
-**The build of this change starts only after v3.0.0, the e-mail release, is deployed** (step
-m10 of `docs/EMAIL_PLAN.md`). The plan will say so in its first lines.
+**The build happens on the branch `multi-calendar`**, which holds `main` at `491ca3c`: e-mail
+at the stage `on` (`v3.0.0`) and the two languages (`v3.1.0`), both deployed. `main` is what
+runs in the cloud and stays deployable: part B of step m10 of `docs/EMAIL_PLAN.md`, and any
+fix of a release, deploy from it, and the branch then merges `main` again. The branch is merged
+into `main` once, after v4.0.0 is deployed (`docs/MULTI_CALENDAR_SEQUENCE.md` step 4). The plan
+says so in its first lines.
 
-| Point of this design | What it needs from the e-mail work |
+Everything this design needs from the earlier work is on `main`:
+
+| Point of this design | What it uses, as built |
 |---|---|
-| Every invitation (sections 5 and 7.1) | the stage `on`: the domain verified, SES out of its sandbox, the pool sending through SES |
-| The first sign-in (section 4.2) | the page's "Choose your password", built in step m7 of `docs/EMAIL_PLAN.md` |
+| Every invitation (sections 5 and 7.1) | the stage `on`: the domain verified, the pool sending through SES. In the sandbox, to verified addresses only (section 5.7) |
+| The first sign-in (section 4.2) | the page's "Choose your password", and the language the page stores at a first sign-in |
 | The mailer's new kinds and the closing backup (sections 5.1 and 7.2) | the mailer, its Excel module, the fake mail, `local:lambda` |
-| The details kept in Cognito's standard attributes (section 4.2) | the four facts, built in steps m1 and m2 of `docs/EMAIL_PLAN.md` |
+| The details kept in Cognito's standard attributes (section 4.2) | the four facts, and `locale` beside them |
 | `GET /me` (section 9.2) | the route, which this design extends |
+| The texts in two languages (section 11.6) | the three objects of texts, the one list of languages, the invitation function, `DefaultLanguage`, the tests of the texts |
 | The migration's last backup (section 10.7) | the daily mail or a mail on demand |
 | The operator's command `test-user` (section 5.6) | the command, which this design extends |
 
-Two consequences for the people:
+**E-mail as it runs today, and what follows:**
 
-- **They are invited twice in a short time**: once at v3.0.0, in the old pool, and again at
-  v4.0.0, in the new one, with a new password to choose. If v4.0.0 is to follow v3.0.0 closely,
-  step m10's "create again the Users who need an account" could be kept to the few who cannot
-  wait. That is a choice about the e-mail plan, taken when v3.0.0 is released (point Q2 of section 21).
+- **The sandbox is enough to build, test and release.** The local stack sends nothing real.
+  In the cloud, the smoke test mails SES's simulator and the operator's own address, and the
+  operator's look uses verified addresses. v4.0.0 does not wait for production access.
+- **The real Users are invited when AWS grants production access** (point Q2 of section 21),
+  and it decides how:
+  - *granted before v4.0.0 is deployed*: part B of step m10 runs from `main`. Its Users are
+    invited in today's pool and again, weeks later, in the new one, so it invites only those
+    who cannot wait;
+  - *granted after*: the real Users are invited once, in the new pool, by their calendar's
+    Administrator. What is left of part B is its other items, the mailer's role first.
+- **The mailer's right on every identity of the account** is `main`'s exception for the
+  sandbox. This design leaves it as it is. Part B takes it back: from `main` before the merge,
+  or from the merged `main` after it. The plan's release names it among what is still owed.
+- **Still owed on `main`, not by this work**: the look at the daily mail in Italian
+  (`docs/RUNBOOK.md` section 5.12).
 - **The Reply-To and the alarm address** stay the operator's (`AlertEmail`). With several
   Administrators, a reply to a calendar's mail reaches the operator, not that calendar's
   Administrator. Setting the Reply-To per calendar, from its Administrator's address, is
   possible in the mailer's own mails and not in Cognito's invitation: left out of this release.
 
-This design was read against `main` at `a2b4774`. If the e-mail work changes `GET /me`, the
-four facts, the invitation or the stages before v3.0.0, the next session on this branch merges
-`main` first and corrects the sections above.
+This design was read against `main` at `491ca3c`. When `main` moves, the branch merges it and
+the sections it touches are read again.
 
 ---
 
@@ -1203,16 +1437,20 @@ handler goes through, a lint rule that enforces it, and the journey with two Adm
 ## 20. Outline for the implementation plan
 
 The plan, `docs/MULTI_CALENDAR_PLAN.md`, is written after this document is agreed, in the shape
-of `docs/EMAIL_PLAN.md`: each step with its acceptance check, reviewed before the next. Its
-steps would follow this order; nothing reaches the cloud before the last two.
+of `docs/EMAIL_PLAN.md` and `docs/MULTILANGUAGE_PLAN.md`: each step with what it builds, its
+tests, its acceptance check, the documents it merges into (section 17) and its "As done" note.
+Its steps would follow this order. Every step that adds a text a person reads adds it in both
+languages. Nothing reaches the cloud before step 10.
 
-1. **The documents and the facts**: the changes of section 17 made; the trials of section 14.1
-   run and this design corrected by them; the future appointments counted (section 10.7).
+1. **The facts**: the local trials of section 14.1 run; the facts of the new pool tried in a
+   stack of its own, deployed and deleted by the operator (decision K32); this design corrected
+   by both; the future appointments counted (section 10.7); the time of the local API's first
+   request measured.
 2. **The contract** in `shared/`: the calendar, the link, the new bodies, answers and error
-   codes, `userId` in the place of `username`.
-3. **The accounts**: the new pool in the template beside the old one, sign-in by address, the
-   group `superuser`, the bootstrap script, the local seed; the authorizer and the page's
-   sign-in.
+   codes, `userId` in the place of `username`; the mails' and the assistant's new texts.
+3. **The accounts**: the new pool in the template beside the old one, with its app client's
+   write list and the invitation function; sign-in by address, the group `superuser`, the
+   bootstrap script, the local seed; the authorizer and the page's sign-in.
 4. **Calendars and links**: `access.ts` and its lint rule, the keys of section 10, the routes
    of the calendars, of the person and of the Users of a calendar, the invitation accepted and
    declined, the details.
@@ -1220,12 +1458,23 @@ steps would follow this order; nothing reaches the cloud before the last two.
    elsewhere", the removal of a User; the journey with two Administrators.
 6. **E-mail per calendar**: the daily mail, the mail on demand, the mailer's two new kinds; the
    eraser and the deletion of a calendar.
-7. **The assistant** over every calendar of its person; the evaluation, agreed and run.
-8. **The page**: the services, then the screens.
-9. **The release prepared**: the migration script, the smoke test, the runbook, the full
-   regression.
-10. **The cloud**: the last backup, the deploy, the super-user, the first calendar and its
-    set-up, the invitations, the old pool retired; tag v4.0.0.
+7. **The assistant** over every calendar of its person, with the fake Claude; the evaluation's
+   new requests written, not run.
+8. **The page**: the services, then the screens, in both languages, with their budgets and the
+   looks in Italian and in the padded test language.
+9. **The release prepared**: the migration script and its trial on a copy of the set-up, the
+   smoke test, the runbook, the Italian read by the Product Owner, the full regression, the
+   paid evaluation agreed and run.
+10. **The cloud**: the last backup, the deploy from the branch, the API before the page, the
+    change set read; the facts of section 14.1 on the new pool, checked again; the super-user, the first
+    calendar and its set-up; the operator's look with two Administrators and one person linked
+    to both; tag v4.0.0.
+11. **After the release**: the branch merged into `main`; the old pool retired; what is still
+    owed named (part B of step m10 of `docs/EMAIL_PLAN.md`, the mailer's role, the branches
+    `gdpr` and `whatsapp`, which merge the new `main`).
+
+How the old routes and the new ones live together while steps 3 to 8 run, and how each step
+leaves the branch green, is the plan's to say after reading the code.
 
 ---
 
@@ -1236,24 +1485,34 @@ steps would follow this order; nothing reaches the cloud before the last two.
 | Id | Question | Decision |
 |---|---|---|
 | Q1 | What does `POST /hello` answer, now that no account is "the Administrator" and nobody has a username? | **Decided**: the messages of section 11.4 |
-| Q2 | Should step m10 of `docs/EMAIL_PLAN.md` create again only the Users who cannot wait, since they are all invited again at v4.0.0? | **Decided**: chosen when v3.0.0 is released, by how soon this is built |
+| Q2 | Should step m10 of `docs/EMAIL_PLAN.md` create again only the Users who cannot wait, since they are all invited again at v4.0.0? | **Decided**: chosen when v3.0.0 is released, by how soon this is built. As of 2026-11-28: v3.0.0 is released in the sandbox and no real User is invited yet; the choice is made when AWS grants production access (section 18) |
 | Q3 | How many calendars and people is this for? | **Decided**: about 10 calendars of 10 people each; well beyond it, the `calendar` table's capacity and the assistant's cost are looked at again (section 10.6) |
 | Q4 | A second factor at the sign-in for super-users? | **Decided**: yes, for super-users only, as a later step, outside this release |
 | Q5 | The proposals of section 2.3 (K16 to K20, K22 to K25) | **Confirmed** |
 | Q6 | A removed person's past appointments show "former user" to the Administrator (decision K25) | **Decided**: yes; the Excel backups hold the names |
 
+**Confirmed on 2026-11-28** (section 2.4): K26, the language beside the three details; K27,
+the language of each invitation; K28, the default language is the stack's; K29, the message of
+`POST /hello` in English; K30, the two error codes that go; K31, the documents changed step by
+step; K32, the facts of the new pool tried early, in a stack of its own.
+
 Still to settle, when the plan is written: whether people and appointments are carried over
-after all, by the count of section 10.7; and the five trials of section 14.1.
+after all, by the count of section 10.7; and the local trials of section 14.1.
 
 **Do** (as operator, when the plan reaches them):
 
-1. Release v3.0.0 first.
-2. Before the release of v4.0.0: tell the Administrator and the Users that they will be invited
-   again and will sign in with their e-mail address; have the last Excel backup; note the
-   appointments still to come.
-3. At the release: run the bootstrap script for your super-user; create the first calendar; run
-   the migration script; see the Administrator's invitation accepted.
-4. Give the GDPR work this document (section 12.4).
+1. In the plan's first step: deploy the small stack of decision K32, receive its invitation,
+   and delete the stack the same day.
+2. Before the release of v4.0.0: tell the Administrator and the testers that they will be
+   invited again and will sign in with their e-mail address; have the last Excel backup; note
+   the appointments still to come.
+3. Read the Italian of the new texts, once, before the release (section 11.6).
+4. Agree the cost of the assistant's paid evaluation before it runs.
+5. At the release: verify at SES each address that will be invited while the sandbox lasts; run
+   the bootstrap script for your super-user; create the first calendar; run the migration
+   script; see the Administrator's invitation accepted.
+6. When AWS grants production access: the real Users, as section 18 says.
+7. Give the GDPR work this document (section 12.4).
 
 ---
 
@@ -1272,6 +1531,12 @@ after all, by the count of section 10.7; and the five trials of section 14.1.
   `AdminCreateUser`: "If your user pool only supports phone numbers or email addresses as
   sign-in attributes, Amazon Cognito automatically generates a username value."
   https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-cognito-userpooluser.html
+
+Read on 2026-11-28, the section "Attribute permissions and scopes" of "Working with user
+attributes" (the second source above): an app client with no `WriteAttributes` may write every
+standard attribute, and a list limits it. It does not say whether the app client of a pool
+whose sign-in name is the e-mail address accepts a list of `locale` alone: listed in section
+14.1, to try.
 
 Not read yet, and listed in section 14.1 to be confirmed before the first step: the printed
 value of the invitation's username placeholder and the token's `username` claim in such a pool,
