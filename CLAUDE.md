@@ -67,10 +67,10 @@ one that is fixed:
   conversation with the assistant (a message, an answer, a tool's input or result).
 - The assistant changes the calendar, or sends a mail, only through `confirmProposal`, after the
   person's button, and reaches it through a route's handler, never through `backend/src/lib/calendarDb.ts`.
-- IAM policies never use a wildcard action or resource. One role per function, granting only
-  what its route needs, scoped to the user pool and/or table it uses. The calendar's DynamoDB
-  permissions are shared managed policies on the `calendar` table, attached per role
-  (`docs/ARCHITECTURE.md` section 7.1).
+- IAM policies never use a wildcard action or resource, but the mailer's `identity/*` while SES
+  keeps the account in its sandbox (`docs/EMAIL_PLAN.md` step m10). One role per function, with
+  only what its route needs, on its user pool and/or table. The calendar's DynamoDB permissions
+  are shared managed policies on the `calendar` table, attached per role (`docs/ARCHITECTURE.md` section 7.1).
 - A User's first password is temporary: Cognito makes it, e-mails it and forces its change at
   the first sign-in; the API never sees or answers it. The Administrator's is set once as
   permanent by `bootstrap-admin`. One exception: `test-user`, the operator's command, gives its

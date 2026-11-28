@@ -704,11 +704,11 @@ views follow `docs/FRONTEND_ARCHITECTURE.md` sections 3 and 4 (a dialog, a form)
   Administrator's edit of a profile, and the on-demand mails go to the asker. The limits of
   section 6.5 cap the volume.
 
-### 12.2 Permissions (one role per function, nothing wildcard)
+### 12.2 Permissions (one role per function, nothing wildcard but the mailer's in the sandbox)
 
 | Function | Gains |
 |---|---|
-| `mailer` (new) | `ses:SendEmail` on the domain identity and the configuration set; `CalendarReadPolicy`; the `mail` table read/write; Cognito `ListUsersInGroup` and `AdminGetUser` on the one pool |
+| `mailer` (new) | `ses:SendEmail` on the domain identity and the configuration set (in the sandbox, on every identity of the account with the From held to the stack's address: section 13.2); `CalendarReadPolicy`; the `mail` table read/write; Cognito `ListUsersInGroup` and `AdminGetUser` on the one pool |
 | `sendCalendarMail` (new route) | `lambda:InvokeFunction` on the mailer; Cognito `AdminGetUser` (has the person an address?); the `mail` table (counter) |
 | `confirmProposal` | `lambda:InvokeFunction` on the mailer, plus what `sendCalendarMail` needs: `dynamodb:UpdateItem` on the table `mail` (the `AdminGetUser` it already held); the variables `MAIL_STAGE`, `MAIL_TABLE`, `MAILER_FUNCTION`, `LAMBDA_ENDPOINT` |
 | `sendAssistantMessage`, `continueAssistant` | Cognito `AdminGetUser` on the one pool: the tool's proposal reads the person's address through the handler of `GET /me` (section 7); the variable `MAIL_STAGE`, and nothing of the table `mail` or the mailer |
@@ -786,8 +786,12 @@ for DNS. Hence a stage parameter:
    mailbox simulator, Cognito's invitations included: so until production access the
    Administrator creates no User, and asks no mail, for an address that is not verified. The
    smoke test fits that rule (its Users get the simulator, its invitation the operator's own
-   verified address). Once the account is out of the sandbox, nothing is deployed again: the same
-   stage mails any address. `docs/EMAIL_PLAN.md` step m10 runs this stage in two parts, A in the
+   verified address). In the sandbox SES also checks the mailer's role against the recipient when
+   the recipient is a verified address, so while it lasts the mailer's `ses:SendEmail` names
+   every identity of the account, its From held to the stack's address by a condition (the one
+   exception to the root `CLAUDE.md`'s wildcard rule; Cognito's invitations, sent with Cognito's
+   own role, need none). Once the account is out of the sandbox, one deploy puts the right back to
+   the domain alone, and the same stage mails any address. `docs/EMAIL_PLAN.md` step m10 runs this stage in two parts, A in the
    sandbox and B after production access.
 
 Pointing the pool at SES (`EmailConfiguration` with `EmailSendingAccount: DEVELOPER`) makes

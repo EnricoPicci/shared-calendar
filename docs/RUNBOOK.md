@@ -654,6 +654,13 @@ does not say what `AdminCreateUser` does then, and a mail the mailer sends there
    "E-mail…" in the week as the Administrator and as a test User whose address is verified, each
    Excel file opened; in "Settings" the daily mail's hour, set to the next whole hour to see the
    daily mail and its two files the same day, then to the hour wanted.
+   **The mailer's role in the sandbox:** with `ses:SendEmail` on the domain's identity alone, the
+   mail on demand fails with `AccessDeniedException` (the mailer's log, field `reason`; its
+   error alarm), because SES checks the role against a verified recipient's identity too, while
+   the invitations, sent with Cognito's own role, arrive. So between parts A and B the template
+   gives the mailer `identity/*`, the From held to `noreply@<domain>` by the condition
+   `ses:FromAddress` (`docs/EMAIL_PLAN.md` step m10): its deploy's change set is the mailer's
+   role alone, Modify; then the smoke test again.
 7. The API's 5xx alarm should no longer go off for the e-mail routes, which answer `503` only
    below `on`: one now is a fault, looked at in the access log. The mailer's error alarm counts a
    mail SES refused, such as one to an address that is not verified.
@@ -662,18 +669,25 @@ does not say what `AdminCreateUser` does then, and a mail the mailer sends there
 **At `on`, part B: out of the sandbox** (`docs/EMAIL_PLAN.md` step m10, part B). It starts when
 `aws sesv2 get-account --query '{production:ProductionAccessEnabled,quota:SendQuota}'` answers
 `production` true; the query keeps the contact addresses out of the answer. Write the new quota
-in section 5.11. Nothing is deployed.
+in section 5.11.
 
-1. Create again, in the page, the Users who need an account (step m9's list): each receives an
+1. The mailer's role back to the domain's identity alone, in `backend/template.yaml`, and the
+   root `CLAUDE.md`'s wildcard rule without its exception; committed, then section 2's steps:
+   the change set is the mailer's role alone, Modify. The smoke test again: 65 PASS, its mail on
+   demand `sent`. Checked: `grep -rn 'identity/\*' backend/template.yaml CLAUDE.md
+   docs/ARCHITECTURE.md` finds nothing. AWS does not say whether SES, out of the sandbox, still checks the role against
+   a recipient that is a verified identity: if the mail line fails with `AccessDeniedException`,
+   delete the address identity of that recipient (step 4) and ask the mail again.
+2. Create again, in the page, the Users who need an account (step m9's list): each receives an
    invitation; book their future appointments again by hand if wanted. A bounce report, should
    one come, reaches the Reply-To mailbox: correct the User's address in the Users screen and
    "Resend invitation".
-2. Delete the test Users in the Users screen.
-3. The address identities verified in part A: keep them, or delete those no longer wanted (SES
+3. Delete the test Users in the Users screen.
+4. The address identities verified in part A: keep them, or delete those no longer wanted (SES
    console, Identities, the address, "Delete"). A recipient needs no identity out of the sandbox,
    so nothing depends on them; kept, they spare a new verification should mail be tried in a
    sandbox again. Never delete the domain's identity, which the stack owns.
-4. Update the privacy notice, outside the system (`docs/EMAIL_ARCHITECTURE.md` section 12.3).
+5. Update the privacy notice, outside the system (`docs/EMAIL_ARCHITECTURE.md` section 12.3).
 
 ---
 

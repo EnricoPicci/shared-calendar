@@ -1,6 +1,12 @@
 # Shared Calendar: e-mail (implementation plan)
 
-**Version:** v14 (2026-11-28): step m10 cut into parts A (the stage `on` in SES's sandbox,
+**Version:** v15 (2026-11-28): found at part A's first smoke test, SES in the sandbox refuses
+the mailer's mail to a verified address, since it checks the role against the recipient's
+identity too, and the role names the domain alone; Cognito's invitations, sent with Cognito's own
+role, arrive. The Product Owner's decision: the mailer's sending right names every identity of
+the account (`identity/*`, the From held to the stack's address by a condition) between parts A
+and B, the one exception to the root `CLAUDE.md`'s wildcard rule; part B puts the domain back,
+with a deploy and the smoke test. v14 (2026-11-28): step m10 cut into parts A (the stage `on` in SES's sandbox,
 every recipient an address verified in SES, the smoke test, the operator's look with real mails,
 the tag `v3.0.0`) and B (after production access: the Users invited again, the test Users and
 the verified addresses kept or deleted at the operator's choice, the documents closed), each with its start, its check and its
@@ -235,8 +241,8 @@ breaks it**, not later.
 | m7 | `docs/FRONTEND_SERVICES.md` (the sign-in's challenge), `docs/FRONTEND_ARCHITECTURE.md` and `docs/FRONTEND_WALK.md` (the screen "Choose your password") |
 | m8 | **Root `CLAUDE.md`: the hard rule's password part** becomes "A User's first password is temporary: Cognito makes it, e-mails it and forces its change at the first sign-in; the API never sees it or answers it. The Administrator's password is set once as permanent by the bootstrap" (the creation without a password is what makes it true), with F15's exception for the operator's test User. `docs/ARCHITECTURE.md` sections 1.2, 5.1, 6.3, 7.3, 7.4, 10 and 13 rewritten from `docs/EMAIL_ARCHITECTURE.md` (its section 17), with the stages and parameters; `docs/RUNBOOK.md` section 6 and a draft of the stages' steps; the three front-end documents (the users screen's invitation); every changed journey's page |
 | m9 | `docs/RUNBOOK.md`: the stage `domain`, the DNS records, the production access, the suppression list; section 5.11, the deployment record, opened |
-| m10 A | `README.md` "Versions": v3.0.0; `docs/RUNBOOK.md` section 3.3's "At `on`", part A, corrected by the run, and section 5.11 continued |
-| m10 B | `docs/EMAIL_ARCHITECTURE.md` a record (status line); `docs/ARCHITECTURE.md` v18 closed; `docs/SHARED_CALENDAR_SPEC.md` section 15's sentence on the address confirmed; `docs/CONVERSATIONAL_ARCHITECTURE.md` status line (deployed); `docs/RUNBOOK.md` section 3.3's "At `on`", part B, corrected, and section 5.11 closed; root `CLAUDE.md`: `docs/EMAIL_PLAN.md` among the records of finished work |
+| m10 A | **Root `CLAUDE.md`: the wildcard rule** names its one exception, the mailer's `identity/*` while SES keeps the account in its sandbox; `docs/ARCHITECTURE.md` section 7.1's row "Mail only to oneself" and `docs/EMAIL_ARCHITECTURE.md` section 12.2 say the same; `README.md` "Versions": v3.0.0; `docs/RUNBOOK.md` section 3.3's "At `on`", part A, corrected by the run, and section 5.11 continued |
+| m10 B | **Root `CLAUDE.md`: the wildcard rule's exception removed**, with `docs/ARCHITECTURE.md` section 7.1's row and `docs/EMAIL_ARCHITECTURE.md` section 12.2; `docs/EMAIL_ARCHITECTURE.md` a record (status line); `docs/ARCHITECTURE.md` v18 closed; `docs/SHARED_CALENDAR_SPEC.md` section 15's sentence on the address confirmed; `docs/CONVERSATIONAL_ARCHITECTURE.md` status line (deployed); `docs/RUNBOOK.md` section 3.3's "At `on`", part B, corrected, and section 5.11 closed; root `CLAUDE.md`: `docs/EMAIL_PLAN.md` among the records of finished work |
 
 ## 5. The acceptance check
 
@@ -275,9 +281,9 @@ whole of `docs/FRONTEND_WALK.md` on a restarted and seeded local stack, and
   requirement, minutes long), the smoke test in the cloud, and the operator's look at the
   deployed page with real mails, every recipient an address verified in SES. The whole local walk
   is not repeated unless a screen changed after step m9 (the page is deployed in step m9, F13);
-  if one did, it runs again in full before the page's second deploy. Part B redeploys nothing
-  unless something changed after part A; if something did, the gate's `verify`, the deploy and
-  the smoke test run again there.
+  if one did, it runs again in full before the page's second deploy. Part B deploys the API once
+  more, to put the mailer's sending right back to the domain alone: the gate's `verify`, the
+  deploy and the smoke test run again there.
 
 ## 6. Steps
 
@@ -1147,6 +1153,20 @@ listed in `docs/EMAIL_ARCHITECTURE.md` section 22.2):
   SES" and "Delete an identity using the SES console"). So part B keeps them or deletes them at
   the operator's choice: they are the operator's own addresses, cost nothing, and spare a new
   verification should mail be tried again in a sandbox (another stack or region).
+- **The mailer's role in the sandbox** (found at part A's first smoke test, 2026-11-28). SES
+  refused the mailer's mail on demand to a verified address with `AccessDeniedException`, three
+  times (the call and Lambda's two retries), while the smoke test's two invitations, sent by
+  Cognito with its own role, arrived; a mail on demand by a test User whose address is SES's
+  simulator, which is no identity of the account, was `sent`. So in the sandbox SES checks the
+  sender's role against the recipient when the recipient is a verified identity, and a role that
+  names the domain alone reaches no real mailbox. SES's IAM guide says only that the sandbox's
+  restrictions "prevent the implementation of some of these policies" ("Identity and access
+  management in Amazon SES", https://docs.aws.amazon.com/ses/latest/dg/control-user-access.html).
+  **Decided** (the Product Owner, 2026-11-28): between parts A and B the mailer's `ses:SendEmail`
+  names every identity of the account, `identity/*`, with the condition `ses:FromAddress` equal
+  to the stack's address, so that it still sends only as `noreply@<domain>`: the one exception to
+  the root `CLAUDE.md`'s wildcard rule, written in that rule. Part B, out of the sandbox, puts the
+  domain's identity back.
 
 #### Part A — the stage `on` in the sandbox, and the release v3.0.0
 
@@ -1185,7 +1205,9 @@ production access.
    65 PASS (`docs/RUNBOOK.md` section 2.4); its invitation, sent and resent, in your mailbox; its
    mail on demand in the Administrator's. Then the log search from the deploy on, by field only
    (`level`, `status`, `route`), as in step m9. A failure that names SES's rate (1 mail a second
-   in the sandbox) is said as such, not fixed by hand.
+   in the sandbox) is said as such, not fixed by hand. The first run, with the role on the domain
+   alone, failed its mail line (the finding above); the run after the role's widening
+   (`identity/*`, deployed as point 3 was) is the one that counts.
 6. **Operator, the look at the deployed page with real mails**, every recipient verified:
    - the smoke's invitation: from `noreply@<domain>`, Reply-To the alarm address, not in spam;
    - a throw-away User created in the page with your own address, the last look checked: its
@@ -1218,9 +1240,14 @@ logs clean; the operator's look all yes; the tag `v3.0.0`. With it the full regr
 `--query` of `ProductionAccessEnabled` and `SendQuota` only (the whole answer holds the contact
 addresses). The new daily quota and rate are written in `docs/RUNBOOK.md` section 5.11.
 
-1. **Nothing is deployed:** the stage `on` mails any address once the account is out of the
-   sandbox. Only if the code or the page changed after part A: the gate's `verify`, the deploy
-   and the smoke test again (section 5.2).
+1. **The mailer's role back to the domain alone:** in `backend/template.yaml` its
+   `ses:SendEmail` names the domain's identity and the configuration set again, the condition
+   removed; the root `CLAUDE.md`'s wildcard rule without its exception. Committed; the gate's
+   `verify`; `npm run deploy -w backend`, its change set the mailer's role alone, Modify; the
+   smoke test again, 65 PASS, now that a mail to any address needs no identity (section 5.2).
+   AWS does not say whether SES, out of the sandbox, still checks the role against a recipient
+   that is a verified identity: if the mail line fails with `AccessDeniedException`, the address
+   identity of that recipient is deleted, which point 2 allows, and the mail asked again.
 2. **Operator:**
    - the Users of step m9's list created again in the page, each with their four facts and the
      last look checked; each receives their invitation; their future appointments booked again
@@ -1235,12 +1262,17 @@ addresses). The new daily quota and rate are written in `docs/RUNBOOK.md` sectio
 3. **The documents closed:** section 4's row m10 B; this part's "As done" note; this plan marked
    finished (its version line).
 
-**Operator, in plain words (B):** say when AWS's answer has come; create the people again in the
+**Operator, in plain words (B):** say when AWS's answer has come; say "y" to the deploy that
+narrows the mailer's role, and run the smoke test again; create the people again in the
 page and tell them to look for the invitation, spam folder included; book their appointments
 again if wanted; delete the two test Users; keep or delete the verified addresses, as you like;
 update the privacy notice.
 
-**Check (B):** the operator reports the Users invited and their mails received; `miri` and
+**Check (B):** **the wildcard gone**: `grep -rn 'identity/\*' backend/template.yaml CLAUDE.md docs/ARCHITECTURE.md`
+finds nothing, the root `CLAUDE.md`'s rule reads "IAM policies never use a wildcard action or
+resource" with no exception, and the deployed mailer's role names the domain's identity alone
+(`aws iam get-role-policy` on it, read-only); the smoke test 65 PASS after that deploy; the
+operator reports the Users invited and their mails received; `miri` and
 `enri` gone; the domain's identity still `SUCCESS`; root `typecheck` and `lint` green; the documents closed.
 Then the merge of `multilanguage` may begin, with its own brief.
 
@@ -1261,6 +1293,7 @@ Then the merge of `multilanguage` may begin, with its own brief.
 | m10 A | Type own address for the smoke test; its invitation | Own terminal, own mailbox |
 | m10 A | The look with real mails: a throw-away User, its resend and first sign-in; "E-mail…" as the Administrator and as a test User; the daily mail's hour and its mail | The deployed page, own mailbox |
 | m10 A | The word for the tag `v3.0.0` | The review |
+| m10 B | "y" to the deploy that narrows the mailer's role; the smoke test again | Own terminal |
 | m10 B | The Users invited again (step m9's list), their appointments booked again if wanted | The deployed page |
 | m10 B | The test Users `miri` and `enri` deleted; the verified addresses kept or deleted, as the operator prefers | The deployed page, the SES console |
 | m10 B | The privacy notice updated with the new data and the Excel files (`docs/EMAIL_ARCHITECTURE.md` section 12.3) | Outside the system |
