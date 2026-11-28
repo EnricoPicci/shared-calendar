@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| Status | Agreed with the Product Owner in the session of 2026-11-27. Nothing of it is done yet |
-| Date | 2026-11-27 |
-| What it is | The order in which three pieces of work reach `main` and the cloud: e-mail (`docs/EMAIL_PLAN.md`, at its step m10), the two languages (branch `multilanguage`, finished and waiting to be merged) and several calendars (`docs/MULTI_CALENDAR_ARCHITECTURE.md`, designed, no plan yet) |
+| Status | Agreed with the Product Owner in the session of 2026-11-27. Steps 1 to 3 are done (`main` at the tag `v3.1.0`). Step 4 is under way: `main` is merged into the branch `multi-calendar`, the design is being corrected against it, no plan yet. Step 5 is open: AWS has not granted production access |
+| Date | 2026-11-27, the states of the steps as of 2026-11-28 |
+| What it is | The order in which three pieces of work reach `main` and the cloud: e-mail (`docs/EMAIL_PLAN.md`, its step m10), the two languages (`docs/MULTILANGUAGE_PLAN.md`) and several calendars (`docs/MULTI_CALENDAR_ARCHITECTURE.md`, designed, no plan yet) |
 | Why it exists | Step m10 of `docs/EMAIL_PLAN.md` waits for AWS to grant production access to Amazon SES, a wait of unknown length that held everything behind it. This order takes that wait off the path |
-| What it does not do | It changes no plan. `docs/EMAIL_PLAN.md` and the plan of the branch `multilanguage` are changed by their own sessions, on their own branches (section 4) |
+| What it does not do | It changes no plan. `docs/EMAIL_PLAN.md` and `docs/MULTILANGUAGE_PLAN.md` were changed by their own sessions, on their own branches (section 4) |
 
 ---
 
@@ -21,6 +21,14 @@
    plan, build it on that branch, deploy, and only then merge the branch into `main`.
 5. Whenever AWS grants production access, during any of the above: nothing is deployed again;
    the same stack starts reaching every address.
+
+| Step | State | Closed by |
+|---|---|---|
+| 1 | Done | `ef6ddc4`, tag `v3.0.0`: the addresses were verified within part A of step m10 of `docs/EMAIL_PLAN.md` |
+| 2 | Done | `ef6ddc4`, tag `v3.0.0` |
+| 3 | Done | `491ca3c`, tag `v3.1.0` |
+| 4 | Under way | Its point 1, the merge of `main` at `491ca3c` into the branch, is done. Points 2 to 5 are open |
+| 5 | Open | AWS has not granted production access. Part B of step m10 of `docs/EMAIL_PLAN.md` is owed, from `main` |
 
 ---
 
@@ -74,26 +82,32 @@ it.
 
 - Keep it to the operator and the testers: the verification mail comes from Amazon and reads
   oddly to a client.
-- Not confirmed: whether one verified address also covers its plus-addresses
-  (`name+demo1@…`) as recipients in the sandbox. If it does not, each plus-address is verified
-  by itself.
+- One verified address does not cover its plus-addresses (`name+demo1@…`) as recipients in
+  the sandbox: each is its own identity and is verified by itself (`docs/RUNBOOK.md` section
+  3.3).
 
 **Done when** each address shows as verified in the console.
 
+**State: done**, within part A of step m10 of `docs/EMAIL_PLAN.md` (`ef6ddc4`, tag `v3.0.0`).
+
 ### Step 2. `main` at the stage `on`, in the sandbox
 
-Step m10 of `docs/EMAIL_PLAN.md`, in two halves, of which this is the first: the deploy at
+Step m10 of `docs/EMAIL_PLAN.md`, in two parts, of which this is part A: the deploy at
 `MailStage` `on`, the smoke test, the operator's look with a real invitation and a real daily
-mail, all with verified addresses. The second half, the Users who need an account created
-again, waits for step 5.
+mail, all with verified addresses. Part B, the Users who need an account created again, waits
+for step 5.
 
 - The smoke test needs nothing more: it mails SES's simulator and the operator's own address
   (`docs/EMAIL_ARCHITECTURE.md` section 13.3).
-- To decide in that session: whether the tag `v3.0.0` marks this half or waits for the second.
-  The code is the same in both.
+- The tag `v3.0.0` marks part A.
+- While SES keeps the account in its sandbox, the mailer's right to send is on every identity
+  of the account, with the sender held to the stack's address. Part B takes that back
+  (`docs/RUNBOOK.md` section 3.3).
 
 **Done when** the smoke test passes in the cloud at the stage `on` and the operator has received
 an invitation and a daily mail.
+
+**State: done** (`ef6ddc4`, tag `v3.0.0`; the record is `docs/RUNBOOK.md` section 5.11).
 
 ### Step 3. Merge `multilanguage` into `main`
 
@@ -101,6 +115,9 @@ The merge that branch's own plan describes, which was waiting for step m10. It i
 that plan says.
 
 **Done when** `main` holds the two languages and its gate is green.
+
+**State: done**, released and deployed as `v3.1.0` (`491ca3c`; the record is `docs/RUNBOOK.md`
+section 5.12). Still owed on `main`, by that work: the look at the daily mail in Italian.
 
 ### Step 4. Several calendars
 
@@ -125,6 +142,10 @@ that plan says.
 
 **Done when** v4.0.0 is deployed and the branch is merged into `main`.
 
+**State: under way.** Point 1 is done: `main` at `491ca3c` is merged into the branch, without a
+conflict. Point 2 is being done. Points 3 to 5 are open. Whenever `main` moves again (part B
+of step m10, a fix of a release), the branch merges it again.
+
 ### Step 5. Production access, whenever AWS grants it
 
 No deploy. The operator invites the real Users again: the second half of step m10 of
@@ -135,15 +156,17 @@ time, once in today's user pool and once in the new one. Whether to invite only 
 cannot wait is point Q2 of `docs/MULTI_CALENDAR_ARCHITECTURE.md` section 21, decided at that
 moment.
 
+**State: open.** AWS has not granted production access.
+
 ---
 
 ## 4. What each piece of work must change for this order
 
-| Where | What | By whom |
-|---|---|---|
-| `docs/EMAIL_PLAN.md`, step m10 | Split in two: the stage `on` in the sandbox with verified addresses (step 2 here); the real Users, at production access (step 5 here). `docs/RUNBOOK.md` section 3.3 says today that the stage `on` follows production access | the e-mail work's session, on `main` |
-| The plan of the branch `multilanguage` | Its merge waits for step 2 here, not for production access | that branch's session |
-| `docs/MULTI_CALENDAR_ARCHITECTURE.md` section 18 | "The build starts only after v3.0.0 is deployed" becomes: after step 3 here, on the branch `multi-calendar`, merged into `main` after its release | this branch, at step 4 |
+| Where | What | By whom | State |
+|---|---|---|---|
+| `docs/EMAIL_PLAN.md`, step m10 | Split in two: the stage `on` in the sandbox with verified addresses (step 2 here); the real Users, at production access (step 5 here). `docs/RUNBOOK.md` section 3.3 said that the stage `on` follows production access | the e-mail work's session, on `main` | Done on `main` (`d1d66cc`): parts A and B of step m10 |
+| `docs/MULTILANGUAGE_PLAN.md`, phase B | Its merge waits for step 2 here, not for production access | that branch's session | Done on `main` (`f6755c7`, the merge after part A) |
+| `docs/MULTI_CALENDAR_ARCHITECTURE.md` section 18 | "The build starts only after v3.0.0 is deployed" becomes: after step 3 here, on the branch `multi-calendar`, merged into `main` after its release | this branch, at step 4 | Open: step 4's point 2 |
 
 ---
 
