@@ -6,7 +6,8 @@ brief `prompts/lang-l03-phase-a-implementation.md`; steps l1 to l8 done. v3 (202
 `main` merged in at phase B's item 6, with brief `prompts/lang-l04-merge-with-main.md`. v4
 (2026-11-28): phase B's item 7, the full regression, with brief
 `prompts/lang-l05-full-regression.md`. v5 (2026-11-28): phase B's item 8, the deploy, with brief
-`prompts/lang-l06-deploy.md`.
+`prompts/lang-l06-deploy.md`. v6 (2026-11-28): phase B's item 9, the release `v3.1.0`, with
+brief `prompts/lang-l07-release.md`; the plan finished.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -1117,6 +1118,21 @@ without it, and the rules of the root `CLAUDE.md` hold as written.
      the version, `README.md`'s row, the tag, `main` moved and the push are left to it.
 9. **The release closed**: the version (a minor one after the e-mail work's, chosen then),
     the record in `docs/RUNBOOK.md`, `README.md`'s versions, the tag, the push.
+   **As done (2026-11-28)**, with the brief `prompts/lang-l07-release.md`; nothing deployed again.
+   - The cloud read first and found as item 8 left it: `shared-calendar-api` `UPDATE_COMPLETE`
+     at item 8's deploy, `DefaultLanguage` `it`.
+   - The version `v3.1.0`, a minor one: nothing breaks an old client
+     (`docs/MULTILANGUAGE_ARCHITECTURE.md` section 13).
+   - The Administrator's daily mail had not come: the day's run had gone out before the deploy,
+     and every line of kind `daily` since says `already_sent`. The release did not wait;
+     `docs/RUNBOOK.md` section 5.12 keeps it owed.
+   - The records in one closing commit: `README.md`'s row of `v3.1.0`; `docs/RUNBOOK.md` section
+     5.12 named with the version, and section 2 step 6's note on the branch; the architecture's
+     status line and section 17, the cloud's facts as tried, and its four marks of a fact still
+     to try in the cloud (the introduction, sections 4.4, 4.5 and 11) now "tried, section 17".
+   - `main` moved to the closing commit by a fast-forward, the annotated tag `v3.1.0` on it;
+     `main`, `multilanguage` and the tag pushed; the worktree `../shared-calendar-multilanguage`
+     removed, the branch kept. The plan is finished.
 
 ## 6. The rules of the run
 

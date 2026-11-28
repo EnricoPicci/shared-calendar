@@ -128,7 +128,9 @@ both fit into its 30 minutes; otherwise run it again before the second.
    that loads is the proof. The page's address is the command's last line and the stack's output
    `PageUrl`.
    **Which branch:** `main`. The first release was made from the branch `deploy-frontend`
-   (section 5.5), merged into `main` since; the release of section 5.6 was made from `main`.
+   (section 5.5), merged into `main` since; the release of section 5.6 was made from `main`; the
+   release of section 5.12 (`v3.1.0`) was made from the branch `multilanguage`, merged into
+   `main` since.
 
 Rules:
 
@@ -1492,10 +1494,12 @@ read-only `aws` commands, and printed no address.
 - **Cost:** a few dozen mails through SES, a fraction of a US cent; the smoke tests' exchanges at
   Anthropic, about three US cents.
 
-### 5.12 The languages (`docs/MULTILANGUAGE_PLAN.md` phase B, item 8, 2026-11-28)
+### 5.12 The languages, `v3.1.0` (`docs/MULTILANGUAGE_PLAN.md` phase B, items 8 and 9, 2026-11-28)
 
 The API and the page at `744572b`, on the branch `multilanguage` (`main` at `ef6ddc4` merged
-in), not pushed; `main` and the cloud before it at `v3.0.0` (section 5.11). Who did what: the
+in); `main` and the cloud before it at `v3.0.0` (section 5.11). Released as `v3.1.0`: the tag
+on the record's commit after `744572b`, `main` moved to that commit, both pushed (`README.md`
+"Versions"). Who did what: the
 operator ran the deploy, the smoke test and the page's release in a terminal inside `script -q`
 (macOS: `script -q <file> <command>`), typing `y`, the admin password and their own address, and
 looked at the page, the mails and the gap; the session ran `verify`, read-only `aws` commands
@@ -1547,7 +1551,10 @@ no password, token or address.
   `admin-get-user`, that attribute only). Its "E-mail…" at 13:12 UTC answered `429
   mail_limit_reached`: the day's five mails on demand were spent by part A's look and the smoke
   tests. The mail opened was the smoke test's, sent while the account had no language, so in the
-  default. **Owed:** the next daily mail, in the Administrator's language, read the day after.
+  default. **Owed:** the next daily mail, in the Administrator's language. The day's run had gone
+  out at 10:00 UTC, before the deploy; the mailer's lines of kind `daily` since the deploy say
+  `already_sent`, so the first mail in the Administrator's language is the next day's, and the
+  release of `v3.1.0` did not wait for it.
 - **The alarms:** the API's 5xx, the authorizer's and the mailer's errors all `OK`, unchanged
   since before the deploy; the new function has no alarm of its own.
 - **Cost:** a handful of mails through SES and of calls of the new function, nothing measurable;

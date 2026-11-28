@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Finalized as a design, being built (`docs/MULTILANGUAGE_PLAN.md`). The decisions of section 2.2, the proposals of section 2.3 and every open point (section 16) are confirmed by the Product Owner (2026-11-27); L7 was changed by the plan's decision P1. The facts about the local Cognito are tried; the facts about the cloud's pool wait for the plan's phase B (section 17) |
+| Status | Built and deployed (`docs/MULTILANGUAGE_PLAN.md`), released as `v3.1.0` (`docs/RUNBOOK.md` section 5.12). The decisions of section 2.2, the proposals of section 2.3 and every open point (section 16) are confirmed by the Product Owner (2026-11-27); L7 was changed by the plan's decision P1. The facts about the local Cognito and about the cloud's pool are tried (section 17) |
 | Date | 2026-11-27 |
 | Brief | `prompts/lang-l01-multilanguage-idea.md`, with the answers of the clarification round (section 2.2) |
 | Builds on | `docs/ARCHITECTURE.md` (section 5.1, the user pool), `docs/EMAIL_ARCHITECTURE.md` (sections 4, 5, 6 and 7), `docs/FRONTEND_ARCHITECTURE.md` (section 12.4, the language), `docs/CONVERSATIONAL_ARCHITECTURE.md` (section 4.2, the language of a conversation) |
@@ -16,9 +16,9 @@ checked, and what adding a third language costs. It also says what you, as Produ
 operator, have to decide and do (section 16).
 
 The facts about the code were read in the repository on 2026-11-27. The facts about AWS were
-read that day in AWS's documentation (section 17); those not yet tried on a real stack are
-marked "to try". The local Cognito was tried in the plan's step l1; the cloud's pool is tried in
-the plan's phase B (`docs/MULTILANGUAGE_PLAN.md` section 5).
+read that day in AWS's documentation (section 17); those tried on a real stack are marked
+"tried, section 17". The local Cognito was tried in the plan's step l1, the cloud's pool in the
+plan's phase B (`docs/MULTILANGUAGE_PLAN.md` section 5).
 
 ---
 
@@ -245,10 +245,9 @@ The design sets `WriteAttributes: [locale]` on the app client. A person's token 
 their language and nothing else. The Administrator's routes are not affected: they use the
 administrative calls, which this list does not govern.
 
-To try in the cloud (the plan's phase B; the local Cognito ignores the write list, section 17):
-that the change of `WriteAttributes` updates the app client in
-place (the client id must not change, or every page would lose its sign-in), and that the
-back end's routes still write the four facts afterwards.
+Tried in the cloud, section 17 (the local Cognito ignores the write list): the change of
+`WriteAttributes` updates the app client in place (the client id must not change, or every page
+would lose its sign-in), and the back end's routes still write the four facts afterwards.
 
 ### 4.5 How each part knows it
 
@@ -262,8 +261,8 @@ back end's routes still write the four facts afterwards.
 The profile is still "never put into the token" by our code (`docs/EMAIL_ARCHITECTURE.md`
 section 9.2). The page does not read the language from the id token at all: the local Cognito
 never puts `locale` there (section 17), so `GetUser` is the one path, locally and in the cloud.
-To try in the cloud (the plan's phase B): that `GetUser` answers `locale` with the app client's
-default read list.
+Tried in the cloud, section 17: `GetUser` answers `locale` with the app client's default read
+list.
 
 ---
 
@@ -541,7 +540,7 @@ language.
   English.
 - **No table changes.** The conversation already stores its language.
 - **Cognito**: the attribute `locale` on accounts; `WriteAttributes` on the app client; with
-  proposal L12, the trigger on the pool. None replaces the pool (to try, section 4.4).
+  proposal L12, the trigger on the pool. None replaces the pool (tried, section 17).
 - **The logs** stay English and may hold a language's code: it is not one of the facts the
   logs must never contain, and it helps to explain a mail.
 
@@ -687,8 +686,16 @@ user created, read, written and deleted (`docs/MULTILANGUAGE_PLAN.md` step l1):
   the probe changed its own `given_name`. It calls no "custom message" function unless its own
   configuration names one.
 
-Still to try, on the cloud's pool, in the plan's phase B: that setting `WriteAttributes`
-updates the app client in place (the change set says "Modify", not "Replace"); that a write
-list of `locale` alone is accepted; that the administrative calls still write the four facts;
-that `GetUser` answers `locale` with the default read list; that a person's token can no longer
-write their own e-mail.
+Tried on the cloud's pool on 2026-11-28, at the deploy of `docs/MULTILANGUAGE_PLAN.md` phase B
+item 8, with a throw-away User made in "Users" and deleted after (`docs/RUNBOOK.md` section 5.12):
+
+- **Confirmed**: setting `WriteAttributes` updates the app client in place: the change set
+  "Modify", replacement `False`, each detail `RequiresRecreation` `Never`, the client's id
+  unchanged; a write list of `locale` alone is accepted. The pool's `LambdaConfig` changed the
+  same way, so the pool was not replaced either.
+- **Confirmed**: the administrative calls still write the four facts (the smoke test, 65 PASS).
+- **Confirmed**: `GetUser` answers `locale` with the app client's default read list.
+- **Confirmed**: a person's own access token can no longer write their e-mail
+  (`UpdateUserAttributes` on `email` refused, `NotAuthorizedException`) and can write `locale`.
+- **Confirmed**: the invitation function is called for each invitation and each resend (source
+  `CustomMessage_AdminCreateUser`), and the mail that arrives is the one it words, in Italian.
