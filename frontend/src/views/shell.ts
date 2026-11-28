@@ -443,6 +443,12 @@ export function mountShell(
           if (screens[i] === screen) link.setAttribute('aria-current', 'page');
           else link.removeAttribute('aria-current');
         });
+        // On a phone the navigation is a strip that scrolls sideways in its own box, and drawn
+        // again it may stand where the link on show is out of sight: the strip alone is scrolled
+        // just enough to show that link whole, the page itself never.
+        const strip = nav.getBoundingClientRect();
+        const current = links[screens.indexOf(screen)]!.getBoundingClientRect();
+        nav.scrollLeft += Math.min(0, current.left - strip.left) + Math.max(0, current.right - strip.right);
         const element = find(screen.element);
         element.hidden = false;
         shown = screen.show(element, objects);

@@ -196,10 +196,11 @@ label.check { display: flex; align-items: center; gap: 0.4rem; }
 .user-row button { flex: none; }
 /* The row's texts share its width, the e-mail the larger part; on a narrow screen they wrap
    onto more lines rather than break an address in the middle */
-.users-screen .list { max-width: 52rem; }
+.users-screen .list { max-width: 60rem; }
 /* The row's buttons stay together, at its right end: when the row is too narrow for them they
-   go to a line of their own, both, never one under the other's texts */
-.user-row .row-buttons { display: flex; flex: none; gap: 0.5rem; margin-left: auto; }
+   go to a line of their own, all of them, never one under the other's texts; when even that
+   line is too narrow they wrap among themselves, still at the right end, never past the row */
+.user-row .row-buttons { display: flex; flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; min-width: 0; margin-left: auto; }
 .user-row { flex-wrap: wrap; }
 .user-row .username { flex: 1 1 6rem; }
 .user-row .name { flex: 1 1 8rem; overflow-wrap: break-word; color: #52606d; }
@@ -326,7 +327,9 @@ dialog .person { display: flex; flex-wrap: wrap; gap: 0 0.75rem; width: 100%; te
 /* The assistant: a panel fixed to the bottom of the window, over whichever screen is on show.
    Collapsed it is one bar, the heading and the field side by side. */
 .assistant { position: fixed; left: 0; right: 0; bottom: 0; z-index: 3; display: flex; align-items: center; gap: 0.5rem 0.75rem; box-sizing: border-box; padding: 0.5rem 1rem; background: #fff; border-top: 1px solid #b6c0cc; box-shadow: 0 -2px 10px #0002; }
-.assistant-head { display: flex; align-items: center; gap: 0.5rem; }
+/* The heading's buttons wrap to a second line, at the right, when the window is too narrow for
+   the three side by side */
+.assistant-head { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 0.5rem; }
 .assistant-head h2 { font-size: 1rem; margin-right: auto; }
 .assistant .toggle { font-weight: 600; }
 /* The arrow is drawing only: after the slash it is given no words, so that a screen reader says
@@ -340,7 +343,7 @@ dialog .person { display: flex; flex-wrap: wrap; gap: 0 0.75rem; width: 100%; te
 .compose button { flex: none; }
 /* Open: the heading with its two buttons on top, the conversation in the middle, taking what
    is left and scrolling inside, the field at the bottom. About half of the window's height. */
-.assistant.open { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; align-items: stretch; height: 50dvh; }
+.assistant.open { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; align-items: stretch; height: 50dvh; }
 .talk { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 .talk p { margin: 0; }
 .talk p:empty { display: none; }

@@ -1067,13 +1067,20 @@ without it, and the rules of the root `CLAUDE.md` hold as written.
      whole in Italian at 390 × 844 (headless Chromium) and at 1280 × 800 (Chrome), checks 179,
      182, 183 and 219 at both, an English look at every screen and dialog at 1280. Every check
      walked answered yes; 223 at 390 only. Checks 235 and 238 corrected. Three findings on
-     the screens, none fixed, for the Product Owner to decide: the padded Italian at 390 (an
-     invited User's row scrolls the page sideways, the panel's "Chiudi" and "Invia" cut); an
-     invited User's row at 1280 with its buttons on a line of their own, against check 233; the
-     active link half outside the navigation strip at 390 after the frame is drawn again.
-   - Item 8 finds the code as merged at item 6, with the one journey above changed and nothing
-     under `shared/`, `backend/src`, `frontend/src` or either `template.yaml`, ready for the
-     deploy once the Product Owner has ruled on the three findings.
+     the screens: the padded Italian at 390 (an invited User's row scrolls the page sideways,
+     the panel's "Chiudi" and "Invia" cut); an invited User's row at 1280 with its buttons on a
+     line of their own, against check 233; the active link half outside the navigation strip at
+     390 after the frame is drawn again.
+   - The three fixed on the Product Owner's decision (`docs/FRONTEND_ARCHITECTURE.md` v33):
+     `frontend/style.css` (the row's buttons wrap among themselves at its right end, the list
+     60rem; the panel's heading wraps and its column keeps to the window) and
+     `frontend/src/views/shell.ts` (the navigation's strip scrolled to show the link on show),
+     with three tests of the shell. The front end's `verify` green, 3296 unit tests, 100 % line
+     coverage; the screens measured again at 390 and 1280, English and Italian, plain and
+     padded (`docs/FRONTEND_WALK.md` v17, note): yes.
+   - Item 8 finds the code as merged at item 6, with the journey above and these three fixes
+     changed, and nothing under `shared/`, `backend/src` or either `template.yaml`, ready for
+     the deploy.
 8. **The deploy**, each command on an explicit instruction: the API first, with
    `DefaultLanguage` at `it`. Before it, the cloud's facts, reading only (F16), each command on
    an explicit instruction: the app client as it is today (its write and read lists) and the

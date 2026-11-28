@@ -704,6 +704,26 @@ describe('the navigation', () => {
     expect(links()[0]!.getAttribute('aria-current')).toBe('page');
   });
 
+  it.each([
+    ['beyond the strip\'s right end', { left: 400, right: 480 }, 120 + 90],
+    ['before the strip\'s left end', { left: -30, right: 50 }, 120 - 30],
+    ['inside the strip', { left: 100, right: 180 }, 120],
+  ])('the link of the screen on show, %s, is brought within the navigation strip by scrolling the strip alone', (_name, shown, scrolled) => {
+    window.history.replaceState(null, '', `${window.location.pathname}#/password`);
+    const box = (left: number, right: number) => ({ left, right, top: 0, bottom: 40, width: right - left, height: 40, x: left, y: 0, toJSON: () => ({}) });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.matches('#app .nav')) return box(0, 390) as DOMRect;
+      if (this.matches('a[href="#/password"]')) return box(shown.left, shown.right) as DOMRect;
+      return box(0, 0) as DOMRect;
+    });
+    const nav = find('#app .nav');
+    nav.scrollLeft = 120;
+    mounted(ALICE);
+    expect(links().at(-1)!.getAttribute('aria-current')).toBe('page');
+    expect(nav.scrollLeft).toBe(scrolled);
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockRestore();
+  });
+
   it('an unknown address typed while the week is on show is put right, and the week is neither left nor loaded again', async () => {
     fetchMock.mockResolvedValueOnce(json(200, winterWeek()));
     mounted(ALICE);
