@@ -1,52 +1,15 @@
-import { ASSISTANT_LIMITS, CALENDAR_LIMITS, localDateOf, localTimeOf, MAIL_LIMITS, maskAddress, PASSWORD_POLICY, PASSWORD_SYMBOLS, toInstant, type Role } from '@shared-calendar/shared';
-import type { NewPasswordProblem } from '../services/change-password.types';
+import { ASSISTANT_LIMITS, CALENDAR_LIMITS, localDateOf, localTimeOf, MAIL_LIMITS, toInstant, type DateFormats, type Role } from '@shared-calendar/shared';
+import { FAILURE_REASONS, type FailureReason, type FailureTexts } from '../texts/texts';
 
 // The texts that depend on data (docs/FRONTEND_ARCHITECTURE.md section 5 and section 12.4): a
-// date, a time, a range, a date with a time, a week's label, a UTC offset, and a failure in plain
-// words. Pure
-// functions. A time is read in the time zone given, through the helpers of shared/; a date is
-// turned into words reading it as UTC. The browser's own zone plays no part in either.
+// time, a range, a date with a time, a UTC offset, and a failure in plain words. Pure functions.
+// A time is read in the time zone given, through the helpers of shared/; the words come from the
+// page texts of the language in use (frontend/src/texts/texts.ts), the dates' words from shared/
+// (docs/MULTILANGUAGE_ARCHITECTURE.md decision L10). The browser's own zone and language play no
+// part.
 
 const MINUTE_MS = 60_000;
 const pad = (n: number) => String(n).padStart(2, '0');
-
-type DateParts = { weekday: string; day: string; month: string; year: string };
-
-// The words of a local date `YYYY-MM-DD`, its month short ("Nov") or whole ("November"). The
-// parts are put together here, not by Intl, so that the order and the punctuation do not change
-// with the browser's version of the locale data.
-function partsOf(date: string, month: 'short' | 'long' = 'short'): DateParts {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'UTC',
-    weekday: 'short',
-    day: 'numeric',
-    month,
-    year: 'numeric',
-  }).formatToParts(new Date(`${date}T00:00:00Z`));
-  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
-  return { weekday: part('weekday'), day: part('day'), month: part('month'), year: part('year') };
-}
-
-// A local date as a day of the week calendar: "Mon 16 Nov".
-export function dateText(date: string): string {
-  const { weekday, day, month } = partsOf(date);
-  return `${weekday} ${day} ${month}`;
-}
-
-// A local date with its year, for a date that may be far from today: "20 November 2026".
-export function longDateText(date: string): string {
-  const { day, month, year } = partsOf(date, 'long');
-  return `${day} ${month} ${year}`;
-}
-
-// The seven days from `monday`: "16 Nov – 22 Nov 2026". The first date carries its year only when
-// the week ends in another one: "28 Dec 2026 – 3 Jan 2027".
-export function weekLabel(monday: string, sunday: string): string {
-  const first = partsOf(monday);
-  const last = partsOf(sunday);
-  const firstYear = first.year === last.year ? '' : ` ${first.year}`;
-  return `${first.day} ${first.month}${firstYear} – ${last.day} ${last.month} ${last.year}`;
-}
 
 // The UTC offset of `zone` at `instant`: "+02:00", "-03:30", "+00:00". It is what the zone's
 // clock shows, read as if it were UTC, minus the instant itself, both to the minute.
@@ -84,186 +47,44 @@ export function offsetChangesOn(date: string, zone: string): boolean {
 
 // An instant as a day and a time on the clock of `zone`: "Mon 23 Nov, 10:00"; on a day whose
 // offset changes, "Sun 31 Oct, 02:00 +01:00".
-export function dateTimeText(instant: string, zone: string): string {
+export function dateTimeText(dates: DateFormats, instant: string, zone: string): string {
   const date = localDateOf(instant, zone);
-  return `${dateText(date)}, ${timeText(instant, zone, offsetChangesOn(date, zone))}`;
+  return `${dates.shortDate(date)}, ${timeText(instant, zone, offsetChangesOn(date, zone))}`;
 }
-
-// What went wrong, in words for the person in front of the screen. Never the service's own
-// `message`, which is written for a developer.
-const GENERAL = 'Something went wrong. Please try again.';
-const PLAIN_WORDS = new Map<string, string>([
-  // Every API call (the transport reasons of docs/FRONTEND_SERVICES.md section 10.2), and the
-  // login where it has the same reason.
-  ['network', 'The server cannot be reached. Check the connection and try again.'],
-  ['server', 'The server is not answering as it should. Please try again in a moment.'],
-  ['unexpected', GENERAL],
-  ['not_signed_in', 'You are not signed in. Please sign in again.'],
-  ['session_rejected', 'Your session has ended. Please sign in again.'],
-  // GET /calendar (docs/FRONTEND_SERVICES.md section 18.1).
-  ['forbidden', 'Your account is not allowed to do this.'],
-  ['invalid_request', 'The request was not accepted. Check what you entered and try again.'],
-  ['internal_error', 'Something went wrong on the server. Please try again in a moment.'],
-  // Booking, cancelling, changing and the note (docs/FRONTEND_SERVICES.md section 19.1) and the
-  // list of users (docs/FRONTEND_SERVICES.md section 13.1). After a refused booking or change
-  // the week is loaded again (docs/FRONTEND_ARCHITECTURE.md section 5.1), which is what the
-  // sentence of `slot_taken` says: a time is full when its places are taken, one place or more
-  // (docs/SHARED_CALENDAR_SPEC.md R-BOOK-07). `user_busy` is a person's own appointment in the way
-  // (docs/SHARED_CALENDAR_SPEC.md R-BOOK-12); a change leaves the old appointment out of that
-  // check (docs/SHARED_CALENDAR_SPEC.md R-CHG-01), which is why the sentence points to changing it.
-  ['invalid_json', 'The server could not read the request. Please try again.'],
-  ['slot_taken', 'This time is full: there is no place left. The calendar has been refreshed: please choose another time.'],
-  ['user_busy', 'You already have an appointment at this time. To move it, change that appointment instead.'],
-  ['booking_in_past', 'This time has already passed. Please choose a later one.'],
-  ['booking_notice_too_short', 'This time is too soon to be booked. Please choose a later one.'],
-  ['booking_beyond_horizon', 'This time is too far ahead to be booked yet. Please choose an earlier one.'],
-  ['outside_availability', 'This time is not within the hours open for booking. Please choose another time.'],
-  ['appointment_limit_reached', 'You have as many upcoming appointments as the calendar allows. Cancel one to book another.'],
-  ['user_not_found', 'This user no longer exists.'],
-  ['target_not_user', 'An appointment can be booked for a User only, not for an Administrator.'],
-  ['concurrent_update', 'The calendar was being changed at the same moment. Please try again.'],
-  ['appointment_not_found', 'This appointment cannot be found.'],
-  ['appointment_not_active', 'This appointment has already been cancelled, or it has ended.'],
-  ['cancellation_notice_too_short', 'It is too late to cancel this appointment.'],
-  // Creating and deleting a user (docs/FRONTEND_SERVICES.md section 13.1).
-  ['user_exists', 'A user with this username exists already. Choose another username.'],
-  ['cannot_delete_admin', 'An Administrator cannot be deleted.'],
-  // A person's facts and e-mail (docs/EMAIL_ARCHITECTURE.md section 9.1). `mail_unavailable` is
-  // the answer of a stack where e-mail is not switched on yet (docs/EMAIL_PLAN.md finding F13).
-  ['cannot_edit_admin', "Another Administrator's details cannot be changed."],
-  ['not_invited', 'This user has already chosen a password: there is no invitation to send again.'],
-  ['no_email_address', 'There is no e-mail address in your details. Ask the Administrator to add one.'],
-  ['mail_limit_reached', 'You have asked for as many e-mails as a day allows. Please try again tomorrow.'],
-  ['mail_unavailable', 'E-mail is not available yet.'],
-  // The availability types and the weekly patterns (docs/FRONTEND_SERVICES.md sections 16.1
-  // and 17.1). A type is in use as docs/SHARED_CALENDAR_SPEC.md R-TYPE-03 says; two windows of
-  // one date may not overlap whatever their types (docs/SHARED_CALENDAR_SPEC.md R-AV-01); and
-  // the appointments a change of availability would leave outside it are listed under the
-  // sentence of `availability_conflict` (docs/SHARED_CALENDAR_SPEC.md R-AV-03).
-  ['type_name_exists', 'A type with this name exists already. Choose another name.'],
-  ['type_in_use', 'This type is in use, so it cannot be deleted. A type is in use while a weekly pattern, a date of today or later or an upcoming appointment uses it.'],
-  ['type_not_found', 'This type no longer exists.'],
-  ['pattern_not_found', 'This pattern no longer exists.'],
-  ['availability_overlap', 'Another window of the same day covers part of these hours, whatever its type. Choose other hours.'],
-  ['availability_conflict', 'This would leave booked appointments outside the hours open for booking. Cancel or move them in the week first.'],
-  ['limit_reached', 'The calendar cannot hold more of these. Delete one to create another.'],
-  // A single date: its own windows and its extra windows (docs/FRONTEND_SERVICES.md
-  // section 17.1). A date before today, the calendar's today, cannot be changed
-  // (docs/SHARED_CALENDAR_SPEC.md R-AV-02): the server says so for a page left open over
-  // midnight.
-  ['date_in_past', 'This date is now in the past, so it can no longer be changed.'],
-  ['override_not_found', 'This day no longer has windows of its own: the weekly patterns apply.'],
-  ['window_not_found', 'This extra window no longer exists.'],
-  // The assistant (docs/FRONTEND_SERVICES.md section 21.1): the three answers after which the
-  // panel reads the conversation again, so that it shows what the server holds; each sentence
-  // says so. The three reasons for which the assistant cannot answer and a full conversation
-  // have their sentences in shared/, in the conversation's language.
-  ['assistant_busy', 'The assistant was still at work on this conversation. The conversation has been read again: please look at it before going on.'],
-  ['proposal_not_found', 'This proposal was no longer waiting for an answer. The conversation has been read again.'],
-  ['nothing_to_continue', 'The assistant had nothing left to do. The conversation has been read again.'],
-  // The login (docs/FRONTEND_SERVICES.md section 4.3). A wrong password and an unknown user are
-  // one reason, so that the sentence does not say which usernames exist.
-  ['invalid_credentials', 'The username or the password is not correct.'],
-  ['too_many_attempts', 'Too many attempts. Please wait a few minutes and try again.'],
-  ['password_reset_required', 'Your password must be reset before you can sign in. Please ask the Administrator.'],
-  ['challenge', 'This account needs a sign-in step that this page does not offer. Please ask the Administrator.'],
-  ['no_role', 'Your account has no role yet, so it cannot use the calendar. Please ask the Administrator.'],
-  // The first sign-in with a temporary password (docs/FRONTEND_SERVICES.md section 4.9): Cognito's
-  // 3 minutes for the new password are over, or Cognito did not take the new password.
-  ['session_expired', 'This took too long. Please sign in again.'],
-  ['password_refused', 'This password was not accepted. Please choose another one.'],
-  // The change of one's own password (docs/FRONTEND_SERVICES.md section 22.3). Its other reasons
-  // have the sentences above: `too_many_attempts` is the login's, since a wrong current password
-  // counts towards the same lockout at Cognito.
-  ['wrong_current_password', 'The current password is not correct.'],
-]);
 
 // What was being attempted when a call failed, where the same reason needs other words for it.
 export type Attempt = 'change' | 'type' | 'pattern' | 'window' | 'patterns-back' | 'message' | 'mail';
-const AFTER: Record<Attempt, Map<string, string>> = {
-  // A change is refused with the cancellation's reason when its appointment is too close to be
-  // moved by a User (docs/SHARED_CALENDAR_SPEC.md section 8.4): nothing was being cancelled. And
-  // a change that meets the limit of upcoming appointments books nothing more: the limit was
-  // lowered below what the User already holds (docs/SHARED_CALENDAR_SPEC.md R-SET-03), and the
-  // way out is to cancel one, not to give up a booking.
-  change: new Map([
-    ['cancellation_notice_too_short', 'It is too late to change this appointment.'],
-    ['appointment_limit_reached', 'You have more upcoming appointments than the calendar now allows, so this one cannot be moved. Cancel one first.'],
-  ]),
-  // The limit met says how many the calendar holds, which depends on what was being created:
-  // an availability type (docs/SHARED_CALENDAR_SPEC.md R-TYPE-01) or a weekly pattern
-  // (docs/SHARED_CALENDAR_SPEC.md R-PAT-04). The numbers are those of shared/.
-  type: new Map([['limit_reached', `The calendar can hold ${CALENDAR_LIMITS.types} types at most. Delete one to create another.`]]),
-  pattern: new Map([['limit_reached', `The calendar can hold ${CALENDAR_LIMITS.patterns} weekly patterns at most. Delete one to create another.`]]),
-  // An extra window of a date (docs/SHARED_CALENDAR_SPEC.md R-ONE-03), with the number of shared/.
-  window: new Map([['limit_reached', `A day can hold ${CALENDAR_LIMITS.oneOffWindowsPerDate} extra windows at most. Delete one to add another.`]]),
-  // Going back to the weekly patterns chooses no hours: the overlap is between the patterns'
-  // hours, which would apply again, and an extra window of the day
-  // (docs/SHARED_CALENDAR_SPEC.md section 6.5, the last row of its table).
-  'patterns-back': new Map([['availability_overlap', 'The hours the weekly patterns give this day overlap one of its extra windows. Delete that extra window first.']]),
-  // A message to the assistant that the check before the request refused: the one thing that
-  // can be wrong with it is its length (docs/CONVERSATIONAL_ARCHITECTURE.md section 4.4), with
-  // the number of shared/.
-  message: new Map([['invalid_request', `A message can be ${ASSISTANT_LIMITS.messageLength} characters long at most, and cannot be empty.`]]),
-  // A mail of the calendar that the check before the request refused: the two dates are what can
-  // be wrong (docs/EMAIL_ARCHITECTURE.md section 6.5), with the number of shared/.
-  mail: new Map([['invalid_request', `Choose two dates, the first not after the second, at most ${MAIL_LIMITS.rangeDays} days in all.`]]),
-};
 
-// Who attempted, where the same reason needs other words for the Administrator. `user_busy`
-// is about the User the Administrator booked for, not about the Administrator
-// (docs/SHARED_CALENDAR_SPEC.md R-BOOK-12).
-const BY_ADMIN = new Map([['user_busy', 'This User already has an appointment at this time.']]);
-
-// A failure's `reason` as a sentence; a reason without a sentence of its own gets the general
-// one. `attempt` says what was attempted and `role` who attempted, for the reasons whose sentence
-// depends on them; what was attempted comes first.
-export function failureText(reason: string, attempt?: Attempt, role?: Role): string {
-  const after = attempt === undefined ? undefined : AFTER[attempt].get(reason);
-  return after ?? (role === 'admin' ? BY_ADMIN.get(reason) : undefined) ?? PLAIN_WORDS.get(reason) ?? GENERAL;
+// The sentence of a reason for what was being attempted, where it has one of its own. The limits
+// are the numbers of shared/.
+function afterAttempt(failures: FailureTexts, reason: string, attempt: Attempt): string | undefined {
+  switch (attempt) {
+    case 'change':
+      return reason === 'cancellation_notice_too_short' || reason === 'appointment_limit_reached' ? failures.change[reason] : undefined;
+    case 'type':
+      return reason === 'limit_reached' ? failures.typeLimit(CALENDAR_LIMITS.types) : undefined;
+    case 'pattern':
+      return reason === 'limit_reached' ? failures.patternLimit(CALENDAR_LIMITS.patterns) : undefined;
+    case 'window':
+      return reason === 'limit_reached' ? failures.windowLimit(CALENDAR_LIMITS.oneOffWindowsPerDate) : undefined;
+    case 'patterns-back':
+      return reason === 'availability_overlap' ? failures.patternsBackOverlap : undefined;
+    case 'message':
+      return reason === 'invalid_request' ? failures.messageRefused(ASSISTANT_LIMITS.messageLength) : undefined;
+    case 'mail':
+      return reason === 'invalid_request' ? failures.mailRefused(MAIL_LIMITS.rangeDays) : undefined;
+  }
 }
 
-// The change of one's own password (docs/FRONTEND_ARCHITECTURE.md section 5.1): what a new
-// password still misses, one sentence per name of the shared rule (shared/src/password.ts) and
-// for being the current password again, with the rule's own numbers and its 32 symbols.
-export const PASSWORD_PROBLEM_TEXT: Record<NewPasswordProblem, string> = {
-  too_short: `At least ${PASSWORD_POLICY.minimumLength} characters.`,
-  too_long: `At most ${PASSWORD_POLICY.maximumLength} characters.`,
-  no_uppercase: 'An upper-case letter, A to Z.',
-  no_lowercase: 'A lower-case letter, a to z.',
-  no_digit: 'A digit, 0 to 9.',
-  no_symbol: `One of these symbols: ${[...PASSWORD_SYMBOLS].join(' ')}`,
-  blank: 'No space, and no other blank character.',
-  same_as_current: 'Not the same as the current password.',
-};
+const isFailureReason = (reason: string): reason is FailureReason => (FAILURE_REASONS as readonly string[]).includes(reason);
 
-// The other words of the password screen: the field of the current password while it is empty,
-// the repeated new password while it is empty or differs, and what the login says after a change.
-export const PASSWORD_TEXTS = {
-  currentEmpty: 'Type the password you use now.',
-  againEmpty: 'Type the new password once more.',
-  differ: 'The two new passwords are not the same.',
-  changed: 'Password changed.',
-} as const;
-
-// The words of the week's "E-mail…" dialog (docs/FRONTEND_ARCHITECTURE.md section 5.1): what the
-// mail holds, which is the role's (docs/EMAIL_ARCHITECTURE.md section 9.1), and where it goes once
-// asked for, the person's own address masked (docs/EMAIL_ARCHITECTURE.md section 12.4), or in
-// general words when it could not be read.
-export const MAIL_TEXTS = {
-  what: {
-    admin: 'The whole calendar between the two dates, as an Excel file, to your own e-mail address.',
-    user: 'Your appointments between the two dates, as an Excel file, to your own e-mail address.',
-  },
-  sent: (address: string | null) => `On its way to ${address === null ? 'your e-mail address' : maskAddress(address)}`,
-} as const satisfies { what: Record<Role, string>; sent: (address: string | null) => string };
-
-// The words of the settings' "Daily e-mail" (docs/FRONTEND_ARCHITECTURE.md section 5.1): an hour
-// as the field shows it, "07:00"; under the field, what it takes, with the calendar's time zone
-// when it is known (docs/EMAIL_ARCHITECTURE.md section 6.2: the hour is the calendar's); and why
-// a typed hour is refused.
-export const DAILY_MAIL_TEXTS = {
-  hour: (hour: number) => `${pad(hour)}:00`,
-  range: (timeZone: string | null) => `A whole hour, from 00:00 to 23:00, in the calendar's time zone${timeZone === null ? '' : `, ${timeZone}`}.`,
-  refusal: 'The hour must be a whole hour from 00:00 to 23:00, such as 07:00.',
-} as const satisfies { hour: (hour: number) => string; range: (timeZone: string | null) => string; refusal: string };
+// A failure's `reason` as a sentence, never the service's own `message`, which is written for a
+// developer; a reason without a sentence of its own gets the general one. `attempt` says what was
+// attempted and `role` who attempted, for the reasons whose sentence depends on them; what was
+// attempted comes first.
+export function failureText(failures: FailureTexts, reason: string, attempt?: Attempt, role?: Role): string {
+  const after = attempt === undefined ? undefined : afterAttempt(failures, reason, attempt);
+  if (after !== undefined) return after;
+  if (role === 'admin' && reason === 'user_busy') return failures.userBusyForAdmin;
+  return isFailureReason(reason) ? failures.reasons[reason] : failures.general;
+}

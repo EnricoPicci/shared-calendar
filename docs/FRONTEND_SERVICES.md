@@ -1,11 +1,11 @@
-# Front end — The services layer: login, session, refresh, logout, Hello World, users, the shared calendar, the assistant and the change of password
+# Front end — The services layer: login, session, refresh, logout, Hello World, users, the shared calendar, the assistant, the change of password and the person's language
 
 | | |
 |---|---|
-| Status | v17 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` step m8): the invitation; `UsersService.createUser` answers the username and the state `invited`, no password, and `resendInvitation` sends the invitation again (section 13). v16 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` step m7): the first sign-in with a temporary password, the challenge `NEW_PASSWORD_REQUIRED` answered with a new password (section 4.9). v15 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` step m5): `MailSettingsService` reads and saves the daily mail's settings (section 25). v14 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): `MailService` asks for the mail of a range of dates (section 24). v13 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m1 and m2): the four facts of a person in `UsersService` (`createUser` with them, `updateUser`, section 13) and `MeService` (section 23). v12 — implemented (2026-11-24, brief `prompts/e14-step-u4-implementation.md`, `docs/CAPACITY_PLAN.md` step u4): the capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` v17, decisions D24 to D31) in the services: `AvailabilityTypesService.create` and `rename` take an optional `capacity` (section 16, decision 70); `AppointmentsService.book` and `change` pass `overbook` through and answer `user_busy` (section 19). v11 — implemented (2026-11-23, brief `prompts/e05-step-p3-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p3): `ChangePasswordService` says its success before it clears the store (section 22.4, decision 69), so that the shell reacts while the person is still signed in. v10 — implemented (2026-11-22, brief `prompts/e03-step-p2-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p2): `ChangePasswordService` (section 22), a person's change of their own password straight at Cognito, with `cognito.ts` making one request for any target of Cognito (section 10.1). v9 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 21), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v8 — implemented (2026-11-21, brief `prompts/95-step-71-implementation.md`, `docs/FRONTEND_DEPLOY_PLAN.md` step 71; the design reviewed before the code): `LogoutService` (section 20), `revokeToken` and `toRevokeOutcome` in `cognito.ts` (section 10.1), `reset()` on `LoginService` and `RefreshService`; proven against cognito-local, and at the deployed page as far as the revocation answered 200 (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; section 20.9 says what was seen and what was not). v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). Times on 5-minute steps (`docs/SHARED_CALENDAR_SPEC.md` decision D32) change no service: the shared schemas they check with accept a time on the step, `TIME_STEP_MINUTES` of `shared/src/calendar/defaults.ts`; deployed with the page (`docs/RUNBOOK.md` section 5.9). Windows of whole hours (`docs/SHARED_CALENDAR_SPEC.md` decision D33) changed no service: the shared schemas refuse a window not whole hours before sending, and the server decides whether a User's start is a slot's; the page's part, the end of a window chosen as an hour, is built (`docs/WINDOW_HOURS_PLAN.md` step w4, `docs/FRONTEND_ARCHITECTURE.md` decisions 201 and 202) and deployed (`docs/RUNBOOK.md` section 5.10). |
-| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-21; v9 and v10 2026-11-22; v11 2026-11-23; v12 2026-11-24; v13, v14, v15, v16 and v17 2026-11-25 |
-| Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows); since v7 the calendar view and the appointments; since v8 the sign-out; since v9 the conversation with the assistant; since v10 the change of one's own password; since v12 the capacity of a type |
-| Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), since v6 v12 (sections 3 and 4: the calendar routes as implemented); `docs/SHARED_CALENDAR_SPEC.md` v15 section 16 (v13 when v6 was written), and for v7 sections 8, 11.1 (routes 15–20), 11.2, 11.5, 11.6; for v8 `docs/FRONTEND_ARCHITECTURE.md` section 13.7 and section 11, decision 152 (the direction for logout as v14 had it; its v15 follows this design), and `docs/ARCHITECTURE.md` section 7.3; `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/`; for v9 `docs/CONVERSATIONAL_ARCHITECTURE.md` v14 (sections 4.4, 5.1 to 5.5, 6, 6.1 and 13) and `docs/ARCHITECTURE.md` section 4, "The assistant's routes"; for v10 `docs/ARCHITECTURE.md` v14 (sections 5.1, 6.9, 7.3 and 8) and `docs/CHANGE_PASSWORD_PLAN.md` |
+| Status | v18 — implemented (2026-11-27, `docs/MULTILANGUAGE_PLAN.md` steps l4, l5 and l8), not yet deployed: `LanguageService` reads and writes the person's own language, the attribute `locale`, straight at Cognito (section 26); `LanguageMemory` keeps the page's language in this browser (section 26.8); `AssistantService.send(text, language?)` sends the page's language (section 21). v17 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` step m8): the invitation; `UsersService.createUser` answers the username and the state `invited`, no password, and `resendInvitation` sends the invitation again (section 13). v16 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` step m7): the first sign-in with a temporary password, the challenge `NEW_PASSWORD_REQUIRED` answered with a new password (section 4.9). v15 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` step m5): `MailSettingsService` reads and saves the daily mail's settings (section 25). v14 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m3 and m4): `MailService` asks for the mail of a range of dates (section 24). v13 — implemented (2026-11-25, `docs/EMAIL_PLAN.md` steps m1 and m2): the four facts of a person in `UsersService` (`createUser` with them, `updateUser`, section 13) and `MeService` (section 23). v12 — implemented (2026-11-24, brief `prompts/e14-step-u4-implementation.md`, `docs/CAPACITY_PLAN.md` step u4): the capacity of a type (`docs/SHARED_CALENDAR_SPEC.md` v17, decisions D24 to D31) in the services: `AvailabilityTypesService.create` and `rename` take an optional `capacity` (section 16, decision 70); `AppointmentsService.book` and `change` pass `overbook` through and answer `user_busy` (section 19). v11 — implemented (2026-11-23, brief `prompts/e05-step-p3-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p3): `ChangePasswordService` says its success before it clears the store (section 22.4, decision 69), so that the shell reacts while the person is still signed in. v10 — implemented (2026-11-22, brief `prompts/e03-step-p2-implementation.md`, `docs/CHANGE_PASSWORD_PLAN.md` step p2): `ChangePasswordService` (section 22), a person's change of their own password straight at Cognito, with `cognito.ts` making one request for any target of Cognito (section 10.1). v9 — implemented (2026-11-22, brief `prompts/a13-step-c11-implementation.md`, `docs/CONVERSATIONAL_PLAN.md` step c11): `AssistantService` (section 21), one stream for its six calls (section 3.4); **with it the services layer covers every route of the API again**. v8 — implemented (2026-11-21, brief `prompts/95-step-71-implementation.md`, `docs/FRONTEND_DEPLOY_PLAN.md` step 71; the design reviewed before the code): `LogoutService` (section 20), `revokeToken` and `toRevokeOutcome` in `cognito.ts` (section 10.1), `reset()` on `LoginService` and `RefreshService`; proven against cognito-local, and at the deployed page as far as the revocation answered 200 (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; section 20.9 says what was seen and what was not). v7 — implemented (2026-11-15, brief `prompts/56-step-54-implementation.md`, plan step 54): `CalendarService` (section 18) and `AppointmentsService` (19); the services layer was then complete for every route the API had: the assistant's six routes came later. v6 — implemented (2026-11-15, brief `prompts/54-step-53-implementation.md`, plan step 53): `api.ts` for every calendar route (section 10.2), `CalendarSettingsService` (15), `AvailabilityTypesService` (16), `AvailabilityRulesService` (17), `UsersService.listUsers` (13). v5 — implemented (2026-11-05): `LoginService` (brief `prompts/31-implement-login-service.md`; design brief `prompts/30-design-first-service-class.md`), and, by brief `prompts/32-implement-session-and-api-services.md`, `SessionStore` (section 9), the shared building blocks `cognito.ts` and `api.ts` (section 10), `RefreshService` (11), `HelloService` (12), `UsersService` (13). Times on 5-minute steps (`docs/SHARED_CALENDAR_SPEC.md` decision D32) change no service: the shared schemas they check with accept a time on the step, `TIME_STEP_MINUTES` of `shared/src/calendar/defaults.ts`; deployed with the page (`docs/RUNBOOK.md` section 5.9). Windows of whole hours (`docs/SHARED_CALENDAR_SPEC.md` decision D33) changed no service: the shared schemas refuse a window not whole hours before sending, and the server decides whether a User's start is a slot's; the page's part, the end of a window chosen as an hour, is built (`docs/WINDOW_HOURS_PLAN.md` step w4, `docs/FRONTEND_ARCHITECTURE.md` decisions 201 and 202) and deployed (`docs/RUNBOOK.md` section 5.10). |
+| Date | 2026-11-05; v6 and v7 2026-11-15; v8 2026-11-21; v9 and v10 2026-11-22; v11 2026-11-23; v12 2026-11-24; v13, v14, v15, v16 and v17 2026-11-25; v18 2026-11-27 |
+| Scope | The rules of the front end's services layer, the pattern every service follows, `LoginService`, the `SessionStore` that keeps the signed-in session, the token refresh, the Hello World call and the user administration; since v6 the calendar settings, the availability types and the availability rules (patterns, overrides, one-off windows); since v7 the calendar view and the appointments; since v8 the sign-out; since v9 the conversation with the assistant; since v10 the change of one's own password; since v12 the capacity of a type; since v18 the person's language |
+| Depends on | `docs/ARCHITECTURE.md` v11 (sections 3, 3.1, 4, 6.2, 7.3, 8), since v6 v12 (sections 3 and 4: the calendar routes as implemented); `docs/SHARED_CALENDAR_SPEC.md` v15 section 16 (v13 when v6 was written), and for v7 sections 8, 11.1 (routes 15–20), 11.2, 11.5, 11.6; for v8 `docs/FRONTEND_ARCHITECTURE.md` section 13.7 and section 11, decision 152 (the direction for logout as v14 had it; its v15 follows this design), and `docs/ARCHITECTURE.md` section 7.3; `docs/FOLDER_STRUCTURE.md` sections 7 and 8, `shared/`; for v9 `docs/CONVERSATIONAL_ARCHITECTURE.md` v14 (sections 4.4, 5.1 to 5.5, 6, 6.1 and 13) and `docs/ARCHITECTURE.md` section 4, "The assistant's routes"; for v10 `docs/ARCHITECTURE.md` v14 (sections 5.1, 6.9, 7.3 and 8) and `docs/CHANGE_PASSWORD_PLAN.md`; for v18 `docs/MULTILANGUAGE_ARCHITECTURE.md` (sections 4 and 9) and `docs/MULTILANGUAGE_PLAN.md` (decision P1, findings F8 and F11) |
 
 ### Change log
 
@@ -31,6 +31,7 @@
 | v15 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m5 (brief `prompts/mail-m05-daily-mail-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 6.2 and 9.1. New section 25, **`MailSettingsService`**: `getSettings()` (`GET /mail/settings`) and `updateSettings(settings)` (`PUT /mail/settings`), the Administrator's; the body checked with the shared `MailSettingsBody` before any request. A service of its own, not a part of `CalendarSettingsService` (the Product Owner's choice, 2026-11-25): the settings screen uses both. |
 | v16 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m7 (brief `prompts/mail-m07-first-sign-in-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 5.1 and 5.2. New section 4.9, **the first sign-in**: an account whose password is temporary gets the challenge `NEW_PASSWORD_REQUIRED` instead of tokens; `LoginService` gives the result and state `new_password_required` (the username only), keeps the challenge's session to itself, and `choosePassword(newPassword)` checks the new password with the shared rule, answers with `RespondToAuthChallenge` (state `answering`) and signs the person in as `login` does; a session Cognito no longer takes is the failure `session_expired`; any other refusal leaves the challenge open (`refusal` on the result). `reset()` is also the screen's Cancel. `cognito.ts` (section 10.1) gains `respondToNewPassword`, `toSignInOutcome` and `toChallengeOutcome`; any other challenge stays the failure `challenge`. Found: cognito-local 5.3.0 checks neither the challenge's session (a made-up session gets tokens) nor the pool's rule for the new password, so the expiry is proved by the unit tests only; Cognito's own answer to an expired session, `NotAuthorizedException`, is read from AWS's API reference and is to be seen in the cloud (`docs/EMAIL_PLAN.md` step m9). Unit tests in sections 6 and 10.4; the journey in section 14.11. |
 | v17 | 2026-11-25 | `docs/EMAIL_PLAN.md` step m8 (brief `prompts/mail-m08-invitation-implementation.md`), from `docs/EMAIL_ARCHITECTURE.md` sections 5.1, 5.3 and 9.1. **The invitation**: `POST /users` answers `201 { username, status: 'invited' }` and no password, since Cognito makes the temporary one and e-mails it; `createUser`'s success is that, and nothing else of the body is kept (section 13.5). Section 2, rule 6 loses its exception for a new user's password; section 13.7 says there is no password in the service. A fifth pair, **`resendInvitation(username)`** (`POST /users/{username}/invitation`, `202 { username, status: 'invited' }`; `user_not_found`, `not_invited`, `cannot_edit_admin`), the username checked before any request. Both calls answer `mail_unavailable` while e-mail is not switched on (`docs/EMAIL_ARCHITECTURE.md` section 13.2). `listUsers` and `updateUser` check each User's `status` too. Sections 13.1 to 13.9 brought in line with the code as it is, the parts of v13 included (`createUser(user)` with the four facts, `updateUser`). The journeys give a created account its password with `setPermanentPassword` of `local.ts`; a new journey, section 14.12, the invitation. |
+| v18 | 2026-11-27 | `docs/MULTILANGUAGE_PLAN.md` steps l4, l5 and l8 (brief `prompts/lang-l03-phase-a-implementation.md`), from `docs/MULTILANGUAGE_ARCHITECTURE.md` sections 4 and 9; built and tested on the local stack, not deployed. New section 26, **`LanguageService`**: `read()` (`GetUser`) on `readResult$`, `write(language)` (`UpdateUserAttributes`, the one attribute `locale`) on `writeResult$` and `writeState$`, straight at Cognito with the access token of the `SessionStore`, no route of the API; a value outside the list reads as `null` (decision 71). **The language is not in the session**: the id token never carries `locale` (`docs/MULTILANGUAGE_PLAN.md` finding F8), so the shell asks Cognito after each sign-in (decision P1 of that plan), and the `SessionStore` and `Session` are unchanged (decision 72). Section 26.8, **`LanguageMemory`**, the one entry of the browser's storage that keeps the page's language; rule 7 of section 2 names it. `cognito.ts` gains the targets `GetUser` and `UpdateUserAttributes` (section 10.1). **`AssistantService.send(text, language?)`**: the page's language goes in the body beside the text when given, checked by the shared `AssistantMessageBody`, whose `language` is optional (section 21, decision 73). The journey `frontend/tests/integration/language.test.ts` (section 26.7). |
 
 ---
 
@@ -53,7 +54,7 @@ calendar settings (15), the availability types (16) and the availability rules (
 calendar view (18) and the appointments (19), which completed the services layer for the routes the
 API had then; since v8 the sign-out (20); since v9 the conversation with the assistant (21), whose
 six routes were added to the API afterwards; since v10 the change of one's own password (22), which
-calls Cognito and no route.
+calls Cognito and no route; since v18 the person's own language (26), also straight at Cognito.
 
 The services layer is implemented in `frontend/src/services/` (v2). It was created ahead of the
 front-end architecture document, as the one exception of `docs/FOLDER_STRUCTURE.md` section 7:
@@ -111,6 +112,8 @@ a remote service and exposes the result", and it follows the same pattern as eve
    5.1), and `createUser` keeps nothing of a body but the username and the state (section 13.7).
 7. **No persistence in v1.** A service holds its state in memory. Whether a session is kept in
    `sessionStorage` across a page reload is a decision for the front-end architecture document.
+   The one thing kept in the browser (v18) is the page's language, one word in one entry of
+   `localStorage`, by `LanguageMemory` (section 26.8): no token, nothing of the person.
 8. **Unit tests, no network.** vitest, the global `fetch` replaced by a stub, 100 % line
    coverage on `frontend/src/services`, like `backend/src/lib` and `shared/src`.
 9. **Tokens live only in the `SessionStore`** (v4, section 9). No result, no state and no
@@ -763,6 +766,9 @@ unexpected`).
 | 68 | **The store is cleared unguarded** (`clear()`, not `clear(session)`), after the sign-out and, since v11, after the success is emitted (decision 69). A call made again abandons the first, as in every service (decision 6): when the first change was already made, its sign-out and its clear are abandoned too, and the screen keeps the button disabled while the state is `pending` so that this cannot happen from the page | A refresh during the change replaces the session object (section 9.2), and a guarded clear would then leave the person signed in after their password changed. The login says "Password changed", the shell's sentence (decision 69) |
 | 69 | **The success comes before the store is cleared.** At the end of a change both streams say `success`, the state first, and only then is the store cleared. The service takes no page-wide service: whoever reacts to the success does it while the person is still signed in. The shell puts the `LoginService` and the `RefreshService` back to their first state then, as `LogoutService` does before it clears the store (decision 53), and words the login's "Password changed" (`docs/FRONTEND_ARCHITECTURE.md` section 6) | Decided by the Product Owner, 2026-11-23, at the start of `docs/CHANGE_PASSWORD_PLAN.md` step p3, which reversed the first order of decision 68. With the store cleared first, the person's teardown had ended every subscription of the session before the success arrived: no view and no shell code of the session could hear it, and the `reset()`s would have come after the login was mounted. Without them nothing on screen goes wrong (the login view reads only `loginState$`, whose last value is the person's own success, which shows no text, and a refresh in flight cannot write the store back, `replace` being guarded), but the person's name stays in the two services' last outcome, as decision 53 means to prevent. A change of the service rather than a subscription the shell keeps past the session's end |
 | 70 | **The capacity is an optional extra value of the type calls**: `create(name, capacity?)`, `rename(typeId, name, capacity?)`. A `capacity` left out is not sent, and absent from `pending` too; one given goes out as `TypeBody` parses it | Decided by the Product Owner, 2026-11-24, at `docs/CAPACITY_PLAN.md` step u4. The route keeps its path and the body its optional field (`docs/SHARED_CALENDAR_SPEC.md` R-TYPE-02, R-TYPE-05), so the methods keep their names; the screens that rename a type keep working unchanged until they offer the capacity, and an edit by name only never resets a capacity to 1 |
+| 71 | **The person's language is read and written straight at Cognito**, by `LanguageService` with the person's access token from the store: `GetUser` and `UpdateUserAttributes` with the one attribute `locale`, no route of the API and no username, as `ChangePasswordService` does (decision 66). The app client may write `locale` and no other attribute. A read keeps only a language of the list: a missing value, any other word (`fr`) and a language with a region (`it-IT`) are `null`, through `readLanguage` of `shared/` | `docs/MULTILANGUAGE_PLAN.md` finding F11 and step l5. Cognito changes the attribute of the token's owner and nobody else, so "only one's own" holds by construction; Cognito stores any word, so every reader checks it (`docs/MULTILANGUAGE_ARCHITECTURE.md` section 4.1) |
+| 72 | **The language is not part of the session.** `Session` and `SessionStore` are unchanged: the shell reads the language with `LanguageService.read()` after each sign-in, before the frame is shown, and keeps it as the page's language; a refresh of the tokens does not read it again | Decision P1 of the Product Owner in `docs/MULTILANGUAGE_PLAN.md`: the local Cognito never puts `locale` into the id token (finding F8), so the page asks Cognito, by the same path locally and in the cloud. The id token is not read for the language at all |
+| 73 | **`AssistantService.send` takes the page's language as an optional second argument**, sent in the body beside the text and checked by the shared `AssistantMessageBody`, whose `language` is optional and one of the list. The service still chooses nothing: the caller gives the language | `docs/MULTILANGUAGE_PLAN.md` step l8, `docs/MULTILANGUAGE_ARCHITECTURE.md` section 9: the server uses it for a first message written in none of the calendar's languages. Optional so that a call without it keeps the body `{ text }` |
 
 ---
 
@@ -794,6 +800,12 @@ Two kinds of state stay separate:
 
 After an expiry `loginState$` still shows the last attempt's `success`: the view decides "signed in
 or not" from `session$` only.
+
+**The person's language is not in the session** (v18, decision 72). A `Session` holds the tokens,
+the username, the role and the expiry, nothing else. The id token never carries the attribute
+`locale` (`docs/MULTILANGUAGE_PLAN.md` finding F8), so the shell asks Cognito for it after each
+sign-in with `LanguageService.read()` (section 26) and keeps the answer as the page's language,
+outside the store.
 
 ### 9.2 The class
 
@@ -1010,11 +1022,13 @@ every class.
 **One request for any target** (v10, decision 66). Every call the front end makes to Cognito has
 the shape of section 4.1: a `POST` to `cognitoUrl`, `Content-Type: application/x-amz-json-1.1`,
 the action in `X-Amz-Target`, a JSON body, no signing and no secret. One function builds it for
-the four targets the front end uses; `init` adds what one request needs and the others do not,
+every target the front end uses (seven since v18: the sign-in and the refresh, the answer to a
+challenge, the revocation, the change of password and its sign-out everywhere, and the read and
+the write of the person's language, section 26); `init` adds what one request needs and the others do not,
 the `keepalive` of the revocation (decision 56):
 
 ```ts
-export type CognitoTarget = 'InitiateAuth' | 'RespondToAuthChallenge' | 'RevokeToken' | 'ChangePassword' | 'GlobalSignOut';
+export type CognitoTarget = 'InitiateAuth' | 'RespondToAuthChallenge' | 'RevokeToken' | 'ChangePassword' | 'GlobalSignOut' | 'GetUser' | 'UpdateUserAttributes';
 
 // Emits one { status, text } and completes; errors only when fetch rejects.
 export function cognitoRequest(
@@ -2120,7 +2134,13 @@ frontend/src/services/
 ├── assistant.service.ts           # AssistantService (21, v9)
 ├── assistant.types.ts             # AssistantCall, AssistantOutcome, the reasons of each call
 ├── change-password.service.ts     # ChangePasswordService (22, v10)
-└── change-password.types.ts       # ChangePasswordConfig, NewPasswordProblem, the reasons, Result, State
+├── change-password.types.ts       # ChangePasswordConfig, NewPasswordProblem, the reasons, Result, State
+├── me.service.ts, me.types.ts     # MeService (23, v13)
+├── mail.service.ts, mail.types.ts # MailService (24, v14)
+├── mail-settings.service.ts, mail-settings.types.ts  # MailSettingsService (25, v15)
+├── language.service.ts            # LanguageService, LANGUAGE_ATTRIBUTE (26, v18)
+├── language.types.ts              # LanguageFailureReason, LanguageRead/WriteResult, LanguageWriteState
+└── language-memory.ts             # LanguageMemory, LANGUAGE_KEY, LanguageStorage (26.8, v18)
 
 frontend/tests/
 ├── unit/services/        # one file per source file: session.store, cognito, api, jwt,
@@ -2128,7 +2148,9 @@ frontend/tests/
 │                         # calendar-settings.service, availability-types.service,
 │                         # availability-rules.service (v6); calendar.service,
 │                         # appointments.service (v7); assistant.service (v9);
-│                         # change-password.service (v10);
+│                         # change-password.service (v10); me.service (v13);
+│                         # mail.service (v14); mail-settings.service (v15);
+│                         # language.service, language-memory (v18);
 │                         # plus fixtures.ts (v5): JWT, Response and session builders,
 │                         # and suite.ts (v6): the per-method suite of the API services
 ├── unit/integration/     # claude.test.ts (v9): the check of integration/claude.ts, no stack needed
@@ -2143,7 +2165,11 @@ frontend/tests/
     ├── calendar.test.ts   # v6: sections 13.9 (listUsers), 15.9, 16.9, 17.9; v7: 18.9, 19.9 (section 14.4)
     ├── claude.ts          # v9: which Claude the stack is wired to; the journeys refuse the real one
     ├── assistant.test.ts  # v9: section 21.9 (section 14.7)
-    └── change-password.test.ts  # v10: section 22.9 (section 14.9)
+    ├── change-password.test.ts  # v10: section 22.9 (section 14.9)
+    ├── profiles.test.ts   # v13: section 23.7
+    ├── mail.test.ts       # v14: section 24.7, with local:lambda
+    ├── mail-settings.test.ts  # v15: section 25.7
+    └── language.test.ts   # v18: section 26.7
 ```
 
 `local.ts`, `claude.ts` and `suite.ts` are helpers, not tests (both projects select `*.test.ts` only). Nothing
@@ -3585,7 +3611,7 @@ on these routes.
 |---|---|---|---|
 | `load()` | `GET /assistant/conversation`, no body | `200` `AssistantReply` with every message, or an empty one when there is no conversation | none |
 | `end()` | `DELETE /assistant/conversation`, no body | `204`; also with no conversation to end | none |
-| `send(text)` | `POST /assistant/messages`, `AssistantMessageBody` | `200` `AssistantReply` with the messages the request added | 400 `invalid_json` / `invalid_request` · 409 `assistant_busy`, `conversation_full` · 429 `assistant_limit_reached` · 503 `assistant_unavailable`, `assistant_budget_reached` |
+| `send(text, language?)` | `POST /assistant/messages`, `AssistantMessageBody` `{ text, language? }` | `200` `AssistantReply` with the messages the request added | 400 `invalid_json` / `invalid_request` · 409 `assistant_busy`, `conversation_full` · 429 `assistant_limit_reached` · 503 `assistant_unavailable`, `assistant_budget_reached` |
 | `continue()` | `POST /assistant/continue`, no body | the same | 409 `nothing_to_continue`, `assistant_busy` · 503 `assistant_unavailable`, `assistant_budget_reached` |
 | `confirm(proposalId)` | `POST /assistant/proposals/{proposalId}/confirm`, no body | the same, with the proposal and the outcome of each change | 400 `invalid_request` · 404 `proposal_not_found` · 409 `assistant_busy` · 503 `assistant_unavailable`, `assistant_budget_reached` |
 | `decline(proposalId)` | `POST /assistant/proposals/{proposalId}/decline`, no body | the same, with the fixed notice and `proposal` `null` | 400 `invalid_request` · 404 `proposal_not_found` |
@@ -3649,7 +3675,7 @@ export class AssistantService {
 
   load(): void;
   end(): void;
-  send(text: string): void;
+  send(text: string, language?: Language): void;
   continue(): void;
   confirm(proposalId: string): void;
   decline(proposalId: string): void;
@@ -3671,17 +3697,19 @@ export class AssistantService {
 
   | Method | Schema | Sent |
   |---|---|---|
-  | `send` | `AssistantMessageBody` on `{ text }` | the parsed body: the text trimmed |
+  | `send` | `AssistantMessageBody` on `{ text }`, or on `{ text, language }` when a language is given (v18) | the parsed body: the text trimmed, the language as given |
   | `confirm`, `decline` | `Ulid` on the id | no body; the id in the path through `encodeURIComponent` |
   | `load`, `end`, `continue` | none | no body |
 
   A text that is empty after trimming or longer than `ASSISTANT_LIMITS.messageLength` answers
-  `invalid_request` `text: 1 to 2000 characters`; an id that is not a ULID answers
+  `invalid_request` `text: 1 to 2000 characters`; a language not of the list answers
+  `invalid_request` on `language`; an id that is not a ULID answers
   `invalid_request` `proposalId: expected a ULID` (the schema's message, under the field's name,
   since `shared/` has the id's schema and not one for the path). No request is sent.
 - **Nothing of the model is interpreted.** A message's text, the proposal's question, labels and
   summaries and the line of progress are passed on as given. The service builds no sentence and
-  chooses no language (decision 61).
+  chooses no language (decision 61): the language it sends with a message is the caller's, the
+  page's own (decision 73).
 
 ### 21.5 Mapping the answer
 
@@ -3713,7 +3741,7 @@ assistant.outcome$.subscribe((o) => {
   if (o.reply.status === 'working') assistant.continue(); // the caller's loop, with its limit
 });
 assistant.load();
-form.onSend = (text) => assistant.send(text);
+form.onSend = (text) => assistant.send(text, page.language); // the page's language (v18)
 ```
 
 - The replies are put together by the caller: `load` gives every message, the other calls the
@@ -3723,8 +3751,12 @@ form.onSend = (text) => assistant.send(text);
   started again after `assistant_budget_reached`
   (`docs/CONVERSATIONAL_ARCHITECTURE.md` section 13).
 - The sentences of the three reasons of section 21.1 are `shared/`'s fixed texts, chosen by the
-  screen in the conversation's language (`reply.language` of the last reply, English when there
-  is none).
+  screen in the conversation's language (`reply.language` of the last reply, the page's language
+  when there is none; `docs/MULTILANGUAGE_PLAN.md` step l8).
+- **The page's language in `send`** (v18). The server takes it for a first message written in
+  none of the calendar's languages; otherwise the conversation follows the person's own words
+  (`docs/MULTILANGUAGE_ARCHITECTURE.md` section 9). Left out, the body is `{ text }` as before,
+  and the server falls back to English.
 - After a `confirm` whose proposal has an action `done`, the screens that show the calendar
   reload: no service refreshes another.
 
@@ -3748,8 +3780,9 @@ codes of a route that asks Claude on `decline`; `slot_taken` on `send` and `conf
 that are not a reply (a 201, `status`, `messages` or `remainingToday` missing or wrong, an empty
 200; a 200 for `end`); a rejected token (the store cleared); a 503 without a code (`server`);
 nobody signed in (no request); the inputs refused before a request (an empty text, one of spaces
-and line breaks, 2 001 characters, none; an id with an `I`, too short, with a path in it, empty);
-the network failing, then a success; a second call abandoning the first and not another call's;
+and line breaks, 2 001 characters, none, a language not of the list; an id with an `I`, too short, with a path in it, empty);
+the page's language sent in the body beside the text, and no `language` field when none is given
+(v18); the network failing, then a success; a second call abandoning the first and not another call's;
 the replay to a late subscriber; no token in any outcome.
 
 Then, for the one stream: the outcomes of five different calls in the order the answers came,
@@ -4144,3 +4177,160 @@ Integration (`mail-settings.test.ts`, one `describe`, against the local stack; p
 `docs/journeys/frontend/mail-settings.md`): the Administrator saves other values and reads them
 back; an hour of 24 is refused before any request and changes nothing; a User is `forbidden` on
 both. The file writes back the settings it found.
+
+## 26. `LanguageService` (v18)
+
+The signed-in person's own language, English or Italian, kept in their account as Cognito's
+attribute `locale` (`docs/MULTILANGUAGE_ARCHITECTURE.md` section 4.1). The browser talks to
+Cognito directly, as for the change of password (section 22): no route of the API, no Lambda.
+Two methods: a read with a result stream, a write with a result stream and a state stream
+(section 3.3). `docs/MULTILANGUAGE_PLAN.md` finding F11 and step l5.
+
+### 26.1 The remote calls
+
+Both through `cognitoRequest` (section 10.1), with the person's access token as their only
+authority.
+
+| Call | `X-Amz-Target` | Body | Success |
+|---|---|---|---|
+| `read()` | `AWSCognitoIdentityProviderService.GetUser` | `{ "AccessToken" }` | `200` with `UserAttributes`, a list of `{ Name, Value }`; only `locale` is read |
+| `write(language)` | `AWSCognitoIdentityProviderService.UpdateUserAttributes` | `{ "AccessToken", "UserAttributes": [{ "Name": "locale", "Value": language }] }` | `200` |
+
+No username is sent: Cognito reads and writes the token's owner and nobody else. The app client
+may write `locale` and no other attribute (`WriteAttributes` in `backend/template.yaml`); the
+local emulator ignores that list and stores any word (`docs/MULTILANGUAGE_PLAN.md` finding F8).
+The routes of the API refuse a `language`: the language is the person's own to choose, never the
+Administrator's (decision 71).
+
+**Why a read at all.** The id token never carries `locale`, locally at least
+(`docs/MULTILANGUAGE_PLAN.md` finding F8), so the page does not look for it there: the shell asks
+with `read()` after each sign-in, the first sign-in's "Choose your password" included, and before
+the frame is shown (decision P1 of `docs/MULTILANGUAGE_PLAN.md`; decision 72). The language is
+then the page's, held by the logic layer's `PageLanguage` (`frontend/src/logic/language.ts`), not by the `SessionStore` (section
+9.1).
+
+### 26.2 Configuration
+
+`Pick<CognitoConfig, 'cognitoUrl'>` (section 10.1) and the `SessionStore`. The shell makes one per
+person who signs in, through `ShellDeps.accountLanguage` of `frontend/src/views/shell.ts`, so that the shell's
+tests bring a fake. "My details" uses its `write` and `writeResult$`, both roles.
+
+### 26.3 Types (`language.types.ts`)
+
+```ts
+import type { Language } from '@shared-calendar/shared';
+
+export type LanguageFailureReason =
+  | 'not_signed_in'     // the store is empty: no request
+  | 'session_rejected'  // NotAuthorizedException: Cognito no longer takes the access token
+  | 'too_many_attempts' // LimitExceededException, TooManyRequestsException
+  | 'network'           // fetch rejected
+  | 'server'            // 5xx, or a failure whose body is not JSON
+  | 'unexpected';       // any other answer
+
+export type LanguageReadResult =
+  | { status: 'success'; language: Language | null } // null: none held, or a word not of the list
+  | { status: 'failure'; reason: LanguageFailureReason; message: string };
+export type LanguageWriteResult =
+  | { status: 'success'; language: Language } // the language now stored
+  | { status: 'failure'; reason: LanguageFailureReason; message: string };
+export type LanguageWriteState = { status: 'idle' } | { status: 'pending'; language: Language } | LanguageWriteResult;
+```
+
+`Language` is the shared list (`shared/src/language/languages.ts`), `en` and `it`.
+
+### 26.4 The class
+
+```ts
+export const LANGUAGE_ATTRIBUTE = 'locale';
+
+export class LanguageService {
+  readonly readResult$: Observable<LanguageReadResult>;   // ReplaySubject(1)
+  readonly writeResult$: Observable<LanguageWriteResult>; // ReplaySubject(1)
+  readonly writeState$: Observable<LanguageWriteState>;   // BehaviorSubject, idle first
+  constructor(config: Pick<CognitoConfig, 'cognitoUrl'>, store: SessionStore) {}
+  read(): void;
+  write(language: Language): void;
+}
+```
+
+- The session is read from the store at the moment of the call (`take(1)`, section 9.5): none is
+  `not_signed_in`, and nothing is sent. The access token goes into the request body only.
+- A call made again abandons the one of its own kind in flight, never the other's.
+- The read has no state stream: the shell waits for its one result with the frame hidden, and a
+  form never shows it. The write's `pending` carries the language asked for, so "My details" can
+  keep its list closed while a save is under way.
+- The service never touches the store.
+
+### 26.5 Mapping the answer
+
+| Answer | `read` | `write` |
+|---|---|---|
+| `200` | `success`; `language` from `locale` through `readLanguage` of `shared/` | `success`, the language written |
+| `200` without `UserAttributes`, or without `locale` | `success`, `null` | — |
+| `200` with a word not of the list (`fr`), or a language with a region (`it-IT`) | `success`, `null` | — |
+| `200` that is not JSON | `server` | `success` (the body is not read) |
+| `NotAuthorizedException` | `session_rejected` | `session_rejected` |
+| `LimitExceededException`, `TooManyRequestsException` | `too_many_attempts` | `too_many_attempts` |
+| 5xx without a class known above, or a refusal whose body is not JSON | `server` | `server` |
+| any other class (`InvalidParameterException`…) | `unexpected` | `unexpected` |
+| fetch rejects | `network` | `network` |
+
+The class is read behind a namespace prefix; the message is Cognito's when it is a string, else
+`Cognito answered <status>`. A `null` read is not a failure: the shell then writes the page's
+language to the account once, without waiting for the answer, and a write that fails is tried
+again at the next sign-in (`docs/MULTILANGUAGE_PLAN.md` finding F11). A read that fails enters in
+the page's language and writes nothing.
+
+### 26.6 Security notes
+
+- The access token is read from the store at the call and goes into the request body only
+  (rule 9); no result, state or field holds it.
+- `GetUser` answers every attribute of the account, the e-mail address and the name included;
+  the service keeps the language alone, and no value it emits holds anything else of the account.
+- Nothing is logged.
+
+### 26.7 Tests
+
+Unit (`language.service.test.ts`): after every test, every value the three streams emitted is
+searched for the session's three tokens and the account's e-mail address. The read: `GetUser`
+with the access token, a language of the list answered; no language held, `fr` and `it-IT` read
+as `null`, an answer without a list of attributes as `null`; every refusal of section 26.5 with
+its reason, a refusal without a message naming the status; the network failing; nobody signed
+in, no request; a second read abandoning the first. The write: `UpdateUserAttributes` with the
+access token and `locale` alone, states `idle`, `pending` with the language, `success`; a refusal
+on both streams; the network failing, nobody signed in; a second write abandoning the first.
+
+Integration (`language.test.ts`, one `describe`, against the local stack; page
+`docs/journeys/frontend/language.md`): the throw-away User `fe-language`, created and removed
+before and after; a new account holds no language; it writes Italian with its own token and reads
+it back; a change to English replaces it; `alice`'s language is not touched; a word not of the
+list, written at Cognito by hand, reads as `null`; the id token of a new sign-in has no `locale`
+while `GetUser` answers it; the Administrator's `PUT /users/{username}` and `POST /users` refuse
+a `language` with `invalid_request`; nobody signed in sends nothing.
+
+### 26.8 `LanguageMemory`: the page's language in this browser
+
+Not a service in the sense of section 3: it makes no remote call. It keeps the language last used
+on the page in one entry of the browser's storage, `shared-calendar.language`, so that the
+sign-in screen opens in it at the next visit (`docs/MULTILANGUAGE_PLAN.md` step l4 and finding
+F11).
+
+```ts
+export const LANGUAGE_KEY = 'shared-calendar.language';
+export type LanguageStorage = Pick<Storage, 'getItem' | 'setItem'>;
+
+export class LanguageMemory {
+  constructor(storage: LanguageStorage | null) {}
+  read(): Language | null; // through readLanguage of shared/
+  write(language: Language): void;
+}
+```
+
+- The storage is handed in (rule 3): `frontend/src/main.ts` gives `window.localStorage`, or `null`
+  when the browser refuses it, as some do in a private window. The shell makes one at start-up.
+- A storage that is missing, throws, or holds a word not of the list reads as `null`; a write it
+  refuses is forgotten in silence, and the page's first language is then the browser's again.
+- It holds one word, no token and nothing of the person (rule 7).
+- Unit tests (`language-memory.test.ts`): a language remembered in one entry and read back; a
+  storage that refuses counts as empty and a refused write is silent; no storage at all.

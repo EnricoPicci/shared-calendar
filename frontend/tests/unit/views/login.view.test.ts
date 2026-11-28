@@ -2,22 +2,39 @@ import { BehaviorSubject } from 'rxjs';
 import type { LoginState } from '../../../src/services/login.types';
 import { mountLogin, type LoginDeps } from '../../../src/views/login.view';
 import { find, submit, useRealPage } from './page';
+import { PageLanguage } from '../../../src/logic/language';
+import { fillPage } from '../../../src/views/page-texts';
+import { PAGE_TEXTS } from '../../../src/texts/texts';
 
 // The DOM test of the login view (docs/FRONTEND_ARCHITECTURE.md section 8): the real index.html,
 // and a fake LoginService whose state stream the test controls and whose method is a spy.
 
 const PASSWORD = 'Secret-Pass-1!';
 
+// The page's language, English first, with a browser's memory whose writes the test sees; the
+// page's fixed texts filled again at each change, as the shell does.
+function pageLanguage() {
+  const memory = { read: () => null, write: vi.fn() };
+  const language = new PageLanguage('en', (code) => PAGE_TEXTS[code], memory);
+  language.state$.subscribe((state) => fillPage(document, state.texts.html, state.language));
+  return { language, memory };
+}
+
 function mounted(first: LoginState = { status: 'idle' }) {
   const state$ = new BehaviorSubject<LoginState>(first);
   const login = { loginState$: state$.asObservable(), login: vi.fn<LoginDeps['login']>() };
   const root = find('#login');
-  const subscription = mountLogin(root, login);
+  const { language, memory } = pageLanguage();
+  const subscription = mountLogin(root, login, language);
   return {
     state$,
     login,
     root,
+    language,
+    memory,
     subscription,
+    choice: find('#login label.language'),
+    languages: find<HTMLSelectElement>('#login [name="language"]'),
     form: find<HTMLFormElement>('#login form.sign-in'),
     username: find<HTMLInputElement>('#login [name="username"]'),
     password: find<HTMLInputElement>('#login [name="password"]'),
@@ -154,13 +171,14 @@ describe('mountLogin', () => {
   it('a notice given by the shell is said until the next "Sign in", and gone when the view is left', () => {
     const state$ = new BehaviorSubject<LoginState>({ status: 'idle' });
     const login = { loginState$: state$.asObservable(), login: vi.fn<LoginDeps['login']>() };
-    const subscription = mountLogin(find('#login'), login, 'Password changed.');
+    const { language } = pageLanguage();
+    const subscription = mountLogin(find('#login'), login, language, (texts) => texts.password.changed);
     const notice = find('#login .notice');
     expect(notice.textContent).toBe('Password changed.');
     submit(find<HTMLFormElement>('#login form'));
     expect(notice.textContent).toBe('');
     subscription.unsubscribe();
-    const again = mountLogin(find('#login'), login, 'Password changed.');
+    const again = mountLogin(find('#login'), login, language, (texts) => texts.password.changed);
     again.unsubscribe();
     expect(notice.textContent).toBe('');
   });
@@ -221,5 +239,72 @@ describe('mountLogin', () => {
   it('without a notice the place stays empty', () => {
     mounted();
     expect(find('#login .notice').textContent).toBe('');
+  });
+
+  // The choice of language before sign-in (docs/MULTILANGUAGE_PLAN.md finding F4).
+  describe('the choice of language', () => {
+    const choose = (languages: HTMLSelectElement, code: string) => {
+      languages.value = code;
+      languages.dispatchEvent(new Event('change'));
+    };
+
+    it('offers each language under its own name, marked as being in it, the one in use chosen', () => {
+      const { languages } = mounted();
+      expect([...languages.options].map((option) => [option.value, option.textContent, option.lang])).toEqual([
+        ['en', 'English', 'en'],
+        ['it', 'Italiano', 'it'],
+      ]);
+      expect(languages.value).toBe('en');
+    });
+
+    it('Italian chosen: the page in Italian, what was typed kept, the failure line worded again, the choice remembered', () => {
+      const { state$, languages, username, password, error, memory } = mounted();
+      username.value = 'anna';
+      password.value = PASSWORD;
+      state$.next({ status: 'failure', reason: 'invalid_credentials', message: 'Incorrect username or password.' });
+      expect(error.textContent).toBe('The username or the password is not correct.');
+      choose(languages, 'it');
+      expect(error.textContent).toBe('Il nome utente o la password non sono corretti.');
+      expect(find('#login button').textContent).toBe('Accedi');
+      expect(document.documentElement.lang).toBe('it');
+      expect([username.value, password.value, languages.value]).toEqual(['anna', PASSWORD, 'it']);
+      expect(memory.write).toHaveBeenCalledWith('it');
+    });
+
+    it('the notice is worded again in the language chosen', () => {
+      const state$ = new BehaviorSubject<LoginState>({ status: 'idle' });
+      const { language } = pageLanguage();
+      const subscription = mountLogin(find('#login'), { loginState$: state$.asObservable(), login: vi.fn() }, language, (texts) => texts.password.changed);
+      choose(find<HTMLSelectElement>('#login [name="language"]'), 'it');
+      expect(find('#login .notice').textContent).toBe('Password modificata.');
+      subscription.unsubscribe();
+    });
+
+    it('a value that is no language of the calendar changes nothing', () => {
+      const { languages, language, memory } = mounted();
+      languages.append(Object.assign(document.createElement('option'), { value: 'tlh', textContent: 'Klingon' }));
+      choose(languages, 'tlh');
+      expect(language.state.language).toBe('en');
+      expect(memory.write).not.toHaveBeenCalled();
+    });
+
+    it('is not offered while "Choose your password" is on show, and is again on the way back', () => {
+      const { state$, choice } = mounted();
+      expect(choice.hidden).toBe(false);
+      state$.next({ status: 'new_password_required', username: 'anna' });
+      expect(choice.hidden).toBe(true);
+      state$.next({ status: 'idle' });
+      expect(choice.hidden).toBe(false);
+    });
+
+    it('left: the list emptied and shown, no language chosen any more by it', () => {
+      const { state$, subscription, choice, languages, language } = mounted();
+      state$.next({ status: 'new_password_required', username: 'anna' });
+      subscription.unsubscribe();
+      expect([choice.hidden, languages.options.length]).toEqual([false, 0]);
+      languages.append(Object.assign(document.createElement('option'), { value: 'it', textContent: 'Italiano' }));
+      choose(languages, 'it');
+      expect(language.state.language).toBe('en');
+    });
   });
 });

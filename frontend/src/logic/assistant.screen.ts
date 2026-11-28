@@ -1,12 +1,12 @@
-import type { AssistantLanguage, AssistantMessage, AssistantProposal, AssistantReply, AssistantStatus, Role } from '@shared-calendar/shared';
+import type { AssistantMessage, AssistantProposal, AssistantReply, AssistantStatus, Language, Role } from '@shared-calendar/shared';
 import { BehaviorSubject, Subject, type Observable, type Subscription } from 'rxjs';
 import type { AssistantService } from '../services/assistant.service';
 import type { AssistantOutcome } from '../services/assistant.types';
+import type { PageTexts } from '../texts/texts';
 import {
   changeMade,
   confirmTrouble,
   continueTrouble,
-  COULD_NOT_FINISH,
   dayLimitText,
   declineTrouble,
   joined,
@@ -90,7 +90,7 @@ export class AssistantScreen {
 
   // The conversation as the server last said it.
   private conversationId: string | null = null;
-  private language: AssistantLanguage | null = null;
+  private language: Language | null = null;
   private status: AssistantStatus = 'idle';
   private held: readonly AssistantMessage[] = [];
   private rows: readonly ShownMessage[] = NOTHING.messages;
@@ -113,6 +113,9 @@ export class AssistantScreen {
   constructor(
     private readonly assistant: AssistantCalls,
     private readonly role: Role,
+    // The page texts of the language in use, kept for the panel's life
+    // (docs/MULTILANGUAGE_PLAN.md decision D2).
+    private readonly texts: PageTexts,
   ) {}
 
   // Called once the view has subscribed (docs/FRONTEND_ARCHITECTURE.md section 5, rule 5):
@@ -183,7 +186,7 @@ export class AssistantScreen {
     this.sent = trimmed;
     this.begin();
     this.show();
-    this.assistant.send(text);
+    this.assistant.send(text, this.texts.locale);
   }
 
   // The proposal's first button: the only way a change is made.
@@ -241,7 +244,7 @@ export class AssistantScreen {
         if (outcome.status === 'failure') {
           // A first read that failed is asked again at the next opening.
           if (this.read === 'asked') this.read = 'no';
-          this.troubled(loadTrouble(outcome.reason));
+          this.troubled(loadTrouble(this.texts, outcome.reason));
           return;
         }
         // A message that the server refused as busy and holds already was taken after all.
@@ -253,7 +256,7 @@ export class AssistantScreen {
         return;
       case 'end':
         if (outcome.status === 'failure') {
-          this.troubled(loadTrouble(outcome.reason));
+          this.troubled(loadTrouble(this.texts, outcome.reason));
           return;
         }
         this.forget();
@@ -263,7 +266,7 @@ export class AssistantScreen {
         return;
       case 'send':
         if (outcome.status === 'failure') {
-          this.troubled(sendTrouble(outcome.reason, this.language));
+          this.troubled(sendTrouble(this.texts, outcome.reason, this.spoken()));
           return;
         }
         this.accepted += 1;
@@ -273,7 +276,7 @@ export class AssistantScreen {
         return;
       case 'continue':
         if (outcome.status === 'failure') {
-          this.troubled(continueTrouble(outcome.reason, this.language));
+          this.troubled(continueTrouble(this.texts, outcome.reason, this.spoken()));
           return;
         }
         this.take(outcome.reply, false);
@@ -281,7 +284,7 @@ export class AssistantScreen {
         return;
       case 'confirm':
         if (outcome.status === 'failure') {
-          this.troubled(confirmTrouble(outcome.reason, this.language));
+          this.troubled(confirmTrouble(this.texts, outcome.reason, this.spoken()));
           return;
         }
         this.take(outcome.reply, false);
@@ -289,7 +292,7 @@ export class AssistantScreen {
         return;
       case 'decline':
         if (outcome.status === 'failure') {
-          this.troubled(declineTrouble(outcome.reason));
+          this.troubled(declineTrouble(this.texts, outcome.reason));
           return;
         }
         this.take(outcome.reply, false);
@@ -305,7 +308,7 @@ export class AssistantScreen {
     const replace = whole || reply.conversationId !== this.conversationId;
     if (!whole) this.news = newsOf(replace ? [] : this.held, reply) ?? this.news;
     this.held = replace ? [...reply.messages].sort((a, b) => a.seq - b.seq) : joined(this.held, reply.messages);
-    this.rows = messageRows(this.held);
+    this.rows = messageRows(this.texts, this.held);
     this.conversationId = reply.conversationId;
     this.language = reply.language ?? this.language;
     this.status = reply.status;
@@ -328,7 +331,7 @@ export class AssistantScreen {
       return;
     }
     if (this.steps === STEPS_AT_MOST) {
-      this.failure = COULD_NOT_FINISH;
+      this.failure = this.texts.assistant.couldNotFinish;
       this.away = false;
       this.show();
       return;
@@ -375,13 +378,19 @@ export class AssistantScreen {
       open: this.opened,
       messages: this.rows,
       progress: this.away ? (this.activity ?? NO_ACTIVITY) : null,
-      proposal: proposalShown(this.proposal, this.status, this.away, this.role),
-      failure: this.failure ?? (this.left === 0 ? dayLimitText(this.language) : null),
-      remaining: this.left === null ? '' : remainingText(this.left),
+      proposal: proposalShown(this.texts, this.proposal, this.status, this.away, this.role),
+      failure: this.failure ?? (this.left === 0 ? dayLimitText(this.spoken()) : null),
+      remaining: this.left === null ? '' : remainingText(this.texts, this.left),
       canSend: this.canSend(),
       canEnd: this.canEnd(),
       accepted: this.accepted,
       news: this.news,
     });
+  }
+
+  // The language of the panel's own sentences: the conversation's, and the page's while there is
+  // none (docs/MULTILANGUAGE_ARCHITECTURE.md section 9).
+  private spoken(): Language {
+    return this.language ?? this.texts.locale;
   }
 }

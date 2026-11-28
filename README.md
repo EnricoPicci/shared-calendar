@@ -8,6 +8,9 @@ makes it only when the person confirms. The calendar is described in `docs/ARCHI
 `docs/CONVERSATIONAL_ARCHITECTURE.md`). Underneath, a Hello World route proves that the whole
 chain works: signed-in users call `POST /hello` and get a message back that is also stored in a
 database. Two roles: **user** and **admin**; only an admin creates and deletes users.
+The page, the mails, the Excel files, the invitation and the assistant speak English and
+Italian: each person chooses on the sign-in screen and in "My details", and the installation
+has a default language for the rest (`docs/MULTILANGUAGE_ARCHITECTURE.md`).
 TypeScript on AWS Lambda behind an HTTP API, identities in Amazon Cognito, data in DynamoDB,
 everything declared in one SAM template and fully testable on a laptop before anything reaches
 the cloud.
@@ -32,6 +35,7 @@ Where the full story is:
 | `docs/AWS_ACCOUNTS.md` | Which AWS identity to sign in with, and why |
 | `docs/FOLDER_STRUCTURE.md` | The monorepo layout (back end, front end, shared): which folder holds what, and how the pieces are built |
 | `docs/CONVERSATIONAL_ARCHITECTURE.md` | The assistant's design: its instructions, its tools, its evaluation with the real model, the alternatives; where it is merged into `docs/ARCHITECTURE.md`, the architecture wins |
+| `docs/MULTILANGUAGE_ARCHITECTURE.md` | The languages: where each text lives, how a person's language is chosen and kept, how a new language is added; merged into `docs/ARCHITECTURE.md`, which wins |
 | `docs/FRONTEND_SERVICES.md` | The front end's services layer: the `SessionStore` and one service per remote call (login, refresh, logout, Hello World, users, the calendar), in `frontend/src/services/` |
 | `docs/FRONTEND_ARCHITECTURE.md` | The front end's pages: how a view is written, the logic between the services and the views, the shell; and how the page is hosted and deployed (its section 13) |
 | `docs/FRONTEND_DEPLOY_PLAN.md` | In which order the hosting was built and deployed (steps 70 to 73; done, with a few checks at the deployed page still owed, listed in `docs/RUNBOOK.md` section 5.5) |
@@ -126,6 +130,8 @@ takes the next minor version; the major version changes when a client would brea
 | `v2.3.0` | `a8b3a2b` | The capacity of a type, several people in one slot (`docs/CAPACITY_PLAN.md`) | `docs/RUNBOOK.md` section 5.8 |
 | `v2.4.0` | the record's commit after `259e0d6`, whose code was deployed | Times on 5-minute steps (`docs/SLOT_STEP_PLAN.md`), released from the branch `slot-5min` | `docs/RUNBOOK.md` section 5.9 |
 | `v2.5.0` | the record's commit after `2dfd39c`, whose code was deployed | Windows of whole hours (`docs/WINDOW_HOURS_PLAN.md`), released from the branch `slot-5min` | `docs/RUNBOOK.md` section 5.10 |
+| `v3.0.0` | the record's commit after `5a4456c`, whose code was deployed | E-mail (`docs/EMAIL_PLAN.md`): the invitation with a temporary password, the mail on demand, the daily mail, the four facts of a person; `POST /users` answers no password, so a client that read it breaks | `docs/RUNBOOK.md` section 5.11 |
+| `v3.1.0` | the record's commit after `744572b`, whose code was deployed | Several languages (`docs/MULTILANGUAGE_PLAN.md`): the page, the mails, the Excel files, the invitation and the assistant in English and Italian, a person's language kept in their account, the installation's language `DefaultLanguage`; nothing breaks an old client | `docs/RUNBOOK.md` section 5.12 |
 
 `git checkout v2.5.0` gives the code as it was released; `git tag -n1` lists the tags with
 their one-line message.
@@ -179,7 +185,7 @@ each of them finds:
 | Settings (`#/settings`) | Administrator | The cancellation notice, the booking notice, the booking horizon and the maximum of upcoming appointments |
 | Users (`#/users`) | Administrator | The list, a form that creates a user and shows the generated password once, a "Delete" per row that asks first |
 | Availability (`#/availability`) | Administrator | The availability types, each with its capacity (how many people at the same time, 1 to 100), the weekly patterns, and a single date: its own windows ("This day only…"), "Not available on this day", extra windows. A change that would leave a booked appointment outside the hours open for booking is refused and lists the appointments in the way |
-| The assistant's panel | both, under every screen | A conversation in English or Italian: questions about the calendar, and changes the assistant proposes and the person confirms with a button. Up to 30 messages a day per person; each conversation runs out a day after its last message |
+| The assistant's panel | both, under every screen | A conversation in English or Italian (the first message's language, else the page's): questions about the calendar, and changes the assistant proposes and the person confirms with a button. Up to 30 messages a day per person; each conversation runs out a day after its last message |
 | Password (`#/password`) | both, last link | The change of one's own password: the current one, the new one twice, with what the new one still misses said under it while typing. After a change the person is signed out everywhere and the login says "Password changed." |
 
 Good to know: the week is loaded again after every write and every time the browser's tab
@@ -189,6 +195,10 @@ reload. The dev server passes the page's calls on to the local API and to cognit
 for local work only. The deployed page ("The deployed stacks" above) is the same page, built
 once and served by CloudFront, which passes its calls on to the real API
 (`docs/FRONTEND_ARCHITECTURE.md` section 13).
+
+The sign-in screen has a list of languages; "My details" keeps the chosen one in the account.
+`http://localhost:5173/?padded` shows the page in a test language where every text is between
+⟦ ⟧, so a word written straight into the code stands out (`docs/COMMANDS.md` section 5).
 
 **To check every screen after a change**: `docs/FRONTEND_WALK.md`, one list of checks to do
 by hand in the browser, as `alice` and as `admin`, from a fresh, seeded local stack.

@@ -1,11 +1,12 @@
 import type { Appointment, Role } from '@shared-calendar/shared';
-import { dateText, dateTimeText, offsetChangesOn, rangeText } from './texts';
+import type { AppointmentTexts, PageTexts } from '../texts/texts';
+import { dateTimeText, offsetChangesOn, rangeText } from './texts';
 
 // The appointment detail (docs/FRONTEND_ARCHITECTURE.md section 5): an appointment as the API
 // answers it (docs/SHARED_CALENDAR_SPEC.md section 11.5) turned into what the detail dialog
 // shows, with which of its three actions are offered (editing the note, "Change", "Cancel
-// appointment") and the sentence about them. Pure: "now" and the calendar's time zone are
-// arguments.
+// appointment") and the sentence about them. Pure: the page texts, "now" and the calendar's time
+// zone are arguments.
 
 export type AppointmentDetail = {
   appointmentId: string;
@@ -30,22 +31,22 @@ export type AppointmentDetail = {
 //   R-CAN-02). A User may while "now" is not after `cancellableUntil`, the instant the server
 //   computed from its settings: exactly at it is still allowed, one millisecond later is not
 //   (docs/SHARED_CALENDAR_SPEC.md R-CAN-03).
-export function appointmentDetail(appointment: Appointment, role: Role, now: Date, zone: string): AppointmentDetail {
+export function appointmentDetail(texts: PageTexts, appointment: Appointment, role: Role, now: Date, zone: string): AppointmentDetail {
   const admin = role === 'admin';
   const until = appointment.cancellableUntil;
   const active = appointment.status === 'booked' && now.getTime() < Date.parse(appointment.end);
   const canCancel = admin ? active : appointment.status === 'booked' && until !== null && now.getTime() <= Date.parse(until);
-  const hint = sentence(appointment, admin, active, canCancel, zone);
+  const hint = sentence(texts, appointment, admin, active, canCancel, zone);
   // A User books only for themselves: a booking made in the role User is the reader's own.
-  const by = !admin && appointment.createdBy.role === 'user' ? 'you' : appointment.createdBy.username;
+  const by = !admin && appointment.createdBy.role === 'user' ? texts.appointment.byYou : appointment.createdBy.username;
   return {
     appointmentId: appointment.appointmentId,
-    when: `${dateText(appointment.date)}, ${rangeText(appointment.start, appointment.end, zone, offsetChangesOn(appointment.date, zone))}`,
+    when: `${texts.dates.shortDate(appointment.date)}, ${rangeText(appointment.start, appointment.end, zone, offsetChangesOn(appointment.date, zone))}`,
     typeName: appointment.typeName,
-    who: admin ? appointment.username : 'You',
-    note: appointment.note ?? '—',
+    who: admin ? appointment.username : texts.appointment.you,
+    note: appointment.note ?? texts.appointment.noNote,
     noteValue: appointment.note ?? '',
-    booked: `Booked by ${by} on ${dateTimeText(appointment.createdAt, zone)}`,
+    booked: texts.appointment.bookedBy(by, dateTimeText(texts.dates, appointment.createdAt, zone)),
     canEditNote: active,
     canChange: canCancel,
     canCancel,
@@ -58,15 +59,12 @@ export function appointmentDetail(appointment: Appointment, role: Role, now: Dat
 // a booked one whose end has passed has ended, for both roles. Of one still to end, a User
 // reads until when it can be changed or cancelled, or that it is too late; the Administrator,
 // who may do both until the end, reads nothing.
-function sentence(appointment: Appointment, admin: boolean, active: boolean, canCancel: boolean, zone: string): string {
-  if (appointment.status === 'cancelled') {
-    return appointment.cancelReason === 'changed' ? 'This appointment was moved to another time.' : 'This appointment was cancelled.';
-  }
-  if (!active) return 'This appointment has ended.';
+function sentence(texts: PageTexts, appointment: Appointment, admin: boolean, active: boolean, canCancel: boolean, zone: string): string {
+  const words: AppointmentTexts = texts.appointment;
+  if (appointment.status === 'cancelled') return appointment.cancelReason === 'changed' ? words.moved : words.cancelled;
+  if (!active) return words.ended;
   if (admin) return '';
-  return canCancel
-    ? `It can be changed or cancelled until ${dateTimeText(appointment.cancellableUntil!, zone)}.`
-    : 'It is too late to change or cancel this appointment.';
+  return canCancel ? words.until(dateTimeText(texts.dates, appointment.cancellableUntil!, zone)) : words.tooLate;
 }
 
 // An appointment being moved to another time, as the week's banner and the confirmation name

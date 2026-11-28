@@ -1,9 +1,10 @@
 // npm run build -w frontend: writes the three files of the page into frontend/dist/.
 //
-//   API_URL=https://… COGNITO_URL=https://… CLIENT_ID=… npm run build -w frontend
+//   API_URL=https://… COGNITO_URL=https://… CLIENT_ID=… [DEFAULT_LANGUAGE=it] npm run build -w frontend
 //
 // app.js is src/main.ts bundled and minified, with its source map beside it; index.html and
-// style.css are copied as they are. The configuration comes from the three environment variables
+// style.css are copied as they are. The configuration comes from the three environment variables,
+// and the page's default language from a fourth, DEFAULT_LANGUAGE, `en` when it is not given,
 // and from nowhere else: nothing about a deployed stack is written in a committed file
 // (docs/FOLDER_STRUCTURE.md section 7). No variable turns off the sign-out everywhere after a
 // change of password: the bundle's SKIP_GLOBAL_SIGN_OUT is false in every build
@@ -23,6 +24,7 @@ if (missing.length > 0) {
   process.exit(1);
 }
 const config = Object.fromEntries(NAMES.map((name) => [name, process.env[name]]));
+if (process.env.DEFAULT_LANGUAGE) config.DEFAULT_LANGUAGE = process.env.DEFAULT_LANGUAGE;
 
 // Start from an empty folder, so that nothing of an earlier build is left in it.
 await rm(path('dist'), { recursive: true, force: true });

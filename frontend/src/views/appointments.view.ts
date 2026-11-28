@@ -11,12 +11,14 @@ export type AppointmentsDeps = {
   screen: Pick<AppointmentsScreen, 'list$' | 'upcoming' | 'history' | 'show' | 'detail' | 'move'>;
   appointments: DetailDeps['appointments'];
   showWeek: () => void;
+  // The page texts of the language in use, for the detail dialog.
+  texts: DetailDeps['texts'];
 };
 
 // The view of "My appointments" (docs/FRONTEND_ARCHITECTURE.md sections 3 and 4): wires the
 // element #appointments of index.html. It draws the rows the logic layer hands over ready,
 // forwards the two modes and the period's form, and opens the detail dialog on a row.
-export function mountAppointments(root: HTMLElement, { screen, appointments, showWeek }: AppointmentsDeps): Subscription {
+export function mountAppointments(root: HTMLElement, { screen, appointments, showWeek, texts }: AppointmentsDeps): Subscription {
   // 1. Find the elements, once.
   const find = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
   const upcoming = find('.upcoming');
@@ -42,6 +44,7 @@ export function mountAppointments(root: HTMLElement, { screen, appointments, sho
       screen.move(appointmentId);
       showWeek();
     },
+    texts,
   });
 
   // 2. Drawing the list: one copy of the template per row, filled with textContent. The row is

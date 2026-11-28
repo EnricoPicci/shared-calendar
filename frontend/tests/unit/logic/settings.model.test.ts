@@ -1,6 +1,7 @@
 import { DEFAULT_SETTINGS, SETTINGS_RANGES, UpdateSettingsBody, type CalendarSettings } from '@shared-calendar/shared';
 import { SETTING_FIELDS, settingRange, settingsFields, settingsFor, settingsInfo, type SettingsFields } from '../../../src/logic/settings.model';
 import { useFarBrowserZone } from './zone';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 const DEFAULTS: CalendarSettings = { timeZone: 'Europe/Rome', ...DEFAULT_SETTINGS, updatedAt: null, updatedBy: null };
 const SAVED: CalendarSettings = {
@@ -13,7 +14,7 @@ const SAVED: CalendarSettings = {
   updatedBy: { username: 'admin', role: 'admin' },
 };
 const TYPED: SettingsFields = { cancellationNoticeHours: '24', minBookingNoticeHours: '0', bookingHorizonDays: '56', maxFutureAppointmentsPerUser: '5', noLimit: false };
-const body = (over: Partial<SettingsFields> = {}) => settingsFor({ ...TYPED, ...over });
+const body = (over: Partial<SettingsFields> = {}) => settingsFor(PAGE_TEXTS_EN.settings, { ...TYPED, ...over });
 const refusals = (over: Partial<SettingsFields>) => {
   const checked = body(over);
   return 'refusals' in checked ? checked.refusals : null;
@@ -35,45 +36,45 @@ describe('the settings form', () => {
     it('what it gives is accepted back as it is', () => {
       for (const settings of [DEFAULTS, SAVED]) {
         const four = Object.fromEntries(SETTING_FIELDS.map((field) => [field, settings[field]]));
-        expect(settingsFor(settingsFields(settings))).toEqual({ body: four });
+        expect(settingsFor(PAGE_TEXTS_EN.settings, settingsFields(settings))).toEqual({ body: four });
       }
     });
   });
 
   describe('settingsInfo: what the form says beside the fields', () => {
     it('never saved: the time zone, and that these are the defaults', () => {
-      expect(settingsInfo(DEFAULTS)).toEqual({ timeZone: 'Europe/Rome', lastSaved: 'These are the default settings: nobody has saved them yet.' });
+      expect(settingsInfo(PAGE_TEXTS_EN, DEFAULTS)).toEqual({ timeZone: 'Europe/Rome', lastSaved: 'These are the default settings: nobody has saved them yet.' });
     });
 
     it('saved: who and when, in the calendar\'s zone, not the browser\'s', () => {
       // 15:44 UTC is 16:44 in Rome in winter; in the browser's zone of the test it is already Friday.
-      expect(settingsInfo(SAVED)).toEqual({ timeZone: 'Europe/Rome', lastSaved: 'Last saved by admin on Thu 19 Nov, 16:44' });
+      expect(settingsInfo(PAGE_TEXTS_EN, SAVED)).toEqual({ timeZone: 'Europe/Rome', lastSaved: 'Last saved by admin on Thu 19 Nov, 16:44' });
     });
 
     it('in summer, in a half-hour zone, and late in the evening', () => {
-      expect(settingsInfo({ ...SAVED, updatedAt: '2027-07-05T08:15:00.000Z' }).lastSaved).toBe('Last saved by admin on Mon 5 Jul, 10:15');
-      expect(settingsInfo({ ...SAVED, timeZone: 'Asia/Kolkata' })).toEqual({ timeZone: 'Asia/Kolkata', lastSaved: 'Last saved by admin on Thu 19 Nov, 21:14' });
+      expect(settingsInfo(PAGE_TEXTS_EN, { ...SAVED, updatedAt: '2027-07-05T08:15:00.000Z' }).lastSaved).toBe('Last saved by admin on Mon 5 Jul, 10:15');
+      expect(settingsInfo(PAGE_TEXTS_EN, { ...SAVED, timeZone: 'Asia/Kolkata' })).toEqual({ timeZone: 'Asia/Kolkata', lastSaved: 'Last saved by admin on Thu 19 Nov, 21:14' });
       // 23:30 in Rome on Thursday: Friday in UTC is still to come, Friday in the browser is under way.
-      expect(settingsInfo({ ...SAVED, updatedAt: '2026-11-19T22:30:00.000Z' }).lastSaved).toBe('Last saved by admin on Thu 19 Nov, 23:30');
+      expect(settingsInfo(PAGE_TEXTS_EN, { ...SAVED, updatedAt: '2026-11-19T22:30:00.000Z' }).lastSaved).toBe('Last saved by admin on Thu 19 Nov, 23:30');
     });
 
     it('a name with markup is handed over as it is; a moment without a name counts as never saved', () => {
-      expect(settingsInfo({ ...SAVED, updatedBy: { username: '<b>x</b>', role: 'admin' } }).lastSaved).toBe('Last saved by <b>x</b> on Thu 19 Nov, 16:44');
-      expect(settingsInfo({ ...SAVED, updatedBy: null }).lastSaved).toBe('These are the default settings: nobody has saved them yet.');
+      expect(settingsInfo(PAGE_TEXTS_EN, { ...SAVED, updatedBy: { username: '<b>x</b>', role: 'admin' } }).lastSaved).toBe('Last saved by <b>x</b> on Thu 19 Nov, 16:44');
+      expect(settingsInfo(PAGE_TEXTS_EN, { ...SAVED, updatedBy: null }).lastSaved).toBe('These are the default settings: nobody has saved them yet.');
     });
   });
 
   describe('settingRange: the range of a field (9)', () => {
     it('the ends are those of shared/, for every field', () => {
       for (const field of SETTING_FIELDS) {
-        const { min, max } = settingRange(field);
+        const { min, max } = settingRange(PAGE_TEXTS_EN.settings, field);
         expect({ min, max }, field).toEqual(SETTINGS_RANGES[field]);
       }
       expect([...SETTING_FIELDS].sort()).toEqual(Object.keys(SETTINGS_RANGES).sort());
     });
 
     it('in words: what the field counts, and from where to where', () => {
-      expect(SETTING_FIELDS.map((field) => settingRange(field).words)).toEqual(['hours, from 0 to 720', 'hours, from 0 to 720', 'days, from 1 to 365', 'appointments, from 1 to 100']);
+      expect(SETTING_FIELDS.map((field) => settingRange(PAGE_TEXTS_EN.settings, field).words)).toEqual(['hours, from 0 to 720', 'hours, from 0 to 720', 'days, from 1 to 365', 'appointments, from 1 to 100']);
     });
   });
 

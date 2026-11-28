@@ -1,6 +1,6 @@
 import type { AppointmentConflict, AvailabilityType, WeeklyPattern } from '@shared-calendar/shared';
 import { BehaviorSubject } from 'rxjs';
-import { NO_TYPE_YET, patternFor, patternGroups, startingFields, TYPE_CAPACITY_HINT, TYPE_NAME_HINT, typeChoices, typeRows, type PatternFields } from '../../../src/logic/availability.model';
+import { patternFor, patternGroups, startingFields, typeChoices, typeRows, type PatternFields } from '../../../src/logic/availability.model';
 import type { Ask, AvailabilityState } from '../../../src/logic/availability.screen';
 import { conflictList } from '../../../src/logic/conflicts';
 import type { DeletePatternState } from '../../../src/services/availability-rules.types';
@@ -9,6 +9,8 @@ import { mountConfirm } from '../../../src/views/availability.parts';
 import { mountAvailability, type AvailabilityDeps } from '../../../src/views/availability.view';
 import { POOL, STUDIO } from '../logic/fixtures';
 import { choicesOf, choose, chooseTime, clock, find, loadPage, setTime, submit, timeIn, useRealPage } from './page';
+import { NO_TYPE_YET, TYPE_CAPACITY_HINT, TYPE_NAME_HINT } from '../logic/availability.words';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // The DOM test of the availability view (docs/FRONTEND_ARCHITECTURE.md section 8): the real
 // index.html, a fake AvailabilityScreen whose stream the test controls, and the parts of the
@@ -31,13 +33,13 @@ const CONFLICTS: AppointmentConflict[] = [
   { appointmentId: 'appt-2', username: 'bob', start: '2026-11-30T08:00:00.000Z', end: '2026-11-30T09:00:00.000Z' },
   { appointmentId: 'appt-1', username: 'alice', start: '2026-11-23T08:00:00.000Z', end: '2026-11-23T09:00:00.000Z' },
 ];
-const IN_THE_WAY = conflictList(CONFLICTS, 'Europe/Rome')!;
+const IN_THE_WAY = conflictList(PAGE_TEXTS_EN, CONFLICTS, 'Europe/Rome')!;
 
 // The objects of the state stay the same from one state to the next unless a test brings
 // another: another object is what tells the view to draw a list or to fill a form again.
 const QUIET: Ask<never> = { about: '', busy: false, refusals: {}, failure: null, conflicts: null, done: false };
-const ROWS = typeRows(TYPES);
-const GROUPS = patternGroups(PATTERNS, TYPES, '2026-11-20');
+const ROWS = typeRows(PAGE_TEXTS_EN, TYPES);
+const GROUPS = patternGroups(PAGE_TEXTS_EN, PATTERNS, TYPES, '2026-11-20');
 const CHOICES = typeChoices(TYPES);
 const TYPE_FIELDS = { name: '', capacity: '1' };
 const STARTING = startingFields('2026-11-20');
@@ -74,13 +76,13 @@ function mounted(first: AvailabilityState = listed(), removed: RemoveTypeState =
     retryTypes: vi.fn<AvailabilityDeps['screen']['retryTypes']>(),
     retryPatterns: vi.fn<AvailabilityDeps['screen']['retryPatterns']>(),
     // The fake screen knows the zone of these tests' calendar.
-    conflicts: vi.fn<AvailabilityDeps['screen']['conflicts']>((conflicts) => conflictList(conflicts, 'Europe/Rome')),
+    conflicts: vi.fn<AvailabilityDeps['screen']['conflicts']>((conflicts) => conflictList(PAGE_TEXTS_EN, conflicts, 'Europe/Rome')),
   };
   const types = { remove: vi.fn<AvailabilityDeps['types']['remove']>(), removeState$: removeState$.asObservable() };
   const rules = { deletePattern: vi.fn<AvailabilityDeps['rules']['deletePattern']>(), deletePatternState$: deletePatternState$.asObservable() };
   // The dialog that confirms is mounted by whoever shows the screen and ends with it.
   const confirm = mountConfirm(find('#availability'));
-  const subscription = mountAvailability(find('#availability'), { screen, types, rules, confirm });
+  const subscription = mountAvailability(find('#availability'), { screen, types, rules, confirm, texts: PAGE_TEXTS_EN });
   subscription.add(confirm.subscription);
   const writes = () => [screen.createType, screen.rename, screen.createPattern, screen.change, types.remove, rules.deletePattern].map((spy) => spy.mock.calls.length);
   return { availability$, removeState$, deletePatternState$, screen, types, rules, subscription, writes };
@@ -323,8 +325,8 @@ describe('mountAvailability', () => {
 
     it('every refusal of the logic layer names its field in the words of the field\'s label', () => {
       mounted();
-      const checked = patternFor({ weekday: '1', start: '10:00', end: '10:00', typeId: '', validFrom: '', validUntil: 'x' });
-      const before = patternFor({ weekday: '1', start: '09:00', end: '10:00', typeId: STUDIO, validFrom: '2026-11-20', validUntil: '2026-11-19' });
+      const checked = patternFor(PAGE_TEXTS_EN, { weekday: '1', start: '10:00', end: '10:00', typeId: '', validFrom: '', validUntil: 'x' });
+      const before = patternFor(PAGE_TEXTS_EN, { weekday: '1', start: '09:00', end: '10:00', typeId: STUDIO, validFrom: '2026-11-20', validUntil: '2026-11-19' });
       if (!('refusals' in checked) || !('refusals' in before)) throw new Error('accepted');
       // The words of a label: its own text, before the field (a list's choices are text of the
       // label too); for a time, the name of its group of two lists.
@@ -364,7 +366,7 @@ describe('mountAvailability', () => {
       field(CREATE_TYPE, 'name').value = 'Sala';
       availability$.next(listed({ typeCreate: ask({ busy: true }) }));
       availability$.next(listed({ typeCreate: ask({ failure: FAILURE }) }));
-      availability$.next(listed({ types: typeRows([type(STUDIO, 'Studio')]), typeCreate: ask({ done: true }) }));
+      availability$.next(listed({ types: typeRows(PAGE_TEXTS_EN, [type(STUDIO, 'Studio')]), typeCreate: ask({ done: true }) }));
       expect(field(CREATE_TYPE, 'name').value).toBe('Sala');
       availability$.next(listed({ typeFields: { name: '', capacity: '1' }, typeCreate: ask({ done: true }) }));
       expect(field(CREATE_TYPE, 'name').value).toBe('');
@@ -382,7 +384,7 @@ describe('mountAvailability', () => {
 
   describe('the capacity of a type (6.1, D24)', () => {
     // Piscina holds 3 people, Studio 1.
-    const WITH_THREE = typeRows([{ ...type(POOL, 'Piscina'), capacity: 3 }, type(STUDIO, 'Studio')]);
+    const WITH_THREE = typeRows(PAGE_TEXTS_EN, [{ ...type(POOL, 'Piscina'), capacity: 3 }, type(STUDIO, 'Studio')]);
     const placesOf = () => typeItems().map((item) => item.querySelector('.places')!.textContent);
 
     it('a number field in the form that creates and in the dialog that edits, each with the hint of the bounds under it', () => {
@@ -466,7 +468,7 @@ describe('mountAvailability', () => {
       set(CREATE_PATTERN, chosen);
       availability$.next(listed({ patternCreate: ask({ busy: true }) }));
       availability$.next(listed({ patternCreate: ask({ failure: FAILURE, conflicts: IN_THE_WAY }) }));
-      availability$.next(listed({ loading: true, groups: patternGroups(PATTERNS.slice(0, 1), TYPES, '2026-11-20') }));
+      availability$.next(listed({ loading: true, groups: patternGroups(PAGE_TEXTS_EN, PATTERNS.slice(0, 1), TYPES, '2026-11-20') }));
       expect(held(CREATE_PATTERN)).toEqual(chosen);
       availability$.next(listed({ patternFields: startingFields('2026-11-21'), patternCreate: ask({ done: true }) }));
       expect(held(CREATE_PATTERN)).toEqual({ weekday: '1', start: '09:00', end: '10:00', typeId: '', validFrom: '2026-11-21', validUntil: '' });
@@ -491,7 +493,7 @@ describe('mountAvailability', () => {
     };
     // Opens the dialog that changes a pattern of the given times, the only one listed.
     const openedOn = (start: string, end: string) => {
-      const view = mounted(listed({ groups: patternGroups([pattern(P1, { start, end })], TYPES, '2026-11-20') }));
+      const view = mounted(listed({ groups: patternGroups(PAGE_TEXTS_EN, [pattern(P1, { start, end })], TYPES, '2026-11-20') }));
       patternButton(0, '.ask-change').click();
       return view;
     };
@@ -567,7 +569,7 @@ describe('mountAvailability', () => {
       const { screen } = openedOn('08:30', '09:45');
       expect([value(CHANGE, 'start'), value(CHANGE, 'end'), endChoices(CHANGE)[1]]).toEqual(['08:30', '09:45', ['30', '45']]);
       submit(form(CHANGE));
-      expect(patternFor(screen.change.mock.lastCall![1])).toEqual({ refusals: { end: 'End must be a whole number of hours after Start.' } });
+      expect(patternFor(PAGE_TEXTS_EN, screen.change.mock.lastCall![1])).toEqual({ refusals: { end: 'End must be a whole number of hours after Start.' } });
     });
 
     it('the dialog opened on a window stored with a start after 23:00, 23:30–24:00, shows it as it is', () => {
@@ -725,12 +727,12 @@ describe('mountAvailability', () => {
     it('a list that arrives behind it leaves it as it is', () => {
       const { availability$ } = opened();
       field(RENAME, 'name').value = 'Sal';
-      availability$.next(listed({ types: typeRows([type(STUDIO, 'Studio')]), loading: true }));
+      availability$.next(listed({ types: typeRows(PAGE_TEXTS_EN, [type(STUDIO, 'Studio')]), loading: true }));
       expect([dialog('rename').open, field(RENAME, 'name').value, typeNames()]).toEqual([true, 'Sal', ['Studio']]);
     });
 
     it('a name containing <script> is shown as text in the row, in the names of its buttons and in the dialog\'s field', () => {
-      const rows = typeRows([type(STUDIO, SCRIPT)]);
+      const rows = typeRows(PAGE_TEXTS_EN, [type(STUDIO, SCRIPT)]);
       mounted(listed({ types: rows, choices: typeChoices([type(STUDIO, SCRIPT)]) }));
       expect(typeNames()).toEqual([SCRIPT]);
       expect(typeButton(SCRIPT, '.ask-rename').getAttribute('aria-label')).toBe(`Edit ${SCRIPT}`);
@@ -874,7 +876,7 @@ describe('mountAvailability', () => {
       const { availability$ } = opened();
       set(CHANGE, { weekday: '5', typeId: STUDIO, validUntil: '' });
       const more = [type('01M6SALA000000000000000000', 'Sala'), ...TYPES];
-      availability$.next(listed({ types: typeRows(more), choices: typeChoices(more), groups: patternGroups(PATTERNS.slice(0, 1), more, '2026-11-20') }));
+      availability$.next(listed({ types: typeRows(PAGE_TEXTS_EN, more), choices: typeChoices(more), groups: patternGroups(PAGE_TEXTS_EN, PATTERNS.slice(0, 1), more, '2026-11-20') }));
       expect(dialog('change').open).toBe(true);
       expect(held(CHANGE)).toEqual({ ...TUESDAY_POOL, weekday: '5', typeId: STUDIO, validUntil: '' });
       expect([options(CHANGE, 'typeId').length, typeNames().length, patternItems().length]).toEqual([3, 3, 1]);
@@ -890,14 +892,14 @@ describe('mountAvailability', () => {
     });
 
     it('a pattern whose type is not among the choices opens with none chosen', () => {
-      const lonely = patternGroups([pattern(P1, { typeId: '01M6ZZZZZZZZZZZZZZZZZZZZZZ' })], TYPES, '2026-11-20');
+      const lonely = patternGroups(PAGE_TEXTS_EN, [pattern(P1, { typeId: '01M6ZZZZZZZZZZZZZZZZZZZZZZ' })], TYPES, '2026-11-20');
       opened(0, listed({ groups: lonely }));
       expect([field(CHANGE, 'typeId').value, patternItems()[0]!.querySelector('.type-name')!.textContent]).toEqual(['', 'Unknown type']);
     });
 
     it('a type\'s name containing <script> is shown as text in the row, in the names of its buttons and in the dialog\'s list', () => {
       const scripted = [type(STUDIO, SCRIPT)];
-      mounted(listed({ groups: patternGroups(PATTERNS.slice(0, 1), scripted, '2026-11-20'), choices: typeChoices(scripted) }));
+      mounted(listed({ groups: patternGroups(PAGE_TEXTS_EN, PATTERNS.slice(0, 1), scripted, '2026-11-20'), choices: typeChoices(scripted) }));
       expect(patternItems()[0]!.querySelector('.type-name')!.textContent).toBe(SCRIPT);
       expect(patternButton(0, '.ask-change').getAttribute('aria-label')).toBe(`Change Monday 09:00 – 13:00 ${SCRIPT}`);
       patternButton(0, '.ask-change').click();
@@ -1073,7 +1075,7 @@ describe('mountAvailability', () => {
 
     it('lists that arrive behind it leave it as it is', () => {
       const { availability$ } = aboutPattern();
-      availability$.next(listed({ loading: true, groups: patternGroups(PATTERNS.slice(0, 1), TYPES, '2026-11-20') }));
+      availability$.next(listed({ loading: true, groups: patternGroups(PAGE_TEXTS_EN, PATTERNS.slice(0, 1), TYPES, '2026-11-20') }));
       expect([dialog('delete').open, one('dialog.delete .question').textContent, patternItems().length]).toEqual([true, PATTERN_QUESTION, 1]);
     });
   });
@@ -1090,9 +1092,9 @@ describe('mountAvailability', () => {
       expect(typeButton('Studio', '.ask-rename')).toBe(rename);
       expect(patternButton(0, '.ask-change')).toBe(change);
       // Another list of types leaves the patterns' rows, and the other way round.
-      availability$.next(listed({ types: typeRows(TYPES) }));
+      availability$.next(listed({ types: typeRows(PAGE_TEXTS_EN, TYPES) }));
       expect([typeButton('Studio', '.ask-rename') === rename, patternButton(0, '.ask-change') === change]).toEqual([false, true]);
-      availability$.next(listed({ types: typeRows(TYPES), groups: patternGroups(PATTERNS, TYPES, '2026-11-20') }));
+      availability$.next(listed({ types: typeRows(PAGE_TEXTS_EN, TYPES), groups: patternGroups(PAGE_TEXTS_EN, PATTERNS, TYPES, '2026-11-20') }));
       expect(patternButton(0, '.ask-change')).not.toBe(change);
     });
 

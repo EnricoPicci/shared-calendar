@@ -1,4 +1,4 @@
-import { localDateOf, localTimeOf, type CancelReason } from '@shared-calendar/shared';
+import { EXCEL_COLUMNS, localDateOf, localTimeOf, mailTexts, type ExcelColumn, type Language } from '@shared-calendar/shared';
 import writeXlsxFile, { type Row, type SheetData } from 'write-excel-file/node';
 import type { ViewAppointment } from './calendarRules';
 
@@ -12,42 +12,44 @@ export type NamesBySub = ReadonlyMap<string, { givenName: string; familyName: st
 
 // The name columns are the Administrator's only: a User's file holds their own appointments and
 // no name of anybody (docs/EMAIL_ARCHITECTURE.md section 6.3).
-const HEADINGS = ['Date', 'Start', 'End', 'Type', 'Username', 'First name', 'Last name', 'Status', 'Cancelled because', 'Note', 'Booked at'];
-const NAME_COLUMNS = ['First name', 'Last name'];
-const WIDTHS: Record<string, number> = { Date: 12, Start: 7, End: 7, Type: 20, Username: 16, 'First name': 16, 'Last name': 16, Status: 10, 'Cancelled because': 17, Note: 40, 'Booked at': 17 };
-
-// Why a cancelled appointment was cancelled, in the words of the file.
-const REASONS: Record<CancelReason, string> = { cancelled: 'cancelled', changed: 'changed', user_deleted: 'user deleted' };
+const NAME_COLUMNS: readonly ExcelColumn[] = ['givenName', 'familyName'];
+// The width of each column in characters, at least that of its heading in the file's language.
+const WIDTHS: Record<ExcelColumn, number> = { date: 12, start: 7, end: 7, type: 20, username: 16, givenName: 16, familyName: 16, status: 10, cancelReason: 17, note: 40, bookedAt: 17 };
 
 /**
- * One sheet, "Appointments": a row of headings, then one row per appointment in the order given
- * (the mailer gives them by start). Dates and times are local to the calendar's time zone, as on
- * the pages; "Booked at" is the creation instant as a local date and time. Every cell is text, so
- * that Excel shows a date and a time as written and changes no note into a number. With `names`
- * the file has the two name columns, empty for an account that no longer exists; without, it has
- * none.
+ * One sheet, named in the file's language: a row of headings, then one row per appointment in the
+ * order given (the mailer gives them by start). The headings, the status and the reason of a
+ * cancellation are words of the language (docs/MULTILANGUAGE_ARCHITECTURE.md decision L3); the
+ * dates and times are not, so that they sort and filter rightly in any Excel
+ * (docs/MULTILANGUAGE_ARCHITECTURE.md section 8). Dates and times are local to the calendar's time
+ * zone, as on the pages; the booking's column is the creation instant as a local date and time.
+ * Every cell is text, so that Excel shows a date and a time as written and changes no note into a
+ * number. With `names` the file has the two name columns, empty for an account that no longer
+ * exists; without, it has none.
  */
-export async function appointmentsFile(appointments: readonly ViewAppointment[], timeZone: string, names: NamesBySub | null): Promise<Buffer> {
-  const headings = HEADINGS.filter((heading) => names !== null || !NAME_COLUMNS.includes(heading));
+export async function appointmentsFile(language: Language, appointments: readonly ViewAppointment[], timeZone: string, names: NamesBySub | null): Promise<Buffer> {
+  const words = mailTexts(language);
+  const columns = EXCEL_COLUMNS.filter((column) => names !== null || !NAME_COLUMNS.includes(column));
   const rows: SheetData = [
-    headings.map((heading) => ({ value: heading, fontWeight: 'bold' as const })),
+    columns.map((column) => ({ value: words.headings[column], fontWeight: 'bold' as const })),
     ...appointments.map(({ userId, appointment: a }): Row => {
       const person = names?.get(userId);
-      const cells: Record<string, string> = {
-        Date: a.date,
-        Start: localTimeOf(a.start, timeZone),
-        End: localTimeOf(a.end, timeZone),
-        Type: a.typeName,
-        Username: a.username,
-        'First name': person?.givenName ?? '',
-        'Last name': person?.familyName ?? '',
-        Status: a.status,
-        'Cancelled because': a.cancelReason === null ? '' : REASONS[a.cancelReason],
-        Note: a.note ?? '',
-        'Booked at': `${localDateOf(a.createdAt, timeZone)} ${localTimeOf(a.createdAt, timeZone)}`,
+      const cells: Record<ExcelColumn, string> = {
+        date: a.date,
+        start: localTimeOf(a.start, timeZone),
+        end: localTimeOf(a.end, timeZone),
+        type: a.typeName,
+        username: a.username,
+        givenName: person?.givenName ?? '',
+        familyName: person?.familyName ?? '',
+        status: words.statuses[a.status],
+        cancelReason: a.cancelReason === null ? '' : words.reasons[a.cancelReason],
+        note: a.note ?? '',
+        bookedAt: `${localDateOf(a.createdAt, timeZone)} ${localTimeOf(a.createdAt, timeZone)}`,
       };
-      return headings.map((heading) => cells[heading]);
+      return columns.map((column) => cells[column]);
     }),
   ];
-  return writeXlsxFile(rows, { sheet: 'Appointments', columns: headings.map((heading) => ({ width: WIDTHS[heading] })), stickyRowsCount: 1 }).toBuffer();
+  const widths = columns.map((column) => ({ width: Math.max(WIDTHS[column], words.headings[column].length) }));
+  return writeXlsxFile(rows, { sheet: words.sheet, columns: widths, stickyRowsCount: 1 }).toBuffer();
 }

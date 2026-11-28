@@ -1,10 +1,11 @@
 import { BehaviorSubject } from 'rxjs';
 import { meDetails, meFields } from '../../../src/logic/me.model';
 import type { MeState } from '../../../src/logic/me.screen';
-import { NO_REFUSALS, PROFILE_RULES } from '../../../src/logic/profile.model';
+import { NO_REFUSALS, profileRules } from '../../../src/logic/profile.model';
 import type { EditState } from '../../../src/logic/users.screen';
 import { mountMe, type MeDeps } from '../../../src/views/me.view';
 import { find, submit, useRealPage } from './page';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // The DOM test of the "My details" view (docs/FRONTEND_ARCHITECTURE.md section 8): the real
 // index.html and a fake MeScreen whose stream the test controls. What the texts say is checked in
@@ -15,9 +16,10 @@ const FAILURE = 'The server cannot be reached. Check the connection and try agai
 const NO_EDIT: EditState = { saving: false, refusals: NO_REFUSALS, failure: null, saved: null };
 const ADMIN = { username: 'admin', role: 'admin' as const, givenName: 'Ada', familyName: 'Lovelace', email: 'ada@example.com', address: 'Via dei Calcoli 1\n00100 Roma' };
 const ALICE = { username: 'alice', role: 'user' as const, givenName: 'Alice', familyName: 'Liddell', email: 'alice@example.com', address: 'Piazza 7' };
-const state = (over: Partial<MeState> = {}): MeState => ({ loading: false, unread: null, details: null, fields: null, canEdit: true, edit: NO_EDIT, ...over });
-const admin = (over: Partial<MeState> = {}) => state({ details: meDetails(ADMIN), fields: meFields(ADMIN), ...over });
-const alice = (over: Partial<MeState> = {}) => state({ details: meDetails(ALICE), fields: meFields(ALICE), canEdit: false, ...over });
+const ENGLISH = { value: 'en' as const, saving: false, failure: null };
+const state = (over: Partial<MeState> = {}): MeState => ({ loading: false, unread: null, details: null, fields: null, canEdit: true, edit: NO_EDIT, language: ENGLISH, ...over });
+const admin = (over: Partial<MeState> = {}) => state({ details: meDetails(PAGE_TEXTS_EN, ADMIN), fields: meFields(ADMIN), ...over });
+const alice = (over: Partial<MeState> = {}) => state({ details: meDetails(PAGE_TEXTS_EN, ALICE), fields: meFields(ALICE), canEdit: false, ...over });
 
 function mounted(first: MeState = state()) {
   const me$ = new BehaviorSubject<MeState>(first);
@@ -27,6 +29,7 @@ function mounted(first: MeState = state()) {
     editOpened: vi.fn<MeDeps['editOpened']>(),
     editTyped: vi.fn<MeDeps['editTyped']>(),
     save: vi.fn<MeDeps['save']>(),
+    chooseLanguage: vi.fn<MeDeps['chooseLanguage']>(),
   };
   const root = find('#me');
   const subscription = mountMe(root, screen);
@@ -105,8 +108,8 @@ describe('mountMe', () => {
       expect(screen.editTyped).toHaveBeenLastCalledWith({ ...meFields(ADMIN), email: 'ada@' });
       submit(one<HTMLFormElement>('dialog.edit form'));
       expect(screen.save).toHaveBeenCalledWith({ ...meFields(ADMIN), email: 'ada@' });
-      me$.next(admin({ edit: { ...NO_EDIT, refusals: { ...NO_REFUSALS, email: PROFILE_RULES.email } } }));
-      expect([editField('email').closest('.field')!.querySelector('.refusal')!.textContent, editField('email').getAttribute('aria-invalid')]).toEqual([PROFILE_RULES.email, 'true']);
+      me$.next(admin({ edit: { ...NO_EDIT, refusals: { ...NO_REFUSALS, email: profileRules(PAGE_TEXTS_EN.profile).email } } }));
+      expect([editField('email').closest('.field')!.querySelector('.refusal')!.textContent, editField('email').getAttribute('aria-invalid')]).toEqual([profileRules(PAGE_TEXTS_EN.profile).email, 'true']);
       me$.next(admin({ edit: { ...NO_EDIT, saving: true } }));
       expect(one<HTMLButtonElement>('dialog.edit .submit').disabled).toBe(true);
       me$.next(admin({ edit: { ...NO_EDIT, failure: FAILURE } }));
@@ -136,7 +139,7 @@ describe('mountMe', () => {
       const before = html();
       const { me$, subscription } = mounted(admin({ loading: true }));
       one('.ask-edit').click();
-      me$.next(admin({ unread: FAILURE, edit: { ...NO_EDIT, saving: true, failure: FAILURE, refusals: { ...NO_REFUSALS, address: PROFILE_RULES.address } } }));
+      me$.next(admin({ unread: FAILURE, edit: { ...NO_EDIT, saving: true, failure: FAILURE, refusals: { ...NO_REFUSALS, address: profileRules(PAGE_TEXTS_EN.profile).address } } }));
       expect(html()).not.toBe(before);
       subscription.unsubscribe();
       expect(edit().open).toBe(false);
@@ -159,6 +162,41 @@ describe('mountMe', () => {
       expect(root.hidden).toBe(true);
       subscription.unsubscribe();
       expect(root.hidden).toBe(true);
+    });
+  });
+
+  describe('the choice of language', () => {
+    const list = () => one<HTMLSelectElement>('.language-field select');
+    const why = () => one('.language-field .refusal');
+
+    it('each language under its own name, marked as being in it; the one in use chosen', () => {
+      mounted(alice());
+      expect([...list().options].map((option) => [option.value, option.lang, option.textContent])).toEqual([
+        ['en', 'en', 'English'],
+        ['it', 'it', 'Italiano'],
+      ]);
+      expect(list().value).toBe('en');
+    });
+
+    it('another language chosen: the call; while saving the list is closed; a failure says why', () => {
+      const { me$, screen } = mounted(admin());
+      list().value = 'it';
+      list().dispatchEvent(new Event('change'));
+      expect(screen.chooseLanguage).toHaveBeenCalledWith('it');
+      me$.next(admin({ language: { value: 'it', saving: true, failure: null } }));
+      expect([list().value, list().disabled]).toEqual(['it', true]);
+      me$.next(admin({ language: { value: 'en', saving: false, failure: SCRIPT } }));
+      expect([list().value, list().disabled, why().textContent]).toEqual(['en', false, SCRIPT]);
+      expect(why().children).toHaveLength(0);
+    });
+
+    it('after unsubscribing: no choice, no sentence, the list open, no call', () => {
+      const { me$, screen, subscription } = mounted(admin());
+      me$.next(admin({ language: { value: 'en', saving: true, failure: 'why' } }));
+      subscription.unsubscribe();
+      expect([list().options.length, list().disabled, why().textContent]).toEqual([0, false, '']);
+      list().dispatchEvent(new Event('change'));
+      expect(screen.chooseLanguage).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,22 +1,10 @@
 import { CALENDAR_LIMITS, OneOffWindowBody, OverrideBody, toInstant, type AvailabilityType, type CalendarDay, type CalendarWindow, type WeeklyPattern, type WindowBody } from '@shared-calendar/shared';
 import {
   dateFor,
-  dateWords,
-  DATE_NEEDED,
   dayModel,
-  DRAFT_EMPTY,
-  DRAFT_FULL,
   draftAdd,
   draftModel,
-  NO_EXTRAS,
-  NO_PATTERN_HOURS,
-  NOT_AVAILABLE,
   IN_FAULT_TOO,
-  OVERLAPS_DRAFT,
-  OWN_WINDOWS,
-  PAST_DATE,
-  PATTERNS_APPLY,
-  PATTERNS_NOT_KNOWN,
   STARTING_WINDOW,
   startingWindows,
   windowFor,
@@ -24,6 +12,8 @@ import {
 } from '../../../src/logic/date.model';
 import { POOL, STUDIO } from './fixtures';
 import { useFarBrowserZone } from './zone';
+import { DATE_NEEDED, DRAFT_EMPTY, DRAFT_FULL, NOT_AVAILABLE, NO_EXTRAS, NO_PATTERN_HOURS, OVERLAPS_DRAFT, OWN_WINDOWS, PAST_DATE, PATTERNS_APPLY, PATTERNS_NOT_KNOWN, dateWords } from './availability.words';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 const ROME = 'Europe/Rome';
 const STAMPS = { createdAt: '2026-11-01T10:00:00.000Z', updatedAt: '2026-11-01T10:00:00.000Z' };
@@ -55,14 +45,14 @@ describe('date.model', () => {
 
   describe('dateFor: the date chosen, checked before any call', () => {
     it('an empty field and a text that is not a date are refused with the same sentence', () => {
-      for (const text of ['', '2026-11', '23/11/2026', '2026-02-30', 'tomorrow']) expect(dateFor(text, '2026-11-20'), text).toEqual({ refusal: DATE_NEEDED });
+      for (const text of ['', '2026-11', '23/11/2026', '2026-02-30', 'tomorrow']) expect(dateFor(PAGE_TEXTS_EN, text, '2026-11-20'), text).toEqual({ refusal: DATE_NEEDED });
     });
 
     it('a date before today is refused (R-AV-02); today and tomorrow are accepted', () => {
-      expect(dateFor('2026-11-19', '2026-11-20')).toEqual({ refusal: PAST_DATE });
-      expect(dateFor('2025-12-31', '2026-01-01')).toEqual({ refusal: PAST_DATE });
-      expect(dateFor('2026-11-20', '2026-11-20')).toEqual({ date: '2026-11-20' });
-      expect(dateFor('2026-11-21', '2026-11-20')).toEqual({ date: '2026-11-21' });
+      expect(dateFor(PAGE_TEXTS_EN, '2026-11-19', '2026-11-20')).toEqual({ refusal: PAST_DATE });
+      expect(dateFor(PAGE_TEXTS_EN, '2025-12-31', '2026-01-01')).toEqual({ refusal: PAST_DATE });
+      expect(dateFor(PAGE_TEXTS_EN, '2026-11-20', '2026-11-20')).toEqual({ date: '2026-11-20' });
+      expect(dateFor(PAGE_TEXTS_EN, '2026-11-21', '2026-11-20')).toEqual({ date: '2026-11-21' });
     });
 
     it('the sentence of a past date says that it cannot be changed', () => {
@@ -76,7 +66,7 @@ describe('date.model', () => {
 
   describe('dayModel: the day as the weekly patterns give it', () => {
     const given = (patterns: WeeklyPattern[] | null, date = MONDAY, types: AvailabilityType[] | null = TYPES) => {
-      const model = dayModel(date, patterns, types, dayOf(date, []), ROME);
+      const model = dayModel(PAGE_TEXTS_EN, date, patterns, types, dayOf(date, []), ROME);
       return [lines(model.patterns), model.patternsNone];
     };
 
@@ -120,7 +110,7 @@ describe('date.model', () => {
 
   describe('dayModel: the day as it is now, from the Administrator\'s calendar view', () => {
     const now = (day: CalendarDay, zone = ROME) => {
-      const model = dayModel(day.date, [pattern('1')], TYPES, day, zone);
+      const model = dayModel(PAGE_TEXTS_EN, day.date, [pattern('1')], TYPES, day, zone);
       return { which: model.which, own: lines(model.own), extras: lines(model.extras), extrasNone: model.extrasNone, hasOverride: model.hasOverride };
     };
 
@@ -144,7 +134,7 @@ describe('date.model', () => {
     });
 
     it('an extra window carries its id, the name of its button and the question before its deletion', () => {
-      const model = dayModel(MONDAY, [], TYPES, dayOf(MONDAY, [seen(MONDAY, '18:00', '20:00', POOL, 'Piscina', 'one_off', W1)], false), ROME);
+      const model = dayModel(PAGE_TEXTS_EN, MONDAY, [], TYPES, dayOf(MONDAY, [seen(MONDAY, '18:00', '20:00', POOL, 'Piscina', 'one_off', W1)], false), ROME);
       expect(model.extras).toEqual([
         {
           windowId: W1,
@@ -157,7 +147,7 @@ describe('date.model', () => {
     });
 
     it('the date in words, and the two questions about the day', () => {
-      const model = dayModel(MONDAY, [], TYPES, dayOf(MONDAY, [], false), ROME);
+      const model = dayModel(PAGE_TEXTS_EN, MONDAY, [], TYPES, dayOf(MONDAY, [], false), ROME);
       expect(model.date).toBe('Monday 23 November 2026');
       expect(model.closeQuestion).toBe('Make Monday 23 November 2026 not available? No hours of the weekly patterns, and none of its own, will be open for booking on this day. Its extra windows stay.');
       expect(model.reopenQuestion).toBe('Back to the weekly patterns for Monday 23 November 2026? What was set for this day only will be removed. Its extra windows stay.');
@@ -214,7 +204,7 @@ describe('date.model', () => {
 
   describe('draftModel: the windows being put together, ready to draw', () => {
     it('a row per window, in the order given, with its hours, its type and the name of its "Remove" button', () => {
-      expect(draftModel([window('09:00', '13:00'), window('15:00', '24:00', POOL)], TYPES)).toEqual({
+      expect(draftModel(PAGE_TEXTS_EN, [window('09:00', '13:00'), window('15:00', '24:00', POOL)], TYPES)).toEqual({
         rows: [
           { time: '09:00 – 13:00', typeName: 'Studio', removeLabel: 'Remove 09:00 – 13:00 Studio' },
           { time: '15:00 – 24:00', typeName: 'Piscina', removeLabel: 'Remove 15:00 – 24:00 Piscina' },
@@ -224,12 +214,12 @@ describe('date.model', () => {
     });
 
     it('none left: the sentence says what saving would do', () => {
-      expect(draftModel([], TYPES)).toEqual({ rows: [], empty: DRAFT_EMPTY });
+      expect(draftModel(PAGE_TEXTS_EN, [], TYPES)).toEqual({ rows: [], empty: DRAFT_EMPTY });
     });
 
     it('a type the types do not hold, and no list of types, are "Unknown type"', () => {
-      expect(draftModel([window('09:00', '10:00', '01M6UNKNOWN000000000000000')], TYPES).rows[0]!.typeName).toBe('Unknown type');
-      expect(draftModel([window('09:00', '10:00')], null).rows[0]!.typeName).toBe('Unknown type');
+      expect(draftModel(PAGE_TEXTS_EN, [window('09:00', '10:00', '01M6UNKNOWN000000000000000')], TYPES).rows[0]!.typeName).toBe('Unknown type');
+      expect(draftModel(PAGE_TEXTS_EN, [window('09:00', '10:00')], null).rows[0]!.typeName).toBe('Unknown type');
     });
   });
 
@@ -237,26 +227,26 @@ describe('date.model', () => {
     const DRAFT = [window('09:00', '12:00'), window('14:00', '16:00', POOL)];
 
     it('a window in free hours is added, and the list stays by start', () => {
-      expect(draftAdd(DRAFT, fields('12:30', '13:30'))).toEqual({ windows: [window('09:00', '12:00'), window('12:30', '13:30'), window('14:00', '16:00', POOL)] });
-      expect(draftAdd(DRAFT, fields('07:00', '08:00', POOL))).toEqual({ windows: [window('07:00', '08:00', POOL), ...DRAFT] });
-      expect(draftAdd([], fields('20:00', '24:00'))).toEqual({ windows: [window('20:00', '24:00')] });
+      expect(draftAdd(PAGE_TEXTS_EN, DRAFT, fields('12:30', '13:30'))).toEqual({ windows: [window('09:00', '12:00'), window('12:30', '13:30'), window('14:00', '16:00', POOL)] });
+      expect(draftAdd(PAGE_TEXTS_EN, DRAFT, fields('07:00', '08:00', POOL))).toEqual({ windows: [window('07:00', '08:00', POOL), ...DRAFT] });
+      expect(draftAdd(PAGE_TEXTS_EN, [], fields('20:00', '24:00'))).toEqual({ windows: [window('20:00', '24:00')] });
     });
 
     it('the list given is left as it was', () => {
       const before = [...DRAFT];
-      draftAdd(DRAFT, fields('07:00', '08:00'));
+      draftAdd(PAGE_TEXTS_EN, DRAFT, fields('07:00', '08:00'));
       expect(DRAFT).toEqual(before);
     });
 
     it('the end not after the start, and no type chosen, are refused under their fields, both at once, with the sentences of a pattern\'s form', () => {
-      expect(draftAdd(DRAFT, fields('18:00', '18:00'))).toEqual({ refusals: { end: 'End must be later than Start.' } });
-      expect(draftAdd(DRAFT, fields('18:00', '17:00', ''))).toEqual({ refusals: { end: 'End must be later than Start.', typeId: 'Type must be chosen.' } });
-      expect(draftAdd(DRAFT, fields('18:00', '19:00', ''))).toEqual({ refusals: { typeId: 'Type must be chosen.' } });
+      expect(draftAdd(PAGE_TEXTS_EN, DRAFT, fields('18:00', '18:00'))).toEqual({ refusals: { end: 'End must be later than Start.' } });
+      expect(draftAdd(PAGE_TEXTS_EN, DRAFT, fields('18:00', '17:00', ''))).toEqual({ refusals: { end: 'End must be later than Start.', typeId: 'Type must be chosen.' } });
+      expect(draftAdd(PAGE_TEXTS_EN, DRAFT, fields('18:00', '19:00', ''))).toEqual({ refusals: { typeId: 'Type must be chosen.' } });
     });
 
     it('D33: a window that is not whole hours, 09:05–10:30, is refused under "End", before the overlap and the limit; an end before the start is said once', () => {
-      expect(draftAdd(DRAFT, fields('09:05', '10:30'))).toEqual({ refusals: { end: 'End must be a whole number of hours after Start.' } });
-      expect(draftAdd(DRAFT, fields('10:30', '09:05'))).toEqual({ refusals: { end: 'End must be later than Start.' } });
+      expect(draftAdd(PAGE_TEXTS_EN, DRAFT, fields('09:05', '10:30'))).toEqual({ refusals: { end: 'End must be a whole number of hours after Start.' } });
+      expect(draftAdd(PAGE_TEXTS_EN, DRAFT, fields('10:30', '09:05'))).toEqual({ refusals: { end: 'End must be later than Start.' } });
       expect(OverrideBody.safeParse({ windows: [fields('09:05', '10:30')] }).success).toBe(false);
     });
 
@@ -264,27 +254,27 @@ describe('date.model', () => {
       const refused = { refusals: { start: OVERLAPS_DRAFT, end: '' } };
       expect([IN_FAULT_TOO, OVERLAPS_DRAFT.startsWith('Start and End ')]).toEqual(['', true]);
       for (const [start, end] of [['11:00', '13:00'], ['08:00', '10:00'], ['10:00', '11:00'], ['08:00', '17:00'], ['15:00', '24:00']] as const) {
-        expect(draftAdd(DRAFT, fields(start, end)), `${start}–${end}`).toEqual(refused);
-        expect(draftAdd(DRAFT, fields(start, end, POOL)), `${start}–${end} Piscina`).toEqual(refused);
+        expect(draftAdd(PAGE_TEXTS_EN, DRAFT, fields(start, end)), `${start}–${end}`).toEqual(refused);
+        expect(draftAdd(PAGE_TEXTS_EN, DRAFT, fields(start, end, POOL)), `${start}–${end} Piscina`).toEqual(refused);
       }
     });
 
     it('a window that touches another, before or after, of the same type or not, is accepted (R-AV-01)', () => {
-      expect(draftAdd(DRAFT, fields('12:00', '14:00'))).toEqual({ windows: [window('09:00', '12:00'), window('12:00', '14:00'), window('14:00', '16:00', POOL)] });
-      expect(draftAdd(DRAFT, fields('16:00', '24:00', POOL))).toEqual({ windows: [...DRAFT, window('16:00', '24:00', POOL)] });
+      expect(draftAdd(PAGE_TEXTS_EN, DRAFT, fields('12:00', '14:00'))).toEqual({ windows: [window('09:00', '12:00'), window('12:00', '14:00'), window('14:00', '16:00', POOL)] });
+      expect(draftAdd(PAGE_TEXTS_EN, DRAFT, fields('16:00', '24:00', POOL))).toEqual({ windows: [...DRAFT, window('16:00', '24:00', POOL)] });
     });
 
     it('the eleventh window is refused as the form\'s failure, with the number of shared/; the tenth is accepted', () => {
       const hour = (n: number) => `${String(n).padStart(2, '0')}:00`;
       const nine = Array.from({ length: 9 }, (_, i) => window(hour(i), hour(i + 1)));
-      const ten = draftAdd(nine, fields('09:00', '10:00'));
+      const ten = draftAdd(PAGE_TEXTS_EN, nine, fields('09:00', '10:00'));
       expect('windows' in ten && ten.windows.length).toBe(CALENDAR_LIMITS.overrideWindowsPerDate);
-      expect(draftAdd('windows' in ten ? ten.windows : [], fields('10:00', '11:00'))).toEqual({ failure: DRAFT_FULL });
+      expect(draftAdd(PAGE_TEXTS_EN, 'windows' in ten ? ten.windows : [], fields('10:00', '11:00'))).toEqual({ failure: DRAFT_FULL });
       expect(DRAFT_FULL).toBe('A day can have 10 windows of its own at most. Remove one to add another.');
     });
 
     it('every list it makes is a body the shared schema accepts unchanged, an empty one too', () => {
-      const added = draftAdd(DRAFT, fields('16:00', '24:00'));
+      const added = draftAdd(PAGE_TEXTS_EN, DRAFT, fields('16:00', '24:00'));
       const windows = 'windows' in added ? added.windows : [];
       expect(OverrideBody.parse({ windows })).toEqual({ windows });
       expect(OverrideBody.parse({ windows: [] })).toEqual({ windows: [] });
@@ -298,22 +288,22 @@ describe('date.model', () => {
 
   describe('windowFor: an extra window\'s body from its form', () => {
     it('the three fields and the date on show, as a body the shared schema accepts unchanged', () => {
-      const made = windowFor(MONDAY, fields('18:00', '24:00', POOL));
+      const made = windowFor(PAGE_TEXTS_EN, MONDAY, fields('18:00', '24:00', POOL));
       expect(made).toEqual({ window: { date: MONDAY, start: '18:00', end: '24:00', typeId: POOL } });
       expect(OneOffWindowBody.parse('window' in made && made.window)).toEqual('window' in made && made.window);
     });
 
     it('the end not after the start and no type chosen are refused under their fields, both at once; the schema refuses them too', () => {
-      expect(windowFor(MONDAY, fields('18:00', '17:45'))).toEqual({ refusals: { end: 'End must be later than Start.' } });
-      expect(windowFor(MONDAY, fields('18:00', '19:00', ''))).toEqual({ refusals: { typeId: 'Type must be chosen.' } });
-      expect(windowFor(MONDAY, fields('18:00', '18:00', ''))).toEqual({ refusals: { end: 'End must be later than Start.', typeId: 'Type must be chosen.' } });
+      expect(windowFor(PAGE_TEXTS_EN, MONDAY, fields('18:00', '17:45'))).toEqual({ refusals: { end: 'End must be later than Start.' } });
+      expect(windowFor(PAGE_TEXTS_EN, MONDAY, fields('18:00', '19:00', ''))).toEqual({ refusals: { typeId: 'Type must be chosen.' } });
+      expect(windowFor(PAGE_TEXTS_EN, MONDAY, fields('18:00', '18:00', ''))).toEqual({ refusals: { end: 'End must be later than Start.', typeId: 'Type must be chosen.' } });
       expect(OneOffWindowBody.safeParse({ date: MONDAY, ...fields('18:00', '17:45') }).success).toBe(false);
       expect(OneOffWindowBody.safeParse({ date: MONDAY, ...fields('18:00', '19:00', '') }).success).toBe(false);
     });
 
     it('D33: a window that is not whole hours, 09:05–10:30, is refused under "End"; whole hours from 09:05 are accepted; the schema agrees', () => {
-      expect(windowFor(MONDAY, fields('09:05', '10:30'))).toEqual({ refusals: { end: 'End must be a whole number of hours after Start.' } });
-      expect(windowFor(MONDAY, fields('09:05', '11:05'))).toEqual({ window: { date: MONDAY, start: '09:05', end: '11:05', typeId: STUDIO } });
+      expect(windowFor(PAGE_TEXTS_EN, MONDAY, fields('09:05', '10:30'))).toEqual({ refusals: { end: 'End must be a whole number of hours after Start.' } });
+      expect(windowFor(PAGE_TEXTS_EN, MONDAY, fields('09:05', '11:05'))).toEqual({ window: { date: MONDAY, start: '09:05', end: '11:05', typeId: STUDIO } });
       expect(OneOffWindowBody.safeParse({ date: MONDAY, ...fields('09:05', '10:30') }).success).toBe(false);
     });
   });

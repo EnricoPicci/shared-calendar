@@ -128,7 +128,9 @@ both fit into its 30 minutes; otherwise run it again before the second.
    that loads is the proof. The page's address is the command's last line and the stack's output
    `PageUrl`.
    **Which branch:** `main`. The first release was made from the branch `deploy-frontend`
-   (section 5.5), merged into `main` since; the release of section 5.6 was made from `main`.
+   (section 5.5), merged into `main` since; the release of section 5.6 was made from `main`; the
+   release of section 5.12 (`v3.1.0`) was made from the branch `multilanguage`, merged into
+   `main` since.
 
 Rules:
 
@@ -348,7 +350,9 @@ Plan step 11 has the full list; in short:
    put it in `backend/samconfig.toml` (both `region` lines), in `frontend/samconfig.toml` (the
    page's deploy stops when the two files name different regions) and in the profile.
 1. Steps 1 to 3 of section 2 (commit, local stack, verify).
-2. `npm run deploy -w backend -- --parameter-overrides AdminUsername="admin" FunctionArchitecture="arm64" AssistantModel="claude-sonnet-5-5" AssistantDailyMessageLimit="30" AlertEmail=<alert address>`.
+2. `npm run deploy -w backend -- --parameter-overrides AdminUsername="admin" FunctionArchitecture="arm64" AssistantModel="claude-sonnet-5-5" AssistantDailyMessageLimit="30" MailStage="off" MailDomain="…" MailFromLocalPart="noreply" MailFromName="Shared calendar" PageAddress="…" DefaultLanguage="it" AlertEmail=<alert address>`,
+   the values of the line in `backend/samconfig.toml` but `MailStage`, which a new stack starts
+   at `off` (section 3.3).
    `backend/samconfig.toml` holds everything else (stack, region, capabilities); the address is
    the one value it leaves out, because the repository is public. A `--parameter-overrides` on the
    command line replaces the whole `parameter_overrides` line of `backend/samconfig.toml`, so the
@@ -549,11 +553,14 @@ other route.
 A key that leaked is deleted in the Console at once, without waiting: the assistant then
 answers `503` (`key_refused`) until step 2 is done and ten minutes have passed.
 
-### 3.3 E-mail: the stages (`domain` run in `docs/EMAIL_PLAN.md` step m9; `on` is a draft, run and corrected in its step m10)
+### 3.3 E-mail: the stages (`domain` run in `docs/EMAIL_PLAN.md` step m9, `on` part A in its step m10 part A; `on` part B is a draft)
 
 E-mail is switched on in two deploys, because SES must first prove the domain, which waits for
-DNS, and lift the sandbox, which waits for AWS (`docs/ARCHITECTURE.md` section 9.2,
-`docs/EMAIL_ARCHITECTURE.md` section 13.2). Each deploy is section 2's steps 1 to 6, with the one
+DNS (`docs/ARCHITECTURE.md` section 9.2, `docs/EMAIL_ARCHITECTURE.md` section 13.2). The stage
+`on` does not wait for SES's sandbox to be lifted, which waits for AWS: in the sandbox it mails
+only addresses verified in SES, so it is deployed and tried first with those (part A), and the
+people are invited once AWS grants production access (part B), with no deploy. The split lets
+the work go on while AWS answers, which can take days. Each deploy is section 2's steps 1 to 6, with the one
 line of `backend/samconfig.toml` changed: `MailStage=off` → `domain` → `on`. `MailDomain`,
 `MailFromLocalPart`, `MailFromName` and `PageAddress` are already in that line; `MailReplyTo` is
 left out, so replies and bounce reports go to `AlertEmail`. No e-mail address goes into the file.
@@ -618,11 +625,126 @@ of 5xx (section 5.11 has the search).
   one tries the 3 minutes of "Choose your password" (`docs/FRONTEND_WALK.md` check 216). Delete
   them in the Users screen when done.
 
-**At `on`**, once SES shows the domain verified and the account out of the sandbox: the deploy,
-the smoke test (65 PASS, section 2.4) and its invitation in your mailbox; the daily mail's hour
-in "Settings"; a User created in the page with your own address, its invitation, its first sign-in; a mail on demand from the week
-page; the next morning, the daily mail. A bounce report, should one come, reaches the Reply-To
-mailbox: correct the User's address in the Users screen and "Resend invitation".
+**At `on`, part A: in the sandbox, every recipient verified** (`docs/EMAIL_PLAN.md` step m10,
+part A). Until production access SES delivers only to addresses verified in SES and to the
+mailbox simulator, Cognito's invitations included (`docs/EMAIL_ARCHITECTURE.md` section 22.2).
+**Create no User, and ask no mail, for an address that is not verified**: AWS's documentation
+does not say what `AdminCreateUser` does then, and a mail the mailer sends there fails.
+
+1. Read-only, before: the domain still verified (`aws sesv2 get-email-identity --email-identity
+   <domain>` with a `--query` of `VerificationStatus` and `DkimAttributes.Status`: `SUCCESS`).
+2. **Verify each address that will receive a mail**: your own (the smoke test's invitation, a
+   throw-away User), the Administrator's in "My details" (the smoke test's mail on demand, the
+   daily mail), each test User's that will ask for a mail. In the SES console, region Europe
+   (Stockholm): Identities, "Create identity", "Email address", the address, "Create identity";
+   then the link in the mail from `no-reply-aws@amazon.com` or
+   `no-reply-aws@verification.amazonses.com` (valid 24 hours; "Resend" on the identity's page).
+   Not "Get started". Checked without printing an address:
+   `aws sesv2 list-email-identities --query "EmailIdentities[?IdentityType=='EMAIL_ADDRESS'].VerificationStatus"`,
+   each `SUCCESS`; compare the console's list with the addresses by eye.
+3. A test User whose address is not verified: delete it in the Users screen, or never use it for
+   a mail. Create no other User until part B.
+4. `MailStage=on` in `backend/samconfig.toml`, committed; section 2's steps. The change set before
+   "y", from `domain`: 32 changes, no Remove, no Replacement. Add for the mailer, its role, log
+   group and error alarm, the hourly schedule and its role; the pool Modify on
+   `AdminCreateUserConfig`, `EmailConfiguration` and `Policies`, each `RequiresRecreation`
+   `Never`; the routes' `MAIL_STAGE`, `MAILER_FUNCTION` and the invoke right of `sendCalendarMail`
+   and `confirmProposal`. The other roles, functions and `HttpApi` are listed only because they
+   name the pool's ARN, or a changed function's: they keep it. The page only if `frontend/` or
+   `shared/` changed since its last deploy.
+   **The mailer's role in the sandbox.** SES checks the sender's role against the recipient too
+   when the recipient is a verified address: with `ses:SendEmail` on the domain's identity alone,
+   every mail of the mailer fails with `AccessDeniedException` (the mailer's log, field `reason`;
+   its error alarm), while the invitations, sent with Cognito's own role, arrive, and a mail to
+   the simulator, no identity of the account, is `sent`. So while the account is in the sandbox
+   the template gives the mailer `identity/*`, the From held to `noreply@<domain>` by the
+   condition `ses:FromAddress`: the one exception to the root `CLAUDE.md`'s wildcard rule, which
+   part B removes (`docs/EMAIL_PLAN.md` step m10).
+5. The smoke test, a verified address typed when asked (an address with a `+label` is its own
+   identity, verified as such): 65 PASS (section 2.4), its mail line `sent` within seconds; its
+   invitation and its resend in your mailbox, from `noreply@<domain>`, Reply-To the alarm
+   address, not in spam; its mail on demand in the Administrator's, its Excel file opening. Then
+   every log group since the deploy searched for `level` `error`, and the access log for `status`
+   500 or more, by field.
+6. In the page: a throw-away User with a verified address, its invitation, "Resend invitation",
+   the first sign-in with the second password, "Choose your password", `active` in the list, then
+   the User deleted; "E-mail…" in the week as the Administrator and as a test User whose address
+   is verified, each Excel file opened; in "Settings" the daily mail's hour, set to the next whole
+   hour to see the daily mail and its two files the same day, then to the hour wanted.
+7. The API's 5xx alarm should no longer go off for the e-mail routes, which answer `503` only
+   below `on`: one now is a fault, looked at in the access log. The mailer's error alarm counts a
+   mail SES refused; it turns OK by itself an hour after the last one.
+8. The tag `v3.0.0`, on the operator's word, at the commit of the record (`README.md` "Versions").
+
+**At `on`, part B: out of the sandbox** (`docs/EMAIL_PLAN.md` step m10, part B). It starts when
+`aws sesv2 get-account --query '{production:ProductionAccessEnabled,quota:SendQuota}'` answers
+`production` true; the query keeps the contact addresses out of the answer. Write the new quota
+in section 5.11.
+
+1. The mailer's role back to the domain's identity alone, in `backend/template.yaml`, and the
+   root `CLAUDE.md`'s wildcard rule without its exception; committed, then section 2's steps:
+   the change set is the mailer's role alone, Modify. The smoke test again: 65 PASS, its mail on
+   demand `sent`. Checked: `grep -rn 'identity/\*' backend/template.yaml CLAUDE.md
+   docs/ARCHITECTURE.md` finds nothing. AWS does not say whether SES, out of the sandbox, still checks the role against
+   a recipient that is a verified identity: if the mail line fails with `AccessDeniedException`,
+   delete the address identity of that recipient (step 4) and ask the mail again.
+2. Create again, in the page, the Users who need an account (step m9's list): each receives an
+   invitation; book their future appointments again by hand if wanted. A bounce report, should
+   one come, reaches the Reply-To mailbox: correct the User's address in the Users screen and
+   "Resend invitation".
+3. Delete the test Users in the Users screen.
+4. The address identities verified in part A: keep them, or delete those no longer wanted (SES
+   console, Identities, the address, "Delete"). A recipient needs no identity out of the sandbox,
+   so nothing depends on them; kept, they spare a new verification should mail be tried in a
+   sandbox again. Never delete the domain's identity, which the stack owns.
+5. Update the privacy notice, outside the system (`docs/EMAIL_ARCHITECTURE.md` section 12.3).
+
+### 3.4 The languages
+
+The page, the mails, the Excel files, the invitation and the assistant speak English and Italian
+(`docs/MULTILANGUAGE_ARCHITECTURE.md`). What the operator sets, and what each person chooses:
+
+- **The installation's language**: the parameter `DefaultLanguage` of the API's stack, `en` or
+  `it`, in the line of `backend/samconfig.toml` (`it`). It is the language of a mail, a file and
+  an invitation for a person whose account holds none, which an invited person never does; and
+  the page's language for a browser that remembers none and speaks none of the calendar's. The
+  page takes it at its release: `npm run deploy -w frontend` reads the stack's output
+  `DefaultLanguage` and builds with it. Changing it is one deploy of the API, then one release of
+  the page.
+- **A person's language**: their own choice, on the sign-in screen (remembered by that browser)
+  and in "My details" (kept in their account, the attribute `locale`). At a first sign-in the
+  page saves its language into an account that holds none. The Administrator cannot set another
+  person's language and the API has no field for it. After a deploy that brings the languages,
+  the Administrator signs in once so that the daily mail follows their language.
+- **The invitation** is worded by the invitation function (`InviteMessageFunction`), which the
+  stack has only at `MailStage` `on`; the template's English invitation, `InviteMessageTemplate`,
+  stays as what Cognito sends when the function's answer is unusable. Its log group is
+  `/aws/lambda/<stack>-invite-message`: one line per invitation and per resend, its kind
+  (`source`, `CustomMessage_AdminCreateUser` for both), the language's code (`language`) and
+  `outcome` `worded`; a call of another kind says `untouched` and has no language.
+- **The assistant** answers in the language of a conversation's first message, else the page's,
+  else English. A change of its instructions ends the conversations in progress at the deploy,
+  and asks for the paid evaluation before it (section 3.2).
+- **What a first deploy with the languages must show** (`docs/MULTILANGUAGE_PLAN.md` phase B,
+  item 8): read first, without changing anything, the app client's attribute lists
+  (`aws cognito-idp describe-user-pool-client`) and the pool's triggers
+  (`aws cognito-idp describe-user-pool`); in the change set, the user pool and its app client
+  "Modify", never "Replace", and one function, one role, one log group and one permission added;
+  after it, the smoke test, a test User whose own token can change its `locale` and can no longer
+  change its e-mail, one invitation received in Italian and its password used. Section 5.12 is
+  the record of that deploy. What it taught:
+  - Read the change set with `aws cloudformation describe-change-set` (its rows'
+    `Action`, `Replacement` and each detail's `RequiresRecreation`), not only on the terminal:
+    recorded with `script`, the deploy's table lost rows, among them the pool and the app client.
+  - The test User for the gap is made in "Users" (`npm run test-user cloud` sends no
+    invitation); its first password is chosen on the page before its token is tried. The outcome
+    of each `UpdateUserAttributes` is also in CloudTrail (`aws cloudtrail lookup-events`, event
+    name `UpdateUserAttributes`, its `errorCode` only).
+  - The Administrator's mail in their language is looked for before the smoke tests of the day
+    or on the next: each smoke test spends one of the Administrator's five mails on demand, and
+    a sixth is `429 mail_limit_reached`. A language equal to `DefaultLanguage` proves nothing in
+    a mail; the stored `locale` is read with `aws cognito-idp admin-get-user` and a `--query` of
+    that attribute alone.
 
 ---
 
@@ -1327,6 +1449,116 @@ session saw no password and no token.
   deleted when no longer needed.
 - **Cost:** AWS within the free tier; nothing at Anthropic but the smoke test's one exchange,
   about a US cent.
+
+**Stage `on` in the sandbox (step m10, part A), 2026-11-28.** The API at `5a4456c`, on `main`,
+pushed before each deploy; the page unchanged since step m9. Who did what as in step m9: the
+operator verified the addresses, ran the three deploys and the three smoke tests inside `script
+-q`, and looked at the page and the mails; the session ran `verify` before each deploy and
+read-only `aws` commands, and printed no address.
+
+- **Before:** the domain `SUCCESS`, DKIM `SUCCESS`; the account in the sandbox (200 mails a day,
+  1 a second, the review `DENIED` while AWS's answer is pending); four address identities, each
+  `SUCCESS`, the operator's own, the Administrator's (a `+admin` address of it) and the test
+  Users'. `miri` asks for mail, `enri` is kept away from it.
+- **Deploy 1, `MailStage=on`** (`e8884b2`), at 08:32 UTC after `verify` PASSED: 32 changes, 6 Add
+  (the mailer, its role, log group and error alarm, the schedule and its role) and 26 Modify, no
+  Remove, no Replacement; the pool Modify on `AdminCreateUserConfig`, `EmailConfiguration` and
+  `Policies`, each `Never`. Then the pool sends with `DEVELOPER` through the configuration set,
+  its invitation's subject set, temporary passwords valid 7 days.
+- **Smoke test 1:** 64 PASS, 1 FAIL, the mail on demand: SES refused the mailer
+  (`AccessDeniedException`, the call and Lambda's two retries) while both invitations arrived. A
+  test User `simtest` with the simulator's address asked a mail on demand: `sent`. So SES in the
+  sandbox checks the mailer's role against a verified recipient's identity (section 3.3, step 4).
+  The mailer's error alarm went to ALARM at 08:40 UTC, and back to OK by itself at 09:42.
+- **Deploy 2, the mailer's `identity/*`** (`d2817ab`, the Product Owner's decision): 9 changes, all
+  Modify, one of them real (`MailerRole`'s policy), the others listed only for the ARNs they name.
+- **Smoke test 2:** 64 PASS, 1 FAIL: the mail was `sent`, but the script read the CLI's per-page
+  counts as two lines (`1` and `0`); and the mail's `.xlsx` did not open, every byte that is not
+  text turned into the replacement character, as SES writes an attachment given no
+  `ContentTransferEncoding` (`docs/EMAIL_PLAN.md` step m10).
+- **Deploy 3, the attachments as base64 and the script's sum** (`5a4456c`): 8 changes, all Modify,
+  one real (`MailerFunction`'s code).
+- **Smoke test 3:** **65 PASS**, no FAIL, no SKIP; the mailer's line `sent` after 5 s; the Excel
+  file 3161 bytes, as made, its sheet and headings read back, and opened by the operator.
+- **The operator's look:** the invitation from `noreply@<domain>`, not in spam, replies to the
+  alarm address; a throw-away User created in the page, its invitation, its resend, the first
+  sign-in with the second password, a password chosen, `active`, deleted; "E-mail…" as the
+  Administrator and as `miri`, each mail arrived, each file opened. The daily mail, its hour set
+  to the next whole hour: the timer's run at 10:00 UTC `sent`, the mail arrived with its two
+  files, both opened and correct.
+- **The logs**, from the first deploy on: 38 log groups, the only lines of level `error` the
+  mailer's three refusals of smoke test 1; the access log without a 5xx. The alarms OK; the 5xx
+  alarm unchanged since 2026-11-26, so the e-mail routes no longer set it off.
+- **Owed to part B:** production access; the mailer's role back to the domain's identity, deployed,
+  the smoke test again; `simtest`, `miri` and `enri` deleted.
+- **Cost:** a few dozen mails through SES, a fraction of a US cent; the smoke tests' exchanges at
+  Anthropic, about three US cents.
+
+### 5.12 The languages, `v3.1.0` (`docs/MULTILANGUAGE_PLAN.md` phase B, items 8 and 9, 2026-11-28)
+
+The API and the page at `744572b`, on the branch `multilanguage` (`main` at `ef6ddc4` merged
+in); `main` and the cloud before it at `v3.0.0` (section 5.11). Released as `v3.1.0`: the tag
+on the record's commit after `744572b`, `main` moved to that commit, both pushed (`README.md`
+"Versions"). Who did what: the
+operator ran the deploy, the smoke test and the page's release in a terminal inside `script -q`
+(macOS: `script -q <file> <command>`), typing `y`, the admin password and their own address, and
+looked at the page, the mails and the gap; the session ran `verify`, read-only `aws` commands
+and the recordings by line, wrote the scratch script of the gap outside the repository, and saw
+no password, token or address.
+
+- **Before, read-only:** the app client with no `ReadAttributes` and no `WriteAttributes` (every
+  standard attribute writable by a person's own token), `ExplicitAuthFlows`
+  `ALLOW_USER_PASSWORD_AUTH` and `ALLOW_REFRESH_TOKEN_AUTH`; the pool's `LambdaConfig` empty, the
+  invitation's subject the English one, sending `DEVELOPER`; the stack's `MailStage` `on`, no
+  parameter and no output `DefaultLanguage`; SES in the sandbox (`ProductionAccessEnabled`
+  false, 200 mails a day, 1 a second). As the documents say.
+- **The gate:** root `DYNAMODB_PORT=8002 npm run verify` PASSED at `744572b` on a clean tree:
+  2090 back-end unit tests, 673 shared, 3296 front end, 100 % line coverage, 249 back-end
+  journeys. One stamp served both deploys.
+- **The API's deploy**, 12:44 to 12:46 UTC: 58 changes, 4 Add (`InviteMessageFunction`, its role,
+  log group and permission) and 54 Modify, every one Replacement `False`, every detail
+  `RequiresRecreation` `Never`, no Remove. The pool Modify on `LambdaConfig`, the app client
+  Modify on `WriteAttributes`; 37 functions for their code, the mailer's environment too
+  (`DEFAULT_LANGUAGE`); 13 roles, `HttpApi` and the daily schedule only for the names they point
+  at, none changed directly; the mailer's role with its `identity/*` of part A untouched. The
+  tables, the Administrator, the SES identity and the configuration set not in the list. Read
+  with `describe-change-set`: the terminal's table had lost the pool's and the client's rows
+  (section 3.4). `UPDATE_COMPLETE`; after it, the client's write list `locale`, its id unchanged,
+  the pool's `CustomMessage` the new function, the parameter and the output `DefaultLanguage`
+  `it`.
+- **The smoke test in the cloud:** **65 PASS**, no FAIL, no SKIP; the mailer's line `sent` after
+  10 s. The invitation and its resend reached the operator's mailbox in Italian, from
+  `noreply@<domain>`, not in spam. The invitation function's log: five lines, each
+  `CustomMessage_AdminCreateUser`, `it`, `worded` (the smoke User and the capacity journey's two
+  at the mailbox simulator, the operator's and its resend). No line of level `error` or `warn`
+  in the 39 log groups; the access log without a 5xx, its seven 4xx the smoke test's expected
+  refusals.
+- **The page**, at 12:57 UTC on the same stamp: the hosting stack had no change, the four checks
+  PASS, the served `app.js` byte for byte the built one, holding the default language `it`.
+  Right after, the page's name did not resolve on the operator's Mac for some minutes (curl:
+  `Could not resolve host`, the CloudFront name too) while CloudFront answered 200 through a
+  public resolver: a passing DNS failure on that machine, not the release.
+- **The operator's look, all yes:** the sign-in screen with its list of languages, following the
+  browser's; a throw-away User made in "Users", its invitation in Italian, the first sign-in with
+  the temporary password, "Choose your password", the frame and "My details" in the page's
+  language, the language changed and back and kept at the next sign-in, the User deleted; the
+  assistant's panel, one message answered in the page's language.
+- **The gap closed:** the scratch script, with the throw-away User's own access token:
+  `UpdateUserAttributes` on `email` refused, `NotAuthorizedException`; on `locale` accepted;
+  `GetUser` answering `locale`, the e-mail unchanged. CloudTrail shows the same, and the page's
+  own writes of `locale` all accepted.
+- **The Administrator:** signed in once, its account holds `locale` `it` (read with
+  `admin-get-user`, that attribute only). Its "E-mail…" at 13:12 UTC answered `429
+  mail_limit_reached`: the day's five mails on demand were spent by part A's look and the smoke
+  tests. The mail opened was the smoke test's, sent while the account had no language, so in the
+  default. **Owed:** the next daily mail, in the Administrator's language. The day's run had gone
+  out at 10:00 UTC, before the deploy; the mailer's lines of kind `daily` since the deploy say
+  `already_sent`, so the first mail in the Administrator's language is the next day's, and the
+  release of `v3.1.0` did not wait for it.
+- **The alarms:** the API's 5xx, the authorizer's and the mailer's errors all `OK`, unchanged
+  since before the deploy; the new function has no alarm of its own.
+- **Cost:** a handful of mails through SES and of calls of the new function, nothing measurable;
+  the smoke test's and the panel's exchanges at Anthropic, about two US cents.
 
 ## 6. A person's password: what to tell them
 

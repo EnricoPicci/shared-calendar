@@ -2,9 +2,10 @@ import { addDays, DEFAULT_TIME_ZONE, localDateOf, weekdayOf, type CalendarView, 
 import { BehaviorSubject, type Observable, type Subscription } from 'rxjs';
 import type { AppointmentsService } from '../services/appointments.service';
 import type { CalendarService } from '../services/calendar.service';
+import type { PageTexts } from '../texts/texts';
 import { appointmentDetail, movingOf, type AppointmentDetail, type Moving } from './appointment.detail';
 import { refusalOf, type Asked, type Refusal } from './booking';
-import { failureText, weekLabel } from './texts';
+import { failureText } from './texts';
 import { weekModel, type WeekModel } from './week.model';
 
 // The week screen (docs/FRONTEND_ARCHITECTURE.md section 5): which week is on screen, its load
@@ -39,13 +40,15 @@ export class WeekScreen {
 
   // `now` gives the present moment: nothing here reads the clock by itself. `visible$` notifies
   // each time the page becomes visible again: the logic layer has no document to ask
-  // (docs/FRONTEND_ARCHITECTURE.md section 5, rule 1).
+  // (docs/FRONTEND_ARCHITECTURE.md section 5, rule 1). `texts` are the page texts of the language
+  // in use, kept for the screen's life (docs/MULTILANGUAGE_PLAN.md decision D2).
   constructor(
     private readonly calendar: WeekCalendar,
     private readonly appointments: WeekAppointments,
     private readonly role: Role,
     private readonly now: () => Date,
     private readonly visible$: Observable<unknown>,
+    private readonly texts: PageTexts,
   ) {
     this.monday = this.thisMonday();
     this.state = new BehaviorSubject<WeekState>({ label: this.label(), loading: false, failure: null, week: null, moving: null });
@@ -67,10 +70,10 @@ export class WeekScreen {
     const subscription = this.calendar.calendarState$.subscribe((state) => {
       const shown = this.state.getValue();
       if (state.status === 'pending') this.state.next({ ...shown, label: this.label(), loading: true });
-      if (state.status === 'failure') this.state.next({ ...shown, loading: false, failure: failureText(state.reason) });
+      if (state.status === 'failure') this.state.next({ ...shown, loading: false, failure: failureText(this.texts.failures, state.reason) });
       if (state.status === 'success') {
         this.view = state.calendar;
-        this.state.next({ ...shown, label: this.label(), loading: false, failure: null, week: weekModel(state.calendar, this.role) });
+        this.state.next({ ...shown, label: this.label(), loading: false, failure: null, week: weekModel(this.texts, state.calendar, this.role) });
       }
     });
     this.started = true;
@@ -107,13 +110,13 @@ export class WeekScreen {
   // what can be done to it at this moment; null when that week does not hold it.
   detail(appointmentId: string): AppointmentDetail | null {
     const appointment = this.view?.appointments.find((a) => a.appointmentId === appointmentId);
-    return appointment ? appointmentDetail(appointment, this.role, this.now(), this.view!.timeZone) : null;
+    return appointment ? appointmentDetail(this.texts, appointment, this.role, this.now(), this.view!.timeZone) : null;
   }
 
   // What the book dialog says when the server refused what it `asked`, the appointment in the
   // way looked for among those of the last week loaded.
   refusal(reason: string, asked: Asked): Refusal {
-    return refusalOf(reason, asked, this.role, this.view?.appointments ?? []);
+    return refusalOf(this.texts, reason, asked, this.role, this.view?.appointments ?? []);
   }
 
   // Starts the move of the appointment `appointmentId` of the last week loaded to another
@@ -176,7 +179,7 @@ export class WeekScreen {
   }
 
   private label(): string {
-    return weekLabel(this.monday, addDays(this.monday, 6));
+    return this.texts.dates.weekLabel(this.monday, addDays(this.monday, 6));
   }
 
   // Once started, the load's own "pending" brings the new label with `loading`, in one

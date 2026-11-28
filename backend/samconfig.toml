@@ -38,6 +38,8 @@ lint = true
 #   (its section 13.2); MailDomain, the domain mail is sent from; MailFromLocalPart and
 #   MailFromName, the sender; PageAddress, the page an invitation points at. MailReplyTo is left
 #   empty, so replies go to AlertEmail: a real address is never written here.
+# - DefaultLanguage: it, the language of the mails to a person who has not chosen one, and of the
+#   page before it knows the person's (docs/MULTILANGUAGE_ARCHITECTURE.md section 4.3).
 # The assistant's effort is not a parameter: the template leaves ASSISTANT_EFFORT empty in the
 # cloud, which means the effort low.
 #
@@ -51,7 +53,7 @@ capabilities = "CAPABILITY_IAM"
 resolve_s3 = true
 confirm_changeset = true
 s3_prefix = "shared-calendar-api"
-parameter_overrides = "AdminUsername=\"admin\" FunctionArchitecture=\"arm64\" AssistantModel=\"claude-sonnet-5-5\" AssistantDailyMessageLimit=\"30\" MailStage=\"domain\" MailDomain=\"enricopiccinin.com\" MailFromLocalPart=\"noreply\" MailFromName=\"Shared calendar\" PageAddress=\"https://calendar.enricopiccinin.com\""
+parameter_overrides = "AdminUsername=\"admin\" FunctionArchitecture=\"arm64\" AssistantModel=\"claude-sonnet-5-5\" AssistantDailyMessageLimit=\"30\" MailStage=\"on\" MailDomain=\"enricopiccinin.com\" MailFromLocalPart=\"noreply\" MailFromName=\"Shared calendar\" PageAddress=\"https://calendar.enricopiccinin.com\" DefaultLanguage=\"it\""
 image_repositories = []
 
 # Laptop: sam local start-api against the Docker emulators (docs/IMPLEMENTATION_PLAN.md step 3).

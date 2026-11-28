@@ -4,6 +4,7 @@ import { MailScreen, type MailCalls, type MailMeCalls, type MailState } from '..
 import type { SendCalendarResult } from '../../../src/services/mail.types';
 import type { MeResult } from '../../../src/services/me.types';
 import { useFarBrowserZone } from './zone';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // A fake MailService and a fake MeService: result streams that replay their last value, as the
 // real ones do, and spies. No network, no DOM.
@@ -18,7 +19,7 @@ function screenOf(role: 'admin' | 'user' = 'user') {
   const meResult$ = new ReplaySubject<MeResult>(1);
   const sendCalendar = vi.fn<MailCalls['sendCalendar']>();
   const getMe = vi.fn<MailMeCalls['getMe']>();
-  const screen = new MailScreen({ sendCalendar, sendCalendarResult$ }, { getMe, meResult$ }, role);
+  const screen = new MailScreen({ sendCalendar, sendCalendarResult$ }, { getMe, meResult$ }, role, PAGE_TEXTS_EN);
   const states: MailState[] = [];
   screen.mail$.subscribe((s) => states.push(s));
   const queued = () => sendCalendarResult$.next({ status: 'success' });

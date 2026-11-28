@@ -1,9 +1,13 @@
-import type { AppointmentStatus } from '../calendar/types';
-import { weekdayOf } from '../calendar/time';
+import type { AppointmentStatus, CancelReason } from '../calendar/types';
+import type { Language } from '../language/languages';
+import { MAIL_TEXTS_EN } from './texts.en';
+import { MAIL_TEXTS_IT } from './texts.it';
 
-// The texts of the mails the mailer sends, in English (docs/EMAIL_ARCHITECTURE.md section 6.6 and
-// decision M17), as pure functions: each gives a subject, a plain-text body and an HTML body with
-// the same words. The invitation is not here: Cognito sends it from the pool's own template.
+// The texts of the mails the mailer sends and of the Excel files it attaches, in each language of
+// the calendar (docs/MULTILANGUAGE_ARCHITECTURE.md section 8, docs/EMAIL_ARCHITECTURE.md section
+// 6.6 and decision M17). A mail is a subject, a plain-text body and an HTML body with the same
+// words, marked with its language. The invitation is Cognito's mail, worded here and answered to
+// Cognito by the invitation function (docs/MULTILANGUAGE_ARCHITECTURE.md section 7).
 
 /** One mail's words. */
 export type MailText = { subject: string; text: string; html: string };
@@ -20,54 +24,106 @@ export type CalendarMailFacts = { from: string; to: string; count: number; file:
 /** A User's own appointments on demand: the dates asked, the appointments in order, the file. */
 export type MineMailFacts = { from: string; to: string; appointments: MailLine[]; file: string };
 
-/** The last line of every mail: `noreply@` receives nothing, the Reply-To does. */
-export const MAIL_FOOTER = "This is an automatic e-mail. Replies reach the calendar's Administrator.";
+/** The columns of an Excel file, in their order. */
+export const EXCEL_COLUMNS = ['date', 'start', 'end', 'type', 'username', 'givenName', 'familyName', 'status', 'cancelReason', 'note', 'bookedAt'] as const;
+export type ExcelColumn = (typeof EXCEL_COLUMNS)[number];
 
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** The invitation: where Cognito puts the username and the temporary password, and the page's address. */
+export type InvitationFacts = { username: string; password: string; page: string };
 
-// A local date written short: "Tue 1 Dec 2026".
-const shortDate = (date: string) => `${WEEKDAYS[weekdayOf(date) - 1]} ${Number(date.slice(8, 10))} ${MONTHS[Number(date.slice(5, 7)) - 1]} ${date.slice(0, 4)}`;
+/** A mail before it is put together: its subject, its paragraphs, and the items of a list after the first paragraph. */
+export type MailParts = { subject: string; paragraphs: string[]; items?: string[] };
 
-// "1 appointment", "3 appointments".
-const appointments = (count: number) => `${count} appointment${count === 1 ? '' : 's'}`;
+// The words of one language: one object of this type per language, so that a language with a text
+// missing does not compile. A text that carries a value is a function of that value.
+export type MailTexts = {
+  // The last line of every mail: `noreply@` receives nothing, the Reply-To does.
+  footer: string;
+  // The invitation's words, put together around the username, the password and the page's link.
+  invitation: {
+    subject: string;
+    hello: string;
+    username: string;
+    password: string;
+    // The sentence that holds the page's link: the words before it and after it.
+    signIn: { before: string; after: string };
+    unexpected: string;
+  };
+  // The three mails, from their facts.
+  daily: (facts: DailyMailFacts) => MailParts;
+  calendar: (facts: CalendarMailFacts) => MailParts;
+  mine: (facts: MineMailFacts) => MailParts;
+  // The words of an appointment's status and of the reason of a cancellation, in a mail's list and
+  // in a file.
+  statuses: Record<AppointmentStatus, string>;
+  reasons: Record<CancelReason, string>;
+  // The files: the headings of the columns, the sheet's name (31 characters at most, Excel's
+  // limit), and the four file names, in plain letters, digits and `-` (docs/MULTILANGUAGE_ARCHITECTURE.md
+  // decision L3).
+  headings: Record<ExcelColumn, string>;
+  sheet: string;
+  files: {
+    calendar: (from: string, to: string) => string;
+    mine: (from: string, to: string) => string;
+    next7Days: (date: string) => string;
+    backup: (from: string) => string;
+  };
+};
+
+const MAIL_TEXTS: Record<Language, MailTexts> = { en: MAIL_TEXTS_EN, it: MAIL_TEXTS_IT };
+
+/** The words of the mails and the files of a language. */
+export function mailTexts(language: Language): MailTexts {
+  return MAIL_TEXTS[language];
+}
 
 // Text that goes into the HTML body: the five characters HTML gives a meaning, written as entities,
 // so that a type's name or a file name is shown as typed and never read as markup.
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 // A mail made of paragraphs, and of one list where `items` is given, after the first paragraph,
-// with the footer last. The plain text puts a blank line between paragraphs and "- " before an item.
-function mail(subject: string, paragraphs: string[], items?: string[]): MailText {
-  const [first, ...rest] = [...paragraphs, MAIL_FOOTER];
+// with the footer last. The plain text puts a blank line between paragraphs and "- " before an
+// item. The HTML is one block marked with the mail's language, so that a reader pronounces it
+// rightly.
+function mail(language: Language, { subject, paragraphs, items }: MailParts): MailText {
+  const [first, ...rest] = [...paragraphs, mailTexts(language).footer];
   const textList = items === undefined ? [] : [items.map((item) => `- ${item}`).join('\n')];
   const htmlList = items === undefined ? [] : [`<ul>${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>`];
   const text = [first!, ...textList, ...rest].join('\n\n') + '\n';
-  const html = [`<p>${escapeHtml(first!)}</p>`, ...htmlList, ...rest.map((p) => `<p>${escapeHtml(p)}</p>`)].join('\n');
+  const html = `<div lang="${language}">${[`<p>${escapeHtml(first!)}</p>`, ...htmlList, ...rest.map((p) => `<p>${escapeHtml(p)}</p>`)].join('\n')}</div>`;
   return { subject, text, html };
 }
 
+/**
+ * The invitation, a subject and an HTML body: Cognito sends no plain text with it. The username and
+ * the password are what Cognito gives in their place, `{username}` and `{####}`, which it fills in
+ * after; the password never passes through this code.
+ */
+export function invitationMailText(language: Language, { username, password, page }: InvitationFacts): { subject: string; html: string } {
+  const words = mailTexts(language);
+  const { invitation: say } = words;
+  const link = `<a href="${escapeHtml(page)}">${escapeHtml(page)}</a>`;
+  const paragraphs = [
+    escapeHtml(say.hello),
+    `${escapeHtml(say.username)}: ${escapeHtml(username)}<br>${escapeHtml(say.password)}: ${escapeHtml(password)}`,
+    `${escapeHtml(say.signIn.before)}${link}${escapeHtml(say.signIn.after)}`,
+    escapeHtml(say.unexpected),
+    escapeHtml(words.footer),
+  ];
+  return { subject: say.subject, html: `<div lang="${language}">${paragraphs.map((p) => `<p>${p}</p>`).join('\n')}</div>` };
+}
+
 /** The daily mail to the Administrator, with its two files (docs/EMAIL_ARCHITECTURE.md section 6.3). */
-export function dailyMailText({ date, nextCount, backupFrom, nextFile, backupFile }: DailyMailFacts): MailText {
-  return mail(`Calendar: next 7 days and backup, ${shortDate(date)}`, [
-    `The next 7 days hold ${appointments(nextCount)}.`,
-    `Attached: ${nextFile}, the appointments booked from today for 7 days; ${backupFile}, the backup.`,
-    `The backup covers every appointment from ${shortDate(backupFrom)} onwards.`,
-  ]);
+export function dailyMailText(language: Language, facts: DailyMailFacts): MailText {
+  return mail(language, mailTexts(language).daily(facts));
 }
 
 /** The whole calendar between two dates, to the Administrator who asked. */
-export function calendarMailText({ from, to, count, file }: CalendarMailFacts): MailText {
-  return mail(`Calendar, ${shortDate(from)} to ${shortDate(to)}`, [
-    `The calendar from ${shortDate(from)} to ${shortDate(to)} holds ${appointments(count)}, booked and cancelled.`,
-    `Attached: ${file}.`,
-  ]);
+export function calendarMailText(language: Language, facts: CalendarMailFacts): MailText {
+  return mail(language, mailTexts(language).calendar(facts));
 }
 
 /** A User's own appointments between two dates, listed in the mail and in the file. */
-export function mineMailText({ from, to, appointments: lines, file }: MineMailFacts): MailText {
-  const subject = `Your appointments, ${shortDate(from)} to ${shortDate(to)}`;
-  if (lines.length === 0) return mail(subject, ['You have no appointments in this period.', `Attached: ${file}.`]);
-  const items = lines.map((a) => `${shortDate(a.date)}, ${a.start}–${a.end}, ${a.type}, ${a.status}`);
-  return mail(subject, [`Your appointments from ${shortDate(from)} to ${shortDate(to)}:`, `Attached: ${file}, the same list.`], items);
+export function mineMailText(language: Language, facts: MineMailFacts): MailText {
+  return mail(language, mailTexts(language).mine(facts));
 }

@@ -1,9 +1,15 @@
-import { BehaviorSubject, firstValueFrom, Observable, Subscription } from 'rxjs';
+import { BehaviorSubject, firstValueFrom, Observable, ReplaySubject, Subscription } from 'rxjs';
+import { PageLanguage } from '../../../src/logic/language';
+import { padded, PADDED_CLOSE, PADDED_OPEN } from '../../../src/texts/padded';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
+import { PAGE_TEXTS } from '../../../src/texts/texts';
+import type { Language } from '@shared-calendar/shared';
+import type { LanguageReadResult, LanguageWriteResult } from '../../../src/services/language.types';
 import type { LoginState, Session } from '../../../src/services/login.types';
 import { LogoutService } from '../../../src/services/logout.service';
 import { SessionStore } from '../../../src/services/session.store';
 import type { LoginDeps } from '../../../src/views/login.view';
-import { mountShell, runShell, SCREENS, type Screen } from '../../../src/views/shell';
+import { mountShell, runShell, SCREENS, type AccountLanguage, type Screen } from '../../../src/views/shell';
 import { appointment, STUDIO, view, winterWeek } from '../logic/fixtures';
 import { call, cognitoError, cognitoTokens, json, jwt, session } from '../services/fixtures';
 import { find, loadPage, setTime, submit, timeIn, useRealPage } from './page';
@@ -13,9 +19,46 @@ import { find, loadPage, setTime, submit, timeIn, useRealPage } from './page';
 // LogoutService, and the global fetch a stub: entering the frame creates the real API services, whose first call
 // stays unanswered unless a test answers it.
 
-const CONFIG = { apiUrl: 'http://api.test', cognitoUrl: 'http://cognito.test/', clientId: 'client-123' };
+const CONFIG = { apiUrl: 'http://api.test', cognitoUrl: 'http://cognito.test/', clientId: 'client-123', defaultLanguage: 'en' as const, storage: null };
+// The page in English, as the start-up makes it, with a browser that remembers nothing.
+const english = () => new PageLanguage('en', (code) => PAGE_TEXTS[code], { read: () => null, write: () => {} });
 // A call that is never answered.
 const unanswered = () => new Promise<Response>(() => {});
+
+// A fake LanguageService for mountShell: the read answers at once with `answer`, the account's
+// language (null: none held), or a failure; a write answers at once, a success unless `refuse`.
+type FakeAccount = AccountLanguage & { reads: number; written: Language[]; reads$: ReplaySubject<LanguageReadResult>; writes$: ReplaySubject<LanguageWriteResult> };
+function fakeAccount(answer: Language | null | 'failure' | 'silent' = null, refuse = false): FakeAccount {
+  const reads$ = new ReplaySubject<LanguageReadResult>(1);
+  const writes$ = new ReplaySubject<LanguageWriteResult>(1);
+  const fake: FakeAccount = {
+    reads: 0,
+    written: [],
+    reads$,
+    writes$,
+    readResult$: reads$.asObservable(),
+    writeResult$: writes$.asObservable(),
+    read: () => {
+      fake.reads++;
+      if (answer === 'silent') return;
+      reads$.next(answer === 'failure' ? { status: 'failure', reason: 'network', message: 'for a developer' } : { status: 'success', language: answer });
+    },
+    write: (language) => {
+      fake.written.push(language);
+      writes$.next(refuse ? { status: 'failure', reason: 'network', message: 'for a developer' } : { status: 'success', language });
+    },
+  };
+  return fake;
+}
+
+// For runShell, which makes the real LanguageService: the read and the write of a person's
+// language go to `accountMock`, not to `fetchMock`, so that the tests' queued answers and their
+// count of Cognito's calls are those of the sign-in, the refresh and the sign-out. By default the
+// account holds no language and the write is answered.
+const ACCOUNT_TARGETS = ['AWSCognitoIdentityProviderService.GetUser', 'AWSCognitoIdentityProviderService.UpdateUserAttributes'];
+const accountTarget = (init?: RequestInit) => (init?.headers as Record<string, string> | undefined)?.['X-Amz-Target'] ?? '';
+const accountAnswer = (_url: string, init?: RequestInit) =>
+  Promise.resolve(json(200, accountTarget(init).endsWith('GetUser') ? { Username: 'someone', UserAttributes: [] } : {}, 'application/x-amz-json-1.1'));
 
 const ALICE = session();
 const ADMIN = session({ username: 'admin', role: 'admin', accessToken: 'access-token-admin', idToken: 'id-token-admin', refreshToken: 'refresh-token-admin' });
@@ -35,13 +78,20 @@ const summary = (username: string, createdAt = '2026-11-01T10:00:00.000Z') => ({
 });
 // What a field of the page holds: its value, or for a checkbox, whose value never changes,
 // whether it is ticked.
+// Every field a person fills, the choice of the page's language left out: it holds the language
+// in use, which is no one's data.
+const FIELDS = 'textarea, select:not([name="language"]), input';
 const held = (field: HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement) => (field instanceof HTMLInputElement && field.type === 'checkbox' ? (field.checked ? 'ticked' : '') : field.value);
 
 let shell: Subscription | undefined;
 let fetchMock: ReturnType<typeof vi.fn>;
+let accountMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   fetchMock = vi.fn(unanswered);
-  vi.stubGlobal('fetch', fetchMock);
+  accountMock = vi.fn(accountAnswer);
+  vi.stubGlobal('fetch', (url: string, init?: RequestInit): unknown =>
+    ACCOUNT_TARGETS.includes(accountTarget(init)) ? (accountMock as (...a: unknown[]) => unknown)(url, init) : (fetchMock as (...a: unknown[]) => unknown)(url, init),
+  );
   // The emulated page keeps its address from one test to the next: each starts without a hash.
   window.history.replaceState(null, '', window.location.pathname);
 });
@@ -59,7 +109,7 @@ const apiCalls = () =>
     .map(([url, init]) => [url, (init.headers as Record<string, string>).Authorization]);
 const cognitoCalls = () => (fetchMock.mock.calls as [string, RequestInit][]).filter(([url]) => url === CONFIG.cognitoUrl);
 
-function mounted(first: Session | null = null, screens?: readonly Screen[]) {
+function mounted(first: Session | null = null, screens?: readonly Screen[], account: () => AccountLanguage = () => fakeAccount()) {
   const store = new SessionStore();
   if (first) store.set(first);
   const state$ = new BehaviorSubject<LoginState>({ status: 'idle' });
@@ -75,9 +125,11 @@ function mounted(first: Session | null = null, screens?: readonly Screen[]) {
   // The real sign-out service on the test's store: its request to Cognito stays unanswered
   // unless a test answers it. The fake login has nothing to put back.
   const logout = new LogoutService(CONFIG, store, []);
-  shell = mountShell(document.body, { config: CONFIG, store, login, logout, ...(screens ? { screens } : {}) });
+  const language = english();
+  shell = mountShell(document.body, { config: CONFIG, language, store, login, logout, accountLanguage: account, ...(screens ? { screens } : {}) });
   return {
     store,
+    language,
     state$,
     login,
     loginMounts: () => loginMounts,
@@ -179,7 +231,7 @@ describe('mountShell', () => {
     store.set(ALICE);
     const logout = { logout: vi.fn<() => void>() };
     const login: LoginDeps = { loginState$: new BehaviorSubject<LoginState>({ status: 'idle' }), login: vi.fn<LoginDeps['login']>() };
-    shell = mountShell(document.body, { config: CONFIG, store, login, logout });
+    shell = mountShell(document.body, { config: CONFIG, language: english(), store, login, logout, accountLanguage: () => fakeAccount() });
 
     find('#app .sign-out').click();
     expect(logout.logout).toHaveBeenCalledTimes(1);
@@ -235,7 +287,7 @@ describe('mountShell', () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-11-19T10:00:00.000Z'));
     // The whole page as a person finds it: its source, and what every field holds.
-    const page = () => ({ source: html(), fields: [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held) });
+    const page = () => ({ source: html(), fields: [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>(FIELDS)].map(held) });
 
     // The Administrator, alone on a fresh page.
     mounted(ADMIN);
@@ -312,6 +364,91 @@ describe('runShell', () => {
     expect(find('#login').hidden).toBe(false);
     expect(find('#app').hidden).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // The padded test language (docs/MULTILANGUAGE_ARCHITECTURE.md section 6.3, rule 4).
+  describe('the language of the page', () => {
+    const at = (search: string) => window.history.replaceState(null, '', `${window.location.pathname}${search}`);
+    afterEach(() => at(''));
+
+    it('is English, its words in the frame and in the title, the page in English for a screen reader', async () => {
+      fetchMock.mockResolvedValueOnce(tokensFor('ada', 'admin'));
+      shell = runShell(CONFIG);
+      signIn('ada', 'Secret-Pass-1!');
+      await vi.waitFor(() => expect(find('#app').hidden).toBe(false));
+      expect(find('#app .sign-out').textContent).toBe('Sign out');
+      expect(find('#app .role').textContent).toBe('Administrator');
+      expect(document.title).toBe('Shared calendar');
+      expect(document.documentElement.lang).toBe('en');
+    });
+
+    // The language before sign-in (docs/MULTILANGUAGE_PLAN.md finding F11).
+    const storage = (held: Record<string, string> = {}) => ({ getItem: (key: string) => held[key] ?? null, setItem: vi.fn((key: string, value: string) => void (held[key] = value)) });
+    const browser = (languages: string[]) => vi.spyOn(window.navigator, 'languages', 'get').mockReturnValue(languages);
+    afterEach(() => vi.restoreAllMocks());
+
+    it('is the one this browser remembers, before the browser\'s own', () => {
+      browser(['en-US']);
+      shell = runShell({ ...CONFIG, storage: storage({ 'shared-calendar.language': 'it' }) });
+      expect([document.documentElement.lang, document.title, find('#login button').textContent]).toEqual(['it', 'Calendario condiviso', 'Accedi']);
+      expect(find<HTMLSelectElement>('#login [name="language"]').value).toBe('it');
+    });
+
+    it('is the browser\'s own when nothing is remembered: it-IT counts as Italian', () => {
+      browser(['fr-FR', 'it-IT']);
+      shell = runShell(CONFIG);
+      expect(document.documentElement.lang).toBe('it');
+    });
+
+    it('is the bundle\'s default when the browser names no language of the calendar', () => {
+      browser(['fr-FR']);
+      shell = runShell({ ...CONFIG, defaultLanguage: 'it' });
+      expect(document.documentElement.lang).toBe('it');
+      vi.restoreAllMocks();
+      browser(['de']);
+      shell.unsubscribe();
+      shell = runShell(CONFIG);
+      expect(document.documentElement.lang).toBe('en');
+    });
+
+    it('chosen on the sign-in screen: the page in it, remembered by this browser, and the frame entered in it', async () => {
+      browser(['en-GB']);
+      const held = storage();
+      shell = runShell({ ...CONFIG, storage: held });
+      const languages = find<HTMLSelectElement>('#login [name="language"]');
+      languages.value = 'it';
+      languages.dispatchEvent(new Event('change'));
+      expect([document.documentElement.lang, find('#login button').textContent]).toEqual(['it', 'Accedi']);
+      expect(held.setItem).toHaveBeenCalledWith('shared-calendar.language', 'it');
+      fetchMock.mockResolvedValueOnce(tokensFor('ada', 'admin'));
+      signIn('ada', 'Secret-Pass-1!');
+      await vi.waitFor(() => expect(find('#app').hidden).toBe(false));
+      expect([find('#app .sign-out').textContent, find('#app .role').textContent]).toEqual(['Esci', 'Amministratore']);
+    });
+
+    it('is English when the address asks for the padded language and the bundle offers none', () => {
+      at('?padded');
+      shell = runShell(CONFIG);
+      expect(document.title).toBe('Shared calendar');
+    });
+
+    it('is English when the bundle offers the padded language and the address does not ask for it', () => {
+      shell = runShell({ ...CONFIG, testLanguage: padded });
+      expect(document.title).toBe('Shared calendar');
+    });
+
+    it('is the padded language when the bundle offers it and the address asks: every text of the frame is marked', async () => {
+      at('?padded');
+      fetchMock.mockResolvedValueOnce(tokensFor('ada', 'admin'));
+      shell = runShell({ ...CONFIG, testLanguage: padded });
+      signIn('ada', 'Secret-Pass-1!');
+      await vi.waitFor(() => expect(find('#app').hidden).toBe(false));
+      const marked = new RegExp(`^${PADDED_OPEN}.+${PADDED_CLOSE}$`);
+      expect(document.title).toMatch(marked);
+      for (const element of [find('#app .title'), find('#app .sign-out'), find('#app .role'), ...document.querySelectorAll<HTMLElement>('#app .nav a')]) expect(element.textContent).toMatch(marked);
+      expect(find('#app .nav').getAttribute('aria-label')).toMatch(marked);
+      expect(find('#app .username').textContent).toBe('ada');
+    });
   });
 
   it('signing in posts to the configured Cognito with the configured client, then shows the frame', async () => {
@@ -422,7 +559,7 @@ describe('runShell', () => {
     expect(cognitoCalls()).toHaveLength(before + 1);
     expect(JSON.parse(String(cognitoCalls().at(-1)![1].body))).toEqual({ ClientId: 'client-123', Token: 'refresh-token' });
 
-    const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
+    const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>(FIELDS)].map(held);
     for (const left of ['alice', 'refresh-token', 'id-token', 'Secret-Pass-1!']) {
       expect(html()).not.toContain(left);
       expect(fields.join('\n')).not.toContain(left);
@@ -565,6 +702,26 @@ describe('the navigation', () => {
     expect(window.history.length).toBe(steps);
     expect(find('#week').hidden).toBe(false);
     expect(links()[0]!.getAttribute('aria-current')).toBe('page');
+  });
+
+  it.each([
+    ['beyond the strip\'s right end', { left: 400, right: 480 }, 120 + 90],
+    ['before the strip\'s left end', { left: -30, right: 50 }, 120 - 30],
+    ['inside the strip', { left: 100, right: 180 }, 120],
+  ])('the link of the screen on show, %s, is brought within the navigation strip by scrolling the strip alone', (_name, shown, scrolled) => {
+    window.history.replaceState(null, '', `${window.location.pathname}#/password`);
+    const box = (left: number, right: number) => ({ left, right, top: 0, bottom: 40, width: right - left, height: 40, x: left, y: 0, toJSON: () => ({}) });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.matches('#app .nav')) return box(0, 390) as DOMRect;
+      if (this.matches('a[href="#/password"]')) return box(shown.left, shown.right) as DOMRect;
+      return box(0, 0) as DOMRect;
+    });
+    const nav = find('#app .nav');
+    nav.scrollLeft = 120;
+    mounted(ALICE);
+    expect(links().at(-1)!.getAttribute('aria-current')).toBe('page');
+    expect(nav.scrollLeft).toBe(scrolled);
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockRestore();
   });
 
   it('an unknown address typed while the week is on show is put right, and the week is neither left nor loaded again', async () => {
@@ -952,7 +1109,7 @@ describe('the navigation', () => {
 
       signOut.click();
       expect([banner().hidden, book().open, detail().open]).toEqual([true, false, false]);
-      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
+      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>(FIELDS)].map(held);
       expect(fields.every((value) => value === '')).toBe(true);
       for (const gone of ['bob', 'Bob\'s note', 'A private note', 'Typed in the detail', 'Mon 16 Nov', 'Studio']) expect(html()).not.toContain(gone);
       expect(html()).toBe(before);
@@ -1067,7 +1224,7 @@ describe('the navigation', () => {
     const other = () => {
       const left = vi.fn();
       const show = vi.fn<Screen['show']>(() => new Subscription(left));
-      const screen: Screen = { hash: '#/other', label: 'Other', roles: ['admin'], element: '#week', show };
+      const screen: Screen = { hash: '#/other', label: () => 'Other', roles: ['admin'], element: '#week', show };
       return { screens: [...SCREENS, screen], show, left };
     };
     const current = () => links().map((a) => [a.textContent, a.getAttribute('aria-current')]);
@@ -1526,7 +1683,7 @@ describe('the navigation', () => {
       expect(detail().open).toBe(false);
       expect(rows()).toHaveLength(0);
       expect(find('#appointments').hidden).toBe(true);
-      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
+      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>(FIELDS)].map(held);
       expect(fields.every((value) => value === '')).toBe(true);
       for (const gone of ['alice', 'First lesson', 'A private note', 'Mon 7 Dec', 'Studio', 'Changed']) expect(html()).not.toContain(gone);
       expect(links()).toHaveLength(0);
@@ -1788,7 +1945,7 @@ describe('the navigation', () => {
       expect(html()).toContain('carol');
 
       signOut.click();
-      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
+      const fields = [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>(FIELDS)].map(held);
       expect(fields.every((value) => value === '')).toBe(true);
       for (const gone of ['carol', 'Europe/Rome', 'must be', 'from 0 to 720', 'aria-invalid']) expect(html()).not.toContain(gone);
       expect(html()).toBe(before);
@@ -1902,7 +2059,7 @@ describe('the navigation', () => {
     const inviteText = (part: string) => find(`#users dialog.invite .${part}`).textContent;
     const remove = () => find<HTMLDialogElement>('#users dialog.delete');
     const current = () => links().map((a) => [a.textContent, a.getAttribute('aria-current')]);
-    const fields = () => [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
+    const fields = () => [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>(FIELDS)].map(held);
     // Whether a text is in the page's source, in a field or in the address.
     const anywhere = (text: string) => html().includes(text) || fields().some((value) => value.includes(text)) || window.location.href.includes(text);
     // The Administrator on the users' address, with the list read.
@@ -2242,7 +2399,7 @@ describe('the navigation', () => {
     };
     const dialog = (name: 'rename' | 'change' | 'delete') => one<HTMLDialogElement>(`dialog.${name}`);
     const current = () => links().map((a) => [a.textContent, a.getAttribute('aria-current')]);
-    const fields = () => [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>('textarea, select, input')].map(held);
+    const fields = () => [...document.querySelectorAll<HTMLTextAreaElement | HTMLSelectElement | HTMLInputElement>(FIELDS)].map(held);
     const anywhere = (text: string) => html().includes(text) || fields().some((value) => value.includes(text));
     const MONDAY = 'Monday: 09:00 – 13:00 Studio';
     const TUESDAY = 'Tuesday: 15:00 – 18:00 Piscina';
@@ -2961,7 +3118,7 @@ describe('the navigation', () => {
       expect(toTheAssistant()).toEqual(['GET /assistant/conversation', 'POST /assistant/messages', 'POST /assistant/continue']);
       expect([field().value, one('.progress').textContent, one('.news').textContent]).toEqual(['', '', 'Tuesday is open.']);
       const sent = (fetchMock.mock.calls as [string, RequestInit][]).find(([url]) => url.endsWith('/assistant/messages'))!;
-      expect(JSON.parse(sent[1].body as string)).toEqual({ text: 'what is open?' });
+      expect(JSON.parse(sent[1].body as string)).toEqual({ text: 'what is open?', language: 'en' });
     });
 
     it('a change confirmed with the week on show: the week is loaded again by itself, once, under the open panel', async () => {
@@ -3081,7 +3238,7 @@ describe('"My details", for both roles', () => {
 
   it('is the row just before the password, for both roles, at #/me', () => {
     const row = SCREENS.at(-2)!;
-    expect([row.hash, row.label, row.roles, row.element]).toEqual(['#/me', 'My details', ['admin', 'user'], '#me']);
+    expect([row.hash, row.label(PAGE_TEXTS_EN.frame), row.roles, row.element]).toEqual(['#/me', 'My details', ['admin', 'user'], '#me']);
   });
 
   it('a User on #/me: one GET /me with the person\'s token, the details shown, no Edit, and the sentence that says whom to ask', async () => {
@@ -3153,7 +3310,7 @@ describe('the password, the last screen of both roles', () => {
       void firstValueFrom(store.session$).then((s) => atReset.push(s));
     });
     const config = skipGlobalSignOut === undefined ? CONFIG : { ...CONFIG, skipGlobalSignOut };
-    shell = mountShell(document.body, { config, store, login, logout: new LogoutService(CONFIG, store, []), pageWide });
+    shell = mountShell(document.body, { config, language: english(), store, login, logout: new LogoutService(CONFIG, store, []), pageWide, accountLanguage: () => fakeAccount() });
     window.location.hash = '#/password';
     window.dispatchEvent(new HashChangeEvent('hashchange'));
     return { store, pageWide, atReset };
@@ -3172,7 +3329,7 @@ describe('the password, the last screen of both roles', () => {
 
   it('is the last row of the table, for both roles, at #/password', () => {
     const row = SCREENS.at(-1)!;
-    expect([row.hash, row.label, row.roles, row.element]).toEqual(['#/password', 'Password', ['admin', 'user'], '#password']);
+    expect([row.hash, row.label(PAGE_TEXTS_EN.frame), row.roles, row.element]).toEqual(['#/password', 'Password', ['admin', 'user'], '#password']);
   });
 
   it.each([
@@ -3307,5 +3464,128 @@ describe('the password, the last screen of both roles', () => {
     links()[0]!.click();
     await vi.waitFor(() => expect(find('#password').hidden).toBe(true));
     expect(['current', 'next', 'again'].map((name) => one<HTMLInputElement>(`[name="${name}"]`).value)).toEqual(['', '', '']);
+  });
+});
+
+// The person's own language, read at sign-in and saved in "My details" (docs/MULTILANGUAGE_PLAN.md
+// finding F11, decision D1).
+describe('the person\'s language', () => {
+  useRealPage();
+
+  const at = (hash: string) => window.history.replaceState(null, '', `${window.location.pathname}${hash}`);
+  const ME = { username: 'alice', role: 'user', givenName: 'Alice', familyName: 'Liddell', email: 'alice@example.com', address: 'Piazza 7' };
+  const list = () => find<HTMLSelectElement>('#me .language-field select');
+
+  it('nothing is shown while the account\'s language is read; the login is gone, the frame comes with the answer', () => {
+    const account = fakeAccount('silent');
+    const { store, loginRoot, frame } = mounted(null, undefined, () => account);
+    store.set(ALICE);
+    expect([loginRoot.hidden, frame.hidden, account.reads]).toEqual([true, true, 1]);
+    expect(apiCalls()).toEqual([]);
+    account.reads$.next({ status: 'success', language: 'en' });
+    expect(frame.hidden).toBe(false);
+    expect(find('#app .username').textContent).toBe('alice');
+  });
+
+  it('a language of the calendar held by the account: the page and the frame in it, nothing written', () => {
+    const account = fakeAccount('it');
+    const { store, language } = mounted(null, undefined, () => account);
+    store.set(ALICE);
+    expect([language.state.language, document.documentElement.lang, find('#app .sign-out').textContent, find('#app .role').textContent]).toEqual(['it', 'it', 'Esci', 'Utente']);
+    expect(account.written).toEqual([]);
+  });
+
+  it('none held: the page\'s language written to the account, once, and the frame shown without waiting for the answer', () => {
+    const account = fakeAccount(null);
+    account.write = (language) => void account.written.push(language);
+    const { store, frame } = mounted(null, undefined, () => account);
+    store.set(ALICE);
+    expect([frame.hidden, account.written, document.documentElement.lang]).toEqual([false, ['en'], 'en']);
+  });
+
+  it('a read that fails: the frame in the page\'s language, nothing written', () => {
+    const account = fakeAccount('failure');
+    const { store, frame } = mounted(null, undefined, () => account);
+    store.set(ALICE);
+    expect([frame.hidden, account.written, find('#app .sign-out').textContent]).toEqual([false, [], 'Sign out']);
+  });
+
+  it('a sign-out while the read is unanswered: the login, and a late answer shows nothing', () => {
+    const account = fakeAccount('silent');
+    const { store, loginRoot, frame } = mounted(null, undefined, () => account);
+    store.set(ALICE);
+    store.clear();
+    account.reads$.next({ status: 'success', language: 'it' });
+    expect([loginRoot.hidden, frame.hidden, document.documentElement.lang]).toEqual([false, true, 'en']);
+  });
+
+  it('each person who signs in has the account\'s language read again', () => {
+    const accounts = [fakeAccount('it'), fakeAccount('en')];
+    let made = 0;
+    const { store } = mounted(null, undefined, () => accounts[made++]!);
+    store.set(ALICE);
+    expect(document.documentElement.lang).toBe('it');
+    store.clear();
+    store.set(ADMIN);
+    expect([made, document.documentElement.lang, find('#app .role').textContent]).toEqual([2, 'en', 'Administrator']);
+  });
+
+  it('"My details": another language saved, the frame entered again in it at the same address; no new read, no second write', async () => {
+    at('#/me');
+    fetchMock.mockResolvedValueOnce(json(200, ME)).mockResolvedValueOnce(json(200, ME));
+    const account = fakeAccount('en');
+    const { store } = mounted(null, undefined, () => account);
+    store.set(ALICE);
+    await vi.waitFor(() => expect(find('#me .details').hidden).toBe(false));
+    expect(list().value).toBe('en');
+    list().value = 'it';
+    list().dispatchEvent(new Event('change'));
+    expect([account.written, account.reads, window.location.hash, document.documentElement.lang]).toEqual([['it'], 1, '#/me', 'it']);
+    expect([find('#me').hidden, list().value, list().disabled, find('#app .sign-out').textContent]).toEqual([false, 'it', false, 'Esci']);
+    await vi.waitFor(() => expect(find('#me .details dd.role').textContent).toBe('Utente'));
+    expect(apiCalls().map(([url]) => url)).toEqual(['http://api.test/me', 'http://api.test/me']);
+  });
+
+  it('"My details": a save that fails says why under the list, which goes back to the language in use; the frame stays', async () => {
+    at('#/me');
+    fetchMock.mockResolvedValueOnce(json(200, ME));
+    const account = fakeAccount('en', true);
+    const { store } = mounted(null, undefined, () => account);
+    store.set(ALICE);
+    await vi.waitFor(() => expect(find('#me .details').hidden).toBe(false));
+    list().value = 'it';
+    list().dispatchEvent(new Event('change'));
+    expect([list().value, document.documentElement.lang, apiCalls()]).toEqual(['en', 'en', [['http://api.test/me', 'Bearer access-token-alice']]]);
+    expect(find('#me .language-field .refusal').textContent).toMatch(/^The language was not changed\. /);
+  });
+
+  it('runShell: GetUser with the person\'s token after the sign-in, the account\'s language becomes this browser\'s memory', async () => {
+    const held: Record<string, string> = {};
+    const storage = { getItem: (key: string) => held[key] ?? null, setItem: (key: string, value: string) => void (held[key] = value) };
+    accountMock.mockImplementation((_url: string, init?: RequestInit) =>
+      Promise.resolve(json(200, accountTarget(init).endsWith('GetUser') ? { UserAttributes: [{ Name: 'locale', Value: 'it' }] } : {}, 'application/x-amz-json-1.1')),
+    );
+    const access = jwt({ username: 'alice', 'cognito:groups': ['user'], exp: Math.floor(Date.now() / 1000) + 900 });
+    fetchMock.mockResolvedValueOnce(cognitoTokens({ AccessToken: access, IdToken: 'id-token', RefreshToken: 'refresh-token' }));
+    shell = runShell({ ...CONFIG, storage });
+    find<HTMLInputElement>('#login [name="username"]').value = 'alice';
+    find<HTMLInputElement>('#login [name="password"]').value = 'Secret-Pass-1!';
+    submit(find<HTMLFormElement>('#login form'));
+    await vi.waitFor(() => expect(find('#app').hidden).toBe(false));
+    expect([find('#app .sign-out').textContent, held['shared-calendar.language']]).toEqual(['Esci', 'it']);
+    const calls = accountMock.mock.calls as [string, RequestInit][];
+    expect(calls.map(([url, init]) => [url, accountTarget(init), JSON.parse(String(init.body))])).toEqual([[CONFIG.cognitoUrl, 'AWSCognitoIdentityProviderService.GetUser', { AccessToken: access }]]);
+  });
+
+  it('runShell: an account without a language gets the page\'s, written with the person\'s token', async () => {
+    const access = jwt({ username: 'alice', 'cognito:groups': ['user'], exp: Math.floor(Date.now() / 1000) + 900 });
+    fetchMock.mockResolvedValueOnce(cognitoTokens({ AccessToken: access, IdToken: 'id-token', RefreshToken: 'refresh-token' }));
+    shell = runShell(CONFIG);
+    find<HTMLInputElement>('#login [name="username"]').value = 'alice';
+    find<HTMLInputElement>('#login [name="password"]').value = 'Secret-Pass-1!';
+    submit(find<HTMLFormElement>('#login form'));
+    await vi.waitFor(() => expect(accountMock).toHaveBeenCalledTimes(2));
+    const [, init] = (accountMock.mock.calls as [string, RequestInit][])[1]!;
+    expect([accountTarget(init), JSON.parse(String(init.body))]).toEqual(['AWSCognitoIdentityProviderService.UpdateUserAttributes', { AccessToken: access, UserAttributes: [{ Name: 'locale', Value: 'en' }] }]);
   });
 });

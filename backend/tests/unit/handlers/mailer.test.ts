@@ -22,9 +22,13 @@ const BOB_APPT = storedItem({ SK: '2026-11-16T10:00:00.000Z#BOB', userId: 'sub-b
 
 let output: string[];
 const logLines = () => output.map((line) => JSON.parse(line) as Record<string, unknown>);
-const profile = (email: string | null) => ({
+const profile = (email: string | null, locale?: string) => ({
   UserCreateDate: new Date('2026-11-01T00:00:00.000Z'),
-  UserAttributes: [{ Name: 'given_name', Value: 'Anna' }, ...(email === null ? [] : [{ Name: 'email', Value: email }])],
+  UserAttributes: [
+    { Name: 'given_name', Value: 'Anna' },
+    ...(email === null ? [] : [{ Name: 'email', Value: email }]),
+    ...(locale === undefined ? [] : [{ Name: 'locale', Value: locale }]),
+  ],
 });
 const sent = () => ses.commandCalls(SendEmailCommand)[0]!.args[0].input;
 const rowsOfSent = async () => (await readXlsxFile(Buffer.from(sent().Content!.Simple!.Attachments![0]!.RawContent!)))[0]!.data;
@@ -101,6 +105,42 @@ describe('mailer handler', () => {
     for (const secret of ['anna@example.com', 'Anna', 'Liddell', 'private note', 'Calendar, Mon']) expect(all).not.toContain(secret);
   });
 
+  // The recipient's language, else the installation's (docs/MULTILANGUAGE_ARCHITECTURE.md section 8).
+  describe('the language of the mail', () => {
+    const subject = () => sent().Content!.Simple!.Subject!.Data;
+    const fileName = () => sent().Content!.Simple!.Attachments![0]!.FileName;
+
+    it('an Italian recipient: the mail, its list, its file and the file\'s name in Italian; the code in the log line', async () => {
+      cognito.on(AdminGetUserCommand).resolves(profile('anna@example.com', 'it'));
+      await handler(MINE, { awsRequestId: 'inv-1' });
+      expect(subject()).toBe('I suoi appuntamenti, dal lun 16 nov 2026 al dom 22 nov 2026');
+      expect(sent().Content!.Simple!.Body!.Text!.Data).toContain('- lun 16 nov 2026, 09:00–10:00, Studio, prenotato');
+      expect(sent().Content!.Simple!.Body!.Html!.Data).toMatch(/^<div lang="it">/);
+      expect(fileName()).toBe('miei-appuntamenti-dal-2026-11-16-al-2026-11-22.xlsx');
+      expect((await rowsOfSent())[0]![0]).toBe('Data');
+      expect(logLines()[0]).toMatchObject({ language: 'it', outcome: 'sent' });
+    });
+
+    it.each([
+      ['none', undefined],
+      ['a word that is not a language of the calendar', 'fr'],
+    ])('a recipient with %s: the installation\'s language, English when it is unset', async (_case, locale) => {
+      cognito.on(AdminGetUserCommand).resolves(profile('anna@example.com', locale));
+      await handler(CALENDAR);
+      expect([subject(), fileName()]).toEqual(['Calendar, Mon 16 Nov 2026 to Sun 22 Nov 2026', 'calendar-2026-11-16-to-2026-11-22.xlsx']);
+    });
+
+    it('DEFAULT_LANGUAGE at it: a recipient with none gets Italian; one with English keeps it', async () => {
+      vi.stubEnv('DEFAULT_LANGUAGE', 'it');
+      await handler(CALENDAR);
+      expect([subject(), fileName()]).toEqual(['Calendario, dal lun 16 nov 2026 al dom 22 nov 2026', 'calendario-dal-2026-11-16-al-2026-11-22.xlsx']);
+      ses.resetHistory();
+      cognito.on(AdminGetUserCommand).resolves(profile('anna@example.com', 'en'));
+      await handler(CALENDAR);
+      expect(subject()).toBe('Calendar, Mon 16 Nov 2026 to Sun 22 Nov 2026');
+    });
+  });
+
   it('an event that is not one sends nothing and logs only the paths of what is wrong', async () => {
     await expect(handler({ ...MINE, email: 'someone@example.com' })).resolves.toEqual({ outcome: 'invalid_event' });
     await expect(handler({ ...MINE, kind: 'calendar' })).resolves.toEqual({ outcome: 'invalid_event' });
@@ -156,7 +196,10 @@ describe('mailer handler, the daily mail (6.2, 6.3)', () => {
   const AT_SEVEN = '2026-11-16T06:00:00.000Z';
   const DAILY = { kind: 'daily', now: AT_SEVEN };
   const CAROL_APPT = storedItem({ SK: '2026-12-20T09:00:00.000Z#CAROL', userId: 'sub-carol', username: 'carol', date: '2026-12-20', start: '2026-12-20T09:00:00.000Z', end: '2026-12-20T10:00:00.000Z' });
-  const admin = (username: string, email: string | null) => ({ Username: username, Attributes: email === null ? [] : [{ Name: 'email', Value: email }] });
+  const admin = (username: string, email: string | null, locale?: string) => ({
+    Username: username,
+    Attributes: [...(email === null ? [] : [{ Name: 'email', Value: email }]), ...(locale === undefined ? [] : [{ Name: 'locale', Value: locale }])],
+  });
   const conditionFailed = () => new ConditionalCheckFailedException({ message: 'The conditional request failed', $metadata: {} });
   const mails = () => ses.commandCalls(SendEmailCommand).map((c) => c.args[0].input);
   const fileRows = async (mail: number, file: number) => (await readXlsxFile(Buffer.from(mails()[mail]!.Content!.Simple!.Attachments![file]!.RawContent!)))[0]!.data;
@@ -208,6 +251,29 @@ describe('mailer handler, the daily mail (6.2, 6.3)', () => {
     cognito.on(ListUsersInGroupCommand, { GroupName: 'admin' }).resolves({ Users: [admin('boss', 'boss@example.com'), admin('admin', 'ada@example.com')] });
     await expect(handler(DAILY)).resolves.toMatchObject({ outcome: 'sent', mailCount: 2, skipped: [] });
     expect(mails().map((m) => m.Destination)).toEqual([{ ToAddresses: ['ada@example.com'] }, { ToAddresses: ['boss@example.com'] }]);
+  });
+
+  // Each administrator in their own language (docs/MULTILANGUAGE_ARCHITECTURE.md section 8).
+  it('two administrators of two languages: a mail each in their own, the files made once per language, the languages in the log line', async () => {
+    cognito.on(ListUsersInGroupCommand, { GroupName: 'admin' }).resolves({
+      Users: [admin('admin', 'ada@example.com', 'it'), admin('boss', 'boss@example.com'), admin('chief', 'chief@example.com', 'it')],
+    });
+    await expect(handler(DAILY)).resolves.toMatchObject({ outcome: 'sent', mailCount: 3 });
+    expect(mails().map((m) => [m.Destination!.ToAddresses![0], m.Content!.Simple!.Subject!.Data, m.Content!.Simple!.Attachments!.map((a) => a.FileName)])).toEqual([
+      ['ada@example.com', 'Calendario: prossimi 7 giorni e copia di sicurezza, lun 16 nov 2026', ['calendario-prossimi-7-giorni-2026-11-16.xlsx', 'calendario-copia-dal-2026-10-01.xlsx']],
+      ['boss@example.com', 'Calendar: next 7 days and backup, Mon 16 Nov 2026', ['calendar-next-7-days-2026-11-16.xlsx', 'calendar-backup-from-2026-10-01.xlsx']],
+      ['chief@example.com', 'Calendario: prossimi 7 giorni e copia di sicurezza, lun 16 nov 2026', ['calendario-prossimi-7-giorni-2026-11-16.xlsx', 'calendario-copia-dal-2026-10-01.xlsx']],
+    ]);
+    expect(mails()[0]!.Content!.Simple!.Body!.Text!.Data).toContain("Nei prossimi 7 giorni c'è 1 appuntamento.");
+    expect((await fileRows(0, 1)).slice(1).map((r) => [r[4], r[7]])).toEqual([['alice', 'prenotato'], ['bob', 'annullato'], ['carol', 'prenotato']]);
+    expect((await fileRows(1, 1))[0]![0]).toBe('Date');
+    expect(logLines()[0]).toMatchObject({ languages: ['it', 'en'] });
+  });
+
+  it('DEFAULT_LANGUAGE at it: an administrator with no language gets the daily mail in Italian', async () => {
+    vi.stubEnv('DEFAULT_LANGUAGE', 'it');
+    await handler(DAILY);
+    expect(mails()[0]!.Content!.Simple!.Attachments!.map((a) => a.FileName)).toEqual(['calendario-prossimi-7-giorni-2026-11-16.xlsx', 'calendario-copia-dal-2026-10-01.xlsx']);
   });
 
   it('writes one log line: the outcome, the date, the hour, the mails sent and skipped, the counts; no address, no name', async () => {

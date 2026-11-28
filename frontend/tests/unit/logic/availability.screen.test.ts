@@ -1,12 +1,14 @@
 import type { AppointmentConflict, AvailabilityType, CalendarSettings, WeeklyPattern } from '@shared-calendar/shared';
 import { ReplaySubject, Subject } from 'rxjs';
-import { NO_PATTERNS, NO_TYPE_YET, NO_TYPES, startingFields, TYPE_CAPACITY_HINT, TYPE_NAME_HINT, type PatternFields } from '../../../src/logic/availability.model';
+import { startingFields, type PatternFields } from '../../../src/logic/availability.model';
 import { AvailabilityScreen, type Ask, type AvailabilityRules, type AvailabilityState, type AvailabilityTypes, type Known } from '../../../src/logic/availability.screen';
 import type { CreatePatternResult, DeletePatternResult, PatternsResult, UpdatePatternResult } from '../../../src/services/availability-rules.types';
 import type { CreateTypeResult, RemoveTypeResult, RenameTypeResult, TypesResult } from '../../../src/services/availability-types.types';
 import type { SettingsResult } from '../../../src/services/calendar-settings.types';
 import { POOL, STUDIO } from './fixtures';
 import { useFarBrowserZone } from './zone';
+import { NO_PATTERNS, NO_TYPES, NO_TYPE_YET, TYPE_CAPACITY_HINT, TYPE_NAME_HINT } from './availability.words';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // Fake services: result streams that replay their last value, as the real ones do, and spies.
 // No network, no DOM. "Now" is a fixed moment handed to the screen: Friday 20 November 2026,
@@ -84,7 +86,7 @@ function screenOf(now: Date = NOW) {
     updatePatternResult$: results.updatePattern.asObservable(),
     deletePatternResult$: results.deletePattern.asObservable(),
   };
-  const screen = new AvailabilityScreen(settings, types, rules, () => now, visible$);
+  const screen = new AvailabilityScreen(settings, types, rules, () => now, visible$, PAGE_TEXTS_EN);
   const states: AvailabilityState[] = [];
   screen.availability$.subscribe((s) => states.push(s)); // the view subscribes first
   const zoned = (timeZone = 'Europe/Rome') => results.settings.next({ status: 'success', settings: settingsOf(timeZone) });

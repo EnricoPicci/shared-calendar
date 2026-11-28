@@ -1,9 +1,10 @@
 import type { Subscription } from 'rxjs';
 import { failureText } from '../logic/texts';
-import { deleteQuestion, editTitle, USERNAME_HINT, type UserRow } from '../logic/users.model';
+import type { UserRow } from '../logic/users.model';
 import type { UsernameField, UsersScreen } from '../logic/users.screen';
 import type { UsersService } from '../services/users.service';
 import { editDialog, profileForm } from './profile.parts';
+import type { PageTexts } from '../texts/texts';
 
 // What the users view uses: of the UsersScreen its stream, the create, the invitation's dialog,
 // the edit and the new try after a read that failed; of the UsersService the delete with its
@@ -11,6 +12,8 @@ import { editDialog, profileForm } from './profile.parts';
 export type UsersDeps = {
   screen: Pick<UsersScreen, 'users$' | 'create' | 'typed' | 'retry' | 'resend' | 'confirm' | 'closeInvite' | 'editOpened' | 'editTyped' | 'save'>;
   users: Pick<UsersService, 'deleteUser' | 'deleteUserState$'>;
+  // The page texts of the language in use: the hint of the username, the dialogs' words.
+  texts: PageTexts;
 };
 
 // The users view (docs/FRONTEND_ARCHITECTURE.md sections 3 and 4): wires the element #users of
@@ -18,7 +21,7 @@ export type UsersDeps = {
 // "Create user", shows the invitation's dialog the logic layer describes (the last look at the
 // address, then where the invitation went or why not), opens the Edit dialog of a row, and asks
 // before a delete.
-export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Subscription {
+export function mountUsers(root: HTMLElement, { screen, users, texts }: UsersDeps): Subscription {
   // 1. Find the elements, once.
   const find = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
   const form = find<HTMLFormElement>('form.create');
@@ -54,7 +57,7 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
   });
 
   // What a username is, under the field: the logic layer's words, which are also its refusal.
-  hint.textContent = USERNAME_HINT;
+  hint.textContent = texts.users.usernameHint;
 
   // 2. Pure view state (docs/FRONTEND_ARCHITECTURE.md section 3, rule 10): which user the open
   // delete dialog is about, and whether its delete was asked for since it opened. A result is
@@ -79,7 +82,7 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
   const openDelete = (row: UserRow) => {
     deleting = row.username;
     deleteAsked = false;
-    question.textContent = deleteQuestion(row.username);
+    question.textContent = texts.users.deleteQuestion(row.username);
     removeError.textContent = '';
     remove.showModal();
   };
@@ -96,13 +99,13 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
     item.querySelector('.username')!.textContent = row.username;
     item.querySelector('.name')!.textContent = row.name;
     item.querySelector('.email')!.textContent = row.email;
-    item.querySelector('.status')!.textContent = row.status;
+    item.querySelector('.status')!.textContent = row.statusText;
     item.classList.toggle('is-invited', row.status === 'invited');
     const editButton = item.querySelector<HTMLElement>('.ask-edit')!;
     editButton.setAttribute('aria-label', row.editLabel);
     editButton.onclick = () => {
       editing = row.username;
-      editTitleText.textContent = editTitle(row.username);
+      editTitleText.textContent = texts.users.edit(row.username);
       edit.open(row.facts);
     };
     const resend = item.querySelector<HTMLElement>('.ask-resend')!;
@@ -183,7 +186,7 @@ export function mountUsers(root: HTMLElement, { screen, users }: UsersDeps): Sub
     users.deleteUserState$.subscribe((state) => {
       removeSubmit.disabled = state.status === 'pending';
       if (!deleteAsked) return;
-      removeError.textContent = state.status === 'failure' ? failureText(state.reason) : '';
+      removeError.textContent = state.status === 'failure' ? failureText(texts.failures, state.reason) : '';
       if (state.status === 'success') remove.close();
     }),
   );

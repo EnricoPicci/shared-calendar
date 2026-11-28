@@ -66,7 +66,7 @@ of a message (`AssistantMessageBody` in `shared/src/assistant/`):
 | no body at all | `400 invalid_json` |
 | `{ text: "   " }` (empty once trimmed) | `400 invalid_request` |
 | a text of 2 001 characters (one over the limit) | `400 invalid_request` |
-| `{ text, language: "it" }` (a field the contract does not have) | `400 invalid_request` |
+| `{ text, language: "de" }` (a language not of the calendar's list) | `400 invalid_request` |
 
 Then the test reads the conversation and checks that it is still the empty reply with
 `remainingToday` `LIMIT`: none of the four started a conversation or counted as a message.

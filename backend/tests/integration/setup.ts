@@ -534,6 +534,12 @@ export async function setFactsOf(username: string, facts: ReturnType<typeof fact
   );
 }
 
+// Sets an account's own language, the attribute `locale`, straight in cognito-local, as the
+// person's choice in "My details" would (docs/MULTILANGUAGE_ARCHITECTURE.md section 4.1).
+export async function setLanguageOf(username: string, language: string): Promise<void> {
+  await cognito.send(new AdminUpdateUserAttributesCommand({ UserPoolId: localPool().userPoolId, Username: username, UserAttributes: [{ Name: 'locale', Value: language }] }));
+}
+
 // ── E-mail (docs/EMAIL_ARCHITECTURE.md section 14.2) ───────────────────────────────────────────
 
 /** A mail as the fake mail keeps it: the headers, the two bodies, each file in base64. */

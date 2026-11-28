@@ -425,7 +425,7 @@ describe('the key', () => {
 
 // Test names: section numbers are those of docs/CONVERSATIONAL_ARCHITECTURE.md.
 describe('askLanguage (4.2)', () => {
-  it('asks one question whose answer is constrained to the supported languages', async () => {
+  it('asks one question whose answer is constrained to the supported languages, or none', async () => {
     const lib = await load();
     languageAnswer('{"language":"it"}');
 
@@ -440,12 +440,13 @@ describe('askLanguage (4.2)', () => {
         effort: 'low',
         format: {
           type: 'json_schema',
-          schema: { type: 'object', properties: { language: { type: 'string', enum: ['en', 'it'] } }, required: ['language'], additionalProperties: false },
+          schema: { type: 'object', properties: { language: { type: 'string', enum: ['en', 'it', 'none'] } }, required: ['language'], additionalProperties: false },
         },
       },
       messages: [{ role: 'user', content: 'Quali appuntamenti ho?' }],
     });
     expect(body.system).toContain('en, it');
+    expect(body.system).toContain('answer "none"');
     expect(body).not.toHaveProperty('tools');
   });
 
@@ -465,23 +466,24 @@ describe('askLanguage (4.2)', () => {
   });
 
   it.each([
+    ['none of the list', '{"language":"none"}'],
     ['a language outside the list', '{"language":"de"}'],
     ['no language at all', '{"lingua":"it"}'],
     ['JSON that is not an object', 'null'],
     ['a sentence instead of JSON', 'The message is written in Italian.'],
     ['nothing', ''],
-  ])('gives English for an answer that is not what was asked for: %s', async (_name, text) => {
+  ])('gives no language for %s, or an answer that is not what was asked for', async (_name, text) => {
     const lib = await load();
     languageAnswer(text);
 
-    await expect(lib.askLanguage('a text', NOW)).resolves.toMatchObject({ kind: 'language', language: 'en' });
+    await expect(lib.askLanguage('a text', NOW)).resolves.toMatchObject({ kind: 'language', language: null });
   });
 
-  it('gives English when the answer was refused and holds no text', async () => {
+  it('gives no language when the answer was refused and holds no text', async () => {
     const lib = await load();
     answers({ stop_reason: 'refusal', content: [] });
 
-    await expect(lib.askLanguage('a text', NOW)).resolves.toMatchObject({ kind: 'language', language: 'en' });
+    await expect(lib.askLanguage('a text', NOW)).resolves.toMatchObject({ kind: 'language', language: null });
   });
 });
 

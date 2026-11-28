@@ -1,4 +1,4 @@
-import { ASSISTANT_LIMITS, AssistantMessageBody } from '../../src/index';
+import { ASSISTANT_LIMITS, AssistantMessageBody, SUPPORTED_LANGUAGES } from '../../src/index';
 
 // The body of POST /assistant/messages (docs/CONVERSATIONAL_ARCHITECTURE.md section 6): what it
 // accepts, what it refuses, and that the text is trimmed before it is counted.
@@ -45,8 +45,16 @@ describe('AssistantMessageBody', () => {
     expect(AssistantMessageBody.safeParse({ text: 'a'.repeat(ASSISTANT_LIMITS.messageLength + 1) }).success).toBe(false);
   });
 
+  it.each(SUPPORTED_LANGUAGES)('accepts the page\'s language %s beside the text', (language) => {
+    expect(AssistantMessageBody.safeParse({ text: 'hello', language })).toEqual({ success: true, data: { text: 'hello', language } });
+  });
+
+  it.each(['fr', 'it-IT', '', 'IT', 3, null])('rejects a language that is not one of the list: %j', (language) => {
+    expect(AssistantMessageBody.safeParse({ text: 'hello', language }).success).toBe(false);
+  });
+
   it('rejects another field', () => {
-    expect(AssistantMessageBody.safeParse({ text: 'hello', language: 'it' }).success).toBe(false);
+    expect(AssistantMessageBody.safeParse({ text: 'hello', locale: 'it' }).success).toBe(false);
   });
 
   it('rejects a missing text', () => {

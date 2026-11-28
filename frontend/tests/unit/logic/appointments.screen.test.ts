@@ -7,6 +7,7 @@ import type { AppointmentsResult, CancelResult, UpdateNoteResult } from '../../.
 import type { SettingsResult } from '../../../src/services/calendar-settings.types';
 import { appointment } from './fixtures';
 import { useFarBrowserZone } from './zone';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // A fake CalendarSettingsService and a fake AppointmentsService (result streams that replay
 // their last value, as the real ones do, and spies), a fake WeekScreen (a spy), a stream for
@@ -55,6 +56,7 @@ function screenAt(now = NOW, role: 'admin' | 'user' = 'user') {
     role,
     () => new Date(clock.now),
     visible$,
+    PAGE_TEXTS_EN,
   );
   const states: ListState[] = [];
   const view$ = screen.list$.subscribe((s) => states.push(s)); // the view subscribes first
@@ -119,7 +121,7 @@ describe('AppointmentsScreen', () => {
     it('the list arrives: its rows, in the zone the settings named', () => {
       const rome = screenAt();
       rome.listed([BOOKED]);
-      expect(rome.last()).toEqual({ ...START, rows: appointmentRows([BOOKED], new Date(NOW), 'Europe/Rome') });
+      expect(rome.last()).toEqual({ ...START, rows: appointmentRows(PAGE_TEXTS_EN, [BOOKED], new Date(NOW), 'Europe/Rome') });
       expect(rome.last().rows![0]).toMatchObject({ date: 'Mon 23 Nov', time: '10:00–11:00', status: 'Booked' });
 
       const kolkata = screenAt();
@@ -504,7 +506,7 @@ describe('AppointmentsScreen', () => {
     it('an appointment of the list, ready to show, at the "now" given and in the zone of the settings', () => {
       const { screen, listed } = screenAt();
       listed();
-      expect(screen.detail('booked')).toEqual(appointmentDetail(BOOKED, 'user', new Date(NOW), 'Europe/Rome'));
+      expect(screen.detail('booked')).toEqual(appointmentDetail(PAGE_TEXTS_EN, BOOKED, 'user', new Date(NOW), 'Europe/Rome'));
       expect(screen.detail('booked')).toMatchObject({
         when: 'Mon 23 Nov, 10:00–11:00',
         who: 'You',
@@ -568,7 +570,7 @@ describe('AppointmentsScreen', () => {
         { appointmentId: 'booked', when: 'Mon 23 Nov, 10:00–11:00', what: 'Mon 23 Nov, 10:00–11:00 · Studio', who: 'You', note: 'First lesson' },
         '2026-11-23',
       );
-      expect(handOver.mock.calls[0]![0]).toEqual(movingOf(appointmentDetail(BOOKED, 'user', new Date(NOW), 'Europe/Rome'), 'user'));
+      expect(handOver.mock.calls[0]![0]).toEqual(movingOf(appointmentDetail(PAGE_TEXTS_EN, BOOKED, 'user', new Date(NOW), 'Europe/Rome'), 'user'));
       expect(list).toHaveBeenCalledTimes(1); // handing over asks nothing of the server
     });
 

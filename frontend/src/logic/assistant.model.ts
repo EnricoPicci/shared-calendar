@@ -1,13 +1,12 @@
 import {
   ASSISTANT_LIMITS,
   assistantTexts,
-  DEFAULT_ASSISTANT_LANGUAGE,
-  type AssistantLanguage,
   type AssistantMessage,
   type AssistantProposal,
   type AssistantProposalAction,
   type AssistantReply,
   type AssistantStatus,
+  type Language,
   type Role,
 } from '@shared-calendar/shared';
 import type {
@@ -18,13 +17,14 @@ import type {
   AssistantLoadFailureReason,
   AssistantSendFailureReason,
 } from '../services/assistant.types';
-import { FULL_FOR_ADMIN } from './booking';
 import { failureText } from './texts';
+import type { PageTexts } from '../texts/texts';
 
 // Pure functions for the assistant's panel (docs/FRONTEND_ARCHITECTURE.md section 5.1): the
 // conversation put together from the server's replies and made ready to draw, the proposal with
 // what became of each of its changes, the line that counts the messages left, and what the panel
-// says and does when a call fails, reason by reason.
+// says and does when a call fails, reason by reason. The page's words are the page texts', handed
+// in first.
 
 // The longest message a person can send, for the field's own limit.
 export const MESSAGE_LENGTH = ASSISTANT_LIMITS.messageLength;
@@ -33,9 +33,6 @@ export const MESSAGE_LENGTH = ASSISTANT_LIMITS.messageLength;
 // the requests to Claude one message may take (docs/CONVERSATIONAL_ARCHITECTURE.md section 4.4).
 export const STEPS_AT_MOST = ASSISTANT_LIMITS.modelRequestsPerMessage;
 
-// Said when an exchange is still not over after that many steps.
-export const COULD_NOT_FINISH = 'The assistant could not finish. Please ask again, in other words.';
-
 // The progress line while a call is away and the server named no activity.
 export const NO_ACTIVITY = '…';
 
@@ -43,10 +40,8 @@ export const NO_ACTIVITY = '…';
 // are told apart without colour.
 export type ShownMessage = { seq: number; from: AssistantMessage['from']; who: string; text: string };
 
-const WHO: Record<AssistantMessage['from'], string> = { person: 'You', assistant: 'Assistant', notice: 'Notice' };
-
-export function messageRows(messages: readonly AssistantMessage[]): ShownMessage[] {
-  return messages.map(({ seq, from, text }) => ({ seq, from, who: WHO[from], text }));
+export function messageRows(texts: PageTexts, messages: readonly AssistantMessage[]): ShownMessage[] {
+  return messages.map(({ seq, from, text }) => ({ seq, from, who: texts.assistant.who[from], text }));
 }
 
 // The conversation with the messages of one more reply: a message already held (its `seq`
@@ -87,26 +82,26 @@ export type ShownProposal = {
 // the User booked for is busy (docs/SHARED_CALENDAR_SPEC.md R-BOOK-12). A full time is said to
 // the Administrator without "The calendar has been refreshed": the panel reads no calendar; the
 // conversation offers to book over the capacity (docs/SHARED_CALENDAR_SPEC.md R-BOOK-13).
-function outcomeWords(action: AssistantProposalAction, role: Role): string {
+function outcomeWords(texts: PageTexts, action: AssistantProposalAction, role: Role): string {
   switch (action.outcome) {
     case null:
       return '';
     case 'done':
-      return 'Done';
+      return texts.assistant.done;
     case 'refused':
-      return `Not done. ${role === 'admin' && action.error === 'slot_taken' ? FULL_FOR_ADMIN : failureText(action.error, undefined, role)}`;
+      return texts.assistant.notDone(role === 'admin' && action.error === 'slot_taken' ? texts.week.fullForAdmin : failureText(texts.failures, action.error, undefined, role));
     case 'unknown':
-      return 'It is not known whether this was done. Please check the calendar.';
+      return texts.assistant.unknown;
   }
 }
 
-export function proposalShown(proposal: AssistantProposal | null, status: AssistantStatus, away: boolean, role: Role): ShownProposal | null {
+export function proposalShown(texts: PageTexts, proposal: AssistantProposal | null, status: AssistantStatus, away: boolean, role: Role): ShownProposal | null {
   if (proposal === null) return null;
   return {
     question: proposal.question,
     confirmLabel: proposal.confirmLabel,
     declineLabel: proposal.declineLabel,
-    actions: proposal.actions.map((action) => ({ summary: action.summary, outcome: outcomeWords(action, role) })),
+    actions: proposal.actions.map((action) => ({ summary: action.summary, outcome: outcomeWords(texts, action, role) })),
     buttons: status !== 'awaiting_confirmation' ? 'none' : away ? 'disabled' : 'offered',
   };
 }
@@ -117,14 +112,13 @@ export function changeMade(reply: AssistantReply): boolean {
 }
 
 // The messages the person may still send today, as the line by the field says it.
-export function remainingText(left: number): string {
-  if (left <= 0) return 'No messages left today';
-  return left === 1 ? '1 message left today' : `${left} messages left today`;
+export function remainingText(texts: PageTexts, left: number): string {
+  return texts.assistant.remaining(left);
 }
 
 // The sentence for the day's limit, also said when a reply counts no message left.
-export function dayLimitText(language: AssistantLanguage | null): string {
-  return assistantTexts(language ?? DEFAULT_ASSISTANT_LANGUAGE).cannotAnswer.assistant_limit_reached;
+export function dayLimitText(language: Language): string {
+  return assistantTexts(language).cannotAnswer.assistant_limit_reached;
 }
 
 // What the panel does about a call that failed.
@@ -141,14 +135,15 @@ const plain = (say: string): Trouble => ({ say, then: 'nothing', stop: 'no', mad
 
 // The three reasons for which the assistant cannot answer without anything being wrong with
 // the request (docs/CONVERSATIONAL_ARCHITECTURE.md section 6.1): the sentence of shared/, in the
-// conversation's language, and in English while there is no conversation.
-const cannotAnswer = (code: 'assistant_limit_reached' | 'assistant_budget_reached' | 'assistant_unavailable', language: AssistantLanguage | null) =>
-  assistantTexts(language ?? DEFAULT_ASSISTANT_LANGUAGE).cannotAnswer[code];
+// conversation's language, and in the page's while there is no conversation: the caller hands in
+// the one that holds (docs/MULTILANGUAGE_ARCHITECTURE.md section 9).
+const cannotAnswer = (code: 'assistant_limit_reached' | 'assistant_budget_reached' | 'assistant_unavailable', language: Language) =>
+  assistantTexts(language).cannotAnswer[code];
 
 // Each function below is one `switch` over the closed list of reasons of its call, with no
 // default: a code added to a route and not named here does not compile.
 
-export function loadTrouble(reason: AssistantLoadFailureReason | AssistantEndFailureReason): Trouble {
+export function loadTrouble(texts: PageTexts, reason: AssistantLoadFailureReason | AssistantEndFailureReason): Trouble {
   switch (reason) {
     case 'forbidden':
     case 'internal_error':
@@ -157,11 +152,11 @@ export function loadTrouble(reason: AssistantLoadFailureReason | AssistantEndFai
     case 'network':
     case 'server':
     case 'unexpected':
-      return plain(failureText(reason));
+      return plain(failureText(texts.failures, reason));
   }
 }
 
-export function sendTrouble(reason: AssistantSendFailureReason, language: AssistantLanguage | null): Trouble {
+export function sendTrouble(texts: PageTexts, reason: AssistantSendFailureReason, language: Language): Trouble {
   switch (reason) {
     case 'assistant_limit_reached':
       return { ...plain(cannotAnswer(reason, language)), stop: 'day' };
@@ -173,14 +168,14 @@ export function sendTrouble(reason: AssistantSendFailureReason, language: Assist
     case 'assistant_unavailable':
       return { ...plain(cannotAnswer(reason, language)), then: 'read' };
     case 'conversation_full':
-      return { ...plain(assistantTexts(language ?? DEFAULT_ASSISTANT_LANGUAGE).conversationFull), stop: 'full' };
+      return { ...plain(assistantTexts(language).conversationFull), stop: 'full' };
     // A step of the conversation waits, or a confirmation is under way: the conversation is
     // read again and the step that waits is asked for.
     case 'assistant_busy':
-      return { ...plain(failureText(reason)), then: 'read-on' };
+      return { ...plain(failureText(texts.failures, reason)), then: 'read-on' };
     case 'invalid_json':
     case 'invalid_request':
-      return plain(failureText(reason, 'message'));
+      return plain(failureText(texts.failures, reason, 'message'));
     case 'forbidden':
     case 'internal_error':
     case 'not_signed_in':
@@ -188,18 +183,18 @@ export function sendTrouble(reason: AssistantSendFailureReason, language: Assist
     case 'network':
     case 'server':
     case 'unexpected':
-      return plain(failureText(reason));
+      return plain(failureText(texts.failures, reason));
   }
 }
 
-export function continueTrouble(reason: AssistantContinueFailureReason, language: AssistantLanguage | null): Trouble {
+export function continueTrouble(texts: PageTexts, reason: AssistantContinueFailureReason, language: Language): Trouble {
   switch (reason) {
     case 'assistant_budget_reached':
     case 'assistant_unavailable':
       return plain(cannotAnswer(reason, language));
     case 'nothing_to_continue':
     case 'assistant_busy':
-      return { ...plain(failureText(reason)), then: 'read-on' };
+      return { ...plain(failureText(texts.failures, reason)), then: 'read-on' };
     case 'forbidden':
     case 'internal_error':
     case 'not_signed_in':
@@ -207,11 +202,11 @@ export function continueTrouble(reason: AssistantContinueFailureReason, language
     case 'network':
     case 'server':
     case 'unexpected':
-      return plain(failureText(reason));
+      return plain(failureText(texts.failures, reason));
   }
 }
 
-export function confirmTrouble(reason: AssistantConfirmFailureReason, language: AssistantLanguage | null): Trouble {
+export function confirmTrouble(texts: PageTexts, reason: AssistantConfirmFailureReason, language: Language): Trouble {
   switch (reason) {
     // The changes were made and saved, and only the closing words are missing
     // (docs/CONVERSATIONAL_ARCHITECTURE.md section 6.1): the conversation is read again to show
@@ -222,9 +217,9 @@ export function confirmTrouble(reason: AssistantConfirmFailureReason, language: 
     // The changes were made and their outcomes are not saved
     // (docs/CONVERSATIONAL_ARCHITECTURE.md section 6): no reply will show them.
     case 'assistant_busy':
-      return { ...plain(failureText(reason)), then: 'read-on', made: true };
+      return { ...plain(failureText(texts.failures, reason)), then: 'read-on', made: true };
     case 'proposal_not_found':
-      return { ...plain(failureText(reason)), then: 'read-on' };
+      return { ...plain(failureText(texts.failures, reason)), then: 'read-on' };
     case 'invalid_request':
     case 'forbidden':
     case 'internal_error':
@@ -233,14 +228,14 @@ export function confirmTrouble(reason: AssistantConfirmFailureReason, language: 
     case 'network':
     case 'server':
     case 'unexpected':
-      return plain(failureText(reason));
+      return plain(failureText(texts.failures, reason));
   }
 }
 
-export function declineTrouble(reason: AssistantDeclineFailureReason): Trouble {
+export function declineTrouble(texts: PageTexts, reason: AssistantDeclineFailureReason): Trouble {
   switch (reason) {
     case 'proposal_not_found':
-      return { ...plain(failureText(reason)), then: 'read-on' };
+      return { ...plain(failureText(texts.failures, reason)), then: 'read-on' };
     case 'invalid_request':
     case 'forbidden':
     case 'internal_error':
@@ -249,6 +244,6 @@ export function declineTrouble(reason: AssistantDeclineFailureReason): Trouble {
     case 'network':
     case 'server':
     case 'unexpected':
-      return plain(failureText(reason));
+      return plain(failureText(texts.failures, reason));
   }
 }

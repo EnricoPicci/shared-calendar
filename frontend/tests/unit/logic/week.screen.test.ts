@@ -6,6 +6,7 @@ import type { BookResult, CancelResult, ChangeResult, UpdateNoteResult } from '.
 import type { CalendarState } from '../../../src/services/calendar.types';
 import { appointment, view, winterWeek } from './fixtures';
 import { useFarBrowserZone } from './zone';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // A fake CalendarService (a subject and spies), a fake AppointmentsService (four result streams
 // that replay their last value, as the real ones do), a stream for the page becoming visible
@@ -36,6 +37,7 @@ function screenAt(now = NOW, role: 'admin' | 'user' = 'user') {
     role,
     () => new Date(clock.now),
     visible$,
+    PAGE_TEXTS_EN,
   );
   const states: WeekState[] = [];
   const view$ = screen.week$.subscribe((s) => states.push(s)); // the view subscribes first
@@ -108,7 +110,7 @@ describe('WeekScreen', () => {
       user.pending();
       expect(user.last()).toEqual({ label: '16 Nov – 22 Nov 2026', loading: true, failure: null, week: null, moving: null });
       user.succeed();
-      expect(user.last()).toEqual({ label: '16 Nov – 22 Nov 2026', loading: false, failure: null, week: weekModel(winterWeek(), 'user'), moving: null });
+      expect(user.last()).toEqual({ label: '16 Nov – 22 Nov 2026', loading: false, failure: null, week: weekModel(PAGE_TEXTS_EN, winterWeek(), 'user'), moving: null });
       expect(user.last().week!.days[0]!.appointments[0]!.who).toBe('You');
 
       const admin = screenAt(NOW, 'admin');
@@ -165,7 +167,7 @@ describe('WeekScreen', () => {
 
       const second = view('2026-11-23');
       succeed(second);
-      expect(last()).toEqual({ label: '23 Nov – 29 Nov 2026', loading: false, failure: null, week: weekModel(second, 'user'), moving: null });
+      expect(last()).toEqual({ label: '23 Nov – 29 Nov 2026', loading: false, failure: null, week: weekModel(PAGE_TEXTS_EN, second, 'user'), moving: null });
     });
 
     it('today returns to the week of "now", read again at that moment', () => {
@@ -240,7 +242,7 @@ describe('WeekScreen', () => {
       screen.today();
       pending();
       succeed();
-      expect(last()).toEqual({ label: '16 Nov – 22 Nov 2026', loading: false, failure: null, week: weekModel(winterWeek(), 'user'), moving: null });
+      expect(last()).toEqual({ label: '16 Nov – 22 Nov 2026', loading: false, failure: null, week: weekModel(PAGE_TEXTS_EN, winterWeek(), 'user'), moving: null });
     });
   });
 
@@ -269,7 +271,7 @@ describe('WeekScreen', () => {
 
       screen.start();
       expect(load).toHaveBeenLastCalledWith('2026-11-23', '2026-11-29');
-      expect(last().week).toEqual(weekModel(view('2026-11-23'), 'user'));
+      expect(last().week).toEqual(weekModel(PAGE_TEXTS_EN, view('2026-11-23'), 'user'));
     });
   });
 
@@ -396,7 +398,7 @@ describe('WeekScreen', () => {
     const OWN = winterWeek().appointments[0]!; // Monday 16 November, 11:00–12:00 in Rome
     // A slot of the week over the User's own appointment, as the book dialog would have sent it.
     const asked = () => {
-      const slot = weekModel(winterWeek(), 'user').days[0]!.slots[0]!;
+      const slot = weekModel(PAGE_TEXTS_EN, winterWeek(), 'user').days[0]!.slots[0]!;
       return { slot: { ...slot, start: OWN.start, end: OWN.end }, zone: 'Europe/Rome', fields: { note: '', username: '', start: '', end: '' }, moving: null };
     };
 
@@ -421,7 +423,7 @@ describe('WeekScreen', () => {
       const user = screenAt('2026-11-14T10:00:00.000Z');
       user.screen.start();
       user.succeed();
-      expect(user.screen.detail(OWN.appointmentId)).toEqual(appointmentDetail(OWN, 'user', new Date('2026-11-14T10:00:00.000Z'), 'Europe/Rome'));
+      expect(user.screen.detail(OWN.appointmentId)).toEqual(appointmentDetail(PAGE_TEXTS_EN, OWN, 'user', new Date('2026-11-14T10:00:00.000Z'), 'Europe/Rome'));
       expect(user.screen.detail(OWN.appointmentId)).toMatchObject({
         when: 'Mon 16 Nov, 11:00–12:00',
         who: 'You',
@@ -798,7 +800,7 @@ describe('WeekScreen', () => {
       expect(last()).toEqual({ label: '7 Dec – 13 Dec 2026', loading: false, failure: null, week: null, moving: HANDED });
       pending();
       succeed(view('2026-12-07'));
-      expect(last()).toEqual({ label: '7 Dec – 13 Dec 2026', loading: false, failure: null, week: weekModel(view('2026-12-07'), 'user'), moving: HANDED });
+      expect(last()).toEqual({ label: '7 Dec – 13 Dec 2026', loading: false, failure: null, week: weekModel(PAGE_TEXTS_EN, view('2026-12-07'), 'user'), moving: HANDED });
     });
 
     it.each([

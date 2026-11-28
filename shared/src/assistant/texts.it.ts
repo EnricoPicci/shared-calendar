@@ -1,11 +1,8 @@
-import { weekdayOf } from '../calendar/time';
+import { dateFormats } from '../language/formats';
 import type { AppointmentSummary, AssistantSettingName, AssistantTexts, DayHours, HoursSummary, MailSummary, OverCapacity, PatternSummary, SettingChange, TypeEditSummary } from './texts';
 
-const WEEKDAYS = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica'];
-const MONTHS = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
-
-// A local date written out in full: "martedì 24 novembre 2026".
-const fullDate = (date: string) => `${WEEKDAYS[weekdayOf(date) - 1]} ${Number(date.slice(8, 10))} ${MONTHS[Number(date.slice(5, 7)) - 1]} ${date.slice(0, 4)}`;
+// A local date written out in full, "martedì 24 novembre 2026", and the name of a weekday.
+const { fullDate, weekdayName } = dateFormats('it');
 
 // An existing appointment as a sentence names it: "l'appuntamento di alice di martedì 24 novembre
 // 2026, dalle 10:00 alle 11:00 (Visit)", without "di alice" when it is the person's own.
@@ -30,7 +27,7 @@ const settingChange = ({ setting, from, to }: SettingChange) => {
 // A weekly pattern as a sentence names it: "ogni martedì, dalle 09:00 alle 12:00 (Visit), valido da
 // martedì 1 dicembre 2026, senza scadenza".
 const thePattern = ({ weekday, start, end, type, validFrom, validUntil }: PatternSummary) =>
-  `ogni ${WEEKDAYS[weekday - 1]}, dalle ${start} alle ${end} (${type}), valido da ${fullDate(validFrom)}` + (validUntil === null ? ', senza scadenza' : ` fino a ${fullDate(validUntil)}`);
+  `ogni ${weekdayName(weekday)}, dalle ${start} alle ${end} (${type}), valido da ${fullDate(validFrom)}` + (validUntil === null ? ', senza scadenza' : ` fino a ${fullDate(validUntil)}`);
 
 // Some hours in a list: "09:00–12:00 (Visit)".
 const hours = ({ start, end, type }: HoursSummary) => `${start}–${end} (${type})`;
@@ -74,6 +71,11 @@ const mailOf = ({ from, to, kind, address }: MailSummary) =>
 // with the formal "lei" throughout. The second button is not "Annulla": in a calendar that word
 // would read as cancelling the appointment.
 export const ASSISTANT_TEXTS_IT: AssistantTexts = {
+  notes: {
+    name: 'Italian',
+    address: 'Address the person with the formal "lei", as the application\'s own texts do.',
+    words: { weeklyPattern: 'orario settimanale', dayHours: 'orari propri del giorno', extraWindow: 'finestra aggiuntiva' },
+  },
   cannotAnswer: {
     assistant_limit_reached:
       "Ha raggiunto il limite di messaggi all'assistente per oggi. Sarà di nuovo disponibile domani. Può comunque fare tutto dalle altre pagine.",

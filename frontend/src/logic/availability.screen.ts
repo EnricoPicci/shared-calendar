@@ -3,10 +3,8 @@ import { BehaviorSubject, Subscription, type Observable } from 'rxjs';
 import type { AvailabilityRulesService } from '../services/availability-rules.service';
 import type { AvailabilityTypesService } from '../services/availability-types.service';
 import type { CalendarSettingsService } from '../services/calendar-settings.service';
+import type { PageTexts } from '../texts/texts';
 import {
-  NO_PATTERNS,
-  NO_TYPE_YET,
-  NO_TYPES,
   patternFor,
   patternGroups,
   startingFields,
@@ -148,6 +146,9 @@ export class AvailabilityScreen {
     private readonly rules: AvailabilityRules,
     private readonly now: () => Date,
     private readonly visible$: Observable<unknown>,
+    // The page texts of the language in use, kept for the screen's life
+    // (docs/MULTILANGUAGE_PLAN.md decision D2).
+    private readonly texts: PageTexts,
   ) {}
 
   // Called once the view has subscribed (docs/FRONTEND_ARCHITECTURE.md section 5, rule 5): reads
@@ -174,19 +175,19 @@ export class AvailabilityScreen {
     hear(this.settings.settingsResult$, (result) => {
       const first = this.zone === null && result.status === 'success';
       if (result.status === 'success') this.zone = result.settings.timeZone;
-      this.zoneWhy = result.status === 'failure' ? failureText(result.reason) : null;
+      this.zoneWhy = result.status === 'failure' ? failureText(this.texts.failures, result.reason) : null;
       // The form that creates a pattern starts on today, once the zone says which day that is.
       this.haveRead('settings', first ? { patternFields: startingFields(this.today()) } : {});
     });
     hear(this.types.typesResult$, (result) => {
       this.listed = result.status === 'success' ? result.types : null;
       this.known = this.listed ?? this.known;
-      this.typesWhy = result.status === 'failure' ? failureText(result.reason) : null;
+      this.typesWhy = result.status === 'failure' ? failureText(this.texts.failures, result.reason) : null;
       this.haveRead('types');
     });
     hear(this.rules.patternsResult$, (result) => {
       this.patterns = result.status === 'success' ? result.patterns : null;
-      this.patternsWhy = result.status === 'failure' ? failureText(result.reason) : null;
+      this.patternsWhy = result.status === 'failure' ? failureText(this.texts.failures, result.reason) : null;
       this.haveRead('patterns');
     });
 
@@ -270,13 +271,13 @@ export class AvailabilityScreen {
   // zone, for the view's own call, the delete of a pattern; null when it names none, and
   // while the zone is not known.
   conflicts(conflicts: readonly AppointmentConflict[] | undefined): ConflictList | null {
-    return this.zone === null ? null : conflictList(conflicts, this.zone);
+    return this.zone === null ? null : conflictList(this.texts, conflicts, this.zone);
   }
 
   // A write with a type's fields. While one of its kind is under way another is not taken.
   private typed(ask: 'typeCreate' | 'rename', about: string, fields: TypeFields, call: (type: { name: string; capacity: number }) => void): void {
     if (!this.started || this.state.getValue()[ask].busy) return;
-    const checked = typeFor(fields);
+    const checked = typeFor(this.texts, fields);
     if ('refusals' in checked) {
       this.patch({ [ask]: { ...QUIET, about, refusals: checked.refusals } });
       return;
@@ -288,7 +289,7 @@ export class AvailabilityScreen {
   // A write with a pattern's fields. While one of its kind is under way another is not taken.
   private patterned(ask: 'patternCreate' | 'change', about: string, fields: PatternFields, call: (pattern: PatternBody) => void): void {
     if (!this.started || this.state.getValue()[ask].busy) return;
-    const checked = patternFor(fields);
+    const checked = patternFor(this.texts, fields);
     if ('refusals' in checked) {
       this.patch({ [ask]: { ...QUIET, about, refusals: checked.refusals } });
       return;
@@ -302,7 +303,7 @@ export class AvailabilityScreen {
   private answer(ask: AskName, result: Outcome, attempt: Attempt, more: Partial<AvailabilityState> = {}): void {
     // The answer is of the call under way, which is the one the state is about.
     const about = this.state.getValue()[ask].about;
-    const outcome = result.status === 'success' ? { ...QUIET, about, done: true } : { ...QUIET, about, failure: failureText(result.reason, attempt), conflicts: this.conflicts(result.conflicts) };
+    const outcome = result.status === 'success' ? { ...QUIET, about, done: true } : { ...QUIET, about, failure: failureText(this.texts.failures, result.reason, attempt), conflicts: this.conflicts(result.conflicts) };
     this.patch({ [ask]: outcome, ...more });
   }
 
@@ -341,18 +342,18 @@ export class AvailabilityScreen {
     this.knownSubject.next({ zone: this.zone, zoneWhy: this.zoneWhy, types: this.known, patterns: this.patterns });
     const shown = this.state.getValue();
     const today = this.today();
-    const types = this.listed === null ? null : kept(shown.types, typeRows(this.listed));
-    const groups = this.patterns === null || today === null ? null : kept(shown.groups, patternGroups(this.patterns, this.known, today));
+    const types = this.listed === null ? null : kept(shown.types, typeRows(this.texts, this.listed));
+    const groups = this.patterns === null || today === null ? null : kept(shown.groups, patternGroups(this.texts, this.patterns, this.known, today));
     this.patch({
       loading: this.reading.size > 0,
       typesUnread: this.typesWhy,
       types,
-      typesEmpty: types?.length === 0 ? NO_TYPES : null,
+      typesEmpty: types?.length === 0 ? this.texts.availability.noTypes : null,
       patternsUnread: this.patternsWhy ?? this.zoneWhy,
       groups,
-      patternsEmpty: groups?.length === 0 ? NO_PATTERNS : null,
+      patternsEmpty: groups?.length === 0 ? this.texts.availability.noPatterns : null,
       choices: kept(shown.choices, typeChoices(this.known ?? [])),
-      typeHint: this.listed?.length === 0 ? NO_TYPE_YET : '',
+      typeHint: this.listed?.length === 0 ? this.texts.availability.noTypeYet : '',
       ...more,
     });
   }

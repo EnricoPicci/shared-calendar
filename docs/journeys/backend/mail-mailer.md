@@ -4,7 +4,7 @@
 |---|---|
 | Test file | `backend/tests/integration/mail.test.ts` |
 | `describe` | `the mailer run by hand (6.1, 6.3)` |
-| Tests | 1. "calendar: one mail to the Administrator's own address, From and Reply-To of the stack, the file with every appointment of the day and the names"<br>2. "mine: one mail to the User's own address, their appointments listed and in the file, nobody else's and no name"<br>3. "an event carrying an address, or a kind not of the role, sends nothing" |
+| Tests | 1. "calendar: one mail to the Administrator's own address, From and Reply-To of the stack, the file with every appointment of the day and the names"<br>2. "mine: one mail to the User's own address, their appointments listed and in the file, nobody else's and no name"<br>3. "mine in Italian: a User whose language is Italian gets the mail, its list, its file and the file's name in Italian"<br>4. "an event carrying an address, or a kind not of the role, sends nothing" |
 | Runs against | the local stack: the API on port 3000 (`sam local start-api`), the functions' invoke on port 3001 (`npm run local:lambda`), cognito-local on port 9229, DynamoDB Local on `DYNAMODB_PORT`, the fake mail on port 8025 (`RUN_INTEGRATION=1`) |
 
 Ideas used here, explained once for all journeys:
@@ -21,6 +21,8 @@ Ideas used here, explained once for all journeys:
   starts it carries none (`docs/EMAIL_ARCHITECTURE.md` section 6.1).
 - The Administrator's mail holds every appointment of the range with the names; a User's holds
   only their own, without names (`docs/EMAIL_ARCHITECTURE.md` section 6.3).
+- The mail, its file and the file's name are in the recipient's own language, read in Cognito
+  with the address (`docs/MULTILANGUAGE_ARCHITECTURE.md` section 8).
 - An event the mailer does not accept sends nothing (`docs/EMAIL_ARCHITECTURE.md` section 6.1).
 
 ## Who takes part
@@ -30,9 +32,12 @@ Ideas used here, explained once for all journeys:
 - **`alice`** (seeded, address `alice@example.com`, named Alice Liddell): two appointments of the
   day, one booked and one cancelled; receives the mail of their own.
 - **`mail-bob`**: a throw-away User with one booked appointment of the day, whose name must show
-  in the Administrator's file and whose appointment must not show in alice's.
+  in the Administrator's file and whose appointment must not show in alice's. In test 3 its
+  language is Italian, and it receives the mail of its own at `mail-bob@example.com`.
 - **The mailer**, run through `npm run local:lambda` by `runMailer()`, which waits for its
-  result; **the fake mail**, which keeps the mails.
+  result; **the fake mail**, which keeps the mails. The local stack runs with the template's
+  default language (`DefaultLanguage`, English), so a person whose account holds no language
+  gets English: `admin` and `alice` in tests 1 and 2.
 
 ## Before the block starts
 
@@ -134,7 +139,25 @@ sequenceDiagram
    rows marked `MARK` are exactly alice's two of the journey, by start.
 5. The test checks `admin@example.com` holds no mail.
 
-## Test 3: events the mailer refuses
+## Test 3: their own, to mail-bob, in Italian
+
+1. The fake mail forgets `mail-bob@example.com`'s mails. The test sets `mail-bob`'s language to
+   `it` straight in cognito-local (`setLanguageOf()`: the attribute `locale`, as the person's
+   choice in "My details" stores it), sets its password again and signs it in, for its `sub`.
+2. `runMailer()` invokes the mailer with the event of kind `mine` for `mail-bob`, from `D` to
+   `D`. The test checks `outcome` `sent`. The mailer reads the language with the address
+   (`getProfile()`), and writes the mail, the file and its name in it.
+3. It reads mail-bob's mails. The test checks: exactly one; a subject starting
+   `I suoi appuntamenti, dal `; the plain text listing mail-bob's appointment as
+   `<start>–<end>, mail journey, prenotato` and holding the Italian footer's first sentence,
+   `Questa è un'e-mail automatica.`; the file `miei-appuntamenti-dal-D-al-D.xlsx`.
+4. It opens the file. The test checks the heading row in Italian (`Data`, `Inizio`, `Fine`,
+   `Tipo`, `Nome utente`, `Stato`, `Motivo dell'annullamento`, `Nota`, `Prenotato il`), and
+   that the rows marked `MARK` are exactly one: `D`, `mail-bob`, `prenotato`. The dates and
+   times stay as they are in every language.
+5. The fake mail forgets mail-bob's mails again.
+
+## Test 4: events the mailer refuses
 
 The test invokes the mailer twice with alice's `mine` event changed: once with an extra field
 `email: 'admin@example.com'`, once with `kind` `calendar` for the role `user`. It checks both
@@ -144,17 +167,21 @@ not know, the kind that goes with the role) before it reads anything.
 
 ## What the block leaves
 
-- **The fake mail**: nothing for `admin@example.com` and `alice@example.com` (test 3 sends none,
-  and each test starts by forgetting them).
+- **The fake mail**: nothing for `admin@example.com`, `alice@example.com` and
+  `mail-bob@example.com` (test 4 sends none, each test starts by forgetting the first two, and
+  test 3 forgets the third before and after).
 - **The calendar**: the three appointments of the file's `beforeAll`, as they were, and its
   settings, which the file's `afterAll` writes back; the block changes nothing. The next block
   uses them.
-- **Cognito**: `mail-bob` as the `beforeAll` made it.
+- **Cognito**: `mail-bob` as the `beforeAll` made it, with its language Italian since test 3;
+  the file's `afterAll` removes it.
 
 ## If the block fails halfway
 
 A failed check skips the rest of its test; the next test still runs, and needs nothing from the
-one before (each forgets the mails first). The file's `afterAll` runs whatever happens: it
+one before (each forgets the mails first). A failure in test 3 after its first step leaves
+`mail-bob` Italian and may leave its mail in the fake mail; the account goes with the file's
+`afterAll`. The file's `afterAll` runs whatever happens: it
 removes what the file made in the calendar (`removeFromCalendar()`: as the Administrator, it
 cancels every appointment of the type `mail journey` still booked from today to 56 days ahead,
 deletes the type's one-off windows found in the view, two reads of at most 31 days, and deletes
@@ -170,8 +197,9 @@ history, which is why the checks look for `MARK`.
 | The mailer | `backend/src/handlers/mailer.ts`; its event `backend/src/lib/mailerEvent.ts` |
 | The file | `appointmentsFile()` in `backend/src/lib/excel.ts` |
 | The mail | `sendMail()` in `backend/src/lib/ses.ts`; the texts `calendarMailText()` and `mineMailText()` of `shared/src/mail/texts.ts` |
-| The address and the names | `getProfile()` and `namesBySub()` in `backend/src/lib/cognito.ts` |
+| The address, the language and the names | `getProfile()` and `namesBySub()` in `backend/src/lib/cognito.ts` |
+| The words of each language | `mailTexts()` of `shared/src/mail/texts.ts`, with `texts.en.ts` and `texts.it.ts` |
 | The appointments | `listAppointments()` in `backend/src/lib/calendarDb.ts` |
 | The fake mail | `backend/docker/fake-mail.mjs` |
-| Test helpers | in the file: `removeFromCalendar()`, `newUser()`, `bookSlot()`, `rowsOf()`, `journeyRows()`, `rowOf()`; in `backend/tests/integration/setup.ts`: `api()`, `setPasswordOf()`, `signIn()`, `subOf()`, `factsOf()`, `withFacts()`, `removeUserIfPresent()`, `runMailer()`, `waitForMails()`, `forgetMailsTo()` |
+| Test helpers | in the file: `removeFromCalendar()`, `newUser()`, `bookSlot()`, `rowsOf()`, `journeyRows()`, `rowOf()`; in `backend/tests/integration/setup.ts`: `api()`, `setPasswordOf()`, `setLanguageOf()`, `signIn()`, `subOf()`, `factsOf()`, `withFacts()`, `removeUserIfPresent()`, `runMailer()`, `waitForMails()`, `forgetMailsTo()` |
 | Constants | `TYPE`, `DAYS_AHEAD`, `MARK`, `FROM`, `REPLY_TO` |

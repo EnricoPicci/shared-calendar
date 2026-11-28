@@ -3,9 +3,9 @@ import {
   deletePatternQuestion,
   deleteTypeQuestion,
   PATTERN_FIELDS,
-  TYPE_CAPACITY_HINT,
-  TYPE_NAME_HINT,
-  WEEKDAY_CHOICES,
+  typeCapacityHint,
+  typeNameHint,
+  weekdayChoices,
   type Choice,
   type PatternFields,
   type PatternGroup,
@@ -21,6 +21,7 @@ import type { AvailabilityTypesService } from '../services/availability-types.se
 import type { RemoveTypeState } from '../services/availability-types.types';
 import { availabilityParts, type Confirm, type Tell } from './availability.parts';
 import { windowTimes } from './time.parts';
+import type { PageTexts } from '../texts/texts';
 
 // What the availability view uses: of the AvailabilityScreen its stream, the four writes it
 // checks, the two new tries after a read that failed, and the appointments in the way of a
@@ -31,13 +32,15 @@ export type AvailabilityDeps = {
   types: Pick<AvailabilityTypesService, 'remove' | 'removeState$'>;
   rules: Pick<AvailabilityRulesService, 'deletePattern' | 'deletePatternState$'>;
   confirm: Pick<Confirm, 'open'>;
+  // The page texts of the language in use: the hints, the weekdays, the questions, a failure.
+  texts: PageTexts;
 };
 
 // The availability view (docs/FRONTEND_ARCHITECTURE.md sections 3 and 4): wires the element
 // #availability of index.html. It draws the rows the logic layer hands over, sends the fields
 // of its four forms as text, shows under each field why it was refused and under a refused
 // change the appointments in the way, and asks before a delete.
-export function mountAvailability(root: HTMLElement, { screen, types, rules, confirm }: AvailabilityDeps): Subscription {
+export function mountAvailability(root: HTMLElement, { screen, types, rules, confirm, texts }: AvailabilityDeps): Subscription {
   // 1. Find the elements, once. The four forms have one shape: the fields, each with the
   // refusal of its .field, the failure, the appointments in the way (the two forms of a
   // pattern), and the button.
@@ -65,11 +68,11 @@ export function mountAvailability(root: HTMLElement, { screen, types, rules, con
   // chosen by the person sets the end (windowTimes of src/views/time.parts.ts). What a name and
   // a capacity are stands under their fields.
   for (const { fields, times } of [forms.patternCreate, forms.change]) {
-    choices(fields[0]!.inputs[0]!, WEEKDAY_CHOICES);
+    choices(fields[0]!.inputs[0]!, weekdayChoices(texts));
     windowTimes(times.start!, times.end!);
   }
-  for (const hint of nameHints) hint.textContent = TYPE_NAME_HINT;
-  for (const hint of capacityHints) hint.textContent = TYPE_CAPACITY_HINT;
+  for (const hint of nameHints) hint.textContent = typeNameHint(texts);
+  for (const hint of capacityHints) hint.textContent = typeCapacityHint(texts);
 
   // 2. Pure view state (docs/FRONTEND_ARCHITECTURE.md section 3, rule 10): which type or
   // pattern each open dialog is about, and whether its action was asked for since it opened.
@@ -107,7 +110,7 @@ export function mountAvailability(root: HTMLElement, { screen, types, rules, con
     item.querySelector('.name')!.textContent = row.name;
     item.querySelector('.places')!.textContent = row.places;
     button(item, '.ask-rename', row.editLabel, () => openForm('rename', row.typeId, row.fields));
-    button(item, '.ask-delete', row.deleteLabel, () => openDelete('type', row.typeId, deleteTypeQuestion(row)));
+    button(item, '.ask-delete', row.deleteLabel, () => openDelete('type', row.typeId, deleteTypeQuestion(texts, row)));
     return item;
   };
   const patternRow = (row: PatternRow) => {
@@ -116,7 +119,7 @@ export function mountAvailability(root: HTMLElement, { screen, types, rules, con
     item.querySelector<HTMLElement>('.ended')!.hidden = !row.ended;
     item.classList.toggle('is-ended', row.ended);
     button(item, '.ask-change', row.changeLabel, () => openForm('change', row.patternId, row.fields));
-    button(item, '.ask-delete', row.deleteLabel, () => openDelete('pattern', row.patternId, deletePatternQuestion(row)));
+    button(item, '.ask-delete', row.deleteLabel, () => openDelete('pattern', row.patternId, deletePatternQuestion(texts, row)));
     return item;
   };
   const groupFor = (group: PatternGroup) => {
@@ -194,7 +197,7 @@ export function mountAvailability(root: HTMLElement, { screen, types, rules, con
     deletePending[kind] = state.status === 'pending';
     if (deleting?.kind !== kind) return;
     const failed = state.status === 'failure';
-    deleting.tell({ busy: deletePending[kind], failure: failed ? failureText(state.reason) : null, conflicts: failed ? screen.conflicts(state.conflicts) : null, done: state.status === 'success' });
+    deleting.tell({ busy: deletePending[kind], failure: failed ? failureText(texts.failures, state.reason) : null, conflicts: failed ? screen.conflicts(state.conflicts) : null, done: state.status === 'success' });
   };
   subscription.add(types.removeState$.subscribe(deleted('type')));
   subscription.add(rules.deletePatternState$.subscribe(deleted('pattern')));

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | v1 — applied on 2026-11-04 (plan step 20) |
+| Status | v2 (2026-11-27) — the files of the languages (`docs/MULTILANGUAGE_PLAN.md` finding F14) added to the tree and to section 3. v1 — applied on 2026-11-04 (plan step 20) |
 | Date | 2026-11-04 |
 | Supersedes | `docs/ARCHITECTURE.md` section 12 ("Proposed repository layout") |
 | Brief | `prompts/20-org-folders-for-client-and-server.md` (decision), `prompts/21-step-20-implementation.md` (move) |
@@ -68,7 +68,9 @@ stays at the root.
 │   ├── vitest.config.ts         # projects unit + integration; 100 % line coverage on src/lib
 │   │                            # and src/assistant
 │   ├── src/
-│   │   ├── handlers/            # one Lambda entry point per file
+│   │   ├── handlers/            # one Lambda entry point per file; inviteMessage.ts is the
+│   │   │                        # invitation function, Cognito's "custom message" trigger, on
+│   │   │                        # no route (docs/MULTILANGUAGE_ARCHITECTURE.md section 7)
 │   │   ├── assistant/           # the assistant's core (docs/ARCHITECTURE.md section 12): takes an
 │   │   │   │                    # identity and a text, never an HTTP request; reaches the table and
 │   │   │   │                    # Claude through lib/ only, and the calendar through a handler only;
@@ -121,11 +123,20 @@ stays at the root.
 │   │   │                        # login, refresh, logout, hello, users, the calendar's, the
 │   │   │                        # assistant's (assistant.service.ts, assistant.types.ts), the
 │   │   │                        # change of one's own password (change-password.service.ts,
-│   │   │                        # .types.ts), me and mail (each .service.ts, .types.ts);
-│   │   │                        # cognito.ts (one request for any target of Cognito)
-│   │   │                        # and api.ts
-│   │   ├── logic/               # between the services and the views, no DOM: texts.ts (dates, times,
-│   │   │                        # failures in plain words), week.model.ts, week.screen.ts,
+│   │   │                        # .types.ts), me and mail (each .service.ts, .types.ts); the
+│   │   │                        # person's language in their account (language.service.ts,
+│   │   │                        # .types.ts, straight at Cognito) and in this browser
+│   │   │                        # (language-memory.ts); cognito.ts (one request for any target
+│   │   │                        # of Cognito) and api.ts
+│   │   ├── texts/               # every word of the page, one object per language: texts.ts (the
+│   │   │                        # type PageTexts, the budgets, pageTexts(language)), texts.en.ts,
+│   │   │                        # texts.it.ts, padded.ts (the test language ?padded, never
+│   │   │                        # shipped); no DOM, imports shared/ only
+│   │   │                        # (docs/MULTILANGUAGE_ARCHITECTURE.md section 5.1)
+│   │   ├── logic/               # between the services and the views, no DOM: texts.ts (times,
+│   │   │                        # ranges, offsets, failures in plain words, from the page texts),
+│   │   │                        # language.ts (the page's language and its texts, page-wide),
+│   │   │                        # week.model.ts, week.screen.ts,
 │   │   │                        # booking.ts, appointment.detail.ts, appointments.model.ts,
 │   │   │                        # appointments.screen.ts, settings.model.ts, settings.screen.ts,
 │   │   │                        # users.model.ts, users.screen.ts, availability.model.ts,
@@ -144,7 +155,9 @@ stays at the root.
 │   │                            # assistant's panel, at the bottom of every screen;
 │   │                            # password.view.ts, the change of one's own password;
 │   │                            # choose-password.view.ts, the first sign-in's new password;
-│   │                            # time.parts.ts, the two lists of a time in a form
+│   │                            # time.parts.ts, the two lists of a time in a form;
+│   │                            # me.view.ts, "My details"; page-texts.ts, which fills the
+│   │                            # page's keys (data-text, data-label) with the words of a language
 │   ├── tests/
 │   │   ├── unit/                # mirrors src/ (plus services/fixtures.ts, logic/zone.ts and
 │   │   │                        # logic/fixtures.ts, views/page.ts); integration/claude.test.ts,
@@ -173,14 +186,23 @@ stays at the root.
     │   │                        # time.ts (time-zone helpers, Intl only), schemas.ts (primitives,
     │   │                        # bodies, parameters), types.ts (responses, events), rules.ts (pure
     │   │                        # availability and slot rules), defaults.ts (defaults, limits, ranges)
+    │   ├── language/            # the one list of languages (docs/MULTILANGUAGE_ARCHITECTURE.md
+    │   │                        # decision L9): languages.ts (SUPPORTED_LANGUAGES, the schema
+    │   │                        # Language, each language's own name, readLanguage,
+    │   │                        # chooseLanguage), formats.ts (the date writers of a language)
+    │   │                        # with formats.en.ts and formats.it.ts (the names of days and months)
     │   ├── mail/                # the mail's contract (docs/EMAIL_ARCHITECTURE.md): schemas.ts (the
-    │   │                        # mail settings, MailCalendarBody), limits.ts, texts.ts (subject,
-    │   │                        # text and HTML of each kind), mask.ts (maskAddress)
+    │   │                        # mail settings, MailCalendarBody), limits.ts, texts.ts (the type
+    │   │                        # MailTexts and the mails, the Excel file's words and the
+    │   │                        # invitation, each taking a language) with texts.en.ts and
+    │   │                        # texts.it.ts (the words), mask.ts (maskAddress)
     │   └── assistant/           # the assistant's contract (docs/CONVERSATIONAL_ARCHITECTURE.md 6):
     │                            # types.ts (AssistantReply and its parts), schemas.ts (the body of
-    │                            # a message), limits.ts, languages.ts (en, it), texts.ts with
-    │                            # texts.en.ts and texts.it.ts (the fixed texts, one object each)
-    └── tests/                   # mirrors src/ (tests/calendar/ and tests/assistant/ too)
+    │                            # a message, with the page's language), limits.ts, texts.ts with
+    │                            # texts.en.ts and texts.it.ts (the fixed texts and the notes Claude
+    │                            # is given of each language, one object each)
+    └── tests/                   # mirrors src/ (tests/calendar/, tests/assistant/, tests/language/
+                                 # and tests/mail/ too)
 ```
 
 Names are plain words, as in the brief, rather than the `apps/` + `packages/` convention: with
@@ -196,6 +218,8 @@ three folders the extra level would add nesting without adding information.
 | An AWS resource, an IAM statement, an alarm | `backend/template.yaml` | The back end's infrastructure is one file |
 | A script that deploys, seeds, verifies or inspects the API | `backend/scripts` | It reads `samconfig.toml`, `env.local.json` or the stack outputs, all of which live in `backend/` |
 | A screen, a component, a browser-side store | `frontend/src` | Runs in the browser only |
+| A text a person reads | the texts of its part, in every language: `frontend/src/texts/` for the page, `shared/src/mail/` for the mails, the files and the invitation, `shared/src/assistant/` for the assistant's own sentences | Each language has one object of a type, so the compiler finds a text missing (`docs/MULTILANGUAGE_ARCHITECTURE.md` section 5.1) |
+| A new language | its entry in `shared/src/language/languages.ts`, then one object of texts in each of the three places above, and its names of days and months in `shared/src/language/` | The compiler asks for every object still missing (`docs/MULTILANGUAGE_ARCHITECTURE.md` section 5.3) |
 | The bucket and CDN that serve the front end | `frontend/template.yaml` | A separate stack: deploying the UI must never touch the API's resources |
 | A request or response shape, an error code, a role name, a validation rule that both the API and the UI must apply identically | `shared/src` | One definition, two consumers; a change there is a contract change and must be visible as such in review |
 | A type that only one side uses (a DynamoDB item, an authorizer context, a React prop type) | That side's `src` | Putting it in `shared/` would suggest a contract that does not exist |
@@ -378,7 +402,7 @@ messages, its proposal and the outcome of each action, types only), `schemas.ts`
 and `assistantTexts(language)`), `texts.en.ts` and `texts.it.ts` (one object of that type each).
 `api.ts` gained the assistant's seven error codes. A text the server or the screen says in the
 conversation's language goes into both language files. The words of the front end's own pages do
-not: they stay English, in `frontend/`.
+not: they are in `frontend/` (`frontend/src/texts/`).
 
 Step c04 of `docs/CONVERSATIONAL_PLAN.md` (2026-11-21) added to `texts.ts` the kinds of read
 (`ASSISTANT_READ_KINDS`: settings, types, calendar, appointments) and to both language files the
@@ -414,6 +438,17 @@ its list of appointments made small.
 Step m6 of `docs/EMAIL_PLAN.md` (2026-11-25) added `tools/sendCalendarMail.ts`, the assistant's
 tool for a mail, with its sentence `sendCalendarMail` in `changes` (the type `MailSummary`) and
 the kind of read `details`.
+
+The languages (`docs/MULTILANGUAGE_PLAN.md` steps l2, l6, l7 and l8, 2026-11-27) added
+`shared/src/language/`: `languages.ts` (the one list `SUPPORTED_LANGUAGES`, the schema
+`Language`, each language's own name, `readLanguage` for a stored value, `chooseLanguage` among a
+browser's languages) and `formats.ts` with `formats.en.ts` and `formats.it.ts` (the names of days
+and months, and the ways a date is written). `shared/src/mail/texts.ts` became the type
+`MailTexts` and the functions that take a language, with the words in `texts.en.ts` and
+`texts.it.ts`: the three mails, the Excel file's headings, statuses, reasons, sheet and file
+names, and the invitation. `shared/src/assistant/languages.ts` is gone: the assistant uses the one
+list, and each language's texts hold the notes Claude is given (`notes`). The words of the front
+end's pages are not in `shared/`: they are in `frontend/src/texts/`.
 
 What stays out of `shared/`: the DynamoDB item shape (`MessageItem`), the authorizer context,
 the logger, and everything that imports
@@ -548,6 +583,17 @@ headless browser is not in the repository, and no end-to-end test tool is.
   `cognito.ts` gains `RespondToAuthChallenge`, `login.service.ts` the challenge. In the back end,
   `backend/scripts/test-user.sh` (`npm run test-user -w backend -- local <username>`). No new
   dependency.
+- **The languages, since 2026-11-27** (`docs/MULTILANGUAGE_PLAN.md` steps l3 to l5 and l8,
+  design `docs/MULTILANGUAGE_ARCHITECTURE.md` section 5): `src/texts/` (`texts.ts`, the type
+  `PageTexts` and the budgets; `texts.en.ts`, `texts.it.ts`; `padded.ts`, the test language of
+  `?padded`, used by the views' tests and the dev server only), under the same lint rules as
+  the logic layer (no DOM, no global). `src/views/page-texts.ts` fills the keys `index.html`
+  holds instead of words (`data-text`, `data-label`); `src/logic/language.ts`, the page's
+  language and its texts, page-wide; `src/services/language.service.ts` and
+  `language.types.ts`, the person's language read and written at Cognito (`GetUser`,
+  `UpdateUserAttributes`); `src/services/language-memory.ts`, the language this browser
+  remembers. The bundle's constant `DEFAULT_LANGUAGE` (`scripts/bundle.mjs`), which the
+  deployment fills from the API stack's output. No new dependency.
 
 **The hosting is deployed** (2026-11-21, `docs/FRONTEND_DEPLOY_PLAN.md` step 72; the record is
 `docs/RUNBOOK.md` section 5.5), as the stack `shared-calendar-web`. What the folder holds and

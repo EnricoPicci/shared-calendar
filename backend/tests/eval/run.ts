@@ -172,7 +172,7 @@ async function play(request: EvalRequest, world: World, log: string): Promise<Pl
   for (const message of request.messages) {
     const exchange: Exchange = { message, steps: 0, modelMs: [], usage: NO_USAGE, cents: 0, texts: [], kind: 'plain' };
     exchanges.push(exchange);
-    if ((await ask(exchange, 'POST', '/assistant/messages', 'POST /assistant/messages', { text: message })) !== 200) break;
+    if ((await ask(exchange, 'POST', '/assistant/messages', 'POST /assistant/messages', { text: message, ...(request.pageLanguage && { language: request.pageLanguage }) })) !== 200) break;
     await goOn(exchange);
   }
 

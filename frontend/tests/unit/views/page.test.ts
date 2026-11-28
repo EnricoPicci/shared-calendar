@@ -82,7 +82,8 @@ describe('index.html', () => {
     it('every field has its label: a <label> around it, with words of its own', () => {
       const fields = everywhere('input, select, textarea');
       // A start and an end are two lists each, an hour and a minute: five places, ten lists more.
-      expect(fields).toHaveLength(70);
+      // The choices of language of the sign-in screen and of "My details" are two of them.
+      expect(fields).toHaveLength(72);
       for (const field of fields) {
         const label = field.closest('label');
         expect(label, field.getAttribute('name')!).not.toBeNull();
@@ -141,7 +142,7 @@ describe('index.html', () => {
       const place = (element: Element) => [...element.classList].join('.');
       const alerts = everywhere('[role="alert"]');
       const failures = everywhere('.error');
-      expect(failures).toHaveLength(73);
+      expect(failures).toHaveLength(74);
       expect(alerts).toEqual(failures);
       for (const alert of alerts) expect(['P', alert.textContent], place(alert)).toEqual(['P', '']);
       const loading = everywhere('.loading');
@@ -425,7 +426,7 @@ describe('index.html', () => {
     expect([one('.unread .error').getAttribute('role'), one('.empty').textContent]).toEqual(['alert', '']);
   });
 
-  it('a row of the users is the username, the name, the e-mail, the state and three buttons of type "button", "Edit", "Resend invitation" (hidden) and "Delete", and nothing in it can be typed in', () => {
+  it('a row of the users is the username, the name, the e-mail, the state and one group of three buttons of type "button", "Edit", "Resend invitation" (hidden) and "Delete", and nothing in it can be typed in', () => {
     const row = pageAside().querySelector<HTMLTemplateElement>('#tpl-user-row')!.content.firstElementChild!;
     expect(row.tagName).toBe('LI');
     expect([...row.children].map((part) => [part.tagName, part.className, part.textContent, part.hasAttribute('hidden')])).toEqual([
@@ -433,6 +434,11 @@ describe('index.html', () => {
       ['SPAN', 'name', '', false],
       ['SPAN', 'email', '', false],
       ['SPAN', 'status', '', false],
+      ['SPAN', 'row-buttons', 'Edit Resend invitation\n              Delete', false],
+    ]);
+    // The three buttons in one group, which the style sheet keeps together.
+    const buttons = row.querySelector('.row-buttons')!;
+    expect([...buttons.children].map((part) => [part.tagName, part.className, part.textContent, part.hasAttribute('hidden')])).toEqual([
       ['BUTTON', 'ask-edit', 'Edit', false],
       ['BUTTON', 'ask-resend', 'Resend invitation', true],
       ['BUTTON', 'danger ask-delete', 'Delete', false],
@@ -727,7 +733,9 @@ describe('index.html', () => {
       expect(panel().parentElement!.id).toBe('app');
       expect(panel().closest('main')).toBeNull();
       expect(document.querySelector('main.screen')!.compareDocumentPosition(panel()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      expect([panel().tagName, panel().getAttribute('aria-label'), panel().hidden, panel().className]).toEqual(['SECTION', 'Assistant', true, 'assistant']);
+      // Its name is the words of its own button, which opens and closes it.
+      const name = document.getElementById(panel().getAttribute('aria-labelledby')!)!;
+      expect([panel().tagName, name.textContent, panel().contains(name), panel().hidden, panel().className]).toEqual(['SECTION', 'Assistant', true, true, 'assistant']);
       // It is no screen: the navigation is filled by the script from the table of screens, and
       // no link of the page leads to it.
       expect(document.querySelectorAll('a[href*="assistant"]')).toHaveLength(0);

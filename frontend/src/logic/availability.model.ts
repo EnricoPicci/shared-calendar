@@ -1,11 +1,11 @@
 import { CALENDAR_LIMITS, lastsWholeHours, LocalDate, TYPE_CAPACITY, TypeName, type AvailabilityType, type PatternBody, type WeeklyPattern } from '@shared-calendar/shared';
-import { longDateText } from './texts';
+import type { PageTexts } from '../texts/texts';
 
 // The availability screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the availability types
 // and the weekly patterns as the API answers them (docs/SHARED_CALENDAR_SPEC.md sections 6.1
 // and 6.2) turned into rows ready to draw, the choices of the pattern form's lists, from what
 // a form holds to the argument of a call or to why not, and the words of the dialog that
-// confirms a deletion. Pure. What only the server knows is not checked here: a name that
+// confirms a deletion. Pure: the words are the page texts', handed in first. What only the server knows is not checked here: a name that
 // exists, an overlap, a conflict, a limit.
 
 // ── The types ───────────────────────────────────────────────────────────────────────────────
@@ -24,54 +24,56 @@ export const STARTING_TYPE: TypeFields = { name: '', capacity: String(TYPE_CAPAC
 export type TypeRow = { typeId: string; name: string; places: string; editLabel: string; deleteLabel: string; fields: TypeFields };
 
 // The rows, in the order the server gives: by name (docs/FRONTEND_SERVICES.md section 16.1).
-export function typeRows(types: readonly AvailabilityType[]): TypeRow[] {
+export function typeRows(texts: PageTexts, types: readonly AvailabilityType[]): TypeRow[] {
+  const words = texts.availability;
   return types.map(({ typeId, name, capacity }) => ({
     typeId,
     name,
-    places: capacity > 1 ? `· ${capacity} places` : '',
-    editLabel: `Edit ${name}`,
-    deleteLabel: `Delete ${name}`,
+    places: capacity > 1 ? `· ${words.places(capacity)}` : '',
+    editLabel: words.editLabel(name),
+    deleteLabel: words.deleteLabel(name),
     fields: { name, capacity: String(capacity) },
   }));
 }
 
-// The sentence of a list of types with no row.
-export const NO_TYPES = 'There are no types yet.';
-
 // What a type's name is (docs/SHARED_CALENDAR_SPEC.md section 6.1). The words stand under the
 // field as its hint and are also the refusal of a text that is not one. What decides is the
 // shared schema, below; the length is the one of shared/.
-export const TYPE_NAME_HINT = `A name has 1 to ${CALENDAR_LIMITS.typeNameLength} characters, with no tab in it.`;
+export function typeNameHint(texts: PageTexts): string {
+  return texts.availability.typeNameHint(CALENDAR_LIMITS.typeNameLength);
+}
 
 // From what the name field holds to the name to create or to rename to, or to the refusal of
 // the field. Spaces around the name are removed, by the schema; nothing else is changed. A
 // name that exists already, whatever its capitals, is the server's to say.
-export function typeNameFor(text: string): { name: string } | { refusal: string } {
+export function typeNameFor(texts: PageTexts, text: string): { name: string } | { refusal: string } {
   const parsed = TypeName.safeParse(text);
-  return parsed.success ? { name: parsed.data } : { refusal: TYPE_NAME_HINT };
+  return parsed.success ? { name: parsed.data } : { refusal: typeNameHint(texts) };
 }
 
 // What a type's capacity is (docs/SHARED_CALENDAR_SPEC.md decision D24), with the shared
 // bounds: the hint under the field, and the refusal of a text that is not one.
-export const TYPE_CAPACITY_HINT = `How many people at the same time: a whole number from ${TYPE_CAPACITY.min} to ${TYPE_CAPACITY.max}.`;
+export function typeCapacityHint(texts: PageTexts): string {
+  return texts.availability.typeCapacityHint(TYPE_CAPACITY.min, TYPE_CAPACITY.max);
+}
 
 // From what the two fields hold to the name and the capacity to send, or to the refusals of
 // the fields in fault, both said when both are. The capacity is written with digits only,
 // spaces around it aside, so that a fraction, an empty field and a text are refused, and it is
 // within the shared bounds. Both are always sent: the capacity the field holds, never left to the server.
-export function typeFor(fields: TypeFields): { type: { name: string; capacity: number } } | { refusals: Partial<Record<keyof TypeFields, string>> } {
-  const name = typeNameFor(fields.name);
+export function typeFor(texts: PageTexts, fields: TypeFields): { type: { name: string; capacity: number } } | { refusals: Partial<Record<keyof TypeFields, string>> } {
+  const name = typeNameFor(texts, fields.name);
   const text = fields.capacity.trim();
   const capacity = /^\d+$/.test(text) ? Number(text) : Number.NaN;
   const refusals: Partial<Record<keyof TypeFields, string>> = {};
   if ('refusal' in name) refusals.name = name.refusal;
-  if (!(capacity >= TYPE_CAPACITY.min && capacity <= TYPE_CAPACITY.max)) refusals.capacity = TYPE_CAPACITY_HINT;
+  if (!(capacity >= TYPE_CAPACITY.min && capacity <= TYPE_CAPACITY.max)) refusals.capacity = typeCapacityHint(texts);
   return 'name' in name && refusals.capacity === undefined ? { type: { name: name.name, capacity } } : { refusals };
 }
 
 // What the dialog asks before a type is deleted.
-export function deleteTypeQuestion(row: TypeRow): string {
-  return `Delete the type ${row.name}? This cannot be undone.`;
+export function deleteTypeQuestion(texts: PageTexts, row: TypeRow): string {
+  return texts.availability.deleteType(row.name);
 }
 
 // ── The choices of the pattern form ─────────────────────────────────────────────────────────
@@ -79,19 +81,19 @@ export function deleteTypeQuestion(row: TypeRow): string {
 // A choice of a list: what is sent, and what a person reads.
 export type Choice = { value: string; label: string };
 
-const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+// The weekdays as the API numbers them, Monday 1 to Sunday 7.
+const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7];
 
-// The weekdays, Monday to Sunday, as the API numbers them: 1 to 7. The two times of the form
-// are an hour and a minute each, offered by src/logic/times.ts.
-export const WEEKDAY_CHOICES: readonly Choice[] = WEEKDAYS.map((label, i) => ({ value: String(i + 1), label }));
+// The weekdays, Monday to Sunday, with their names in the page's language. The two times of the
+// form are an hour and a minute each, offered by src/logic/times.ts.
+export function weekdayChoices(texts: PageTexts): Choice[] {
+  return WEEKDAYS.map((weekday) => ({ value: String(weekday), label: texts.dates.weekdayName(weekday) }));
+}
 
 // The types to choose from, by name, in the server's order.
 export function typeChoices(types: readonly AvailabilityType[]): Choice[] {
   return types.map(({ typeId, name }) => ({ value: typeId, label: name }));
 }
-
-// Said under the list of types of the pattern form while no type exists.
-export const NO_TYPE_YET = 'Create a type first: a pattern needs one.';
 
 // ── The pattern form ────────────────────────────────────────────────────────────────────────
 
@@ -123,21 +125,15 @@ export function patternFields(pattern: PatternBody): PatternFields {
 
 const isDate = (text: string) => LocalDate.safeParse(text).success;
 
-// The refusals of a window's fields, which a pattern, a window of one date's own and an extra
-// window share: each starts with the words of its field's label. A window lasts a whole number
-// of hours (docs/SHARED_CALENDAR_SPEC.md decision D33): the end's lists offer nothing else, but
-// a window stored before the rule can still be opened in a form.
-export const END_NOT_LATER = 'End must be later than Start.';
-export const END_NOT_WHOLE_HOURS = 'End must be a whole number of hours after Start.';
-export const TYPE_NOT_CHOSEN = 'Type must be chosen.';
-
 // The refusal of a window's two times, or none: an end not after its start (two times of one
 // day, written alike: the later one is the greater text, "24:00" included), and only when it is
 // after it, an end that is not a whole number of hours later (lastsWholeHours of shared/), so
-// one sentence is said.
-export function endRefusal(start: string, end: string): string | undefined {
-  if (end <= start) return END_NOT_LATER;
-  return lastsWholeHours(start, end) ? undefined : END_NOT_WHOLE_HOURS;
+// one sentence is said. A window lasts a whole number of hours
+// (docs/SHARED_CALENDAR_SPEC.md decision D33): the end's lists offer nothing else, but a window
+// stored before the rule can still be opened in a form.
+export function endRefusal(texts: PageTexts, start: string, end: string): string | undefined {
+  if (end <= start) return texts.availability.endNotLater;
+  return lastsWholeHours(start, end) ? undefined : texts.availability.endNotWholeHours;
 }
 
 // From what the form holds to the body of a create or of a change, or to the refusals: one
@@ -146,16 +142,17 @@ export function endRefusal(start: string, end: string): string | undefined {
 // step; an end not after its start, or not a whole number of hours after it, is the one fault
 // two times can have; the shared schema, through the service, has the last word on the body
 // (docs/FRONTEND_SERVICES.md section 17.4).
-export function patternFor(fields: PatternFields): { pattern: PatternBody } | { refusals: Partial<Record<PatternField, string>> } {
+export function patternFor(texts: PageTexts, fields: PatternFields): { pattern: PatternBody } | { refusals: Partial<Record<PatternField, string>> } {
   const refusals: Partial<Record<PatternField, string>> = {};
-  const end = endRefusal(fields.start, fields.end);
+  const words = texts.availability;
+  const end = endRefusal(texts, fields.start, fields.end);
   if (end !== undefined) refusals.end = end;
-  if (fields.typeId === '') refusals.typeId = TYPE_NOT_CHOSEN;
-  if (!isDate(fields.validFrom)) refusals.validFrom = 'Valid from must be a date.';
+  if (fields.typeId === '') refusals.typeId = words.typeNotChosen;
+  if (!isDate(fields.validFrom)) refusals.validFrom = words.validFromNotDate;
   if (fields.validUntil !== '') {
-    if (!isDate(fields.validUntil)) refusals.validUntil = 'Valid until must be a date, or left empty.';
+    if (!isDate(fields.validUntil)) refusals.validUntil = words.validUntilNotDate;
     // Two dates written alike: the earlier one is the smaller text.
-    else if (isDate(fields.validFrom) && fields.validUntil < fields.validFrom) refusals.validUntil = 'Valid until must not be before Valid from.';
+    else if (isDate(fields.validFrom) && fields.validUntil < fields.validFrom) refusals.validUntil = words.validUntilBefore;
   }
   if (Object.keys(refusals).length > 0) return { refusals };
   return {
@@ -190,39 +187,37 @@ export type PatternRow = {
 // The patterns of one weekday, under its name.
 export type PatternGroup = { weekday: string; rows: PatternRow[] };
 
-// The sentence of a list of patterns with no row, and the word in the place of the name of a
-// type that the list of types does not hold: the two lists are read at different moments.
-export const NO_PATTERNS = 'There are no weekly patterns yet.';
-export const UNKNOWN_TYPE = 'Unknown type';
-
 // The patterns grouped by weekday, Monday to Sunday, a weekday with no pattern left out; in a
 // group by start, then by end, then by the first date of validity. Every pattern the server
 // returns is there: one whose validity ended before `today`, the calendar's own, is marked,
 // not hidden, since a type cannot be deleted while any pattern uses it
 // (docs/SHARED_CALENDAR_SPEC.md R-TYPE-03). A pattern that ends today has not ended
 // (docs/SHARED_CALENDAR_SPEC.md section 6.2: `validUntil` is inclusive). The type's name is
-// joined from `types`, the list of types as last read, or null while there is none.
-export function patternGroups(patterns: readonly WeeklyPattern[], types: readonly AvailabilityType[] | null, today: string): PatternGroup[] {
+// joined from `types`, the list of types as last read, or null while there is none; a type that
+// list does not hold is "Unknown type", since the two lists are read at different moments.
+export function patternGroups(texts: PageTexts, patterns: readonly WeeklyPattern[], types: readonly AvailabilityType[] | null, today: string): PatternGroup[] {
+  const words = texts.availability;
   const names = new Map((types ?? []).map((type) => [type.typeId, type.name]));
   const order = (a: WeeklyPattern, b: WeeklyPattern) => a.start.localeCompare(b.start) || a.end.localeCompare(b.end) || a.validFrom.localeCompare(b.validFrom);
-  return WEEKDAYS.map((weekday, i) => {
+  return WEEKDAYS.map((number) => {
+    const weekday = texts.dates.weekdayName(number);
     const rows = patterns
-      .filter((pattern) => pattern.weekday === i + 1)
+      .filter((pattern) => pattern.weekday === number)
       .sort(order)
       .map((pattern): PatternRow => {
         const time = `${pattern.start} – ${pattern.end}`;
-        const typeName = names.get(pattern.typeId) ?? UNKNOWN_TYPE;
+        const typeName = names.get(pattern.typeId) ?? words.unknownType;
         const what = `${weekday} ${time} ${typeName}`;
-        const from = `from ${longDateText(pattern.validFrom)}`;
+        const from = texts.dates.longDate(pattern.validFrom);
         return {
           patternId: pattern.patternId,
           time,
           typeName,
-          validity: pattern.validUntil === null ? from : `${from} to ${longDateText(pattern.validUntil)}`,
+          validity: pattern.validUntil === null ? words.validFrom(from) : words.validFromTo(from, texts.dates.longDate(pattern.validUntil)),
           ended: pattern.validUntil !== null && pattern.validUntil < today,
           what,
-          changeLabel: `Change ${what}`,
-          deleteLabel: `Delete ${what}`,
+          changeLabel: words.changeLabel(what),
+          deleteLabel: words.deleteLabel(what),
           fields: patternFields(pattern),
         };
       });
@@ -231,6 +226,6 @@ export function patternGroups(patterns: readonly WeeklyPattern[], types: readonl
 }
 
 // What the dialog asks before a pattern is deleted.
-export function deletePatternQuestion(row: PatternRow): string {
-  return `Delete the pattern ${row.what}, ${row.validity}? Its hours will no longer be open for booking. This cannot be undone.`;
+export function deletePatternQuestion(texts: PageTexts, row: PatternRow): string {
+  return texts.availability.deletePattern(row.what, row.validity);
 }

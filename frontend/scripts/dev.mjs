@@ -1,7 +1,8 @@
 // npm run dev -w frontend [-- <port>]: the page on http://localhost:5173, against the back
 // end's local stack. For local work only.
 //
-// It serves three addresses: / (index.html), /style.css and /app.js. The last is not a file: it is
+// It serves three addresses: / (index.html, also as /?padded, the padded test language), /style.css
+// and /app.js. The last is not a file: it is
 // src/main.ts bundled at every request, so an edit shows after a reload of the page. It passes
 // /api/… on to the local API and /cognito/… to cognito-local, so that the browser sees one
 // origin: the API answers no cross-origin request (docs/FRONTEND_SERVICES.md section 10.3).
@@ -39,9 +40,12 @@ try {
 // The bundle for this server. The two addresses have no host: the browser completes them with
 // the origin the page came from, whichever name it reached this server by (localhost, or a
 // forwarded port of a Codespace). The sign-out everywhere after a change of password is skipped:
-// cognito-local does not implement GlobalSignOut (docs/ARCHITECTURE.md section 8).
+// cognito-local does not implement GlobalSignOut (docs/ARCHITECTURE.md section 8). The padded
+// test language is offered: http://localhost:5173/?padded shows the page in it
+// (docs/MULTILANGUAGE_ARCHITECTURE.md section 6.3, rule 4). The default language is English: a
+// browser that names neither language shows the page in it.
 async function bundle() {
-  const config = { API_URL: '/api', COGNITO_URL: '/cognito/', CLIENT_ID: await clientId(), SKIP_GLOBAL_SIGN_OUT: true };
+  const config = { API_URL: '/api', COGNITO_URL: '/cognito/', CLIENT_ID: await clientId(), SKIP_GLOBAL_SIGN_OUT: true, TEST_LANGUAGE: true, DEFAULT_LANGUAGE: 'en' };
   const result = await build({ ...bundleOptions(config), sourcemap: 'inline', write: false });
   return result.outputFiles[0].text;
 }
@@ -76,7 +80,7 @@ const server = createServer(async (req, res) => {
   if (url.startsWith('/cognito/')) return pass(req, res, COGNITO + url.slice('/cognito'.length));
   if (req.method !== 'GET') return refuse(res, 405, 'Only GET here');
   try {
-    if (url === '/') {
+    if (url === '/' || url === '/?padded') {
       // A strict policy: this origin's script and style sheet only, nothing inline
       // (docs/FRONTEND_ARCHITECTURE.md section 3, rule 6), no other site may show the page in
       // a frame, and the page may hold no <base> element. The words the deployed page gets

@@ -61,7 +61,8 @@ async function newUser(username: string): Promise<string> {
   return signIn(username, await setPasswordOf(username));
 }
 
-const say = (token: string, text: string) => api('POST', '/assistant/messages', token, { text });
+// A message of the person, with the page's language when the test names one.
+const say = (token: string, text: string, language?: string) => api('POST', '/assistant/messages', token, language === undefined ? { text } : { text, language });
 const conversation = (token: string) => api('GET', '/assistant/conversation', token);
 const startAgain = (token: string) => api('DELETE', '/assistant/conversation', token);
 const goOn = (token: string) => api('POST', '/assistant/continue', token);
@@ -316,7 +317,7 @@ describe('a conversation in text (5.6, 6)', () => {
     expect(await api('POST', '/assistant/messages', token)).toMatchObject({ status: 400, body: { error: 'invalid_json' } });
     expect(await say(token, '   ')).toMatchObject({ status: 400, body: { error: 'invalid_request' } });
     expect(await say(token, 'a'.repeat(2001))).toMatchObject({ status: 400, body: { error: 'invalid_request' } });
-    expect(await api('POST', '/assistant/messages', token, { text: HELLO, language: 'it' })).toMatchObject({ status: 400, body: { error: 'invalid_request' } });
+    expect(await api('POST', '/assistant/messages', token, { text: HELLO, language: 'de' })).toMatchObject({ status: 400, body: { error: 'invalid_request' } });
     expect((await conversation(token)).body).toEqual(none(LIMIT));
   });
 
@@ -440,6 +441,35 @@ describe('the language of a conversation (4.2)', () => {
     expect((await startAgain(token)).status).toBe(204);
     const res = await say(token, HELLO);
     expect(res.body).toMatchObject({ language: 'en', messages: [{ seq: 1 }, { seq: 3, text: HELLO_ANSWER }] });
+  });
+
+  it('a first message in none of the languages, from a page in Italian: an Italian conversation, told its notes', async () => {
+    expect((await startAgain(token)).status).toBe(204);
+    const res = await say(token, 'Guten Tag, hören Sie mich?', 'it');
+    expect(res.status).toBe(200);
+    expect(res.body?.language).toBe('it');
+    const answer = (res.body?.messages as { from: string; text: string }[]).find((message) => message.from === 'assistant');
+    expect(answer?.text).toContain('The language of this conversation is Italian: answer in Italian');
+    expect(answer?.text).toContain('the formal "lei"');
+    expect(answer?.text).toContain('"orario settimanale"');
+  });
+
+  it('the same from a page that sends no language: an English one', async () => {
+    expect((await startAgain(token)).status).toBe(204);
+    const res = await say(token, 'Guten Tag, hören Sie mich?');
+    expect(res.status).toBe(200);
+    expect(res.body?.language).toBe('en');
+    const answer = (res.body?.messages as { from: string; text: string }[]).find((message) => message.from === 'assistant');
+    expect(answer?.text).toContain('The language of this conversation is English: answer in English');
+    expect(answer?.text).toContain('"weekly pattern"');
+  });
+
+  it('a language not of the list is refused, and nothing is started', async () => {
+    expect((await startAgain(token)).status).toBe(204);
+    const res = await say(token, 'Guten Tag, hören Sie mich?', 'de');
+    expect(res.status).toBe(400);
+    expect(res.body?.error).toBe('invalid_request');
+    expect((await conversation(token)).body?.conversationId).toBeNull();
   });
 });
 

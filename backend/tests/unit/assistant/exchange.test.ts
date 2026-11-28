@@ -41,6 +41,7 @@ async function load(limit = '10'): Promise<void> {
   const tools = toolsForClaude(DEFINITIONS, 'user');
   offered = tools;
   mark = prompt.promptVersion(prompt.INSTRUCTIONS, prompt.contextBlock(ALICE, 'Europe/Rome'), tools);
+  LINE_EN_FIRST = prompt.timeLine(NOW, 'Europe/Rome', 'en', true);
 }
 
 const NOW = '2026-11-21T14:05:00.000Z';
@@ -48,7 +49,8 @@ const ALICE = { sub: 'sub-alice', username: 'alice', role: 'user' as const };
 const ID = '01JD0000000000000000000001';
 const TEXT = 'Which slots are free next week?';
 const ANSWER = 'I cannot look that up here.';
-const LINE_EN = "Now it is Saturday 21 November 2026 (2026-11-21), 15:05, in the calendar's time zone (Europe/Rome). The language of this conversation is English: answer in English, whatever language the person writes in.";
+// The line after the first message of a conversation: the time, the language and its notes.
+let LINE_EN_FIRST: string;
 
 const USAGE = { inputTokens: 100, outputTokens: 40, cacheReadTokens: 6000, cacheWriteTokens: 300 };
 const LANGUAGE_USAGE = { inputTokens: 300, outputTokens: 10, cacheReadTokens: 0, cacheWriteTokens: 0 };
@@ -121,7 +123,7 @@ describe('sendMessage: the first message of a conversation (4.2, 5.6)', () => {
   it('asks the language, asks Claude once, and starts the conversation with one write', async () => {
     noConversation();
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW);
 
     expect(claude.askLanguage).toHaveBeenCalledWith(TEXT, NOW);
     expect(claude.askStep).toHaveBeenCalledTimes(1);
@@ -132,7 +134,7 @@ describe('sendMessage: the first message of a conversation (4.2, 5.6)', () => {
         context: 'The person writing to you has the username "alice" and is a User. The calendar\'s time zone is Europe/Rome.',
         conversation: [
           { role: 'user', content: TEXT },
-          { role: 'system', content: LINE_EN },
+          { role: 'system', content: LINE_EN_FIRST },
         ],
       },
       NOW,
@@ -145,7 +147,7 @@ describe('sendMessage: the first message of a conversation (4.2, 5.6)', () => {
       {
         messages: [
           { kind: 'model', content: { role: 'user', content: TEXT }, fromPerson: true },
-          { kind: 'model', content: { role: 'system', content: LINE_EN } },
+          { kind: 'model', content: { role: 'system', content: LINE_EN_FIRST } },
           { kind: 'model', content: { role: 'assistant', content: CONTENT } },
         ],
         status: 'idle',
@@ -194,16 +196,49 @@ describe('sendMessage: the first message of a conversation (4.2, 5.6)', () => {
     noConversation();
     claude.askLanguage.mockResolvedValue({ kind: 'language', language: 'it', usage: LANGUAGE_USAGE });
 
-    await exchange.sendMessage(ALICE, 'Buongiorno, mi sente?', NOW);
+    await exchange.sendMessage(ALICE, { text: 'Buongiorno, mi sente?' }, NOW);
 
     const line = claude.askStep.mock.calls[0]?.[0].conversation[1];
     expect(line).toEqual({ role: 'system', content: expect.stringContaining('The language of this conversation is Italian') });
     expect(db.startConversation.mock.calls[0]?.[2]).toEqual({ language: 'it', promptVersion: mark });
   });
 
+  it('the line after the first message carries the notes of the language: the Italian ones for Italian', async () => {
+    noConversation();
+    claude.askLanguage.mockResolvedValue({ kind: 'language', language: 'it', usage: LANGUAGE_USAGE });
+
+    await exchange.sendMessage(ALICE, { text: 'Buongiorno, mi sente?' }, NOW);
+
+    const line = claude.askStep.mock.calls[0]?.[0].conversation[1];
+    expect(line).toEqual({ role: 'system', content: prompt.timeLine(NOW, 'Europe/Rome', 'it', true) });
+    expect(line?.content).toContain('"orario settimanale"');
+  });
+
+  it.each([
+    ['the page\'s language', { text: TEXT, language: 'it' as const }, 'it' as const],
+    ['English, when the page sent none', { text: TEXT }, 'en' as const],
+  ])('a first message in none of the languages takes %s', async (_case, message, language) => {
+    noConversation();
+    claude.askLanguage.mockResolvedValue({ kind: 'language', language: null, usage: LANGUAGE_USAGE });
+
+    await exchange.sendMessage(ALICE, message, NOW);
+
+    expect(db.startConversation.mock.calls[0]?.[2]).toEqual({ language, promptVersion: mark });
+    expect(claude.askStep.mock.calls[0]?.[0].conversation[1]).toEqual({ role: 'system', content: prompt.timeLine(NOW, 'Europe/Rome', language, true) });
+  });
+
+  it('the language Claude named wins over the page\'s', async () => {
+    noConversation();
+    claude.askLanguage.mockResolvedValue({ kind: 'language', language: 'en', usage: LANGUAGE_USAGE });
+
+    await exchange.sendMessage(ALICE, { text: TEXT, language: 'it' }, NOW);
+
+    expect(db.startConversation.mock.calls[0]?.[2]).toEqual({ language: 'en', promptVersion: mark });
+  });
+
   it('replaces whatever the person had before, naming the version read', async () => {
     noConversation(7);
-    await exchange.sendMessage(ALICE, TEXT, NOW);
+    await exchange.sendMessage(ALICE, { text: TEXT }, NOW);
     expect(db.startConversation.mock.calls[0]?.[1]).toBe(7);
   });
 
@@ -214,7 +249,7 @@ describe('sendMessage: the first message of a conversation (4.2, 5.6)', () => {
     noConversation();
     claude.askLanguage.mockResolvedValue(answer);
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW);
 
     expect(result).toEqual({ ok: false, refusal, log: { conversationId: null, ...log, model: 'claude-sonnet-5-5', effort: 'low', languageMs: 0 } });
     expect(claude.askStep).not.toHaveBeenCalled();
@@ -228,7 +263,7 @@ describe('sendMessage: a later message (4.2, 4.3)', () => {
   it('keeps the language, sends the stored conversation as stored without the notices, and saves the step', async () => {
     inConversation();
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW);
 
     expect(claude.askLanguage).not.toHaveBeenCalled();
     const sent = claude.askStep.mock.calls[0]?.[0].conversation;
@@ -269,7 +304,7 @@ describe('sendMessage: a later message (4.2, 4.3)', () => {
   it('a conversation started under other instructions is over: the message starts a new one in its place', async () => {
     inConversation({ promptVersion: 'an-older-mark' });
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW);
 
     expect(claude.askLanguage).toHaveBeenCalledTimes(1);
     expect(claude.askStep.mock.calls[0]?.[0].conversation).toHaveLength(2);
@@ -284,7 +319,7 @@ describe('sendMessage: a later message (4.2, 4.3)', () => {
       vi.advanceTimersByTime(2300);
       return Promise.resolve({ kind: 'text', content: CONTENT, text: ANSWER, usage: USAGE });
     });
-    expect((await exchange.sendMessage(ALICE, TEXT, NOW)).log.modelMs).toBe(2300);
+    expect((await exchange.sendMessage(ALICE, { text: TEXT }, NOW)).log.modelMs).toBe(2300);
   });
 });
 
@@ -301,40 +336,40 @@ describe('sendMessage: what stops it before Claude is asked (4.4, 6)', () => {
   // which tests/unit/assistant/proposals.test.ts covers.
   it.each(['working'] as const)('a conversation that is %s is busy', async (status) => {
     inConversation({ status });
-    expect(await exchange.sendMessage(ALICE, TEXT, NOW)).toEqual({ ok: false, refusal: 'assistant_busy', log: { conversationId: ID, outcome: 'busy' } });
+    expect(await exchange.sendMessage(ALICE, { text: TEXT }, NOW)).toEqual({ ok: false, refusal: 'assistant_busy', log: { conversationId: ID, outcome: 'busy' } });
     untouched();
   });
 
   it("today's messages are all sent", async () => {
     noConversation();
     usedToday(10);
-    expect(await exchange.sendMessage(ALICE, TEXT, NOW)).toEqual({ ok: false, refusal: 'assistant_limit_reached', log: { conversationId: null, outcome: 'daily_limit' } });
+    expect(await exchange.sendMessage(ALICE, { text: TEXT }, NOW)).toEqual({ ok: false, refusal: 'assistant_limit_reached', log: { conversationId: null, outcome: 'daily_limit' } });
     untouched();
   });
 
   it('the last message of the day is still taken', async () => {
     noConversation();
     usedToday(9);
-    expect(await exchange.sendMessage(ALICE, TEXT, NOW)).toMatchObject({ ok: true, reply: { remainingToday: 0 } });
+    expect(await exchange.sendMessage(ALICE, { text: TEXT }, NOW)).toMatchObject({ ok: true, reply: { remainingToday: 0 } });
   });
 
   it.each([{ messageCount: 40 }, { storedBytes: 100_000 }])('the conversation is full: %j', async (full) => {
     inConversation(full);
-    expect(await exchange.sendMessage(ALICE, TEXT, NOW)).toEqual({ ok: false, refusal: 'conversation_full', log: { conversationId: ID, outcome: 'conversation_full' } });
+    expect(await exchange.sendMessage(ALICE, { text: TEXT }, NOW)).toEqual({ ok: false, refusal: 'conversation_full', log: { conversationId: ID, outcome: 'conversation_full' } });
     untouched();
   });
 
   it('a conversation just under both bounds takes the message', async () => {
     inConversation({ messageCount: 39, storedBytes: 99_999 });
-    expect((await exchange.sendMessage(ALICE, TEXT, NOW)).ok).toBe(true);
+    expect((await exchange.sendMessage(ALICE, { text: TEXT }, NOW)).ok).toBe(true);
   });
 
   it('a waiting step is said before the daily limit, and the daily limit before a full conversation', async () => {
     usedToday(10);
     inConversation({ status: 'working', messageCount: 40 });
-    expect(await exchange.sendMessage(ALICE, TEXT, NOW)).toMatchObject({ refusal: 'assistant_busy' });
+    expect(await exchange.sendMessage(ALICE, { text: TEXT }, NOW)).toMatchObject({ refusal: 'assistant_busy' });
     inConversation({ messageCount: 40 });
-    expect(await exchange.sendMessage(ALICE, TEXT, NOW)).toMatchObject({ refusal: 'assistant_limit_reached' });
+    expect(await exchange.sendMessage(ALICE, { text: TEXT }, NOW)).toMatchObject({ refusal: 'assistant_limit_reached' });
   });
 
   it('a broken deployment is thrown, not answered: no model, or no time zone', async () => {
@@ -342,13 +377,13 @@ describe('sendMessage: what stops it before Claude is asked (4.4, 6)', () => {
     claude.assistantModel.mockImplementation(() => {
       throw new Error('ASSISTANT_MODEL is not set');
     });
-    await expect(exchange.sendMessage(ALICE, TEXT, NOW)).rejects.toThrow('ASSISTANT_MODEL');
+    await expect(exchange.sendMessage(ALICE, { text: TEXT }, NOW)).rejects.toThrow('ASSISTANT_MODEL');
     expect(db.readConversation).not.toHaveBeenCalled();
 
     vi.stubEnv('CALENDAR_TIME_ZONE', '');
     vi.resetModules();
     const broken = await import('../../../src/assistant/exchange');
-    await expect(broken.sendMessage(ALICE, TEXT, NOW)).rejects.toMatchObject({ name: 'CoreConfigError' });
+    await expect(broken.sendMessage(ALICE, { text: TEXT }, NOW)).rejects.toMatchObject({ name: 'CoreConfigError' });
   });
 });
 
@@ -360,7 +395,7 @@ describe('the step: each answer of Claude (7.4)', () => {
     inConversation();
     claude.askStep.mockResolvedValue({ kind: 'cut_short', content: CONTENT, text: ANSWER, usage: USAGE });
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW);
 
     expect(savedStep().status).toBe('idle');
     expect(savedStep().messages.slice(2)).toEqual([
@@ -386,7 +421,7 @@ describe('the step: each answer of Claude (7.4)', () => {
     inConversation();
     claude.askStep.mockResolvedValue({ kind: 'text', content: [], text: '', usage: USAGE });
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW);
 
     expect(savedStep().messages).toHaveLength(2);
     expect(result).toMatchObject({ ok: true, reply: { status: 'idle', messages: [{ seq: 5, from: 'person' }] } });
@@ -396,7 +431,7 @@ describe('the step: each answer of Claude (7.4)', () => {
     inConversation();
     claude.askStep.mockResolvedValue({ kind: 'refusal', usage: USAGE });
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW);
 
     const sentence = "L'assistente non può rispondere a questa richiesta. Questa conversazione è terminata: il suo prossimo messaggio ne inizierà una nuova.";
     expect(savedStep().messages.slice(2)).toEqual([{ kind: 'notice', content: sentence }]);
@@ -426,7 +461,7 @@ describe('the step: each answer of Claude (7.4)', () => {
     inConversation();
     claude.askStep.mockResolvedValue(answer);
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW);
 
     expect(savedStep().status).toBe('working');
     expect(savedStep().messages).toEqual([
@@ -442,7 +477,7 @@ describe('the step: each answer of Claude (7.4)', () => {
     noConversation();
     claude.askStep.mockResolvedValue({ kind: 'unavailable', reason: 'timeout' });
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW);
 
     expect(db.startConversation.mock.calls[0]?.[3]).toMatchObject({ status: 'working', inputTokens: 300, outputTokens: 10 });
     expect(result.log).not.toHaveProperty('usage');
@@ -456,7 +491,7 @@ describe('the step: the one write (9)', () => {
     inConversation();
     db.saveStep.mockRejectedValue(new db.AssistantBusyError());
 
-    expect(await exchange.sendMessage(ALICE, TEXT, NOW)).toEqual({
+    expect(await exchange.sendMessage(ALICE, { text: TEXT }, NOW)).toEqual({
       ok: false,
       refusal: 'assistant_busy',
       log: { conversationId: ID, outcome: 'lost_the_race', model: 'claude-sonnet-5-5', effort: 'low', modelMs: 0 },
@@ -466,13 +501,13 @@ describe('the step: the one write (9)', () => {
   it('the same at the start of a conversation', async () => {
     noConversation();
     db.startConversation.mockRejectedValue(new db.AssistantBusyError());
-    expect(await exchange.sendMessage(ALICE, TEXT, NOW)).toMatchObject({ ok: false, refusal: 'assistant_busy', log: { conversationId: null } });
+    expect(await exchange.sendMessage(ALICE, { text: TEXT }, NOW)).toMatchObject({ ok: false, refusal: 'assistant_busy', log: { conversationId: null } });
   });
 
   it('any other failure of the table is thrown', async () => {
     inConversation();
     db.saveStep.mockRejectedValue(new Error('DynamoDB is down'));
-    await expect(exchange.sendMessage(ALICE, TEXT, NOW)).rejects.toThrow('DynamoDB is down');
+    await expect(exchange.sendMessage(ALICE, { text: TEXT }, NOW)).rejects.toThrow('DynamoDB is down');
   });
 });
 
@@ -540,7 +575,7 @@ describe('the step: Claude asks to read (5.1, 7.4, 8.1)', () => {
     const answer = asksFor(use('toolu_a', 'calendar'), use('toolu_b', 'appointments', { from: '2026-11-24' }));
     claude.askStep.mockResolvedValue(answer);
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, READS);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, READS);
 
     // Each handler once, calendar before appointments, with alice's identity and the request's id.
     expect(calendarHandler).toHaveBeenCalledTimes(1);
@@ -606,7 +641,7 @@ describe('the step: Claude asks to read (5.1, 7.4, 8.1)', () => {
     db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: markFor(WITH_ADMIN_ONLY, ADMIN) }), messages: STORED });
     claude.askStep.mockResolvedValue(asksFor(use('toolu_a', 'appointments', { from: 'trialbob' }), use('toolu_b', 'made_up_by_claude')));
 
-    const result = await exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST, WITH_ADMIN_ONLY);
+    const result = await exchange.sendMessage(ADMIN, { text: TEXT }, NOW, REQUEST, WITH_ADMIN_ONLY);
 
     const line = JSON.stringify(result.log);
     expect(line).toContain('"tools":[{"name":"appointments","status":200,"ms":0},{"name":null,"notRun":"unknown_tool"}]');
@@ -616,9 +651,9 @@ describe('the step: Claude asks to read (5.1, 7.4, 8.1)', () => {
 
   it('gives Claude the tools of the role only: a User is not told of a tool of the Administrator', async () => {
     noConversation();
-    await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, WITH_ADMIN_ONLY);
+    await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, WITH_ADMIN_ONLY);
     noConversation();
-    await exchange.sendMessage(ADMIN, TEXT, NOW, REQUEST, WITH_ADMIN_ONLY);
+    await exchange.sendMessage(ADMIN, { text: TEXT }, NOW, REQUEST, WITH_ADMIN_ONLY);
 
     const names = (call: number) => (claude.askStep.mock.calls[call]?.[0].tools as { name: string }[]).map((tool) => tool.name);
     expect(names(0)).toEqual(['calendar', 'appointments']);
@@ -638,7 +673,7 @@ describe('the step: Claude asks to read (5.1, 7.4, 8.1)', () => {
     db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: markFor(WITH_ADMIN_ONLY) }), messages: STORED });
     claude.askStep.mockResolvedValue(asksFor(block, use('toolu_ok', 'calendar')));
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, WITH_ADMIN_ONLY);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, WITH_ADMIN_ONLY);
 
     expect(everyoneHandler).not.toHaveBeenCalled();
     // The read asked for beside it is still run.
@@ -721,7 +756,7 @@ describe('the step: at most eight requests to Claude for one message (5.6)', () 
   it('counts from the last message of the person: the answers before it do not count', async () => {
     db.readConversation.mockResolvedValue({ version: 3, conversation: conversation({ promptVersion: markFor(READS) }), messages: waitingAfter(7).messages });
     claude.askStep.mockResolvedValue(asksFor(use('toolu_n', 'calendar')));
-    const result = await exchange.sendMessage(ALICE, 'And the week after?', NOW, REQUEST, READS);
+    const result = await exchange.sendMessage(ALICE, { text: 'And the week after?' }, NOW, REQUEST, READS);
     expect(result).toMatchObject({ ok: true, reply: { status: 'working' }, log: { steps: 1 } });
   });
 });
@@ -811,7 +846,7 @@ describe('the step: a conversation that fills up during an exchange (4.4)', () =
   it('the first step of a new conversation counts from nothing', async () => {
     noConversation();
     claude.askStep.mockResolvedValue(asksFor(use('toolu_n', 'calendar')));
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, REQUEST, READS);
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, REQUEST, READS);
     expect(result).toMatchObject({ ok: true, reply: { status: 'working' } });
   });
 
@@ -831,7 +866,7 @@ describe('sendMessage: a language question that took too long (5.6)', () => {
     noConversation();
     const remainingMs = vi.fn(() => ROOM - 1);
 
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, { requestId: 'req-9', remainingMs });
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, { requestId: 'req-9', remainingMs });
 
     expect(claude.askLanguage).toHaveBeenCalledTimes(1);
     expect(claude.askStep).not.toHaveBeenCalled();
@@ -842,7 +877,7 @@ describe('sendMessage: a language question that took too long (5.6)', () => {
       {
         messages: [
           { kind: 'model', content: { role: 'user', content: TEXT }, fromPerson: true },
-          { kind: 'model', content: { role: 'system', content: LINE_EN } },
+          { kind: 'model', content: { role: 'system', content: LINE_EN_FIRST } },
         ],
         status: 'working',
         proposal: null,
@@ -865,7 +900,7 @@ describe('sendMessage: a language question that took too long (5.6)', () => {
 
   it('with exactly the time a step may take, Claude is asked', async () => {
     noConversation();
-    const result = await exchange.sendMessage(ALICE, TEXT, NOW, { requestId: 'req-9', remainingMs: () => ROOM });
+    const result = await exchange.sendMessage(ALICE, { text: TEXT }, NOW, { requestId: 'req-9', remainingMs: () => ROOM });
     expect(claude.askStep).toHaveBeenCalledTimes(1);
     expect(result).toMatchObject({ ok: true, reply: { status: 'idle' }, log: { outcome: 'text' } });
   });
@@ -873,7 +908,7 @@ describe('sendMessage: a language question that took too long (5.6)', () => {
   it('a later message asked no language question: the time left is not looked at', async () => {
     inConversation();
     const remainingMs = vi.fn(() => 1);
-    await exchange.sendMessage(ALICE, TEXT, NOW, { requestId: 'req-9', remainingMs });
+    await exchange.sendMessage(ALICE, { text: TEXT }, NOW, { requestId: 'req-9', remainingMs });
     expect(remainingMs).not.toHaveBeenCalled();
     expect(claude.askStep).toHaveBeenCalledTimes(1);
   });
@@ -929,7 +964,7 @@ describe('continueExchange (POST /assistant/continue, 5.1, 6)', () => {
   it('does the step a slow language question left: the conversation holds the message only', async () => {
     const stored: StoredMessage[] = [
       { seq: 1, at: AT, kind: 'model', content: { role: 'user', content: TEXT } },
-      { seq: 2, at: AT, kind: 'model', content: { role: 'system', content: LINE_EN } },
+      { seq: 2, at: AT, kind: 'model', content: { role: 'system', content: LINE_EN_FIRST } },
     ];
     db.readConversation.mockResolvedValue({ version: 1, conversation: conversation({ language: 'en', status: 'working', nextSeq: 3 }), messages: stored });
 

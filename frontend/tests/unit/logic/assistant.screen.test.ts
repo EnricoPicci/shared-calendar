@@ -1,6 +1,5 @@
 import { ASSISTANT_TEXTS_EN, ASSISTANT_TEXTS_IT, type ApiErrorCode, type AssistantMessage, type AssistantProposal, type AssistantReply } from '@shared-calendar/shared';
 import { ReplaySubject } from 'rxjs';
-import { COULD_NOT_FINISH } from '../../../src/logic/assistant.model';
 import { AssistantScreen, type AssistantCalls, type AssistantState } from '../../../src/logic/assistant.screen';
 import { failureText } from '../../../src/logic/texts';
 import type {
@@ -13,6 +12,8 @@ import type {
   AssistantSendFailureReason,
 } from '../../../src/services/assistant.types';
 import { useFarBrowserZone } from './zone';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
+import { PAGE_TEXTS_IT } from '../../../src/texts/texts.it';
 
 // A fake AssistantService: one stream that replays its last outcome, as the real one does, and
 // six spies. No network, no DOM.
@@ -21,7 +22,7 @@ const START: AssistantState = { open: false, messages: [], progress: null, propo
 const CONVERSATION = '01ARZ3NDEKTSV4RRFFQ69G5FAW';
 const PROPOSAL_ID = '01ARZ3NDEKTSV4RRFFQ69G5FAV';
 const UNREACHABLE = 'The server cannot be reached. Check the connection and try again.';
-const BUSY = failureText('assistant_busy');
+const BUSY = failureText(PAGE_TEXTS_EN.failures, 'assistant_busy');
 
 const message = (seq: number, from: AssistantMessage['from'], text: string): AssistantMessage => ({ seq, from, text, at: '2026-11-22T09:00:00.000Z' });
 const proposal = (...outcomes: (null | 'done' | 'unknown')[]): AssistantProposal => ({
@@ -45,7 +46,7 @@ const NONE = reply({ conversationId: null, language: null, remainingToday: 10 })
 const working = (over: Partial<AssistantReply> = {}) => reply({ status: 'working', activity: 'Looking at the calendar…', ...over });
 const waiting = (over: Partial<AssistantReply> = {}) => reply({ status: 'awaiting_confirmation', proposal: proposal(null), ...over });
 
-function screenOf(role: 'admin' | 'user' = 'user') {
+function screenOf(role: 'admin' | 'user' = 'user', texts = PAGE_TEXTS_EN) {
   const outcome$ = new ReplaySubject<AssistantOutcome>(1);
   const service = {
     outcome$: outcome$.asObservable(),
@@ -56,7 +57,7 @@ function screenOf(role: 'admin' | 'user' = 'user') {
     confirm: vi.fn<AssistantCalls['confirm']>(),
     decline: vi.fn<AssistantCalls['decline']>(),
   };
-  const screen = new AssistantScreen(service, role);
+  const screen = new AssistantScreen(service, role, texts);
   const states: AssistantState[] = [];
   screen.assistant$.subscribe((s) => states.push(s)); // the view subscribes first
   let changes = 0;
@@ -193,7 +194,7 @@ describe('AssistantScreen', () => {
       screen.start();
       screen.open();
       failed.load(reason);
-      expect(last()).toEqual({ ...START, open: true, failure: failureText(reason) });
+      expect(last()).toEqual({ ...START, open: true, failure: failureText(PAGE_TEXTS_EN.failures, reason) });
       expect(JSON.stringify(last())).not.toContain('for a developer');
       screen.close();
       screen.open();
@@ -216,7 +217,7 @@ describe('AssistantScreen', () => {
       const { screen, service, opened, calls, last } = screenOf();
       opened();
       screen.send('  hello  ');
-      expect(service.send).toHaveBeenCalledWith('  hello  ');
+      expect(service.send).toHaveBeenCalledWith('  hello  ', 'en');
       expect(calls()).toEqual({ ...NO_CALLS, load: 1, send: 1 });
       expect(last()).toMatchObject({ canSend: false, canEnd: false, progress: '…', accepted: 0 });
     });
@@ -334,7 +335,7 @@ describe('AssistantScreen', () => {
       expect(last().failure).toBeNull();
       answered('continue', working());
       expect(calls().continue).toBe(8);
-      expect(last()).toMatchObject({ failure: COULD_NOT_FINISH, progress: null, canSend: true, canEnd: true });
+      expect(last()).toMatchObject({ failure: PAGE_TEXTS_EN.assistant.couldNotFinish, progress: null, canSend: true, canEnd: true });
     });
 
     it('the next message starts its count again', () => {
@@ -366,12 +367,12 @@ describe('AssistantScreen', () => {
       ['assistant_budget_reached', ASSISTANT_TEXTS_EN.cannotAnswer.assistant_budget_reached],
       ['assistant_unavailable', ASSISTANT_TEXTS_EN.cannotAnswer.assistant_unavailable],
       ['network', UNREACHABLE],
-      ['server', failureText('server')],
-      ['unexpected', failureText('unexpected')],
-      ['forbidden', failureText('forbidden')],
-      ['internal_error', failureText('internal_error')],
-      ['not_signed_in', failureText('not_signed_in')],
-      ['session_rejected', failureText('session_rejected')],
+      ['server', failureText(PAGE_TEXTS_EN.failures, 'server')],
+      ['unexpected', failureText(PAGE_TEXTS_EN.failures, 'unexpected')],
+      ['forbidden', failureText(PAGE_TEXTS_EN.failures, 'forbidden')],
+      ['internal_error', failureText(PAGE_TEXTS_EN.failures, 'internal_error')],
+      ['not_signed_in', failureText(PAGE_TEXTS_EN.failures, 'not_signed_in')],
+      ['session_rejected', failureText(PAGE_TEXTS_EN.failures, 'session_rejected')],
     ] as const)('a step that fails with %s stops the loop: the sentence, no further step and no read', (reason, sentence) => {
       const { screen, opened, answered, failed, calls, last } = screenOf();
       opened();
@@ -390,11 +391,11 @@ describe('AssistantScreen', () => {
       answered('send', working({ messages: [message(1, 'person', 'what is open?')] }));
       failed.continue(reason);
       expect(calls()).toEqual({ ...NO_CALLS, load: 2, send: 1, continue: 1 });
-      expect(last()).toMatchObject({ failure: failureText(reason), progress: 'Looking at the calendar…', canSend: false });
+      expect(last()).toMatchObject({ failure: failureText(PAGE_TEXTS_EN.failures, reason), progress: 'Looking at the calendar…', canSend: false });
       // Another tab got the answer meanwhile.
       answered('load', reply({ messages: [message(1, 'person', 'what is open?'), message(2, 'assistant', 'Tuesday is open.')] }));
       expect(texts(last())).toEqual(['what is open?', 'Tuesday is open.']);
-      expect(last()).toMatchObject({ failure: failureText(reason), progress: null, canSend: true });
+      expect(last()).toMatchObject({ failure: failureText(PAGE_TEXTS_EN.failures, reason), progress: null, canSend: true });
       expect(calls().continue).toBe(1);
     });
 
@@ -425,14 +426,14 @@ describe('AssistantScreen', () => {
   describe('a message the server does not take', () => {
     it.each([
       ['invalid_request', 'A message can be 2000 characters long at most, and cannot be empty.'],
-      ['invalid_json', failureText('invalid_json')],
-      ['forbidden', failureText('forbidden')],
-      ['internal_error', failureText('internal_error')],
+      ['invalid_json', failureText(PAGE_TEXTS_EN.failures, 'invalid_json')],
+      ['forbidden', failureText(PAGE_TEXTS_EN.failures, 'forbidden')],
+      ['internal_error', failureText(PAGE_TEXTS_EN.failures, 'internal_error')],
       ['network', UNREACHABLE],
-      ['server', failureText('server')],
-      ['unexpected', failureText('unexpected')],
-      ['not_signed_in', failureText('not_signed_in')],
-      ['session_rejected', failureText('session_rejected')],
+      ['server', failureText(PAGE_TEXTS_EN.failures, 'server')],
+      ['unexpected', failureText(PAGE_TEXTS_EN.failures, 'unexpected')],
+      ['not_signed_in', failureText(PAGE_TEXTS_EN.failures, 'not_signed_in')],
+      ['session_rejected', failureText(PAGE_TEXTS_EN.failures, 'session_rejected')],
     ] as const)('%s: its sentence, the field not emptied, no step and no read, and "Send" in use again', (reason, sentence) => {
       const { screen, opened, failed, calls, last } = screenOf();
       opened();
@@ -523,6 +524,27 @@ describe('AssistantScreen', () => {
       screen.send('ancora');
       failed.send('assistant_limit_reached');
       expect(last().failure).toBe(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_limit_reached);
+    });
+
+    it('before a conversation, the three sentences of shared/ are said in the page\'s language, and the page\'s language goes with the message', () => {
+      const { screen, service, opened, answered, failed, last } = screenOf('user', PAGE_TEXTS_IT);
+      opened();
+      screen.send('Guten Tag');
+      expect(service.send).toHaveBeenCalledWith('Guten Tag', 'it');
+      failed.send('assistant_unavailable');
+      expect(last().failure).toBe(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_unavailable);
+      answered('load', NONE);
+      screen.send('Guten Tag');
+      failed.send('assistant_limit_reached');
+      expect(last().failure).toBe(ASSISTANT_TEXTS_IT.cannotAnswer.assistant_limit_reached);
+    });
+
+    it('a conversation in English on an Italian page: its sentences in English', () => {
+      const { screen, opened, failed, last } = screenOf('user', PAGE_TEXTS_IT);
+      opened(reply({ language: 'en', messages: [message(1, 'person', 'hello')] }));
+      screen.send('again');
+      failed.send('assistant_budget_reached');
+      expect(last().failure).toBe(ASSISTANT_TEXTS_EN.cannotAnswer.assistant_budget_reached);
     });
 
     it('the daily limit: its sentence, and "Send" out of use from then on; reading, confirming and declining still work', () => {
@@ -694,7 +716,7 @@ describe('AssistantScreen', () => {
       failed[call]('proposal_not_found');
       expect(calls().load).toBe(2);
       answered('load', reply({ messages: [message(1, 'person', 'book it'), message(2, 'notice', 'Nothing was changed.')] }));
-      expect(last()).toMatchObject({ failure: failureText('proposal_not_found'), proposal: null, canSend: true });
+      expect(last()).toMatchObject({ failure: failureText(PAGE_TEXTS_EN.failures, 'proposal_not_found'), proposal: null, canSend: true });
       expect(texts(last())).toEqual(['book it', 'Nothing was changed.']);
     });
 
@@ -707,7 +729,7 @@ describe('AssistantScreen', () => {
         opened(waiting());
         screen[call]();
         failed[call](reason);
-        expect(last(), reason).toMatchObject({ failure: failureText(reason), canSend: true });
+        expect(last(), reason).toMatchObject({ failure: failureText(PAGE_TEXTS_EN.failures, reason), canSend: true });
         expect(last().proposal!.buttons, reason).toBe('offered');
         expect([calls().load, changes()], reason).toEqual([1, 0]);
       }
@@ -780,7 +802,7 @@ describe('AssistantScreen', () => {
       opened(reply({ messages: [message(1, 'person', 'hi')] }));
       screen.end();
       failed.end(reason);
-      expect(last()).toMatchObject({ failure: failureText(reason), canSend: true, canEnd: true });
+      expect(last()).toMatchObject({ failure: failureText(PAGE_TEXTS_EN.failures, reason), canSend: true, canEnd: true });
       expect(texts(last())).toEqual(['hi']);
     });
   });

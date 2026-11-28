@@ -5,6 +5,7 @@ import type { ListState } from '../../../src/logic/appointments.screen';
 import type { CancelState, UpdateNoteState } from '../../../src/services/appointments.types';
 import { mountAppointments, type AppointmentsDeps } from '../../../src/views/appointments.view';
 import { find, submit, useRealPage } from './page';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // The DOM test of the view of "My appointments" (docs/FRONTEND_ARCHITECTURE.md section 8): the
 // real index.html, and a fake AppointmentsScreen and a fake AppointmentsService whose streams
@@ -74,7 +75,7 @@ function mounted(first: ListState = state(), details: AppointmentDetail[] = [DET
   };
   const showWeek = vi.fn<AppointmentsDeps['showWeek']>(() => void order.push('showWeek'));
   const root = find('#appointments');
-  const subscription = mountAppointments(root, { screen, appointments, showWeek });
+  const subscription = mountAppointments(root, { screen, appointments, showWeek, texts: PAGE_TEXTS_EN });
   return { list$, cancelState$, updateNoteState$, screen, appointments, showWeek, order, root, subscription };
 }
 

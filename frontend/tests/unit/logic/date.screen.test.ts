@@ -1,7 +1,7 @@
 import { OneOffWindowBody, OverrideBody, toInstant, type AppointmentConflict, type AvailabilityType, type CalendarDay, type CalendarWindow, type WeeklyPattern } from '@shared-calendar/shared';
 import { BehaviorSubject, ReplaySubject, Subject } from 'rxjs';
 import type { Ask, Known } from '../../../src/logic/availability.screen';
-import { DATE_NEEDED, DRAFT_FULL, DRAFT_OPEN, NOT_AVAILABLE, OVERLAPS_DRAFT, OWN_WINDOWS, PAST_DATE, PATTERNS_APPLY, STARTING_WINDOW, ZONE_PENDING, type WindowFields } from '../../../src/logic/date.model';
+import { STARTING_WINDOW, type WindowFields } from '../../../src/logic/date.model';
 import { DateScreen, type DateRules, type DateState } from '../../../src/logic/date.screen';
 import type {
   CreatePatternResult,
@@ -16,6 +16,8 @@ import type { CreateTypeResult, RemoveTypeResult, RenameTypeResult } from '../..
 import type { CalendarResult } from '../../../src/services/calendar.types';
 import { POOL, STUDIO, view } from './fixtures';
 import { useFarBrowserZone } from './zone';
+import { DATE_NEEDED, DRAFT_FULL, DRAFT_OPEN, NOT_AVAILABLE, OVERLAPS_DRAFT, OWN_WINDOWS, PAST_DATE, PATTERNS_APPLY, ZONE_PENDING } from './availability.words';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // Fake services: result streams that replay their last value, as the real ones do, and spies;
 // what the AvailabilityScreen knows is a subject the test controls. No network, no DOM. "Now"
@@ -101,7 +103,7 @@ function screenOf(known: Known = KNOWN, now: Date = NOW) {
     updatePatternResult$: results.updatePattern.asObservable(),
     deletePatternResult$: results.deletePattern.asObservable(),
   };
-  const screen = new DateScreen(known$, calendar, types, rules, () => now, visible$);
+  const screen = new DateScreen(known$, calendar, types, rules, () => now, visible$, PAGE_TEXTS_EN);
   const states: DateState[] = [];
   screen.date$.subscribe((s) => states.push(s)); // the view subscribes first
   const last = () => states.at(-1)!;

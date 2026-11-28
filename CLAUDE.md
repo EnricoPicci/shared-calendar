@@ -32,6 +32,7 @@ part you touch.
   evaluation. Where it is merged into the architecture, the architecture wins as usual.
 - `docs/EMAIL_ARCHITECTURE.md`: e-mail and the four facts of a person, built step by step in
   `docs/EMAIL_PLAN.md`; each step merges what it built into the documents above.
+- `docs/MULTILANGUAGE_ARCHITECTURE.md`: the languages, merged into the documents above, which win.
 - `prompts/`: the numbered briefs behind the documents and the code. Number new ones in sequence.
 
 Not sources of truth; when one disagrees with the documents above or with the tests, it is the
@@ -67,10 +68,10 @@ one that is fixed:
   conversation with the assistant (a message, an answer, a tool's input or result).
 - The assistant changes the calendar, or sends a mail, only through `confirmProposal`, after the
   person's button, and reaches it through a route's handler, never through `backend/src/lib/calendarDb.ts`.
-- IAM policies never use a wildcard action or resource. One role per function, granting only
-  what its route needs, scoped to the user pool and/or table it uses. The calendar's DynamoDB
-  permissions are shared managed policies on the `calendar` table, attached per role
-  (`docs/ARCHITECTURE.md` section 7.1).
+- IAM policies never use a wildcard action or resource, but the mailer's `identity/*` while SES
+  keeps the account in its sandbox (`docs/EMAIL_PLAN.md` step m10). One role per function, with
+  only what its route needs, on its user pool and/or table. The calendar's DynamoDB permissions
+  are shared managed policies on the `calendar` table, attached per role (`docs/ARCHITECTURE.md` section 7.1).
 - A User's first password is temporary: Cognito makes it, e-mails it and forces its change at
   the first sign-in; the API never sees or answers it. The Administrator's is set once as
   permanent by `bootstrap-admin`. One exception: `test-user`, the operator's command, gives its
@@ -78,6 +79,8 @@ one that is fixed:
 - The API can never create an administrator, delete one, or set its password.
 - A password is changed only by its owner, at Cognito; the API has no route that changes one.
 - Role resolution: `admin` wins over `user`; a token in neither group gets 403.
+- A text a person reads lives in the texts of its part, in every language, and nowhere else:
+  `frontend/src/texts/`, `shared/src/mail/texts.*.ts`, `shared/src/assistant/texts.*.ts`.
 
 ## Cloud safety
 
@@ -169,12 +172,8 @@ What goes wrong most often:
 
 ## Folder map
 
-The annotated tree and where a new file goes: `docs/FOLDER_STRUCTURE.md` sections 2 and 3.
-
-- Root: the workspaces' `package.json`, the one `package-lock.json`, `tsconfig.base.json`,
-  `eslint.config.js`, `docs/`, `prompts/`, `scripts/` (the comment check), `.claude/`.
-- `backend/` (the API), `frontend/` (the page), `shared/` (the code both import): each
-  package's own `CLAUDE.md` has its folder map.
+The annotated tree, the root's files included, and where a new file goes: `docs/FOLDER_STRUCTURE.md`
+sections 2 and 3. Each package's own `CLAUDE.md` (`backend/`, `frontend/`, `shared/`) has its map.
 
 ## Changing these files
 

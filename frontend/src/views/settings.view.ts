@@ -1,9 +1,9 @@
 import type { Subscription } from 'rxjs';
-import type { DailyFields } from '../logic/daily-mail.model';
+import { dailyRange, type DailyFields } from '../logic/daily-mail.model';
 import type { DailyMailScreen } from '../logic/daily-mail.screen';
 import { SETTING_FIELDS, settingRange, type SettingsFields } from '../logic/settings.model';
 import type { SettingsScreen } from '../logic/settings.screen';
-import { DAILY_MAIL_TEXTS } from '../logic/texts';
+import type { PageTexts } from '../texts/texts';
 
 // What the view uses of the SettingsScreen: its stream, the save, the notice of an edit and
 // the new try after a read that failed.
@@ -12,7 +12,8 @@ export type SettingsDeps = Pick<SettingsScreen, 'settings$' | 'save' | 'edited' 
 // The settings view (docs/FRONTEND_ARCHITECTURE.md sections 3 and 4): wires the element
 // #settings of index.html, one fixed form. It fills the fields with what the logic layer hands
 // over, sends them back as text at "Save", and shows under each field why it was refused.
-export function mountSettings(root: HTMLElement, screen: SettingsDeps): Subscription {
+// `texts` are the page texts of the language in use, for the range under each field.
+export function mountSettings(root: HTMLElement, screen: SettingsDeps, texts: PageTexts): Subscription {
   // 1. Find the elements, once. A field of the form is its input with, in the same .field, the
   // words of its range and its refusal.
   const find = <T extends HTMLElement = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
@@ -36,7 +37,7 @@ export function mountSettings(root: HTMLElement, screen: SettingsDeps): Subscrip
   // The range of each field, in words and as the native field's own limits: a convenience (the
   // arrows of the field stop there). The check that counts is the logic layer's, at "Save".
   for (const { name, input, range } of fields) {
-    const { min, max, words } = settingRange(name);
+    const { min, max, words } = settingRange(texts.settings, name);
     range.textContent = words;
     input.min = String(min);
     input.max = String(max);
@@ -121,7 +122,8 @@ export type DailyMailDeps = Pick<DailyMailScreen, 'daily$' | 'save' | 'edited' |
 // view so that a failure of one hides nothing of the other. It fills the switch and the hour with
 // what the logic layer hands over, sends them back at "Save daily e-mail", says under the hour why
 // it was refused, and says "E-mail is not available yet" in place of the form when that is so.
-export function mountDailyMail(root: HTMLElement, screen: DailyMailDeps): Subscription {
+// `texts` are the page texts of the language in use, for the range under the hour.
+export function mountDailyMail(root: HTMLElement, screen: DailyMailDeps, texts: PageTexts): Subscription {
   // 1. Find the elements, once, inside the part only: the settings form above has elements of the
   // same classes.
   const part = root.querySelector<HTMLElement>('.daily-mail')!;
@@ -168,7 +170,7 @@ export function mountDailyMail(root: HTMLElement, screen: DailyMailDeps): Subscr
       enabled.checked = filled?.dailyEnabled ?? false;
       hour.value = filled?.dailyHour ?? '';
     }
-    range.textContent = DAILY_MAIL_TEXTS.range(state.timeZone);
+    range.textContent = dailyRange(texts.settings, state.timeZone);
     refusal.textContent = state.refusal ?? '';
     if (state.refusal === null) hour.removeAttribute('aria-invalid');
     else hour.setAttribute('aria-invalid', 'true');

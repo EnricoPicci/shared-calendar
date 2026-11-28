@@ -115,7 +115,7 @@ describe('getProfile', () => {
     cognito
       .on(AdminGetUserCommand, { UserPoolId: POOL, Username: 'bob' })
       .resolves({ Username: 'bob', UserCreateDate: created, UserStatus: 'CONFIRMED', UserAttributes: [{ Name: 'sub', Value: 's-1' }, ...factAttributes()] });
-    expect(await getProfile('bob')).toEqual({ username: 'bob', createdAt: '2026-11-25T09:00:00.000Z', status: 'active', ...FACTS });
+    expect(await getProfile('bob')).toEqual({ username: 'bob', createdAt: '2026-11-25T09:00:00.000Z', status: 'active', language: null, ...FACTS });
   });
 
   it('answers invited for an account that must change its first password', async () => {
@@ -129,6 +129,7 @@ describe('getProfile', () => {
       username: 'admin',
       createdAt: '2026-11-25T09:00:00.000Z',
       status: 'active',
+      language: null,
       givenName: 'Anna',
       familyName: null,
       email: null,
@@ -139,6 +140,16 @@ describe('getProfile', () => {
   it('answers null for every fact when the answer has no attributes', async () => {
     cognito.on(AdminGetUserCommand).resolves({ UserCreateDate: created });
     expect(await getProfile('admin')).toMatchObject({ givenName: null, familyName: null, email: null, address: null });
+  });
+
+  // The language for the mailer (docs/MULTILANGUAGE_ARCHITECTURE.md section 4.1).
+  it.each([
+    ['a language of the calendar', 'it', 'it'],
+    ['a word that is not one', 'fr', null],
+    ['an empty value', '', null],
+  ])('answers the language of `locale`: %s', async (_case, value, language) => {
+    cognito.on(AdminGetUserCommand).resolves({ UserCreateDate: created, UserAttributes: [...factAttributes(), { Name: 'locale', Value: value }] });
+    expect((await getProfile('bob')).language).toBe(language);
   });
 
   it('fails as an ordinary error when the answer has no creation date', async () => {
@@ -153,10 +164,11 @@ describe('getProfile', () => {
 });
 
 describe('asUserSummary and asMe', () => {
-  const account = { username: 'bob', createdAt: '2026-11-25T09:00:00.000Z', status: 'active' as const, ...FACTS };
+  const summary = { username: 'bob', createdAt: '2026-11-25T09:00:00.000Z', status: 'active' as const, ...FACTS };
+  const account = { ...summary, language: 'it' as const };
 
-  it('makes a User of GET /users from a stored account', () => {
-    expect(asUserSummary(account)).toEqual(account);
+  it('makes a User of GET /users from a stored account, without its language', () => {
+    expect(asUserSummary(account)).toEqual(summary);
   });
 
   it('refuses an account without every fact, naming the missing ones and no value', () => {
@@ -481,19 +493,23 @@ describe('namesBySub', () => {
 });
 
 describe('adminRecipients', () => {
-  const admin = (username: string | undefined, email: string | null) => ({
+  const admin = (username: string | undefined, email: string | null, locale?: string) => ({
     Username: username,
-    Attributes: [{ Name: 'sub', Value: `sub-${String(username)}` }, ...(email === null ? [] : [{ Name: 'email', Value: email }])],
+    Attributes: [
+      { Name: 'sub', Value: `sub-${String(username)}` },
+      ...(email === null ? [] : [{ Name: 'email', Value: email }]),
+      ...(locale === undefined ? [] : [{ Name: 'locale', Value: locale }]),
+    ],
   });
 
-  it('answers every member of group admin by username, following NextToken, with the e-mail or null', async () => {
-    cognito.on(ListUsersInGroupCommand, { UserPoolId: POOL, GroupName: 'admin', NextToken: undefined }).resolves({ Users: [admin('zeta', 'z@example.com')], NextToken: 'n2' });
-    cognito.on(ListUsersInGroupCommand, { UserPoolId: POOL, GroupName: 'admin', NextToken: 'n2' }).resolves({ Users: [admin('admin', null), admin('boss', 'b@example.com')] });
+  it('answers every member of group admin by username, following NextToken, with the e-mail or null and the language or null', async () => {
+    cognito.on(ListUsersInGroupCommand, { UserPoolId: POOL, GroupName: 'admin', NextToken: undefined }).resolves({ Users: [admin('zeta', 'z@example.com', 'it')], NextToken: 'n2' });
+    cognito.on(ListUsersInGroupCommand, { UserPoolId: POOL, GroupName: 'admin', NextToken: 'n2' }).resolves({ Users: [admin('admin', null), admin('boss', 'b@example.com', 'de')] });
 
     await expect(adminRecipients()).resolves.toEqual([
-      { username: 'admin', email: null },
-      { username: 'boss', email: 'b@example.com' },
-      { username: 'zeta', email: 'z@example.com' },
+      { username: 'admin', email: null, language: null },
+      { username: 'boss', email: 'b@example.com', language: null },
+      { username: 'zeta', email: 'z@example.com', language: 'it' },
     ]);
   });
 

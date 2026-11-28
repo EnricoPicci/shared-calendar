@@ -3,19 +3,18 @@ import { BehaviorSubject, Subscription, type Observable } from 'rxjs';
 import type { AvailabilityRulesService } from '../services/availability-rules.service';
 import type { AvailabilityTypesService } from '../services/availability-types.service';
 import type { CalendarService } from '../services/calendar.service';
+import type { PageTexts } from '../texts/texts';
 import { typeChoices, type Choice } from './availability.model';
 import { kept, QUIET, type Ask, type Known } from './availability.screen';
 import { conflictList } from './conflicts';
 import {
   dateFor,
   dayModel,
-  DRAFT_OPEN,
   draftAdd,
   draftModel,
   STARTING_WINDOW,
   startingWindows,
   windowFor,
-  ZONE_PENDING,
   type DayModel,
   type DraftModel,
   type WindowField,
@@ -134,6 +133,9 @@ export class DateScreen {
     private readonly rules: DateRules,
     private readonly now: () => Date,
     private readonly visible$: Observable<unknown>,
+    // The page texts of the language in use, kept for the screen's life
+    // (docs/MULTILANGUAGE_PLAN.md decision D2).
+    private readonly texts: PageTexts,
   ) {}
 
   // Called once the view has subscribed (docs/FRONTEND_ARCHITECTURE.md section 5, rule 5).
@@ -176,7 +178,7 @@ export class DateScreen {
       const day = result.status === 'success' ? result.calendar.days.find((each) => each.date === this.shown) : undefined;
       this.read = day === undefined || result.status !== 'success' ? null : { day, zone: result.calendar.timeZone };
       // A view without the date asked for is not what the contract says.
-      this.draw({ loading: false, unread: result.status === 'failure' ? failureText(result.reason) : day === undefined ? failureText('unexpected') : null });
+      this.draw({ loading: false, unread: result.status === 'failure' ? failureText(this.texts.failures, result.reason) : day === undefined ? failureText(this.texts.failures, 'unexpected') : null });
     });
 
     // A save and "not available" are one call: the answer is of the one under way.
@@ -231,9 +233,9 @@ export class DateScreen {
   // again is read again; another one takes the day on show off the screen.
   show(text: string): void {
     if (!this.started) return;
-    if (this.draft !== null) return this.refuse('draft', DRAFT_OPEN);
-    if (this.known.zone === null) return this.refuse('zone', this.known.zoneWhy ?? ZONE_PENDING);
-    const checked = dateFor(text, this.today(this.known.zone));
+    if (this.draft !== null) return this.refuse('draft', this.texts.date.draftOpen);
+    if (this.known.zone === null) return this.refuse('zone', this.known.zoneWhy ?? this.texts.date.zonePending);
+    const checked = dateFor(this.texts, text, this.today(this.known.zone));
     if ('refusal' in checked) return this.refuse('date', checked.refusal);
     if (checked.date !== this.shown) this.read = null;
     this.shown = checked.date;
@@ -260,7 +262,7 @@ export class DateScreen {
   // are left as they were sent.
   add(fields: WindowFields): void {
     if (this.draft === null || this.overriding === 'save') return;
-    const added = draftAdd(this.draft, fields);
+    const added = draftAdd(this.texts, this.draft, fields);
     if ('windows' in added) {
       this.draft = added.windows;
       this.draw({ add: QUIET, addFields: { ...STARTING_WINDOW } });
@@ -294,7 +296,7 @@ export class DateScreen {
   // show, or which fields are in fault. While one is being added another is not taken.
   addWindow(fields: WindowFields): void {
     if (!this.started || this.shown === null || this.state.getValue().window.busy) return;
-    const checked = windowFor(this.shown, fields);
+    const checked = windowFor(this.texts, this.shown, fields);
     if ('refusals' in checked) return this.draw({ window: { ...QUIET, refusals: checked.refusals } });
     this.draw({ window: { ...QUIET, busy: true } });
     this.rules.createWindow(checked.window);
@@ -339,7 +341,7 @@ export class DateScreen {
   // A write that failed: why, in plain words, with the appointments in the way when the
   // server named some, in the time zone the date was judged in.
   private failed(about: string, result: Outcome & { status: 'failure' }, attempt?: Attempt): Ask<never> {
-    return { ...QUIET, about, failure: failureText(result.reason, attempt), conflicts: conflictList(result.conflicts, this.zone!) };
+    return { ...QUIET, about, failure: failureText(this.texts.failures, result.reason, attempt), conflicts: conflictList(this.texts, result.conflicts, this.zone!) };
   }
 
   private today(zone: string): string {
@@ -368,14 +370,14 @@ export class DateScreen {
   // view redraws nothing and the keyboard stays where it is.
   private draw(change: Partial<DateState> = {}): void {
     const shown = this.state.getValue();
-    const day = this.read === null ? null : kept(shown.day, dayModel(this.shown!, this.known.patterns, this.known.types, this.read.day, this.read.zone));
+    const day = this.read === null ? null : kept(shown.day, dayModel(this.texts, this.shown!, this.known.patterns, this.known.types, this.read.day, this.read.zone));
     const editing = this.draft !== null;
     this.state.next({
       ...shown,
       day,
       offers: { change: day !== null && !editing, back: day !== null && day.hasOverride && !editing },
       choices: kept(shown.choices, typeChoices(this.known.types ?? [])),
-      draft: this.draft === null ? null : kept(shown.draft, draftModel(this.draft, this.known.types)),
+      draft: this.draft === null ? null : kept(shown.draft, draftModel(this.texts, this.draft, this.known.types)),
       ...change,
     });
   }

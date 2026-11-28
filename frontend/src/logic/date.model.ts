@@ -5,45 +5,33 @@ import {
   localDateOf,
   localTimeOf,
   overlaps,
-  weekdayOf,
   type AvailabilityType,
   type CalendarDay,
   type OneOffWindowBody,
   type WeeklyPattern,
   type WindowBody,
 } from '@shared-calendar/shared';
-import { endRefusal, TYPE_NOT_CHOSEN, UNKNOWN_TYPE, WEEKDAY_CHOICES } from './availability.model';
-import { longDateText } from './texts';
+import type { PageTexts } from '../texts/texts';
+import { endRefusal } from './availability.model';
 
 // A single date of the availability screen (docs/FRONTEND_ARCHITECTURE.md section 5.1): the
 // check of the date chosen, the day as the weekly patterns give it and as it is now, the
 // windows of "this day only" while they are being put together, an extra window's body, and
-// the words of the three questions. Pure. A date override and a one-off window
+// the words of the three questions. Pure: the words are the page texts', handed in first. A date override and a one-off window
 // (docs/SHARED_CALENDAR_SPEC.md sections 6.3 and 6.4) are called here, as on the page, a day's
 // own windows and an extra window.
 
 // ── The date ────────────────────────────────────────────────────────────────────────────────
 
-// Why "Show" was refused, under the date field.
-export const DATE_NEEDED = 'Choose a date.';
-export const PAST_DATE = 'A date before today cannot be changed. The week shows what a past day had.';
-// While the settings, which name the calendar's time zone, are still being read: without the
-// zone "today" is not known, and no date can be judged.
-export const ZONE_PENDING = 'The calendar is still being read. Try again in a moment.';
-// While the windows of "this day only" are being put together.
-export const DRAFT_OPEN = 'Save or discard the changes to this day first.';
-
-// From what the date field holds to the date to show, or to why not. A date before `today`,
-// the calendar's own, cannot be changed (docs/SHARED_CALENDAR_SPEC.md R-AV-02) and is not
-// read; today itself is accepted. Two dates written alike: the earlier one is the smaller text.
-export function dateFor(text: string, today: string): { date: string } | { refusal: string } {
-  if (!LocalDate.safeParse(text).success) return { refusal: DATE_NEEDED };
-  return text < today ? { refusal: PAST_DATE } : { date: text };
-}
-
-// A date with its weekday and its year: "Monday 23 November 2026".
-export function dateWords(date: string): string {
-  return `${WEEKDAY_CHOICES[weekdayOf(date) - 1]!.label} ${longDateText(date)}`;
+// From what the date field holds to the date to show, or to why not, said under the field. A
+// date before `today`, the calendar's own, cannot be changed (docs/SHARED_CALENDAR_SPEC.md
+// R-AV-02) and is not read; today itself is accepted. Two dates written alike: the earlier one
+// is the smaller text. Two other refusals are the screen's: while the calendar's time zone is
+// still being read ("today" is not known), and while the windows of "this day only" are being put
+// together.
+export function dateFor(texts: PageTexts, text: string, today: string): { date: string } | { refusal: string } {
+  if (!LocalDate.safeParse(text).success) return { refusal: texts.date.dateNeeded };
+  return text < today ? { refusal: texts.date.pastDate } : { date: text };
 }
 
 // ── The day ─────────────────────────────────────────────────────────────────────────────────
@@ -75,13 +63,6 @@ export type DayModel = {
   reopenQuestion: string;
 };
 
-export const NO_PATTERN_HOURS = 'The weekly patterns give no hours on this day.';
-export const PATTERNS_NOT_KNOWN = 'The weekly patterns could not be read.';
-export const PATTERNS_APPLY = 'The weekly patterns apply on this day.';
-export const OWN_WINDOWS = 'This day has its own windows, in the place of the weekly patterns.';
-export const NOT_AVAILABLE = 'This day is not available: the weekly patterns do not apply.';
-export const NO_EXTRAS = 'This day has no extra windows.';
-
 const hours = (window: { start: string; end: string }) => `${window.start} – ${window.end}`;
 
 // A window of the calendar view, whose times are instants, as local times of its date in the
@@ -99,28 +80,41 @@ function localWindow(date: string, window: { start: string; end: string }, zone:
 //   say where they come from (docs/SHARED_CALENDAR_SPEC.md section 11.6), in `zone`. A window
 //   with no `source` (a User's view, which cannot arrive here) is in neither list, and a day
 //   with no `hasOverride` has none.
-export function dayModel(date: string, patterns: readonly WeeklyPattern[] | null, types: readonly AvailabilityType[] | null, day: CalendarDay, zone: string): DayModel {
+export function dayModel(
+  texts: PageTexts,
+  date: string,
+  patterns: readonly WeeklyPattern[] | null,
+  types: readonly AvailabilityType[] | null,
+  day: CalendarDay,
+  zone: string,
+): DayModel {
+  const said = texts.date;
+  const unknown = texts.availability.unknownType;
   const names = new Map((types ?? []).map((type) => [type.typeId, type.name]));
-  const words = dateWords(date);
-  const given = definedWindows(date, patterns ?? [], null, []).map((window) => ({ time: hours(window), typeName: names.get(window.typeId) ?? UNKNOWN_TYPE }));
+  // The date with its weekday and its year: "Monday 23 November 2026".
+  const words = texts.dates.fullDate(date);
+  const given = definedWindows(date, patterns ?? [], null, []).map((window) => ({ time: hours(window), typeName: names.get(window.typeId) ?? unknown }));
   const from = (source: string) => day.windows.filter((window) => window.source === source).map((window) => ({ ...window, time: hours(localWindow(date, window, zone)) }));
   const hasOverride = day.hasOverride === true;
   const own = from('override').map(({ time, typeName }) => ({ time, typeName }));
-  const extras = from('one_off').map(({ time, typeName, sourceId }) => {
-    const what = `the extra window ${time} ${typeName}`;
-    return { windowId: sourceId ?? '', time, typeName, deleteLabel: `Delete ${what}`, question: `Delete ${what} of ${words}? Its hours will no longer be open for booking. This cannot be undone.` };
-  });
+  const extras = from('one_off').map(({ time, typeName, sourceId }) => ({
+    windowId: sourceId ?? '',
+    time,
+    typeName,
+    deleteLabel: said.deleteExtraLabel(time, typeName),
+    question: said.deleteExtraQuestion(time, typeName, words),
+  }));
   return {
     date: words,
     patterns: given,
-    patternsNone: patterns === null ? PATTERNS_NOT_KNOWN : given.length === 0 ? NO_PATTERN_HOURS : null,
-    which: !hasOverride ? PATTERNS_APPLY : own.length > 0 ? OWN_WINDOWS : NOT_AVAILABLE,
+    patternsNone: patterns === null ? said.patternsNotKnown : given.length === 0 ? said.noPatternHours : null,
+    which: !hasOverride ? said.patternsApply : own.length > 0 ? said.ownWindows : said.notAvailable,
     own,
     extras,
-    extrasNone: extras.length === 0 ? NO_EXTRAS : null,
+    extrasNone: extras.length === 0 ? said.noExtras : null,
     hasOverride,
-    closeQuestion: `Make ${words} not available? No hours of the weekly patterns, and none of its own, will be open for booking on this day. Its extra windows stay.`,
-    reopenQuestion: `Back to the weekly patterns for ${words}? What was set for this day only will be removed. Its extra windows stay.`,
+    closeQuestion: said.closeQuestion(words),
+    reopenQuestion: said.reopenQuestion(words),
   };
 }
 
@@ -154,30 +148,27 @@ export function startingWindows(date: string, day: CalendarDay, zone: string): W
 // button for a screen reader. `empty` is the sentence of a list with no row.
 export type DraftRow = WindowRow & { removeLabel: string };
 export type DraftModel = { rows: DraftRow[]; empty: string | null };
-export const DRAFT_EMPTY = 'No window is left: saved like this, the day is not available.';
 
-export function draftModel(windows: readonly WindowBody[], types: readonly AvailabilityType[] | null): DraftModel {
+export function draftModel(texts: PageTexts, windows: readonly WindowBody[], types: readonly AvailabilityType[] | null): DraftModel {
   const names = new Map((types ?? []).map((type) => [type.typeId, type.name]));
   const rows = windows.map((window) => {
-    const row = { time: hours(window), typeName: names.get(window.typeId) ?? UNKNOWN_TYPE };
-    return { ...row, removeLabel: `Remove ${row.time} ${row.typeName}` };
+    const row = { time: hours(window), typeName: names.get(window.typeId) ?? texts.availability.unknownType };
+    return { ...row, removeLabel: texts.date.removeLabel(row.time, row.typeName) };
   });
-  return { rows, empty: rows.length === 0 ? DRAFT_EMPTY : null };
+  return { rows, empty: rows.length === 0 ? texts.date.draftEmpty : null };
 }
 
-export const OVERLAPS_DRAFT = 'Start and End overlap another window of this day. Choose other hours.';
 // A field in fault that has no sentence of its own: another field's sentence names it. The
 // form marks it and writes nothing under it.
 export const IN_FAULT_TOO = '';
-export const DRAFT_FULL = `A day can have ${CALENDAR_LIMITS.overrideWindowsPerDate} windows of its own at most. Remove one to add another.`;
 
 // The refusals of the three fields by themselves: the end not after the start, or not a whole
 // number of hours after it (endRefusal of src/logic/availability.model.ts), and no type.
-function fieldRefusals(fields: WindowFields): Partial<Record<WindowField, string>> {
+function fieldRefusals(texts: PageTexts, fields: WindowFields): Partial<Record<WindowField, string>> {
   const refusals: Partial<Record<WindowField, string>> = {};
-  const end = endRefusal(fields.start, fields.end);
+  const end = endRefusal(texts, fields.start, fields.end);
   if (end !== undefined) refusals.end = end;
-  if (fields.typeId === '') refusals.typeId = TYPE_NOT_CHOSEN;
+  if (fields.typeId === '') refusals.typeId = texts.availability.typeNotChosen;
   return refusals;
 }
 
@@ -188,11 +179,11 @@ function fieldRefusals(fields: WindowFields): Partial<Record<WindowField, string
 // sentence, which names both, is said once, under "Start". Windows that touch do not overlap,
 // whatever their types (docs/SHARED_CALENDAR_SPEC.md R-AV-01, through `overlaps` of shared/). The
 // extra windows of the day are the server's to compare, at the save.
-export function draftAdd(windows: readonly WindowBody[], fields: WindowFields): { windows: WindowBody[] } | { refusals: Partial<Record<WindowField, string>> } | { failure: string } {
-  const refusals = fieldRefusals(fields);
+export function draftAdd(texts: PageTexts, windows: readonly WindowBody[], fields: WindowFields): { windows: WindowBody[] } | { refusals: Partial<Record<WindowField, string>> } | { failure: string } {
+  const refusals = fieldRefusals(texts, fields);
   if (Object.keys(refusals).length > 0) return { refusals };
-  if (windows.length >= CALENDAR_LIMITS.overrideWindowsPerDate) return { failure: DRAFT_FULL };
-  if (windows.some((window) => overlaps(window, fields))) return { refusals: { start: OVERLAPS_DRAFT, end: IN_FAULT_TOO } };
+  if (windows.length >= CALENDAR_LIMITS.overrideWindowsPerDate) return { failure: texts.date.draftFull(CALENDAR_LIMITS.overrideWindowsPerDate) };
+  if (windows.some((window) => overlaps(window, fields))) return { refusals: { start: texts.date.overlapsDraft, end: IN_FAULT_TOO } };
   return { windows: [...windows, { start: fields.start, end: fields.end, typeId: fields.typeId }].sort(byStart) };
 }
 
@@ -201,8 +192,8 @@ export function draftAdd(windows: readonly WindowBody[], fields: WindowFields): 
 // From what the form holds to the body of the create, on the date on show, or to the
 // refusals. An overlap with the day's other windows and the limit of extra windows are the
 // server's to say; the shared schema, through the service, has the last word on the body.
-export function windowFor(date: string, fields: WindowFields): { window: OneOffWindowBody } | { refusals: Partial<Record<WindowField, string>> } {
-  const refusals = fieldRefusals(fields);
+export function windowFor(texts: PageTexts, date: string, fields: WindowFields): { window: OneOffWindowBody } | { refusals: Partial<Record<WindowField, string>> } {
+  const refusals = fieldRefusals(texts, fields);
   if (Object.keys(refusals).length > 0) return { refusals };
   return { window: { date, start: fields.start, end: fields.end, typeId: fields.typeId } };
 }

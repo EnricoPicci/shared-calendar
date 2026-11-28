@@ -37,9 +37,10 @@ export type AuthOutcome =
 
 // The targets of Cognito's user-pool API the front end calls: the sign-in and the refresh, the
 // answer to the challenge of a temporary password, the revocation of a refresh token at sign-out,
-// and a person's change of their own password with the sign-out everywhere that follows it
-// (docs/ARCHITECTURE.md section 6.9).
-export type CognitoTarget = 'InitiateAuth' | 'RespondToAuthChallenge' | 'RevokeToken' | 'ChangePassword' | 'GlobalSignOut';
+// a person's change of their own password with the sign-out everywhere that follows it
+// (docs/ARCHITECTURE.md section 6.9), and the read and the write of the person's own language
+// (docs/MULTILANGUAGE_PLAN.md finding F11).
+export type CognitoTarget = 'InitiateAuth' | 'RespondToAuthChallenge' | 'RevokeToken' | 'ChangePassword' | 'GlobalSignOut' | 'GetUser' | 'UpdateUserAttributes';
 
 // One request to Cognito: JSON over HTTPS, the action named in a header, no signing and no secret.
 // Emits one { status, text } and completes; errors only when fetch rejects. The body holds

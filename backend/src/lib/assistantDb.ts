@@ -1,6 +1,6 @@
 import { ConditionalCheckFailedException, TransactionCanceledException, TransactionConflictException } from '@aws-sdk/client-dynamodb';
 import { GetCommand, QueryCommand, TransactWriteCommand, UpdateCommand, type TransactWriteCommandInput } from '@aws-sdk/lib-dynamodb';
-import { localDateOf, type AssistantLanguage, type AssistantStatus } from '@shared-calendar/shared';
+import { localDateOf, type Language, type AssistantStatus } from '@shared-calendar/shared';
 import { ulid } from 'ulid';
 import type { ConversationEntry } from './anthropic';
 import { documentClient } from './db';
@@ -53,7 +53,7 @@ export type Executing = { proposalId: string; at: string };
 // seconds) is the same on every item of the conversation.
 export type Conversation = {
   conversationId: string;
-  language: AssistantLanguage;
+  language: Language;
   status: AssistantStatus;
   startedAt: string;
   lastActivityAt: string;
@@ -127,7 +127,7 @@ const epochSeconds = (instant: string) => Math.floor(Date.parse(instant) / 1000)
 function toConversation(item: Record<string, unknown>): Conversation {
   return {
     conversationId: item.conversationId as string,
-    language: item.language as AssistantLanguage,
+    language: item.language as Language,
     status: item.status as AssistantStatus,
     startedAt: item.startedAt as string,
     lastActivityAt: item.lastActivityAt as string,
@@ -277,7 +277,7 @@ async function transact(items: TransactItem[]): Promise<void> {
 export async function startConversation(
   sub: string,
   version: number,
-  start: { language: AssistantLanguage; promptVersion: string },
+  start: { language: Language; promptVersion: string },
   step: Step,
   now: string,
 ): Promise<Conversation> {

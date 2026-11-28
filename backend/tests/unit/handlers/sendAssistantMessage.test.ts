@@ -77,7 +77,7 @@ describe('sendAssistantMessage handler (6)', () => {
   ])('gives the core the identity of the token ($role), the trimmed text and the request\'s now, and answers its reply', async ({ groups, role }) => {
     const response = await handler(caller('alice', groups, { text: `  ${TEXT}\n` }));
 
-    expect(core.sendMessage).toHaveBeenCalledWith({ sub: 'sub-alice', username: 'alice', role }, TEXT, NOW, { requestId: 'req-1', remainingMs: null });
+    expect(core.sendMessage).toHaveBeenCalledWith({ sub: 'sub-alice', username: 'alice', role }, { text: TEXT }, NOW, { requestId: 'req-1', remainingMs: null });
     expect(response.statusCode).toBe(200);
     expect(response.headers).toEqual({ 'content-type': 'application/json' });
     expect(body(response)).toEqual(REPLY);
@@ -131,7 +131,9 @@ describe('sendAssistantMessage handler (6)', () => {
     ['an empty text', { text: '   ' }, 'invalid_request'],
     ['a text of 2 001 characters', { text: 'a'.repeat(2001) }, 'invalid_request'],
     ['a text that is not a string', { text: 7 }, 'invalid_request'],
-    ['another field', { text: TEXT, language: 'it' }, 'invalid_request'],
+    ['another field', { text: TEXT, locale: 'it' }, 'invalid_request'],
+    ['a language not of the list', { text: TEXT, language: 'fr' }, 'invalid_request'],
+    ['a language with a region', { text: TEXT, language: 'it-IT' }, 'invalid_request'],
   ])('answers 400 for %s and never reaches the core', async (_what, sent, code) => {
     const event = sent === undefined ? eventWith({ sub: 'sub-alice', username: 'alice', groups: '["user"]' }) : caller('alice', ['user'], sent);
     const response = await handler(event);
@@ -140,6 +142,13 @@ describe('sendAssistantMessage handler (6)', () => {
     expect(body(response).error).toBe(code);
     expect(core.sendMessage).not.toHaveBeenCalled();
     expect(logLine()).toMatchObject({ outcome: 'invalid_request', status: 400, username: 'alice' });
+  });
+
+  it('gives the core the page\'s language with the text', async () => {
+    const response = await handler(caller('alice', ['user'], { text: TEXT, language: 'it' }));
+
+    expect(core.sendMessage).toHaveBeenCalledWith({ sub: 'sub-alice', username: 'alice', role: 'user' }, { text: TEXT, language: 'it' }, NOW, { requestId: 'req-1', remainingMs: null });
+    expect(response.statusCode).toBe(200);
   });
 
   it('takes a text of exactly 2 000 characters', async () => {

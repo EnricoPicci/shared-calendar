@@ -1,9 +1,13 @@
 import { BehaviorSubject, ReplaySubject } from 'rxjs';
-import { EMPTY_HINTS, passwordHints } from '../../../src/logic/password.model';
+import {
+  passwordHints,
+} from '../../../src/logic/password.model';
 import { PasswordScreen, type PasswordCalls, type PasswordState } from '../../../src/logic/password.screen';
-import { PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS } from '../../../src/logic/texts';
+
 import type { ChangePasswordResult, ChangePasswordState } from '../../../src/services/change-password.types';
 import { useFarBrowserZone } from './zone';
+import { EMPTY_HINTS, PASSWORD_PROBLEM_TEXT, PASSWORD_TEXTS } from './password.words';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // A fake ChangePasswordService: a state stream that gives its present value, a result stream that
 // replays its last one, as the real ones do, and a spy. No network, no DOM. The passwords are
@@ -17,7 +21,7 @@ function screenOf(state: ChangePasswordState = { status: 'idle' }) {
   const changePasswordState$ = new BehaviorSubject<ChangePasswordState>(state);
   const changePasswordResult$ = new ReplaySubject<ChangePasswordResult>(1);
   const changePassword = vi.fn<PasswordCalls['changePassword']>();
-  const screen = new PasswordScreen({ changePassword, changePasswordState$, changePasswordResult$ });
+  const screen = new PasswordScreen({ changePassword, changePasswordState$, changePasswordResult$ }, PAGE_TEXTS_EN);
   const states: PasswordState[] = [];
   screen.password$.subscribe((s) => states.push(s)); // the view subscribes first
   // An outcome as the service gives it: the state first, then the result.
@@ -56,7 +60,7 @@ describe('PasswordScreen', () => {
       const { screen, last } = screenOf();
       screen.start();
       screen.typed({ current: CURRENT, next: 'Next', again: '' });
-      expect(last().hints).toEqual(passwordHints({ current: CURRENT, next: 'Next', again: '' }));
+      expect(last().hints).toEqual(passwordHints(PASSWORD_TEXTS, { current: CURRENT, next: 'Next', again: '' }));
       expect(last().blocked).toBe(true);
       screen.typed({ current: CURRENT, next: NEXT, again: 'Next' });
       expect(last().hints.again).toBe(PASSWORD_TEXTS.differ);

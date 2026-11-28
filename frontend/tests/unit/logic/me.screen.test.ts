@@ -1,11 +1,13 @@
 import type { MeResponse } from '@shared-calendar/shared';
 import { ReplaySubject, Subject } from 'rxjs';
-import { NOT_SET } from '../../../src/logic/me.model';
-import { MeScreen, type MeCalls, type MeState, type MeUpdateCalls } from '../../../src/logic/me.screen';
-import { NO_REFUSALS, PROFILE_RULES } from '../../../src/logic/profile.model';
+
+import { MeScreen, type MeCalls, type MeLanguageCalls, type MeState, type MeUpdateCalls } from '../../../src/logic/me.screen';
+import type { LanguageWriteResult } from '../../../src/services/language.types';
+import { NO_REFUSALS, profileRules } from '../../../src/logic/profile.model';
 import type { UpdateOutcome } from '../../../src/logic/users.screen';
 import type { MeResult } from '../../../src/services/me.types';
 import { useFarBrowserZone } from './zone';
+import { PAGE_TEXTS_EN } from '../../../src/texts/texts.en';
 
 // A fake MeService and the part of a fake UsersService "My details" uses: result streams that
 // replay their last value, as the real ones do, and spies. No network, no DOM.
@@ -16,6 +18,7 @@ const ADMIN: MeResponse = { username: 'admin', role: 'admin', ...FACTS };
 const BARE_ADMIN: MeResponse = { username: 'admin', role: 'admin', givenName: null, familyName: null, email: null, address: null };
 const ALICE: MeResponse = { username: 'alice', role: 'user', givenName: 'Alice', familyName: 'Liddell', email: 'alice@example.com', address: 'Piazza 7' };
 const NO_EDIT = { saving: false, refusals: NO_REFUSALS, failure: null, saved: null };
+const ENGLISH = { value: 'en', saving: false, failure: null };
 
 function screenOf(role: 'admin' | 'user' = 'admin') {
   const meResult$ = new ReplaySubject<MeResult>(1);
@@ -23,7 +26,16 @@ function screenOf(role: 'admin' | 'user' = 'admin') {
   const visible$ = new Subject<void>();
   const getMe = vi.fn<MeCalls['getMe']>();
   const updateUser = vi.fn<MeUpdateCalls['updateUser']>();
-  const screen = new MeScreen({ getMe, meResult$: meResult$.asObservable() }, { updateUser, updateUserResult$: updateUserResult$.asObservable() }, role, visible$);
+  const writeResult$ = new ReplaySubject<LanguageWriteResult>(1);
+  const write = vi.fn<MeLanguageCalls['write']>();
+  const screen = new MeScreen(
+    { getMe, meResult$: meResult$.asObservable() },
+    { updateUser, updateUserResult$: updateUserResult$.asObservable() },
+    role,
+    visible$,
+    { write, writeResult$: writeResult$.asObservable() },
+    PAGE_TEXTS_EN,
+  );
   const states: MeState[] = [];
   screen.me$.subscribe((s) => states.push(s));
   const read = (me: MeResponse) => meResult$.next({ status: 'success', me });
@@ -33,7 +45,7 @@ function screenOf(role: 'admin' | 'user' = 'admin') {
     read(me);
     return started;
   };
-  return { screen, meResult$, updateUserResult$, visible$, getMe, updateUser, states, read, unread, shown, last: () => states.at(-1)! };
+  return { screen, meResult$, updateUserResult$, writeResult$, write, visible$, getMe, updateUser, states, read, unread, shown, last: () => states.at(-1)! };
 }
 
 describe('MeScreen', () => {
@@ -47,7 +59,7 @@ describe('MeScreen', () => {
     screen.save(FACTS);
     expect([getMe.mock.calls.length, updateUser.mock.calls.length, states.length]).toEqual([0, 0, 1]);
     expect([meResult$.observed, updateUserResult$.observed, visible$.observed]).toEqual([false, false, false]);
-    expect(states[0]).toEqual({ loading: false, unread: null, details: null, fields: null, canEdit: true, edit: NO_EDIT });
+    expect(states[0]).toEqual({ loading: false, unread: null, details: null, fields: null, canEdit: true, edit: NO_EDIT, language: ENGLISH });
     expect(screenOf('user').last().canEdit).toBe(false);
   });
 
@@ -57,13 +69,13 @@ describe('MeScreen', () => {
     expect(getMe).toHaveBeenCalledTimes(1);
     expect(last()).toMatchObject({ loading: true, details: null });
     read(ADMIN);
-    expect(last()).toEqual({ loading: false, unread: null, details: { ...FACTS, username: 'admin', role: 'Administrator' }, fields: FACTS, canEdit: true, edit: NO_EDIT });
+    expect(last()).toEqual({ loading: false, unread: null, details: { ...FACTS, username: 'admin', role: 'Administrator' }, fields: FACTS, canEdit: true, edit: NO_EDIT, language: ENGLISH });
   });
 
   it('an Administrator without facts yet: "Not set" for each, the dialog empty', () => {
     const { shown, last } = screenOf();
     shown(BARE_ADMIN);
-    expect(last().details).toMatchObject({ givenName: NOT_SET, familyName: NOT_SET, email: NOT_SET, address: NOT_SET });
+    expect(last().details).toMatchObject({ givenName: PAGE_TEXTS_EN.profile.notSet, familyName: PAGE_TEXTS_EN.profile.notSet, email: PAGE_TEXTS_EN.profile.notSet, address: PAGE_TEXTS_EN.profile.notSet });
     expect(last().fields).toEqual({ givenName: '', familyName: '', email: '', address: '' });
   });
 
@@ -129,7 +141,7 @@ describe('MeScreen', () => {
       shown(ADMIN);
       screen.save({ ...FACTS, email: 'ada' });
       expect(updateUser).not.toHaveBeenCalled();
-      expect(last().edit.refusals).toEqual({ ...NO_REFUSALS, email: PROFILE_RULES.email });
+      expect(last().edit.refusals).toEqual({ ...NO_REFUSALS, email: profileRules(PAGE_TEXTS_EN.profile).email });
       screen.editTyped(FACTS);
       expect(last().edit.refusals).toEqual(NO_REFUSALS);
       screen.save({ ...FACTS, email: 'ada' });
@@ -169,5 +181,58 @@ describe('MeScreen', () => {
     screen.save(FACTS);
     screen.retry();
     expect([getMe.mock.calls.length, updateUser.mock.calls.length]).toEqual([1, 1]);
+  });
+
+  describe('the choice of language', () => {
+    it('another language: saved at once, the list on it while saving; nothing more asked meanwhile', () => {
+      const { screen, shown, write, last } = screenOf('user');
+      shown(ALICE);
+      screen.chooseLanguage('it');
+      expect(write).toHaveBeenCalledWith('it');
+      expect(last().language).toEqual({ value: 'it', saving: true, failure: null });
+      screen.chooseLanguage('it');
+      expect(write).toHaveBeenCalledTimes(1);
+    });
+
+    it('the language in use, or before start(): nothing asked', () => {
+      const { screen, shown, write } = screenOf();
+      screen.chooseLanguage('it');
+      shown(ADMIN);
+      screen.chooseLanguage('en');
+      expect(write).not.toHaveBeenCalled();
+    });
+
+    it('a save that failed: the list back on the language in use, with why', () => {
+      const { screen, shown, writeResult$, last } = screenOf('user');
+      shown(ALICE);
+      screen.chooseLanguage('it');
+      writeResult$.next({ status: 'failure', reason: 'network', message: 'for a developer' });
+      expect(last().language).toEqual({ value: 'en', saving: false, failure: `The language was not changed. ${UNREACHABLE}` });
+    });
+
+    it('a success leaves the list saving: the shell enters the frame again; a result not asked for here is not heard', () => {
+      const { screen, shown, writeResult$, last } = screenOf();
+      writeResult$.next({ status: 'failure', reason: 'network', message: 'before start' });
+      shown(ADMIN);
+      expect(last().language).toEqual(ENGLISH);
+      writeResult$.next({ status: 'failure', reason: 'network', message: 'not asked here' });
+      expect(last().language).toEqual(ENGLISH);
+      screen.chooseLanguage('it');
+      writeResult$.next({ status: 'success', language: 'it' });
+      expect(last().language).toEqual({ value: 'it', saving: true, failure: null });
+    });
+
+    it('the end of start() forgets a save under way', () => {
+      const { screen, writeResult$, read, last } = screenOf();
+      const started = screen.start();
+      read(ADMIN);
+      screen.chooseLanguage('it');
+      started.unsubscribe();
+      expect(last().language).toEqual(ENGLISH);
+      const again = screen.start();
+      writeResult$.next({ status: 'failure', reason: 'network', message: 'late' });
+      expect(last().language).toEqual(ENGLISH);
+      again.unsubscribe();
+    });
   });
 });
