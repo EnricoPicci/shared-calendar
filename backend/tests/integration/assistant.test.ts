@@ -317,7 +317,7 @@ describe('a conversation in text (5.6, 6)', () => {
     expect(await api('POST', '/assistant/messages', token)).toMatchObject({ status: 400, body: { error: 'invalid_json' } });
     expect(await say(token, '   ')).toMatchObject({ status: 400, body: { error: 'invalid_request' } });
     expect(await say(token, 'a'.repeat(2001))).toMatchObject({ status: 400, body: { error: 'invalid_request' } });
-    expect(await api('POST', '/assistant/messages', token, { text: HELLO, language: 'it' })).toMatchObject({ status: 400, body: { error: 'invalid_request' } });
+    expect(await api('POST', '/assistant/messages', token, { text: HELLO, language: 'de' })).toMatchObject({ status: 400, body: { error: 'invalid_request' } });
     expect((await conversation(token)).body).toEqual(none(LIMIT));
   });
 

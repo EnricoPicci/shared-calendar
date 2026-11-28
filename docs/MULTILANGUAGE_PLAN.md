@@ -3,7 +3,9 @@
 **Version:** v1 (2026-11-27): the plan, after the Product Owner's eight decisions of the brief
 and the answer to one question of planning (section 2). v2 (2026-11-27): phase A started with
 brief `prompts/lang-l03-phase-a-implementation.md`; steps l1 to l8 done. v3 (2026-11-28):
-`main` merged in at phase B's item 6, with brief `prompts/lang-l04-merge-with-main.md`.
+`main` merged in at phase B's item 6, with brief `prompts/lang-l04-merge-with-main.md`. v4
+(2026-11-28): phase B's item 7, the full regression, with brief
+`prompts/lang-l05-full-regression.md`.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -1050,6 +1052,28 @@ without it, and the rules of the root `CLAUDE.md` hold as written.
    `DYNAMODB_PORT=8002 npm run verify`, the front end's journeys, the smoke test locally, and
    `docs/FRONTEND_WALK.md` in English with its new section in Italian. How much of the walk is
    walked is agreed first, as in the earlier releases.
+   **As done (2026-11-28):** on the merged code of item 6, the lock file unchanged.
+   - The gate: `DYNAMODB_PORT=8002 npm run verify` green on its third run, with the unit tests
+     2090 (back end), 673 (shared) and 3293 (front end), 100 % line coverage, and 249 back-end
+     journeys; the front end's journeys, run apart, 109. The first run met DynamoDB Local off
+     port 8002 (the stack restarted with it); the second, 9 failures of two causes. One journey
+     of `backend/tests/integration/assistant.test.ts` still refused `language` as an unknown
+     field, which since step l8 the body carries: it now refuses a language not of the list
+     (`de`), with its page `docs/journeys/backend/assistant-text.md`. And `admin`'s `locale`
+     left at `it` in cognito-local by an earlier look, put back to `en`.
+   - The smoke test locally: 62 PASS and 3 SKIP of 65 lines, run by the operator in a
+     terminal, since the script asks for the password there.
+   - The walk, `docs/FRONTEND_WALK.md` v17, to the extent the Product Owner decided: section 18
+     whole in Italian at 390 × 844 (headless Chromium) and at 1280 × 800 (Chrome), checks 179,
+     182, 183 and 219 at both, an English look at every screen and dialog at 1280. Every check
+     walked answered yes; 223 at 390 only. Checks 235 and 238 corrected. Three findings on
+     the screens, none fixed, for the Product Owner to decide: the padded Italian at 390 (an
+     invited User's row scrolls the page sideways, the panel's "Chiudi" and "Invia" cut); an
+     invited User's row at 1280 with its buttons on a line of their own, against check 233; the
+     active link half outside the navigation strip at 390 after the frame is drawn again.
+   - Item 8 finds the code as merged at item 6, with the one journey above changed and nothing
+     under `shared/`, `backend/src`, `frontend/src` or either `template.yaml`, ready for the
+     deploy once the Product Owner has ruled on the three findings.
 8. **The deploy**, each command on an explicit instruction: the API first, with
    `DefaultLanguage` at `it`. Before it, the cloud's facts, reading only (F16), each command on
    an explicit instruction: the app client as it is today (its write and read lists) and the
