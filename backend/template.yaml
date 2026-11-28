@@ -3258,9 +3258,13 @@ Resources:
   # the Users' names for the Administrator's file, the administrators' addresses for the daily
   # mail), on this user pool only; in the mail table only, read the daily mail's settings and the
   # day's mark (GetItem), write the mark (PutItem) and record how the run ended on it (UpdateItem);
-  # and send mail through SES, only as the stack's domain and only through the stack's
-  # configuration set: SES checks the sending identity and the configuration set against these two
-  # names. It cannot write the calendar, delete an item of the mail table or change an account.
+  # and send mail through SES, only from the stack's own address and only through the stack's
+  # configuration set. The sending right names every identity of the account (identity/*), the one
+  # wildcard of the template, kept while SES holds the account in its sandbox: there SES checks the
+  # role against the recipient too when the recipient is a verified address, so a right on the
+  # domain alone refuses every real mailbox (docs/EMAIL_PLAN.md step m10 says why and when it goes
+  # back to the domain alone). The condition on ses:FromAddress keeps the sender to the stack's
+  # address. It cannot write the calendar, delete an item of the mail table or change an account.
   MailerRole:
     Type: AWS::IAM::Role
     Condition: MailOn
@@ -3311,8 +3315,11 @@ Resources:
                 Action:
                   - ses:SendEmail
                 Resource:
-                  - !Sub arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/${MailDomain}
+                  - !Sub arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/*
                   - !Sub arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/${AWS::StackName}-mail
+                Condition:
+                  StringEquals:
+                    ses:FromAddress: !Sub ${MailFromLocalPart}@${MailDomain}
 
   # POST /mail/calendar (docs/EMAIL_ARCHITECTURE.md section 9.1; the Administrator and Users): asks
   # for a mail of the calendar between two dates, sent to the asker's own address. It checks the

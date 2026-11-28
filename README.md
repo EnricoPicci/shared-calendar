@@ -130,6 +130,7 @@ takes the next minor version; the major version changes when a client would brea
 | `v2.3.0` | `a8b3a2b` | The capacity of a type, several people in one slot (`docs/CAPACITY_PLAN.md`) | `docs/RUNBOOK.md` section 5.8 |
 | `v2.4.0` | the record's commit after `259e0d6`, whose code was deployed | Times on 5-minute steps (`docs/SLOT_STEP_PLAN.md`), released from the branch `slot-5min` | `docs/RUNBOOK.md` section 5.9 |
 | `v2.5.0` | the record's commit after `2dfd39c`, whose code was deployed | Windows of whole hours (`docs/WINDOW_HOURS_PLAN.md`), released from the branch `slot-5min` | `docs/RUNBOOK.md` section 5.10 |
+| `v3.0.0` | the record's commit after `5a4456c`, whose code was deployed | E-mail (`docs/EMAIL_PLAN.md`): the invitation with a temporary password, the mail on demand, the daily mail, the four facts of a person; `POST /users` answers no password, so a client that read it breaks | `docs/RUNBOOK.md` section 5.11 |
 
 `git checkout v2.5.0` gives the code as it was released; `git tag -n1` lists the tags with
 their one-line message.

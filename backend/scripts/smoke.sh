@@ -1046,11 +1046,12 @@ fake_mail_count() {
 
 # mailer_sent_since <epoch ms>: how many of the mailer's log lines since then say that a calendar
 # mail for the Administrator was sent; read-only, in the stack's log group of the mailer
-# (backend/template.yaml, MailerLogGroup).
+# (backend/template.yaml, MailerLogGroup). The AWS CLI reads the answer page by page and prints
+# the query's count once per page, one line each, so the lines are added up into one number.
 mailer_sent_since() {
   aws logs filter-log-events --log-group-name "/aws/lambda/$TARGET-mailer" --start-time "$1" \
     --filter-pattern "{ (\$.outcome = \"sent\") && (\$.kind = \"calendar\") && (\$.username = \"$ADMIN_USERNAME\") }" \
-    --query 'length(events)' --output text 2>/dev/null
+    --query 'length(events)' --output text 2>/dev/null | awk '{ s += $1 } END { print s + 0 }'
 }
 
 # A mail on demand for the Administrator (docs/EMAIL_ARCHITECTURE.md section 13.3): today to

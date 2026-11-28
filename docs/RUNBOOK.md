@@ -551,11 +551,14 @@ other route.
 A key that leaked is deleted in the Console at once, without waiting: the assistant then
 answers `503` (`key_refused`) until step 2 is done and ten minutes have passed.
 
-### 3.3 E-mail: the stages (`domain` run in `docs/EMAIL_PLAN.md` step m9; `on` is a draft, run and corrected in its step m10)
+### 3.3 E-mail: the stages (`domain` run in `docs/EMAIL_PLAN.md` step m9, `on` part A in its step m10 part A; `on` part B is a draft)
 
 E-mail is switched on in two deploys, because SES must first prove the domain, which waits for
-DNS, and lift the sandbox, which waits for AWS (`docs/ARCHITECTURE.md` section 9.2,
-`docs/EMAIL_ARCHITECTURE.md` section 13.2). Each deploy is section 2's steps 1 to 6, with the one
+DNS (`docs/ARCHITECTURE.md` section 9.2, `docs/EMAIL_ARCHITECTURE.md` section 13.2). The stage
+`on` does not wait for SES's sandbox to be lifted, which waits for AWS: in the sandbox it mails
+only addresses verified in SES, so it is deployed and tried first with those (part A), and the
+people are invited once AWS grants production access (part B), with no deploy. The split lets
+the work go on while AWS answers, which can take days. Each deploy is section 2's steps 1 to 6, with the one
 line of `backend/samconfig.toml` changed: `MailStage=off` → `domain` → `on`. `MailDomain`,
 `MailFromLocalPart`, `MailFromName` and `PageAddress` are already in that line; `MailReplyTo` is
 left out, so replies and bounce reports go to `AlertEmail`. No e-mail address goes into the file.
@@ -620,11 +623,79 @@ of 5xx (section 5.11 has the search).
   one tries the 3 minutes of "Choose your password" (`docs/FRONTEND_WALK.md` check 216). Delete
   them in the Users screen when done.
 
-**At `on`**, once SES shows the domain verified and the account out of the sandbox: the deploy,
-the smoke test (65 PASS, section 2.4) and its invitation in your mailbox; the daily mail's hour
-in "Settings"; a User created in the page with your own address, its invitation, its first sign-in; a mail on demand from the week
-page; the next morning, the daily mail. A bounce report, should one come, reaches the Reply-To
-mailbox: correct the User's address in the Users screen and "Resend invitation".
+**At `on`, part A: in the sandbox, every recipient verified** (`docs/EMAIL_PLAN.md` step m10,
+part A). Until production access SES delivers only to addresses verified in SES and to the
+mailbox simulator, Cognito's invitations included (`docs/EMAIL_ARCHITECTURE.md` section 22.2).
+**Create no User, and ask no mail, for an address that is not verified**: AWS's documentation
+does not say what `AdminCreateUser` does then, and a mail the mailer sends there fails.
+
+1. Read-only, before: the domain still verified (`aws sesv2 get-email-identity --email-identity
+   <domain>` with a `--query` of `VerificationStatus` and `DkimAttributes.Status`: `SUCCESS`).
+2. **Verify each address that will receive a mail**: your own (the smoke test's invitation, a
+   throw-away User), the Administrator's in "My details" (the smoke test's mail on demand, the
+   daily mail), each test User's that will ask for a mail. In the SES console, region Europe
+   (Stockholm): Identities, "Create identity", "Email address", the address, "Create identity";
+   then the link in the mail from `no-reply-aws@amazon.com` or
+   `no-reply-aws@verification.amazonses.com` (valid 24 hours; "Resend" on the identity's page).
+   Not "Get started". Checked without printing an address:
+   `aws sesv2 list-email-identities --query "EmailIdentities[?IdentityType=='EMAIL_ADDRESS'].VerificationStatus"`,
+   each `SUCCESS`; compare the console's list with the addresses by eye.
+3. A test User whose address is not verified: delete it in the Users screen, or never use it for
+   a mail. Create no other User until part B.
+4. `MailStage=on` in `backend/samconfig.toml`, committed; section 2's steps. The change set before
+   "y", from `domain`: 32 changes, no Remove, no Replacement. Add for the mailer, its role, log
+   group and error alarm, the hourly schedule and its role; the pool Modify on
+   `AdminCreateUserConfig`, `EmailConfiguration` and `Policies`, each `RequiresRecreation`
+   `Never`; the routes' `MAIL_STAGE`, `MAILER_FUNCTION` and the invoke right of `sendCalendarMail`
+   and `confirmProposal`. The other roles, functions and `HttpApi` are listed only because they
+   name the pool's ARN, or a changed function's: they keep it. The page only if `frontend/` or
+   `shared/` changed since its last deploy.
+   **The mailer's role in the sandbox.** SES checks the sender's role against the recipient too
+   when the recipient is a verified address: with `ses:SendEmail` on the domain's identity alone,
+   every mail of the mailer fails with `AccessDeniedException` (the mailer's log, field `reason`;
+   its error alarm), while the invitations, sent with Cognito's own role, arrive, and a mail to
+   the simulator, no identity of the account, is `sent`. So while the account is in the sandbox
+   the template gives the mailer `identity/*`, the From held to `noreply@<domain>` by the
+   condition `ses:FromAddress`: the one exception to the root `CLAUDE.md`'s wildcard rule, which
+   part B removes (`docs/EMAIL_PLAN.md` step m10).
+5. The smoke test, a verified address typed when asked (an address with a `+label` is its own
+   identity, verified as such): 65 PASS (section 2.4), its mail line `sent` within seconds; its
+   invitation and its resend in your mailbox, from `noreply@<domain>`, Reply-To the alarm
+   address, not in spam; its mail on demand in the Administrator's, its Excel file opening. Then
+   every log group since the deploy searched for `level` `error`, and the access log for `status`
+   500 or more, by field.
+6. In the page: a throw-away User with a verified address, its invitation, "Resend invitation",
+   the first sign-in with the second password, "Choose your password", `active` in the list, then
+   the User deleted; "E-mail…" in the week as the Administrator and as a test User whose address
+   is verified, each Excel file opened; in "Settings" the daily mail's hour, set to the next whole
+   hour to see the daily mail and its two files the same day, then to the hour wanted.
+7. The API's 5xx alarm should no longer go off for the e-mail routes, which answer `503` only
+   below `on`: one now is a fault, looked at in the access log. The mailer's error alarm counts a
+   mail SES refused; it turns OK by itself an hour after the last one.
+8. The tag `v3.0.0`, on the operator's word, at the commit of the record (`README.md` "Versions").
+
+**At `on`, part B: out of the sandbox** (`docs/EMAIL_PLAN.md` step m10, part B). It starts when
+`aws sesv2 get-account --query '{production:ProductionAccessEnabled,quota:SendQuota}'` answers
+`production` true; the query keeps the contact addresses out of the answer. Write the new quota
+in section 5.11.
+
+1. The mailer's role back to the domain's identity alone, in `backend/template.yaml`, and the
+   root `CLAUDE.md`'s wildcard rule without its exception; committed, then section 2's steps:
+   the change set is the mailer's role alone, Modify. The smoke test again: 65 PASS, its mail on
+   demand `sent`. Checked: `grep -rn 'identity/\*' backend/template.yaml CLAUDE.md
+   docs/ARCHITECTURE.md` finds nothing. AWS does not say whether SES, out of the sandbox, still checks the role against
+   a recipient that is a verified identity: if the mail line fails with `AccessDeniedException`,
+   delete the address identity of that recipient (step 4) and ask the mail again.
+2. Create again, in the page, the Users who need an account (step m9's list): each receives an
+   invitation; book their future appointments again by hand if wanted. A bounce report, should
+   one come, reaches the Reply-To mailbox: correct the User's address in the Users screen and
+   "Resend invitation".
+3. Delete the test Users in the Users screen.
+4. The address identities verified in part A: keep them, or delete those no longer wanted (SES
+   console, Identities, the address, "Delete"). A recipient needs no identity out of the sandbox,
+   so nothing depends on them; kept, they spare a new verification should mail be tried in a
+   sandbox again. Never delete the domain's identity, which the stack owns.
+5. Update the privacy notice, outside the system (`docs/EMAIL_ARCHITECTURE.md` section 12.3).
 
 ### 3.4 The languages
 
@@ -1362,6 +1433,50 @@ session saw no password and no token.
   deleted when no longer needed.
 - **Cost:** AWS within the free tier; nothing at Anthropic but the smoke test's one exchange,
   about a US cent.
+
+**Stage `on` in the sandbox (step m10, part A), 2026-11-28.** The API at `5a4456c`, on `main`,
+pushed before each deploy; the page unchanged since step m9. Who did what as in step m9: the
+operator verified the addresses, ran the three deploys and the three smoke tests inside `script
+-q`, and looked at the page and the mails; the session ran `verify` before each deploy and
+read-only `aws` commands, and printed no address.
+
+- **Before:** the domain `SUCCESS`, DKIM `SUCCESS`; the account in the sandbox (200 mails a day,
+  1 a second, the review `DENIED` while AWS's answer is pending); four address identities, each
+  `SUCCESS`, the operator's own, the Administrator's (a `+admin` address of it) and the test
+  Users'. `miri` asks for mail, `enri` is kept away from it.
+- **Deploy 1, `MailStage=on`** (`e8884b2`), at 08:32 UTC after `verify` PASSED: 32 changes, 6 Add
+  (the mailer, its role, log group and error alarm, the schedule and its role) and 26 Modify, no
+  Remove, no Replacement; the pool Modify on `AdminCreateUserConfig`, `EmailConfiguration` and
+  `Policies`, each `Never`. Then the pool sends with `DEVELOPER` through the configuration set,
+  its invitation's subject set, temporary passwords valid 7 days.
+- **Smoke test 1:** 64 PASS, 1 FAIL, the mail on demand: SES refused the mailer
+  (`AccessDeniedException`, the call and Lambda's two retries) while both invitations arrived. A
+  test User `simtest` with the simulator's address asked a mail on demand: `sent`. So SES in the
+  sandbox checks the mailer's role against a verified recipient's identity (section 3.3, step 4).
+  The mailer's error alarm went to ALARM at 08:40 UTC, and back to OK by itself at 09:42.
+- **Deploy 2, the mailer's `identity/*`** (`d2817ab`, the Product Owner's decision): 9 changes, all
+  Modify, one of them real (`MailerRole`'s policy), the others listed only for the ARNs they name.
+- **Smoke test 2:** 64 PASS, 1 FAIL: the mail was `sent`, but the script read the CLI's per-page
+  counts as two lines (`1` and `0`); and the mail's `.xlsx` did not open, every byte that is not
+  text turned into the replacement character, as SES writes an attachment given no
+  `ContentTransferEncoding` (`docs/EMAIL_PLAN.md` step m10).
+- **Deploy 3, the attachments as base64 and the script's sum** (`5a4456c`): 8 changes, all Modify,
+  one real (`MailerFunction`'s code).
+- **Smoke test 3:** **65 PASS**, no FAIL, no SKIP; the mailer's line `sent` after 5 s; the Excel
+  file 3161 bytes, as made, its sheet and headings read back, and opened by the operator.
+- **The operator's look:** the invitation from `noreply@<domain>`, not in spam, replies to the
+  alarm address; a throw-away User created in the page, its invitation, its resend, the first
+  sign-in with the second password, a password chosen, `active`, deleted; "E-mail…" as the
+  Administrator and as `miri`, each mail arrived, each file opened. The daily mail, its hour set
+  to the next whole hour: the timer's run at 10:00 UTC `sent`, the mail arrived with its two
+  files, both opened and correct.
+- **The logs**, from the first deploy on: 38 log groups, the only lines of level `error` the
+  mailer's three refusals of smoke test 1; the access log without a 5xx. The alarms OK; the 5xx
+  alarm unchanged since 2026-11-26, so the e-mail routes no longer set it off.
+- **Owed to part B:** production access; the mailer's role back to the domain's identity, deployed,
+  the smoke test again; `simtest`, `miri` and `enri` deleted.
+- **Cost:** a few dozen mails through SES, a fraction of a US cent; the smoke tests' exchanges at
+  Anthropic, about three US cents.
 
 ## 6. A person's password: what to tell them
 

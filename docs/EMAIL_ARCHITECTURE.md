@@ -53,7 +53,7 @@ every hour; when the hour is the one the Administrator chose, it sends the daily
 
 - **The domain must be proven** to SES with three DNS records, and the AWS account must be
   taken out of SES's "sandbox" by a request to AWS (section 8). Until then no mail reaches an
-  ordinary address.
+  address that is not verified in SES.
 - **Personal data grows**: names, an e-mail and a postal address for every person, and Excel
   files with names sitting in a mailbox. The purpose of each fact goes into the privacy notice,
   for the GDPR page that will come (section 12.3).
@@ -664,8 +664,11 @@ A new SES account is in the **sandbox** in each region: it can mail only verifie
 "transactional mail of a private booking application, about 10 recipients, invitation and
 calendar reports, no marketing; bounces and complaints handled through SNS"). The console's form
 takes only the mail type and the website: AWS asks for the use case by mail, in a support case,
-and the operator answers there (`docs/RUNBOOK.md` section 3.3). AWS answers usually within a day. Until then, the operator can verify their own address and one test
-address, and try everything with them.
+and the operator answers there (`docs/RUNBOOK.md` section 3.3). AWS answers usually within a day,
+and within 96 hours at most for a first answer. The stage `on` does not wait for it (section 13.2): in the sandbox SES delivers
+only to addresses verified in SES (in the console: Identities, "Create identity", "Email address",
+then the link in AWS's mail) and to the mailbox simulator, Cognito's invitations included, so until
+production access the Administrator creates no User, and asks no mail, for any other address.
 
 ---
 
@@ -760,11 +763,11 @@ views follow `docs/FRONTEND_ARCHITECTURE.md` sections 3 and 4 (a dialog, a form)
   Administrator's edit of a profile, and the on-demand mails go to the asker. The limits of
   section 6.5 cap the volume.
 
-### 12.2 Permissions (one role per function, nothing wildcard)
+### 12.2 Permissions (one role per function, nothing wildcard but the mailer's in the sandbox)
 
 | Function | Gains |
 |---|---|
-| `mailer` (new) | `ses:SendEmail` on the domain identity and the configuration set; `CalendarReadPolicy`; the `mail` table read/write; Cognito `ListUsersInGroup` and `AdminGetUser` on the one pool |
+| `mailer` (new) | `ses:SendEmail` on the domain identity and the configuration set (in the sandbox, on every identity of the account with the From held to the stack's address: section 13.2); `CalendarReadPolicy`; the `mail` table read/write; Cognito `ListUsersInGroup` and `AdminGetUser` on the one pool |
 | `sendCalendarMail` (new route) | `lambda:InvokeFunction` on the mailer; Cognito `AdminGetUser` (has the person an address?); the `mail` table (counter) |
 | `confirmProposal` | `lambda:InvokeFunction` on the mailer, plus what `sendCalendarMail` needs: `dynamodb:UpdateItem` on the table `mail` (the `AdminGetUser` it already held); the variables `MAIL_STAGE`, `MAIL_TABLE`, `MAILER_FUNCTION`, `LAMBDA_ENDPOINT` |
 | `sendAssistantMessage`, `continueAssistant` | Cognito `AdminGetUser` on the one pool: the tool's proposal reads the person's address through the handler of `GET /me` (section 7); the variable `MAIL_STAGE`, and nothing of the table `mail` or the mailer |
@@ -838,9 +841,22 @@ for DNS. Hence a stage parameter:
    operator's test User (section 5.4) could not sign in with it. The new page says "E-mail is not
    available yet" wherever `503 mail_unavailable` answers: the creation of a User, the resend,
    the week's "E-mail…", the settings' "Daily e-mail".
-3. **`MailStage=on`**, once the domain is verified and the account out of the sandbox: the pool
-   sends through SES with its invitation template and 7-day validity, the creation route sends
-   invitations, the mailer and its timer exist, the routes work.
+3. **`MailStage=on`**, once the domain is verified: the pool sends through SES with its
+   invitation template and 7-day validity, the creation route sends invitations, the mailer and
+   its timer exist, the routes work. It does not wait for production access (section 8.5), so
+   that the work goes on while AWS answers, which can take days: the deploy, the smoke test and
+   the operator's look with real mails are done and proven before it. While
+   the account is in the sandbox, SES delivers only to addresses verified in SES and to the
+   mailbox simulator, Cognito's invitations included: so until production access the
+   Administrator creates no User, and asks no mail, for an address that is not verified. The
+   smoke test fits that rule (its Users get the simulator, its invitation the operator's own
+   verified address). In the sandbox SES also checks the mailer's role against the recipient when
+   the recipient is a verified address, so while it lasts the mailer's `ses:SendEmail` names
+   every identity of the account, its From held to the stack's address by a condition (the one
+   exception to the root `CLAUDE.md`'s wildcard rule; Cognito's invitations, sent with Cognito's
+   own role, need none). Once the account is out of the sandbox, one deploy puts the right back to
+   the domain alone, and the same stage mails any address. `docs/EMAIL_PLAN.md` step m10 runs this stage in two parts, A in the
+   sandbox and B after production access.
 
 Pointing the pool at SES (`EmailConfiguration` with `EmailSendingAccount: DEVELOPER`) makes
 Cognito create its service-linked role, which needs `iam:CreateServiceLinkedRole` in the
@@ -1023,9 +1039,11 @@ to m10) and says each step's check. Nothing reaches the cloud before step 9.
    deploy (section 4.3); the API and the new page deployed together (section 13.2); the
    Administrator's facts set; the test User made and signed in (section 5.4); DNS records, SNS
    confirmation, production access request.
-10. **Cloud, stage `on`**: deploy, smoke test, the page deployed again only if it changed after
-    step 9, the quick look by the operator with a real invitation and a real daily mail; the
-    Users who need an account created again; documents merged; tag v3.0.0.
+10. **Cloud, stage `on`**, in two parts. A, in SES's sandbox, every recipient an address
+    verified in SES: deploy, smoke test, the page deployed again only if it changed after step 9,
+    the quick look by the operator with a real invitation, a mail on demand and a real daily
+    mail; tag v3.0.0. B, once the account is out of the sandbox: the Users who need an account
+    created again; documents merged.
 
 ---
 
@@ -1112,3 +1130,36 @@ to m10) and says each step's check. Nothing reaches the cloud before step 9.
   Sources: `npm view <library> version license time`, the projects' issue trackers
   (`gh api`, GitLab's API), `npm audit`. The mailer's memory and timeout are set from these in
   step m3, with its own measure inside a Lambda container.
+
+### 22.2 Read on 2026-11-28, for step m10 of `docs/EMAIL_PLAN.md` in two parts
+
+- **The sandbox's recipients.** Amazon SES guide, "Request production access (Moving out of the
+  Amazon SES sandbox)",
+  https://docs.aws.amazon.com/ses/latest/dg/request-production-access.html: in the sandbox
+  "You can only send mail **to** verified email addresses and domains, or to the Amazon SES
+  mailbox simulator", at most 200 mails in 24 hours and 1 a second; out of it, mail goes to any
+  recipient, and only the "From", "Source", "Sender" or "Return-Path" identities must be
+  verified. No page says a Reply-To must be verified, in the sandbox or out of it. AWS's first
+  answer to a request comes within 96 hours.
+- **Cognito's invitations obey the same rule.** Amazon Cognito guide, "Email settings for Amazon
+  Cognito user pools", its step 2,
+  https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-email.html: with the pool's
+  own SES configuration, in the sandbox "You can send emails only to addresses and domains that
+  you have verified with Amazon SES, or you can send them to Amazon SES mailbox simulator
+  addresses", and "Amazon Cognito can't send messages to your users' email addresses".
+- **A User created for an address that is not verified: not said.** The API reference of
+  `AdminCreateUser`,
+  https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/API_AdminCreateUser.html,
+  lists `CodeDeliveryFailureException` (400, "a verification code fails to deliver
+  successfully"), but no page says whether the sandbox's refusal raises it, or whether the account
+  is then kept. Section 13.2's rule avoids the case.
+- **An address identity.** Amazon SES guide, "Creating and verifying identities in Amazon SES",
+  https://docs.aws.amazon.com/ses/latest/dg/creating-identities.html: Identities, "Create
+  identity", "Email address", then the link in a mail from `no-reply-aws@amazon.com` or
+  `no-reply-aws@verification.amazonses.com`, valid 24 hours ("Resend" on the identity's page),
+  after which its status is Verified; a verified address's settings override the domain's only
+  for an address of that domain. "Delete an identity using the SES console",
+  https://docs.aws.amazon.com/ses/latest/dg/remove-verified-domain.html: each identity is deleted
+  on its own. "Deleting personal data from Amazon SES",
+  https://docs.aws.amazon.com/ses/latest/dg/deleting-personal-data.html: an e-mail address may be
+  personal data.

@@ -2,7 +2,8 @@
 
 **Version:** v1 (2026-11-27): the plan, after the Product Owner's eight decisions of the brief
 and the answer to one question of planning (section 2). v2 (2026-11-27): phase A started with
-brief `prompts/lang-l03-phase-a-implementation.md`; steps l1 to l8 done.
+brief `prompts/lang-l03-phase-a-implementation.md`; steps l1 to l8 done. v3 (2026-11-28):
+`main` merged in at phase B's item 6, with brief `prompts/lang-l04-merge-with-main.md`.
 **Brief:** `prompts/lang-l02-implementation-plan.md`.
 **Governed by:** `docs/MULTILANGUAGE_ARCHITECTURE.md` (decisions L1 to L16, open points O1 to
 O6), and through it `docs/ARCHITECTURE.md`, `docs/EMAIL_ARCHITECTURE.md`,
@@ -1016,10 +1017,35 @@ without it, and the rules of the root `CLAUDE.md` hold as written.
    open: section 2 of `docs/ARCHITECTURE.md` still omits the e-mail functions and the
    invitation function, a gap older than this work.
 6. **The merge with `main`** (section 9), in a session of its own.
-   It waits until `docs/EMAIL_PLAN.md` step m10 is deployed: the invitation function exists only
-   at `MailStage` `on`, so item 8 can prove the invitation in Italian only after m10, and m10
-   first proves the English invitation alone, which is also what Cognito sends when the
-   function's answer is unusable. One deploy then changes one thing.
+   It waits until part A of `docs/EMAIL_PLAN.md` step m10 is deployed, the stage `on` in SES's
+   sandbox; part B is not waited for. The invitation function exists only at `MailStage` `on`,
+   so item 8 can prove the invitation in Italian only after part A, and part A first proves the
+   English invitation alone, which is also what Cognito sends when the function's answer is
+   unusable. One deploy then changes one thing. `main` itself receives this branch only at items
+   8 and 9, once the languages are deployed: until then it is what runs in the cloud, and part
+   B or a fix of the e-mail release deploys from it; if one lands there first, `main` is merged
+   into this branch again.
+   **As done (2026-11-28):** `main` at `ef6ddc4` (part A closed, `v3.0.0`) merged into this
+   branch with `git merge --no-ff main`. The trial merge found one file in conflict and six
+   merged by themselves.
+   - `backend/samconfig.toml`, in conflict on the line `parameter_overrides`: `main`'s
+     `MailStage="on"` with this branch's `DefaultLanguage="it"`, and this branch's comment on it.
+   - Read and left as merged: `backend/template.yaml` (`main`'s mailer role, `identity/*` with
+     the condition on `ses:FromAddress`, beside the invitation function, whose role writes its
+     own logs only; the pool's `LambdaConfig` at `on` intact); the root `CLAUDE.md` (`main`'s
+     wildcard rule with its exception and this branch's rule on texts, 198 lines); `README.md`
+     (the row of `v3.0.0`); `docs/EMAIL_ARCHITECTURE.md` (sections 12.2 and 13.2 on the sandbox
+     beside M17 rewritten); `docs/RUNBOOK.md` (sections 3.3 and 5.11 as `main` has them, 3.4
+     after them). No number was taken twice: `main` added no version row to
+     `docs/ARCHITECTURE.md` and no section 3.4 to the runbook.
+   - Changed by hand: `docs/ARCHITECTURE.md` section 9.2, whose sentence on `samconfig.toml`
+     now says the stage is `on`, in the sandbox.
+   - The texts: `main` changed nothing under `shared/` or `frontend/src`; `backend/src/lib/ses.ts`
+     sends each attachment as base64, which the Italian file names, all ASCII, do not touch.
+     The assistant's instructions are unchanged: no paid evaluation is owed.
+   - The checks: typecheck and lint green; the unit tests 673 (shared), 2090 (back end) and 3293
+     (front end), 100 % line coverage on each. Item 7 finds the merged code ready, the lock file
+     unchanged.
 7. **The full regression, once, on what will be deployed**: the root
    `DYNAMODB_PORT=8002 npm run verify`, the front end's journeys, the smoke test locally, and
    `docs/FRONTEND_WALK.md` in English with its new section in Italian. How much of the walk is
@@ -1027,9 +1053,11 @@ without it, and the rules of the root `CLAUDE.md` hold as written.
 8. **The deploy**, each command on an explicit instruction: the API first, with
    `DefaultLanguage` at `it`. Before it, the cloud's facts, reading only (F16), each command on
    an explicit instruction: the app client as it is today (its write and read lists) and the
-   pool (no trigger yet). Its change set is read before it is carried out: the app client
-   and the pool "Modify", never "Replace"; one function, one role, one log group and one
-   permission added. Then the smoke test in the cloud; the gap of the architecture's section
+   pool (no trigger yet; at `on` since part A of `docs/EMAIL_PLAN.md` step m10, sending through
+   SES). Its change set is read before it is carried out: the app client and the pool
+   "Modify", never "Replace"; one function, one role, one log group and one permission added;
+   the mailer's role, with its exception `identity/*` of part A, untouched unless part B has
+   put the domain back by then. Then the smoke test in the cloud; the gap of the architecture's section
    4.4 tried on a test user (its own e-mail can no longer be written, its `locale` can); one
    invitation received and read, in Italian, its password used. Then the page. Then the
    Product Owner signs in once, so that the Administrator's account gets its language and the

@@ -53,7 +53,7 @@ capabilities = "CAPABILITY_IAM"
 resolve_s3 = true
 confirm_changeset = true
 s3_prefix = "shared-calendar-api"
-parameter_overrides = "AdminUsername=\"admin\" FunctionArchitecture=\"arm64\" AssistantModel=\"claude-sonnet-5-5\" AssistantDailyMessageLimit=\"30\" MailStage=\"domain\" MailDomain=\"enricopiccinin.com\" MailFromLocalPart=\"noreply\" MailFromName=\"Shared calendar\" PageAddress=\"https://calendar.enricopiccinin.com\" DefaultLanguage=\"it\""
+parameter_overrides = "AdminUsername=\"admin\" FunctionArchitecture=\"arm64\" AssistantModel=\"claude-sonnet-5-5\" AssistantDailyMessageLimit=\"30\" MailStage=\"on\" MailDomain=\"enricopiccinin.com\" MailFromLocalPart=\"noreply\" MailFromName=\"Shared calendar\" PageAddress=\"https://calendar.enricopiccinin.com\" DefaultLanguage=\"it\""
 image_repositories = []
 
 # Laptop: sam local start-api against the Docker emulators (docs/IMPLEMENTATION_PLAN.md step 3).

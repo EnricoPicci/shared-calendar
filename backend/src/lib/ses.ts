@@ -44,7 +44,10 @@ export async function sendMail(to: string, text: MailText, attachments: readonly
         Simple: {
           Subject: { Data: text.subject, Charset: 'UTF-8' },
           Body: { Text: { Data: text.text, Charset: 'UTF-8' }, Html: { Data: text.html, Charset: 'UTF-8' } },
-          Attachments: attachments.map((a) => ({ FileName: a.fileName, ContentType: a.contentType, ContentDisposition: 'ATTACHMENT', RawContent: a.content })),
+          // Each file goes into the mail as base64, said in so many words: without
+          // ContentTransferEncoding SES writes the bytes as 7-bit text and a binary file such as
+          // an .xlsx arrives broken (docs/EMAIL_PLAN.md step m10).
+          Attachments: attachments.map((a) => ({ FileName: a.fileName, ContentType: a.contentType, ContentDisposition: 'ATTACHMENT', ContentTransferEncoding: 'BASE64', RawContent: a.content })),
         },
       },
     }),
