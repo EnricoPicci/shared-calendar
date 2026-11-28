@@ -549,7 +549,7 @@ other route.
 A key that leaked is deleted in the Console at once, without waiting: the assistant then
 answers `503` (`key_refused`) until step 2 is done and ten minutes have passed.
 
-### 3.3 E-mail: the stages (`domain` run in `docs/EMAIL_PLAN.md` step m9; `on` is a draft, run and corrected in its step m10, parts A and B)
+### 3.3 E-mail: the stages (`domain` run in `docs/EMAIL_PLAN.md` step m9, `on` part A in its step m10 part A; `on` part B is a draft)
 
 E-mail is switched on in two deploys, because SES must first prove the domain, which waits for
 DNS (`docs/ARCHITECTURE.md` section 9.2, `docs/EMAIL_ARCHITECTURE.md` section 13.2). The stage
@@ -641,29 +641,35 @@ does not say what `AdminCreateUser` does then, and a mail the mailer sends there
 3. A test User whose address is not verified: delete it in the Users screen, or never use it for
    a mail. Create no other User until part B.
 4. `MailStage=on` in `backend/samconfig.toml`, committed; section 2's steps. The change set before
-   "y": the pool Modify, every detail `RequiresRecreation` `Never`; Add for the mailer, its role,
-   log group and error alarm, the hourly schedule and its role; Modify for the routes that start
-   the mailer, with their invoke permission; no Remove, no Replacement of the tables or the pool
-   (section 5.11 has the change set at `on` read in step m9). The page only if `frontend/` or
+   "y", from `domain`: 32 changes, no Remove, no Replacement. Add for the mailer, its role, log
+   group and error alarm, the hourly schedule and its role; the pool Modify on
+   `AdminCreateUserConfig`, `EmailConfiguration` and `Policies`, each `RequiresRecreation`
+   `Never`; the routes' `MAIL_STAGE`, `MAILER_FUNCTION` and the invoke right of `sendCalendarMail`
+   and `confirmProposal`. The other roles, functions and `HttpApi` are listed only because they
+   name the pool's ARN, or a changed function's: they keep it. The page only if `frontend/` or
    `shared/` changed since its last deploy.
-5. The smoke test, your verified address typed when asked: 65 PASS (section 2.4); its invitation
-   and its resend in your mailbox, from `noreply@<domain>`, Reply-To the alarm address, not in
-   spam; its mail on demand in the Administrator's. Then the log search of section 5.11, by field.
-6. In the page: a throw-away User with your own address, its invitation, "Resend invitation", the
-   first sign-in with the second password, "Choose your password", then the User deleted;
-   "E-mail…" in the week as the Administrator and as a test User whose address is verified, each
-   Excel file opened; in "Settings" the daily mail's hour, set to the next whole hour to see the
-   daily mail and its two files the same day, then to the hour wanted.
-   **The mailer's role in the sandbox:** with `ses:SendEmail` on the domain's identity alone, the
-   mail on demand fails with `AccessDeniedException` (the mailer's log, field `reason`; its
-   error alarm), because SES checks the role against a verified recipient's identity too, while
-   the invitations, sent with Cognito's own role, arrive. So between parts A and B the template
-   gives the mailer `identity/*`, the From held to `noreply@<domain>` by the condition
-   `ses:FromAddress` (`docs/EMAIL_PLAN.md` step m10): its deploy's change set is the mailer's
-   role alone, Modify; then the smoke test again.
+   **The mailer's role in the sandbox.** SES checks the sender's role against the recipient too
+   when the recipient is a verified address: with `ses:SendEmail` on the domain's identity alone,
+   every mail of the mailer fails with `AccessDeniedException` (the mailer's log, field `reason`;
+   its error alarm), while the invitations, sent with Cognito's own role, arrive, and a mail to
+   the simulator, no identity of the account, is `sent`. So while the account is in the sandbox
+   the template gives the mailer `identity/*`, the From held to `noreply@<domain>` by the
+   condition `ses:FromAddress`: the one exception to the root `CLAUDE.md`'s wildcard rule, which
+   part B removes (`docs/EMAIL_PLAN.md` step m10).
+5. The smoke test, a verified address typed when asked (an address with a `+label` is its own
+   identity, verified as such): 65 PASS (section 2.4), its mail line `sent` within seconds; its
+   invitation and its resend in your mailbox, from `noreply@<domain>`, Reply-To the alarm
+   address, not in spam; its mail on demand in the Administrator's, its Excel file opening. Then
+   every log group since the deploy searched for `level` `error`, and the access log for `status`
+   500 or more, by field.
+6. In the page: a throw-away User with a verified address, its invitation, "Resend invitation",
+   the first sign-in with the second password, "Choose your password", `active` in the list, then
+   the User deleted; "E-mail…" in the week as the Administrator and as a test User whose address
+   is verified, each Excel file opened; in "Settings" the daily mail's hour, set to the next whole
+   hour to see the daily mail and its two files the same day, then to the hour wanted.
 7. The API's 5xx alarm should no longer go off for the e-mail routes, which answer `503` only
    below `on`: one now is a fault, looked at in the access log. The mailer's error alarm counts a
-   mail SES refused, such as one to an address that is not verified.
+   mail SES refused; it turns OK by itself an hour after the last one.
 8. The tag `v3.0.0`, on the operator's word, at the commit of the record (`README.md` "Versions").
 
 **At `on`, part B: out of the sandbox** (`docs/EMAIL_PLAN.md` step m10, part B). It starts when
@@ -1392,6 +1398,50 @@ session saw no password and no token.
   deleted when no longer needed.
 - **Cost:** AWS within the free tier; nothing at Anthropic but the smoke test's one exchange,
   about a US cent.
+
+**Stage `on` in the sandbox (step m10, part A), 2026-11-28.** The API at `5a4456c`, on `main`,
+pushed before each deploy; the page unchanged since step m9. Who did what as in step m9: the
+operator verified the addresses, ran the three deploys and the three smoke tests inside `script
+-q`, and looked at the page and the mails; the session ran `verify` before each deploy and
+read-only `aws` commands, and printed no address.
+
+- **Before:** the domain `SUCCESS`, DKIM `SUCCESS`; the account in the sandbox (200 mails a day,
+  1 a second, the review `DENIED` while AWS's answer is pending); four address identities, each
+  `SUCCESS`, the operator's own, the Administrator's (a `+admin` address of it) and the test
+  Users'. `miri` asks for mail, `enri` is kept away from it.
+- **Deploy 1, `MailStage=on`** (`e8884b2`), at 08:32 UTC after `verify` PASSED: 32 changes, 6 Add
+  (the mailer, its role, log group and error alarm, the schedule and its role) and 26 Modify, no
+  Remove, no Replacement; the pool Modify on `AdminCreateUserConfig`, `EmailConfiguration` and
+  `Policies`, each `Never`. Then the pool sends with `DEVELOPER` through the configuration set,
+  its invitation's subject set, temporary passwords valid 7 days.
+- **Smoke test 1:** 64 PASS, 1 FAIL, the mail on demand: SES refused the mailer
+  (`AccessDeniedException`, the call and Lambda's two retries) while both invitations arrived. A
+  test User `simtest` with the simulator's address asked a mail on demand: `sent`. So SES in the
+  sandbox checks the mailer's role against a verified recipient's identity (section 3.3, step 4).
+  The mailer's error alarm went to ALARM at 08:40 UTC, and back to OK by itself at 09:42.
+- **Deploy 2, the mailer's `identity/*`** (`d2817ab`, the Product Owner's decision): 9 changes, all
+  Modify, one of them real (`MailerRole`'s policy), the others listed only for the ARNs they name.
+- **Smoke test 2:** 64 PASS, 1 FAIL: the mail was `sent`, but the script read the CLI's per-page
+  counts as two lines (`1` and `0`); and the mail's `.xlsx` did not open, every byte that is not
+  text turned into the replacement character, as SES writes an attachment given no
+  `ContentTransferEncoding` (`docs/EMAIL_PLAN.md` step m10).
+- **Deploy 3, the attachments as base64 and the script's sum** (`5a4456c`): 8 changes, all Modify,
+  one real (`MailerFunction`'s code).
+- **Smoke test 3:** **65 PASS**, no FAIL, no SKIP; the mailer's line `sent` after 5 s; the Excel
+  file 3161 bytes, as made, its sheet and headings read back, and opened by the operator.
+- **The operator's look:** the invitation from `noreply@<domain>`, not in spam, replies to the
+  alarm address; a throw-away User created in the page, its invitation, its resend, the first
+  sign-in with the second password, a password chosen, `active`, deleted; "E-mail…" as the
+  Administrator and as `miri`, each mail arrived, each file opened. The daily mail, its hour set
+  to the next whole hour: the timer's run at 10:00 UTC `sent`, the mail arrived with its two
+  files, both opened and correct.
+- **The logs**, from the first deploy on: 38 log groups, the only lines of level `error` the
+  mailer's three refusals of smoke test 1; the access log without a 5xx. The alarms OK; the 5xx
+  alarm unchanged since 2026-11-26, so the e-mail routes no longer set it off.
+- **Owed to part B:** production access; the mailer's role back to the domain's identity, deployed,
+  the smoke test again; `simtest`, `miri` and `enri` deleted.
+- **Cost:** a few dozen mails through SES, a fraction of a US cent; the smoke tests' exchanges at
+  Anthropic, about three US cents.
 
 ## 6. A person's password: what to tell them
 

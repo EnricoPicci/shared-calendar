@@ -1,6 +1,7 @@
 # Shared Calendar: e-mail (implementation plan)
 
-**Version:** v15 (2026-11-28): found at part A's first smoke test, SES in the sandbox refuses
+**Version:** v16 (2026-11-28): step m10's part A done, its "As done" note written; two findings of its smoke tests written in step m10 (the Excel file
+sent as base64, the smoke test's sum of the CLI's pages). v15 (2026-11-28): found at part A's first smoke test, SES in the sandbox refuses
 the mailer's mail to a verified address, since it checks the role against the recipient's
 identity too, and the role names the domain alone; Cognito's invitations, sent with Cognito's own
 role, arrive. The Product Owner's decision: the mailer's sending right names every identity of
@@ -1245,6 +1246,28 @@ your mailbox; try the page as point 6 says; say when to tag.
 **Check (A):** the gate's `verify` before each deploy; the smoke test 65 PASS in the cloud; the
 logs clean; the operator's look all yes; the tag `v3.0.0`. With it the full regression ends
 (section 5.2).
+
+**As done (part A, 2026-11-28).** The record is `docs/RUNBOOK.md` section 5.11, "Stage `on` in
+the sandbox"; in short:
+
+- **Before:** the domain and DKIM `SUCCESS`; four address identities verified, `SUCCESS`
+  (the operator's own, the Administrator's as a `+admin` address, the test Users'); `miri` for
+  the mail, `enri` kept away from it.
+- **Three deploys**, each after `verify` PASSED on its commit, none with a Remove or a
+  Replacement: `MailStage=on` (`e8884b2`, 32 changes, the pool Modify with `Never`); the
+  mailer's `identity/*` (`d2817ab`, the finding on the mailer's role above); the attachments as
+  base64 and the smoke test's sum (`5a4456c`, the two findings above). The page not deployed.
+- **The smoke test** failed its mail line twice, for the three findings above, then **65 PASS**.
+- **The operator's look:** the invitation (sender, not in spam, Reply-To), the throw-away User
+  (invitation, resend, first sign-in, `active`, deleted), "E-mail…" as the Administrator and as
+  `miri` with each Excel file opened; the daily mail at the next whole hour (the timer's run at
+  10:00 UTC, `sent`) with its two files, both correct: all yes.
+- **The logs and the alarms:** no `error` but the mailer's three refusals, no 5xx; the alarms OK,
+  the 5xx alarm silent at `on`.
+- **The documents:** the root `CLAUDE.md`'s wildcard rule with its exception;
+  `docs/ARCHITECTURE.md` section 7.1, `docs/EMAIL_ARCHITECTURE.md` sections 12.2 and 13.2;
+  `docs/RUNBOOK.md` section 3.3 part A corrected, section 5.11 continued; `README.md` "Versions"
+  `v3.0.0`. The tag waits for the operator's word.
 
 #### Part B — out of the sandbox: the Users invited again, the documents closed
 
